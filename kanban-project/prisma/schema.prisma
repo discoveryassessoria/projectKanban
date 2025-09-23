@@ -13,3 +13,153 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// Modelo para o usuário do sistema
+model Usuario {
+  id     Int    @id @default(autoincrement())
+  nome   String @db.VarChar(50)
+  email  String @unique @db.VarChar(30)
+  senha  String @db.VarChar(10) // Em um projeto real, armazene o hash da senha, não a senha em si.
+  tipo   String @db.VarChar(15)
+
+  // Relacionamento: Um usuário pode estar associado a várias atividades
+  atividades UserAtv[]
+}
+
+// Modelo para as Pessoas da árvore genealógica
+model Pessoa {
+  id          Int       @id @default(autoincrement())
+  nome        String    @db.VarChar(50)
+  sobrenome   String?   @db.VarChar(40)
+  data_nasc   DateTime?
+  local_nasc  String?   @db.VarChar(30)
+  data_obito  DateTime?
+  batizado    String?   @db.VarChar(10)
+
+  // Chave estrangeira para a Árvore a que a pessoa pertence
+  arvoreId Int
+  arvore   Arvore @relation(fields: [arvoreId], references: [id])
+
+  // --- Auto-relacionamentos para pai e mãe ---
+  // Uma pessoa pode ter um pai, que também é uma Pessoa
+  paiId Int?
+  pai   Pessoa? @relation("FilhosPai", fields: [paiId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // Uma pessoa pode ter uma mãe, que também é uma Pessoa
+  maeId Int?
+  mae   Pessoa? @relation("FilhosMae", fields: [maeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // Back-relations: Uma pessoa pode ser pai ou mãe de vários filhos
+  filhosComoPai Pessoa[] @relation("FilhosPai")
+  filhosComoMae Pessoa[] @relation("FilhosMae")
+
+  // Relacionamento com União: Uma pessoa pode estar em várias uniões (como pessoa1 ou pessoa2)
+  unioesComoPessoa1 Uniao[] @relation("Pessoa1")
+  unioesComoPessoa2 Uniao[] @relation("Pessoa2")
+}
+
+// Modelo para representar a união (casamento, etc.) entre duas pessoas
+model Uniao {
+  id          Int       @id @default(autoincrement())
+  data_inicio DateTime?
+  data_fim    DateTime?
+  tipo        String?   @db.VarChar(10)
+
+  // Chave estrangeira para a primeira pessoa na união
+  pessoa1Id Int
+  pessoa1   Pessoa @relation("Pessoa1", fields: [pessoa1Id], references: [id])
+
+  // Chave estrangeira para a segunda pessoa na união
+  pessoa2Id Int
+  pessoa2   Pessoa @relation("Pessoa2", fields: [pessoa2Id], references: [id])
+}
+
+
+// Modelo para a Árvore Genealógica
+model Arvore {
+  id        Int      @id @default(autoincrement())
+  nome      String   @db.VarChar(50)
+  descricao String?  @db.VarChar(200)
+  // Relacionamento: Uma árvore contém várias pessoas
+  pessoas   Pessoa[]
+}
+
+// Modelo para o Projeto (Kanban)
+model ProjetoKanban {
+  id        Int      @id @default(autoincrement())
+  nome      String   @db.VarChar(50)
+  descricao String?  @db.VarChar(40)
+  
+  // Relacionamento: Um projeto tem várias atividades
+  atividades Atividade[]
+
+  // O modelo conceitual sugere entidades "Contratante" e "Requerente"
+  // que podem ser vinculadas a um projeto.
+  contratanteId Int?
+  requerenteId  Int?
+
+  contratante Requerente? @relation(fields: [contratanteId], references: [id])
+  requerente  Contratante? @relation(fields: [requerenteId], references: [id])
+}
+
+// Modelo para as atividades dentro de um projeto Kanban
+model Atividade {
+  id           Int       @id @default(autoincrement())
+  nome         String    @db.VarChar(20)
+  descricao    String?   @db.VarChar(40)
+  data_termino DateTime?
+
+  // Chave estrangeira para o Projeto a que pertence
+  projetoId Int
+  projeto   ProjetoKanban @relation(fields: [projetoId], references: [id])
+
+  // Chave estrangeira para o Status da atividade
+  statusId Int
+  status   Status @relation(fields: [statusId], references: [id])
+
+  // Relacionamento: Uma atividade pode ter vários usuários associados
+  usuarios UserAtv[]
+}
+
+// Tabela pivot para o relacionamento Muitos-para-Muitos entre Usuario e Atividade
+model UserAtv {
+  usuarioId   Int
+  atividadeId Int
+  usuario     Usuario   @relation(fields: [usuarioId], references: [id])
+  atividade   Atividade @relation(fields: [atividadeId], references: [id])
+
+  @@id([usuarioId, atividadeId]) // Chave primária composta
+}
+
+// Modelo para o Status de uma atividade (Ex: "A Fazer", "Em Andamento")
+model Status {
+  id   Int    @id @default(autoincrement())
+  nome String @db.VarChar(20)
+
+  // Relacionamento: Um status pode ser usado em várias atividades
+  atividades Atividade[]
+}
+
+
+// Os modelos abaixo (Requerente, Contratante) são baseados na estrutura do
+// seu diagrama. Eles parecem representar pessoas ou empresas com papéis específicos.
+model Requerente {
+  id       Int      @id @default(autoincrement())
+  nome     String   @db.VarChar(50)
+  cpf      String?  @db.VarChar(11)
+  rg       String?  @db.VarChar(10)
+  endereco String?  @db.VarChar(100)
+  telefone String?  @db.VarChar(10)
+
+  projetos ProjetoKanban[]
+}
+
+model Contratante {
+  id       Int      @id @default(autoincrement())
+  nome     String   @db.VarChar(50)
+  cpf      String?  @db.VarChar(11)
+  rg       String?  @db.VarChar(10)
+  endereco String?  @db.VarChar(10) // No seu modelo, o varchar era 10
+
+  projetos ProjetoKanban[]
+}
