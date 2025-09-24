@@ -18,8 +18,8 @@ datasource db {
 model Usuario {
   id     Int    @id @default(autoincrement())
   nome   String @db.VarChar(50)
-  email  String @unique @db.VarChar(30)
-  senha  String @db.VarChar(10) // Em um projeto real, armazene o hash da senha, não a senha em si.
+  email  String @unique @db.VarChar(50)
+  senha  String @db.VarChar(255) // Hash da senha
   tipo   String @db.VarChar(15)
 
   // Relacionamento: Um usuário pode estar associado a várias atividades
@@ -92,6 +92,9 @@ model ProjetoKanban {
   
   // Relacionamento: Um projeto tem várias atividades
   atividades Atividade[]
+  
+  // Relacionamento: Um projeto pode ter vários status
+  status Status[]
 
   // O modelo conceitual sugere entidades "Contratante" e "Requerente"
   // que podem ser vinculadas a um projeto.
@@ -135,6 +138,8 @@ model UserAtv {
 model Status {
   id   Int    @id @default(autoincrement())
   nome String @db.VarChar(20)
+  projetoId Int?
+  projeto   ProjetoKanban? @relation(fields: [projetoId], references: [id])
 
   // Relacionamento: Um status pode ser usado em várias atividades
   atividades Atividade[]
