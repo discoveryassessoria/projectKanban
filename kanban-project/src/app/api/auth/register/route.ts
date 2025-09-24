@@ -1,4 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
+import { UserType } from "@/src/utils/userTypes"
+import { hash } from "bcrypt"
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,28 +11,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Todos os campos são obrigatórios" }, { status: 400 })
     }
 
-    // Validar tipo de usuário
-    const tiposValidos = ["admin", "usuario", "gestor"]
-    if (!tiposValidos.includes(tipo)) {
+    // Validar tipo de usuário usando o enum
+    if (!Object.values(UserType).includes(tipo as UserType)) {
       return NextResponse.json({ error: "Tipo de usuário inválido" }, { status: 400 })
     }
 
-    // Simulação de usuários existentes para demonstração
-    const usuariosExistentes = ["admin@teste.com", "usuario@teste.com", "gestor@teste.com"]
-
     // Verificar se o email já existe
-    if (usuariosExistentes.includes(email)) {
+    const usuarioExistente = await prisma.usuario.findUnique({
+      where: { email }
+    })
+
+    if (usuarioExistente) {
       return NextResponse.json({ error: "Este email já está em uso" }, { status: 409 })
     }
 
-    // Simular criação de usuário
-    const novoUsuario = {
-      id: Date.now(), // ID simples baseado em timestamp
-      nome,
-      email,
-      tipo,
-      criadoEm: new Date().toISOString(),
-    }
+    // Hash da senha
+    const senhaHash = await hash(senha, 10)
+
+    // Criar usuário no banco
+    const novoUsuario = await prisma.usuario.create({
+      data: {
+        nome,
+        email,
+        senha: senhaHash,
+        tipo
+      }
+    })
 
     return NextResponse.json(
       {
