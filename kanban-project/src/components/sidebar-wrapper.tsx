@@ -10,15 +10,22 @@ export function SidebarWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
   if (!shouldShowSidebar) {
-    // Classes específicas para páginas sem sidebar (como auth)
     const isAuthPage = pathname.startsWith('/auth')
     
+    if (isAuthPage) {
+      // Layout específico para páginas de auth - centralizado e com fundo
+      return (
+        <div className="min-h-screen w-full flex items-center justify-center bg-gray-50/50">
+          <div className="w-full max-w-md">
+            {children}
+          </div>
+        </div>
+      )
+    }
+    
+    // Para outras páginas sem sidebar - layout normal
     return (
-      <div className={`min-h-screen w-full ${
-        isAuthPage 
-          ? 'flex items-center justify-center bg-gray-50' // Centralizado para auth
-          : '' // Normal para outras páginas sem sidebar
-      }`}>
+      <div className="min-h-screen w-full">
         {children}
       </div>
     )
