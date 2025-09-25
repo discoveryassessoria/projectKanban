@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { UserType, userTypeLabels } from "@/src/utils/userTypes"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -199,9 +200,11 @@ export function AuthComponent({ onAuthSuccess, redirectTo = "/dashboard" }: Auth
                   disabled={isLoading}
                 >
                   <option value="">Selecione o tipo</option>
-                  <option value="admin">Administrador</option>
-                  <option value="usuario">Usuário</option>
-                  <option value="gestor">Gestor</option>
+                  {Object.entries(userTypeLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-2">
