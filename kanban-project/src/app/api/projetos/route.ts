@@ -64,9 +64,16 @@ export async function POST(request: NextRequest) {
       { nome: 'Concluído', projetoId: projeto.id }
     ];
 
-    await prisma.status.createMany({
-      data: statusPadrao
-    });
+for (const status of statusPadrao) {
+  await prisma.status.create({
+    data: {
+      nome: status.nome,
+      projeto: {
+        connect: { id: projeto.id }
+      }
+    }
+  });
+}
 
     console.log('✅ Status padrão criados')
     console.log('📦 Buscando projeto completo...')

@@ -13,17 +13,29 @@ import {
   Trash2
 } from 'lucide-react'
 
+// Interfaces atualizadas para corresponder à página principal
+interface Status {
+  id: number;
+  nome: string;
+}
+
+interface Atividade {
+  id: number;
+  nome: string;
+  descricao: string | null;
+  statusId: number;
+  status: {
+    id: number;
+    nome: string;
+  };
+}
+
 interface ProjetoKanban {
-  id: number
-  nome: string
-  descricao: string | null
-  atividades: Array<{
-    id: number
-    nome: string
-    status: {
-      nome: string
-    }
-  }>
+  id: number;
+  nome: string;
+  descricao: string | null;
+  status: Status[];
+  atividades: Atividade[];
 }
 
 interface User {
