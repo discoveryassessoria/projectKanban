@@ -207,7 +207,7 @@ export default function KanbanPage() {
               </div>
             </header>
             
-            <div className="flex-1 overflow-x-auto p-6">
+            <div className="flex-1 p-6">
               <KanbanBoard projeto={projetoSelecionado} onStatusAdd={handleStatusAdd} />
             </div>
           </>
