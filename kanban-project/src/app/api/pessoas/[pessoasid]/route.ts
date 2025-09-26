@@ -78,13 +78,24 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const id = Number.parseInt(params.id)
+    console.log("[v0] DELETE request received")
+    console.log("[v0] Raw params:", params)
+    console.log("[v0] params.id:", params.id, "type:", typeof params.id)
+
+    const resolvedParams = await params
+    console.log("[v0] Resolved params:", resolvedParams)
+    console.log("[v0] Resolved params.id:", resolvedParams.id, "type:", typeof resolvedParams.id)
+
+    const id = Number.parseInt(resolvedParams.id)
+    console.log("[v0] Parsed ID:", id, "isNaN:", isNaN(id))
 
     if (isNaN(id)) {
+      console.log("[v0] Invalid ID detected, returning 400")
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
 
-    // Verificar se a pessoa tem filhos antes de excluir
+    // Verificar se a pessoa existe e tem filhos antes de excluir
+    console.log("[v0] Searching for person with ID:", id)
     const pessoa = await prisma.pessoa.findUnique({
       where: { id },
       include: {
@@ -93,21 +104,31 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       },
     })
 
+    console.log("[v0] Person found:", pessoa ? "Yes" : "No")
+    if (pessoa) {
+      console.log("[v0] Children as father:", pessoa.filhosComoPai?.length || 0)
+      console.log("[v0] Children as mother:", pessoa.filhosComoMae?.length || 0)
+    }
+
     if (!pessoa) {
+      console.log("[v0] Person not found, returning 404")
       return NextResponse.json({ error: "Pessoa não encontrada" }, { status: 404 })
     }
 
     if (pessoa.filhosComoPai.length > 0 || pessoa.filhosComoMae.length > 0) {
+      console.log("[v0] Person has children, cannot delete")
       return NextResponse.json({ error: "Não é possível excluir uma pessoa que possui filhos" }, { status: 400 })
     }
 
+    console.log("[v0] Attempting to delete person...")
     await prisma.pessoa.delete({
       where: { id },
     })
 
+    console.log("[v0] Person deleted successfully")
     return NextResponse.json({ message: "Pessoa excluída com sucesso" })
   } catch (error) {
-    console.error("Erro ao excluir pessoa:", error)
+    console.error("[v0] Error during delete operation:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }

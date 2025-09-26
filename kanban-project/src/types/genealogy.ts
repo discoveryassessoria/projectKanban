@@ -41,6 +41,7 @@ export interface TreeNode {
   position: { x: number; y: number }
   data: {
     pessoa: Pessoa
+    relationshipType?: string
     onAddChild: (parentId: number) => void
     onAddParent: (childId: number, parentType: "pai" | "mae") => void
     onAddSpouse: (personId: number) => void
@@ -53,10 +54,25 @@ export interface TreeEdge {
   id: string
   source: string
   target: string
-  type: "smoothstep"
-  style: {
-    stroke: string
-    strokeWidth: number
+  type?: string
+  style?: {
+    stroke?: string
+    strokeWidth?: number
+    strokeDasharray?: string
+  }
+  markerEnd?: {
+    type: "arrow" | "arrowclosed"
+    color?: string
+    width?: number
+    height?: number
   }
   label?: string
+  labelStyle?: {
+    fontSize?: string
+    fontWeight?: string
+    backgroundColor?: string
+    padding?: string
+    borderRadius?: string
+    border?: string
+  }
 }

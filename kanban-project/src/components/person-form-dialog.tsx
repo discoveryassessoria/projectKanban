@@ -1,5 +1,7 @@
 "use client"
 
+import React from "react"
+
 import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -29,7 +31,7 @@ const personSchema = z.object({
   batizado: z.string().optional(),
 })
 
-type PersonFormData = z.infer<typeof personSchema>
+export type PersonFormData = z.infer<typeof personSchema>
 
 interface PersonFormDialogProps {
   open: boolean
@@ -55,6 +57,19 @@ export function PersonFormDialog({ open, onOpenChange, onSubmit, person, title, 
     },
   })
 
+  React.useEffect(() => {
+    if (open) {
+      form.reset({
+        nome: person?.nome || "",
+        sobrenome: person?.sobrenome || "",
+        data_nasc: person?.data_nasc ? new Date(person.data_nasc) : undefined,
+        local_nasc: person?.local_nasc || "",
+        data_obito: person?.data_obito ? new Date(person.data_obito) : undefined,
+        batizado: person?.batizado || "",
+      })
+    }
+  }, [open, person, form])
+
   const handleSubmit = async (data: PersonFormData) => {
     setIsSubmitting(true)
     try {
@@ -70,15 +85,15 @@ export function PersonFormDialog({ open, onOpenChange, onSubmit, person, title, 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-[#123C73]">{title}</DialogTitle>
           <DialogDescription className="text-[#9AA0A6]">{description}</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <div className="space-y-4">
               <FormField
                 control={form.control}
                 name="nome"
@@ -106,9 +121,7 @@ export function PersonFormDialog({ open, onOpenChange, onSubmit, person, title, 
                   </FormItem>
                 )}
               />
-            </div>
 
-            <div className="space-y-4">
               <FormField
                 control={form.control}
                 name="data_nasc"
@@ -140,9 +153,7 @@ export function PersonFormDialog({ open, onOpenChange, onSubmit, person, title, 
                   </FormItem>
                 )}
               />
-            </div>
 
-            <div className="space-y-4">
               <FormField
                 control={form.control}
                 name="data_obito"

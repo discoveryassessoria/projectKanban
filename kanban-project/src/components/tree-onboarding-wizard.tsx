@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { PersonFormDialog } from "@/src/components/person-form-dialog"
+import { PersonFormDialog, type PersonFormData } from "@/src/components/person-form-dialog"
 import { TreePine, User, Users, Heart, ArrowRight, CheckCircle } from "lucide-react"
 import type { Arvore } from "@/src/types/genealogy"
 
@@ -18,7 +18,11 @@ type OnboardingStep = "welcome" | "add-self" | "add-parents" | "add-spouse" | "c
 export function TreeOnboardingWizard({ arvore, onComplete }: TreeOnboardingWizardProps) {
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("welcome")
   const [showPersonDialog, setShowPersonDialog] = useState(false)
-  const [dialogConfig, setDialogConfig] = useState({
+  const [dialogConfig, setDialogConfig] = useState<{
+    title: string
+    description: string
+    onSubmit: (data: PersonFormData) => Promise<void>
+  }>({
     title: "",
     description: "",
     onSubmit: async () => {},
@@ -57,32 +61,51 @@ export function TreeOnboardingWizard({ arvore, onComplete }: TreeOnboardingWizar
       title: `Adicionar ${parentType === "pai" ? "Pai" : "Mãe"}`,
       description: `Adicione informações sobre ${parentType === "pai" ? "seu pai" : "sua mãe"} à árvore genealógica.`,
       onSubmit: async (data) => {
-        // Assumindo que a primeira pessoa é o usuário
         const selfPerson = arvore.pessoas?.[0]
-        if (!selfPerson) return
-
-        const parentData = {
-          ...data,
-          arvoreId: arvore.id,
+        if (!selfPerson) {
+          alert("Erro: Pessoa principal não encontrada")
+          return
         }
 
-        const response = await fetch("/api/pessoas", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(parentData),
-        })
+        try {
+          const parentData = {
+            ...data,
+            arvoreId: arvore.id,
+          }
 
-        if (response.ok) {
-          const parent = await response.json()
-          // Atualizar a pessoa para referenciar o pai/mãe
-          await fetch(`/api/pessoas/${selfPerson.id}`, {
-            method: "PUT",
+          const response = await fetch("/api/pessoas", {
+            method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ...selfPerson,
-              [parentType === "pai" ? "paiId" : "maeId"]: parent.id,
-            }),
+            body: JSON.stringify(parentData),
           })
+
+          if (response.ok) {
+            const parent = await response.json()
+
+            // Update the person to reference the parent
+            const updateResponse = await fetch(`/api/pessoas/${selfPerson.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...selfPerson,
+                [parentType === "pai" ? "paiId" : "maeId"]: parent.id,
+              }),
+            })
+
+            if (updateResponse.ok) {
+              // Trigger tree update
+              window.location.reload()
+            } else {
+              const error = await updateResponse.json()
+              alert(error.error || `Erro ao vincular ${parentType}`)
+            }
+          } else {
+            const error = await response.json()
+            alert(error.error || `Erro ao adicionar ${parentType}`)
+          }
+        } catch (error) {
+          console.error(`Erro ao adicionar ${parentType}:`, error)
+          alert(`Erro ao adicionar ${parentType}`)
         }
       },
     })
@@ -95,27 +118,45 @@ export function TreeOnboardingWizard({ arvore, onComplete }: TreeOnboardingWizar
       description: "Adicione informações sobre seu cônjuge à árvore genealógica.",
       onSubmit: async (data) => {
         const selfPerson = arvore.pessoas?.[0]
-        if (!selfPerson) return
+        if (!selfPerson) {
+          alert("Erro: Pessoa principal não encontrada")
+          return
+        }
 
-        const response = await fetch("/api/pessoas", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...data, arvoreId: arvore.id }),
-        })
-
-        if (response.ok) {
-          const spouse = await response.json()
-          // Criar união entre o usuário e o cônjuge
-          await fetch("/api/unioes", {
+        try {
+          const response = await fetch("/api/pessoas", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              pessoa1Id: selfPerson.id,
-              pessoa2Id: spouse.id,
-              tipo: "Casamento",
-            }),
+            body: JSON.stringify({ ...data, arvoreId: arvore.id }),
           })
-          setCurrentStep("complete")
+
+          if (response.ok) {
+            const spouse = await response.json()
+
+            const unionResponse = await fetch("/api/unioes", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                pessoa1Id: selfPerson.id,
+                pessoa2Id: spouse.id,
+                tipo: "Casamento",
+                arvoreId: arvore.id,
+              }),
+            })
+
+            if (unionResponse.ok) {
+              setCurrentStep("complete")
+            } else {
+              const error = await unionResponse.json()
+              alert(error.error || "Erro ao criar união")
+            }
+          } else {
+            const error = await response.json()
+            alert(error.error || "Erro ao adicionar cônjuge")
+          }
+        } catch (error) {
+          console.error("Erro ao adicionar cônjuge:", error)
+          alert("Erro ao adicionar cônjuge")
         }
       },
     })
