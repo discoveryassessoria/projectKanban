@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { GenealogyDatePicker } from "@/src/components/genealogy-date-picker"
 import { Loader2 } from "lucide-react"
-import type { Pessoa } from "@/src/types/genealogy"
+import type { Pessoa } from "@prisma/client"
 
 const personSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),

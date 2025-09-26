@@ -6,16 +6,23 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { PersonFormDialog, type PersonFormData } from "@/src/components/person-form-dialog"
 import { TreePine, User, Users, Heart, ArrowRight, CheckCircle } from "lucide-react"
-import type { Arvore } from "@/src/types/genealogy"
+import type { Arvore as PrismaArvore, Pessoa as PrismaPessoa } from "@prisma/client"
+
+// Estendemos o tipo da árvore para garantir que 'pessoas' esteja sempre incluído.
+type Arvore = PrismaArvore & {
+  pessoas?: (PrismaPessoa & { [key: string]: any })[]
+}
+type Pessoa = PrismaPessoa
 
 interface TreeOnboardingWizardProps {
   arvore: Arvore
   onComplete: () => void
+  onArvoreUpdate: (arvore: Arvore) => void
 }
 
 type OnboardingStep = "welcome" | "add-self" | "add-parents" | "add-spouse" | "complete"
 
-export function TreeOnboardingWizard({ arvore, onComplete }: TreeOnboardingWizardProps) {
+export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: TreeOnboardingWizardProps) {
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("welcome")
   const [showPersonDialog, setShowPersonDialog] = useState(false)
   const [dialogConfig, setDialogConfig] = useState<{
@@ -49,14 +56,16 @@ export function TreeOnboardingWizard({ arvore, onComplete }: TreeOnboardingWizar
           body: JSON.stringify({ ...data, arvoreId: arvore.id }),
         })
         if (response.ok) {
-          const newPerson = await response.json()
+          const newPerson: Pessoa = await response.json()
           // Agora, atualize a árvore para definir esta pessoa como principal
           const arvoreUpdateResponse = await fetch(`/api/arvore/${arvore.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ pessoaPrincipalId: newPerson.id }),
           });
           if (arvoreUpdateResponse.ok) {
+            const updatedArvore = await arvoreUpdateResponse.json();
+            onArvoreUpdate(updatedArvore); // Atualiza o estado da árvore na página pai
             setCurrentStep("add-parents")
           } else {
             alert("Erro ao definir a pessoa principal na árvore.")
@@ -98,14 +107,17 @@ export function TreeOnboardingWizard({ arvore, onComplete }: TreeOnboardingWizar
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                ...selfPerson,
                 [parentType === "pai" ? "paiId" : "maeId"]: parent.id,
               }),
             })
-
             if (updateResponse.ok) {
-              // Trigger tree update
-              window.location.reload()
+              // Busca a árvore atualizada para refletir a adição do novo parente
+              const arvoreResponse = await fetch(`/api/arvore/${arvore.id}`);
+              if (arvoreResponse.ok) {
+                const updatedArvore = await arvoreResponse.json();
+                onArvoreUpdate(updatedArvore); // Atualiza o estado da árvore na página pai
+                alert(`${parentType === "pai" ? "Pai" : "Mãe"} adicionado(a) com sucesso!`);
+              }
             } else {
               const error = await updateResponse.json()
               alert(error.error || `Erro ao vincular ${parentType}`)

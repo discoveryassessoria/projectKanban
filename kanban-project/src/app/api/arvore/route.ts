@@ -5,27 +5,9 @@ export async function GET() {
   try {
     const arvores = await prisma.arvore.findMany({
       include: {
-        pessoas: {
-          include: {
-            pai: true,
-            mae: true,
-            filhosComoPai: true,
-            filhosComoMae: true,
-            unioesComoPessoa1: {
-              include: {
-                pessoa2: true,
-              },
-            },
-            unioesComoPessoa2: {
-              include: {
-                pessoa1: true,
-              },
-            },
-          },
-        },
+        pessoas: true,
       },
     })
-
     return NextResponse.json(arvores)
   } catch (error) {
     console.error("Erro ao buscar árvores:", error)
@@ -38,7 +20,7 @@ export async function POST(request: NextRequest) {
     const { nome, descricao } = await request.json()
 
     if (!nome) {
-      return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 })
+      return NextResponse.json({ error: "O nome da árvore é obrigatório" }, { status: 400 })
     }
 
     const novaArvore = await prisma.arvore.create({
@@ -54,6 +36,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(novaArvore, { status: 201 })
   } catch (error) {
     console.error("Erro ao criar árvore:", error)
-    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+    // Adiciona mais detalhes do erro no log do servidor para depuração
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+    return NextResponse.json({ error: "Erro interno do servidor ao criar árvore" }, { status: 500 })
   }
 }

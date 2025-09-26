@@ -19,7 +19,7 @@ import ReactFlow, {
 } from "reactflow"
 import "reactflow/dist/style.css"
 
-import { Card } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/src/components/ui/badge"
 import { Plus, Edit3, Trash2, Users, Calendar, MapPin, Heart, Crown, User, UserPlus, TreePine } from "lucide-react"
@@ -243,7 +243,13 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
     [],
   )
 
-  const [confirmDialog, setConfirmDialog] = useState({
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    title: string
+    description: string
+    onConfirm: () => void
+    variant?: "default" | "destructive"
+  }>({
     open: false,
     title: "",
     description: "",
@@ -311,23 +317,13 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
             const childData = await childResponse.json()
 
             // Atualizar o filho para referenciar o novo pai/mãe
-            const updatePayload = {
-              ...childData,
-              [parentType === "pai" ? "paiId" : "maeId"]: newParent.id
-            }
-
-            const updateResponse = await fetch(`/api/pessoas/${childId}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(updatePayload),
-            })
-
+            const updateResponse = await fetch(`/api/pessoas/${childId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [parentType === "pai" ? "paiId" : "maeId"]: newParent.id }) })
             if (updateResponse.ok) {
-              onUpdate()
+              onUpdate();
             } else {
-              const error = await updateResponse.json()
-              console.error("Erro ao vincular pai/mãe:", error)
-              alert(error.error || `Erro ao vincular ${parentType}`)
+              const error = await updateResponse.json();
+              console.error("Erro ao vincular pai/mãe:", error);
+              alert(error.error || `Erro ao vincular ${parentType}`);
             }
           } else {
             const error = await parentResponse.json()
@@ -404,7 +400,7 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
           const response = await fetch(`/api/pessoas/${pessoa.id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...pessoa, ...data }),
+            body: JSON.stringify(data), // Envia apenas os dados do formulário
           })
           if (response.ok) {
             onUpdate()
@@ -425,17 +421,14 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
     const pessoa = arvore.pessoas?.find((p) => p.id === pessoaId)
     const personName = pessoa ? `${pessoa.nome} ${pessoa.sobrenome || ""}`.trim() : "esta pessoa"
 
-    console.log("[v0] Delete requested for person ID:", pessoaId, "type:", typeof pessoaId)
-    console.log("[v0] Person found in tree:", pessoa ? "Yes" : "No")
-
     setConfirmDialog({
       open: true,
       title: "Confirmar Exclusão",
       description: `Tem certeza que deseja excluir ${personName}? Esta ação não pode ser desfeita.`,
+      variant: "destructive",
       onConfirm: async () => {
         try {
           const validId = Number(pessoaId)
-          console.log("[v0] Converted ID:", validId, "isNaN:", isNaN(validId))
 
           if (isNaN(validId) || validId <= 0) {
             console.log("[v0] Invalid ID detected in frontend")
@@ -444,26 +437,20 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
               title: "Erro na Exclusão",
               description: "ID da pessoa inválido. Tente recarregar a página.",
               onConfirm: () => setConfirmDialog((prev) => ({ ...prev, open: false })),
+              variant: "destructive",
             })
             return
           }
 
-          console.log("[v0] Making DELETE request to:", `/api/pessoas/${validId}`)
           const response = await fetch(`/api/pessoas/${validId}`, {
             method: "DELETE",
           })
 
-          console.log("[v0] Response status:", response.status)
-          console.log("[v0] Response ok:", response.ok)
-
           if (response.ok) {
-            console.log("[v0] Delete successful, updating tree")
             onUpdate()
             setConfirmDialog((prev) => ({ ...prev, open: false }))
           } else {
             const error = await response.json()
-            console.log("[v0] Delete failed with error:", error)
-
             let errorMessage = "Erro ao excluir pessoa"
 
             if (error.error === "Não é possível excluir uma pessoa que possui filhos") {
@@ -481,6 +468,7 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
               title: "Erro na Exclusão",
               description: errorMessage,
               onConfirm: () => setConfirmDialog((prev) => ({ ...prev, open: false })),
+              variant: "destructive",
             })
           }
         } catch (error) {
@@ -490,6 +478,7 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
             title: "Erro de Conexão",
             description: "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.",
             onConfirm: () => setConfirmDialog((prev) => ({ ...prev, open: false })),
+            variant: "destructive",
           })
         }
       },
@@ -506,126 +495,20 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
       }
 
       // Constantes para layout
-      const LEVEL_HEIGHT = 400
-      const NODE_WIDTH = 320
-      const SIBLING_SPACING = 50
-      const SPOUSE_OFFSET = 150
-
-      // Mapas para controle
-      const generationLevels = new Map<number, number>() // pessoa.id -> nível da geração
-      const processedNodes = new Set<number>()
-      const generationPositions = new Map<number, number>() // nível -> próxima posição X
-
-      // Função para determinar nível hierárquico de uma pessoa
-      const calculateGeneration = (pessoa: Pessoa, visited = new Set<number>()): number => {
-        if (visited.has(pessoa.id)) return 0 // Evita loops
-        visited.add(pessoa.id)
-
-        // Se já calculamos, retorna o valor
-        if (generationLevels.has(pessoa.id)) {
-          return generationLevels.get(pessoa.id)!
-        }
-
-        let generation = 0
-
-        // Se tem pai ou mãe, está uma geração abaixo deles
-        if (pessoa.paiId || pessoa.maeId) {
-          const pai = pessoa.paiId ? pessoas.find(p => p.id === pessoa.paiId) : null
-          const mae = pessoa.maeId ? pessoas.find(p => p.id === pessoa.maeId) : null
-          
-          let parentGeneration = -1
-          if (pai && !visited.has(pai.id)) {
-            parentGeneration = Math.max(parentGeneration, calculateGeneration(pai, new Set(visited)))
-          }
-          if (mae && !visited.has(mae.id)) {
-            parentGeneration = Math.max(parentGeneration, calculateGeneration(mae, new Set(visited)))
-          }
-          
-          generation = parentGeneration + 1
-        }
-
-        // Se tem filhos, está uma geração acima deles
-        const allChildren = [
-          ...(pessoa.filhosComoPai || []),
-          ...(pessoa.filhosComoMae || [])
-        ]
-        
-        if (allChildren.length > 0) {
-          const childGenerations = allChildren
-            .filter(child => !visited.has(child.id))
-            .map(child => calculateGeneration(child, new Set(visited)))
-          
-          if (childGenerations.length > 0) {
-            const minChildGeneration = Math.min(...childGenerations)
-            generation = Math.max(generation, minChildGeneration - 1)
-          }
-        }
-
-        generationLevels.set(pessoa.id, generation)
-        return generation
-      }
-
-      // Calcular gerações para todas as pessoas
-      pessoas.forEach(pessoa => {
-        if (!generationLevels.has(pessoa.id)) {
-          calculateGeneration(pessoa)
-        }
-      })
-
-      // Normalizar gerações para começar de 0
-      const minGeneration = Math.min(...Array.from(generationLevels.values()))
-      generationLevels.forEach((level, personId) => {
-        generationLevels.set(personId, level - minGeneration)
-      })
-
-      // Função para obter próxima posição X em uma geração
-      const getNextPosition = (generation: number): number => {
-        const currentX = generationPositions.get(generation) || 0
-        const newX = currentX + NODE_WIDTH + SIBLING_SPACING
-        generationPositions.set(generation, newX)
-        return currentX
-      }
-
-      // Função para determinar tipo de relacionamento
-      const determineRelationshipType = (pessoa: Pessoa): string | undefined => {
-        const generation = generationLevels.get(pessoa.id) || 0
-        
-        // Verificar se é pai ou mãe
-        const hasChildrenAsPai = (pessoa.filhosComoPai?.length || 0) > 0
-        const hasChildrenAsMae = (pessoa.filhosComoMae?.length || 0) > 0
-        
-        if (hasChildrenAsPai && !hasChildrenAsMae) return "pai"
-        if (hasChildrenAsMae && !hasChildrenAsPai) return "mae"
-        if (hasChildrenAsPai && hasChildrenAsMae) return "pai" // Default para ambos
-        
-        // Verificar se é filho
-        if (pessoa.paiId || pessoa.maeId) return "filho"
-        
-        // Verificar se tem cônjuge
-        const hasSpouse = (pessoa.unioesComoPessoa1?.length || 0) + (pessoa.unioesComoPessoa2?.length || 0) > 0
-        if (hasSpouse && generation > 0) return "conjuge"
-        
-        return undefined
-      }
+      const DEFAULT_X_SPACING = 350
+      const DEFAULT_Y_SPACING = 450
 
       // Criar nós
       pessoas.forEach(pessoa => {
-        if (processedNodes.has(pessoa.id)) return
-        processedNodes.add(pessoa.id)
-
-        const generation = generationLevels.get(pessoa.id) || 0
-        const x = getNextPosition(generation)
-        const y = generation * LEVEL_HEIGHT
-
-        const relationshipType = determineRelationshipType(pessoa)
-
         const node: TreeNode = {
           id: pessoa.id.toString(),
           type: "person",
-          position: { x, y },
+          position: {
+            x: pessoa.x ?? (Math.random() - 0.5) * DEFAULT_X_SPACING,
+            y: pessoa.y ?? (Math.random() - 0.5) * DEFAULT_Y_SPACING,
+          },
           data: {
-            pessoa,
-            relationshipType,
+            pessoa: pessoa,
             onAddChild: handleAddChild,
             onAddParent: handleAddParent,
             onAddSpouse: handleAddSpouse,
@@ -637,92 +520,60 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
         nodeMap.set(pessoa.id, node)
       })
 
-      // Ajustar posições de cônjuges para ficarem próximos
-      pessoas.forEach(pessoa => {
-        const spouses = [
-          ...(pessoa.unioesComoPessoa1 || []).map(u => u.pessoa2),
-          ...(pessoa.unioesComoPessoa2 || []).map(u => u.pessoa1)
-        ].filter(Boolean)
-
-        spouses.forEach((spouse, index) => {
-          const personNode = nodeMap.get(pessoa.id)
-          const spouseNode = nodeMap.get(spouse.id)
-          
-          if (personNode && spouseNode) {
-            // Posicionar cônjuge ao lado
-            spouseNode.position.x = personNode.position.x + SPOUSE_OFFSET
-            spouseNode.position.y = personNode.position.y
-            spouseNode.data.relationshipType = "conjuge"
-          }
-        })
-      })
-
       // Criar arestas (conexões)
       pessoas.forEach(pessoa => {
         // Conexões pai -> filho
-        const allChildren = [
-          ...(pessoa.filhosComoPai || []),
-          ...(pessoa.filhosComoMae || [])
-        ]
-        
-        // Remover duplicatas de filhos
-        const uniqueChildren = allChildren.filter(
-          (child, index, arr) => arr.findIndex(c => c.id === child.id) === index
-        )
-
-        uniqueChildren.forEach(child => {
-          if (nodeMap.has(child.id)) {
-            const parentChildEdge: Edge = {
-              id: `parent-${pessoa.id}-${child.id}`,
-              source: pessoa.id.toString(),
-              target: child.id.toString(),
-              sourceHandle: "bottom",
-              targetHandle: "top",
-              type: "smoothstep",
-              style: {
-                stroke: "#1e40af",
-                strokeWidth: 3,
-              },
-              markerEnd: {
-                type: MarkerType.ArrowClosed,
-                color: "#1e40af",
-                width: 20,
-                height: 20,
-              },
-            }
-            edgeList.push(parentChildEdge)
-          }
-        })
+        if (pessoa.paiId && nodeMap.has(pessoa.paiId)) {
+          edgeList.push({
+            id: `edge-pai-${pessoa.id}`,
+            source: pessoa.paiId.toString(),
+            target: pessoa.id.toString(),
+            type: "smoothstep",
+            style: { stroke: "#1e40af", strokeWidth: 2 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: "#1e40af" },
+          })
+        }
+        if (pessoa.maeId && nodeMap.has(pessoa.maeId)) {
+          edgeList.push({
+            id: `edge-mae-${pessoa.id}`,
+            source: pessoa.maeId.toString(),
+            target: pessoa.id.toString(),
+            type: "smoothstep",
+            style: { stroke: "#db2777", strokeWidth: 2 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: "#db2777" },
+          })
+        }
 
         // Conexões de casamento
-        const spouses = [
-          ...(pessoa.unioesComoPessoa1 || []).map(u => u.pessoa2),
-          ...(pessoa.unioesComoPessoa2 || []).map(u => u.pessoa1)
-        ].filter(Boolean)
+        const unioes = [
+          ...(pessoa.unioesComoPessoa1 || []),
+          ...(pessoa.unioesComoPessoa2 || []),
+        ]
 
-        spouses.forEach(spouse => {
-          if (nodeMap.has(spouse.id)) {
-            // Evitar duplicação de conexões de casamento
-            const existingEdge = edgeList.find(edge => 
-              (edge.source === pessoa.id.toString() && edge.target === spouse.id.toString()) ||
-              (edge.source === spouse.id.toString() && edge.target === pessoa.id.toString())
+        unioes.forEach(uniao => {
+          const spouseId = uniao.pessoa1Id === pessoa.id ? uniao.pessoa2Id : uniao.pessoa1Id
+          if (nodeMap.has(spouseId)) {
+            // Evitar duplicação de arestas
+            const edgeExists = edgeList.some(
+              edge =>
+                edge.id === `edge-casamento-${spouseId}-${pessoa.id}` ||
+                edge.id === `edge-casamento-${pessoa.id}-${spouseId}`,
             )
-            
-            if (!existingEdge) {
-              const marriageEdge: Edge = {
-                id: `marriage-${pessoa.id}-${spouse.id}`,
+
+            if (!edgeExists) {
+              edgeList.push({
+                id: `edge-casamento-${pessoa.id}-${spouseId}`,
                 source: pessoa.id.toString(),
-                target: spouse.id.toString(),
-                sourceHandle: "right",
-                targetHandle: "left",
+                target: spouseId.toString(),
                 type: "straight",
                 style: {
-                  stroke: "#dc2626",
-                  strokeWidth: 4,
-                  strokeDasharray: "8,4",
+                  stroke: "#dc2626", // Cor vermelha para casamento/união
+                  strokeWidth: 3,
+                  strokeDasharray: "5 5",
                 },
-              }
-              edgeList.push(marriageEdge)
+                sourceHandle: "right",
+                targetHandle: "left"
+              })
             }
           }
         })
@@ -882,16 +733,7 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
                 </div>
                 <span className="text-xs text-gray-600">Parentesco (pai/mãe → filho)</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-6 h-0.5 bg-red-600"
-                  style={{
-                    backgroundImage:
-                      "repeating-linear-gradient(to right, #dc2626 0, #dc2626 6px, transparent 6px, transparent 10px)",
-                  }}
-                ></div>
-                <span className="text-xs text-gray-600">Casamento/União</span>
-              </div>
+              
             </div>
           </div>
         </div>

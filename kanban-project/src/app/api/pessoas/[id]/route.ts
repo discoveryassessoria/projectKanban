@@ -45,26 +45,27 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const id = Number.parseInt(params.id)
-    const { nome, sobrenome, data_nasc, local_nasc, data_obito, batizado, paiId, maeId, x, y } = await request.json()
+    const body = await request.json()
 
     if (isNaN(id)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
 
+    const dataToUpdate: Prisma.PessoaUpdateInput = {}
+    if (body.nome !== undefined) dataToUpdate.nome = body.nome
+    if (body.sobrenome !== undefined) dataToUpdate.sobrenome = body.sobrenome
+    if (body.data_nasc !== undefined) dataToUpdate.data_nasc = body.data_nasc ? new Date(body.data_nasc) : null
+    if (body.local_nasc !== undefined) dataToUpdate.local_nasc = body.local_nasc
+    if (body.data_obito !== undefined) dataToUpdate.data_obito = body.data_obito ? new Date(body.data_obito) : null
+    if (body.batizado !== undefined) dataToUpdate.batizado = body.batizado
+    if (body.paiId !== undefined) dataToUpdate.pai = body.paiId ? { connect: { id: Number(body.paiId) } } : { disconnect: true }
+    if (body.maeId !== undefined) dataToUpdate.mae = body.maeId ? { connect: { id: Number(body.maeId) } } : { disconnect: true }
+    if (body.x !== undefined) dataToUpdate.x = body.x
+    if (body.y !== undefined) dataToUpdate.y = body.y
+
     const pessoaAtualizada = await prisma.pessoa.update({
       where: { id },
-      data: {
-        nome,
-        sobrenome,
-        data_nasc: data_nasc ? new Date(data_nasc) : null,
-        local_nasc,
-        data_obito: data_obito ? new Date(data_obito) : null,
-        batizado,
-        paiId: paiId ? Number.parseInt(paiId) : null,
-        maeId: maeId ? Number.parseInt(maeId) : null,
-        x,
-        y,
-      },
+      data: dataToUpdate,
       include: {
         pai: true,
         mae: true,

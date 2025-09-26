@@ -2,11 +2,15 @@
 
 import { useState, useEffect } from "react"
 import { GenealogicalTree } from "@/src/components/genealogical-tree"
-import type { Arvore } from "@/src/types/genealogy"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, TreePine } from "lucide-react"
 import { TreeOnboardingWizard } from "@/src/components/tree-onboarding-wizard"
+import type { Arvore as PrismaArvore, Pessoa as PrismaPessoa } from "@prisma/client"
+
+type Arvore = PrismaArvore & {
+  pessoas?: (PrismaPessoa & { [key: string]: any })[]
+}
 
 export default function GenealogyPage() {
   const [arvores, setArvores] = useState<Arvore[]>([])
@@ -64,19 +68,32 @@ export default function GenealogyPage() {
     fetchArvores() // Refresh to get updated tree data
   }
 
+  const handleArvoreUpdate = (updatedArvore: Arvore) => {
+    setArvoreAtual(updatedArvore);
+    setArvores(prevArvores => 
+      prevArvores.map(arvore => 
+        arvore.id === updatedArvore.id ? updatedArvore : arvore
+      )
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <TreePine className="h-12 w-12 mx-auto mb-4 text-[#123C73]" />
-          <p className="text-lg text-[#9AA0A6]">Carregando árvores genealógicas...</p>
+          <p className="text-lg text-[#9AA0A6]">Carregando árvores genealógicas...</p> 
         </div>
       </div>
     )
   }
 
   if (showOnboarding && arvoreAtual) {
-    return <TreeOnboardingWizard arvore={arvoreAtual} onComplete={handleOnboardingComplete} />
+    return <TreeOnboardingWizard 
+      arvore={arvoreAtual} 
+      onComplete={handleOnboardingComplete}
+      onArvoreUpdate={handleArvoreUpdate}
+    />
   }
 
   if (arvores.length === 0) {
