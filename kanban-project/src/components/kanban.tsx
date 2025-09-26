@@ -139,7 +139,7 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
               isLast={index === projeto.status.length - 1}
               onAtividadeAdd={handleAddNewAtividade}
             />
-          ))}}
+          ))}
 
           {/* Add new status column */}
           <div className="w-80 flex-shrink-0 p-2">
