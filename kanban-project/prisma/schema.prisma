@@ -6,7 +6,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  // output   = "../src/generated/prisma" // O caminho de saída foi comentado para usar o padrão, corrija se necessário.
 }
 
 datasource db {
@@ -19,7 +19,7 @@ model Usuario {
   id     Int    @id @default(autoincrement())
   nome   String @db.VarChar(50)
   email  String @unique @db.VarChar(30)
-  senha  String @db.VarChar(10) // Em um projeto real, armazene o hash da senha, não a senha em si.
+  senha  String @db.VarChar(255) // Em um projeto real, armazene o hash da senha, não a senha em si.
   tipo   String @db.VarChar(15)
 
   // Relacionamento: Um usuário pode estar associado a várias atividades
@@ -35,10 +35,14 @@ model Pessoa {
   local_nasc  String?   @db.VarChar(30)
   data_obito  DateTime?
   batizado    String?   @db.VarChar(10)
+  
+  // Campos para salvar a posição do nó na árvore
+  x           Int?
+  y           Int?
 
   // Chave estrangeira para a Árvore a que a pessoa pertence
   arvoreId Int
-  arvore   Arvore @relation(fields: [arvoreId], references: [id])
+  arvore   Arvore @relation("PessoasNaArvore", fields: [arvoreId], references: [id], onDelete: Cascade)
 
   // --- Auto-relacionamentos para pai e mãe ---
   // Uma pessoa pode ter um pai, que também é uma Pessoa
@@ -56,6 +60,9 @@ model Pessoa {
   // Relacionamento com União: Uma pessoa pode estar em várias uniões (como pessoa1 ou pessoa2)
   unioesComoPessoa1 Uniao[] @relation("Pessoa1")
   unioesComoPessoa2 Uniao[] @relation("Pessoa2")
+
+  // Relação inversa para identificar se esta pessoa é a principal de alguma árvore
+  arvorePrincipal Arvore? @relation("ArvorePrincipal")
 }
 
 // Modelo para representar a união (casamento, etc.) entre duas pessoas
@@ -66,12 +73,12 @@ model Uniao {
   tipo        String?   @db.VarChar(10)
 
   // Chave estrangeira para a primeira pessoa na união
-  pessoa1Id Int
-  pessoa1   Pessoa @relation("Pessoa1", fields: [pessoa1Id], references: [id])
+  pessoa1Id Int 
+  pessoa1   Pessoa @relation("Pessoa1", fields: [pessoa1Id], references: [id], onDelete: Cascade)
 
   // Chave estrangeira para a segunda pessoa na união
   pessoa2Id Int
-  pessoa2   Pessoa @relation("Pessoa2", fields: [pessoa2Id], references: [id])
+  pessoa2   Pessoa @relation("Pessoa2", fields: [pessoa2Id], references: [id], onDelete: Cascade)
 }
 
 
@@ -80,8 +87,13 @@ model Arvore {
   id        Int      @id @default(autoincrement())
   nome      String   @db.VarChar(50)
   descricao String?  @db.VarChar(200)
+
+  // Referência para a pessoa principal da árvore
+  pessoaPrincipalId Int?    @unique
+  pessoaPrincipal   Pessoa? @relation("ArvorePrincipal", fields: [pessoaPrincipalId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
   // Relacionamento: Uma árvore contém várias pessoas
-  pessoas   Pessoa[]
+  pessoas   Pessoa[] @relation("PessoasNaArvore")
 }
 
 // Modelo para o Projeto (Kanban)
@@ -98,7 +110,7 @@ model ProjetoKanban {
   contratanteId Int?
   requerenteId  Int?
 
-  contratante Requerente? @relation(fields: [contratanteId], references: [id])
+  contratante Requerente?  @relation(fields: [contratanteId], references: [id])
   requerente  Contratante? @relation(fields: [requerenteId], references: [id])
 }
 
@@ -111,11 +123,11 @@ model Atividade {
 
   // Chave estrangeira para o Projeto a que pertence
   projetoId Int
-  projeto   ProjetoKanban @relation(fields: [projetoId], references: [id])
+  projeto   ProjetoKanban @relation(fields: [projetoId], references: [id], onDelete: Cascade)
 
   // Chave estrangeira para o Status da atividade
   statusId Int
-  status   Status @relation(fields: [statusId], references: [id])
+  status   Status @relation(fields: [statusId], references: [id], onDelete: Cascade)
 
   // Relacionamento: Uma atividade pode ter vários usuários associados
   usuarios UserAtv[]
@@ -125,8 +137,8 @@ model Atividade {
 model UserAtv {
   usuarioId   Int
   atividadeId Int
-  usuario     Usuario   @relation(fields: [usuarioId], references: [id])
-  atividade   Atividade @relation(fields: [atividadeId], references: [id])
+  usuario     Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  atividade   Atividade @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
 
   @@id([usuarioId, atividadeId]) // Chave primária composta
 }

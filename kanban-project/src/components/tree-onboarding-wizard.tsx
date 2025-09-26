@@ -49,7 +49,18 @@ export function TreeOnboardingWizard({ arvore, onComplete }: TreeOnboardingWizar
           body: JSON.stringify({ ...data, arvoreId: arvore.id }),
         })
         if (response.ok) {
-          setCurrentStep("add-parents")
+          const newPerson = await response.json()
+          // Agora, atualize a árvore para definir esta pessoa como principal
+          const arvoreUpdateResponse = await fetch(`/api/arvore/${arvore.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pessoaPrincipalId: newPerson.id }),
+          });
+          if (arvoreUpdateResponse.ok) {
+            setCurrentStep("add-parents")
+          } else {
+            alert("Erro ao definir a pessoa principal na árvore.")
+          }
         }
       },
     })
@@ -61,7 +72,7 @@ export function TreeOnboardingWizard({ arvore, onComplete }: TreeOnboardingWizar
       title: `Adicionar ${parentType === "pai" ? "Pai" : "Mãe"}`,
       description: `Adicione informações sobre ${parentType === "pai" ? "seu pai" : "sua mãe"} à árvore genealógica.`,
       onSubmit: async (data) => {
-        const selfPerson = arvore.pessoas?.[0]
+        const selfPerson = arvore.pessoas?.find(p => p.id === arvore.pessoaPrincipalId)
         if (!selfPerson) {
           alert("Erro: Pessoa principal não encontrada")
           return
@@ -117,7 +128,7 @@ export function TreeOnboardingWizard({ arvore, onComplete }: TreeOnboardingWizar
       title: "Adicionar Cônjuge",
       description: "Adicione informações sobre seu cônjuge à árvore genealógica.",
       onSubmit: async (data) => {
-        const selfPerson = arvore.pessoas?.[0]
+        const selfPerson = arvore.pessoas?.find(p => p.id === arvore.pessoaPrincipalId)
         if (!selfPerson) {
           alert("Erro: Pessoa principal não encontrada")
           return
