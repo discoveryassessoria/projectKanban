@@ -23,6 +23,10 @@ import "reactflow/dist/style.css"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/src/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   Plus,
   Edit3,
@@ -40,7 +44,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Pessoa, Arvore, TreeNode } from "@/src/types/genealogy"
-import { PersonFormDialog, type PersonFormData } from "@/src/components/person-form-dialog"
+import { PersonFormDialog, type PersonFormData, type ExistingPersonFormData } from "@/src/components/person-form-dialog"
 import { ConfirmationDialog } from "@/src/components/confirmation-dialog"
 
 const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
@@ -280,6 +284,10 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
     onConfirm: () => {},
   })
 
+  const isExistingPersonData = (data: PersonFormData | ExistingPersonFormData): data is ExistingPersonFormData => {
+    return 'id' in data && typeof data.id === 'number';
+  }
+
   const handleAddChild = useCallback(
     (parentId: number) => {
       setDialogConfig({
@@ -287,22 +295,40 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
         description: "Adicione informações sobre o filho desta pessoa.",
         relationshipType: "filho",
         currentPersonId: parentId,
-        onSubmit: async (data) => {
+        onSubmit: async (data: PersonFormData | ExistingPersonFormData) => {
           try {
-            const response = await fetch("/api/pessoas", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                ...data,
-                arvoreId: arvore.id,
-                paiId: parentId,
-              }),
-            })
-            if (response.ok) {
-              onUpdate()
+            if (isExistingPersonData(data)) {
+              // Para pessoa existente, apenas vincula como filho
+              const updateResponse = await fetch(`/api/pessoas/${data.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ paiId: parentId }),
+              })
+              
+              if (updateResponse.ok) {
+                onUpdate()
+              } else {
+                const error = await updateResponse.json()
+                alert(error.error || "Erro ao vincular filho")
+              }
             } else {
-              const error = await response.json()
-              alert(error.error || "Erro ao adicionar filho")
+              // Para pessoa nova, cria e vincula
+              const response = await fetch("/api/pessoas", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...data,
+                  arvoreId: arvore.id,
+                  paiId: parentId,
+                }),
+              })
+              
+              if (response.ok) {
+                onUpdate()
+              } else {
+                const error = await response.json()
+                alert(error.error || "Erro ao adicionar filho")
+              }
             }
           } catch (error) {
             console.error("Erro ao adicionar filho:", error)
@@ -323,11 +349,11 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
         fixedSexo: parentType === "pai" ? "Masculino" : "Feminino",
         relationshipType: parentType,
         currentPersonId: childId,
-        onSubmit: async (data) => {
+        onSubmit: async (data: PersonFormData | ExistingPersonFormData) => {
           try {
             let parentId: number
 
-            if (data.id) {
+            if (isExistingPersonData(data)) {
               // Usando pessoa existente
               parentId = data.id
             } else {
@@ -385,66 +411,19 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
 
   const handleAddSpouse = useCallback(
     (personId: number) => {
-      setDialogConfig({
-        title: "Adicionar Cônjuge",
-        description: "Adicione informações sobre o cônjuge desta pessoa.",
-        fixedSexo: undefined,
-        relationshipType: "conjuge",
-        currentPersonId: personId,
-        onSubmit: async (data) => {
-          let spouseId: number
-
-          if (data.id) {
-            // Usando pessoa existente
-            spouseId = data.id
-          } else {
-            // Criando nova pessoa
-            const spouseResponse = await fetch("/api/pessoas", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                ...data,
-                arvoreId: arvore.id,
-              }),
-            })
-
-            if (!spouseResponse.ok) {
-              const error = await spouseResponse.json()
-              console.error("Erro ao criar cônjuge:", error)
-              alert(error.error || "Erro ao adicionar cônjuge")
-              return
-            }
-            const newSpouse = await spouseResponse.json()
-            spouseId = newSpouse.id
-          }
-
-          // Criar união entre as duas pessoas
-          const unionResponse = await fetch("/api/unioes", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              pessoa1Id: personId,
-              pessoa2Id: spouseId,
-              tipo: "Casamento",
-            }),
-          })
-
-          if (unionResponse.ok) {
-            onUpdate()
-          } else {
-            const error = await unionResponse.json()
-            if (error.error?.includes("Unique constraint failed")) {
-              alert("Erro: Esta união já existe.")
-            } else {
-              console.error("Erro ao criar união:", error)
-              alert(error.error || "Erro ao criar união")
-            }
-          }
-        },
+      setCurrentPersonForSpouse(personId)
+      setShowSpouseModal(true)
+      // Limpar dados anteriores
+      setSpouseSearchTerm("")
+      setNewSpouseData({
+        nome: "",
+        sobrenome: "",
+        sexo: "",
+        data_nasc: "",
+        local_nasc: "",
       })
-      setShowPersonDialog(true)
     },
-    [arvore.id, onUpdate],
+    [],
   )
 
   const handleEditPerson = useCallback(
@@ -454,8 +433,14 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
         description: "Atualize as informações desta pessoa.",
         person: pessoa,
         fixedSexo: undefined,
-        onSubmit: async (data) => {
+        onSubmit: async (data: PersonFormData | ExistingPersonFormData) => {
           try {
+            // Para edição, sempre usamos PersonFormData (não existem pessoas existentes para editar)
+            if (isExistingPersonData(data)) {
+              console.error("Erro: tentativa de editar com dados de pessoa existente")
+              return
+            }
+            
             const response = await fetch(`/api/pessoas/${pessoa.id}`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
@@ -668,6 +653,8 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
 
   const onNodeDragStop = useCallback(
     async (event: React.MouseEvent, node: Node) => {
+      if (!node) return
+      
       const { id, position } = node
       const personId = Number(id)
 
@@ -707,7 +694,7 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
     fixedSexo?: "Masculino" | "Feminino"
     relationshipType?: "pai" | "mae" | "filho" | "conjuge"
     currentPersonId?: number
-    onSubmit: (data: PersonFormData) => Promise<void>
+    onSubmit: (data: PersonFormData | ExistingPersonFormData) => Promise<void>
   }>({
     title: "",
     description: "",
@@ -717,6 +704,107 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
     currentPersonId: undefined,
     onSubmit: async () => {},
   })
+
+  // Estado para modal de cônjuge personalizado
+  const [showSpouseModal, setShowSpouseModal] = useState(false)
+  const [currentPersonForSpouse, setCurrentPersonForSpouse] = useState<number | null>(null)
+  const [spouseSearchTerm, setSpouseSearchTerm] = useState("")
+  const [newSpouseData, setNewSpouseData] = useState({
+    nome: "",
+    sobrenome: "",
+    sexo: "",
+    data_nasc: "",
+    local_nasc: "",
+  })
+
+  // Função para criar nova pessoa e união
+  const handleCreateNewSpouse = useCallback(async () => {
+    if (!currentPersonForSpouse || !newSpouseData.nome) {
+      alert("Nome é obrigatório")
+      return
+    }
+
+    try {
+      // 1. Criar nova pessoa
+      const response = await fetch("/api/pessoas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...newSpouseData,
+          data_nasc: newSpouseData.data_nasc ? new Date(newSpouseData.data_nasc) : null,
+          arvoreId: arvore.id,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        alert("Erro ao criar pessoa: " + error.error)
+        return
+      }
+
+      const newPerson = await response.json()
+
+      // 2. Criar união
+      const unionResponse = await fetch("/api/unioes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pessoa1Id: currentPersonForSpouse,
+          pessoa2Id: newPerson.id,
+          tipo: "Casamento",
+        }),
+      })
+
+      if (!unionResponse.ok) {
+        const error = await unionResponse.json()
+        alert("Erro ao criar união: " + error.error)
+        return
+      }
+
+      alert("Cônjuge criado e relacionamento estabelecido com sucesso!")
+      setShowSpouseModal(false)
+      onUpdate()
+    } catch (error) {
+      alert("Erro: " + error)
+    }
+  }, [currentPersonForSpouse, newSpouseData, arvore.id, onUpdate])
+
+  // Função para selecionar pessoa existente
+  const handleSelectExistingSpouse = useCallback(async (selectedPersonId: number) => {
+    if (!currentPersonForSpouse) return
+
+    const confirm = window.confirm(
+      `Criar relacionamento entre:\n` +
+      `• ${arvore.pessoas?.find(p => p.id === currentPersonForSpouse)?.nome}\n` +
+      `• ${arvore.pessoas?.find(p => p.id === selectedPersonId)?.nome}\n\n` +
+      `Confirmar?`
+    )
+
+    if (!confirm) return
+
+    try {
+      const response = await fetch("/api/unioes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pessoa1Id: currentPersonForSpouse,
+          pessoa2Id: selectedPersonId,
+          tipo: "Casamento",
+        }),
+      })
+
+      if (response.ok) {
+        alert("Relacionamento criado com sucesso!")
+        setShowSpouseModal(false)
+        onUpdate()
+      } else {
+        const error = await response.json()
+        alert("Erro ao criar relacionamento: " + (error.error || 'Erro desconhecido'))
+      }
+    } catch (error) {
+      alert("Erro: " + error)
+    }
+  }, [currentPersonForSpouse, arvore.pessoas, onUpdate])
 
   return (
     <div
@@ -882,6 +970,120 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
         relationshipType={dialogConfig.relationshipType}
         currentPersonId={dialogConfig.currentPersonId}
       />
+
+      {/* Modal personalizado para cônjuge */}
+      <Dialog open={showSpouseModal} onOpenChange={setShowSpouseModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Adicionar Cônjuge</DialogTitle>
+          </DialogHeader>
+          
+          <Tabs defaultValue="new" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="new">Criar Nova Pessoa</TabsTrigger>
+              <TabsTrigger value="existing">Selecionar Existente</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="new" className="space-y-4">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="nome">Nome *</Label>
+                    <Input
+                      id="nome"
+                      value={newSpouseData.nome}
+                      onChange={(e) => setNewSpouseData(prev => ({...prev, nome: e.target.value}))}
+                      placeholder="Nome da pessoa"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="sobrenome">Sobrenome</Label>
+                    <Input
+                      id="sobrenome"
+                      value={newSpouseData.sobrenome}
+                      onChange={(e) => setNewSpouseData(prev => ({...prev, sobrenome: e.target.value}))}
+                      placeholder="Sobrenome"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="sexo">Sexo</Label>
+                    <Input
+                      id="sexo"
+                      value={newSpouseData.sexo}
+                      onChange={(e) => setNewSpouseData(prev => ({...prev, sexo: e.target.value}))}
+                      placeholder="Masculino/Feminino"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="data_nasc">Data de Nascimento</Label>
+                    <Input
+                      id="data_nasc"
+                      type="date"
+                      value={newSpouseData.data_nasc}
+                      onChange={(e) => setNewSpouseData(prev => ({...prev, data_nasc: e.target.value}))}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="local_nasc">Local de Nascimento</Label>
+                  <Input
+                    id="local_nasc"
+                    value={newSpouseData.local_nasc}
+                    onChange={(e) => setNewSpouseData(prev => ({...prev, local_nasc: e.target.value}))}
+                    placeholder="Cidade, Estado"
+                  />
+                </div>
+                
+                <Button onClick={handleCreateNewSpouse} className="w-full">
+                  Criar Cônjuge e Relacionamento
+                </Button>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="existing" className="space-y-4">
+              <div>
+                <Label htmlFor="search">Buscar pessoa existente</Label>
+                <Input
+                  id="search"
+                  value={spouseSearchTerm}
+                  onChange={(e) => setSpouseSearchTerm(e.target.value)}
+                  placeholder="Digite o nome para buscar..."
+                />
+              </div>
+              
+              <div className="max-h-60 overflow-y-auto space-y-2">
+                {arvore.pessoas
+                  ?.filter(p => 
+                    p.id !== currentPersonForSpouse &&
+                    (p.nome.toLowerCase().includes(spouseSearchTerm.toLowerCase()) ||
+                     (p.sobrenome?.toLowerCase().includes(spouseSearchTerm.toLowerCase()) || false))
+                  )
+                  .map(person => (
+                    <div key={person.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                      <div>
+                        <div className="font-medium">{person.nome} {person.sobrenome}</div>
+                        <div className="text-sm text-gray-500">
+                          {person.sexo && `${person.sexo} • `}
+                          {person.data_nasc && new Date(person.data_nasc).toLocaleDateString("pt-BR")}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleSelectExistingSpouse(person.id)}
+                      >
+                        Selecionar
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmationDialog
         open={confirmDialog.open}
