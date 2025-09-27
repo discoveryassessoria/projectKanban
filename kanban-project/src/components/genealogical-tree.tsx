@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useCallback, useState, useMemo } from "react"
+import type React from "react"
+import { useCallback, useState, useMemo, useEffect } from "react"
 import ReactFlow, {
   addEdge,
   type Connection,
@@ -14,15 +15,29 @@ import ReactFlow, {
   MarkerType,
   type Edge,
   Handle,
-  Node,
+  type Node,
   Position,
 } from "reactflow"
 import "reactflow/dist/style.css"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/src/components/ui/badge"
-import { Plus, Edit3, Trash2, Users, Calendar, MapPin, Heart, Crown, User, UserPlus, TreePine } from "lucide-react"
+import {
+  Plus,
+  Edit3,
+  Trash2,
+  Users,
+  Calendar,
+  MapPin,
+  Heart,
+  Crown,
+  User,
+  UserPlus,
+  TreePine,
+  MessageSquare,
+  X,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Pessoa, Arvore, TreeNode } from "@/src/types/genealogy"
 import { PersonFormDialog, type PersonFormData } from "@/src/components/person-form-dialog"
@@ -64,7 +79,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
   }
 
   const getRelationshipBadge = () => {
-    const badges: Record<string, { label: string; icon: typeof User; color: string }> = {
+    const badges: Record<string, { label: string; icon: React.ElementType; color: string }> = {
       pai: { label: "Pai", icon: User, color: "bg-blue-100 text-blue-800 border-blue-200" },
       mae: { label: "Mãe", icon: User, color: "bg-pink-100 text-pink-800 border-pink-200" },
       filho: { label: "Filho(a)", icon: UserPlus, color: "bg-green-100 text-green-800 border-green-200" },
@@ -132,6 +147,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
           variant="outline"
           className="h-7 w-7 p-0 bg-white shadow-md hover:bg-blue-500 hover:text-white border-blue-200"
           onClick={() => onAddParent(pessoa.id, "pai")}
+          disabled={!!pessoa.paiId}
           title="Adicionar Pai"
         >
           <User className="h-3 w-3" />
@@ -141,6 +157,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
           variant="outline"
           className="h-7 w-7 p-0 bg-white shadow-md hover:bg-pink-500 hover:text-white border-pink-200"
           onClick={() => onAddParent(pessoa.id, "mae")}
+          disabled={!!pessoa.maeId}
           title="Adicionar Mãe"
         >
           <User className="h-3 w-3" />
@@ -172,6 +189,11 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         >
           <Trash2 className="h-3 w-3" />
         </Button>
+      </div>
+
+      <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+        {pessoa.sexo === "Masculino" && <User className="h-5 w-5 text-blue-500" />}
+        {pessoa.sexo === "Feminino" && <User className="h-5 w-5 text-pink-500" />}
       </div>
 
       {getRelationshipBadge()}
@@ -231,10 +253,12 @@ interface GenealogicalTreeProps {
   className?: string
 }
 
-export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: GenealogicalTreeProps) {
+export function genealogicalTree({ arvore, onUpdate = () => {}, className }: GenealogicalTreeProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
 
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([])
+  const [showCommentModal, setShowCommentModal] = useState(false)
+  const [treeComment, setTreeComment] = useState(arvore.descricao || "")
 
   const nodeTypes = useMemo(
     () => ({
@@ -256,233 +280,291 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
     onConfirm: () => {},
   })
 
-  const handleAddChild = async (parentId: number) => {
-    setDialogConfig({
-      title: "Adicionar Filho",
-      description: "Adicione informações sobre o filho desta pessoa.",
-      onSubmit: async (data) => {
-        try {
-          const response = await fetch("/api/pessoas", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ...data,
-              arvoreId: arvore.id,
-              paiId: parentId,
-            }),
-          })
-          if (response.ok) {
-            onUpdate()
-          } else {
-            const error = await response.json()
-            alert(error.error || "Erro ao adicionar filho")
-          }
-        } catch (error) {
-          console.error("Erro ao adicionar filho:", error)
-          alert("Erro ao adicionar filho")
-        }
-      },
-    })
-    setShowPersonDialog(true)
-  }
-
-  const handleAddParent = async (childId: number, parentType: "pai" | "mae") => {
-    setDialogConfig({
-      title: `Adicionar ${parentType === "pai" ? "Pai" : "Mãe"}`,
-      description: `Adicione informações sobre ${parentType === "pai" ? "o pai" : "a mãe"} desta pessoa.`,
-      onSubmit: async (data) => {
-        try {
-          // Primeiro criar o pai/mãe
-          const parentData = {
-            ...data,
-            arvoreId: arvore.id,
-          }
-
-          const parentResponse = await fetch("/api/pessoas", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(parentData),
-          })
-
-          if (parentResponse.ok) {
-            const newParent = await parentResponse.json()
-
-            // Buscar a pessoa filha atual para manter seus dados
-            const childResponse = await fetch(`/api/pessoas/${childId}`)
-            if (!childResponse.ok) {
-              alert("Erro: Pessoa filha não encontrada")
-              return
-            }
-
-            const childData = await childResponse.json()
-
-            // Atualizar o filho para referenciar o novo pai/mãe
-            const updateResponse = await fetch(`/api/pessoas/${childId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [parentType === "pai" ? "paiId" : "maeId"]: newParent.id }) })
-            if (updateResponse.ok) {
-              onUpdate();
-            } else {
-              const error = await updateResponse.json();
-              console.error("Erro ao vincular pai/mãe:", error);
-              alert(error.error || `Erro ao vincular ${parentType}`);
-            }
-          } else {
-            const error = await parentResponse.json()
-            console.error("Erro ao criar pai/mãe:", error)
-            alert(error.error || `Erro ao adicionar ${parentType}`)
-          }
-        } catch (error) {
-          console.error(`Erro ao adicionar ${parentType}:`, error)
-          alert(`Erro ao adicionar ${parentType}`)
-        }
-      },
-    })
-    setShowPersonDialog(true)
-  }
-
-  const handleAddSpouse = async (personId: number) => {
-    setDialogConfig({
-      title: "Adicionar Cônjuge",
-      description: "Adicione informações sobre o cônjuge desta pessoa.",
-      onSubmit: async (data) => {
-        try {
-          // Primeiro criar o cônjuge
-          const spouseResponse = await fetch("/api/pessoas", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ...data,
-              arvoreId: arvore.id,
-            }),
-          })
-
-          if (spouseResponse.ok) {
-            const newSpouse = await spouseResponse.json()
-
-            // Criar união entre as duas pessoas
-            const unionResponse = await fetch("/api/unioes", {
+  const handleAddChild = useCallback(
+    (parentId: number) => {
+      setDialogConfig({
+        title: "Adicionar Filho",
+        description: "Adicione informações sobre o filho desta pessoa.",
+        relationshipType: "filho",
+        currentPersonId: parentId,
+        onSubmit: async (data) => {
+          try {
+            const response = await fetch("/api/pessoas", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                pessoa1Id: personId,
-                pessoa2Id: newSpouse.id,
-                tipo: "Casamento"
+                ...data,
+                arvoreId: arvore.id,
+                paiId: parentId,
+              }),
+            })
+            if (response.ok) {
+              onUpdate()
+            } else {
+              const error = await response.json()
+              alert(error.error || "Erro ao adicionar filho")
+            }
+          } catch (error) {
+            console.error("Erro ao adicionar filho:", error)
+            alert("Erro ao adicionar filho")
+          }
+        },
+      })
+      setShowPersonDialog(true)
+    },
+    [arvore.id, onUpdate],
+  )
+
+  const handleAddParent = useCallback(
+    (childId: number, parentType: "pai" | "mae") => {
+      setDialogConfig({
+        title: `Adicionar ${parentType === "pai" ? "Pai" : "Mãe"}`,
+        description: `Adicione informações sobre ${parentType === "pai" ? "o pai" : "a mãe"} desta pessoa.`,
+        fixedSexo: parentType === "pai" ? "Masculino" : "Feminino",
+        relationshipType: parentType,
+        currentPersonId: childId,
+        onSubmit: async (data) => {
+          try {
+            let parentId: number
+
+            if (data.id) {
+              // Usando pessoa existente
+              parentId = data.id
+            } else {
+              // Criando nova pessoa
+              const parentData = {
+                ...data,
+                sexo: parentType === "pai" ? "Masculino" : "Feminino",
+                arvoreId: arvore.id,
+              }
+
+              const parentResponse = await fetch("/api/pessoas", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(parentData),
+              })
+
+              if (!parentResponse.ok) {
+                const error = await parentResponse.json()
+                console.error("Erro ao criar pai/mãe:", error)
+                alert(error.error || `Erro ao adicionar ${parentType}`)
+                return
+              }
+              const newParent = await parentResponse.json()
+              parentId = newParent.id
+            }
+
+            // Atualizar o filho para referenciar o pai/mãe
+            const updatePayload = {
+              [parentType === "pai" ? "paiId" : "maeId"]: parentId,
+            }
+
+            const updateResponse = await fetch(`/api/pessoas/${childId}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(updatePayload),
+            })
+
+            if (updateResponse.ok) {
+              onUpdate()
+            } else {
+              const error = await updateResponse.json()
+              console.error("Erro ao vincular pai/mãe:", error)
+              alert(error.error || `Erro ao vincular ${parentType}`)
+            }
+          } catch (error) {
+            console.error(`Erro ao adicionar ${parentType}:`, error)
+            alert(`Erro ao adicionar ${parentType}`)
+          }
+        },
+      })
+      setShowPersonDialog(true)
+    },
+    [arvore.id, onUpdate],
+  )
+
+  const handleAddSpouse = useCallback(
+    (personId: number) => {
+      setDialogConfig({
+        title: "Adicionar Cônjuge",
+        description: "Adicione informações sobre o cônjuge desta pessoa.",
+        fixedSexo: undefined,
+        relationshipType: "conjuge",
+        currentPersonId: personId,
+        onSubmit: async (data) => {
+          let spouseId: number
+
+          if (data.id) {
+            // Usando pessoa existente
+            spouseId = data.id
+          } else {
+            // Criando nova pessoa
+            const spouseResponse = await fetch("/api/pessoas", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...data,
+                arvoreId: arvore.id,
               }),
             })
 
-            if (unionResponse.ok) {
-              onUpdate()
+            if (!spouseResponse.ok) {
+              const error = await spouseResponse.json()
+              console.error("Erro ao criar cônjuge:", error)
+              alert(error.error || "Erro ao adicionar cônjuge")
+              return
+            }
+            const newSpouse = await spouseResponse.json()
+            spouseId = newSpouse.id
+          }
+
+          // Criar união entre as duas pessoas
+          const unionResponse = await fetch("/api/unioes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              pessoa1Id: personId,
+              pessoa2Id: spouseId,
+              tipo: "Casamento",
+            }),
+          })
+
+          if (unionResponse.ok) {
+            onUpdate()
+          } else {
+            const error = await unionResponse.json()
+            if (error.error?.includes("Unique constraint failed")) {
+              alert("Erro: Esta união já existe.")
             } else {
-              const error = await unionResponse.json()
               console.error("Erro ao criar união:", error)
               alert(error.error || "Erro ao criar união")
             }
-          } else {
-            const error = await spouseResponse.json()
-            console.error("Erro ao criar cônjuge:", error)
-            alert(error.error || "Erro ao adicionar cônjuge")
           }
-        } catch (error) {
-          console.error("Erro ao adicionar cônjuge:", error)
-          alert("Erro ao adicionar cônjuge")
-        }
-      },
-    })
-    setShowPersonDialog(true)
-  }
+        },
+      })
+      setShowPersonDialog(true)
+    },
+    [arvore.id, onUpdate],
+  )
 
-  const handleEditPerson = async (pessoa: Pessoa) => {
-    setDialogConfig({
-      title: "Editar Pessoa",
-      description: "Atualize as informações desta pessoa.",
-      person: pessoa,
-      onSubmit: async (data) => {
-        try {
-          const response = await fetch(`/api/pessoas/${pessoa.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data), // Envia apenas os dados do formulário
-          })
-          if (response.ok) {
-            onUpdate()
-          } else {
-            const error = await response.json()
-            alert(error.error || "Erro ao atualizar pessoa")
-          }
-        } catch (error) {
-          console.error("Erro ao atualizar pessoa:", error)
-          alert("Erro ao atualizar pessoa")
-        }
-      },
-    })
-    setShowPersonDialog(true)
-  }
-
-  const handleDeletePerson = async (pessoaId: number) => {
-    const pessoa = arvore.pessoas?.find((p) => p.id === pessoaId)
-    const personName = pessoa ? `${pessoa.nome} ${pessoa.sobrenome || ""}`.trim() : "esta pessoa"
-
-    setConfirmDialog({
-      open: true,
-      title: "Confirmar Exclusão",
-      description: `Tem certeza que deseja excluir ${personName}? Esta ação não pode ser desfeita.`,
-      variant: "destructive",
-      onConfirm: async () => {
-        try {
-          const validId = Number(pessoaId)
-
-          if (isNaN(validId) || validId <= 0) {
-            console.log("[v0] Invalid ID detected in frontend")
-            setConfirmDialog({
-              open: true,
-              title: "Erro na Exclusão",
-              description: "ID da pessoa inválido. Tente recarregar a página.",
-              onConfirm: () => setConfirmDialog((prev) => ({ ...prev, open: false })),
-              variant: "destructive",
+  const handleEditPerson = useCallback(
+    (pessoa: Pessoa) => {
+      setDialogConfig({
+        title: "Editar Pessoa",
+        description: "Atualize as informações desta pessoa.",
+        person: pessoa,
+        fixedSexo: undefined,
+        onSubmit: async (data) => {
+          try {
+            const response = await fetch(`/api/pessoas/${pessoa.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data),
             })
-            return
+            if (response.ok) {
+              onUpdate()
+            } else {
+              const error = await response.json()
+              alert(error.error || "Erro ao atualizar pessoa")
+            }
+          } catch (error) {
+            console.error("Erro ao atualizar pessoa:", error)
+            alert("Erro ao atualizar pessoa")
           }
+        },
+      })
+      setShowPersonDialog(true)
+    },
+    [onUpdate],
+  )
 
-          const response = await fetch(`/api/pessoas/${validId}`, {
-            method: "DELETE",
-          })
+  const handleDeletePerson = useCallback(
+    (pessoaId: number) => {
+      const pessoa = arvore.pessoas?.find((p) => p.id === pessoaId)
+      const personName = pessoa ? `${pessoa.nome} ${pessoa.sobrenome || ""}`.trim() : "esta pessoa"
 
-          if (response.ok) {
-            onUpdate()
-            setConfirmDialog((prev) => ({ ...prev, open: false }))
-          } else {
-            const error = await response.json()
-            let errorMessage = "Erro ao excluir pessoa"
+      setConfirmDialog({
+        open: true,
+        title: "Confirmar Exclusão",
+        description: `Tem certeza que deseja excluir ${personName}? Esta ação não pode ser desfeita.`,
+        variant: "destructive",
+        onConfirm: async () => {
+          try {
+            const validId = Number(pessoaId)
 
-            if (error.error === "Não é possível excluir uma pessoa que possui filhos") {
-              errorMessage = "Não é possível excluir uma pessoa que possui filhos. Remova os filhos primeiro."
-            } else if (error.error === "Pessoa não encontrada") {
-              errorMessage = "Esta pessoa não foi encontrada no sistema."
-            } else if (error.error === "ID inválido") {
-              errorMessage = "Erro interno: ID da pessoa inválido. Tente recarregar a página."
-            } else if (error.error) {
-              errorMessage = error.error
+            if (isNaN(validId) || validId <= 0) {
+              console.log("[v0] Invalid ID detected in frontend")
+              setConfirmDialog({
+                open: true,
+                title: "Erro na Exclusão",
+                description: "ID da pessoa inválido. Tente recarregar a página.",
+                onConfirm: () => setConfirmDialog((prev) => ({ ...prev, open: false })),
+                variant: "destructive",
+              })
+              return
             }
 
+            const response = await fetch(`/api/pessoas/${validId}`, {
+              method: "DELETE",
+            })
+
+            if (response.ok) {
+              onUpdate()
+              setConfirmDialog((prev) => ({ ...prev, open: false }))
+            } else {
+              const error = await response.json()
+              let errorMessage = "Erro ao excluir pessoa"
+
+              if (error.error === "Não é possível excluir uma pessoa que possui filhos") {
+                errorMessage = "Não é possível excluir uma pessoa que possui filhos. Remova os filhos primeiro."
+              } else if (error.error === "Pessoa não encontrada") {
+                errorMessage = "Esta pessoa não foi encontrada no sistema."
+              } else if (error.error === "ID inválido") {
+                errorMessage = "Erro interno: ID da pessoa inválido. Tente recarregar a página."
+              } else if (error.error) {
+                errorMessage = error.error
+              }
+
+              setConfirmDialog({
+                open: true,
+                title: "Erro na Exclusão",
+                description: errorMessage,
+                onConfirm: () => setConfirmDialog((prev) => ({ ...prev, open: false })),
+                variant: "destructive",
+              })
+            }
+          } catch (error) {
+            console.error("[v0] Network error during delete:", error)
             setConfirmDialog({
               open: true,
-              title: "Erro na Exclusão",
-              description: errorMessage,
+              title: "Erro de Conexão",
+              description: "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.",
               onConfirm: () => setConfirmDialog((prev) => ({ ...prev, open: false })),
               variant: "destructive",
             })
           }
-        } catch (error) {
-          console.error("[v0] Network error during delete:", error)
-          setConfirmDialog({
-            open: true,
-            title: "Erro de Conexão",
-            description: "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.",
-            onConfirm: () => setConfirmDialog((prev) => ({ ...prev, open: false })),
-            variant: "destructive",
-          })
-        }
-      },
-    })
+        },
+      })
+    },
+    [arvore.pessoas, onUpdate],
+  )
+
+  const handleSaveTreeComment = async () => {
+    try {
+      const response = await fetch(`/api/arvore/${arvore.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ descricao: treeComment }),
+      })
+      if (response.ok) {
+        onUpdate()
+        setShowCommentModal(false)
+      } else {
+        alert("Erro ao salvar comentário.")
+      }
+    } catch (error) {
+      alert("Erro ao salvar comentário.")
+    }
   }
 
   const generateTreeLayout = useCallback(
@@ -499,7 +581,7 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
       const DEFAULT_Y_SPACING = 450
 
       // Criar nós
-      pessoas.forEach(pessoa => {
+      pessoas.forEach((pessoa) => {
         const node: TreeNode = {
           id: pessoa.id.toString(),
           type: "person",
@@ -521,7 +603,7 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
       })
 
       // Criar arestas (conexões)
-      pessoas.forEach(pessoa => {
+      pessoas.forEach((pessoa) => {
         // Conexões pai -> filho
         if (pessoa.paiId && nodeMap.has(pessoa.paiId)) {
           edgeList.push({
@@ -545,17 +627,14 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
         }
 
         // Conexões de casamento
-        const unioes = [
-          ...(pessoa.unioesComoPessoa1 || []),
-          ...(pessoa.unioesComoPessoa2 || []),
-        ]
+        const unioes = [...(pessoa.unioesComoPessoa1 || []), ...(pessoa.unioesComoPessoa2 || [])]
 
-        unioes.forEach(uniao => {
+        unioes.forEach((uniao) => {
           const spouseId = uniao.pessoa1Id === pessoa.id ? uniao.pessoa2Id : uniao.pessoa1Id
           if (nodeMap.has(spouseId)) {
             // Evitar duplicação de arestas
             const edgeExists = edgeList.some(
-              edge =>
+              (edge) =>
                 edge.id === `edge-casamento-${spouseId}-${pessoa.id}` ||
                 edge.id === `edge-casamento-${pessoa.id}-${spouseId}`,
             )
@@ -572,7 +651,7 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
                   strokeDasharray: "5 5",
                 },
                 sourceHandle: "right",
-                targetHandle: "left"
+                targetHandle: "left",
               })
             }
           }
@@ -584,33 +663,34 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
         edges: edgeList,
       }
     },
-    [arvore.id]
+    [arvore.id, handleAddChild, handleAddParent, handleAddSpouse, handleEditPerson, handleDeletePerson],
   )
 
-  const onNodeDragStop = useCallback((event: React.MouseEvent, node: Node) => {
-    const { id, position } = node
-    const personId = Number(id)
+  const onNodeDragStop = useCallback(
+    async (event: React.MouseEvent, node: Node) => {
+      const { id, position } = node
+      const personId = Number(id)
 
-    if (isNaN(personId)) return
+      if (isNaN(personId)) return
 
-    // Otimisticamente atualiza a UI
-    setNodes((nds) =>
-      nds.map((n) => (n.id === id ? { ...n, position } : n)),
-    )
+      // Otimisticamente atualiza a UI
+      setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, position } : n)))
 
-    // Salva a nova posição no backend
-    fetch(`/api/pessoas/${personId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ x: position.x, y: position.y }),
-    }).catch((error) => {
-      console.error("Falha ao salvar a posição do nó:", error)
-      // TODO: Reverter a posição ou notificar o usuário
-    })
-  }, [setNodes])
+      // Salva a nova posição no backend
+      await fetch(`/api/pessoas/${personId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ x: position.x, y: position.y }),
+      }).catch((error) => {
+        console.error("Falha ao salvar a posição do nó:", error)
+        // TODO: Reverter a posição ou notificar o usuário
+      })
+    },
+    [setNodes],
+  )
 
   // Update nodes and edges when pessoas change
-  React.useEffect(() => {
+  useEffect(() => {
     const { nodes: newNodes, edges: newEdges } = generateTreeLayout(arvore.pessoas || [])
     setNodes(newNodes)
     setEdges(newEdges)
@@ -624,11 +704,17 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
     title: string
     description: string
     person?: Pessoa
+    fixedSexo?: "Masculino" | "Feminino"
+    relationshipType?: "pai" | "mae" | "filho" | "conjuge"
+    currentPersonId?: number
     onSubmit: (data: PersonFormData) => Promise<void>
   }>({
     title: "",
     description: "",
     person: undefined,
+    fixedSexo: undefined,
+    relationshipType: undefined,
+    currentPersonId: undefined,
     onSubmit: async () => {},
   })
 
@@ -689,11 +775,16 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
         </ReactFlow>
       </ReactFlowProvider>
 
-      <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-10 max-w-xs">
-        <h3 className="font-semibold text-sm text-gray-800 mb-3 flex items-center gap-2">
-          <TreePine className="h-4 w-4" />
-          Legenda
-        </h3>
+      <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-10 max-w-xs flex flex-col gap-4">
+        <div className="flex justify-between items-center">
+          <h3 className="font-semibold text-sm text-gray-800 flex items-center gap-2">
+            <TreePine className="h-4 w-4" />
+            Legenda
+          </h3>
+          <Button size="sm" variant="outline" onClick={() => setShowCommentModal(true)} className="h-7 px-2">
+            <MessageSquare className="h-3 w-3 mr-1" /> Comentário
+          </Button>
+        </div>
         <div className="space-y-3">
           {/* Node Types */}
           <div>
@@ -733,11 +824,50 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
                 </div>
                 <span className="text-xs text-gray-600">Parentesco (pai/mãe → filho)</span>
               </div>
-              
+              <div className="flex items-center gap-2">
+                <div className="flex items-center">
+                  <div className="w-4 h-0.5 bg-red-600" style={{ strokeDasharray: "2 2" }}></div>
+                </div>
+                <span className="text-xs text-gray-600">União (casamento)</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Tree Comment Modal */}
+      {showCommentModal && (
+        <div className="absolute bottom-4 left-4 mb-0 ml-[21rem] bg-white rounded-lg shadow-xl border border-gray-200 p-4 z-20 w-80">
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="text-base font-semibold text-gray-800">Comentário da Árvore</h4>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowCommentModal(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <textarea
+            className="w-full p-2 border rounded-md text-sm"
+            rows={5}
+            value={treeComment}
+            onChange={(e) => setTreeComment(e.target.value)}
+            placeholder="Adicione um comentário sobre a árvore..."
+          />
+          <div className="flex justify-end gap-2 mt-3">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                setTreeComment("")
+                handleSaveTreeComment()
+              }}
+            >
+              Excluir
+            </Button>
+            <Button size="sm" onClick={handleSaveTreeComment} className="bg-blue-600 hover:bg-blue-700">
+              Salvar
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* PersonFormDialog */}
       <PersonFormDialog
@@ -747,6 +877,10 @@ export function GenealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
         description={dialogConfig.description}
         person={dialogConfig.person}
         onSubmit={dialogConfig.onSubmit}
+        pessoas={arvore.pessoas}
+        fixedSexo={dialogConfig.fixedSexo}
+        relationshipType={dialogConfig.relationshipType}
+        currentPersonId={dialogConfig.currentPersonId}
       />
 
       <ConfirmationDialog

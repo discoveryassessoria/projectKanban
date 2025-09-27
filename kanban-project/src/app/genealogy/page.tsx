@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { GenealogicalTree } from "@/src/components/genealogical-tree"
+import { genealogicalTree as GenealogicalTree } from "@/src/components/genealogical-tree"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, TreePine } from "lucide-react"
@@ -19,23 +19,47 @@ export default function GenealogyPage() {
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   useEffect(() => {
-    fetchArvores()
+    fetchAllArvores(true)
   }, [])
 
-  const fetchArvores = async () => {
+  const fetchAllArvores = async (setFirstAsCurrent = false) => {
     try {
       const response = await fetch("/api/arvore")
       if (response.ok) {
         const data = await response.json()
         setArvores(data)
-        if (data.length > 0) {
-          setArvoreAtual(data[0])
+        if (setFirstAsCurrent && data.length > 0) {
+          fetchFullTree(data[0].id)
+        } else {
+          setLoading(false)
         }
+      } else {
+        setLoading(false)
       }
     } catch (error) {
       console.error("Erro ao carregar árvores:", error)
+      setLoading(false)
+    }
+  }
+
+  const fetchFullTree = async (arvoreId: number) => {
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/arvore/${arvoreId}`)
+      if (response.ok) {
+        const fullTreeData = await response.json()
+        setArvoreAtual(fullTreeData)
+      }
+    } catch (error) {
+      console.error(`Erro ao carregar dados da árvore ${arvoreId}:`, error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleTreeUpdate = async () => {
+    if (arvoreAtual) {
+      await fetchFullTree(arvoreAtual.id)
     }
   }
 
@@ -54,7 +78,7 @@ export default function GenealogyPage() {
 
       if (response.ok) {
         const novaArvore = await response.json()
-        setArvores([...arvores, novaArvore])
+        await fetchAllArvores()
         setArvoreAtual(novaArvore)
         setShowOnboarding(true)
       }
@@ -65,35 +89,35 @@ export default function GenealogyPage() {
 
   const handleOnboardingComplete = () => {
     setShowOnboarding(false)
-    fetchArvores() // Refresh to get updated tree data
+    handleTreeUpdate()
   }
 
   const handleArvoreUpdate = (updatedArvore: Arvore) => {
-    setArvoreAtual(updatedArvore);
-    setArvores(prevArvores => 
-      prevArvores.map(arvore => 
-        arvore.id === updatedArvore.id ? updatedArvore : arvore
-      )
-    );
-  };
+    setArvoreAtual(updatedArvore)
+    setArvores((prevArvores) =>
+      prevArvores.map((arvore) => (arvore.id === updatedArvore.id ? updatedArvore : arvore)),
+    )
+  }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <TreePine className="h-12 w-12 mx-auto mb-4 text-[#123C73]" />
-          <p className="text-lg text-[#9AA0A6]">Carregando árvores genealógicas...</p> 
+          <p className="text-lg text-[#9AA0A6]">Carregando árvores genealógicas...</p>
         </div>
       </div>
     )
   }
 
   if (showOnboarding && arvoreAtual) {
-    return <TreeOnboardingWizard 
-      arvore={arvoreAtual} 
-      onComplete={handleOnboardingComplete}
-      onArvoreUpdate={handleArvoreUpdate}
-    />
+    return (
+      <TreeOnboardingWizard
+        arvore={arvoreAtual}
+        onComplete={handleOnboardingComplete}
+        onArvoreUpdate={handleArvoreUpdate}
+      />
+    )
   }
 
   if (arvores.length === 0) {
@@ -133,8 +157,10 @@ export default function GenealogyPage() {
             <select
               value={arvoreAtual?.id || ""}
               onChange={(e) => {
-                const arvore = arvores.find((a) => a.id === Number.parseInt(e.target.value))
-                setArvoreAtual(arvore || null)
+                const arvoreId = Number.parseInt(e.target.value)
+                if (arvoreId) {
+                  fetchFullTree(arvoreId)
+                }
               }}
               className="px-3 py-2 border border-border rounded-md bg-background text-foreground"
             >
@@ -161,7 +187,7 @@ export default function GenealogyPage() {
         </div>
       </div>
 
-      {arvoreAtual && !showOnboarding && <GenealogicalTree arvore={arvoreAtual} onUpdate={fetchArvores} />}
+      {arvoreAtual && !showOnboarding && <GenealogicalTree arvore={arvoreAtual} onUpdate={handleTreeUpdate} />}
     </div>
   )
 }
