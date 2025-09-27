@@ -13,14 +13,8 @@ export function SidebarWrapper({ children }: { children: React.ReactNode }) {
     const isAuthPage = pathname.startsWith('/auth')
     
     if (isAuthPage) {
-      // Layout específico para páginas de auth - centralizado e com fundo
-      return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-gray-50/50">
-          <div className="w-full max-w-md">
-            {children}
-          </div>
-        </div>
-      )
+      // Layout específico para páginas de auth - deixa a página controlar completamente o layout
+      return <>{children}</>
     }
     
     // Para outras páginas sem sidebar - layout normal
