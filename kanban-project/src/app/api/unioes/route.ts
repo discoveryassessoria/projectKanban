@@ -8,6 +8,9 @@ export async function GET() {
         pessoa1: true,
         pessoa2: true,
       },
+      orderBy: {
+        id: "asc",
+      },
     })
 
     return NextResponse.json(unioes)
@@ -19,37 +22,35 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { pessoa1Id, pessoa2Id, data_inicio, data_fim, tipo, arvoreId } = await request.json()
+    const body = await request.json()
 
-    if (!pessoa1Id || !pessoa2Id) {
-      return NextResponse.json({ error: "IDs das duas pessoas são obrigatórios" }, { status: 400 })
-    }
+    // Verificar se a união já existe
+    const existingUnion = await prisma.uniao.findFirst({
+      where: {
+        OR: [
+          {
+            pessoa1Id: body.pessoa1Id,
+            pessoa2Id: body.pessoa2Id,
+          },
+          {
+            pessoa1Id: body.pessoa2Id,
+            pessoa2Id: body.pessoa1Id,
+          },
+        ],
+      },
+    })
 
-    if (pessoa1Id === pessoa2Id) {
-      return NextResponse.json({ error: "Uma pessoa não pode ter união consigo mesma" }, { status: 400 })
-    }
-
-    const pessoa1 = await prisma.pessoa.findUnique({ where: { id: Number.parseInt(pessoa1Id) } })
-    const pessoa2 = await prisma.pessoa.findUnique({ where: { id: Number.parseInt(pessoa2Id) } })
-
-    if (!pessoa1 || !pessoa2) {
-      return NextResponse.json({ error: "Uma ou ambas as pessoas não foram encontradas" }, { status: 404 })
-    }
-
-    if (
-      arvoreId &&
-      (pessoa1.arvoreId !== Number.parseInt(arvoreId) || pessoa2.arvoreId !== Number.parseInt(arvoreId))
-    ) {
-      return NextResponse.json({ error: "As pessoas devem pertencer à mesma árvore" }, { status: 400 })
+    if (existingUnion) {
+      return NextResponse.json({ error: "Unique constraint failed: Esta união já existe" }, { status: 400 })
     }
 
     const novaUniao = await prisma.uniao.create({
       data: {
-        pessoa1Id: Number.parseInt(pessoa1Id),
-        pessoa2Id: Number.parseInt(pessoa2Id),
-        data_inicio: data_inicio ? new Date(data_inicio) : null,
-        data_fim: data_fim ? new Date(data_fim) : null,
-        tipo,
+        pessoa1Id: Number(body.pessoa1Id),
+        pessoa2Id: Number(body.pessoa2Id),
+        tipo: body.tipo || "Casamento",
+        data_inicio: body.data_inicio ? new Date(body.data_inicio) : null,
+        data_fim: body.data_fim ? new Date(body.data_fim) : null,
       },
       include: {
         pessoa1: true,

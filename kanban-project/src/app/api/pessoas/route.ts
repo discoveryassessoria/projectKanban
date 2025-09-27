@@ -1,15 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url)
-    const arvoreId = searchParams.get("arvoreId")
-
-    const where = arvoreId ? { arvoreId: Number.parseInt(arvoreId) } : {}
-
     const pessoas = await prisma.pessoa.findMany({
-      where,
       include: {
         pai: true,
         mae: true,
@@ -27,6 +21,9 @@ export async function GET(request: NextRequest) {
           },
         },
       },
+      orderBy: {
+        nome: "asc",
+      },
     })
 
     return NextResponse.json(pessoas)
@@ -38,24 +35,22 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { nome, sobrenome, data_nasc, local_nasc, data_obito, batizado, arvoreId, paiId, maeId } =
-      await request.json()
-
-    if (!nome || !arvoreId) {
-      return NextResponse.json({ error: "Nome e ID da árvore são obrigatórios" }, { status: 400 })
-    }
+    const body = await request.json()
 
     const novaPessoa = await prisma.pessoa.create({
       data: {
-        nome,
-        sobrenome,
-        data_nasc: data_nasc ? new Date(data_nasc) : null,
-        local_nasc,
-        data_obito: data_obito ? new Date(data_obito) : null,
-        batizado,
-        arvoreId: Number.parseInt(arvoreId),
-        paiId: paiId ? Number.parseInt(paiId) : null,
-        maeId: maeId ? Number.parseInt(maeId) : null,
+        nome: body.nome,
+        sobrenome: body.sobrenome || null,
+        sexo: body.sexo || null,
+        data_nasc: body.data_nasc ? new Date(body.data_nasc) : null,
+        local_nasc: body.local_nasc || null,
+        data_obito: body.data_obito ? new Date(body.data_obito) : null,
+        batizado: body.batizado || null,
+        paiId: body.paiId ? Number(body.paiId) : null,
+        maeId: body.maeId ? Number(body.maeId) : null,
+        x: body.x || 0,
+        y: body.y || 0,
+        arvoreId: body.arvoreId ? Number(body.arvoreId) : 1, // Default tree ID
       },
       include: {
         pai: true,

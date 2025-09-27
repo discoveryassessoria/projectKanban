@@ -16,11 +16,11 @@ datasource db {
 
 // Modelo para o usuário do sistema
 model Usuario {
-  id     Int    @id @default(autoincrement())
-  nome   String @db.VarChar(50)
-  email  String @unique @db.VarChar(30)
-  senha  String @db.VarChar(255) // Em um projeto real, armazene o hash da senha, não a senha em si.
-  tipo   String @db.VarChar(15)
+  id    Int    @id @default(autoincrement())
+  nome  String @db.VarChar(50)
+  email String @unique @db.VarChar(30)
+  senha String @db.VarChar(255) // Em um projeto real, armazene o hash da senha, não a senha em si.
+  tipo  String @db.VarChar(15)
 
   // Relacionamento: Um usuário pode estar associado a várias atividades
   atividades UserAtv[]
@@ -28,17 +28,19 @@ model Usuario {
 
 // Modelo para as Pessoas da árvore genealógica
 model Pessoa {
-  id          Int       @id @default(autoincrement())
-  nome        String    @db.VarChar(50)
-  sobrenome   String?   @db.VarChar(40)
-  data_nasc   DateTime?
-  local_nasc  String?   @db.VarChar(30)
-  data_obito  DateTime?
-  batizado    String?   @db.VarChar(10)
-  
+  id         Int       @id @default(autoincrement())
+  nome       String    @db.VarChar(50)
+  sobrenome  String?   @db.VarChar(40)
+  sexo       String?   @db.VarChar(10) // Adicionado para 'Masculino' ou 'Feminino'
+  data_nasc  DateTime?
+  local_nasc String?   @db.VarChar(30)
+  data_obito DateTime?
+  batizado   String?   @db.VarChar(10)
+  comentario String?   @db.Text // Adicionado para comentários
+
   // Campos para salvar a posição do nó na árvore
-  x           Int?
-  y           Int?
+  x Int?
+  y Int?
 
   // Chave estrangeira para a Árvore a que a pessoa pertence
   arvoreId Int
@@ -73,7 +75,7 @@ model Uniao {
   tipo        String?   @db.VarChar(10)
 
   // Chave estrangeira para a primeira pessoa na união
-  pessoa1Id Int 
+  pessoa1Id Int
   pessoa1   Pessoa @relation("Pessoa1", fields: [pessoa1Id], references: [id], onDelete: Cascade)
 
   // Chave estrangeira para a segunda pessoa na união
@@ -81,27 +83,26 @@ model Uniao {
   pessoa2   Pessoa @relation("Pessoa2", fields: [pessoa2Id], references: [id], onDelete: Cascade)
 }
 
-
 // Modelo para a Árvore Genealógica
 model Arvore {
-  id        Int      @id @default(autoincrement())
-  nome      String   @db.VarChar(50)
-  descricao String?  @db.VarChar(200)
+  id        Int     @id @default(autoincrement())
+  nome      String  @db.VarChar(50)
+  descricao String? @db.VarChar(200)
 
   // Referência para a pessoa principal da árvore
   pessoaPrincipalId Int?    @unique
   pessoaPrincipal   Pessoa? @relation("ArvorePrincipal", fields: [pessoaPrincipalId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   // Relacionamento: Uma árvore contém várias pessoas
-  pessoas   Pessoa[] @relation("PessoasNaArvore")
+  pessoas Pessoa[] @relation("PessoasNaArvore")
 }
 
 // Modelo para o Projeto (Kanban)
 model ProjetoKanban {
-  id        Int      @id @default(autoincrement())
-  nome      String   @db.VarChar(50)
-  descricao String?  @db.VarChar(40)
-  
+  id        Int     @id @default(autoincrement())
+  nome      String  @db.VarChar(50)
+  descricao String? @db.VarChar(40)
+
   // Relacionamento: Um projeto tem várias atividades
   atividades Atividade[]
 
@@ -152,26 +153,25 @@ model Status {
   atividades Atividade[]
 }
 
-
 // Os modelos abaixo (Requerente, Contratante) são baseados na estrutura do
 // seu diagrama. Eles parecem representar pessoas ou empresas com papéis específicos.
 model Requerente {
-  id       Int      @id @default(autoincrement())
-  nome     String   @db.VarChar(50)
-  cpf      String?  @db.VarChar(11)
-  rg       String?  @db.VarChar(10)
-  endereco String?  @db.VarChar(100)
-  telefone String?  @db.VarChar(10)
+  id       Int     @id @default(autoincrement())
+  nome     String  @db.VarChar(50)
+  cpf      String? @db.VarChar(11)
+  rg       String? @db.VarChar(10)
+  endereco String? @db.VarChar(100)
+  telefone String? @db.VarChar(10)
 
   projetos ProjetoKanban[]
 }
 
 model Contratante {
-  id       Int      @id @default(autoincrement())
-  nome     String   @db.VarChar(50)
-  cpf      String?  @db.VarChar(11)
-  rg       String?  @db.VarChar(10)
-  endereco String?  @db.VarChar(10) // No seu modelo, o varchar era 10
+  id       Int     @id @default(autoincrement())
+  nome     String  @db.VarChar(50)
+  cpf      String? @db.VarChar(11)
+  rg       String? @db.VarChar(10)
+  endereco String? @db.VarChar(10) // No seu modelo, o varchar era 10
 
   projetos ProjetoKanban[]
 }
