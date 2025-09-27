@@ -44,17 +44,7 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
   const [isAddingStatus, setIsAddingStatus] = useState(false);
 
   useEffect(() => {
-    // Mock data for cards - replace with real data from your API
-    const mockAtividades = projeto.atividades.map(at => ({
-      ...at,
-      data: '13 setembro',
-      responsavel: 'Gabriel Gerbi',
-      tags: [
-        { texto: 'PRAZO ATUALIZADO', cor: '#ef4444' },
-        { texto: 'CONCLUÍDA', cor: '#22c55e' },
-      ],
-    }));
-    setAtividades(mockAtividades);
+    setAtividades(projeto.atividades);
   }, [projeto.atividades]);
 
   const handleAddNewStatus = async (e: React.FormEvent) => {
@@ -89,7 +79,8 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
 
       if (!response.ok) throw new Error('Falha ao criar nova atividade');
 
-      onStatusAdd(); // Re-fetches all project data
+      const { atividade } = await response.json();
+      setAtividades(prev => [...prev, atividade]);
     } catch (error) {
       console.error(error);
       alert('Não foi possível adicionar a atividade.');
@@ -109,15 +100,31 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
     const overContainer = over.data.current?.sortable.containerId || over.id;
 
     if (activeContainer !== overContainer) {
-      // Update card status when moved to a new column
+      const numericOverContainer = parseInt(String(overContainer), 10);
+
+      if (isNaN(numericOverContainer)) {
+        console.error("Invalid drop container id:", overContainer);
+        return;
+      }
+
       setAtividades((prev) => {
         const activeIndex = prev.findIndex((a) => a.id === activeId);
-        prev[activeIndex].statusId = overContainer;
-        return arrayMove(prev, activeIndex, activeIndex);
+        if (activeIndex === -1) {
+          return prev;
+        }
+        return prev.map((item, index) => {
+          if (index === activeIndex) {
+            return { ...item, statusId: numericOverContainer };
+          }
+          return item;
+        });
       });
 
-      // Here you would also make an API call to update the status in the database
-      // Ex: fetch(`/api/atividades/${activeId}`, { method: 'PATCH', body: JSON.stringify({ statusId: overContainer }) });
+      fetch(`/api/atividades/${activeId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statusId: numericOverContainer }),
+      }).catch(console.error);
     }
   };
 

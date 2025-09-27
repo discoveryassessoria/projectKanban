@@ -56,7 +56,7 @@ export function KanbanColumn({ id, title, atividades, headerColor = '#e2e8f0', i
         style={{ backgroundColor: headerColor }}
       >
         <h3 className="font-bold text-lg">{title} <span className="text-sm font-normal">({atividades.length})</span></h3>
-        <Button variant="ghost" size="sm" onClick={() => setIsAdding(true)}>
+        <Button variant="ghost" size="sm" onClick={() => setIsAdding(true)} className="hover:bg-gray-200">
           <Plus className="h-4 w-4 mr-1" /> Adicionar
         </Button>
       </div>
