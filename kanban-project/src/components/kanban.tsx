@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   DndContext,
   closestCenter,
@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/core"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus } from "lucide-react"
+import { Plus, Trash2 } from "lucide-react"
 import { KanbanColumn } from "./kanban/kanban-column"
 import { KanbanCard } from "./kanban/kanban-card"
 import { AtividadeDetailsModal } from "./kanban/atividade-details-modal"
@@ -38,6 +38,10 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
   const [activeAtividade, setActiveAtividade] = useState<Atividade | null>(null)
   const [selectedAtividade, setSelectedAtividade] = useState<AtividadeWithStatus | null>(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [isPanning, setIsPanning] = useState(false)
+  const [startX, setStartX] = useState(0)
+  const [scrollLeft, setScrollLeft] = useState(0)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -50,6 +54,44 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
   useEffect(() => {
     setAtividades(projeto.atividades)
   }, [projeto.atividades])
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!scrollContainerRef.current) return
+    // Only start panning if clicking on the container itself, not on interactive elements
+    if ((e.target as HTMLElement).closest('button, input, [role="button"]')) return
+
+    setIsPanning(true)
+    setStartX(e.pageX - scrollContainerRef.current.offsetLeft)
+    setScrollLeft(scrollContainerRef.current.scrollLeft)
+    scrollContainerRef.current.style.cursor = "grabbing"
+    scrollContainerRef.current.style.userSelect = "none"
+  }
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isPanning || !scrollContainerRef.current) return
+    e.preventDefault()
+    const x = e.pageX - scrollContainerRef.current.offsetLeft
+    const walk = (x - startX) * 1.5 // Multiply by 1.5 for faster scrolling
+    scrollContainerRef.current.scrollLeft = scrollLeft - walk
+  }
+
+  const handleMouseUp = () => {
+    setIsPanning(false)
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.style.cursor = "grab"
+      scrollContainerRef.current.style.userSelect = "auto"
+    }
+  }
+
+  const handleMouseLeave = () => {
+    if (isPanning) {
+      setIsPanning(false)
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.style.cursor = "grab"
+        scrollContainerRef.current.style.userSelect = "auto"
+      }
+    }
+  }
 
   const handleAddNewStatus = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -150,21 +192,92 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
     }
   }
 
+  const handleAtividadeSave = () => {
+    // Refresh the project data
+    onStatusAdd()
+  }
+
+  const handleClearCompleted = async () => {
+    const concluidoStatus = projeto.status.find((s) => s.nome.toLowerCase() === "concluído")
+    if (!concluidoStatus) return
+
+    const completedAtividades = atividades.filter((a) => a.statusId === concluidoStatus.id)
+
+    if (completedAtividades.length === 0) {
+      alert("Não há atividades concluídas para limpar.")
+      return
+    }
+
+    if (!confirm(`Tem certeza que deseja deletar ${completedAtividades.length} atividade(s) concluída(s)?`)) {
+      return
+    }
+
+    try {
+      // Delete all completed activities
+      await Promise.all(
+        completedAtividades.map((atividade) =>
+          fetch(`/api/atividades/${atividade.id}`, {
+            method: "DELETE",
+          }),
+        ),
+      )
+
+      // Update local state
+      setAtividades((prev) => prev.filter((a) => a.statusId !== concluidoStatus.id))
+
+      // Refresh project data
+      onStatusAdd()
+    } catch (error) {
+      console.error("Erro ao limpar atividades concluídas:", error)
+      alert("Não foi possível limpar as atividades concluídas.")
+    }
+  }
+
   return (
     <>
+      <div className="flex justify-end mb-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleClearCompleted}
+          className="bg-zinc-900 border-zinc-800 hover:bg-red-950 hover:border-red-900 hover:text-red-400 text-zinc-400"
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Limpar Concluídas
+        </Button>
+      </div>
+
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={onDragEnd}
         collisionDetection={closestCenter}
       >
-        <div className="overflow-x-auto custom-scrollbar">
+        <div
+          ref={scrollContainerRef}
+          className="overflow-x-auto custom-scrollbar cursor-grab active:cursor-grabbing"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+        >
           <div
             className="grid h-full gap-4"
             style={{ gridTemplateColumns: `repeat(${projeto.status.length + 1}, minmax(320px, 1fr))` }}
           >
             {projeto.status
-              .sort((a, b) => a.id - b.id)
+              .sort((a, b) => {
+                // Check if either status is "CONCLUÍDO" (case insensitive)
+                const aIsConcluido = a.nome.toLowerCase() === "concluído"
+                const bIsConcluido = b.nome.toLowerCase() === "concluído"
+
+                // If a is CONCLUÍDO, it should come after b
+                if (aIsConcluido) return 1
+                // If b is CONCLUÍDO, it should come after a
+                if (bIsConcluido) return -1
+                // Otherwise, sort by id
+                return a.id - b.id
+              })
               .map((status, index) => (
                 <KanbanColumn
                   key={status.id}
@@ -176,6 +289,8 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
                   isLast={index === projeto.status.length - 1}
                   onAtividadeAdd={handleAddNewAtividade}
                   onAtividadeClick={handleAtividadeClick}
+                  onStatusUpdate={onStatusAdd}
+                  projetoId={projeto.id}
                 />
               ))}
 
@@ -232,6 +347,7 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
         atividade={selectedAtividade}
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
+        onSave={handleAtividadeSave}
       />
     </>
   )

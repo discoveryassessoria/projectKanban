@@ -5,10 +5,26 @@ import type React from "react"
 import { SortableContext } from "@dnd-kit/sortable"
 import { useDroppable } from "@dnd-kit/core"
 import { Button } from "@/components/ui/button"
-import { Plus, MoreVertical } from "lucide-react"
+import { Plus, MoreVertical, Edit2, Trash2, ArrowUp, ArrowDown } from "lucide-react"
 import { useMemo, useState } from "react"
 import { KanbanCard } from "./kanban-card"
 import { Input } from "@/components/ui/input"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 import type { Atividade } from "@/src/types/kanban"
 
 interface KanbanColumnProps {
@@ -20,6 +36,8 @@ interface KanbanColumnProps {
   isLast?: boolean
   onAtividadeAdd: (nome: string, statusId: number) => void
   onAtividadeClick?: (atividade: Atividade) => void
+  onStatusUpdate?: () => void
+  projetoId?: number
 }
 
 export function KanbanColumn({
@@ -31,10 +49,17 @@ export function KanbanColumn({
   isLast,
   onAtividadeAdd,
   onAtividadeClick,
+  onStatusUpdate,
+  projetoId,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id })
   const [isAdding, setIsAdding] = useState(false)
   const [newAtividadeName, setNewAtividadeName] = useState("")
+
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editedStatusName, setEditedStatusName] = useState(title)
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   const atividadesIds = useMemo(() => atividades.map((a) => a.id), [atividades])
 
@@ -46,70 +71,225 @@ export function KanbanColumn({
     setIsAdding(false)
   }
 
+  const handleEditStatus = async () => {
+    if (!editedStatusName.trim()) return
+
+    try {
+      const response = await fetch(`/api/status/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome: editedStatusName }),
+      })
+
+      if (!response.ok) throw new Error("Falha ao atualizar status")
+
+      setIsEditDialogOpen(false)
+      onStatusUpdate?.()
+    } catch (error) {
+      console.error(error)
+      alert("Não foi possível atualizar o status.")
+    }
+  }
+
+  const handleDeleteStatus = async () => {
+    try {
+      const response = await fetch(`/api/status/${id}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Falha ao excluir status")
+      }
+
+      setIsDeleteDialogOpen(false)
+      onStatusUpdate?.()
+    } catch (error: any) {
+      console.error(error)
+      alert(error.message || "Não foi possível excluir o status.")
+    }
+  }
+
+  const handleMoveStatus = async (direction: "up" | "down") => {
+    try {
+      const response = await fetch(`/api/status/${id}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ direction, projetoId }),
+      })
+
+      if (!response.ok) throw new Error("Falha ao mover status")
+
+      onStatusUpdate?.()
+    } catch (error) {
+      console.error(error)
+      alert("Não foi possível mover o status.")
+    }
+  }
+
   return (
-    <div
-      ref={setNodeRef}
-      className={`flex flex-col h-full bg-zinc-950 rounded-lg border transition-all ${
-        isOver ? "border-indigo-500 ring-2 ring-indigo-500/20" : "border-zinc-800"
-      }`}
-    >
-      <div className="p-4 border-b border-zinc-800" style={{ backgroundColor: headerColor }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h3 className="font-bold text-sm text-zinc-100">{title}</h3>
-            <span className="px-2 py-0.5 text-xs font-medium bg-zinc-800 text-zinc-400 rounded-full">
-              {atividades.length}
-            </span>
+    <>
+      <div
+        ref={setNodeRef}
+        className={`flex flex-col h-full bg-zinc-950 rounded-lg border transition-all ${
+          isOver ? "border-indigo-500 ring-2 ring-indigo-500/20" : "border-zinc-800"
+        }`}
+      >
+        <div className="p-4 border-b border-zinc-800" style={{ backgroundColor: headerColor }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-sm text-zinc-100">{title}</h3>
+              <span className="px-2 py-0.5 text-xs font-medium bg-zinc-800 text-zinc-400 rounded-full">
+                {atividades.length}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsAdding(true)}
+                className="h-7 px-2 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setEditedStatusName(title)
+                      setIsEditDialogOpen(true)
+                    }}
+                    className="text-zinc-300 hover:bg-zinc-800 cursor-pointer"
+                  >
+                    <Edit2 className="h-4 w-4 mr-2" />
+                    Editar nome
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-zinc-800" />
+                  <DropdownMenuItem
+                    onClick={() => handleMoveStatus("up")}
+                    disabled={isFirst}
+                    className="text-zinc-300 hover:bg-zinc-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ArrowUp className="h-4 w-4 mr-2" />
+                    Mover para cima
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleMoveStatus("down")}
+                    disabled={isLast}
+                    className="text-zinc-300 hover:bg-zinc-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ArrowDown className="h-4 w-4 mr-2" />
+                    Mover para baixo
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-zinc-800" />
+                  <DropdownMenuItem
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    className="text-red-400 hover:bg-zinc-800 hover:text-red-300 cursor-pointer"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir status
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsAdding(true)}
-              className="h-7 px-2 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 px-2 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 min-h-[200px]">
+          <SortableContext items={atividadesIds}>
+            {atividades.map((atividade) => (
+              <KanbanCard key={atividade.id} {...atividade} onClick={() => onAtividadeClick?.(atividade)} />
+            ))}
+          </SortableContext>
+
+          {isAdding && (
+            <form onSubmit={handleAddSubmit} className="mt-2">
+              <Input
+                autoFocus
+                placeholder="Nome da atividade..."
+                value={newAtividadeName}
+                onChange={(e) => setNewAtividadeName(e.target.value)}
+                className="mb-2 bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsAdding(false)}
+                  className="hover:bg-zinc-800"
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                  Adicionar
+                </Button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 min-h-[200px]">
-        <SortableContext items={atividadesIds}>
-          {atividades.map((atividade) => (
-            <KanbanCard key={atividade.id} {...atividade} onClick={() => onAtividadeClick?.(atividade)} />
-          ))}
-        </SortableContext>
-
-        {isAdding && (
-          <form onSubmit={handleAddSubmit} className="mt-2">
-            <Input
-              autoFocus
-              placeholder="Nome da atividade..."
-              value={newAtividadeName}
-              onChange={(e) => setNewAtividadeName(e.target.value)}
-              className="mb-2 bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
-            />
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsAdding(false)}
-                className="hover:bg-zinc-800"
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700">
-                Adicionar
-              </Button>
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100">
+          <DialogHeader>
+            <DialogTitle>Editar Status</DialogTitle>
+            <DialogDescription className="text-zinc-400">Altere o nome do status</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="status-name">Nome do Status</Label>
+              <Input
+                id="status-name"
+                value={editedStatusName}
+                onChange={(e) => setEditedStatusName(e.target.value)}
+                className="bg-zinc-950 border-zinc-800 text-zinc-100"
+              />
             </div>
-          </form>
-        )}
-      </div>
-    </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)} className="hover:bg-zinc-800">
+              Cancelar
+            </Button>
+            <Button onClick={handleEditStatus} className="bg-indigo-600 hover:bg-indigo-700">
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100">
+          <DialogHeader>
+            <DialogTitle>Excluir Status</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Tem certeza que deseja excluir o status "{title}"? Esta ação não pode ser desfeita.
+              {atividades.length > 0 && (
+                <span className="block mt-2 text-red-400">
+                  Atenção: Este status possui {atividades.length} atividade(s). Elas também serão excluídas.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="hover:bg-zinc-800">
+              Cancelar
+            </Button>
+            <Button onClick={handleDeleteStatus} className="bg-red-600 hover:bg-red-700">
+              Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
