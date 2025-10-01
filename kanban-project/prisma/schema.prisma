@@ -107,6 +107,7 @@ model Atividade {
   nome         String    @db.VarChar(20)
   descricao    String?   @db.VarChar(40)
   data_termino DateTime?
+  data_criacao DateTime  @default(now())
 
   // Chave estrangeira para o Projeto a que pertence
   projetoId Int
