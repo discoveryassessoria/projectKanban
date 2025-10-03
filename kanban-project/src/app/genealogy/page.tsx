@@ -1,16 +1,23 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { genealogicalTree as GenealogicalTree } from "@/src/components/genealogical-tree"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect, useRef, createRef } from "react"
+import { genealogicalTree as GenealogicalTree } from "@/src/components/genealogical-tree" // Renomeado para evitar conflito
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, TreePine } from "lucide-react"
 import { TreeOnboardingWizard } from "@/src/components/tree-onboarding-wizard"
 import type { Arvore as PrismaArvore, Pessoa as PrismaPessoa } from "@prisma/client"
+import { io, type Socket } from "socket.io-client"
+import type { GenealogicalTreeHandle } from "@/src/components/genealogical-tree"
+import Swal from "sweetalert2"
+import withReactContent from "sweetalert2-react-content"
 
 type Arvore = PrismaArvore & {
   pessoas?: (PrismaPessoa & { [key: string]: any })[]
+  commentPosX?: number | null
+  commentPosY?: number | null
 }
+import { Edit3 } from "lucide-react"
 
 export default function GenealogyPage() {
   const [arvores, setArvores] = useState<Arvore[]>([])
@@ -18,8 +25,38 @@ export default function GenealogyPage() {
   const [loading, setLoading] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
+  const socketRef = useRef<Socket | null>(null)
+  const treeRef = useRef<GenealogicalTreeHandle>(null)
+
+  const MySwal = withReactContent(Swal)
+
   useEffect(() => {
     fetchAllArvores(true)
+
+    // Inicializa o WebSocket
+    const initializeSocket = async () => {
+      socketRef.current = io({
+        path: "/api/socket_io",
+        addTrailingSlash: false,
+      })
+
+      socketRef.current.on("connect", () => {
+        console.log("Socket conectado!", socketRef.current?.id)
+      })
+
+      socketRef.current.on("update-tree", (arvoreId: number) => {
+        console.log(`Recebida atualização para a árvore ${arvoreId}`)
+        if (arvoreAtual && arvoreAtual.id === arvoreId) {
+          handleTreeUpdate()
+        }
+      })
+    }
+
+    initializeSocket()
+
+    return () => {
+      socketRef.current?.disconnect()
+    }
   }, [])
 
   const fetchAllArvores = async (setFirstAsCurrent = false) => {
@@ -49,6 +86,11 @@ export default function GenealogyPage() {
       if (response.ok) {
         const fullTreeData = await response.json()
         setArvoreAtual(fullTreeData)
+
+        // Entra na "sala" da árvore no WebSocket
+        if (socketRef.current) {
+          socketRef.current.emit("join-tree-room", arvoreId)
+        }
       }
     } catch (error) {
       console.error(`Erro ao carregar dados da árvore ${arvoreId}:`, error)
@@ -64,26 +106,125 @@ export default function GenealogyPage() {
   }
 
   const criarNovaArvore = async () => {
-    const nome = prompt("Nome da nova árvore genealógica:")
-    if (!nome) return
+    const { value: nome } = await MySwal.fire({
+      title: "Criar Nova Árvore",
+      text: "Qual será o nome da sua nova árvore genealógica?",
+      input: "text",
+      inputPlaceholder: "Ex: Família Silva",
+      confirmButtonText: "Criar Árvore",
+      customClass: { popup: "font-sans" },
+      confirmButtonColor: "#123C73",
+      showCancelButton: true,
+      cancelButtonText: "Cancelar",
+      inputValidator: (value) => {
+        if (!value) {
+          return "Você precisa digitar um nome!"
+        }
+      },
+    })
 
-    try {
-      const response = await fetch("/api/arvore", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ nome }),
-      })
+    if (nome) {
+      try {
+        MySwal.fire({
+          title: "Criando árvore...",
+          allowOutsideClick: false,
+          customClass: { popup: "font-sans" },
+          didOpen: () => {
+            MySwal.showLoading()
+          },
+        })
 
-      if (response.ok) {
-        const novaArvore = await response.json()
-        await fetchAllArvores()
-        setArvoreAtual(novaArvore)
-        setShowOnboarding(true)
+        const response = await fetch("/api/arvore", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nome }),
+        })
+
+        if (response.ok) {
+          const novaArvore = await response.json()
+          await fetchAllArvores()
+          setArvoreAtual(novaArvore)
+          setShowOnboarding(true)
+          MySwal.close()
+        } else {
+          throw new Error("Falha ao criar a árvore.")
+        } 
+      } catch (error) {
+        MySwal.fire("Erro", error instanceof Error ? error.message : "Não foi possível criar a árvore.", "error")
       }
-    } catch (error) {
-      console.error("Erro ao criar árvore:", error)
+    }
+  }
+
+  const handleRenameTree = async () => {
+    if (!arvoreAtual) return;
+
+    const { value: newName } = await MySwal.fire({
+      title: "Renomear Árvore",
+      input: "text",
+      inputValue: arvoreAtual.nome,
+      inputPlaceholder: "Digite o novo nome da árvore",
+      customClass: { popup: "font-sans" },
+      confirmButtonText: "Salvar",
+      showCancelButton: true,
+      inputValidator: (value) => {
+        if (!value) {
+          return "O nome não pode ser vazio!";
+        }
+      },
+    });
+
+    if (newName && newName !== arvoreAtual.nome) {
+      try {
+        const response = await fetch(`/api/arvore/${arvoreAtual.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nome: newName }),
+        });
+
+        if (response.ok) {
+          MySwal.fire({ title: "Sucesso!", text: "O nome da árvore foi atualizado.", icon: "success", customClass: { popup: "font-sans" } });
+          handleTreeUpdate(); // Recarrega os dados da árvore
+        } else {
+          MySwal.fire({ title: "Erro", text: "Não foi possível renomear a árvore.", icon: "error", customClass: { popup: "font-sans" } });
+        }
+      } catch (error) {
+        MySwal.fire({ title: "Erro", text: "Ocorreu um erro de conexão.", icon: "error", customClass: { popup: "font-sans" } });
+      }
+    }
+  };
+
+  const handleDeleteTree = async () => {
+    if (!arvoreAtual) return
+
+    const { isConfirmed } = await MySwal.fire({
+      title: "Você tem certeza?",
+      html: `Você está prestes a excluir a árvore "<strong>${arvoreAtual.nome}</strong>".<br/>Esta ação não pode ser desfeita.`,
+      icon: "warning",
+      customClass: { popup: "font-sans" },
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Sim, excluir!",
+      cancelButtonText: "Cancelar",
+    })
+
+    if (isConfirmed) {
+      try {
+        const response = await fetch(`/api/arvore/${arvoreAtual.id}`, {
+          method: "DELETE",
+        })
+
+        if (response.ok) {
+          MySwal.fire({ title: "Excluída!", text: "Sua árvore foi excluída com sucesso.", icon: "success", customClass: { popup: "font-sans" } })
+          setArvoreAtual(null) // Limpa a árvore atual
+          await fetchAllArvores(true) // Recarrega as árvores e define a primeira como atual
+        } else {
+          const error = await response.json()
+          MySwal.fire({ title: "Erro", text: error.error || "Não foi possível excluir a árvore.", icon: "error", customClass: { popup: "font-sans" } })
+        }
+      } catch (error) {
+        MySwal.fire({ title: "Erro", text: "Ocorreu um erro de conexão.", icon: "error", customClass: { popup: "font-sans" } })
+      }
     }
   }
 
@@ -150,7 +291,12 @@ export default function GenealogyPage() {
             <TreePine className="h-8 w-8 text-[#123C73]" />
             <div>
               <h1 className="text-2xl font-bold text-[#123C73]">Árvore Genealógica</h1>
-              <p className="text-[#9AA0A6]">{arvoreAtual?.nome || "Selecione uma árvore"}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-[#9AA0A6]">{arvoreAtual?.nome || "Selecione uma árvore"}</p>
+                {arvoreAtual && (
+                  <button onClick={handleRenameTree} title="Renomear árvore" className="text-gray-400 hover:text-gray-600"><Edit3 className="h-3 w-3" /></button>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -176,18 +322,26 @@ export default function GenealogyPage() {
             </Button>
             {arvoreAtual && (
               <Button
-                onClick={() => setShowOnboarding(true)}
+                onClick={() => treeRef.current?.addUnlinkedPerson()}
                 variant="outline"
                 className="border-[#123C73] text-[#123C73] hover:bg-[#123C73] hover:text-white"
               >
                 Cadastrar Pessoas
               </Button>
             )}
+            {arvoreAtual && (
+              <Button
+                onClick={handleDeleteTree}
+                variant="destructive"
+              >
+                Excluir Árvore
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
-      {arvoreAtual && !showOnboarding && <GenealogicalTree arvore={arvoreAtual} onUpdate={handleTreeUpdate} />}
+      {arvoreAtual && !showOnboarding && <GenealogicalTree ref={treeRef} arvore={arvoreAtual} onUpdate={handleTreeUpdate} />}
     </div>
   )
 }

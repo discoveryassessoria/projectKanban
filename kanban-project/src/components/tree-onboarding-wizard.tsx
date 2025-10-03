@@ -7,10 +7,14 @@ import { Progress } from "@/components/ui/progress"
 import { PersonFormDialog, type PersonFormData } from "@/src/components/person-form-dialog"
 import { TreePine, User, Users, Heart, ArrowRight, CheckCircle } from "lucide-react"
 import type { Arvore as PrismaArvore, Pessoa as PrismaPessoa } from "@prisma/client"
+import Swal from "sweetalert2";
+import withReactContent from "sweetalert2-react-content";
 
 // Estendemos o tipo da árvore para garantir que 'pessoas' esteja sempre incluído.
 type Arvore = PrismaArvore & {
   pessoas?: (PrismaPessoa & { [key: string]: any })[]
+  commentPosX?: number | null
+  commentPosY?: number | null
 }
 type Pessoa = PrismaPessoa
 
@@ -22,6 +26,8 @@ interface TreeOnboardingWizardProps {
 
 type OnboardingStep = "welcome" | "add-self" | "add-parents" | "add-spouse" | "complete"
 
+const MySwal = withReactContent(Swal)
+
 export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: TreeOnboardingWizardProps) {
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("welcome")
   const [showPersonDialog, setShowPersonDialog] = useState(false)
@@ -29,7 +35,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
     title: string
     description: string
     fixedSexo?: "Masculino" | "Feminino"
-    onSubmit: (data: PersonFormData) => Promise<void>
+    onSubmit: (data: PersonFormData | { id: number }) => Promise<void>
   }>({
     title: "",
     description: "",
@@ -56,7 +62,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
         const response = await fetch("/api/pessoas", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...data, arvoreId: arvore.id, sexo: data.sexo || null }),
+          body: JSON.stringify({ ...data, arvoreId: arvore.id, sexo: (data as PersonFormData).sexo || null }),
         })
         if (response.ok) {
           const newPerson: Pessoa = await response.json()
@@ -67,8 +73,10 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
             body: JSON.stringify({ pessoaPrincipalId: newPerson.id }),
           });
           if (arvoreUpdateResponse.ok) {
-            const updatedArvore = await arvoreUpdateResponse.json();
-            onArvoreUpdate(updatedArvore); // Atualiza o estado da árvore na página pai
+            // Recarrega a árvore completa para garantir que a lista de pessoas esteja atualizada
+            const fullTreeResponse = await fetch(`/api/arvore/${arvore.id}`);
+            const fullTree = await fullTreeResponse.json();
+            onArvoreUpdate(fullTree);
             setCurrentStep("add-parents")
           } else {
             alert("Erro ao definir a pessoa principal na árvore.")
@@ -87,14 +95,19 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
       onSubmit: async (data) => {
         const selfPerson = arvore.pessoas?.find((p) => p.id === arvore.pessoaPrincipalId)
         if (!selfPerson) {
-          alert("Erro: Pessoa principal não encontrada")
+          MySwal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Pessoa principal não encontrada para adicionar um parente.',
+            customClass: { popup: "font-sans" },
+          });
           return
         }
 
         try {
           let parentId: number
 
-          if (data.id) {
+          if ("id" in data && data.id) {
             // Usando pessoa existente
             parentId = data.id
           } else {
@@ -113,7 +126,12 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
 
             if (!response.ok) {
               const error = await response.json()
-              alert(error.error || `Erro ao adicionar ${parentType}`)
+              MySwal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: error.error || `Erro ao adicionar ${parentType}`,
+                customClass: { popup: "font-sans" },
+              });
               return
             }
             const parent = await response.json()
@@ -131,14 +149,31 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
             const arvoreResponse = await fetch(`/api/arvore/${arvore.id}`)
             const updatedArvore = await arvoreResponse.json()
             onArvoreUpdate(updatedArvore)
-            alert(`${parentType === "pai" ? "Pai" : "Mãe"} adicionado(a) com sucesso!`)
+            MySwal.fire({
+              icon: 'success',
+              title: 'Sucesso!',
+              text: `${parentType === "pai" ? "Pai" : "Mãe"} adicionado(a) com sucesso!`,
+              customClass: { popup: "font-sans" },
+              timer: 2000,
+              showConfirmButton: false,
+            });
           } else {
             const error = await updateResponse.json()
-            alert(error.error || `Erro ao vincular ${parentType}`)
+            MySwal.fire({
+              icon: 'error',
+              title: 'Erro',
+              text: error.error || `Erro ao vincular ${parentType}`,
+              customClass: { popup: "font-sans" },
+            });
           }
         } catch (error) {
           console.error(`Erro ao adicionar ${parentType}:`, error)
-          alert(`Erro ao adicionar ${parentType}`)
+          MySwal.fire({
+            icon: 'error',
+            title: 'Erro Inesperado',
+            text: `Ocorreu um erro ao adicionar ${parentType}.`,
+            customClass: { popup: "font-sans" },
+          });
         }
       },
     })
@@ -153,24 +188,34 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
       onSubmit: async (data) => {
         const selfPerson = arvore.pessoas?.find(p => p.id === arvore.pessoaPrincipalId)
         if (!selfPerson) {
-          alert("Erro: Pessoa principal não encontrada")
+          MySwal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Pessoa principal não encontrada para adicionar um cônjuge.',
+            customClass: { popup: "font-sans" },
+          });
           return
         }
 
         let spouseId: number
 
-        if (data.id) {
+        if ("id" in data && data.id) {
           spouseId = data.id
         } else {
           const response = await fetch("/api/pessoas", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...data, arvoreId: arvore.id, sexo: data.sexo || null }),
+             body: JSON.stringify({ ...data, arvoreId: arvore.id, sexo: (data as PersonFormData).sexo || null }),
           })
 
           if (!response.ok) {
             const error = await response.json()
-            alert(error.error || "Erro ao adicionar cônjuge")
+            MySwal.fire({
+              icon: 'error',
+              title: 'Erro',
+              text: error.error || "Erro ao adicionar cônjuge",
+              customClass: { popup: "font-sans" },
+            });
             return
           }
           const spouse = await response.json()
@@ -192,13 +237,26 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
           const arvoreResponse = await fetch(`/api/arvore/${arvore.id}`)
           const updatedArvore = await arvoreResponse.json()
           onArvoreUpdate(updatedArvore)
+          MySwal.fire({
+            icon: 'success',
+            title: 'Sucesso!',
+            text: 'Cônjuge adicionado e união criada com sucesso!',
+            customClass: { popup: "font-sans" },
+            timer: 2000,
+            showConfirmButton: false,
+          });
           setCurrentStep("complete")
         } else {
           const error = await unionResponse.json()
           if (error.error?.includes("Unique constraint failed")) {
-            alert("Erro: Esta união já existe.")
+            MySwal.fire({ title: 'Erro', text: 'Esta união já existe.', icon: 'error', customClass: { popup: "font-sans" } });
           } else {
-            alert(error.error || "Erro ao criar união")
+            MySwal.fire({
+              icon: 'error',
+              title: 'Erro',
+              text: error.error || "Erro ao criar união",
+              customClass: { popup: "font-sans" },
+            });
           }
         }
       },

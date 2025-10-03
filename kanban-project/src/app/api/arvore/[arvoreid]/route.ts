@@ -1,10 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ arvoreid: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: { arvoreid: string } }) {
   try {
-    const { arvoreid } = await params
-    const id = Number.parseInt(arvoreid)
+    const id = Number.parseInt(params.arvoreid)
 
     if (isNaN(id)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
@@ -45,39 +44,42 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ arvoreid: string }> }) {
+export async function PUT(request: NextRequest, { params }: { params: { arvoreid: string } }) {
   try {
-    const { arvoreid } = await params
-    const id = Number.parseInt(arvoreid)
-    const { nome, descricao, pessoaPrincipalId } = await request.json()
+    const id = Number.parseInt(params.arvoreid)
+    const { nome, descricao, pessoaPrincipalId, commentPosX, commentPosY } = await request.json()
 
     if (isNaN(id)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
 
-    const arvoreAtualizada = await prisma.arvore.update({
+    // Filtra apenas os campos que foram enviados na requisição para não sobrescrever com `undefined`
+    const dataToUpdate: { [key: string]: any } = {}
+    if (nome !== undefined) dataToUpdate.nome = nome
+    if (descricao !== undefined) dataToUpdate.descricao = descricao
+    if (pessoaPrincipalId !== undefined) dataToUpdate.pessoaPrincipalId = pessoaPrincipalId
+    if (commentPosX !== undefined) dataToUpdate.commentPosX = commentPosX
+    if (commentPosY !== undefined) dataToUpdate.commentPosY = commentPosY
+
+    if (Object.keys(dataToUpdate).length === 0) {
+      return NextResponse.json({ error: "Nenhum dado para atualizar" }, { status: 400 })
+    }
+
+    const updatedArvore = await prisma.arvore.update({
       where: { id },
-      data: {
-        ...(nome && { nome }),
-        ...(descricao && { descricao }),
-        ...(pessoaPrincipalId && { pessoaPrincipalId: Number(pessoaPrincipalId) }),
-      },
-      include: {
-        pessoas: true,
-      },
+      data: dataToUpdate,
     })
 
-    return NextResponse.json(arvoreAtualizada)
+    return NextResponse.json(updatedArvore)
   } catch (error) {
     console.error("Erro ao atualizar árvore:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ arvoreid: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: { arvoreid: string } }) {
   try {
-    const { arvoreid } = await params
-    const id = Number.parseInt(arvoreid)
+    const id = Number.parseInt(params.arvoreid)
 
     if (isNaN(id)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
@@ -85,20 +87,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     // Usar uma transação para garantir que tudo seja deletado atomicamente
     await prisma.$transaction(async (tx) => {
-      // 1. Deletar todas as pessoas associadas à árvore (onDelete: Cascade cuidará das uniões)
-      await tx.pessoa.deleteMany({
-        where: { arvoreId: id },
-      });
-
-      // 2. Deletar a árvore
-      await tx.arvore.delete({
-        where: { id },
-      });
+      await tx.uniao.deleteMany({ where: { pessoa1: { arvoreId: id } } })
+      await tx.pessoa.deleteMany({ where: { arvoreId: id } })
+      await tx.arvore.delete({ where: { id } })
     })
 
-    return NextResponse.json({ message: "Árvore excluída com sucesso" })
+    return NextResponse.json({ message: "Árvore e todos os seus dados foram excluídos com sucesso" })
   } catch (error) {
     console.error("Erro ao excluir árvore:", error)
-    return NextResponse.json({ error: "Erro ao excluir árvore. Verifique se ela não possui dependências." }, { status: 500 })
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }

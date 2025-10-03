@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-import { useCallback, useState, useMemo, useEffect } from "react"
+import React, { useCallback, useState, useMemo, useEffect, forwardRef, useImperativeHandle } from "react"
 import ReactFlow, {
   addEdge,
   type Connection,
@@ -39,13 +38,15 @@ import {
   User,
   UserPlus,
   TreePine,
-  MessageSquare,
   X,
+  StickyNote,
+  UserPlus2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Pessoa, Arvore, TreeNode } from "@/src/types/genealogy"
 import { PersonFormDialog, type PersonFormData, type ExistingPersonFormData } from "@/src/components/person-form-dialog"
-import { ConfirmationDialog } from "@/src/components/confirmation-dialog"
+import Swal from "sweetalert2"
+import withReactContent from "sweetalert2-react-content"
 
 const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
   const { pessoa, onAddChild, onAddParent, onAddSpouse, onEdit, onDelete, relationshipType } = data
@@ -251,38 +252,74 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
   )
 }
 
+const CommentNode = ({ data }: { data: { comment: string; onCommentChange: (comment: string) => void } }) => {
+  const [isEditing, setIsEditing] = useState(false)
+  const [text, setText] = useState(data.comment)
+
+  const handleSave = () => {
+    data.onCommentChange(text)
+    setIsEditing(false)
+  }
+
+  return (
+    <Card className="group w-60 bg-yellow-100 border-yellow-300 shadow-lg hover:scale-105 transition-transform">
+      <Handle type="target" position={Position.Top} className="!bg-transparent !border-none" />
+      <Handle type="source" position={Position.Bottom} className="!bg-transparent !border-none" />
+      <div className="p-3">
+        <div className="flex justify-between items-center mb-2">
+          <h4 className="font-bold text-sm text-yellow-800 flex items-center gap-2">
+            <StickyNote className="h-4 w-4" />
+            Comentário
+          </h4>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsEditing(!isEditing)}>
+            <Edit3 className="h-3 w-3 text-yellow-700" />
+          </Button>
+        </div>
+        {isEditing ? (
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onBlur={handleSave}
+            className="w-full p-1 border rounded-md text-sm bg-yellow-50"
+            rows={4}
+            autoFocus
+          />
+        ) : (
+          <p className="text-sm text-yellow-900 whitespace-pre-wrap break-words">{data.comment || "Clique para editar..."}</p>
+        )}
+      </div>
+    </Card>
+  )
+}
+
 interface GenealogicalTreeProps {
-  arvore: Arvore
+  arvore: Arvore & {
+    commentPosX?: number | null
+    commentPosY?: number | null
+  }
   onUpdate?: () => void
   className?: string
 }
 
-export function genealogicalTree({ arvore, onUpdate = () => {}, className }: GenealogicalTreeProps) {
+export interface GenealogicalTreeHandle {
+  addUnlinkedPerson: () => void;
+}
+
+const MySwal = withReactContent(Swal)
+
+const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, GenealogicalTreeProps>(
+  ({ arvore, onUpdate = () => {}, className }, ref) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
 
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([])
-  const [showCommentModal, setShowCommentModal] = useState(false)
-  const [treeComment, setTreeComment] = useState(arvore.descricao || "")
 
   const nodeTypes = useMemo(
     () => ({
       person: PersonNode,
+      comment: CommentNode as React.FC,
     }),
     [],
   )
-
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean
-    title: string
-    description: string
-    onConfirm: () => void
-    variant?: "default" | "destructive"
-  }>({
-    open: false,
-    title: "",
-    description: "",
-    onConfirm: () => {},
-  })
 
   const isExistingPersonData = (data: PersonFormData | ExistingPersonFormData): data is ExistingPersonFormData => {
     return 'id' in data && typeof data.id === 'number';
@@ -297,19 +334,22 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
         currentPersonId: parentId,
         onSubmit: async (data: PersonFormData | ExistingPersonFormData) => {
           try {
+            const parentPerson = arvore.pessoas?.find(p => p.id === parentId);
+            const parentRelationship = parentPerson?.sexo === 'Feminino' ? { maeId: parentId } : { paiId: parentId };
+
             if (isExistingPersonData(data)) {
               // Para pessoa existente, apenas vincula como filho
               const updateResponse = await fetch(`/api/pessoas/${data.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ paiId: parentId }),
+                body: JSON.stringify(parentRelationship),
               })
               
               if (updateResponse.ok) {
                 onUpdate()
               } else {
                 const error = await updateResponse.json()
-                alert(error.error || "Erro ao vincular filho")
+                MySwal.fire({ title: "Erro", text: error.error || "Erro ao vincular filho(a)", icon: "error", customClass: { popup: "font-sans" } })
               }
             } else {
               // Para pessoa nova, cria e vincula
@@ -319,7 +359,7 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
                 body: JSON.stringify({
                   ...data,
                   arvoreId: arvore.id,
-                  paiId: parentId,
+                  ...parentRelationship,
                 }),
               })
               
@@ -327,18 +367,18 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
                 onUpdate()
               } else {
                 const error = await response.json()
-                alert(error.error || "Erro ao adicionar filho")
+                MySwal.fire({ title: "Erro", text: error.error || "Erro ao adicionar filho(a)", icon: "error", customClass: { popup: "font-sans" } })
               }
             }
           } catch (error) {
             console.error("Erro ao adicionar filho:", error)
-            alert("Erro ao adicionar filho")
+            MySwal.fire({ title: "Erro Inesperado", text: "Ocorreu um erro ao adicionar o filho.", icon: "error", customClass: { popup: "font-sans" } })
           }
         },
       })
       setShowPersonDialog(true)
     },
-    [arvore.id, onUpdate],
+    [arvore.id, arvore.pessoas, onUpdate],
   )
 
   const handleAddParent = useCallback(
@@ -373,7 +413,7 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
               if (!parentResponse.ok) {
                 const error = await parentResponse.json()
                 console.error("Erro ao criar pai/mãe:", error)
-                alert(error.error || `Erro ao adicionar ${parentType}`)
+                MySwal.fire({ title: "Erro", text: error.error || `Erro ao adicionar ${parentType}`, icon: "error", customClass: { popup: "font-sans" } })
                 return
               }
               const newParent = await parentResponse.json()
@@ -396,11 +436,11 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
             } else {
               const error = await updateResponse.json()
               console.error("Erro ao vincular pai/mãe:", error)
-              alert(error.error || `Erro ao vincular ${parentType}`)
+              MySwal.fire({ title: "Erro", text: error.error || `Erro ao vincular ${parentType}`, icon: "error", customClass: { popup: "font-sans" } })
             }
           } catch (error) {
             console.error(`Erro ao adicionar ${parentType}:`, error)
-            alert(`Erro ao adicionar ${parentType}`)
+            MySwal.fire({ title: "Erro Inesperado", text: `Ocorreu um erro ao adicionar ${parentType}.`, icon: "error", customClass: { popup: "font-sans" } })
           }
         },
       })
@@ -450,11 +490,11 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
               onUpdate()
             } else {
               const error = await response.json()
-              alert(error.error || "Erro ao atualizar pessoa")
+              MySwal.fire({ title: "Erro", text: error.error || "Erro ao atualizar pessoa", icon: "error", customClass: { popup: "font-sans" } })
             }
           } catch (error) {
             console.error("Erro ao atualizar pessoa:", error)
-            alert("Erro ao atualizar pessoa")
+            MySwal.fire({ title: "Erro Inesperado", text: "Ocorreu um erro ao atualizar pessoa.", icon: "error", customClass: { popup: "font-sans" } })
           }
         },
       })
@@ -468,89 +508,59 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
       const pessoa = arvore.pessoas?.find((p) => p.id === pessoaId)
       const personName = pessoa ? `${pessoa.nome} ${pessoa.sobrenome || ""}`.trim() : "esta pessoa"
 
-      setConfirmDialog({
-        open: true,
+      MySwal.fire({
         title: "Confirmar Exclusão",
-        description: `Tem certeza que deseja excluir ${personName}? Esta ação não pode ser desfeita.`,
-        variant: "destructive",
-        onConfirm: async () => {
-          try {
-            const validId = Number(pessoaId)
+        text: `Tem certeza que deseja excluir ${personName}? Esta ação não pode ser desfeita.`,
+        icon: "warning",
+        customClass: { popup: "font-sans" },
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Sim, excluir!",
+        cancelButtonText: "Cancelar",
+      }).then(async (result) => {
+        if (result.isConfirmed) {
+          const response = await fetch(`/api/pessoas/${pessoaId}`, {
+            method: "DELETE",
+          })
 
-            if (isNaN(validId) || validId <= 0) {
-              console.log("[v0] Invalid ID detected in frontend")
-              setConfirmDialog({
-                open: true,
-                title: "Erro na Exclusão",
-                description: "ID da pessoa inválido. Tente recarregar a página.",
-                onConfirm: () => setConfirmDialog((prev) => ({ ...prev, open: false })),
-                variant: "destructive",
-              })
-              return
+          if (response.ok) {
+            MySwal.fire({ title: "Excluído!", text: `${personName} foi excluído(a) da árvore.`, icon: "success", customClass: { popup: "font-sans" } })
+            onUpdate()
+          } else {
+            const error = await response.json()
+            let errorMessage = "Erro ao excluir pessoa."
+
+            if (error.error === "Não é possível excluir uma pessoa que possui filhos") {
+              errorMessage = "Não é possível excluir uma pessoa que possui filhos. Remova os filhos primeiro."
+            } else if (error.error) {
+              errorMessage = error.error
             }
 
-            const response = await fetch(`/api/pessoas/${validId}`, {
-              method: "DELETE",
-            })
-
-            if (response.ok) {
-              onUpdate()
-              setConfirmDialog((prev) => ({ ...prev, open: false }))
-            } else {
-              const error = await response.json()
-              let errorMessage = "Erro ao excluir pessoa"
-
-              if (error.error === "Não é possível excluir uma pessoa que possui filhos") {
-                errorMessage = "Não é possível excluir uma pessoa que possui filhos. Remova os filhos primeiro."
-              } else if (error.error === "Pessoa não encontrada") {
-                errorMessage = "Esta pessoa não foi encontrada no sistema."
-              } else if (error.error === "ID inválido") {
-                errorMessage = "Erro interno: ID da pessoa inválido. Tente recarregar a página."
-              } else if (error.error) {
-                errorMessage = error.error
-              }
-
-              setConfirmDialog({
-                open: true,
-                title: "Erro na Exclusão",
-                description: errorMessage,
-                onConfirm: () => setConfirmDialog((prev) => ({ ...prev, open: false })),
-                variant: "destructive",
-              })
-            }
-          } catch (error) {
-            console.error("[v0] Network error during delete:", error)
-            setConfirmDialog({
-              open: true,
-              title: "Erro de Conexão",
-              description: "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.",
-              onConfirm: () => setConfirmDialog((prev) => ({ ...prev, open: false })),
-              variant: "destructive",
-            })
+            MySwal.fire({ title: "Erro", text: errorMessage, icon: "error", customClass: { popup: "font-sans" } })
           }
-        },
+        }
       })
     },
     [arvore.pessoas, onUpdate],
   )
 
-  const handleSaveTreeComment = async () => {
+  const handleSaveTreeComment = useCallback(async (newComment: string) => {
     try {
       const response = await fetch(`/api/arvore/${arvore.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ descricao: treeComment }),
+        body: JSON.stringify({ descricao: newComment }),
       })
       if (response.ok) {
         onUpdate()
-        setShowCommentModal(false)
       } else {
-        alert("Erro ao salvar comentário.")
+        MySwal.fire({ title: "Erro", text: "Não foi possível salvar o comentário.", icon: "error", customClass: { popup: "font-sans" } })
       }
     } catch (error) {
-      alert("Erro ao salvar comentário.")
+      MySwal.fire({ title: "Erro", text: "Não foi possível salvar o comentário.", icon: "error", customClass: { popup: "font-sans" } })
     }
-  }
+  }, [arvore.id, onUpdate, MySwal])
 
   const generateTreeLayout = useCallback(
     (pessoas: Pessoa[]) => {
@@ -562,8 +572,8 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
       }
 
       // Constantes para layout
-      const DEFAULT_X_SPACING = 350
-      const DEFAULT_Y_SPACING = 450
+      const DEFAULT_X_SPACING = 380
+      const DEFAULT_Y_SPACING = 250
 
       // Criar nós
       pessoas.forEach((pessoa) => {
@@ -643,12 +653,39 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
         })
       })
 
+      // Adicionar nó de comentário
+      const commentNode: Node = {
+        id: "tree-comment",
+        type: "comment",
+        position: { x: arvore.commentPosX ?? -400, y: arvore.commentPosY ?? 0 },
+        data: {
+          comment: arvore.descricao || "",
+          onCommentChange: handleSaveTreeComment,
+        },
+        draggable: true,
+        selectable: true,
+      }
+
       return {
-        nodes: Array.from(nodeMap.values()),
+        nodes: [
+          ...Array.from(nodeMap.values()),
+          commentNode
+        ],
         edges: edgeList,
       }
     },
-    [arvore.id, handleAddChild, handleAddParent, handleAddSpouse, handleEditPerson, handleDeletePerson],
+    [
+      arvore.commentPosX,
+      arvore.commentPosY,
+      arvore.descricao,
+      arvore.id,
+      handleAddChild,
+      handleAddParent,
+      handleAddSpouse,
+      handleEditPerson,
+      handleDeletePerson,
+      handleSaveTreeComment,
+    ],
   )
 
   const onNodeDragStop = useCallback(
@@ -656,24 +693,30 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
       if (!node) return
       
       const { id, position } = node
-      const personId = Number(id)
-
-      if (isNaN(personId)) return
 
       // Otimisticamente atualiza a UI
       setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, position } : n)))
 
-      // Salva a nova posição no backend
-      await fetch(`/api/pessoas/${personId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ x: position.x, y: position.y }),
-      }).catch((error) => {
-        console.error("Falha ao salvar a posição do nó:", error)
-        // TODO: Reverter a posição ou notificar o usuário
-      })
+      if (id === "tree-comment") {
+        // Salva a posição do comentário
+        await fetch(`/api/arvore/${arvore.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commentPosX: position.x, commentPosY: position.y }),
+        }).catch((error) => console.error("Falha ao salvar a posição do comentário:", error))
+      } else {
+        // Salva a posição da pessoa
+        const personId = Number(id)
+        if (isNaN(personId)) return
+
+        await fetch(`/api/pessoas/${personId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ x: position.x, y: position.y }),
+        }).catch((error) => console.error("Falha ao salvar a posição do nó:", error))
+      }
     },
-    [setNodes],
+    [setNodes, arvore.id],
   )
 
   // Update nodes and edges when pessoas change
@@ -681,7 +724,7 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
     const { nodes: newNodes, edges: newEdges } = generateTreeLayout(arvore.pessoas || [])
     setNodes(newNodes)
     setEdges(newEdges)
-  }, [arvore.pessoas, generateTreeLayout, setNodes, setEdges])
+  }, [arvore.pessoas, arvore.descricao, generateTreeLayout, setNodes, setEdges])
 
   const onConnect = useCallback((params: Connection) => setEdges((eds) => addEdge(params, eds)), [setEdges])
 
@@ -705,6 +748,36 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
     onSubmit: async () => {},
   })
 
+  const handleAddUnlinkedPerson = useCallback(() => {
+    setDialogConfig({
+      title: "Adicionar Pessoa Avulsa",
+      description: "Cadastre uma nova pessoa na árvore. Você poderá criar vínculos familiares depois.",
+      person: undefined,
+      fixedSexo: undefined,
+      onSubmit: async (data: PersonFormData | ExistingPersonFormData) => {
+        if (isExistingPersonData(data)) return; // Não deve acontecer
+        try {
+          const response = await fetch("/api/pessoas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...data, arvoreId: arvore.id }),
+          });
+          if (response.ok) onUpdate();
+          else MySwal.fire({ title: "Erro", text: "Não foi possível adicionar a pessoa.", icon: "error", customClass: { popup: "font-sans" } });
+        } catch (error) {
+          MySwal.fire({ title: "Erro", text: "Ocorreu um erro de conexão.", icon: "error", customClass: { popup: "font-sans" } });
+        }
+      },
+    });
+    setShowPersonDialog(true);
+  }, [arvore.id, onUpdate, MySwal]);
+
+  useImperativeHandle(ref, () => ({
+    addUnlinkedPerson() {
+      handleAddUnlinkedPerson();
+    }
+  }));
+
   // Estado para modal de cônjuge personalizado
   const [showSpouseModal, setShowSpouseModal] = useState(false)
   const [currentPersonForSpouse, setCurrentPersonForSpouse] = useState<number | null>(null)
@@ -720,7 +793,7 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
   // Função para criar nova pessoa e união
   const handleCreateNewSpouse = useCallback(async () => {
     if (!currentPersonForSpouse || !newSpouseData.nome) {
-      alert("Nome é obrigatório")
+      MySwal.fire({ title: "Atenção", text: "O nome do cônjuge é obrigatório.", icon: "warning", customClass: { popup: "font-sans" } })
       return
     }
 
@@ -738,7 +811,7 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
 
       if (!response.ok) {
         const error = await response.json()
-        alert("Erro ao criar pessoa: " + error.error)
+        MySwal.fire({ title: "Erro", text: "Erro ao criar pessoa: " + error.error, icon: "error", customClass: { popup: "font-sans" } })
         return
       }
 
@@ -757,30 +830,39 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
 
       if (!unionResponse.ok) {
         const error = await unionResponse.json()
-        alert("Erro ao criar união: " + error.error)
+        MySwal.fire({ title: "Erro", text: "Erro ao criar união: " + error.error, icon: "error", customClass: { popup: "font-sans" } })
         return
       }
 
-      alert("Cônjuge criado e relacionamento estabelecido com sucesso!")
+      MySwal.fire({ title: "Sucesso!", text: "Cônjuge criado e relacionamento estabelecido com sucesso!", icon: "success", customClass: { popup: "font-sans" } })
       setShowSpouseModal(false)
       onUpdate()
     } catch (error) {
-      alert("Erro: " + error)
+      MySwal.fire({ title: "Erro Inesperado", text: "Ocorreu um erro: " + error, icon: "error", customClass: { popup: "font-sans" } })
     }
   }, [currentPersonForSpouse, newSpouseData, arvore.id, onUpdate])
 
   // Função para selecionar pessoa existente
   const handleSelectExistingSpouse = useCallback(async (selectedPersonId: number) => {
     if (!currentPersonForSpouse) return
+    
+    // Fecha o modal de cônjuge antes de abrir o alerta de confirmação
+    setShowSpouseModal(false)
 
-    const confirm = window.confirm(
-      `Criar relacionamento entre:\n` +
-      `• ${arvore.pessoas?.find(p => p.id === currentPersonForSpouse)?.nome}\n` +
-      `• ${arvore.pessoas?.find(p => p.id === selectedPersonId)?.nome}\n\n` +
-      `Confirmar?`
-    )
+    const { isConfirmed } = await MySwal.fire({
+      title: 'Confirmar União',
+      html: `Deseja criar uma união entre <strong>${arvore.pessoas?.find(p => p.id === currentPersonForSpouse)?.nome}</strong> e <strong>${arvore.pessoas?.find(p => p.id === selectedPersonId)?.nome}</strong>?`,
+      icon: 'question',
+      customClass: { popup: "font-sans" },
+      showCancelButton: true,
+      confirmButtonText: 'Sim, criar união',
+      cancelButtonText: 'Cancelar'
+    });
 
-    if (!confirm) return
+    if (!isConfirmed) {
+      setShowSpouseModal(true) // Reabre o modal se o usuário cancelar
+      return
+    }
 
     try {
       const response = await fetch("/api/unioes", {
@@ -794,17 +876,16 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
       })
 
       if (response.ok) {
-        alert("Relacionamento criado com sucesso!")
-        setShowSpouseModal(false)
+        MySwal.fire({ title: "Sucesso!", text: "Relacionamento criado com sucesso!", icon: "success", customClass: { popup: "font-sans" } })
         onUpdate()
       } else {
         const error = await response.json()
-        alert("Erro ao criar relacionamento: " + (error.error || 'Erro desconhecido'))
+        MySwal.fire({ title: "Erro", text: "Erro ao criar relacionamento: " + (error.error || 'Erro desconhecido'), icon: "error", customClass: { popup: "font-sans" } })
       }
     } catch (error) {
-      alert("Erro: " + error)
+      MySwal.fire({ title: "Erro Inesperado", text: "Ocorreu um erro: " + error, icon: "error", customClass: { popup: "font-sans" } })
     }
-  }, [currentPersonForSpouse, arvore.pessoas, onUpdate])
+  }, [currentPersonForSpouse, arvore.pessoas, onUpdate, MySwal])
 
   return (
     <div
@@ -837,7 +918,11 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
             showZoom={true}
             showFitView={true}
             showInteractive={true}
-          />
+          >
+             <Button variant="outline" className="react-flow__controls-button" onClick={handleAddUnlinkedPerson} title="Adicionar Pessoa Avulsa">
+              <UserPlus2 />
+            </Button>
+          </Controls>
           <MiniMap
             className="bg-white border border-gray-200 rounded-lg shadow-lg"
             nodeColor={(node) => {
@@ -866,96 +951,45 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
       <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-10 max-w-xs flex flex-col gap-4">
         <div className="flex justify-between items-center">
           <h3 className="font-semibold text-sm text-gray-800 flex items-center gap-2">
-            <TreePine className="h-4 w-4" />
+            <TreePine className="h-4 w-4 text-gray-600" />
             Legenda
           </h3>
-          <Button size="sm" variant="outline" onClick={() => setShowCommentModal(true)} className="h-7 px-2">
-            <MessageSquare className="h-3 w-3 mr-1" /> Comentário
-          </Button>
         </div>
         <div className="space-y-3">
           {/* Node Types */}
           <div>
-            <h4 className="text-xs font-medium text-gray-700 mb-2">Tipos de Pessoa</h4>
+            <h4 className="text-xs font-medium text-gray-700 mb-2">Pessoas</h4>
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded border-2 border-blue-500 bg-blue-50"></div>
-                <span className="text-xs text-gray-600">Pai</span>
+                <User className="h-4 w-4 text-blue-500" />
+                <span className="text-xs text-gray-600">Masculino</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded border-2 border-pink-500 bg-pink-50"></div>
-                <span className="text-xs text-gray-600">Mãe</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded border-2 border-green-500 bg-green-50"></div>
-                <span className="text-xs text-gray-600">Filho(a)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50"></div>
-                <span className="text-xs text-gray-600">Cônjuge</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded border-2 border-gray-300 bg-white"></div>
-                <span className="text-xs text-gray-600">Pessoa Principal</span>
+                <User className="h-4 w-4 text-pink-500" />
+                <span className="text-xs text-gray-600">Feminino</span>
               </div>
             </div>
           </div>
 
           {/* Line Types */}
           <div className="pt-2 border-t border-gray-200">
-            <h4 className="text-xs font-medium text-gray-700 mb-2">Tipos de Ligação</h4>
+            <h4 className="text-xs font-medium text-gray-700 mb-2">Ligações</h4>
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <div className="flex items-center">
-                  <div className="w-4 h-0.5 bg-blue-600"></div>
-                  <div className="w-2 h-2 border border-blue-600 bg-blue-600 transform rotate-45 -ml-1"></div>
+                  <div className="w-4 h-0.5 bg-gray-500"></div>
+                  <div className="w-0 h-0 border-t-4 border-t-transparent border-l-4 border-l-gray-500 border-b-4 border-b-transparent"></div>
                 </div>
-                <span className="text-xs text-gray-600">Parentesco (pai/mãe → filho)</span>
+                <span className="text-xs text-gray-600">Filiação</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center">
-                  <div className="w-4 h-0.5 bg-red-600" style={{ strokeDasharray: "2 2" }}></div>
-                </div>
+                <div className="w-4 h-0.5 bg-red-600 border-dashed border-t-2 border-red-600"></div>
                 <span className="text-xs text-gray-600">União (casamento)</span>
               </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Tree Comment Modal */}
-      {showCommentModal && (
-        <div className="absolute bottom-4 left-4 mb-0 ml-[21rem] bg-white rounded-lg shadow-xl border border-gray-200 p-4 z-20 w-80">
-          <div className="flex justify-between items-center mb-2">
-            <h4 className="text-base font-semibold text-gray-800">Comentário da Árvore</h4>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowCommentModal(false)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <textarea
-            className="w-full p-2 border rounded-md text-sm"
-            rows={5}
-            value={treeComment}
-            onChange={(e) => setTreeComment(e.target.value)}
-            placeholder="Adicione um comentário sobre a árvore..."
-          />
-          <div className="flex justify-end gap-2 mt-3">
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => {
-                setTreeComment("")
-                handleSaveTreeComment()
-              }}
-            >
-              Excluir
-            </Button>
-            <Button size="sm" onClick={handleSaveTreeComment} className="bg-blue-600 hover:bg-blue-700">
-              Salvar
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* PersonFormDialog */}
       <PersonFormDialog
@@ -1085,16 +1119,9 @@ export function genealogicalTree({ arvore, onUpdate = () => {}, className }: Gen
         </DialogContent>
       </Dialog>
 
-      <ConfirmationDialog
-        open={confirmDialog.open}
-        onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}
-        title={confirmDialog.title}
-        description={confirmDialog.description}
-        onConfirm={confirmDialog.onConfirm}
-        confirmText="Excluir"
-        cancelText="Cancelar"
-        variant="destructive"
-      />
     </div>
   )
 }
+)
+
+export const genealogicalTree = GenealogicalTreeComponent;
