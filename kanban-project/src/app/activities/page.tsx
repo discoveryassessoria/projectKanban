@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, Filter, ChevronDown } from "lucide-react"
 import ListaActivities from "@/src/components/activitiesComponents/listaActivities"
 import ListaProjects from "@/src/components/activitiesComponents/listaProjects"
+import CalendarioActivities from "@/src/components/activitiesComponents/calendarioActivities"
 
 interface Usuario {
   nome: string
@@ -129,7 +130,7 @@ export default function ActivitiesPage() {
             </TabsContent>
             
             <TabsContent value="calendar" className="space-y-4">
-              <DevelopmentMessage feature="Calendário" />
+              <CalendarioActivities />
             </TabsContent>
           </Tabs>
         </TabsContent>

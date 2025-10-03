@@ -1,0 +1,368 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import Calendar from 'react-calendar'
+import 'react-calendar/dist/Calendar.css'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
+import { Clock, Calendar as CalendarIcon, User } from "lucide-react"
+
+interface CalendarActivity {
+  date: string // YYYY-MM-DD
+  type: 'creation' | 'deadline'
+  activities: {
+    id: number
+    nome: string
+    projeto: string
+    hora: string // HH:MM
+    data_completa: string // ISO string completa
+    tipo_evento: 'criacao' | 'prazo'
+  }[]
+}
+
+interface DayActivity {
+  id: number
+  nome: string
+  projeto: string
+  hora: string
+  data_completa: string
+  tipo_evento: 'criacao' | 'prazo'
+  descricao: string | null
+}
+
+interface DayData {
+  date: string
+  activities: DayActivity[]
+}
+
+export default function CalendarioActivities() {
+  const [value, setValue] = useState<Date>(new Date())
+  const [activitiesData, setActivitiesData] = useState<CalendarActivity[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
+  // Estados para o modal
+  const [modalOpen, setModalOpen] = useState(false)
+  const [selectedDate, setSelectedDate] = useState<string>('')
+  const [dayData, setDayData] = useState<DayData | null>(null)
+  const [isLoadingDay, setIsLoadingDay] = useState(false)
+
+  // Função para buscar dados do dia específico
+  const fetchDayData = async (date: string) => {
+    try {
+      setIsLoadingDay(true)
+      const response = await fetch(`/api/activities/day?date=${date}`)
+      if (!response.ok) {
+        throw new Error('Erro ao carregar atividades do dia')
+      }
+
+      const data = await response.json()
+      setDayData(data)
+    } catch (err) {
+      console.error('Erro ao buscar dados do dia:', err)
+    } finally {
+      setIsLoadingDay(false)
+    }
+  }
+
+  // Função para lidar com clique em um dia
+  const handleDayClick = (date: Date) => {
+    const dateString = date.toISOString().split('T')[0]
+    const activityInfo = getActivityInfo(date)
+    
+    // Só abrir modal se o dia tem atividades
+    if (activityInfo) {
+      setSelectedDate(dateString)
+      setModalOpen(true)
+      fetchDayData(dateString)
+    }
+  }
+
+  // Função para buscar dados do calendário
+  const fetchCalendarData = async (date: Date) => {
+    try {
+      setIsLoading(true)
+      const year = date.getFullYear()
+      const month = date.getMonth() + 1
+
+      const response = await fetch(`/api/activities/calendar?year=${year}&month=${month}`)
+      if (!response.ok) {
+        throw new Error('Erro ao carregar dados do calendário')
+      }
+
+      const data = await response.json()
+      setActivitiesData(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Carregar dados quando o componente montar ou quando a data mudar
+  useEffect(() => {
+    fetchCalendarData(value)
+  }, [value])
+
+  // Função para verificar se uma data tem atividades
+  const getActivityInfo = (date: Date) => {
+    const dateString = date.toISOString().split('T')[0]
+    
+    // Verificar se existem atividades nesta data
+    const dayActivities = activitiesData.filter(activity => activity.date === dateString)
+    
+    if (dayActivities.length === 0) return null
+
+    // Verificar os tipos presentes
+    const hasCreation = dayActivities.some(a => a.type === 'creation')
+    const hasDeadline = dayActivities.some(a => a.type === 'deadline')
+    
+    let type: 'creation' | 'deadline' | 'both'
+    if (hasCreation && hasDeadline) {
+      type = 'both'
+    } else if (hasCreation) {
+      type = 'creation'
+    } else {
+      type = 'deadline'
+    }
+
+    return { type, activities: dayActivities }
+  }
+
+  // Função para customizar o conteúdo dos dias
+  const tileContent = ({ date, view }: { date: Date; view: string }) => {
+    if (view === 'month') {
+      const activityInfo = getActivityInfo(date)
+      if (activityInfo) {
+        return (
+          <div className="flex flex-col items-center">
+            <div className={`w-2 h-2 rounded-full mt-1 ${
+              activityInfo.type === 'both' ? 'bg-yellow-500' :
+              activityInfo.type === 'creation' ? 'bg-green-500' : 
+              'bg-red-500'
+            }`} />
+          </div>
+        )
+      }
+    }
+    return null
+  }
+
+  // Função para adicionar classes CSS aos dias
+  const tileClassName = ({ date, view }: { date: Date; view: string }) => {
+    if (view === 'month') {
+      const activityInfo = getActivityInfo(date)
+      if (activityInfo) {
+        return activityInfo.type === 'both' ? 'has-both' :
+               activityInfo.type === 'creation' ? 'has-creation' : 
+               'has-deadline'
+      }
+    }
+    return null
+  }
+
+  // Função chamada quando o usuário navega entre meses
+  const handleActiveStartDateChange = ({ activeStartDate }: { activeStartDate: Date | null }) => {
+    if (activeStartDate) {
+      setValue(activeStartDate)
+      fetchCalendarData(activeStartDate)
+    }
+  }
+
+  if (error) {
+    return (
+      <div className="border rounded-lg">
+        <div className="p-6">
+          <div className="flex items-center justify-center h-32">
+            <p className="text-sm text-destructive">Erro: {error}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div>
+        <h3 className="text-lg font-medium">Calendário de Atividades</h3>
+        <p className="text-sm text-muted-foreground">
+          Visualize as datas de criação e prazos das suas atividades. Clique em um dia marcado para ver os detalhes.
+        </p>
+      </div>
+
+      {/* Legenda */}
+      <div className="flex items-center space-x-6 p-4 bg-muted/30 rounded-lg">
+        <div className="flex items-center space-x-2">
+          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+          <span className="text-sm">Data de Criação</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+          <span className="text-sm">Data de Prazo</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+          <span className="text-sm">Ambos</span>
+        </div>
+      </div>
+
+      {/* Calendário */}
+      <div className="border rounded-lg p-6">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <p className="text-sm text-muted-foreground">Carregando calendário...</p>
+          </div>
+        ) : (
+          <div className="calendar-container">
+            <Calendar
+              value={value}
+              onChange={(value) => {
+                if (value instanceof Date) {
+                  setValue(value)
+                }
+              }}
+              onClickDay={handleDayClick}
+              tileContent={tileContent}
+              tileClassName={tileClassName}
+              onActiveStartDateChange={handleActiveStartDateChange}
+              locale="pt-BR"
+              className="react-calendar-custom"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Estatísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="border rounded-lg p-4">
+          <div className="text-2xl font-bold text-green-600">
+            {activitiesData.filter(a => a.type === 'creation').length}
+          </div>
+          <div className="text-sm text-muted-foreground">Dias com Criações</div>
+        </div>
+        <div className="border rounded-lg p-4">
+          <div className="text-2xl font-bold text-red-600">
+            {activitiesData.filter(a => a.type === 'deadline').length}
+          </div>
+          <div className="text-sm text-muted-foreground">Dias com Prazos</div>
+        </div>
+        <div className="border rounded-lg p-4">
+          <div className="text-2xl font-bold text-blue-600">
+            {activitiesData.reduce((total, activity) => total + activity.activities.length, 0)}
+          </div>
+          <div className="text-sm text-muted-foreground">Total de Atividades</div>
+        </div>
+      </div>
+
+      {/* Modal do Dia */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <CalendarIcon className="h-5 w-5" />
+              <span>
+                Atividades de {selectedDate && new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {isLoadingDay ? (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-sm text-muted-foreground">Carregando atividades...</p>
+              </div>
+            ) : dayData && dayData.activities.length > 0 ? (
+              <div className="space-y-3">
+                {/* Timeline das atividades */}
+                <div className="relative">
+                  {/* Linha vertical da timeline */}
+                  <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-border"></div>
+                  
+                  {dayData.activities.map((activity, index) => (
+                    <div key={`${activity.id}-${activity.tipo_evento}-${index}`} className="relative flex items-start space-x-4 pb-4">
+                      {/* Indicador de tempo */}
+                      <div className={`relative z-10 flex-shrink-0 w-16 h-16 rounded-full border-4 border-background flex items-center justify-center text-xs font-bold ${
+                        activity.tipo_evento === 'criacao' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                      }`}>
+                        <div className="text-center">
+                          <div className="text-[10px] opacity-80">
+                            {activity.tipo_evento === 'criacao' ? 'CRIADO' : 'PRAZO'}
+                          </div>
+                          <div className="text-xs font-mono">
+                            {activity.hora}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Conteúdo da atividade */}
+                      <div className="flex-1 min-w-0 bg-muted/30 rounded-lg p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-sm">{activity.nome}</h4>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Projeto: {activity.projeto}
+                            </p>
+                            {activity.descricao && (
+                              <p className="text-xs text-muted-foreground mt-2">
+                                {activity.descricao}
+                              </p>
+                            )}
+                          </div>
+                          <Badge 
+                            variant={activity.tipo_evento === 'criacao' ? 'default' : 'destructive'}
+                            className="ml-2"
+                          >
+                            {activity.tipo_evento === 'criacao' ? 'Criação' : 'Prazo'}
+                          </Badge>
+                        </div>
+                        
+                        <div className="flex items-center space-x-4 mt-3 text-xs text-muted-foreground">
+                          <div className="flex items-center space-x-1">
+                            <Clock className="h-3 w-3" />
+                            <span>{activity.hora}</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <User className="h-3 w-3" />
+                            <span>ID: {activity.id}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Resumo do dia */}
+                <div className="border-t pt-4">
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="text-lg font-bold text-green-600">
+                        {dayData.activities.filter(a => a.tipo_evento === 'criacao').length}
+                      </div>
+                      <div className="text-xs text-green-600">Criações</div>
+                    </div>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <div className="text-lg font-bold text-red-600">
+                        {dayData.activities.filter(a => a.tipo_evento === 'prazo').length}
+                      </div>
+                      <div className="text-xs text-red-600">Prazos</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Nenhuma atividade encontrada para este dia.</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
