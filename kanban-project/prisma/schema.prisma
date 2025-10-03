@@ -89,6 +89,10 @@ model Arvore {
   nome      String  @db.VarChar(50)
   descricao String? @db.VarChar(200)
 
+  // Campos para a posição do comentário
+  commentPosX     Float?   @default(0)
+  commentPosY     Float?   @default(0)
+
   // Referência para a pessoa principal da árvore
   pessoaPrincipalId Int?    @unique
   pessoaPrincipal   Pessoa? @relation("ArvorePrincipal", fields: [pessoaPrincipalId], references: [id], onDelete: SetNull, onUpdate: NoAction)
@@ -124,6 +128,7 @@ model Atividade {
   nome         String    @db.VarChar(20)
   descricao    String?   @db.VarChar(40)
   data_termino DateTime?
+  data_criacao DateTime  @default(now())
 
   // Chave estrangeira para o Projeto a que pertence
   projetoId Int
