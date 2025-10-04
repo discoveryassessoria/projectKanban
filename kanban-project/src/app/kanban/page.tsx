@@ -135,17 +135,17 @@ export default function KanbanPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-zinc-950">
+      <div className="flex h-screen items-center justify-center bg-white">
         <div className="text-center">
           <KanbanIcon className="h-12 w-12 animate-pulse text-indigo-500 mx-auto mb-4" />
-          <p className="text-zinc-400">Carregando...</p>
+          <p className="text-gray-600">Carregando...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex h-screen bg-zinc-950">
+    <div className="flex min-h-screen bg-white">
       <MenuLateral
         user={user}
         projetos={projetos}
@@ -157,29 +157,28 @@ export default function KanbanPage() {
         onToggleMinimize={handleToggleMinimize}
       />
 
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0">
         {projetoSelecionado ? (
           <>
-            <header className="p-6 bg-zinc-900 border-b border-zinc-800 z-10">
+            <header className="p-6 bg-gray-50 border-b border-gray-200 z-10">
               <div className="flex items-start justify-between">
                 <div className="flex-1 flex items-center gap-3">
-                  <SidebarTrigger className="text-zinc-400 hover:text-zinc-100" />
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg">
                         <KanbanIcon className="h-5 w-5 text-white" />
                       </div>
-                      <h1 className="text-3xl font-bold text-zinc-100">{projetoSelecionado.nome}</h1>
+                      <h1 className="text-3xl font-bold text-gray-900">{projetoSelecionado.nome}</h1>
                     </div>
                     {projetoSelecionado.descricao && (
-                      <p className="text-zinc-400 mt-2 ml-14">{projetoSelecionado.descricao}</p>
+                      <p className="text-gray-600 mt-2 ml-14">{projetoSelecionado.descricao}</p>
                     )}
                   </div>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="ml-4 hover:bg-red-950 hover:text-red-400 text-zinc-400"
+                  className="ml-4 hover:bg-red-100 hover:text-red-600 text-gray-600"
                   onClick={() => {
                     if (confirm(`Tem certeza que deseja deletar o projeto "${projetoSelecionado.nome}"?`)) {
                       handleDeletarProjeto(projetoSelecionado.id)
@@ -192,17 +191,19 @@ export default function KanbanPage() {
             </header>
 
             <div className="flex-1 p-6 overflow-auto">
-              <KanbanBoard projeto={projetoSelecionado} onStatusAdd={handleStatusAdd} />
+              <div className="h-full">
+                <KanbanBoard projeto={projetoSelecionado} onStatusAdd={handleStatusAdd} />
+              </div>
             </div>
           </>
         ) : (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <div className="inline-flex p-4 bg-zinc-900 rounded-2xl mb-4">
+              <div className="inline-flex p-4 bg-gray-100 rounded-2xl mb-4">
                 <Sparkles className="h-16 w-16 text-indigo-500" />
               </div>
-              <h2 className="text-2xl font-semibold text-zinc-100 mb-2">Selecione um projeto</h2>
-              <p className="text-zinc-500 mb-6">Ou crie um novo para começar a organizar suas tarefas</p>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-2">Selecione um projeto</h2>
+              <p className="text-gray-600 mb-6">Ou crie um novo para começar a organizar suas tarefas</p>
               <Button onClick={handleNovoProjeto} className="bg-indigo-600 hover:bg-indigo-700">
                 <KanbanIcon className="mr-2 h-4 w-4" />
                 Criar Novo Projeto

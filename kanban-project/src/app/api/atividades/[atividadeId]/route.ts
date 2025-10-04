@@ -5,7 +5,7 @@ export async function PUT(request: NextRequest, { params }: { params: { atividad
   try {
     const { atividadeId } = params
     const body = await request.json()
-    const { statusId, nome, descricao, data_termino } = body
+    const { statusId, nome, descricao, data_termino, usuarioId } = body
 
     const updateData: any = {}
 
@@ -21,14 +21,48 @@ export async function PUT(request: NextRequest, { params }: { params: { atividad
     if (descricao !== undefined) updateData.descricao = descricao
     if (data_termino !== undefined) updateData.data_termino = data_termino ? new Date(data_termino) : null
 
-    const atividadeAtualizada = await prisma.atividade.update({
-      where: {
-        id: Number.parseInt(atividadeId),
-      },
-      data: updateData,
+    const atividadeId_parsed = Number.parseInt(atividadeId)
+
+    // Usar transação para atualizar atividade e gerenciar usuários
+    const result = await prisma.$transaction(async (tx) => {
+      // Atualizar os dados básicos da atividade
+      const atividadeAtualizada = await tx.atividade.update({
+        where: { id: atividadeId_parsed },
+        data: updateData,
+      })
+
+      // Gerenciar usuários responsáveis
+      if (usuarioId !== undefined) {
+        // Primeiro, remover todas as associações existentes
+        await tx.userAtv.deleteMany({
+          where: { atividadeId: atividadeId_parsed }
+        })
+
+        // Se usuarioId não é null, criar nova associação
+        if (usuarioId !== null) {
+          await tx.userAtv.create({
+            data: {
+              usuarioId: Number.parseInt(usuarioId),
+              atividadeId: atividadeId_parsed
+            }
+          })
+        }
+      }
+
+      // Buscar a atividade atualizada com os usuários
+      return await tx.atividade.findUnique({
+        where: { id: atividadeId_parsed },
+        include: {
+          usuarios: {
+            include: {
+              usuario: true
+            }
+          }
+        }
+      })
     })
 
-    return NextResponse.json({ atividade: atividadeAtualizada }, { status: 200 })
+    return NextResponse.json({ atividade: result }, { status: 200 })
   } catch (error) {
     console.error("Erro ao atualizar atividade:", error)
     return NextResponse.json({ error: "Erro interno do servidor ao atualizar atividade" }, { status: 500 })

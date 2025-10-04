@@ -10,13 +10,19 @@ import { Calendar, User } from "lucide-react"
 interface KanbanCardProps {
   id: number
   nome: string
-  data?: string
-  responsavel?: string
+  data_termino?: string
+  usuarios?: Array<{
+    usuario: {
+      id: number
+      nome: string
+      email: string
+    }
+  }>
   tags?: { texto: string; cor: string }[]
   onClick?: () => void
 }
 
-export function KanbanCard({ id, nome, data = "", responsavel = "", tags = [], onClick }: KanbanCardProps) {
+export function KanbanCard({ id, nome, data_termino = "", usuarios = [], tags = [], onClick }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
 
   const style = {
@@ -31,25 +37,28 @@ export function KanbanCard({ id, nome, data = "", responsavel = "", tags = [], o
     }
   }
 
+  // Pegar o primeiro usuário como responsável principal
+  const responsavel = usuarios?.[0]?.usuario?.nome
+
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <Card
-        className={`mb-3 bg-zinc-900 border-zinc-800 hover:border-zinc-700 transition-all cursor-grab active:cursor-grabbing ${isDragging ? "shadow-2xl ring-2 ring-indigo-500" : "shadow-md hover:shadow-lg"}`}
+        className={`mb-3 bg-white border-gray-200 hover:border-gray-300 transition-all cursor-grab active:cursor-grabbing ${isDragging ? "shadow-2xl ring-2 ring-indigo-500" : "shadow-md hover:shadow-lg"}`}
         onClick={handleCardClick}
       >
         <CardContent className="p-4">
-          <h3 className="font-semibold text-sm text-zinc-100 leading-snug mb-3">{nome}</h3>
+          <h3 className="font-semibold text-sm text-gray-900 leading-snug mb-3">{nome}</h3>
 
-          {(data || responsavel) && (
+          {(data_termino || responsavel) && (
             <div className="space-y-2 mb-3">
-              {data && (
-                <div className="flex items-center gap-2 text-xs text-zinc-400">
+              {data_termino && (
+                <div className="flex items-center gap-2 text-xs text-gray-600">
                   <Calendar className="h-3.5 w-3.5" />
-                  <span>{data}</span>
+                  <span>{new Date(data_termino).toLocaleDateString("pt-BR")}</span>
                 </div>
               )}
               {responsavel && (
-                <div className="flex items-center gap-2 text-xs text-zinc-400">
+                <div className="flex items-center gap-2 text-xs text-gray-600">
                   <User className="h-3.5 w-3.5" />
                   <span>{responsavel}</span>
                 </div>

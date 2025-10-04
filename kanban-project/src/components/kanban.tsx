@@ -240,7 +240,7 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
           variant="outline"
           size="sm"
           onClick={handleClearCompleted}
-          className="bg-zinc-900 border-zinc-800 hover:bg-red-950 hover:border-red-900 hover:text-red-400 text-zinc-400"
+          className="bg-white border-gray-300 hover:bg-red-50 hover:border-red-300 hover:text-red-600 text-gray-700"
         >
           <Trash2 className="mr-2 h-4 w-4" />
           Limpar Concluídas
@@ -261,10 +261,7 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
         >
-          <div
-            className="grid h-full gap-4"
-            style={{ gridTemplateColumns: `repeat(${projeto.status.length + 1}, minmax(320px, 1fr))` }}
-          >
+          <div className="flex gap-4 pb-4 min-h-[calc(100vh-200px)]">
             {projeto.status
               .sort((a, b) => {
                 // Check if either status is "CONCLUÍDO" (case insensitive)
@@ -279,31 +276,33 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
                 return a.id - b.id
               })
               .map((status, index) => (
-                <KanbanColumn
-                  key={status.id}
-                  id={status.id}
-                  title={status.nome}
-                  atividades={atividades.filter((a) => a.statusId === status.id)}
-                  headerColor="#18181b"
-                  isFirst={index === 0}
-                  isLast={index === projeto.status.length - 1}
-                  onAtividadeAdd={handleAddNewAtividade}
-                  onAtividadeClick={handleAtividadeClick}
-                  onStatusUpdate={onStatusAdd}
-                  projetoId={projeto.id}
-                />
+                <div className="w-80 flex-shrink-0">
+                  <KanbanColumn
+                    key={status.id}
+                    id={status.id}
+                    title={status.nome}
+                    atividades={atividades.filter((a) => a.statusId === status.id)}
+                    headerColor="#6366f1"
+                    isFirst={index === 0}
+                    isLast={index === projeto.status.length - 1}
+                    onAtividadeAdd={handleAddNewAtividade}
+                    onAtividadeClick={handleAtividadeClick}
+                    onStatusUpdate={onStatusAdd}
+                    projetoId={projeto.id}
+                  />
+                </div>
               ))}
 
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0 w-80">
               {isAddingStatus ? (
-                <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+                <div className="p-4 rounded-lg bg-white border border-gray-200">
                   <form onSubmit={handleAddNewStatus}>
                     <Input
                       autoFocus
                       placeholder="Nome da nova coluna..."
                       value={newStatusName}
                       onChange={(e) => setNewStatusName(e.target.value)}
-                      className="mb-2 bg-zinc-950 border-zinc-800 text-zinc-100"
+                      className="mb-2 bg-white border-gray-300 text-gray-900"
                     />
                     <div className="flex justify-end gap-2">
                       <Button
@@ -311,7 +310,7 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
                         variant="ghost"
                         size="sm"
                         onClick={() => setIsAddingStatus(false)}
-                        className="hover:bg-zinc-800"
+                        className="hover:bg-gray-100"
                       >
                         Cancelar
                       </Button>
@@ -324,7 +323,7 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
               ) : (
                 <Button
                   variant="ghost"
-                  className="w-full h-full min-h-[100px] border-2 border-dashed border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50 text-zinc-400 hover:text-zinc-300"
+                  className="w-full h-full min-h-[100px] border-2 border-dashed border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-600 hover:text-gray-700"
                   onClick={() => setIsAddingStatus(true)}
                 >
                   <Plus className="mr-2 h-4 w-4" /> Adicionar coluna

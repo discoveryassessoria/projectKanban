@@ -3,13 +3,23 @@ export interface Status {
   nome: string
 }
 
+export interface Usuario {
+  id: number
+  nome: string
+  email: string
+}
+
+export interface UserAtv {
+  usuario: Usuario
+}
+
 export interface Atividade {
   id: number
   nome: string
   descricao: string | null
   statusId: number
-  data?: string
-  responsavel?: string
+  data_termino?: string
+  usuarios?: UserAtv[]
   tags?: { texto: string; cor: string }[]
 }
 

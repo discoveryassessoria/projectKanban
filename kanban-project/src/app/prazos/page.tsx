@@ -110,12 +110,12 @@ export default function PrazosPage() {
       }
 
       // Check deadline
-      if (!atividade.data) {
+      if (!atividade.data_termino) {
         grouped.semPrazo.push(atividade)
         return
       }
 
-      const deadline = new Date(atividade.data)
+      const deadline = new Date(atividade.data_termino)
       deadline.setHours(0, 0, 0, 0)
 
       if (deadline < today) {
@@ -141,21 +141,21 @@ export default function PrazosPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
+      <div className="min-h-screen bg-white text-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-zinc-400">Carregando prazos...</p>
+          <p className="text-gray-600">Carregando prazos...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 p-8">
+    <div className="min-h-screen bg-white text-gray-900 p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">Prazos</h1>
 
-        <div className="grid gap-4">
+        <div className="flex gap-4 overflow-x-auto pb-4">
           {/* Vencido */}
           <DeadlineColumn
             title="Vencido"
@@ -221,49 +221,49 @@ interface DeadlineColumnProps {
 
 function DeadlineColumn({ title, atividades, icon, color, onAtividadeClick }: DeadlineColumnProps) {
   const colorClasses = {
-    red: "border-red-800 bg-red-950/20",
-    orange: "border-orange-800 bg-orange-950/20",
-    yellow: "border-yellow-800 bg-yellow-950/20",
-    blue: "border-blue-800 bg-blue-950/20",
-    gray: "border-zinc-800 bg-zinc-900/20",
-    green: "border-green-800 bg-green-950/20",
+    red: "border-red-300 bg-red-50",
+    orange: "border-orange-300 bg-orange-50",
+    yellow: "border-yellow-300 bg-yellow-50",
+    blue: "border-blue-300 bg-blue-50",
+    gray: "border-gray-300 bg-gray-50",
+    green: "border-green-300 bg-green-50",
   }
 
   return (
-    <div className={`rounded-lg border ${colorClasses[color]} p-4`}>
+    <div className={`rounded-lg border ${colorClasses[color]} p-4 min-w-80 flex-shrink-0`}>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           {icon}
           <h2 className="text-lg font-semibold">{title}</h2>
-          <span className="px-2 py-0.5 text-xs font-medium bg-zinc-800 text-zinc-400 rounded-full">
-            {atividades.length}
-          </span>
         </div>
+        <span className="px-2 py-0.5 text-xs font-medium bg-gray-200 text-gray-700 rounded-full">
+          {atividades.length}
+        </span>
       </div>
 
       {atividades.length === 0 ? (
-        <p className="text-zinc-500 text-sm">Nenhuma atividade</p>
+        <p className="text-gray-500 text-sm">Nenhuma atividade</p>
       ) : (
         <div className="space-y-2">
           {atividades.map((atividade) => (
             <div
               key={`${atividade.projeto.id}-${atividade.id}`}
               onClick={() => onAtividadeClick(atividade)}
-              className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 hover:border-zinc-700 transition-colors cursor-pointer"
+              className="bg-white border border-gray-200 rounded-lg p-3 hover:border-gray-300 hover:shadow-sm transition-all cursor-pointer"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-zinc-100 truncate">{atividade.nome}</h3>
+                  <h3 className="font-medium text-gray-900 truncate">{atividade.nome}</h3>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-zinc-500">{atividade.projeto.nome}</span>
-                    <span className="text-xs text-zinc-600">•</span>
-                    <span className="text-xs text-zinc-500">{atividade.status.nome}</span>
+                    <span className="text-xs text-gray-600">{atividade.projeto.nome}</span>
+                    <span className="text-xs text-gray-400">•</span>
+                    <span className="text-xs text-gray-600">{atividade.status.nome}</span>
                   </div>
-                  {atividade.data && (
-                    <p className="text-xs text-zinc-400 mt-1">{new Date(atividade.data).toLocaleDateString("pt-BR")}</p>
+                  {atividade.data_termino && (
+                    <p className="text-xs text-gray-500 mt-1">{new Date(atividade.data_termino).toLocaleDateString("pt-BR")}</p>
                   )}
-                  {atividade.responsavel && (
-                    <p className="text-xs text-zinc-400 mt-1">Responsável: {atividade.responsavel}</p>
+                  {atividade.usuarios?.[0] && (
+                    <p className="text-xs text-gray-500 mt-1">Responsável: {atividade.usuarios[0].usuario.nome}</p>
                   )}
                 </div>
               </div>
