@@ -39,6 +39,11 @@ export async function GET(
               }
             }
           }
+        },
+        status: {
+          orderBy: {
+            ordem: 'asc'
+          }
         }
       }
     })

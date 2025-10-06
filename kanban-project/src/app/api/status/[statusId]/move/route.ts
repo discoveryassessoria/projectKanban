@@ -13,13 +13,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const currentStatusId = Number.parseInt(statusId)
 
-    // Get all statuses for this project, sorted by id
+    // Get all statuses for this project, sorted by ordem
     const allStatuses = await prisma.status.findMany({
       where: {
         projetoId: Number.parseInt(projetoId),
       },
       orderBy: {
-        id: "asc",
+        ordem: "asc",
       },
     })
 
@@ -37,26 +37,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Não é possível mover nesta direção" }, { status: 400 })
     }
 
-    // Swap IDs (simple approach - swap the id values)
+    // Get the statuses to swap
     const currentStatus = allStatuses[currentIndex]
     const targetStatus = allStatuses[targetIndex]
 
-    // Use a transaction to swap IDs
+    // Use a transaction to swap the ordem values
     await prisma.$transaction([
-      // Temporarily set current status to a high number to avoid conflicts
+      // Update current status ordem to target's ordem
       prisma.status.update({
         where: { id: currentStatus.id },
-        data: { id: 999999 },
+        data: { ordem: targetStatus.ordem },
       }),
-      // Update target status to current's id
+      // Update target status ordem to current's ordem
       prisma.status.update({
         where: { id: targetStatus.id },
-        data: { id: currentStatus.id },
-      }),
-      // Update current status (now 999999) to target's id
-      prisma.status.update({
-        where: { id: 999999 },
-        data: { id: targetStatus.id },
+        data: { ordem: currentStatus.ordem },
       }),
     ])
 

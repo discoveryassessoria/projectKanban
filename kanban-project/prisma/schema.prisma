@@ -156,6 +156,7 @@ model UserAtv {
 model Status {
   id   Int    @id @default(autoincrement())
   nome String @db.VarChar(20)
+  ordem Int   @default(0) // Ordem de exibição dos status
   projetoId Int?
   projeto   ProjetoKanban? @relation(fields: [projetoId], references: [id])
 
@@ -171,7 +172,7 @@ model Requerente {
   cpf      String? @db.VarChar(11)
   rg       String? @db.VarChar(10)
   endereco String? @db.VarChar(100)
-  telefone String? @db.VarChar(10)
+  telefone String? @db.VarChar(11)
 
   projetos ProjetoKanban[]
 }
@@ -181,7 +182,8 @@ model Contratante {
   nome     String  @db.VarChar(50)
   cpf      String? @db.VarChar(11)
   rg       String? @db.VarChar(10)
-  endereco String? @db.VarChar(10) // No seu modelo, o varchar era 10
+  endereco String? @db.VarChar(100) // No seu modelo, o varchar era 10
+  telefone String? @db.VarChar(11)
 
   projetos ProjetoKanban[]
 }

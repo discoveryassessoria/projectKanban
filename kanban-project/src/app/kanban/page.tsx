@@ -4,12 +4,16 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { getStoredUser, isAuthenticated } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
-import { KanbanIcon, Trash2, Sparkles } from "lucide-react"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import MenuLateral from "@/src/components/kanban/menu-lateral"
+import { ProjectSelector } from "@/components/ui/project-selector"
+import { ContratanteSelector } from "@/components/ui/contratante-selector"
+import { RequerenteSelector } from "@/components/ui/requerente-selector"
+import { KanbanIcon, Trash2, Sparkles, Plus, Info } from "lucide-react"
 import ModalNovoProjeto from "@/src/components/kanban/modal-novo-projeto"
 import { KanbanBoard } from "@/src/components/kanban"
-import type { Projeto } from "@/src/types/kanban"
+import { ContratanteModal } from "@/src/components/kanban/contratante-modal"
+import { RequerenteModal } from "@/src/components/kanban/requerente-modal"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import type { Projeto, Contratante, Requerente } from "@/src/types/kanban"
 
 interface User {
   id: number
@@ -24,8 +28,24 @@ export default function KanbanPage() {
   const [projetos, setProjetos] = useState<Projeto[]>([])
   const [projetoSelecionado, setProjetoSelecionado] = useState<Projeto | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isMenuMinimized, setIsMenuMinimized] = useState(false)
   const [isModalNovoProjetoOpen, setIsModalNovoProjetoOpen] = useState(false)
+  
+  // Estados para contratantes e requerentes
+  const [contratantes, setContratantes] = useState<Contratante[]>([])
+  const [requerentes, setRequerentes] = useState<Requerente[]>([])
+  
+  // Estados para modais
+  const [contratanteModal, setContratanteModal] = useState({
+    isOpen: false,
+    mode: 'view' as 'view' | 'create' | 'edit',
+    contratante: null as Contratante | null
+  })
+  
+  const [requerenteModal, setRequerenteModal] = useState({
+    isOpen: false,
+    mode: 'view' as 'view' | 'create' | 'edit',
+    requerente: null as Requerente | null
+  })
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -39,6 +59,8 @@ export default function KanbanPage() {
     }
     setUser(userData)
     buscarProjetos(userData.id)
+    buscarContratantes()
+    buscarRequerentes()
   }, [router])
 
   const buscarProjetos = async (userId: number) => {
@@ -79,10 +101,6 @@ export default function KanbanPage() {
 
   const handleProjetoSelect = (projeto: Projeto) => {
     setProjetoSelecionado(projeto)
-  }
-
-  const handleToggleMinimize = () => {
-    setIsMenuMinimized(!isMenuMinimized)
   }
 
   const handleCriarProjeto = async (dados: { nome: string; descricao: string }) => {
@@ -133,6 +151,108 @@ export default function KanbanPage() {
     }
   }
 
+  // Funções para contratantes
+  const buscarContratantes = async () => {
+    try {
+      const response = await fetch("/api/contratantes")
+      if (response.ok) {
+        const { contratantes } = await response.json()
+        setContratantes(contratantes)
+      }
+    } catch (error) {
+      console.error("Erro ao buscar contratantes:", error)
+    }
+  }
+
+  const handleContratanteAdd = () => {
+    setContratanteModal({
+      isOpen: true,
+      mode: 'create',
+      contratante: null
+    })
+  }
+
+  const handleContratanteView = (contratante: Contratante) => {
+    setContratanteModal({
+      isOpen: true,
+      mode: 'view',
+      contratante
+    })
+  }
+
+  const handleContratanteSelect = (contratante: Contratante | null) => {
+    // Aqui você pode implementar a lógica para associar o contratante ao projeto
+    console.log("Contratante selecionado:", contratante)
+  }
+
+  const handleContratanteSave = async (contratanteData: Omit<Contratante, 'id'>) => {
+    try {
+      const response = await fetch("/api/contratantes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contratanteData),
+      })
+
+      if (response.ok) {
+        const { contratante } = await response.json()
+        setContratantes(prev => [...prev, contratante])
+      }
+    } catch (error) {
+      console.error("Erro ao salvar contratante:", error)
+    }
+  }
+
+  // Funções para requerentes
+  const buscarRequerentes = async () => {
+    try {
+      const response = await fetch("/api/requerentes")
+      if (response.ok) {
+        const { requerentes } = await response.json()
+        setRequerentes(requerentes)
+      }
+    } catch (error) {
+      console.error("Erro ao buscar requerentes:", error)
+    }
+  }
+
+  const handleRequerenteAdd = () => {
+    setRequerenteModal({
+      isOpen: true,
+      mode: 'create',
+      requerente: null
+    })
+  }
+
+  const handleRequerenteView = (requerente: Requerente) => {
+    setRequerenteModal({
+      isOpen: true,
+      mode: 'view',
+      requerente
+    })
+  }
+
+  const handleRequerenteSelect = (requerente: Requerente | null) => {
+    // Aqui você pode implementar a lógica para associar o requerente ao projeto
+    console.log("Requerente selecionado:", requerente)
+  }
+
+  const handleRequerenteSave = async (requerenteData: Omit<Requerente, 'id'>) => {
+    try {
+      const response = await fetch("/api/requerentes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requerenteData),
+      })
+
+      if (response.ok) {
+        const { requerente } = await response.json()
+        setRequerentes(prev => [...prev, requerente])
+      }
+    } catch (error) {
+      console.error("Erro ao salvar requerente:", error)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-white">
@@ -145,40 +265,82 @@ export default function KanbanPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-white">
-      <MenuLateral
-        user={user}
-        projetos={projetos}
-        projetoSelecionado={projetoSelecionado}
-        onProjetoSelect={handleProjetoSelect}
-        onNovoProjeto={handleNovoProjeto}
-        onDeletarProjeto={handleDeletarProjeto}
-        isMinimized={isMenuMinimized}
-        onToggleMinimize={handleToggleMinimize}
-      />
-
-      <main className="flex-1 flex flex-col min-w-0">
-        {projetoSelecionado ? (
-          <>
-            <header className="p-6 bg-gray-50 border-b border-gray-200 z-10">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 flex items-center gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg">
-                        <KanbanIcon className="h-5 w-5 text-white" />
-                      </div>
-                      <h1 className="text-3xl font-bold text-gray-900">{projetoSelecionado.nome}</h1>
-                    </div>
-                    {projetoSelecionado.descricao && (
-                      <p className="text-gray-600 mt-2 ml-14">{projetoSelecionado.descricao}</p>
-                    )}
-                  </div>
+    <div className="min-h-screen bg-white">
+      <main className="flex flex-col min-h-screen">
+        <header className="p-6 bg-gray-50 border-b border-gray-200 z-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg">
+                  <KanbanIcon className="h-5 w-5 text-white" />
                 </div>
+                <h1 className="text-2xl font-bold text-gray-900">Kanban</h1>
+              </div>
+              
+              {projetos.length > 0 && (
+                <ProjectSelector
+                  projetos={projetos}
+                  selectedProject={projetoSelecionado}
+                  onSelect={handleProjetoSelect}
+                  placeholder="Selecione um projeto"
+                  className="min-w-[250px]"
+                />
+              )}
+              
+              {/* Ícone de informação para descrição do projeto */}
+              {projetoSelecionado?.descricao && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <Info className="h-4 w-4 text-blue-600" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs">{projetoSelecionado.descricao}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Seletores de Contratante e Requerente */}
+              {projetoSelecionado && (
+                <>
+                  <ContratanteSelector
+                    contratantes={contratantes}
+                    selectedContratante={projetoSelecionado.contratante || null}
+                    onSelect={handleContratanteSelect}
+                    onAdd={handleContratanteAdd}
+                    onView={handleContratanteView}
+                    className="w-[200px]"
+                  />
+                  
+                  <RequerenteSelector
+                    requerentes={requerentes}
+                    selectedRequerente={projetoSelecionado.requerente || null}
+                    onSelect={handleRequerenteSelect}
+                    onAdd={handleRequerenteAdd}
+                    onView={handleRequerenteView}
+                    className="w-[200px]"
+                  />
+                </>
+              )}
+              
+              <Button
+                onClick={handleNovoProjeto}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Projeto
+              </Button>
+              
+              {projetoSelecionado && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="ml-4 hover:bg-red-100 hover:text-red-600 text-gray-600"
+                  className="hover:bg-red-100 hover:text-red-600 text-gray-600"
                   onClick={() => {
                     if (confirm(`Tem certeza que deseja deletar o projeto "${projetoSelecionado.nome}"?`)) {
                       handleDeletarProjeto(projetoSelecionado.id)
@@ -187,27 +349,32 @@ export default function KanbanPage() {
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
-              </div>
-            </header>
-
-            <div className="flex-1 p-6 overflow-auto">
-              <div className="h-full">
-                <KanbanBoard projeto={projetoSelecionado} onStatusAdd={handleStatusAdd} />
-              </div>
+              )}
             </div>
-          </>
+          </div>
+        </header>
+
+        {projetoSelecionado ? (
+          <div className="flex-1 p-6 overflow-auto">
+            <div className="h-full">
+              <KanbanBoard projeto={projetoSelecionado} onStatusAdd={handleStatusAdd} />
+            </div>
+          </div>
         ) : (
-          <div className="flex items-center justify-center h-full">
+          <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <div className="inline-flex p-4 bg-gray-100 rounded-2xl mb-4">
                 <Sparkles className="h-16 w-16 text-indigo-500" />
               </div>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">Selecione um projeto</h2>
-              <p className="text-gray-600 mb-6">Ou crie um novo para começar a organizar suas tarefas</p>
-              <Button onClick={handleNovoProjeto} className="bg-indigo-600 hover:bg-indigo-700">
-                <KanbanIcon className="mr-2 h-4 w-4" />
-                Criar Novo Projeto
-              </Button>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                {projetos.length === 0 ? "Nenhum projeto encontrado" : "Selecione um projeto"}
+              </h2>
+              <p className="text-gray-600 mb-6">
+                {projetos.length === 0 
+                  ? "Crie seu primeiro projeto para começar" 
+                  : "Selecione um projeto no cabeçalho ou crie um novo"
+                }
+              </p>
             </div>
           </div>
         )}
@@ -217,6 +384,23 @@ export default function KanbanPage() {
         isOpen={isModalNovoProjetoOpen}
         onClose={() => setIsModalNovoProjetoOpen(false)}
         onSubmit={handleCriarProjeto}
+      />
+
+      {/* Modais para Contratante e Requerente */}
+      <ContratanteModal
+        contratante={contratanteModal.contratante}
+        isOpen={contratanteModal.isOpen}
+        onClose={() => setContratanteModal(prev => ({ ...prev, isOpen: false }))}
+        onSave={contratanteModal.mode === 'create' ? handleContratanteSave : undefined}
+        mode={contratanteModal.mode}
+      />
+
+      <RequerenteModal
+        requerente={requerenteModal.requerente}
+        isOpen={requerenteModal.isOpen}
+        onClose={() => setRequerenteModal(prev => ({ ...prev, isOpen: false }))}
+        onSave={requerenteModal.mode === 'create' ? handleRequerenteSave : undefined}
+        mode={requerenteModal.mode}
       />
     </div>
   )

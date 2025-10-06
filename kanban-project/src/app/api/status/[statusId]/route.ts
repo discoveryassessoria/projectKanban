@@ -32,27 +32,41 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const { statusId } = await params
     const parsedStatusId = Number.parseInt(statusId)
 
-    // Check if status has activities
-    const atividadesCount = await prisma.atividade.count({
+    // First check if status exists
+    const statusExists = await prisma.status.findUnique({
       where: {
-        statusId: parsedStatusId,
+        id: parsedStatusId,
       },
     })
 
-    // Delete all activities in this status first
-    if (atividadesCount > 0) {
-      await prisma.atividade.deleteMany({
+    if (!statusExists) {
+      return NextResponse.json({ error: "Status não encontrado" }, { status: 404 })
+    }
+
+    // Use transaction to ensure data consistency
+    await prisma.$transaction(async (tx) => {
+      // Delete all UserAtv relations for activities in this status
+      await tx.userAtv.deleteMany({
+        where: {
+          atividade: {
+            statusId: parsedStatusId,
+          },
+        },
+      })
+
+      // Delete all activities in this status
+      await tx.atividade.deleteMany({
         where: {
           statusId: parsedStatusId,
         },
       })
-    }
 
-    // Delete the status
-    await prisma.status.delete({
-      where: {
-        id: parsedStatusId,
-      },
+      // Finally delete the status
+      await tx.status.delete({
+        where: {
+          id: parsedStatusId,
+        },
+      })
     })
 
     return NextResponse.json({ message: "Status excluído com sucesso" }, { status: 200 })

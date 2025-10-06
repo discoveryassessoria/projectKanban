@@ -15,7 +15,13 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        status: true,
+        status: {
+          orderBy: {
+            ordem: 'asc'
+          }
+        },
+        contratante: true,
+        requerente: true,
       },
     })
 
@@ -52,15 +58,16 @@ export async function POST(request: NextRequest) {
 
     // Criar os status padrão para o projeto
     const statusPadrao = [
-      { nome: "A Fazer", projetoId: projeto.id },
-      { nome: "Em Andamento", projetoId: projeto.id },
-      { nome: "Concluído", projetoId: projeto.id },
+      { nome: "A Fazer", projetoId: projeto.id, ordem: 0 },
+      { nome: "Em Andamento", projetoId: projeto.id, ordem: 1 },
+      { nome: "Concluído", projetoId: projeto.id, ordem: 2 },
     ]
 
     for (const status of statusPadrao) {
       await prisma.status.create({
         data: {
           nome: status.nome,
+          ordem: status.ordem,
           projeto: {
             connect: { id: projeto.id },
           },
@@ -84,7 +91,13 @@ export async function POST(request: NextRequest) {
             },
           },
         },
-        status: true,
+        status: {
+          orderBy: {
+            ordem: 'asc'
+          }
+        },
+        contratante: true,
+        requerente: true,
       },
     })
 

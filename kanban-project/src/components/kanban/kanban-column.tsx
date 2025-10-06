@@ -135,7 +135,7 @@ export function KanbanColumn({
           isOver ? "border-indigo-500 ring-2 ring-indigo-500/20" : "border-gray-200"
         }`}
       >
-        <div className="p-4 border-b border-gray-200" style={{ backgroundColor: headerColor }}>
+        <div className="p-4 border-b border-gray-200 rounded-t-lg" style={{ backgroundColor: headerColor }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-sm text-white">{title}</h3>

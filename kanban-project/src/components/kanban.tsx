@@ -255,7 +255,7 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
       >
         <div
           ref={scrollContainerRef}
-          className="overflow-x-auto custom-scrollbar cursor-grab active:cursor-grabbing"
+          className="overflow-hidden cursor-grab active:cursor-grabbing"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -272,8 +272,8 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
                 if (aIsConcluido) return 1
                 // If b is CONCLUÍDO, it should come after a
                 if (bIsConcluido) return -1
-                // Otherwise, sort by id
-                return a.id - b.id
+                // Otherwise, sort by ordem
+                return (a.ordem ?? 0) - (b.ordem ?? 0)
               })
               .map((status, index) => (
                 <div className="w-80 flex-shrink-0">
