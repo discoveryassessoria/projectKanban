@@ -1,0 +1,187 @@
+/* Estilos customizados para o Kanban de Prazos */
+
+/* Scroll horizontal suave para o kanban */
+.kanban-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(203 213 225) transparent;
+}
+
+.kanban-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.kanban-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.kanban-scroll::-webkit-scrollbar-thumb {
+  background-color: rgb(203 213 225);
+  border-radius: 4px;
+}
+
+.kanban-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(148 163 184);
+}
+
+/* Cards com hover suave */
+.activity-card {
+  transition: all 0.2s ease-in-out;
+}
+
+.activity-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -8px rgba(0, 0, 0, 0.1);
+}
+
+/* Indicadores de urgência */
+.urgency-indicator {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Status badges com cores mais vibrantes */
+.status-vencido {
+  background-color: rgb(254 226 226);
+  color: rgb(153 27 27);
+  border-color: rgb(252 165 165);
+}
+
+.status-hoje {
+  background-color: rgb(255 237 213);
+  color: rgb(154 52 18);
+  border-color: rgb(253 186 116);
+}
+
+.status-proximos {
+  background-color: rgb(254 249 195);
+  color: rgb(133 77 14);
+  border-color: rgb(250 204 21);
+}
+
+.status-semana {
+  background-color: rgb(219 234 254);
+  color: rgb(30 58 138);
+  border-color: rgb(147 197 253);
+}
+
+.status-futuro {
+  background-color: rgb(220 252 231);
+  color: rgb(22 101 52);
+  border-color: rgb(134 239 172);
+}
+
+.status-sem-prazo {
+  background-color: rgb(249 250 251);
+  color: rgb(55 65 81);
+  border-color: rgb(209 213 219);
+}
+
+/* Animação de carregamento para skeleton */
+.skeleton-loading {
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Responsividade para mobile */
+@media (max-width: 768px) {
+  .kanban-column {
+    min-width: 280px;
+    max-width: 300px;
+  }
+  
+  .activity-card {
+    margin-bottom: 8px;
+  }
+}
+
+/* Estados de focus melhorados */
+.focus\:ring-primary:focus {
+  --tw-ring-color: rgb(var(--primary));
+}
+
+/* Transições suaves para modais */
+.modal-overlay {
+  backdrop-filter: blur(4px);
+}
+
+/* Melhorias visuais para badges */
+.badge-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Estilo para filtros ativos */
+.filter-active {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.2);
+  color: rgb(59, 130, 246);
+}
+
+/* Loading states */
+.loading-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Melhorias para acessibilidade */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Estados de erro */
+.error-state {
+  color: rgb(220, 38, 38);
+  background-color: rgba(220, 38, 38, 0.1);
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+/* Melhorias para dark mode */
+@media (prefers-color-scheme: dark) {
+  .kanban-scroll::-webkit-scrollbar-thumb {
+    background-color: rgb(71 85 105);
+  }
+  
+  .kanban-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(100 116 139);
+  }
+}

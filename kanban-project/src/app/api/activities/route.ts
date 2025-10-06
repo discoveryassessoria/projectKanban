@@ -10,8 +10,6 @@ export async function GET(request: NextRequest) {
     // Extrair parâmetros de filtro
     const dataInicio = searchParams.get('dataInicio')
     const dataFim = searchParams.get('dataFim')
-    const prazoInicio = searchParams.get('prazoInicio')
-    const prazoFim = searchParams.get('prazoFim')
     const projetoId = searchParams.get('projeto')
     const statusId = searchParams.get('status')
     const responsavel = searchParams.get('responsavel')
@@ -27,17 +25,6 @@ export async function GET(request: NextRequest) {
       }
       if (dataFim) {
         whereClause.data_criacao.lte = new Date(dataFim + 'T23:59:59.999Z')
-      }
-    }
-
-    // Filtro por data de término (prazo)
-    if (prazoInicio || prazoFim) {
-      whereClause.data_termino = {}
-      if (prazoInicio) {
-        whereClause.data_termino.gte = new Date(prazoInicio)
-      }
-      if (prazoFim) {
-        whereClause.data_termino.lte = new Date(prazoFim + 'T23:59:59.999Z')
       }
     }
 

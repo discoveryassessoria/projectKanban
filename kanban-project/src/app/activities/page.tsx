@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, Filter, ChevronDown } from "lucide-react"
 import ListaActivities from "@/src/components/activitiesComponents/listaActivities"
 import ListaProjects from "@/src/components/activitiesComponents/listaProjects"
+import PrazoActivities from "@/src/components/activitiesComponents/prazoActivities"
 import CalendarioActivities from "@/src/components/activitiesComponents/calendarioActivities"
 
 interface Usuario {
@@ -62,8 +63,6 @@ export default function ActivitiesPage() {
   const [filters, setFilters] = useState({
     dataInicio: '',
     dataFim: '',
-    prazoInicio: '',
-    prazoFim: '',
     projeto: 'all',
     status: 'all',
     responsavel: 'all'
@@ -126,7 +125,7 @@ export default function ActivitiesPage() {
             </TabsContent>
             
             <TabsContent value="deadline" className="space-y-4">
-              <DevelopmentMessage feature="Prazo" />
+              <PrazoActivities />
             </TabsContent>
             
             <TabsContent value="calendar" className="space-y-4">
@@ -245,8 +244,6 @@ function FilterModal({
     setFilters({
       dataInicio: '',
       dataFim: '',
-      prazoInicio: '',
-      prazoFim: '',
       projeto: 'all',
       status: 'all',
       responsavel: 'all'
@@ -293,30 +290,7 @@ function FilterModal({
             </div>
           </div>
 
-          {/* Filtros de Data Final (Prazo) */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Data Final (Prazo)</Label>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="prazoInicio" className="text-xs">De:</Label>
-                <Input
-                  id="prazoInicio"
-                  type="date"
-                  value={filters.prazoInicio}
-                  onChange={(e) => handleFilterChange('prazoInicio', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="prazoFim" className="text-xs">Até:</Label>
-                <Input
-                  id="prazoFim"
-                  type="date"
-                  value={filters.prazoFim}
-                  onChange={(e) => handleFilterChange('prazoFim', e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
+          {/* Filtros de Projeto e Status */}
 
           {/* Filtro por Projeto */}
           <div className="space-y-2">
