@@ -40,9 +40,10 @@ interface Atividade {
 interface ActivityCardProps {
   activity: Atividade
   onClick?: (activity: Atividade) => void
+  isDragging?: boolean
 }
 
-export default function ActivityCard({ activity, onClick }: ActivityCardProps) {
+export default function ActivityCard({ activity, onClick, isDragging = false }: ActivityCardProps) {
   const classification = classifyByDeadline(activity.data_termino)
   const urgencyColor = getUrgencyColor(classification.category)
 
@@ -101,6 +102,7 @@ export default function ActivityCard({ activity, onClick }: ActivityCardProps) {
         cursor-pointer transition-all duration-200 hover:shadow-md
         ${urgencyColor}
         ${isUrgent ? 'ring-2 ring-red-200' : ''}
+        ${isDragging ? 'shadow-2xl ring-1 ring-gray-300 rotate-3 scale-105' : ''}
       `}
       onClick={() => onClick?.(activity)}
     >

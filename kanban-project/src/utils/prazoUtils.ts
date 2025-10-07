@@ -169,19 +169,3 @@ export function getUrgencyColor(category: PrazoCategory): string {
   
   return colorMap[category] || colorMap['sem-prazo']
 }
-
-/**
- * Retorna o ícone de urgência baseado na categoria
- */
-export function getUrgencyIcon(category: PrazoCategory): string {
-  const iconMap = {
-    'vencido': '🔴',
-    'hoje': '🟠',
-    'proximos-3-dias': '🟡',
-    'proxima-semana': '🔵',
-    'futuro': '🟢',
-    'sem-prazo': '⚪'
-  }
-  
-  return iconMap[category] || iconMap['sem-prazo']
-}

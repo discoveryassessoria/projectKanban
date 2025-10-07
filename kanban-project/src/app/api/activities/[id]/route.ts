@@ -61,7 +61,7 @@ export async function PATCH(
   try {
     const id = parseInt(params.id)
     const body = await request.json()
-    const { statusId } = body
+    const { statusId, data_termino } = body
 
     if (isNaN(id)) {
       return NextResponse.json(
@@ -70,9 +70,10 @@ export async function PATCH(
       )
     }
 
-    if (!statusId) {
+    // Verificar se pelo menos um campo foi enviado para atualização
+    if (!statusId && data_termino === undefined) {
       return NextResponse.json(
-        { error: 'Status é obrigatório' },
+        { error: 'Pelo menos um campo deve ser fornecido para atualização' },
         { status: 400 }
       )
     }
@@ -89,10 +90,19 @@ export async function PATCH(
       )
     }
 
-    // Atualizar o status da atividade
+    // Construir objeto de dados para atualização
+    const updateData: any = {}
+    if (statusId) {
+      updateData.statusId = parseInt(statusId)
+    }
+    if (data_termino !== undefined) {
+      updateData.data_termino = data_termino ? new Date(data_termino) : null
+    }
+
+    // Atualizar a atividade
     const atividadeAtualizada = await prisma.atividade.update({
       where: { id },
-      data: { statusId: parseInt(statusId) },
+      data: updateData,
       include: {
         projeto: {
           select: {
@@ -118,7 +128,11 @@ export async function PATCH(
       }
     })
 
-    return NextResponse.json(atividadeAtualizada)
+    return NextResponse.json({
+      success: true,
+      data: atividadeAtualizada,
+      message: 'Atividade atualizada com sucesso'
+    })
   } catch (error) {
     return NextResponse.json(
       { 

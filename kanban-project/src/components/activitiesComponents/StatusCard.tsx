@@ -19,6 +19,7 @@ interface StatusCardProps {
   onDelete?: () => void
   canManage?: boolean
   children?: React.ReactNode
+  isDropTarget?: boolean
 }
 
 export default function StatusCard({ 
@@ -27,7 +28,8 @@ export default function StatusCard({
   onEdit, 
   onDelete, 
   canManage = false,
-  children 
+  children,
+  isDropTarget = false
 }: StatusCardProps) {
   const { label, color, description } = classification
   const activityCount = activities.length
@@ -58,7 +60,10 @@ export default function StatusCard({
 
   return (
     <div className="flex flex-col h-full min-w-[300px] max-w-[350px]">
-      <Card className="flex flex-col h-full">
+      <Card className={`
+        flex flex-col h-full transition-all duration-200
+        ${isDropTarget ? 'ring-2 ring-blue-400 shadow-lg' : ''}
+      `}>
         <CardHeader className={`${getHeaderColor()} pb-3`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

@@ -6,6 +6,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, RefreshCw } from "lucide-react"
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverEvent,
+  DragStartEvent,
+  DragOverlay,
+  useSensors,
+  useSensor,
+  PointerSensor,
+  KeyboardSensor,
+  closestCorners,
+} from "@dnd-kit/core"
+import {
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable"
 import { 
   PRAZO_CATEGORIES, 
   groupActivitiesByDeadline, 
@@ -15,6 +30,9 @@ import {
 import StatusCard from "./StatusCard"
 import ActivityCard from "./ActivityCard"
 import CustomStatusManager from "./CustomStatusManager"
+import DraggableActivityCard from "./DraggableActivityCard"
+import DroppableColumn from "./DroppableColumn"
+import { useActivityOperations } from "@/src/hooks/useActivityOperations"
 import "@/src/styles/kanban.css"
 
 interface Usuario {
@@ -56,11 +74,33 @@ export default function PrazoActivities() {
   const [error, setError] = useState<string | null>(null)
   const [selectedActivity, setSelectedActivity] = useState<Atividade | null>(null)
   const [activeTab, setActiveTab] = useState("kanban")
+  
+  // Estados para drag and drop
+  const [draggedActivity, setDraggedActivity] = useState<Atividade | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  
+  // Hook para operações de atividade
+  const { updateDeadline, isUpdating, error: updateError, clearError } = useActivityOperations()
+  
+  // Estado para controlar qual atividade está sendo atualizada
+  const [updatingActivityId, setUpdatingActivityId] = useState<number | null>(null)
 
   // Carregar atividades
   useEffect(() => {
     fetchActivities()
   }, [])
+
+  // Sensores para diferentes tipos de input
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
 
   const fetchActivities = async () => {
@@ -96,6 +136,118 @@ export default function PrazoActivities() {
 
   const handleStatusCreated = () => {
     fetchActivities() // Recarregar atividades quando um novo status for criado
+  }
+
+  // Handlers de drag and drop
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event
+    const activity = atividades.find(a => a.id === Number(active.id))
+    setDraggedActivity(activity || null)
+    setIsDragging(true)
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    
+    setDraggedActivity(null)
+    setIsDragging(false)
+    
+    if (!over || active.id === over.id) return
+
+    const activeId = Number(active.id)
+    const overId = over.id as string
+    
+    // Encontrar a atividade sendo movida
+    const draggedActivity = atividades.find(a => a.id === activeId)
+    if (!draggedActivity) return
+
+    // Calcular nova data baseada na categoria de destino
+    const newDate = calculateNewDateForCategory(overId as PrazoCategory)
+    
+    // Optimistic Update - atualizar UI imediatamente
+    setAtividades(prev => prev.map(activity => 
+      activity.id === activeId 
+        ? { ...activity, data_termino: newDate }
+        : activity
+    ))
+
+    // Indicar que está atualizando
+    setUpdatingActivityId(activeId)
+
+    try {
+      // Chamar API para persistir mudança
+      const success = await updateDeadline(activeId, newDate)
+      
+      if (!success) {
+        // Reverter mudança em caso de erro
+        setAtividades(prev => prev.map(activity => 
+          activity.id === activeId 
+            ? { ...activity, data_termino: draggedActivity.data_termino }
+            : activity
+        ))
+        
+        console.error('Falha ao atualizar prazo no servidor:', updateError)
+      } else {
+        console.log(`Prazo atualizado com sucesso para atividade "${draggedActivity.nome}"`)
+      }
+    } catch (error) {
+      // Reverter em caso de erro de rede
+      setAtividades(prev => prev.map(activity => 
+        activity.id === activeId 
+          ? { ...activity, data_termino: draggedActivity.data_termino }
+          : activity
+      ))
+      console.error('Erro de rede ao atualizar prazo:', error)
+    } finally {
+      setUpdatingActivityId(null)
+    }
+  }
+
+  const handleDragCancel = () => {
+    setDraggedActivity(null)
+    setIsDragging(false)
+  }
+
+  // Função para calcular nova data baseada na categoria
+  const calculateNewDateForCategory = (category: PrazoCategory): string | null => {
+    const now = new Date()
+    
+    switch (category) {
+      case 'vencido':
+        // Um dia atrás
+        const yesterday = new Date(now)
+        yesterday.setDate(now.getDate() - 1)
+        return yesterday.toISOString()
+        
+      case 'hoje':
+        // Hoje
+        return now.toISOString()
+        
+      case 'proximos-3-dias':
+        // Em 2 dias (dentro dos próximos 3)
+        const in2Days = new Date(now)
+        in2Days.setDate(now.getDate() + 2)
+        return in2Days.toISOString()
+        
+      case 'proxima-semana':
+        // Em 5 dias (próxima semana)
+        const in5Days = new Date(now)
+        in5Days.setDate(now.getDate() + 5)
+        return in5Days.toISOString()
+        
+      case 'futuro':
+        // Em 15 dias
+        const in15Days = new Date(now)
+        in15Days.setDate(now.getDate() + 15)
+        return in15Days.toISOString()
+        
+      case 'sem-prazo':
+        // Sem prazo
+        return null
+        
+      default:
+        return null
+    }
   }
 
   // Agrupar atividades por categoria de prazo
@@ -150,11 +302,27 @@ export default function PrazoActivities() {
           <p className="text-muted-foreground">
             Organize suas atividades por proximidade do prazo e gerencie status
           </p>
+          {updateError && (
+            <p className="text-sm text-red-600 mt-1">
+              Erro ao atualizar: {updateError}
+              <button 
+                onClick={clearError}
+                className="ml-2 text-red-800 hover:text-red-900 underline"
+              >
+                Dispensar
+              </button>
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-sm">
             {totalActivities} atividade(s)
           </Badge>
+          {isUpdating && (
+            <Badge variant="secondary" className="text-xs animate-pulse">
+              Atualizando...
+            </Badge>
+          )}
           <Button variant="outline" size="sm" onClick={handleRefresh}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Atualizar
@@ -171,33 +339,53 @@ export default function PrazoActivities() {
 
         <TabsContent value="kanban" className="space-y-4">
           {/* Kanban Board */}
-          <div className="overflow-x-auto pb-4 kanban-scroll">
-            <div className="flex gap-4 min-w-full">
-              {Object.entries(PRAZO_CATEGORIES).map(([categoryKey, classification]) => {
-                const category = categoryKey as PrazoCategory
-                const activities = sortedGroupedActivities[category] || []
-                
-                return (
-                  <div key={category} className="kanban-column">
-                    <StatusCard
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
+          >
+            <div className="overflow-x-auto pb-4 kanban-scroll">
+              <div className="flex gap-4 min-w-full">
+                {Object.entries(PRAZO_CATEGORIES).map(([categoryKey, classification]) => {
+                  const category = categoryKey as PrazoCategory
+                  const activities = sortedGroupedActivities[category] || []
+                  
+                  return (
+                    <DroppableColumn
+                      key={category}
+                      id={category}
                       classification={classification}
                       activities={activities}
-                      canManage={false} // Por enquanto não permite gerenciar essas categorias fixas
                     >
                       {activities.map((activity) => (
                         <div key={activity.id} className="activity-card">
-                          <ActivityCard
+                          <DraggableActivityCard
                             activity={activity}
                             onClick={handleActivityClick}
+                            isUpdating={updatingActivityId === activity.id}
                           />
                         </div>
                       ))}
-                    </StatusCard>
-                  </div>
-                )
-              })}
+                    </DroppableColumn>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+            
+            {/* Drag Overlay */}
+            <DragOverlay>
+              {draggedActivity && (
+                <div className="activity-card">
+                  <ActivityCard
+                    activity={draggedActivity}
+                    isDragging={true}
+                  />
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
 
 
 
