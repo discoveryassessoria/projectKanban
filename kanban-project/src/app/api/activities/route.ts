@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { nome, descricao, data_termino, projeto_id, status_id } = body
+    const { nome, descricao, data_termino, projeto_id, status_id, prazo_category } = body
 
     // Validações básicas
     if (!nome || !projeto_id || !status_id) {
@@ -104,12 +104,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Se prazo_category for fornecido, calcular data_termino automaticamente
+    let calculatedDataTermino = data_termino ? new Date(data_termino) : null
+    
+    if (prazo_category && !data_termino) {
+      calculatedDataTermino = calculateDateForCategory(prazo_category)
+    }
+
     // Criar a atividade
     const atividade = await prisma.atividade.create({
       data: {
         nome,
         descricao: descricao || null,
-        data_termino: data_termino ? new Date(data_termino) : null,
+        data_termino: calculatedDataTermino,
         projetoId: parseInt(projeto_id),
         statusId: parseInt(status_id)
       },
@@ -147,5 +154,52 @@ export async function POST(request: NextRequest) {
     )
   } finally {
     await prisma.$disconnect()
+  }
+}
+
+// Função auxiliar para calcular data baseada na categoria de prazo
+function calculateDateForCategory(category: string): Date | null {
+  const now = new Date()
+  
+  switch (category) {
+    case 'vencido':
+      // Um dia atrás
+      const yesterday = new Date(now)
+      yesterday.setDate(now.getDate() - 1)
+      return yesterday
+      
+    case 'hoje':
+      // Hoje, mas no final do dia
+      const today = new Date(now)
+      today.setHours(23, 59, 59, 999)
+      return today
+      
+    case 'proximos-3-dias':
+      // Em 2 dias (dentro dos próximos 3)
+      const in2Days = new Date(now)
+      in2Days.setDate(now.getDate() + 2)
+      in2Days.setHours(23, 59, 59, 999)
+      return in2Days
+      
+    case 'proxima-semana':
+      // Em 5 dias (próxima semana)
+      const in5Days = new Date(now)
+      in5Days.setDate(now.getDate() + 5)
+      in5Days.setHours(23, 59, 59, 999)
+      return in5Days
+      
+    case 'futuro':
+      // Em 15 dias
+      const in15Days = new Date(now)
+      in15Days.setDate(now.getDate() + 15)
+      in15Days.setHours(23, 59, 59, 999)
+      return in15Days
+      
+    case 'sem-prazo':
+      // Sem prazo
+      return null
+      
+    default:
+      return null
   }
 }

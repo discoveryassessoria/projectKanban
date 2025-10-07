@@ -20,6 +20,7 @@ interface StatusCardProps {
   canManage?: boolean
   children?: React.ReactNode
   isDropTarget?: boolean
+  quickAddButton?: React.ReactNode
 }
 
 export default function StatusCard({ 
@@ -29,7 +30,8 @@ export default function StatusCard({
   onDelete, 
   canManage = false,
   children,
-  isDropTarget = false
+  isDropTarget = false,
+  quickAddButton
 }: StatusCardProps) {
   const { label, color, description } = classification
   const activityCount = activities.length
@@ -112,8 +114,17 @@ export default function StatusCard({
               {description}
             </p>
           )}
+          
+          {/* Quick Add Button */}
+          {quickAddButton && (
+            <div className="mt-3 flex justify-center">
+              {quickAddButton}
+            </div>
+          )}
+          
         </CardHeader>
-        <CardContent className="flex-1 p-3 overflow-y-auto">
+          <CardContent className="flex-1 p-3 overflow-y-auto">
+            
           <div className="space-y-2">
             {children}
             {activityCount === 0 && (

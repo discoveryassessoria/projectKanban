@@ -1,8 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import { useDroppable } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import StatusCard from "./StatusCard"
+import QuickAddButton from "./QuickAddButton"
 import { PrazoClassification } from "@/src/utils/prazoUtils"
 
 interface Usuario {
@@ -41,13 +43,21 @@ interface DroppableColumnProps {
   classification: PrazoClassification
   activities: Atividade[]
   children: React.ReactNode
+  onQuickAdd?: (category: string) => void
+  onHover?: (columnId: string) => void
+  onLeave?: () => void
+  isExpanded?: boolean
 }
 
 export default function DroppableColumn({ 
   id, 
   classification, 
   activities, 
-  children 
+  children,
+  onQuickAdd,
+  onHover,
+  onLeave,
+  isExpanded = false
 }: DroppableColumnProps) {
   const {
     isOver,
@@ -60,19 +70,49 @@ export default function DroppableColumn({
     }
   })
 
+  const handleMouseEnter = () => {
+    if (onHover) {
+      onHover(id)
+    }
+  }
+
+  const handleMouseLeave = () => {
+    if (onLeave) {
+      onLeave()
+    }
+  }
+
+  const handleQuickAdd = () => {
+    if (onQuickAdd) {
+      onQuickAdd(id)
+    }
+  }
+
   return (
     <div
       ref={setNodeRef}
       className={`
-        kanban-column transition-all duration-200
+        kanban-column transition-all duration-200 relative
         ${isOver ? 'bg-blue-50/50 ring-2 ring-blue-300 shadow-lg' : ''}
       `}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <StatusCard
         classification={classification}
         activities={activities}
         canManage={false}
         isDropTarget={isOver}
+        quickAddButton={
+          onQuickAdd ? (
+            <QuickAddButton
+              classification={classification}
+              onQuickAdd={handleQuickAdd}
+              isVisible={true}
+              isExpanded={isExpanded}
+            />
+          ) : null
+        }
       >
         <SortableContext 
           items={activities.map(a => a.id.toString())}

@@ -32,7 +32,9 @@ import ActivityCard from "./ActivityCard"
 import CustomStatusManager from "./CustomStatusManager"
 import DraggableActivityCard from "./DraggableActivityCard"
 import DroppableColumn from "./DroppableColumn"
+import QuickAddModal, { QuickAddFormData } from "./QuickAddModal"
 import { useActivityOperations } from "@/src/hooks/useActivityOperations"
+import { useQuickAddActivity } from "@/src/hooks/useQuickAddActivity"
 import "@/src/styles/kanban.css"
 
 interface Usuario {
@@ -79,8 +81,24 @@ export default function PrazoActivities() {
   const [draggedActivity, setDraggedActivity] = useState<Atividade | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   
+  // Estados para Quick Add
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false)
+  const [quickAddCategory, setQuickAddCategory] = useState<PrazoCategory | null>(null)
+  const [hoveredColumn, setHoveredColumn] = useState<string | null>(null)
+  
   // Hook para operações de atividade
   const { updateDeadline, isUpdating, error: updateError, clearError } = useActivityOperations()
+  
+  // Hook para criação rápida
+  const { createQuickActivity, isLoading: isCreatingActivity, error: createError, clearError: clearCreateError } = useQuickAddActivity({
+    onSuccess: () => {
+      fetchActivities() // Recarregar atividades após criar
+      setIsQuickAddOpen(false)
+    },
+    onError: (error) => {
+      console.error('Erro ao criar atividade:', error)
+    }
+  })
   
   // Estado para controlar qual atividade está sendo atualizada
   const [updatingActivityId, setUpdatingActivityId] = useState<number | null>(null)
@@ -136,6 +154,31 @@ export default function PrazoActivities() {
 
   const handleStatusCreated = () => {
     fetchActivities() // Recarregar atividades quando um novo status for criado
+  }
+
+  // Handler para Quick Add
+  const handleQuickAdd = (category: string) => {
+    setQuickAddCategory(category as PrazoCategory)
+    setIsQuickAddOpen(true)
+  }
+
+  // Handlers para controlar hover global
+  const handleColumnHover = (columnId: string) => {
+    setHoveredColumn(columnId)
+  }
+
+  const handleColumnLeave = () => {
+    setHoveredColumn(null)
+  }
+
+  const handleQuickAddSubmit = async (formData: QuickAddFormData) => {
+    await createQuickActivity(formData)
+  }
+
+  const handleQuickAddClose = () => {
+    setIsQuickAddOpen(false)
+    setQuickAddCategory(null)
+    clearCreateError()
   }
 
   // Handlers de drag and drop
@@ -313,6 +356,17 @@ export default function PrazoActivities() {
               </button>
             </p>
           )}
+          {createError && (
+            <p className="text-sm text-red-600 mt-1">
+              Erro ao criar atividade: {createError}
+              <button 
+                onClick={clearCreateError}
+                className="ml-2 text-red-800 hover:text-red-900 underline"
+              >
+                Dispensar
+              </button>
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-sm">
@@ -321,6 +375,11 @@ export default function PrazoActivities() {
           {isUpdating && (
             <Badge variant="secondary" className="text-xs animate-pulse">
               Atualizando...
+            </Badge>
+          )}
+          {isCreatingActivity && (
+            <Badge variant="secondary" className="text-xs animate-pulse">
+              Criando atividade...
             </Badge>
           )}
           <Button variant="outline" size="sm" onClick={handleRefresh}>
@@ -358,6 +417,10 @@ export default function PrazoActivities() {
                       id={category}
                       classification={classification}
                       activities={activities}
+                      onQuickAdd={handleQuickAdd}
+                      onHover={handleColumnHover}
+                      onLeave={handleColumnLeave}
+                      isExpanded={hoveredColumn === category}
                     >
                       {activities.map((activity) => (
                         <div key={activity.id} className="activity-card">
@@ -410,6 +473,17 @@ export default function PrazoActivities() {
           <CustomStatusManager onStatusCreated={handleStatusCreated} />
         </TabsContent>
       </Tabs>
+
+      {/* Quick Add Modal */}
+      {quickAddCategory && (
+        <QuickAddModal
+          isOpen={isQuickAddOpen}
+          onClose={handleQuickAddClose}
+          classification={PRAZO_CATEGORIES[quickAddCategory]}
+          onSubmit={handleQuickAddSubmit}
+          isLoading={isCreatingActivity}
+        />
+      )}
     </div>
   )
 }
