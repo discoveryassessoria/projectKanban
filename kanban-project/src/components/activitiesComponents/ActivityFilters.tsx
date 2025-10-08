@@ -58,7 +58,7 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
       const response = await fetch('/api/projetos')
       if (response.ok) {
         const data = await response.json()
-        setProjetos(data)
+        setProjetos(data.projetos || [])
       }
     } catch (error) {
       console.error('Erro ao carregar projetos:', error)
@@ -70,7 +70,7 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
       const response = await fetch('/api/status')
       if (response.ok) {
         const data = await response.json()
-        setStatusList(data)
+        setStatusList(data.status || [])
       }
     } catch (error) {
       console.error('Erro ao carregar status:', error)

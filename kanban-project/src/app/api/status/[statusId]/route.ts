@@ -1,23 +1,100 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
+export async function GET(request: NextRequest, { params }: { params: Promise<{ statusId: string }> }) {
+  try {
+    const { statusId } = await params
+    const parsedStatusId = Number.parseInt(statusId)
+
+    if (isNaN(parsedStatusId)) {
+      return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
+    }
+
+    const status = await prisma.status.findUnique({
+      where: { id: parsedStatusId },
+      include: {
+        projeto: true,
+        _count: {
+          select: {
+            atividades: true
+          }
+        }
+      }
+    })
+
+    if (!status) {
+      return NextResponse.json({ error: 'Status não encontrado' }, { status: 404 })
+    }
+
+    return NextResponse.json({ status })
+  } catch (error) {
+    console.error('Erro ao buscar status:', error)
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
+  }
+}
+
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ statusId: string }> }) {
   try {
     const { statusId } = await params
     const body = await request.json()
     const { nome } = body
+    const parsedStatusId = Number.parseInt(statusId)
 
-    if (!nome) {
-      return NextResponse.json({ error: "Nome do status é obrigatório" }, { status: 400 })
+    if (isNaN(parsedStatusId)) {
+      return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
+    }
+
+    // Validações
+    if (!nome || typeof nome !== 'string') {
+      return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 })
+    }
+
+    if (nome.length > 20) {
+      return NextResponse.json({ error: 'Nome deve ter no máximo 20 caracteres' }, { status: 400 })
+    }
+
+    // Verificar se o status existe
+    const existingStatus = await prisma.status.findUnique({
+      where: { id: parsedStatusId }
+    })
+
+    if (!existingStatus) {
+      return NextResponse.json({ error: 'Status não encontrado' }, { status: 404 })
+    }
+
+    // Verificar se já existe outro status com o mesmo nome no mesmo projeto
+    const duplicateStatus = await prisma.status.findFirst({
+      where: {
+        nome: {
+          equals: nome.trim(),
+          mode: 'insensitive'
+        },
+        projetoId: existingStatus.projetoId,
+        id: {
+          not: parsedStatusId
+        }
+      }
+    })
+
+    if (duplicateStatus) {
+      return NextResponse.json({ error: 'Já existe um status com este nome neste projeto' }, { status: 409 })
     }
 
     const statusAtualizado = await prisma.status.update({
       where: {
-        id: Number.parseInt(statusId),
+        id: parsedStatusId,
       },
       data: {
-        nome,
+        nome: nome.trim(),
       },
+      include: {
+        projeto: true,
+        _count: {
+          select: {
+            atividades: true
+          }
+        }
+      }
     })
 
     return NextResponse.json({ status: statusAtualizado }, { status: 200 })
@@ -32,15 +109,41 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const { statusId } = await params
     const parsedStatusId = Number.parseInt(statusId)
 
+    if (isNaN(parsedStatusId)) {
+      return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
+    }
+
     // First check if status exists
     const statusExists = await prisma.status.findUnique({
       where: {
         id: parsedStatusId,
       },
+      include: {
+        _count: {
+          select: {
+            atividades: true
+          }
+        }
+      }
     })
 
     if (!statusExists) {
       return NextResponse.json({ error: "Status não encontrado" }, { status: 404 })
+    }
+
+    // Verificar se há atividades associadas - oferecer opção de deletar ou não
+    if (statusExists._count.atividades > 0) {
+      // Por enquanto, vamos deletar as atividades junto (cascade delete)
+      // Se quiser proteger, descomente as linhas abaixo:
+      /*
+      return NextResponse.json(
+        { 
+          error: 'Não é possível deletar um status que possui atividades associadas',
+          activitiesCount: statusExists._count.atividades
+        }, 
+        { status: 409 }
+      )
+      */
     }
 
     // Use transaction to ensure data consistency

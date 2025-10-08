@@ -54,10 +54,10 @@ export function ProjectSelector({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("justify-between", className)}
+          className={cn("justify-between min-h-[40px] bg-white border-gray-300 text-gray-900 hover:bg-gray-50", className)}
           disabled={disabled}
         >
-          <span className="truncate">
+          <span className="truncate text-left">
             {selectedProject ? selectedProject.nome : placeholder}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

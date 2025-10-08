@@ -265,27 +265,61 @@ export default function KanbanPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <main className="flex flex-col min-h-screen">
-        <header className="p-6 bg-gray-50 border-b border-gray-200 z-10">
-          <div className="flex items-center justify-between">
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      {/* Header */}
+      <div className="flex items-center justify-between space-y-2">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Kanban</h2>
+          <p className="text-gray-600">
+            Gerencie seus projetos em formato Kanban
+          </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button
+            onClick={handleNovoProjeto}
+            className="bg-indigo-600 hover:bg-indigo-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Projeto
+          </Button>
+          
+          {projetoSelecionado && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+              onClick={() => {
+                if (confirm(`Tem certeza que deseja deletar o projeto "${projetoSelecionado.nome}"?`)) {
+                  handleDeletarProjeto(projetoSelecionado.id)
+                }
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Project Selection and Controls */}
+      {projetos.length > 0 && (
+        <div className="bg-white border rounded-lg p-4 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg">
                   <KanbanIcon className="h-5 w-5 text-white" />
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900">Kanban</h1>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-gray-600">Projeto Atual</span>
+                  <ProjectSelector
+                    projetos={projetos}
+                    selectedProject={projetoSelecionado}
+                    onSelect={handleProjetoSelect}
+                    placeholder="Selecione um projeto"
+                    className="min-w-[250px]"
+                  />
+                </div>
               </div>
-              
-              {projetos.length > 0 && (
-                <ProjectSelector
-                  projetos={projetos}
-                  selectedProject={projetoSelecionado}
-                  onSelect={handleProjetoSelect}
-                  placeholder="Selecione um projeto"
-                  className="min-w-[250px]"
-                />
-              )}
               
               {/* Ícone de informação para descrição do projeto */}
               {projetoSelecionado?.descricao && (
@@ -304,82 +338,76 @@ export default function KanbanPage() {
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              {/* Seletores de Contratante e Requerente */}
-              {projetoSelecionado && (
-                <>
+            {/* Seletores de Contratante e Requerente */}
+            {projetoSelecionado && (
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex flex-col">
+                  <span className="text-xs font-medium text-gray-500 mb-1">Contratante</span>
                   <ContratanteSelector
                     contratantes={contratantes}
                     selectedContratante={projetoSelecionado.contratante || null}
                     onSelect={handleContratanteSelect}
                     onAdd={handleContratanteAdd}
                     onView={handleContratanteView}
-                    className="w-[200px]"
+                    className="w-[180px]"
                   />
-                  
+                </div>
+                
+                <div className="flex flex-col">
+                  <span className="text-xs font-medium text-gray-500 mb-1">Requerente</span>
                   <RequerenteSelector
                     requerentes={requerentes}
                     selectedRequerente={projetoSelecionado.requerente || null}
                     onSelect={handleRequerenteSelect}
                     onAdd={handleRequerenteAdd}
                     onView={handleRequerenteView}
-                    className="w-[200px]"
+                    className="w-[180px]"
                   />
-                </>
-              )}
-              
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      {projetoSelecionado ? (
+        <div className="space-y-4">
+          <div className="bg-white border rounded-lg shadow-sm">
+            <div className="p-6">
+              <KanbanBoard projeto={projetoSelecionado} onStatusAdd={handleStatusAdd} />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-center h-[calc(100vh-300px)]">
+          <div className="text-center">
+            <div className="inline-flex p-4 bg-gray-100 rounded-2xl mb-4">
+              <Sparkles className="h-16 w-16 text-indigo-500" />
+            </div>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+              {projetos.length === 0 ? "Nenhum projeto encontrado" : "Selecione um projeto"}
+            </h2>
+            <p className="text-gray-600 mb-6">
+              {projetos.length === 0 
+                ? "Crie seu primeiro projeto para começar" 
+                : "Selecione um projeto na seção acima para visualizar o Kanban"
+              }
+            </p>
+            {projetos.length === 0 && (
               <Button
                 onClick={handleNovoProjeto}
                 className="bg-indigo-600 hover:bg-indigo-700"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Novo Projeto
+                Criar Primeiro Projeto
               </Button>
-              
-              {projetoSelecionado && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="hover:bg-red-100 hover:text-red-600 text-gray-600"
-                  onClick={() => {
-                    if (confirm(`Tem certeza que deseja deletar o projeto "${projetoSelecionado.nome}"?`)) {
-                      handleDeletarProjeto(projetoSelecionado.id)
-                    }
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
+            )}
           </div>
-        </header>
+        </div>
+      )}
 
-        {projetoSelecionado ? (
-          <div className="flex-1 p-6 overflow-auto">
-            <div className="h-full">
-              <KanbanBoard projeto={projetoSelecionado} onStatusAdd={handleStatusAdd} />
-            </div>
-          </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="inline-flex p-4 bg-gray-100 rounded-2xl mb-4">
-                <Sparkles className="h-16 w-16 text-indigo-500" />
-              </div>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-                {projetos.length === 0 ? "Nenhum projeto encontrado" : "Selecione um projeto"}
-              </h2>
-              <p className="text-gray-600 mb-6">
-                {projetos.length === 0 
-                  ? "Crie seu primeiro projeto para começar" 
-                  : "Selecione um projeto no cabeçalho ou crie um novo"
-                }
-              </p>
-            </div>
-          </div>
-        )}
-      </main>
-
+      {/* Modals */}
       <ModalNovoProjeto
         isOpen={isModalNovoProjetoOpen}
         onClose={() => setIsModalNovoProjetoOpen(false)}

@@ -16,7 +16,15 @@ export async function GET(request: NextRequest) {
       },
       include: {
         status: true,
+        usuarios: {
+          include: {
+            usuario: true
+          }
+        }
       },
+      orderBy: {
+        data_criacao: 'desc'
+      }
     })
 
     return NextResponse.json({ atividades }, { status: 200 })
@@ -43,6 +51,11 @@ export async function POST(request: NextRequest) {
       },
       include: {
         status: true,
+        usuarios: {
+          include: {
+            usuario: true
+          }
+        }
       },
     })
 

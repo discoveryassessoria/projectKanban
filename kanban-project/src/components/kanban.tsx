@@ -235,12 +235,18 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
 
   return (
     <>
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h3 className="text-lg font-medium text-gray-900">Board do Projeto</h3>
+          <p className="text-sm text-gray-600">
+            Arraste e solte as atividades entre as colunas
+          </p>
+        </div>
         <Button
           variant="outline"
           size="sm"
           onClick={handleClearCompleted}
-          className="bg-white border-gray-300 hover:bg-red-50 hover:border-red-300 hover:text-red-600 text-gray-700"
+          className="hover:bg-red-50 hover:text-red-600 hover:border-red-200"
         >
           <Trash2 className="mr-2 h-4 w-4" />
           Limpar Concluídas
@@ -261,7 +267,7 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
         >
-          <div className="flex gap-4 pb-4 min-h-[calc(100vh-200px)]">
+          <div className="flex gap-4 pb-4 min-h-[600px]">
             {projeto.status
               .sort((a, b) => {
                 // Check if either status is "CONCLUÍDO" (case insensitive)

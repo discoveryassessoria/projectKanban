@@ -48,6 +48,11 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   const [selectedItems, setSelectedItems] = useState<number[]>([])
   const [statusList, setStatusList] = useState<Status[]>([])
   const [selectedAction, setSelectedAction] = useState<string>('')
+
+  // Debug: Log das atividades quando mudam
+  useEffect(() => {
+    console.log('ListaActivities - estado atividades:', atividades.length, atividades)
+  }, [atividades])
   const [selectedStatus, setSelectedStatus] = useState<string>('')
   const [isActionLoading, setIsActionLoading] = useState(false)
 
@@ -86,7 +91,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
         const response = await fetch('/api/status')
         if (response.ok) {
           const data = await response.json()
-          setStatusList(data)
+          setStatusList(data.status || [])
         }
       } catch (err) {
         console.error('Erro ao carregar status:', err)
@@ -302,10 +307,10 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   }
 
   return (
-    <div className="border rounded-lg">
+    <div className="border rounded-lg bg-white shadow-sm">
       {/* Table Header */}
-      <div className="bg-muted/50 px-4 py-3 border-b">
-        <div className="grid grid-cols-12 gap-4 items-center text-sm font-medium">
+      <div className="bg-gray-50 px-4 py-3 border-b">
+        <div className="grid grid-cols-12 gap-4 items-center text-sm font-medium text-gray-700">
           <div className="col-span-1">
             <input
               type="checkbox"
@@ -328,15 +333,15 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       <div className="divide-y">
         {atividades.length === 0 ? (
           <div className="p-8 text-center">
-            <p className="text-muted-foreground">Nenhuma atividade encontrada</p>
+            <p className="text-gray-500">Nenhuma atividade encontrada</p>
           </div>
         ) : (
-          atividades.map((atividade) => (
+          atividades.filter(atividade => atividade && atividade.nome).map((atividade) => (
             <div
               key={atividade.id}
-              className="px-4 py-3 hover:bg-muted/30 transition-colors"
+              className="px-4 py-3 hover:bg-gray-50 transition-colors bg-white"
             >
-              <div className="grid grid-cols-12 gap-4 items-center">
+              <div className="grid grid-cols-12 gap-4 items-center text-gray-900">
                 <div className="col-span-1">
                   <input
                     type="checkbox"
@@ -348,21 +353,21 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 
                 <div className="col-span-3">
                   <div className="space-y-1">
-                    <div className="font-medium text-sm">{atividade.nome}</div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="font-medium text-sm text-gray-900">{atividade.nome}</div>
+                    <div className="text-xs text-gray-500">
                       {atividade.descricao || 'Sem descrição'}
                     </div>
                   </div>
                 </div>
                 
                 <div className="col-span-2">
-                  <div className="text-sm">
+                  <div className="text-sm text-gray-700">
                     {formatDateOnly(atividade.data_criacao)}
                   </div>
                 </div>
                 
                 <div className="col-span-2">
-                  <div className="text-sm">
+                  <div className="text-sm text-gray-700">
                     {formatDate(atividade.data_termino)}
                   </div>
                 </div>
@@ -402,7 +407,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 </div>
                 
                 <div className="col-span-1">
-                  <div className="text-sm font-medium">{atividade.projeto.nome}</div>
+                  <div className="text-sm font-medium text-gray-900">{atividade.projeto.nome}</div>
                 </div>
               </div>
             </div>
@@ -411,8 +416,8 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       </div>
 
       {/* Footer */}
-      <div className="bg-muted/30 px-4 py-3 border-t">
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div className="bg-gray-50 px-4 py-3 border-t">
+        <div className="flex items-center justify-between text-sm text-gray-600">
           <div className="flex items-center space-x-4">
             <span>Selecionado: {selectedItems.length} / {atividades.length}</span>
             <span>Total mostrando: {atividades.length}</span>

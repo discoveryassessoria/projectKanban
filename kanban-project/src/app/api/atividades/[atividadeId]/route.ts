@@ -49,10 +49,11 @@ export async function PUT(request: NextRequest, { params }: { params: { atividad
         }
       }
 
-      // Buscar a atividade atualizada com os usuários
+      // Buscar a atividade atualizada com os usuários e status
       return await tx.atividade.findUnique({
         where: { id: atividadeId_parsed },
         include: {
+          status: true,
           usuarios: {
             include: {
               usuario: true

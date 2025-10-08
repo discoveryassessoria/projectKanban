@@ -55,7 +55,7 @@ export default function CustomStatusManager({ onStatusCreated }: CustomStatusMan
       }
 
       const data = await response.json()
-      setStatusList(data)
+      setStatusList(data.status || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
     } finally {
@@ -165,7 +165,7 @@ export default function CustomStatusManager({ onStatusCreated }: CustomStatusMan
                       size="sm"
                       onClick={() => handleDeleteStatus(status)}
                       className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                      disabled={status._count.atividades > 0}
+                      disabled={(status._count?.atividades || 0) > 0}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -173,9 +173,9 @@ export default function CustomStatusManager({ onStatusCreated }: CustomStatusMan
                 </div>
                 <div className="flex items-center justify-between">
                   <Badge variant="secondary" className="text-xs">
-                    {status._count.atividades} atividade(s)
+                    {status._count?.atividades || 0} atividade(s)
                   </Badge>
-                  {status._count.atividades > 0 && (
+                  {(status._count?.atividades || 0) > 0 && (
                     <span className="text-xs text-muted-foreground">
                       Em uso
                     </span>
@@ -219,11 +219,11 @@ export default function CustomStatusManager({ onStatusCreated }: CustomStatusMan
             </DialogDescription>
           </DialogHeader>
 
-          {statusToDelete && statusToDelete._count.atividades > 0 && (
+          {statusToDelete && (statusToDelete._count?.atividades || 0) > 0 && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Este status não pode ser deletado pois está sendo usado por {statusToDelete._count.atividades} atividade(s).
+                Este status não pode ser deletado pois está sendo usado por {statusToDelete._count?.atividades || 0} atividade(s).
                 Remova ou altere o status dessas atividades primeiro.
               </AlertDescription>
             </Alert>

@@ -209,6 +209,7 @@
 .overflow-y-auto::-webkit-scrollbar-thumb:hover,
 .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   background: #52525b;
+}
 
 /* Estilos customizados para o React Calendar */
 .react-calendar-custom {

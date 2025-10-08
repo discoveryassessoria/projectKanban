@@ -133,7 +133,7 @@ export default function StatusModal({ open, onOpenChange, status, onSuccess }: S
             {isEditing && status?._count && (
               <div className="text-sm text-muted-foreground">
                 <p>
-                  Este status está sendo usado por {status._count.atividades} atividade(s).
+                  Este status está sendo usado por {status._count?.atividades || 0} atividade(s).
                 </p>
               </div>
             )}

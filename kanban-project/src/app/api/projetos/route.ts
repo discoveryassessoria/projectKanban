@@ -22,6 +22,11 @@ export async function GET(request: NextRequest) {
         },
         contratante: true,
         requerente: true,
+        _count: {
+          select: {
+            atividades: true
+          }
+        }
       },
     })
 

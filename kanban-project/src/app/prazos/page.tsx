@@ -230,19 +230,19 @@ function DeadlineColumn({ title, atividades, icon, color, onAtividadeClick }: De
   }
 
   return (
-    <div className={`rounded-lg border ${colorClasses[color]} p-4 min-w-80 flex-shrink-0`}>
+    <div className={`rounded-lg border ${colorClasses[color]} p-4 min-w-80 flex-shrink-0 text-gray-900`}>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           {icon}
-          <h2 className="text-lg font-semibold">{title}</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
         </div>
-        <span className="px-2 py-0.5 text-xs font-medium bg-gray-200 text-gray-700 rounded-full">
+        <span className="px-2 py-0.5 text-xs font-medium bg-gray-800 text-white rounded-full">
           {atividades.length}
         </span>
       </div>
 
       {atividades.length === 0 ? (
-        <p className="text-gray-500 text-sm">Nenhuma atividade</p>
+        <p className="text-gray-700 text-sm font-medium">Nenhuma atividade</p>
       ) : (
         <div className="space-y-2">
           {atividades.map((atividade) => (
@@ -255,15 +255,15 @@ function DeadlineColumn({ title, atividades, icon, color, onAtividadeClick }: De
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-gray-900 truncate">{atividade.nome}</h3>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-gray-600">{atividade.projeto.nome}</span>
-                    <span className="text-xs text-gray-400">•</span>
-                    <span className="text-xs text-gray-600">{atividade.status.nome}</span>
+                    <span className="text-xs text-gray-700 font-medium">{atividade.projeto.nome}</span>
+                    <span className="text-xs text-gray-600">•</span>
+                    <span className="text-xs text-gray-700 font-medium">{atividade.status.nome}</span>
                   </div>
                   {atividade.data_termino && (
-                    <p className="text-xs text-gray-500 mt-1">{new Date(atividade.data_termino).toLocaleDateString("pt-BR")}</p>
+                    <p className="text-xs text-gray-700 mt-1 font-medium">{new Date(atividade.data_termino).toLocaleDateString("pt-BR")}</p>
                   )}
                   {atividade.usuarios?.[0] && (
-                    <p className="text-xs text-gray-500 mt-1">Responsável: {atividade.usuarios[0].usuario.nome}</p>
+                    <p className="text-xs text-gray-700 mt-1 font-medium">Responsável: {atividade.usuarios[0].usuario.nome}</p>
                   )}
                 </div>
               </div>

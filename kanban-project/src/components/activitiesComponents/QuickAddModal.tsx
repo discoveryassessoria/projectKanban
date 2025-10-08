@@ -102,7 +102,7 @@ export default function QuickAddModal({
       const response = await fetch('/api/projetos')
       if (response.ok) {
         const data = await response.json()
-        setProjetos(data)
+        setProjetos(data.projetos || [])
       }
     } catch (error) {
       console.error('Erro ao carregar projetos:', error)
@@ -117,17 +117,19 @@ export default function QuickAddModal({
       const response = await fetch('/api/status')
       if (response.ok) {
         const data = await response.json()
-        setStatuses(data)
+        // A API retorna { status: [...] }, então precisamos acessar data.status
+        const statusArray = data.status || []
+        setStatuses(statusArray)
         
         // Definir status padrão automaticamente
-        if (data.length > 0 && !formData.status_id) {
-          const defaultStatus = data.find((status: Status) => 
+        if (statusArray.length > 0 && !formData.status_id) {
+          const defaultStatus = statusArray.find((status: Status) => 
             status.nome.toLowerCase().includes('fazer') ||
             status.nome.toLowerCase().includes('pendente') ||
             status.nome.toLowerCase().includes('novo')
           )
           
-          const statusToUse = defaultStatus || data[0]
+          const statusToUse = defaultStatus || statusArray[0]
           setFormData(prev => ({ ...prev, status_id: statusToUse.id }))
         }
       }
@@ -239,7 +241,7 @@ export default function QuickAddModal({
                     <div className="flex items-center justify-between w-full">
                       <span>{projeto.nome}</span>
                       <Badge variant="outline" className="ml-2 text-xs">
-                        {projeto._count.atividades} atividades
+                        {projeto._count?.atividades || 0} atividades
                       </Badge>
                     </div>
                   </SelectItem>

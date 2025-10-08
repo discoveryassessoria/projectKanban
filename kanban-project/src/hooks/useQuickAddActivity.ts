@@ -69,7 +69,8 @@ export function useQuickAddActivity({ onSuccess, onError }: UseQuickAddActivityO
         throw new Error('Erro ao buscar status')
       }
       
-      const statuses = await response.json()
+      const data = await response.json()
+      const statuses = data.status || []
       
       // Procurar por status padrão como "A Fazer", "Pendente", etc.
       const defaultStatus = statuses.find((status: any) => 

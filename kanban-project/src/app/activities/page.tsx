@@ -202,7 +202,7 @@ function FilterModal({
       const response = await fetch('/api/projetos')
       if (response.ok) {
         const data = await response.json()
-        setProjetos(data)
+        setProjetos(data.projetos || [])
       }
     } catch (error) {
       console.error('Erro ao carregar projetos:', error)
@@ -214,7 +214,7 @@ function FilterModal({
       const response = await fetch('/api/status')
       if (response.ok) {
         const data = await response.json()
-        setStatusList(data)
+        setStatusList(data.status || [])
       }
     } catch (error) {
       console.error('Erro ao carregar status:', error)
@@ -584,7 +584,7 @@ function CreateActivityModal() {
       const response = await fetch('/api/projetos')
       if (response.ok) {
         const data = await response.json()
-        setProjetos(data)
+        setProjetos(data.projetos || [])
       }
     } catch (error) {
       console.error('Erro ao carregar projetos:', error)
@@ -597,7 +597,7 @@ function CreateActivityModal() {
       const response = await fetch('/api/status')
       if (response.ok) {
         const data = await response.json()
-        setStatus(data)
+        setStatus(data.status || [])
       }
     } catch (error) {
       console.error('Erro ao carregar status:', error)

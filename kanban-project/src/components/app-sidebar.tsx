@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { KanbanIcon, Home, Settings, Users } from "lucide-react"
+import { KanbanIcon, Home, Settings, Users, Inbox, Calendar, Search } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,

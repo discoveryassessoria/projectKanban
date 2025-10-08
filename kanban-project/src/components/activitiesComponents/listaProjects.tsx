@@ -49,7 +49,7 @@ export default function ListaProjects({ filters }: ListaProjectsProps) {
           throw new Error('Erro ao carregar projetos')
         }
         const data = await response.json()
-        setProjetos(data)
+        setProjetos(data.projetos || [])
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro desconhecido')
       } finally {
