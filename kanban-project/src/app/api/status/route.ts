@@ -27,6 +27,76 @@ export async function POST(request: NextRequest) {
           },
         },
       },
+import { NextRequest, NextResponse } from 'next/server'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+export async function GET() {
+  try {
+    const status = await prisma.status.findMany({
+      select: {
+        id: true,
+        nome: true,
+        _count: {
+          select: {
+            atividades: true
+          }
+        }
+      },
+      orderBy: {
+        id: 'asc'
+      }
+    })
+
+    return NextResponse.json(status)
+  } catch (error) {
+    console.error('Erro ao buscar status:', error)
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { nome } = body
+
+    // Validações
+    if (!nome || typeof nome !== 'string') {
+      return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 })
+    }
+
+    if (nome.length > 20) {
+      return NextResponse.json({ error: 'Nome deve ter no máximo 20 caracteres' }, { status: 400 })
+    }
+
+    // Verificar se já existe um status com o mesmo nome
+    const existingStatus = await prisma.status.findFirst({
+      where: {
+        nome: {
+          equals: nome,
+          mode: 'insensitive'
+        }
+      }
+    })
+
+    if (existingStatus) {
+      return NextResponse.json({ error: 'Já existe um status com este nome' }, { status: 409 })
+    }
+
+    const newStatus = await prisma.status.create({
+      data: {
+        nome: nome.trim()
+      },
+      select: {
+        id: true,
+        nome: true,
+        _count: {
+          select: {
+            atividades: true
+          }
+        }
+      }
     })
 
     return NextResponse.json(newStatus, { status: 201 })
