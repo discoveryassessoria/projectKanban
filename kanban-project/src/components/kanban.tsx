@@ -237,8 +237,8 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
     <>
       <div className="flex justify-between items-center mb-4">
         <div>
-          <h3 className="text-lg font-medium text-gray-900">Board do Projeto</h3>
-          <p className="text-sm text-gray-600">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Board do Projeto</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Arraste e solte as atividades entre as colunas
           </p>
         </div>
@@ -246,7 +246,7 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
           variant="outline"
           size="sm"
           onClick={handleClearCompleted}
-          className="hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+          className="hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-800"
         >
           <Trash2 className="mr-2 h-4 w-4" />
           Limpar Concluídas
@@ -301,14 +301,14 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
 
             <div className="flex-shrink-0 w-80">
               {isAddingStatus ? (
-                <div className="p-4 rounded-lg bg-white border border-gray-200">
+                <div className="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                   <form onSubmit={handleAddNewStatus}>
                     <Input
                       autoFocus
                       placeholder="Nome da nova coluna..."
                       value={newStatusName}
                       onChange={(e) => setNewStatusName(e.target.value)}
-                      className="mb-2 bg-white border-gray-300 text-gray-900"
+                      className="mb-2 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
                     />
                     <div className="flex justify-end gap-2">
                       <Button
@@ -316,7 +316,7 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
                         variant="ghost"
                         size="sm"
                         onClick={() => setIsAddingStatus(false)}
-                        className="hover:bg-gray-100"
+                        className="hover:bg-gray-100 dark:hover:bg-gray-700"
                       >
                         Cancelar
                       </Button>
@@ -329,7 +329,7 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
               ) : (
                 <Button
                   variant="ghost"
-                  className="w-full h-full min-h-[100px] border-2 border-dashed border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-600 hover:text-gray-700"
+                  className="w-full h-full min-h-[100px] border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                   onClick={() => setIsAddingStatus(true)}
                 >
                   <Plus className="mr-2 h-4 w-4" /> Adicionar coluna

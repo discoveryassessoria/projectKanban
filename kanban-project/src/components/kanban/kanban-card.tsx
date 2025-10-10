@@ -49,16 +49,16 @@ function formatDate(dateString: string) {
 }
 
 function getStatusColor(statusNome?: string) {
-  if (!statusNome) return "bg-gray-100 text-gray-800"
+  if (!statusNome) return "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300"
   
   const status = statusNome.toLowerCase()
-  if (status.includes('concluí') || status.includes('finaliz')) return "bg-green-100 text-green-800"
-  if (status.includes('andamento') || status.includes('progresso')) return "bg-blue-100 text-blue-800"
-  if (status.includes('pendente') || status.includes('aguard')) return "bg-yellow-100 text-yellow-800"
-  if (status.includes('pausad') || status.includes('suspend')) return "bg-orange-100 text-orange-800"
-  if (status.includes('cancelad') || status.includes('rejeit')) return "bg-red-100 text-red-800"
+  if (status.includes('concluí') || status.includes('finaliz')) return "bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300"
+  if (status.includes('andamento') || status.includes('progresso')) return "bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300"
+  if (status.includes('pendente') || status.includes('aguard')) return "bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300"
+  if (status.includes('pausad') || status.includes('suspend')) return "bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-300"
+  if (status.includes('cancelad') || status.includes('rejeit')) return "bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300"
   
-  return "bg-gray-100 text-gray-800"
+  return "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300"
 }
 
 export function KanbanCard({
@@ -91,13 +91,13 @@ export function KanbanCard({
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <Card
-        className={`mb-3 bg-white border-l-4 border-l-blue-500 hover:border-l-blue-600 transition-all cursor-grab active:cursor-grabbing ${isDragging ? "shadow-2xl ring-2 ring-indigo-500" : "shadow-sm hover:shadow-md"}`}
+        className={`mb-3 bg-white dark:bg-gray-800 border-l-4 border-l-blue-500 dark:border-l-blue-400 hover:border-l-blue-600 dark:hover:border-l-blue-300 transition-all cursor-grab active:cursor-grabbing ${isDragging ? "shadow-2xl ring-2 ring-indigo-500" : "shadow-sm hover:shadow-md"}`}
         onClick={handleCardClick}
       >
         <CardContent className="p-4 space-y-3">
           {/* Header com título e status */}
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold text-sm text-gray-900 leading-tight line-clamp-2 flex-1">
+            <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 leading-tight line-clamp-2 flex-1">
               {nome}
             </h3>
             {status && (
@@ -113,8 +113,8 @@ export function KanbanCard({
           {/* Descrição se existir */}
           {descricao && (
             <div className="flex items-start gap-2">
-              <FileText className="h-3 w-3 text-gray-400 mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
+              <FileText className="h-3 w-3 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 leading-relaxed">
                 {descricao}
               </p>
             </div>
@@ -124,15 +124,15 @@ export function KanbanCard({
           {responsavel && (
             <div className="flex items-center gap-2">
               <Avatar className="h-6 w-6">
-                <AvatarFallback className="text-xs bg-blue-100 text-blue-800 font-medium">
+                <AvatarFallback className="text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 font-medium">
                   {responsavel.nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-gray-900 truncate">
+                <p className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">
                   {responsavel.nome}
                 </p>
-                <p className="text-xs text-gray-500 truncate">
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                   {responsavel.email}
                 </p>
               </div>
@@ -143,9 +143,9 @@ export function KanbanCard({
           <div className="space-y-1">
             {data_termino && (
               <div className="flex items-center gap-2 text-xs">
-                <Calendar className="h-3 w-3 text-red-500" />
-                <span className="text-gray-600">Entrega:</span>
-                <span className="font-medium text-red-600">
+                <Calendar className="h-3 w-3 text-red-500 dark:text-red-400" />
+                <span className="text-gray-600 dark:text-gray-400">Entrega:</span>
+                <span className="font-medium text-red-600 dark:text-red-400">
                   {new Date(data_termino).toLocaleDateString('pt-BR')}
                 </span>
               </div>
@@ -153,8 +153,8 @@ export function KanbanCard({
             
             {data_criacao && (
               <div className="flex items-center gap-2 text-xs">
-                <Clock className="h-3 w-3 text-gray-400" />
-                <span className="text-gray-500">
+                <Clock className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                <span className="text-gray-500 dark:text-gray-400">
                   Criado {formatDate(data_criacao)}
                 </span>
               </div>
@@ -168,7 +168,7 @@ export function KanbanCard({
                 <Badge
                   key={index}
                   variant="outline"
-                  className="text-xs px-2 py-0.5 rounded-full border-gray-200"
+                  className="text-xs px-2 py-0.5 rounded-full border-gray-200 dark:border-gray-700"
                   style={{
                     backgroundColor: `${tag.cor}20`,
                     borderColor: tag.cor,
@@ -179,7 +179,7 @@ export function KanbanCard({
                 </Badge>
               ))}
               {tags.length > 3 && (
-                <Badge variant="outline" className="text-xs px-2 py-0.5 rounded-full text-gray-500">
+                <Badge variant="outline" className="text-xs px-2 py-0.5 rounded-full text-gray-500 dark:text-gray-400">
                   +{tags.length - 3}
                 </Badge>
               )}
@@ -188,7 +188,7 @@ export function KanbanCard({
 
           {/* Indicador de múltiplos usuários */}
           {usuarios.length > 1 && (
-            <div className="flex items-center gap-1 text-xs text-gray-500">
+            <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
               <User className="h-3 w-3" />
               <span>+{usuarios.length - 1} colaboradores</span>
             </div>

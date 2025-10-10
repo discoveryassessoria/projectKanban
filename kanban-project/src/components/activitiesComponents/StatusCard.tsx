@@ -38,12 +38,12 @@ export default function StatusCard({
 
   const getHeaderColor = () => {
     const colorMap = {
-      'destructive': 'bg-red-50 border-red-200',
-      'orange': 'bg-orange-50 border-orange-200',
-      'yellow': 'bg-yellow-50 border-yellow-200',
-      'blue': 'bg-blue-50 border-blue-200',
-      'green': 'bg-green-50 border-green-200',
-      'secondary': 'bg-gray-50 border-gray-200'
+      'destructive': 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800',
+      'orange': 'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800',
+      'yellow': 'bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-800',
+      'blue': 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800',
+      'green': 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800',
+      'secondary': 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
     }
     return colorMap[color as keyof typeof colorMap] || colorMap.secondary
   }
@@ -69,7 +69,7 @@ export default function StatusCard({
         <CardHeader className={`${getHeaderColor()} pb-3`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <CardTitle className="text-sm font-semibold">
+              <CardTitle className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                 {label}
               </CardTitle>
             </div>
