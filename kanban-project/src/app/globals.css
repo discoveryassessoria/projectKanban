@@ -112,6 +112,74 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Enhanced genealogical tree styles with exact color specifications */
+.genealogy-tree {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.tree-node {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(18, 60, 115, 0.08);
+  border: 2px solid transparent;
+}
+
+.tree-node:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(18, 60, 115, 0.15);
+  border-color: var(--color-tree-gold);
+}
+
+.tree-connection {
+  stroke: var(--color-tree-medium-blue);
+  stroke-width: 2;
+  fill: none;
+}
+
+.tree-action-button {
+  transition: all 0.2s ease;
+  opacity: 0;
+  transform: scale(0.8);
+  background: white;
+  border: 1px solid #e2e8f0;
+}
+
+.tree-node:hover .tree-action-button {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.tree-action-button:hover {
+  background-color: var(--color-tree-gold);
+  color: white;
+  border-color: var(--color-tree-gold);
+}
+
+.tree-action-button.delete:hover {
+  background-color: var(--color-tree-red);
+  border-color: var(--color-tree-red);
+}
+
+/* Added specific styles for genealogical tree text colors */
+.tree-person-name {
+  color: var(--color-tree-institutional-blue);
+}
+
+.tree-person-dates {
+  color: var(--color-tree-gray);
+}
+
+.tree-success {
+  color: var(--color-tree-green);
+}
+
+.tree-warning {
+  color: var(--color-tree-orange);
+}
+
+.tree-error {
+  color: var(--color-tree-red);
+}
+
 @layer base {
   :root {
     --sidebar: oklch(0.985 0 0);

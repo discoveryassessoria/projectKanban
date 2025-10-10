@@ -1,0 +1,274 @@
+import { type NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
+import { Prisma } from "@prisma/client"
+
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id: idParam } = await params
+    const id = Number.parseInt(idParam)
+
+    if (isNaN(id)) {
+      return NextResponse.json({ error: "ID inválido" }, { status: 400 })
+    }
+
+    const pessoa = await prisma.pessoa.findUnique({
+      where: { id },
+      include: {
+        pai: true,
+        mae: true,
+        filhosComoPai: true,
+        filhosComoMae: true,
+        arvore: true,
+        unioesComoPessoa1: {
+          include: {
+            pessoa2: true,
+          },
+        },
+        unioesComoPessoa2: {
+          include: {
+            pessoa1: true,
+          },
+        },
+      },
+    })
+
+    if (!pessoa) {
+      return NextResponse.json({ error: "Pessoa não encontrada" }, { status: 404 })
+    }
+
+    return NextResponse.json(pessoa)
+  } catch (error) {
+    console.error("Erro ao buscar pessoa:", error)
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+  }
+}
+
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id: idParam } = await params
+
+    if (!idParam) {
+      return NextResponse.json({ error: "ID não fornecido" }, { status: 400 })
+    }
+
+    const id = Number.parseInt(idParam.trim())
+
+    if (isNaN(id) || id <= 0) {
+      return NextResponse.json({ error: "ID inválido" }, { status: 400 })
+    }
+
+    const body = await request.json()
+
+    const dataToUpdate: Prisma.PessoaUpdateInput = {}
+    if (body.nome !== undefined) dataToUpdate.nome = body.nome
+    if (body.sobrenome !== undefined) dataToUpdate.sobrenome = body.sobrenome
+    if (body.sexo !== undefined) dataToUpdate.sexo = body.sexo
+    if (body.data_nasc !== undefined) dataToUpdate.data_nasc = body.data_nasc ? new Date(body.data_nasc) : null
+    if (body.local_nasc !== undefined) dataToUpdate.local_nasc = body.local_nasc
+    if (body.data_obito !== undefined) dataToUpdate.data_obito = body.data_obito ? new Date(body.data_obito) : null
+    if (body.batizado !== undefined) dataToUpdate.batizado = body.batizado
+    if (body.paiId !== undefined)
+      dataToUpdate.pai = body.paiId ? { connect: { id: Number(body.paiId) } } : { disconnect: true }
+    if (body.maeId !== undefined)
+      dataToUpdate.mae = body.maeId ? { connect: { id: Number(body.maeId) } } : { disconnect: true }
+    if (body.x !== undefined) dataToUpdate.x = body.x
+    if (body.y !== undefined) dataToUpdate.y = body.y
+
+    const pessoaAtualizada = await prisma.pessoa.update({
+      where: { id },
+      data: dataToUpdate,
+      include: {
+        pai: true,
+        mae: true,
+        arvore: true,
+      },
+    })
+
+    return NextResponse.json(pessoaAtualizada)
+  } catch (error) {
+    console.error("Erro ao atualizar pessoa:", error)
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id: idParam } = await params
+
+    console.log("[DELETE] Raw request params:", idParam)
+    console.log("[DELETE] params.id value:", idParam)
+    console.log("[DELETE] params.id type:", typeof idParam)
+    console.log("[DELETE] params.id length:", idParam?.length)
+
+    // Verificar se o params.id existe
+    if (!idParam) {
+      console.log("[DELETE] No ID provided in params")
+      return NextResponse.json({ error: "ID não fornecido" }, { status: 400 })
+    }
+
+    // Tentar converter para número
+    const id = Number.parseInt(idParam.trim())
+    console.log("[DELETE] Parsed ID:", id)
+    console.log("[DELETE] isNaN:", isNaN(id))
+    console.log("[DELETE] id <= 0:", id <= 0)
+
+    if (isNaN(id) || id <= 0) {
+      console.log("[DELETE] Invalid ID detected - returning 400")
+      return NextResponse.json(
+        {
+          error: "ID inválido",
+          debug: {
+            originalId: idParam,
+            parsedId: id,
+            isNaN: isNaN(id),
+            isNegativeOrZero: id <= 0,
+          },
+        },
+        { status: 400 },
+      )
+    }
+
+    // Verificar se a pessoa existe
+    console.log("[DELETE] Searching for person with ID:", id)
+    const pessoa = await prisma.pessoa.findUnique({
+      where: { id },
+      include: {
+        filhosComoPai: true,
+        filhosComoMae: true,
+        unioesComoPessoa1: true,
+        unioesComoPessoa2: true,
+      },
+    })
+
+    if (!pessoa) {
+      console.log("[DELETE] Person not found")
+      return NextResponse.json({ error: "Pessoa não encontrada" }, { status: 404 })
+    }
+
+    console.log("[DELETE] Person found:", {
+      id: pessoa.id,
+      nome: pessoa.nome,
+      filhosComoPai: pessoa.filhosComoPai.length,
+      filhosComoMae: pessoa.filhosComoMae.length,
+      unioesComoPessoa1: pessoa.unioesComoPessoa1.length,
+      unioesComoPessoa2: pessoa.unioesComoPessoa2.length,
+    })
+
+    // Verificar se tem filhos (não pode deletar se tiver)
+    const totalFilhos = pessoa.filhosComoPai.length + pessoa.filhosComoMae.length
+    if (totalFilhos > 0) {
+      console.log("[DELETE] Person has children, cannot delete")
+      return NextResponse.json(
+        {
+          error: "Não é possível excluir uma pessoa que possui filhos",
+        },
+        { status: 400 },
+      )
+    }
+
+    // Executar deleção dentro de uma transação
+    console.log("[DELETE] Starting deletion transaction...")
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        // 1. Deletar uniões onde a pessoa participa
+        if (pessoa.unioesComoPessoa1.length > 0) {
+          console.log("[DELETE] Deleting unions as pessoa1...")
+          await tx.uniao.deleteMany({
+            where: { pessoa1Id: id },
+          })
+        }
+
+        if (pessoa.unioesComoPessoa2.length > 0) {
+          console.log("[DELETE] Deleting unions as pessoa2...")
+          await tx.uniao.deleteMany({
+            where: { pessoa2Id: id },
+          })
+        }
+
+        // 2. Remover referências de pai/mãe em outros registros
+        console.log("[DELETE] Updating children references...")
+        await tx.pessoa.updateMany({
+          where: { paiId: id },
+          data: { paiId: null },
+        })
+
+        await tx.pessoa.updateMany({
+          where: { maeId: id },
+          data: { maeId: null },
+        })
+
+        // 3. Finalmente, deletar a pessoa
+        console.log("[DELETE] Deleting person...")
+        await tx.pessoa.delete({
+          where: { id },
+        })
+      })
+
+      console.log("[DELETE] Person deleted successfully")
+      return NextResponse.json({
+        message: "Pessoa excluída com sucesso",
+        id: id,
+      })
+    } catch (transactionError) {
+      console.error("[DELETE] Transaction failed:", transactionError)
+
+      // Verificar se é erro específico do Prisma
+      if (transactionError instanceof Prisma.PrismaClientKnownRequestError) {
+        switch (transactionError.code) {
+          case "P2003":
+            return NextResponse.json(
+              {
+                error: "Não é possível excluir: existem dependências relacionadas",
+              },
+              { status: 400 },
+            )
+          case "P2025":
+            return NextResponse.json(
+              {
+                error: "Pessoa não encontrada",
+              },
+              { status: 404 },
+            )
+          default:
+            console.error("[DELETE] Prisma error code:", transactionError.code)
+            return NextResponse.json(
+              {
+                error: "Erro de banco de dados",
+              },
+              { status: 500 },
+            )
+        }
+      }
+
+      throw transactionError
+    }
+  } catch (error: unknown) {
+    console.error("[DELETE] Unexpected error:", error)
+
+    // Tratamento seguro do erro unknown
+    let errorMessage = "Erro interno do servidor"
+
+    if (error instanceof Error) {
+      console.error("[DELETE] Error message:", error.message)
+      console.error("[DELETE] Error stack:", error.stack)
+
+      // Se for erro de desenvolvimento, incluir mais detalhes
+      if (process.env.NODE_ENV === "development") {
+        errorMessage = `Erro: ${error.message}`
+      }
+    } else if (typeof error === "string") {
+      errorMessage = error
+    } else {
+      console.error("[DELETE] Unknown error type:", typeof error)
+    }
+
+    return NextResponse.json(
+      {
+        error: errorMessage,
+        details: process.env.NODE_ENV === "development" ? String(error) : undefined,
+      },
+      { status: 500 },
+    )
+  }
+}
