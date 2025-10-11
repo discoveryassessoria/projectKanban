@@ -3,8 +3,38 @@ import { prisma } from "@/lib/prisma"
 import { UserType } from "@/src/utils/userTypes"
 import { hash } from "bcrypt"
 
+// Função auxiliar para verificar se o usuário é admin
+function verifyAdmin(request: NextRequest): boolean {
+  try {
+    const authHeader = request.headers.get("authorization")
+    const token = authHeader?.replace("Bearer ", "")
+
+    if (!token) {
+      return false
+    }
+
+    const decoded = JSON.parse(atob(token))
+    
+    // Verificar se o token não expirou
+    if (decoded.exp && Date.now() > decoded.exp) {
+      return false
+    }
+
+    return decoded.tipo === "admin"
+  } catch (error) {
+    return false
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // Verificar se o usuário é admin
+    const isAdmin = verifyAdmin(request)
+    
+    if (!isAdmin) {
+      return NextResponse.json({ error: "Acesso negado. Apenas administradores podem criar usuários." }, { status: 403 })
+    }
+
     const { nome, email, senha, tipo } = await request.json()
 
     if (!nome || !email || !senha || !tipo) {
@@ -35,6 +65,12 @@ export async function POST(request: NextRequest) {
         email,
         senha: senhaHash,
         tipo
+      },
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+        tipo: true,
       }
     })
 
@@ -50,3 +86,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
+

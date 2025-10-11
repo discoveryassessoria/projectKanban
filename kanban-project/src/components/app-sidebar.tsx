@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { KanbanIcon, Home, Settings, Users, Inbox, Calendar, Search } from "lucide-react"
+import { KanbanIcon, Home, Settings, Users, Inbox, Calendar, Search, Shield } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -14,6 +14,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
 } from "@/components/ui/sidebar"
+import { useIsAdmin } from "@/src/hooks/use-is-admin"
 
 const menuItems = [
   {
@@ -33,7 +34,7 @@ const menuItems = [
   },
   {
     title: "Genealogical Tree",
-    url: "/tree",
+    url: "/genealogy",
     icon: Search,
   },
   {
@@ -43,8 +44,18 @@ const menuItems = [
   },
 ]
 
+const adminMenuItems = [
+  {
+    title: "Gerenciar Usuários",
+    url: "/administrator",
+    icon: Shield,
+    adminOnly: true,
+  },
+]
+
 export function AppSidebar() {
   const pathname = usePathname()
+  const { isAdmin } = useIsAdmin()
 
   return (
     <Sidebar>
@@ -74,7 +85,29 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Menu administrativo - apenas para admins */}
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administração</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminMenuItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={pathname === item.url}>
+                      <Link href={item.url}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
     </Sidebar>
   )
 }
+

@@ -2,11 +2,11 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export function middleware(request: NextRequest) {
-  // Verificar se a rota é protegida
-  if (request.nextUrl.pathname.startsWith("/dashboard")) {
-    const token =
-      request.cookies.get("authToken")?.value || request.headers.get("authorization")?.replace("Bearer ", "")
+  const token =
+    request.cookies.get("authToken")?.value || request.headers.get("authorization")?.replace("Bearer ", "")
 
+  // Proteger rotas que requerem autenticação
+  if (request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/administrator")) {
     if (!token) {
       return NextResponse.redirect(new URL("/auth", request.url))
     }
@@ -20,6 +20,13 @@ export function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL("/auth", request.url))
       }
 
+      // Proteção específica para rota administrator - apenas admins
+      if (request.nextUrl.pathname.startsWith("/administrator")) {
+        if (decoded.tipo !== "admin") {
+          return NextResponse.redirect(new URL("/dashboard", request.url))
+        }
+      }
+
       return NextResponse.next()
     } catch (error) {
       return NextResponse.redirect(new URL("/auth", request.url))
@@ -30,5 +37,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: ["/dashboard/:path*", "/administrator/:path*"],
 }
