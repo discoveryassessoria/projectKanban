@@ -152,34 +152,33 @@ export function ContratanteModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="endereco" className="flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                Endereço
-              </Label>
-              <Input
-                id="endereco"
-                value={formData.endereco}
-                onChange={(e) => setFormData(prev => ({ ...prev, endereco: e.target.value }))}
-                placeholder="Digite o endereço completo"
-                readOnly={isViewMode}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="telefone" className="flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                Telefone
-              </Label>
-              <Input
-                id="telefone"
-                value={isViewMode ? applyTelefoneMask(formData.telefone) : formData.telefone}
-                onChange={handleTelefoneChange}
-                placeholder="(00) 00000-0000"
-                readOnly={isViewMode}
-                maxLength={15}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="endereco" className="flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              Endereço
+            </Label>
+            <Input
+              id="endereco"
+              value={formData.endereco}
+              onChange={(e) => setFormData(prev => ({ ...prev, endereco: e.target.value }))}
+              placeholder="Digite o endereço completo"
+              readOnly={isViewMode}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="telefone" className="flex items-center gap-2">
+              <Phone className="h-4 w-4" />
+              Telefone
+            </Label>
+            <Input
+              id="telefone"
+              value={isViewMode ? applyTelefoneMask(formData.telefone) : formData.telefone}
+              onChange={handleTelefoneChange}
+              placeholder="(00) 00000-0000"
+              readOnly={isViewMode}
+              maxLength={15}
+            />
           </div>
 
           <DialogFooter>
