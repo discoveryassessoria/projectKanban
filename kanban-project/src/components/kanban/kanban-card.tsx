@@ -72,7 +72,13 @@ export function KanbanCard({
   tags = [],
   onClick
 }: KanbanCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
+    id: id,
+    data: {
+      type: "Card",
+      atividade: { id, nome, descricao, data_termino, data_criacao, usuarios, status, tags },
+    },
+  })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -91,7 +97,7 @@ export function KanbanCard({
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <Card
-        className={`mb-3 bg-white dark:bg-gray-800 border-l-4 border-l-blue-500 dark:border-l-blue-400 hover:border-l-blue-600 dark:hover:border-l-blue-300 transition-all cursor-grab active:cursor-grabbing ${isDragging ? "shadow-2xl ring-2 ring-indigo-500" : "shadow-sm hover:shadow-md"}`}
+        className={`mb-3 bg-white dark:bg-gray-800 border-l-4 border-l-blue-500 dark:border-l-blue-400 hover:border-l-blue-600 dark:hover:border-l-blue-300 transition-all cursor-grab active:cursor-grabbing ${isDragging ? "shadow-2xl ring-2 ring-indigo-500 rotate-2" : "shadow-sm hover:shadow-md"}`}
         onClick={handleCardClick}
       >
         <CardContent className="p-4 space-y-3">

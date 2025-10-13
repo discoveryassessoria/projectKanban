@@ -110,6 +110,13 @@ export async function DELETE(
 }
 
 // PUT/PATCH - Atualizar um projeto específico
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return PATCH(request, { params })
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -122,19 +129,35 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { nome, descricao } = body
+    const { nome, descricao, contratanteId, requerenteId } = body
 
-    // Validações básicas
-    if (!nome || nome.trim().length === 0) {
-      return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 })
+    // Preparar objeto de atualização
+    const updateData: any = {}
+
+    // Validações e atualizações condicionais
+    if (nome !== undefined) {
+      if (!nome || nome.trim().length === 0) {
+        return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 })
+      }
+      if (nome.length > 50) {
+        return NextResponse.json({ error: 'Nome deve ter no máximo 50 caracteres' }, { status: 400 })
+      }
+      updateData.nome = nome.trim()
     }
 
-    if (nome.length > 50) {
-      return NextResponse.json({ error: 'Nome deve ter no máximo 50 caracteres' }, { status: 400 })
+    if (descricao !== undefined) {
+      if (descricao && descricao.length > 40) {
+        return NextResponse.json({ error: 'Descrição deve ter no máximo 40 caracteres' }, { status: 400 })
+      }
+      updateData.descricao = descricao?.trim() || null
     }
 
-    if (descricao && descricao.length > 40) {
-      return NextResponse.json({ error: 'Descrição deve ter no máximo 40 caracteres' }, { status: 400 })
+    if (contratanteId !== undefined) {
+      updateData.contratanteId = contratanteId
+    }
+
+    if (requerenteId !== undefined) {
+      updateData.requerenteId = requerenteId
     }
 
     // Verificar se o projeto existe
@@ -149,14 +172,10 @@ export async function PATCH(
     // Atualizar o projeto
     const projetoAtualizado = await prisma.projetoKanban.update({
       where: { id },
-      data: {
-        nome: nome.trim(),
-        descricao: descricao?.trim() || null
-      },
-      select: {
-        id: true,
-        nome: true,
-        descricao: true,
+      data: updateData,
+      include: {
+        contratante: true,
+        requerente: true,
         _count: {
           select: {
             atividades: true

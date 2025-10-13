@@ -157,7 +157,8 @@ export default function KanbanPage() {
       const response = await fetch("/api/contratantes")
       if (response.ok) {
         const { contratantes } = await response.json()
-        setContratantes(contratantes)
+        console.log("Contratantes carregados:", contratantes)
+        setContratantes(contratantes || [])
       }
     } catch (error) {
       console.error("Erro ao buscar contratantes:", error)
@@ -180,9 +181,38 @@ export default function KanbanPage() {
     })
   }
 
-  const handleContratanteSelect = (contratante: Contratante | null) => {
-    // Aqui você pode implementar a lógica para associar o contratante ao projeto
-    console.log("Contratante selecionado:", contratante)
+  const handleContratanteSelect = async (contratante: Contratante | null) => {
+    if (!projetoSelecionado) return
+
+    try {
+      const response = await fetch(`/api/projetos/${projetoSelecionado.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          contratanteId: contratante?.id || null 
+        }),
+      })
+
+      if (response.ok) {
+        // Atualizar o projeto local
+        setProjetoSelecionado(prev => prev ? {
+          ...prev,
+          contratante: contratante
+        } : null)
+
+        // Atualizar a lista de projetos
+        setProjetos(prev => prev.map(p => 
+          p.id === projetoSelecionado.id 
+            ? { ...p, contratante: contratante }
+            : p
+        ))
+      } else {
+        throw new Error("Falha ao atualizar contratante do projeto")
+      }
+    } catch (error) {
+      console.error("Erro ao associar contratante:", error)
+      alert("Erro ao associar contratante ao projeto.")
+    }
   }
 
   const handleContratanteSave = async (contratanteData: Omit<Contratante, 'id'>) => {
@@ -196,6 +226,9 @@ export default function KanbanPage() {
       if (response.ok) {
         const { contratante } = await response.json()
         setContratantes(prev => [...prev, contratante])
+        
+        // Fechar o modal após salvar
+        setContratanteModal(prev => ({ ...prev, isOpen: false }))
       }
     } catch (error) {
       console.error("Erro ao salvar contratante:", error)
@@ -208,7 +241,8 @@ export default function KanbanPage() {
       const response = await fetch("/api/requerentes")
       if (response.ok) {
         const { requerentes } = await response.json()
-        setRequerentes(requerentes)
+        console.log("Requerentes carregados:", requerentes)
+        setRequerentes(requerentes || [])
       }
     } catch (error) {
       console.error("Erro ao buscar requerentes:", error)
@@ -231,9 +265,38 @@ export default function KanbanPage() {
     })
   }
 
-  const handleRequerenteSelect = (requerente: Requerente | null) => {
-    // Aqui você pode implementar a lógica para associar o requerente ao projeto
-    console.log("Requerente selecionado:", requerente)
+  const handleRequerenteSelect = async (requerente: Requerente | null) => {
+    if (!projetoSelecionado) return
+
+    try {
+      const response = await fetch(`/api/projetos/${projetoSelecionado.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          requerenteId: requerente?.id || null 
+        }),
+      })
+
+      if (response.ok) {
+        // Atualizar o projeto local
+        setProjetoSelecionado(prev => prev ? {
+          ...prev,
+          requerente: requerente
+        } : null)
+
+        // Atualizar a lista de projetos
+        setProjetos(prev => prev.map(p => 
+          p.id === projetoSelecionado.id 
+            ? { ...p, requerente: requerente }
+            : p
+        ))
+      } else {
+        throw new Error("Falha ao atualizar requerente do projeto")
+      }
+    } catch (error) {
+      console.error("Erro ao associar requerente:", error)
+      alert("Erro ao associar requerente ao projeto.")
+    }
   }
 
   const handleRequerenteSave = async (requerenteData: Omit<Requerente, 'id'>) => {
@@ -247,6 +310,9 @@ export default function KanbanPage() {
       if (response.ok) {
         const { requerente } = await response.json()
         setRequerentes(prev => [...prev, requerente])
+        
+        // Fechar o modal após salvar
+        setRequerenteModal(prev => ({ ...prev, isOpen: false }))
       }
     } catch (error) {
       console.error("Erro ao salvar requerente:", error)

@@ -118,8 +118,8 @@ model ProjetoKanban {
   contratanteId Int?
   requerenteId  Int?
 
-  contratante Requerente?  @relation(fields: [contratanteId], references: [id])
-  requerente  Contratante? @relation(fields: [requerenteId], references: [id])
+  contratante Contratante? @relation(fields: [contratanteId], references: [id])
+  requerente  Requerente?  @relation(fields: [requerenteId], references: [id])
 }
 
 // Modelo para as atividades dentro de um projeto Kanban

@@ -45,7 +45,7 @@ export function RequerenteSelector({
   onSelect,
   onAdd,
   onView,
-  placeholder = "Selecione um requerente...",
+  placeholder = "Requerente",
   className,
   disabled = false 
 }: RequerenteSelectorProps) {
@@ -66,8 +66,14 @@ export function RequerenteSelector({
 
     const requerente = requerentes.find(r => r.id.toString() === requerenteId)
     if (requerente) {
-      onView(requerente)
+      onSelect(requerente)
     }
+    setOpen(false)
+  }
+
+  const handleView = (e: React.MouseEvent, requerente: Requerente) => {
+    e.stopPropagation()
+    onView(requerente)
     setOpen(false)
   }
 
@@ -96,7 +102,12 @@ export function RequerenteSelector({
         <Command>
           <CommandInput placeholder="Pesquisar requerente..." />
           <CommandList>
-            <CommandEmpty>Nenhum requerente encontrado.</CommandEmpty>
+            <CommandEmpty>
+              {requerentes.length === 0 
+                ? "Nenhum requerente cadastrado." 
+                : "Nenhum requerente encontrado."
+              }
+            </CommandEmpty>
             <CommandGroup>
               <CommandItem
                 value="none"
@@ -114,16 +125,17 @@ export function RequerenteSelector({
               {requerentes.map((requerente) => (
                 <CommandItem
                   key={requerente.id}
-                  value={requerente.id.toString()}
-                  onSelect={handleSelect}
+                  value={requerente.nome}
+                  onSelect={() => handleSelect(requerente.id.toString())}
+                  className="cursor-pointer"
                 >
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4",
+                      "mr-2 h-4 w-4 flex-shrink-0",
                       selectedRequerente?.id === requerente.id ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  <div className="flex flex-col">
+                  <div className="flex flex-col flex-1">
                     <span>{requerente.nome}</span>
                     {requerente.cpf && (
                       <span className="text-xs text-muted-foreground">
@@ -131,6 +143,14 @@ export function RequerenteSelector({
                       </span>
                     )}
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                    onClick={(e) => handleView(e, requerente)}
+                  >
+                    <User className="h-3 w-3" />
+                  </Button>
                 </CommandItem>
               ))}
               <CommandItem

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { SortableContext } from "@dnd-kit/sortable"
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { useDroppable } from "@dnd-kit/core"
 import { Button } from "@/components/ui/button"
 import { Plus, MoreVertical, Edit2, Trash2, ArrowUp, ArrowDown } from "lucide-react"
@@ -25,17 +25,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import type { Atividade } from "@/src/types/kanban"
+import type { Atividade, AtividadeWithStatus } from "@/src/types/kanban"
 
 interface KanbanColumnProps {
   id: number
   title: string
-  atividades: Atividade[]
+  atividades: AtividadeWithStatus[]
   headerColor?: string
   isFirst?: boolean
   isLast?: boolean
   onAtividadeAdd: (nome: string, statusId: number) => void
-  onAtividadeClick?: (atividade: Atividade) => void
+  onAtividadeClick?: (atividade: AtividadeWithStatus) => void
   onStatusUpdate?: () => void
   projetoId?: number
 }
@@ -52,7 +52,13 @@ export function KanbanColumn({
   onStatusUpdate,
   projetoId,
 }: KanbanColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id })
+  const { setNodeRef, isOver } = useDroppable({ 
+    id: id,
+    data: {
+      type: "Column",
+      statusId: id,
+    },
+  })
   const [isAdding, setIsAdding] = useState(false)
   const [newAtividadeName, setNewAtividadeName] = useState("")
 
@@ -205,7 +211,7 @@ export function KanbanColumn({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 min-h-[200px]">
-          <SortableContext items={atividadesIds}>
+          <SortableContext items={atividadesIds} strategy={verticalListSortingStrategy}>
             {atividades.map((atividade) => (
               <KanbanCard key={atividade.id} {...atividade} onClick={() => onAtividadeClick?.(atividade)} />
             ))}

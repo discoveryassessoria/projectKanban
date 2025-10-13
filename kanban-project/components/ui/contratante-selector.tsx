@@ -45,7 +45,7 @@ export function ContratanteSelector({
   onSelect,
   onAdd,
   onView,
-  placeholder = "Selecione um contratante...",
+  placeholder = "Contratante",
   className,
   disabled = false 
 }: ContratanteSelectorProps) {
@@ -66,8 +66,14 @@ export function ContratanteSelector({
 
     const contratante = contratantes.find(c => c.id.toString() === contratanteId)
     if (contratante) {
-      onView(contratante)
+      onSelect(contratante)
     }
+    setOpen(false)
+  }
+
+  const handleView = (e: React.MouseEvent, contratante: Contratante) => {
+    e.stopPropagation()
+    onView(contratante)
     setOpen(false)
   }
 
@@ -96,7 +102,12 @@ export function ContratanteSelector({
         <Command>
           <CommandInput placeholder="Pesquisar contratante..." />
           <CommandList>
-            <CommandEmpty>Nenhum contratante encontrado.</CommandEmpty>
+            <CommandEmpty>
+              {contratantes.length === 0 
+                ? "Nenhum contratante cadastrado." 
+                : "Nenhum contratante encontrado."
+              }
+            </CommandEmpty>
             <CommandGroup>
               <CommandItem
                 value="none"
@@ -114,16 +125,17 @@ export function ContratanteSelector({
               {contratantes.map((contratante) => (
                 <CommandItem
                   key={contratante.id}
-                  value={contratante.id.toString()}
-                  onSelect={handleSelect}
+                  value={contratante.nome}
+                  onSelect={() => handleSelect(contratante.id.toString())}
+                  className="cursor-pointer"
                 >
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4",
+                      "mr-2 h-4 w-4 flex-shrink-0",
                       selectedContratante?.id === contratante.id ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  <div className="flex flex-col">
+                  <div className="flex flex-col flex-1">
                     <span>{contratante.nome}</span>
                     {(contratante.cpf || contratante.telefone) && (
                       <span className="text-xs text-muted-foreground">
@@ -133,6 +145,14 @@ export function ContratanteSelector({
                       </span>
                     )}
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                    onClick={(e) => handleView(e, contratante)}
+                  >
+                    <Building2 className="h-3 w-3" />
+                  </Button>
                 </CommandItem>
               ))}
               <CommandItem

@@ -12,6 +12,8 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  type DragOverEvent,
+  rectIntersection,
 } from "@dnd-kit/core"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,10 +34,10 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
-  const [atividades, setAtividades] = useState<Atividade[]>([])
+  const [atividades, setAtividades] = useState<AtividadeWithStatus[]>([])
   const [newStatusName, setNewStatusName] = useState("")
   const [isAddingStatus, setIsAddingStatus] = useState(false)
-  const [activeAtividade, setActiveAtividade] = useState<Atividade | null>(null)
+  const [activeAtividade, setActiveAtividade] = useState<AtividadeWithStatus | null>(null)
   const [selectedAtividade, setSelectedAtividade] = useState<AtividadeWithStatus | null>(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [isPanning, setIsPanning] = useState(false)
@@ -52,8 +54,16 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
   )
 
   useEffect(() => {
-    setAtividades(projeto.atividades)
-  }, [projeto.atividades])
+    // Convert Atividade[] to AtividadeWithStatus[] by adding status object
+    const atividadesWithStatus: AtividadeWithStatus[] = projeto.atividades.map(atividade => ({
+      ...atividade,
+      status: projeto.status.find(status => status.id === atividade.statusId) || {
+        id: atividade.statusId,
+        nome: "Desconhecido"
+      }
+    }))
+    setAtividades(atividadesWithStatus)
+  }, [projeto.atividades, projeto.status])
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!scrollContainerRef.current) return
@@ -126,7 +136,17 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
       if (!response.ok) throw new Error("Falha ao criar nova atividade")
 
       const { atividade } = await response.json()
-      setAtividades((prev) => [...prev, atividade])
+      
+      // Convert to AtividadeWithStatus
+      const atividadeWithStatus: AtividadeWithStatus = {
+        ...atividade,
+        status: projeto.status.find(status => status.id === statusId) || {
+          id: statusId,
+          nome: "Desconhecido"
+        }
+      }
+      
+      setAtividades((prev) => [...prev, atividadeWithStatus])
     } catch (error) {
       console.error(error)
       alert("Não foi possível adicionar a atividade.")
@@ -135,7 +155,11 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
-    const atividade = atividades.find((a) => a.id === active.id)
+    const activeId = typeof active.id === 'string' ? parseInt(active.id) : active.id as number
+    const atividade = atividades.find((a) => a.id === activeId)
+    
+
+    
     setActiveAtividade(atividade || null)
   }
 
@@ -145,51 +169,110 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
     const { active, over } = event
     if (!over) return
 
-    const activeId = active.id
-    const overId = over.id
+    // Convert IDs to numbers
+    const activeId = typeof active.id === 'string' ? parseInt(active.id) : active.id as number
+    const overId = typeof over.id === 'string' ? parseInt(over.id) : over.id as number
 
-    // Get the container IDs
-    const activeContainer = active.data.current?.sortable?.containerId
-    const overContainer = over.data.current?.sortable?.containerId || over.id
 
-    // Convert to number (status ID)
-    const targetStatusId = Number(overContainer)
-
-    if (isNaN(targetStatusId)) {
-      console.error("Invalid drop container id:", overContainer)
-      return
-    }
 
     // Find the active activity
     const activeAtividade = atividades.find((a) => a.id === activeId)
-    if (!activeAtividade) return
+    if (!activeAtividade) {
+      console.error("Active atividade not found:", activeId)
+      return
+    }
+
+    // Determine the target status ID
+    let targetStatusId: number
+
+    // Check if we're dropping directly on a droppable container (column)
+    // or if the over element has statusId data
+    if (over.data.current?.statusId) {
+      targetStatusId = over.data.current.statusId
+    } else if (!isNaN(overId)) {
+      // Check if this overId belongs to a status (column) or an atividade (card)
+      const isColumnDrop = projeto.status.some(status => status.id === overId)
+      
+      if (isColumnDrop) {
+        targetStatusId = overId
+      } else {
+        // If dropping on another card, find which column it belongs to
+        const overAtividade = atividades.find((a) => a.id === overId)
+        if (overAtividade) {
+          targetStatusId = overAtividade.statusId
+        } else {
+          console.error("Could not determine target status ID")
+          return
+        }
+      }
+    } else {
+      console.error("Invalid overId:", overId)
+      return
+    }
+
+
 
     // If dropping in a different status, update it
     if (activeAtividade.statusId !== targetStatusId) {
-      setAtividades((prev) => prev.map((item) => (item.id === activeId ? { ...item, statusId: targetStatusId } : item)))
+      // Find the new status object
+      const newStatus = projeto.status.find(status => status.id === targetStatusId)
+      
+      if (!newStatus) {
+        console.error("New status not found:", targetStatusId)
+        return
+      }
+
+      // Update local state immediately for better UX
+      setAtividades((prev) => 
+        prev.map((item) => 
+          item.id === activeId 
+            ? { 
+                ...item, 
+                statusId: targetStatusId,
+                status: { id: newStatus.id, nome: newStatus.nome }
+              } 
+            : item
+        )
+      )
+
+
 
       // Update in database
       fetch(`/api/atividades/${activeId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ statusId: targetStatusId }),
-      }).catch(console.error)
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        return response.json()
+      })
+      .catch(error => {
+        console.error("Error updating atividade status:", error)
+        // Revert the change if the API call fails - restore original status
+        const originalStatus = projeto.status.find(status => status.id === activeAtividade.statusId)
+        setAtividades((prev) => 
+          prev.map((item) => 
+            item.id === activeId 
+              ? { 
+                  ...item, 
+                  statusId: activeAtividade.statusId,
+                  status: originalStatus || { id: activeAtividade.statusId, nome: "Desconhecido" }
+                }
+              : item
+          )
+        )
+        alert("Erro ao mover a atividade. Tente novamente.")
+      })
     }
   }
 
-  const handleAtividadeClick = (atividade: Atividade) => {
-    const fullAtividade = atividades.find((a) => a.id === atividade.id)
-    if (fullAtividade) {
-      const atividadeWithStatus: AtividadeWithStatus = {
-        ...fullAtividade,
-        status: projeto.status.find((s) => s.id === fullAtividade.statusId) || {
-          id: fullAtividade.statusId,
-          nome: "Desconhecido",
-        },
-      }
-      setSelectedAtividade(atividadeWithStatus)
-      setIsDetailsModalOpen(true)
-    }
+  const handleAtividadeClick = (atividade: AtividadeWithStatus) => {
+    setSelectedAtividade(atividade)
+    setIsDetailsModalOpen(true)
   }
 
   const handleAtividadeSave = () => {
@@ -257,7 +340,7 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={onDragEnd}
-        collisionDetection={closestCenter}
+        collisionDetection={rectIntersection}
       >
         <div
           ref={scrollContainerRef}
