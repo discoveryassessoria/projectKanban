@@ -35,47 +35,23 @@ import DroppableColumn from "./DroppableColumn"
 import QuickAddModal, { QuickAddFormData } from "./QuickAddModal"
 import { useActivityOperations } from "@/src/hooks/useActivityOperations"
 import { useQuickAddActivity } from "@/src/hooks/useQuickAddActivity"
+import { useActivities, invalidateActivities } from "@/src/hooks/useActivitiesData"
+import type { Atividade, Usuario, Projeto, Status } from "@/src/hooks/useActivitiesData"
 import "@/src/styles/kanban.css"
-
-interface Usuario {
-  nome: string
-  email: string
-}
-
-interface Projeto {
-  id?: number
-  nome: string
-  descricao: string | null
-}
-
-interface Status {
-  id?: number
-  nome: string
-}
 
 interface UserAtv {
   usuario: Usuario
 }
 
-interface Atividade {
-  id: number
-  nome: string
-  descricao: string | null
-  data_termino: string | null
-  data_criacao: string
-  projeto: Projeto
-  status: Status
-  usuarios: UserAtv[]
-}
-
-
-
 export default function PrazoActivities() {
-  const [atividades, setAtividades] = useState<Atividade[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Usar hook de cache para buscar todas as atividades
+  const { activities = [], isLoading, error, mutate } = useActivities()
+  
   const [selectedActivity, setSelectedActivity] = useState<Atividade | null>(null)
   const [activeTab, setActiveTab] = useState("kanban")
+  
+  // Alias para manter compatibilidade com código existente
+  const atividades = activities
   
   // Estados para drag and drop
   const [draggedActivity, setDraggedActivity] = useState<Atividade | null>(null)
@@ -92,7 +68,8 @@ export default function PrazoActivities() {
   // Hook para criação rápida
   const { createQuickActivity, isLoading: isCreatingActivity, error: createError, clearError: clearCreateError } = useQuickAddActivity({
     onSuccess: () => {
-      fetchActivities() // Recarregar atividades após criar
+      // Invalidar cache para recarregar atividades
+      invalidateActivities()
       setIsQuickAddOpen(false)
     },
     onError: (error) => {
@@ -102,11 +79,6 @@ export default function PrazoActivities() {
   
   // Estado para controlar qual atividade está sendo atualizada
   const [updatingActivityId, setUpdatingActivityId] = useState<number | null>(null)
-
-  // Carregar atividades
-  useEffect(() => {
-    fetchActivities()
-  }, [])
 
   // Sensores para diferentes tipos de input
   const sensors = useSensors(
@@ -120,28 +92,6 @@ export default function PrazoActivities() {
     })
   )
 
-
-  const fetchActivities = async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-      
-      const response = await fetch('/api/activities')
-      if (!response.ok) {
-        throw new Error('Erro ao carregar atividades')
-      }
-
-      const data = await response.json()
-      setAtividades(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  
-
   const handleActivityClick = (activity: Atividade) => {
     setSelectedActivity(activity)
     // Aqui você pode implementar um modal ou drawer para mostrar detalhes
@@ -149,11 +99,13 @@ export default function PrazoActivities() {
   }
 
   const handleRefresh = () => {
-    fetchActivities()
+    // Revalidar cache para recarregar atividades
+    mutate()
   }
 
   const handleStatusCreated = () => {
-    fetchActivities() // Recarregar atividades quando um novo status for criado
+    // Invalidar cache para recarregar atividades quando um novo status for criado
+    invalidateActivities()
   }
 
   // Handler para Quick Add
@@ -207,12 +159,15 @@ export default function PrazoActivities() {
     // Calcular nova data baseada na categoria de destino
     const newDate = calculateNewDateForCategory(overId as PrazoCategory)
     
-    // Optimistic Update - atualizar UI imediatamente
-    setAtividades(prev => prev.map(activity => 
-      activity.id === activeId 
-        ? { ...activity, data_termino: newDate }
-        : activity
-    ))
+    // Optimistic Update - atualizar cache imediatamente
+    mutate(
+      atividades.map(activity => 
+        activity.id === activeId 
+          ? { ...activity, data_termino: newDate }
+          : activity
+      ),
+      { revalidate: false }
+    )
 
     // Indicar que está atualizando
     setUpdatingActivityId(activeId)
@@ -223,23 +178,31 @@ export default function PrazoActivities() {
       
       if (!success) {
         // Reverter mudança em caso de erro
-        setAtividades(prev => prev.map(activity => 
-          activity.id === activeId 
-            ? { ...activity, data_termino: draggedActivity.data_termino }
-            : activity
-        ))
+        mutate(
+          atividades.map(activity => 
+            activity.id === activeId 
+              ? { ...activity, data_termino: draggedActivity.data_termino }
+              : activity
+          ),
+          { revalidate: false }
+        )
         
         console.error('Falha ao atualizar prazo no servidor:', updateError)
       } else {
         console.log(`Prazo atualizado com sucesso para atividade "${draggedActivity.nome}"`)
+        // Revalidar no servidor para garantir sincronização
+        setTimeout(() => mutate(), 100)
       }
     } catch (error) {
       // Reverter em caso de erro de rede
-      setAtividades(prev => prev.map(activity => 
-        activity.id === activeId 
-          ? { ...activity, data_termino: draggedActivity.data_termino }
-          : activity
-      ))
+      mutate(
+        atividades.map(activity => 
+          activity.id === activeId 
+            ? { ...activity, data_termino: draggedActivity.data_termino }
+            : activity
+        ),
+        { revalidate: false }
+      )
       console.error('Erro de rede ao atualizar prazo:', error)
     } finally {
       setUpdatingActivityId(null)

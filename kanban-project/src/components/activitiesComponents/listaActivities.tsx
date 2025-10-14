@@ -5,36 +5,11 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-
-interface Usuario {
-  nome: string
-  email: string
-}
-
-interface Projeto {
-  id?: number
-  nome: string
-  descricao: string | null
-}
-
-interface Status {
-  id?: number
-  nome: string
-}
+import { useActivities, useStatuses, invalidateActivities } from "@/src/hooks/useActivitiesData"
+import type { Atividade, Status, Usuario, Projeto } from "@/src/hooks/useActivitiesData"
 
 interface UserAtv {
   usuario: Usuario
-}
-
-interface Atividade {
-  id: number
-  nome: string
-  descricao: string | null
-  data_termino: string | null
-  data_criacao: string
-  projeto: Projeto
-  status: Status
-  usuarios: UserAtv[]
 }
 
 interface ListaActivitiesProps {
@@ -42,65 +17,18 @@ interface ListaActivitiesProps {
 }
 
 export default function ListaActivities({ filters }: ListaActivitiesProps) {
-  const [atividades, setAtividades] = useState<Atividade[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Usar hooks de cache para buscar dados
+  const { activities = [], isLoading, error, mutate } = useActivities(filters)
+  const { statuses = [] } = useStatuses()
+  
   const [selectedItems, setSelectedItems] = useState<number[]>([])
-  const [statusList, setStatusList] = useState<Status[]>([])
   const [selectedAction, setSelectedAction] = useState<string>('')
-
-  // Debug: Log das atividades quando mudam
-  useEffect(() => {
-    console.log('ListaActivities - estado atividades:', atividades.length, atividades)
-  }, [atividades])
   const [selectedStatus, setSelectedStatus] = useState<string>('')
   const [isActionLoading, setIsActionLoading] = useState(false)
 
-  useEffect(() => {
-    async function fetchActivities() {
-      try {
-        // Construir query string com filtros
-        const params = new URLSearchParams()
-        
-        if (filters) {
-          Object.entries(filters).forEach(([key, value]) => {
-            if (value && value !== '' && value !== 'all') {
-              params.append(key, value as string)
-            }
-          })
-        }
-        
-        const queryString = params.toString()
-        const url = `/api/activities${queryString ? `?${queryString}` : ''}`
-        
-        const response = await fetch(url)
-        if (!response.ok) {
-          throw new Error('Erro ao carregar atividades')
-        }
-        const data = await response.json()
-        setAtividades(data)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro desconhecido')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    async function fetchStatus() {
-      try {
-        const response = await fetch('/api/status')
-        if (response.ok) {
-          const data = await response.json()
-          setStatusList(data.status || [])
-        }
-      } catch (err) {
-        console.error('Erro ao carregar status:', err)
-      }
-    }
-
-    fetchActivities()
-    fetchStatus()
-  }, [JSON.stringify(filters)])
+  // Alias para manter compatibilidade com código existente
+  const atividades = activities
+  const statusList = statuses
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Sem prazo'
@@ -220,7 +148,13 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       
       // Atualizar a lista removendo apenas os itens excluídos com sucesso
       if (successfulDeletes.length > 0) {
-        setAtividades(prev => prev.filter(atividade => !successfulDeletes.includes(atividade.id)))
+        // Usar mutate otimista para atualizar o cache
+        mutate(
+          atividades.filter(atividade => !successfulDeletes.includes(atividade.id)),
+          { revalidate: false }
+        )
+        // Revalidar no servidor para garantir sincronização
+        setTimeout(() => mutate(), 100)
       }
       
       setSelectedItems([])
@@ -251,16 +185,19 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       
       await Promise.all(updatePromises)
       
-      // Atualizar a lista localmente
+      // Atualizar a lista localmente usando mutate otimista
       const newStatus = statusList.find(s => s.id?.toString() === selectedStatus)
       if (newStatus) {
-        setAtividades(prev => 
-          prev.map(atividade => 
+        mutate(
+          atividades.map(atividade => 
             selectedItems.includes(atividade.id)
               ? { ...atividade, status: newStatus }
               : atividade
-          )
+          ),
+          { revalidate: false }
         )
+        // Revalidar no servidor para garantir sincronização
+        setTimeout(() => mutate(), 100)
       }
       
       setSelectedItems([])

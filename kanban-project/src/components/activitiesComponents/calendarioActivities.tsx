@@ -6,6 +6,7 @@ import 'react-calendar/dist/Calendar.css'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Calendar as CalendarIcon, User } from "lucide-react"
+import { useCalendarData, useDayData } from "@/src/hooks/useActivitiesData"
 
 interface CalendarActivity {
   date: string // YYYY-MM-DD
@@ -37,33 +38,18 @@ interface DayData {
 
 export default function CalendarioActivities() {
   const [value, setValue] = useState<Date>(new Date())
-  const [activitiesData, setActivitiesData] = useState<CalendarActivity[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
   
   // Estados para o modal
   const [modalOpen, setModalOpen] = useState(false)
-  const [selectedDate, setSelectedDate] = useState<string>('')
-  const [dayData, setDayData] = useState<DayData | null>(null)
-  const [isLoadingDay, setIsLoadingDay] = useState(false)
-
-  // Função para buscar dados do dia específico
-  const fetchDayData = async (date: string) => {
-    try {
-      setIsLoadingDay(true)
-      const response = await fetch(`/api/activities/day?date=${date}`)
-      if (!response.ok) {
-        throw new Error('Erro ao carregar atividades do dia')
-      }
-
-      const data = await response.json()
-      setDayData(data)
-    } catch (err) {
-      console.error('Erro ao buscar dados do dia:', err)
-    } finally {
-      setIsLoadingDay(false)
-    }
-  }
+  
+  // Usar hooks de cache para buscar dados do calendário
+  const year = value.getFullYear()
+  const month = value.getMonth() + 1
+  const { calendarData = [], isLoading, error } = useCalendarData(year, month)
+  
+  // Buscar dados do dia selecionado apenas quando o modal estiver aberto
+  const { dayData, isLoading: isLoadingDay } = useDayData(selectedDate, modalOpen)
 
   // Função para lidar com clique em um dia
   const handleDayClick = (date: Date) => {
@@ -74,48 +60,28 @@ export default function CalendarioActivities() {
     if (activityInfo) {
       setSelectedDate(dateString)
       setModalOpen(true)
-      fetchDayData(dateString)
     }
   }
 
-  // Função para buscar dados do calendário
-  const fetchCalendarData = async (date: Date) => {
-    try {
-      setIsLoading(true)
-      const year = date.getFullYear()
-      const month = date.getMonth() + 1
-
-      const response = await fetch(`/api/activities/calendar?year=${year}&month=${month}`)
-      if (!response.ok) {
-        throw new Error('Erro ao carregar dados do calendário')
-      }
-
-      const data = await response.json()
-      setActivitiesData(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido')
-    } finally {
-      setIsLoading(false)
+  // Função para mudar o mês visível no calendário
+  const handleActiveStartDateChange = ({ activeStartDate }: { activeStartDate: Date | null }) => {
+    if (activeStartDate) {
+      setValue(activeStartDate)
     }
   }
-
-  // Carregar dados quando o componente montar ou quando a data mudar
-  useEffect(() => {
-    fetchCalendarData(value)
-  }, [value])
 
   // Função para verificar se uma data tem atividades
   const getActivityInfo = (date: Date) => {
     const dateString = date.toISOString().split('T')[0]
     
     // Verificar se existem atividades nesta data
-    const dayActivities = activitiesData.filter(activity => activity.date === dateString)
+    const dayActivities = calendarData.filter((activity: any) => activity.date === dateString)
     
     if (dayActivities.length === 0) return null
-
-    // Verificar os tipos presentes
-    const hasCreation = dayActivities.some(a => a.type === 'creation')
-    const hasDeadline = dayActivities.some(a => a.type === 'deadline')
+    
+    // Verificar tipos de eventos
+    const hasCreation = dayActivities.some((a: any) => a.type === 'creation')
+    const hasDeadline = dayActivities.some((a: any) => a.type === 'deadline')
     
     let type: 'creation' | 'deadline' | 'both'
     if (hasCreation && hasDeadline) {
@@ -161,20 +127,12 @@ export default function CalendarioActivities() {
     return null
   }
 
-  // Função chamada quando o usuário navega entre meses
-  const handleActiveStartDateChange = ({ activeStartDate }: { activeStartDate: Date | null }) => {
-    if (activeStartDate) {
-      setValue(activeStartDate)
-      fetchCalendarData(activeStartDate)
-    }
-  }
-
   if (error) {
     return (
       <div className="border rounded-lg">
         <div className="p-6">
           <div className="flex items-center justify-center h-32">
-            <p className="text-sm text-destructive">Erro: {error}</p>
+            <p className="text-sm text-destructive">Erro: {error.message || 'Erro desconhecido'}</p>
           </div>
         </div>
       </div>
@@ -237,19 +195,19 @@ export default function CalendarioActivities() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="border rounded-lg p-4">
           <div className="text-2xl font-bold text-green-600">
-            {activitiesData.filter(a => a.type === 'creation').length}
+            {calendarData.filter((a: any) => a.type === 'creation').length}
           </div>
           <div className="text-sm text-muted-foreground">Dias com Criações</div>
         </div>
         <div className="border rounded-lg p-4">
           <div className="text-2xl font-bold text-red-600">
-            {activitiesData.filter(a => a.type === 'deadline').length}
+            {calendarData.filter((a: any) => a.type === 'deadline').length}
           </div>
           <div className="text-sm text-muted-foreground">Dias com Prazos</div>
         </div>
         <div className="border rounded-lg p-4">
           <div className="text-2xl font-bold text-blue-600">
-            {activitiesData.reduce((total, activity) => total + activity.activities.length, 0)}
+            {calendarData.reduce((total: number, activity: any) => total + activity.activities.length, 0)}
           </div>
           <div className="text-sm text-muted-foreground">Total de Atividades</div>
         </div>
@@ -284,7 +242,7 @@ export default function CalendarioActivities() {
                   {/* Linha vertical da timeline */}
                   <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-border"></div>
                   
-                  {dayData.activities.map((activity, index) => (
+                  {dayData.activities.map((activity: any, index: number) => (
                     <div key={`${activity.id}-${activity.tipo_evento}-${index}`} className="relative flex items-start space-x-4 pb-4">
                       {/* Indicador de tempo */}
                       <div className={`relative z-10 flex-shrink-0 w-16 h-16 rounded-full border-4 border-background flex items-center justify-center text-xs font-bold ${
@@ -342,13 +300,13 @@ export default function CalendarioActivities() {
                   <div className="grid grid-cols-2 gap-4 text-center">
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                       <div className="text-lg font-bold text-green-600">
-                        {dayData.activities.filter(a => a.tipo_evento === 'criacao').length}
+                        {dayData.activities.filter((a: any) => a.tipo_evento === 'criacao').length}
                       </div>
                       <div className="text-xs text-green-600">Criações</div>
                     </div>
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                       <div className="text-lg font-bold text-red-600">
-                        {dayData.activities.filter(a => a.tipo_evento === 'prazo').length}
+                        {dayData.activities.filter((a: any) => a.tipo_evento === 'prazo').length}
                       </div>
                       <div className="text-xs text-red-600">Prazos</div>
                     </div>
