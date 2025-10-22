@@ -8,8 +8,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import { UserSelector } from "@/components/ui/user-selector"
-import { Calendar, User, FileText, Tag, Save } from "lucide-react"
-import type { AtividadeWithStatus } from "@/src/types/kanban"
+import { ContratanteSelector } from "@/components/ui/contratante-selector"
+import { RequerenteSelector } from "@/components/ui/requerente-selector"
+import { Calendar, User, FileText, Tag, Save, Building2 } from "lucide-react"
+import type { AtividadeWithStatus, Contratante, Requerente } from "@/src/types/kanban"
 import { useState, useEffect } from "react"
 
 interface AtividadeDetailsModalProps {
@@ -17,9 +19,35 @@ interface AtividadeDetailsModalProps {
   isOpen: boolean
   onClose: () => void
   onSave?: () => void
+  // Props para contratantes e requerentes do projeto
+  contratantes?: Contratante[]
+  requerentes?: Requerente[]
+  selectedContratantes?: Contratante[]
+  selectedRequerentes?: Requerente[]
+  onContratantesChange?: (contratantes: Contratante[]) => void
+  onRequerentesChange?: (requerentes: Requerente[]) => void
+  onContratanteAdd?: () => void
+  onRequerenteAdd?: () => void
+  onContratanteView?: (contratante: Contratante) => void
+  onRequerenteView?: (requerente: Requerente) => void
 }
 
-export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: AtividadeDetailsModalProps) {
+export function AtividadeDetailsModal({ 
+  atividade, 
+  isOpen, 
+  onClose, 
+  onSave,
+  contratantes = [],
+  requerentes = [],
+  selectedContratantes = [],
+  selectedRequerentes = [],
+  onContratantesChange,
+  onRequerentesChange,
+  onContratanteAdd,
+  onRequerenteAdd,
+  onContratanteView,
+  onRequerenteView
+}: AtividadeDetailsModalProps) {
   const [nome, setNome] = useState("")
   const [descricao, setDescricao] = useState("")
   const [usuarioId, setUsuarioId] = useState<number | null>(null)
@@ -32,7 +60,13 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
     
     if (selectedUserId) {
       try {
-        const response = await fetch(`/api/usuarios?search=`)
+        const token = localStorage.getItem("authToken")
+        const response = await fetch(`/api/usuarios?search=`, {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        })
         if (response.ok) {
           const data = await response.json()
           const user = data.usuarios.find((u: any) => u.id === selectedUserId)
@@ -97,18 +131,55 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-white border-gray-200 text-gray-900 max-w-2xl">
+      <DialogContent className="bg-white border-gray-200 text-gray-900 min-w-[800px] w-[85vw] max-w-[1400px] max-h-[95vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-gray-900">Editar Atividade</DialogTitle>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <DialogTitle className="text-2xl font-bold text-gray-900">Editar Atividade</DialogTitle>
+              <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white">{atividade.status.nome}</Badge>
+            </div>
+            
+            {/* Seção de Contratante e Requerente */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-700">Contratante</span>
+                </div>
+                <ContratanteSelector
+                  contratantes={contratantes}
+                  selectedContratantes={selectedContratantes}
+                  onSelectMultiple={(contratantes) => onContratantesChange?.(contratantes)}
+                  onAdd={onContratanteAdd}
+                  onView={onContratanteView}
+                  placeholder="Selecionar contratantes..."
+                  className="w-full"
+                  mode="checkbox"
+                />
+              </div>
+              
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-700">Requerente</span>
+                </div>
+                <RequerenteSelector
+                  requerentes={requerentes}
+                  selectedRequerentes={selectedRequerentes}
+                  onSelectMultiple={(requerentes) => onRequerentesChange?.(requerentes)}
+                  onAdd={onRequerenteAdd}
+                  onView={onRequerenteView}
+                  placeholder="Selecionar requerentes..."
+                  className="w-full"
+                  mode="checkbox"
+                />
+              </div>
+            </div>
+          </div>
           <DialogDescription className="text-gray-600">Atualize os detalhes da atividade</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Status:</span>
-            <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white">{atividade.status.nome}</Badge>
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="nome" className="text-sm font-medium text-gray-700">
               Nome da Atividade
@@ -138,7 +209,7 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-gray-600">
                 <Calendar className="h-4 w-4" />

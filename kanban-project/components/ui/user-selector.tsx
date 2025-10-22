@@ -51,7 +51,13 @@ export function UserSelector({
       setLoading(true)
       try {
         const searchParam = search ? `?search=${encodeURIComponent(search)}` : ""
-        const response = await fetch(`/api/usuarios${searchParam}`)
+        const token = localStorage.getItem("authToken")
+        const response = await fetch(`/api/usuarios${searchParam}`, {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        })
         
         if (response.ok) {
           const data = await response.json()

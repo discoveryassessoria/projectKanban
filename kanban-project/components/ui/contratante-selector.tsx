@@ -30,50 +30,75 @@ interface Contratante {
 
 interface ContratanteSelectorProps {
   contratantes: Contratante[]
-  selectedContratante: Contratante | null
-  onSelect: (contratante: Contratante | null) => void
-  onAdd: () => void
-  onView: (contratante: Contratante) => void
+  selectedContratante?: Contratante | null
+  selectedContratantes?: Contratante[]
+  onSelect?: (contratante: Contratante | null) => void
+  onSelectMultiple?: (contratantes: Contratante[]) => void
+  onAdd?: () => void
+  onView?: (contratante: Contratante) => void
   placeholder?: string
   className?: string
   disabled?: boolean
+  mode?: 'single' | 'checkbox'
 }
 
 export function ContratanteSelector({ 
   contratantes, 
   selectedContratante, 
+  selectedContratantes = [],
   onSelect,
+  onSelectMultiple,
   onAdd,
   onView,
   placeholder = "Contratante",
   className,
-  disabled = false 
+  disabled = false,
+  mode = 'single'
 }: ContratanteSelectorProps) {
   const [open, setOpen] = React.useState(false)
 
   const handleSelect = (contratanteId: string) => {
     if (contratanteId === "add-new") {
-      onAdd()
+      onAdd?.()
       setOpen(false)
       return
     }
     
-    if (contratanteId === "none") {
-      onSelect(null)
-      setOpen(false)
-      return
-    }
+    if (mode === 'single') {
+      if (contratanteId === "none") {
+        onSelect?.(null)
+        setOpen(false)
+        return
+      }
 
-    const contratante = contratantes.find(c => c.id.toString() === contratanteId)
-    if (contratante) {
-      onSelect(contratante)
+      const contratante = contratantes.find(c => c.id.toString() === contratanteId)
+      if (contratante) {
+        onSelect?.(contratante)
+      }
+      setOpen(false)
     }
-    setOpen(false)
+  }
+
+  const handleCheckboxToggle = (contratante: Contratante) => {
+    console.log('Checkbox toggle - contratante:', contratante.nome, 'mode:', mode)
+    if (mode === 'checkbox') {
+      const isSelected = selectedContratantes.some(c => c.id === contratante.id)
+      let newSelection: Contratante[]
+      
+      if (isSelected) {
+        newSelection = selectedContratantes.filter(c => c.id !== contratante.id)
+      } else {
+        newSelection = [...selectedContratantes, contratante]
+      }
+      
+      console.log('New selection:', newSelection)
+      onSelectMultiple?.(newSelection)
+    }
   }
 
   const handleView = (e: React.MouseEvent, contratante: Contratante) => {
     e.stopPropagation()
-    onView(contratante)
+    onView?.(contratante)
     setOpen(false)
   }
 
@@ -86,14 +111,21 @@ export function ContratanteSelector({
           aria-expanded={open}
           className={cn(
             "justify-between text-left font-normal",
-            !selectedContratante && "text-muted-foreground",
+            (!selectedContratante && mode === 'single') || (selectedContratantes.length === 0 && mode === 'checkbox') 
+              ? "text-muted-foreground" : "",
             className
           )}
           disabled={disabled}
         >
           <div className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
-            {selectedContratante ? selectedContratante.nome : placeholder}
+            {mode === 'single' 
+              ? (selectedContratante ? selectedContratante.nome : placeholder)
+              : (selectedContratantes.length === 0 
+                  ? placeholder 
+                  : `${selectedContratantes.length} selecionado(s)`
+                )
+            }
           </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -109,32 +141,54 @@ export function ContratanteSelector({
               }
             </CommandEmpty>
             <CommandGroup>
-              <CommandItem
-                value="none"
-                onSelect={handleSelect}
-                className="text-muted-foreground"
-              >
-                <Check
-                  className={cn(
-                    "mr-2 h-4 w-4",
-                    !selectedContratante ? "opacity-100" : "opacity-0"
-                  )}
-                />
-                Nenhum contratante
-              </CommandItem>
+              {mode === 'single' && (
+                <CommandItem
+                  value="none"
+                  onSelect={handleSelect}
+                  className="text-muted-foreground"
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      !selectedContratante ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  Nenhum contratante
+                </CommandItem>
+              )}
               {contratantes.map((contratante) => (
                 <CommandItem
                   key={contratante.id}
                   value={contratante.nome}
-                  onSelect={() => handleSelect(contratante.id.toString())}
-                  className="cursor-pointer"
+                  onSelect={mode === 'single' ? () => handleSelect(contratante.id.toString()) : undefined}
+                  className="cursor-pointer relative"
+                  onClick={mode === 'checkbox' ? (e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleCheckboxToggle(contratante)
+                  } : undefined}
                 >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4 flex-shrink-0",
-                      selectedContratante?.id === contratante.id ? "opacity-100" : "opacity-0"
-                    )}
-                  />
+                  {mode === 'checkbox' && (
+                    <div className="mr-2 flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedContratantes.some(c => c.id === contratante.id)}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          handleCheckboxToggle(contratante)
+                        }}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                    </div>
+                  )}
+                  {mode === 'single' && (
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4 flex-shrink-0",
+                        selectedContratante?.id === contratante.id ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                  )}
                   <div className="flex flex-col flex-1">
                     <span>{contratante.nome}</span>
                     {(contratante.cpf || contratante.telefone) && (
@@ -145,14 +199,16 @@ export function ContratanteSelector({
                       </span>
                     )}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                    onClick={(e) => handleView(e, contratante)}
-                  >
-                    <Building2 className="h-3 w-3" />
-                  </Button>
+                  {onView && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                      onClick={(e) => handleView(e, contratante)}
+                    >
+                      <Building2 className="h-3 w-3" />
+                    </Button>
+                  )}
                 </CommandItem>
               ))}
               <CommandItem

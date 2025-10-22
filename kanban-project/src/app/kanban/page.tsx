@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation"
 import { getStoredUser, isAuthenticated } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { ProjectSelector } from "@/components/ui/project-selector"
-import { ContratanteSelector } from "@/components/ui/contratante-selector"
-import { RequerenteSelector } from "@/components/ui/requerente-selector"
 import { KanbanIcon, Trash2, Sparkles, Plus, Info } from "lucide-react"
 import ModalNovoProjeto from "@/src/components/kanban/modal-novo-projeto"
 import { KanbanBoard } from "@/src/components/kanban"
@@ -403,35 +401,6 @@ export default function KanbanPage() {
                 </TooltipProvider>
               )}
             </div>
-
-            {/* Seletores de Contratante e Requerente */}
-            {projetoSelecionado && (
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex flex-col">
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Contratante</span>
-                  <ContratanteSelector
-                    contratantes={contratantes}
-                    selectedContratante={projetoSelecionado.contratante || null}
-                    onSelect={handleContratanteSelect}
-                    onAdd={handleContratanteAdd}
-                    onView={handleContratanteView}
-                    className="w-[180px]"
-                  />
-                </div>
-                
-                <div className="flex flex-col">
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Requerente</span>
-                  <RequerenteSelector
-                    requerentes={requerentes}
-                    selectedRequerente={projetoSelecionado.requerente || null}
-                    onSelect={handleRequerenteSelect}
-                    onAdd={handleRequerenteAdd}
-                    onView={handleRequerenteView}
-                    className="w-[180px]"
-                  />
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -441,7 +410,26 @@ export default function KanbanPage() {
         <div className="space-y-4">
           <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-sm">
             <div className="p-6">
-              <KanbanBoard projeto={projetoSelecionado} onStatusAdd={handleStatusAdd} />
+              <KanbanBoard 
+                projeto={projetoSelecionado} 
+                onStatusAdd={handleStatusAdd}
+                contratantes={contratantes}
+                requerentes={requerentes}
+                selectedContratantes={projetoSelecionado.contratante ? [projetoSelecionado.contratante] : []}
+                selectedRequerentes={projetoSelecionado.requerente ? [projetoSelecionado.requerente] : []}
+                onContratantesChange={(contratantes) => {
+                  // Aqui você pode implementar a lógica para atualizar os contratantes do projeto
+                  console.log('Contratantes atualizados:', contratantes)
+                }}
+                onRequerentesChange={(requerentes) => {
+                  // Aqui você pode implementar a lógica para atualizar os requerentes do projeto
+                  console.log('Requerentes atualizados:', requerentes)
+                }}
+                onContratanteAdd={handleContratanteAdd}
+                onRequerenteAdd={handleRequerenteAdd}
+                onContratanteView={handleContratanteView}
+                onRequerenteView={handleRequerenteView}
+              />
             </div>
           </div>
         </div>

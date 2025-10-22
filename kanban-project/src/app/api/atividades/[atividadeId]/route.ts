@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 
 export async function PUT(request: NextRequest, { params }: { params: { atividadeId: string } }) {
   try {
-    const { atividadeId } = params
+    const { atividadeId } = await params
     const body = await request.json()
     const { statusId, nome, descricao, data_termino, usuarioId } = body
 
@@ -72,7 +72,7 @@ export async function PUT(request: NextRequest, { params }: { params: { atividad
 
 export async function DELETE(request: NextRequest, { params }: { params: { atividadeId: string } }) {
   try {
-    const { atividadeId } = params
+    const { atividadeId } = await params
 
     await prisma.atividade.delete({
       where: {

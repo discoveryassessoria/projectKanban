@@ -30,50 +30,75 @@ interface Requerente {
 
 interface RequerenteSelectorProps {
   requerentes: Requerente[]
-  selectedRequerente: Requerente | null
-  onSelect: (requerente: Requerente | null) => void
-  onAdd: () => void
-  onView: (requerente: Requerente) => void
+  selectedRequerente?: Requerente | null
+  selectedRequerentes?: Requerente[]
+  onSelect?: (requerente: Requerente | null) => void
+  onSelectMultiple?: (requerentes: Requerente[]) => void
+  onAdd?: () => void
+  onView?: (requerente: Requerente) => void
   placeholder?: string
   className?: string
   disabled?: boolean
+  mode?: 'single' | 'checkbox'
 }
 
 export function RequerenteSelector({ 
   requerentes, 
   selectedRequerente, 
+  selectedRequerentes = [],
   onSelect,
+  onSelectMultiple,
   onAdd,
   onView,
   placeholder = "Requerente",
   className,
-  disabled = false 
+  disabled = false,
+  mode = 'single'
 }: RequerenteSelectorProps) {
   const [open, setOpen] = React.useState(false)
 
   const handleSelect = (requerenteId: string) => {
     if (requerenteId === "add-new") {
-      onAdd()
+      onAdd?.()
       setOpen(false)
       return
     }
     
-    if (requerenteId === "none") {
-      onSelect(null)
-      setOpen(false)
-      return
-    }
+    if (mode === 'single') {
+      if (requerenteId === "none") {
+        onSelect?.(null)
+        setOpen(false)
+        return
+      }
 
-    const requerente = requerentes.find(r => r.id.toString() === requerenteId)
-    if (requerente) {
-      onSelect(requerente)
+      const requerente = requerentes.find(r => r.id.toString() === requerenteId)
+      if (requerente) {
+        onSelect?.(requerente)
+      }
+      setOpen(false)
     }
-    setOpen(false)
+  }
+
+  const handleCheckboxToggle = (requerente: Requerente) => {
+    console.log('Checkbox toggle - requerente:', requerente.nome, 'mode:', mode)
+    if (mode === 'checkbox') {
+      const isSelected = selectedRequerentes.some(r => r.id === requerente.id)
+      let newSelection: Requerente[]
+      
+      if (isSelected) {
+        newSelection = selectedRequerentes.filter(r => r.id !== requerente.id)
+      } else {
+        newSelection = [...selectedRequerentes, requerente]
+      }
+      
+      console.log('New selection:', newSelection)
+      onSelectMultiple?.(newSelection)
+    }
   }
 
   const handleView = (e: React.MouseEvent, requerente: Requerente) => {
     e.stopPropagation()
-    onView(requerente)
+    onView?.(requerente)
     setOpen(false)
   }
 
@@ -86,14 +111,19 @@ export function RequerenteSelector({
           aria-expanded={open}
           className={cn(
             "justify-between text-left font-normal",
-            !selectedRequerente && "text-muted-foreground",
+            (!selectedRequerente && mode === 'single') && "text-muted-foreground",
             className
           )}
           disabled={disabled}
         >
           <div className="flex items-center gap-2">
             <User className="h-4 w-4" />
-            {selectedRequerente ? selectedRequerente.nome : placeholder}
+            {mode === 'checkbox' 
+              ? `${selectedRequerentes.length} requerente(s) selecionado(s)`
+              : selectedRequerente 
+                ? selectedRequerente.nome 
+                : placeholder
+            }
           </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -109,32 +139,54 @@ export function RequerenteSelector({
               }
             </CommandEmpty>
             <CommandGroup>
-              <CommandItem
-                value="none"
-                onSelect={handleSelect}
-                className="text-muted-foreground"
-              >
-                <Check
-                  className={cn(
-                    "mr-2 h-4 w-4",
-                    !selectedRequerente ? "opacity-100" : "opacity-0"
-                  )}
-                />
-                Nenhum requerente
-              </CommandItem>
+              {mode === 'single' && (
+                <CommandItem
+                  value="none"
+                  onSelect={handleSelect}
+                  className="text-muted-foreground"
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      !selectedRequerente ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  Nenhum requerente
+                </CommandItem>
+              )}
               {requerentes.map((requerente) => (
                 <CommandItem
                   key={requerente.id}
                   value={requerente.nome}
-                  onSelect={() => handleSelect(requerente.id.toString())}
-                  className="cursor-pointer"
+                  onSelect={mode === 'single' ? () => handleSelect(requerente.id.toString()) : undefined}
+                  className="cursor-pointer relative"
+                  onClick={mode === 'checkbox' ? (e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleCheckboxToggle(requerente)
+                  } : undefined}
                 >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4 flex-shrink-0",
-                      selectedRequerente?.id === requerente.id ? "opacity-100" : "opacity-0"
-                    )}
-                  />
+                  {mode === 'checkbox' && (
+                    <div className="mr-2 flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedRequerentes.some(r => r.id === requerente.id)}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          handleCheckboxToggle(requerente)
+                        }}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                    </div>
+                  )}
+                  {mode === 'single' && (
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4 flex-shrink-0",
+                        selectedRequerente?.id === requerente.id ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                  )}
                   <div className="flex flex-col flex-1">
                     <span>{requerente.nome}</span>
                     {requerente.cpf && (
@@ -143,14 +195,16 @@ export function RequerenteSelector({
                       </span>
                     )}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                    onClick={(e) => handleView(e, requerente)}
-                  >
-                    <User className="h-3 w-3" />
-                  </Button>
+                  {onView && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                      onClick={(e) => handleView(e, requerente)}
+                    >
+                      <User className="h-3 w-3" />
+                    </Button>
+                  )}
                 </CommandItem>
               ))}
               <CommandItem
