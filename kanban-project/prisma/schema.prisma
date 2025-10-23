@@ -116,10 +116,10 @@ model ProjetoKanban {
   // O modelo conceitual sugere entidades "Contratante" e "Requerente"
   // que podem ser vinculadas a um projeto.
   contratanteId Int?
-  requerenteId  Int?
-
   contratante Contratante? @relation(fields: [contratanteId], references: [id])
-  requerente  Requerente?  @relation(fields: [requerenteId], references: [id])
+  
+  // Relacionamento Many-to-Many com Requerentes
+  requerentes ProjetoRequerente[]
 }
 
 // Modelo para as atividades dentro de um projeto Kanban
@@ -174,7 +174,7 @@ model Requerente {
   endereco String? @db.VarChar(100)
   telefone String? @db.VarChar(11)
 
-  projetos ProjetoKanban[]
+  projetos ProjetoRequerente[]
 }
 
 model Contratante {
@@ -186,4 +186,14 @@ model Contratante {
   telefone String? @db.VarChar(11)
 
   projetos ProjetoKanban[]
+}
+
+// Tabela pivot para relacionamento Many-to-Many entre Projeto e Requerente
+model ProjetoRequerente {
+  projetoId    Int
+  requerenteId Int
+  projeto      ProjetoKanban @relation(fields: [projetoId], references: [id], onDelete: Cascade)
+  requerente   Requerente    @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+
+  @@id([projetoId, requerenteId])
 }

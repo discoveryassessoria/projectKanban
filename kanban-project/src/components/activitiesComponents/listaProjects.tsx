@@ -27,7 +27,7 @@ export default function ListaProjects({ filters }: ListaProjectsProps) {
     if (selectedItems.length === projetos.length) {
       setSelectedItems([])
     } else {
-      setSelectedItems(projetos.map(p => p.id).filter((id): id is number => id !== undefined))
+      setSelectedItems(projetos.map((p: any) => p.id).filter((id: any): id is number => id !== undefined))
     }
   }
 
@@ -162,7 +162,7 @@ export default function ListaProjects({ filters }: ListaProjectsProps) {
             <p className="text-muted-foreground">Nenhum projeto encontrado</p>
           </div>
         ) : (
-          projetos.map((projeto) => (
+          projetos.map((projeto: any) => (
             <div
               key={projeto.id}
               className="px-4 py-3 hover:bg-muted/30 transition-colors"

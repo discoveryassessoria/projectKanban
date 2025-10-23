@@ -21,7 +21,11 @@ export async function GET(request: NextRequest) {
           }
         },
         contratante: true,
-        requerente: true,
+        requerentes: {
+          include: {
+            requerente: true
+          }
+        },
         _count: {
           select: {
             atividades: true
@@ -102,7 +106,11 @@ export async function POST(request: NextRequest) {
           }
         },
         contratante: true,
-        requerente: true,
+        requerentes: {
+          include: {
+            requerente: true
+          }
+        },
       },
     })
 

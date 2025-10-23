@@ -94,7 +94,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
     if (selectedItems.length === atividades.length) {
       setSelectedItems([])
     } else {
-      setSelectedItems(atividades.map(a => a.id))
+      setSelectedItems(atividades.map((a: Atividade) => a.id))
     }
   }
 
@@ -150,7 +150,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       if (successfulDeletes.length > 0) {
         // Usar mutate otimista para atualizar o cache
         mutate(
-          atividades.filter(atividade => !successfulDeletes.includes(atividade.id)),
+          atividades.filter((atividade: Atividade) => !successfulDeletes.includes(atividade.id)),
           { revalidate: false }
         )
         // Revalidar no servidor para garantir sincronização
@@ -186,10 +186,10 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       await Promise.all(updatePromises)
       
       // Atualizar a lista localmente usando mutate otimista
-      const newStatus = statusList.find(s => s.id?.toString() === selectedStatus)
+      const newStatus = statusList.find((s: Status) => s.id?.toString() === selectedStatus)
       if (newStatus) {
         mutate(
-          atividades.map(atividade => 
+          atividades.map((atividade: Atividade) => 
             selectedItems.includes(atividade.id)
               ? { ...atividade, status: newStatus }
               : atividade
@@ -273,7 +273,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
             <p className="text-gray-500">Nenhuma atividade encontrada</p>
           </div>
         ) : (
-          atividades.filter(atividade => atividade && atividade.nome).map((atividade) => (
+          atividades.filter((atividade: Atividade) => atividade && atividade.nome).map((atividade: Atividade) => (
             <div
               key={atividade.id}
               className="px-4 py-3 hover:bg-gray-50 transition-colors bg-white"
@@ -376,7 +376,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
-                      {statusList.map((status) => (
+                      {statusList.map((status: Status) => (
                         <SelectItem key={status.id} value={status.id?.toString() || ''}>
                           {status.nome}
                         </SelectItem>

@@ -144,29 +144,35 @@ export function AtividadeDetailsModal({
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <Building2 className="h-4 w-4 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-700">Contratante</span>
+                  <span className="text-sm font-medium text-gray-700">Contratante do Projeto</span>
                 </div>
                 <ContratanteSelector
                   contratantes={contratantes}
-                  selectedContratantes={selectedContratantes}
-                  onSelectMultiple={(contratantes) => onContratantesChange?.(contratantes)}
+                  selectedContratante={selectedContratantes && selectedContratantes.length > 0 ? selectedContratantes[0] : null}
+                  onSelect={(contratante) => {
+                    console.log('ContratanteSelector onSelect chamado:', contratante)
+                    onContratantesChange?.(contratante ? [contratante] : [])
+                  }}
                   onAdd={onContratanteAdd}
                   onView={onContratanteView}
-                  placeholder="Selecionar contratantes..."
+                  placeholder="Selecionar contratante..."
                   className="w-full"
-                  mode="checkbox"
+                  mode="single"
                 />
               </div>
               
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-700">Requerente</span>
+                  <span className="text-sm font-medium text-gray-700">Requerentes do Projeto</span>
                 </div>
                 <RequerenteSelector
                   requerentes={requerentes}
                   selectedRequerentes={selectedRequerentes}
-                  onSelectMultiple={(requerentes) => onRequerentesChange?.(requerentes)}
+                  onSelectMultiple={(requerentes) => {
+                    console.log('RequerenteSelector onSelectMultiple chamado:', requerentes)
+                    onRequerentesChange?.(requerentes)
+                  }}
                   onAdd={onRequerenteAdd}
                   onView={onRequerenteView}
                   placeholder="Selecionar requerentes..."

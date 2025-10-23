@@ -263,37 +263,41 @@ export default function KanbanPage() {
     })
   }
 
-  const handleRequerenteSelect = async (requerente: Requerente | null) => {
+  const handleRequerenteSelect = async (requerentes: Requerente[]) => {
     if (!projetoSelecionado) return
 
     try {
+      const requerenteIds = requerentes.map(r => r.id)
+      
       const response = await fetch(`/api/projetos/${projetoSelecionado.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          requerenteId: requerente?.id || null 
+          requerenteIds: requerenteIds
         }),
       })
 
       if (response.ok) {
+        const projetoAtualizado = await response.json()
+        
         // Atualizar o projeto local
         setProjetoSelecionado(prev => prev ? {
           ...prev,
-          requerente: requerente
+          requerentes: projetoAtualizado.requerentes
         } : null)
 
         // Atualizar a lista de projetos
         setProjetos(prev => prev.map(p => 
           p.id === projetoSelecionado.id 
-            ? { ...p, requerente: requerente }
+            ? { ...p, requerentes: projetoAtualizado.requerentes }
             : p
         ))
       } else {
-        throw new Error("Falha ao atualizar requerente do projeto")
+        throw new Error("Falha ao atualizar requerentes do projeto")
       }
     } catch (error) {
-      console.error("Erro ao associar requerente:", error)
-      alert("Erro ao associar requerente ao projeto.")
+      console.error("Erro ao associar requerentes:", error)
+      alert("Erro ao associar requerentes ao projeto.")
     }
   }
 
@@ -416,14 +420,25 @@ export default function KanbanPage() {
                 contratantes={contratantes}
                 requerentes={requerentes}
                 selectedContratantes={projetoSelecionado.contratante ? [projetoSelecionado.contratante] : []}
-                selectedRequerentes={projetoSelecionado.requerente ? [projetoSelecionado.requerente] : []}
-                onContratantesChange={(contratantes) => {
-                  // Aqui você pode implementar a lógica para atualizar os contratantes do projeto
-                  console.log('Contratantes atualizados:', contratantes)
+                selectedRequerentes={projetoSelecionado.requerentes?.map(r => r.requerente) || []}
+                onContratantesChange={async (contratantes) => {
+                  // Atualizar o contratante do projeto (apenas um)
+                  console.log('onContratantesChange chamado com:', contratantes)
+                  const contratante = contratantes.length > 0 ? contratantes[0] : null
+                  await handleContratanteSelect(contratante)
+                  // Recarregar os dados do projeto após a atualização
+                  if (user) {
+                    buscarProjetos(user.id)
+                  }
                 }}
-                onRequerentesChange={(requerentes) => {
-                  // Aqui você pode implementar a lógica para atualizar os requerentes do projeto
-                  console.log('Requerentes atualizados:', requerentes)
+                onRequerentesChange={async (requerentes) => {
+                  // Atualizar os requerentes do projeto (múltiplos)
+                  console.log('onRequerentesChange chamado com:', requerentes)
+                  await handleRequerenteSelect(requerentes)
+                  // Recarregar os dados do projeto após a atualização
+                  if (user) {
+                    buscarProjetos(user.id)
+                  }
                 }}
                 onContratanteAdd={handleContratanteAdd}
                 onRequerenteAdd={handleRequerenteAdd}

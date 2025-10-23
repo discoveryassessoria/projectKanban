@@ -52,5 +52,5 @@ export interface Projeto {
   status: Status[]
   atividades: Atividade[]
   contratante?: Contratante | null
-  requerente?: Requerente | null
+  requerentes?: { requerente: Requerente }[]
 }
