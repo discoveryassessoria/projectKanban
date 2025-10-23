@@ -5,70 +5,34 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-
-interface Projeto {
-  id: number
-  nome: string
-  descricao: string | null
-  _count?: {
-    atividades: number
-  }
-}
+import { useProjects, invalidateProjects } from "@/src/hooks/useActivitiesData"
+import type { Projeto } from "@/src/hooks/useActivitiesData"
 
 interface ListaProjectsProps {
   filters?: any
 }
 
 export default function ListaProjects({ filters }: ListaProjectsProps) {
-  const [projetos, setProjetos] = useState<Projeto[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Usar hooks de cache para buscar dados
+  const { projects = [], isLoading, error, mutate } = useProjects()
+  
   const [selectedItems, setSelectedItems] = useState<number[]>([])
   const [selectedAction, setSelectedAction] = useState<string>('')
   const [isActionLoading, setIsActionLoading] = useState(false)
 
-  useEffect(() => {
-    async function fetchProjects() {
-      try {
-        // Construir query string com filtros
-        const params = new URLSearchParams()
-        
-        if (filters) {
-          Object.entries(filters).forEach(([key, value]) => {
-            if (value && value !== '' && value !== 'all') {
-              params.append(key, value as string)
-            }
-          })
-        }
-        
-        const queryString = params.toString()
-        const url = `/api/projetos${queryString ? `?${queryString}` : ''}`
-        
-        const response = await fetch(url)
-        if (!response.ok) {
-          throw new Error('Erro ao carregar projetos')
-        }
-        const data = await response.json()
-        setProjetos(data.projetos || [])
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro desconhecido')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchProjects()
-  }, [JSON.stringify(filters)])
+  // Alias para manter compatibilidade com código existente
+  const projetos = projects
 
   const toggleSelectAll = () => {
     if (selectedItems.length === projetos.length) {
       setSelectedItems([])
     } else {
-      setSelectedItems(projetos.map(p => p.id))
+      setSelectedItems(projetos.map(p => p.id).filter((id): id is number => id !== undefined))
     }
   }
 
-  const toggleSelectItem = (id: number) => {
+  const toggleSelectItem = (id: number | undefined) => {
+    if (id === undefined) return
     setSelectedItems(prev => 
       prev.includes(id) 
         ? prev.filter(item => item !== id)
@@ -125,7 +89,8 @@ export default function ListaProjects({ filters }: ListaProjectsProps) {
       
       // Atualizar a lista removendo apenas os itens excluídos com sucesso
       if (successfulDeletes.length > 0) {
-        setProjetos(prev => prev.filter(projeto => !successfulDeletes.includes(projeto.id)))
+        // Invalidar cache para forçar recarregamento
+        invalidateProjects()
       }
       
       setSelectedItems([])
@@ -206,7 +171,7 @@ export default function ListaProjects({ filters }: ListaProjectsProps) {
                 <div className="col-span-1">
                   <input
                     type="checkbox"
-                    checked={selectedItems.includes(projeto.id)}
+                    checked={projeto.id ? selectedItems.includes(projeto.id) : false}
                     onChange={() => toggleSelectItem(projeto.id)}
                     className="rounded border-gray-300"
                   />

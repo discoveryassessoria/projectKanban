@@ -15,36 +15,11 @@ import ListaActivities from "@/src/components/activitiesComponents/listaActiviti
 import ListaProjects from "@/src/components/activitiesComponents/listaProjects"
 import PrazoActivities from "@/src/components/activitiesComponents/prazoActivities"
 import CalendarioActivities from "@/src/components/activitiesComponents/calendarioActivities"
-
-interface Usuario {
-  nome: string
-  email: string
-}
-
-interface Projeto {
-  id?: number
-  nome: string
-  descricao: string | null
-}
-
-interface Status {
-  id?: number
-  nome: string
-}
+import { useProjects, useStatuses, useUsers, useActivities, invalidateActivities, invalidateProjects } from "@/src/hooks/useActivitiesData"
+import type { Atividade, Projeto, Status, Usuario } from "@/src/hooks/useActivitiesData"
 
 interface UserAtv {
   usuario: Usuario
-}
-
-interface Atividade {
-  id: number
-  nome: string
-  descricao: string | null
-  data_termino: string | null
-  data_criacao: string
-  projeto: Projeto
-  status: Status
-  usuarios: UserAtv[]
 }
 
 interface FormData {
@@ -67,12 +42,6 @@ export default function ActivitiesPage() {
     status: 'all',
     responsavel: 'all'
   })
-  const [activitiesListKey, setActivitiesListKey] = useState(0)
-
-  const applyFiltersToList = () => {
-    // Força a re-renderização do ActivitiesList com os novos filtros
-    setActivitiesListKey(prev => prev + 1)
-  }
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
@@ -120,8 +89,9 @@ export default function ActivitiesPage() {
               </div>
             </div>
             
+            {/* Renderizar todos os conteúdos, mas controlar visibilidade via CSS */}
             <TabsContent value="list" className="space-y-4">
-              <ListaActivities key={activitiesListKey} filters={filters} />
+              <ListaActivities filters={filters} />
             </TabsContent>
             
             <TabsContent value="deadline" className="space-y-4">
@@ -165,7 +135,6 @@ export default function ActivitiesPage() {
         onOpenChange={setFilterModalOpen}
         filters={filters}
         setFilters={setFilters}
-        onApplyFilters={applyFiltersToList}
       />
     </div>
   )
@@ -175,63 +144,17 @@ function FilterModal({
   open, 
   onOpenChange, 
   filters, 
-  setFilters,
-  onApplyFilters 
+  setFilters
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   filters: any
   setFilters: (filters: any) => void
-  onApplyFilters: () => void
 }) {
-  const [projetos, setProjetos] = useState<Projeto[]>([])
-  const [statusList, setStatusList] = useState<Status[]>([])
-  const [usuarios, setUsuarios] = useState<Usuario[]>([])
-
-  // Carregar dados quando o modal abrir
-  useEffect(() => {
-    if (open) {
-      fetchProjetos()
-      fetchStatus()
-      fetchUsuarios()
-    }
-  }, [open])
-
-  const fetchProjetos = async () => {
-    try {
-      const response = await fetch('/api/projetos')
-      if (response.ok) {
-        const data = await response.json()
-        setProjetos(data.projetos || [])
-      }
-    } catch (error) {
-      console.error('Erro ao carregar projetos:', error)
-    }
-  }
-
-  const fetchStatus = async () => {
-    try {
-      const response = await fetch('/api/status')
-      if (response.ok) {
-        const data = await response.json()
-        setStatusList(data.status || [])
-      }
-    } catch (error) {
-      console.error('Erro ao carregar status:', error)
-    }
-  }
-
-  const fetchUsuarios = async () => {
-    try {
-      const response = await fetch('/api/usuarios')
-      if (response.ok) {
-        const data = await response.json()
-        setUsuarios(data)
-      }
-    } catch (error) {
-      console.error('Erro ao carregar usuários:', error)
-    }
-  }
+  // Usar hooks de cache para carregar dados
+  const { projects } = useProjects()
+  const { statuses } = useStatuses()
+  const { users } = useUsers()
 
   const handleFilterChange = (field: string, value: string) => {
     setFilters((prev: any) => ({
@@ -252,7 +175,7 @@ function FilterModal({
 
   const applyFilters = () => {
     onOpenChange(false)
-    onApplyFilters()
+    // Não precisa mais forçar re-render, o SWR vai detectar mudança de filtros automaticamente
   }
 
   const hasActiveFilters = Object.values(filters).some(filter => filter !== '' && filter !== 'all')
@@ -301,7 +224,7 @@ function FilterModal({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os projetos</SelectItem>
-                {projetos.map((projeto) => (
+                {projects.map((projeto) => (
                   <SelectItem key={projeto.id} value={projeto.id?.toString() || ''}>
                     {projeto.nome}
                   </SelectItem>
@@ -319,7 +242,7 @@ function FilterModal({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os status</SelectItem>
-                {statusList.map((status) => (
+                {statuses.map((status) => (
                   <SelectItem key={status.id} value={status.id?.toString() || ''}>
                     {status.nome}
                   </SelectItem>
@@ -337,7 +260,7 @@ function FilterModal({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os responsáveis</SelectItem>
-                {usuarios.map((usuario) => (
+                {users.map((usuario) => (
                   <SelectItem key={usuario.email} value={usuario.email}>
                     {usuario.nome}
                   </SelectItem>
@@ -387,45 +310,17 @@ function SearchModal({
   filteredActivities: Atividade[]
   setFilteredActivities: (activities: Atividade[]) => void
 }) {
-  const [isSearching, setIsSearching] = useState(false)
-  const [allActivities, setAllActivities] = useState<Atividade[]>([])
+  // Usar hook de cache para carregar todas as atividades
+  const { activities = [], isLoading: isSearching } = useActivities()
 
-  // Carregar todas as atividades quando o modal abrir
-  useEffect(() => {
-    if (open) {
-      fetchAllActivities()
-    }
-  }, [open])
-
-  // Filtrar atividades quando o termo de pesquisa mudar
-  useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setFilteredActivities(allActivities)
-    } else {
-      const filtered = allActivities.filter(atividade => 
+  // Calcular resultados filtrados diretamente (sem useEffect para evitar loops)
+  const searchResults = searchTerm.trim() === '' 
+    ? activities 
+    : activities.filter(atividade => 
         atividade.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
         atividade.descricao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         atividade.projeto.nome.toLowerCase().includes(searchTerm.toLowerCase())
       )
-      setFilteredActivities(filtered)
-    }
-  }, [searchTerm, allActivities, setFilteredActivities])
-
-  const fetchAllActivities = async () => {
-    setIsSearching(true)
-    try {
-      const response = await fetch('/api/activities')
-      if (response.ok) {
-        const data = await response.json()
-        setAllActivities(data)
-        setFilteredActivities(data)
-      }
-    } catch (error) {
-      console.error('Erro ao carregar atividades:', error)
-    } finally {
-      setIsSearching(false)
-    }
-  }
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Sem prazo'
@@ -440,7 +335,6 @@ function SearchModal({
 
   const handleClose = () => {
     setSearchTerm('')
-    setFilteredActivities([])
     onOpenChange(false)
   }
 
@@ -471,7 +365,7 @@ function SearchModal({
               <div className="p-4 text-center">
                 <p className="text-sm text-muted-foreground">Carregando atividades...</p>
               </div>
-            ) : filteredActivities.length === 0 ? (
+            ) : searchResults.length === 0 ? (
               <div className="p-4 text-center">
                 <p className="text-sm text-muted-foreground">
                   {searchTerm ? 'Nenhuma atividade encontrada' : 'Digite algo para pesquisar'}
@@ -491,7 +385,7 @@ function SearchModal({
                 </div>
                 
                 {/* Linhas dos resultados */}
-                {filteredActivities.map((atividade) => (
+                {searchResults.map((atividade) => (
                   <div key={atividade.id} className="px-4 py-3 hover:bg-muted/30 transition-colors">
                     <div className="grid grid-cols-12 gap-2 items-center">
                       <div className="col-span-4">
@@ -536,12 +430,12 @@ function SearchModal({
           </div>
 
           {/* Rodapé com informações */}
-          {filteredActivities.length > 0 && (
+          {searchResults.length > 0 && (
             <div className="text-sm text-muted-foreground text-center">
               {searchTerm ? (
-                <span>Encontradas {filteredActivities.length} atividade(s) para "{searchTerm}"</span>
+                <span>Encontradas {searchResults.length} atividade(s) para "{searchTerm}"</span>
               ) : (
-                <span>Total: {filteredActivities.length} atividade(s)</span>
+                <span>Total: {searchResults.length} atividade(s)</span>
               )}
             </div>
           )}
@@ -560,8 +454,6 @@ function SearchModal({
 function CreateActivityModal() {
   const [open, setOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [projetos, setProjetos] = useState<Projeto[]>([])
-  const [status, setStatus] = useState<Status[]>([])
   const [formData, setFormData] = useState<FormData>({
     nome: '',
     descricao: '',
@@ -570,39 +462,9 @@ function CreateActivityModal() {
     status_id: ''
   })
 
-  // Carregar projetos e status quando o modal abrir
-  useEffect(() => {
-    if (open) {
-      fetchProjetos()
-      fetchStatus()
-    }
-  }, [open])
-
-  const fetchProjetos = async () => {
-    try {
-      // Você precisará criar esta API
-      const response = await fetch('/api/projetos')
-      if (response.ok) {
-        const data = await response.json()
-        setProjetos(data.projetos || [])
-      }
-    } catch (error) {
-      console.error('Erro ao carregar projetos:', error)
-    }
-  }
-
-  const fetchStatus = async () => {
-    try {
-      // Você precisará criar esta API
-      const response = await fetch('/api/status')
-      if (response.ok) {
-        const data = await response.json()
-        setStatus(data.status || [])
-      }
-    } catch (error) {
-      console.error('Erro ao carregar status:', error)
-    }
-  }
+  // Usar hooks de cache para carregar dados
+  const { projects } = useProjects()
+  const { statuses } = useStatuses()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -633,8 +495,8 @@ function CreateActivityModal() {
           status_id: ''
         })
         setOpen(false)
-        // Recarregar a página ou atualizar a lista
-        window.location.reload()
+        // Invalidar cache de atividades para recarregar
+        invalidateActivities()
       } else {
         console.error('Erro ao criar atividade')
       }
@@ -704,7 +566,7 @@ function CreateActivityModal() {
                 <SelectValue placeholder="Selecione um projeto" />
               </SelectTrigger>
               <SelectContent>
-                {projetos.map((projeto) => (
+                {projects.map((projeto) => (
                   <SelectItem key={projeto.id} value={projeto.id?.toString() || ''}>
                     {projeto.nome}
                   </SelectItem>
@@ -720,7 +582,7 @@ function CreateActivityModal() {
                 <SelectValue placeholder="Selecione um status" />
               </SelectTrigger>
               <SelectContent>
-                {status.map((st) => (
+                {statuses.map((st) => (
                   <SelectItem key={st.id} value={st.id?.toString() || ''}>
                     {st.nome}
                   </SelectItem>
@@ -774,8 +636,8 @@ function CreateProjectModal() {
           descricao: ''
         })
         setOpen(false)
-        // Recarregar a página ou atualizar a lista
-        window.location.reload()
+        // Invalidar cache de projetos para recarregar
+        invalidateProjects()
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }))
         alert(`Erro ao criar projeto: ${errorData.error || 'Erro desconhecido'}`)
