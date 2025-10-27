@@ -48,12 +48,21 @@ export function AtividadeDetailsModal({
   onContratanteView,
   onRequerenteView
 }: AtividadeDetailsModalProps) {
+  console.log('=== AtividadeDetailsModal RENDER ===')
+  console.log('isOpen:', isOpen)
+  console.log('selectedContratantes recebido:', selectedContratantes)
+  console.log('selectedRequerentes recebido:', selectedRequerentes)
+  
   const [nome, setNome] = useState("")
   const [descricao, setDescricao] = useState("")
   const [usuarioId, setUsuarioId] = useState<number | null>(null)
   const [usuarioNome, setUsuarioNome] = useState("")
   const [dataTermino, setDataTermino] = useState<Date | undefined>(undefined)
   const [isSaving, setIsSaving] = useState(false)
+  
+  // Estados locais para contratantes e requerentes - inicializados com props
+  const [localSelectedContratantes, setLocalSelectedContratantes] = useState<Contratante[]>(selectedContratantes)
+  const [localSelectedRequerentes, setLocalSelectedRequerentes] = useState<Requerente[]>(selectedRequerentes)
 
   const handleUserSelect = async (selectedUserId: number | null) => {
     setUsuarioId(selectedUserId)
@@ -100,6 +109,19 @@ export function AtividadeDetailsModal({
       setDataTermino(atividade.data_termino ? new Date(atividade.data_termino) : undefined)
     }
   }, [atividade])
+
+  // Sincronizar estados locais com props quando mudarem
+  useEffect(() => {
+    console.log('selectedContratantes mudou:', selectedContratantes)
+    setLocalSelectedContratantes(selectedContratantes)
+    console.log('localSelectedContratantes atualizado para:', selectedContratantes)
+  }, [selectedContratantes])
+
+  useEffect(() => {
+    console.log('selectedRequerentes mudou:', selectedRequerentes)
+    setLocalSelectedRequerentes(selectedRequerentes)
+    console.log('localSelectedRequerentes atualizado para:', selectedRequerentes)
+  }, [selectedRequerentes])
 
   if (!atividade) return null
 
@@ -148,10 +170,12 @@ export function AtividadeDetailsModal({
                 </div>
                 <ContratanteSelector
                   contratantes={contratantes}
-                  selectedContratante={selectedContratantes && selectedContratantes.length > 0 ? selectedContratantes[0] : null}
+                  selectedContratante={localSelectedContratantes && localSelectedContratantes.length > 0 ? localSelectedContratantes[0] : null}
                   onSelect={(contratante) => {
                     console.log('ContratanteSelector onSelect chamado:', contratante)
-                    onContratantesChange?.(contratante ? [contratante] : [])
+                    const newSelection = contratante ? [contratante] : []
+                    setLocalSelectedContratantes(newSelection)
+                    onContratantesChange?.(newSelection)
                   }}
                   onAdd={onContratanteAdd}
                   onView={onContratanteView}
@@ -168,9 +192,10 @@ export function AtividadeDetailsModal({
                 </div>
                 <RequerenteSelector
                   requerentes={requerentes}
-                  selectedRequerentes={selectedRequerentes}
+                  selectedRequerentes={localSelectedRequerentes}
                   onSelectMultiple={(requerentes) => {
                     console.log('RequerenteSelector onSelectMultiple chamado:', requerentes)
+                    setLocalSelectedRequerentes(requerentes)
                     onRequerentesChange?.(requerentes)
                   }}
                   onAdd={onRequerenteAdd}

@@ -212,6 +212,65 @@ export function invalidateUsers() {
   mutate('/api/usuarios')
 }
 
+/**
+ * Hook para buscar contratantes
+ */
+export function useContratantes() {
+  const { data, error, isLoading, mutate: revalidate } = useSWR(
+    '/api/contratantes',
+    fetcher,
+    swrConfig
+  )
+  
+  return {
+    contratantes: data?.contratantes || [],
+    isLoading,
+    error: error?.message,
+    mutate: revalidate
+  }
+}
+
+/**
+ * Hook para buscar requerentes
+ */
+export function useRequerentes() {
+  const { data, error, isLoading, mutate: revalidate } = useSWR(
+    '/api/requerentes',
+    fetcher,
+    swrConfig
+  )
+  
+  return {
+    requerentes: data?.requerentes || [],
+    isLoading,
+    error: error?.message,
+    mutate: revalidate
+  }
+}
+
+/**
+ * Hook para buscar dados de um projeto específico
+ */
+export function useProject(projectId: number | null | undefined) {
+  const { data, error, isLoading, mutate: revalidate } = useSWR(
+    projectId ? `/api/projetos/${projectId}` : null,
+    fetcher,
+    swrConfig
+  )
+  
+  return {
+    project: data || null,
+    isLoading,
+    error: error?.message,
+    mutate: revalidate
+  }
+}
+
+// Invalidar cache de um projeto específico
+export function invalidateProject(projectId: number) {
+  mutate(`/api/projetos/${projectId}`, undefined, { revalidate: true })
+}
+
 // Invalidar tudo
 export function invalidateAll() {
   invalidateActivities()

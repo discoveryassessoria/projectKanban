@@ -17,10 +17,13 @@ export async function GET(
 
     const projeto = await prisma.projetoKanban.findUnique({
       where: { id },
-      select: {
-        id: true,
-        nome: true,
-        descricao: true,
+      include: {
+        contratante: true,
+        requerentes: {
+          include: {
+            requerente: true
+          }
+        },
         _count: {
           select: {
             atividades: true
