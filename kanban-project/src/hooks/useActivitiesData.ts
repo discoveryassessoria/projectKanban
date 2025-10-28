@@ -85,7 +85,7 @@ export function useActivities(filters?: any) {
   return {
     activities: data,
     isLoading,
-    error,
+    error: error?.message,
     revalidate,
     mutate: revalidate // Alias para compatibilidade
   }
@@ -104,7 +104,7 @@ export function useProjects() {
   return {
     projects: data?.projetos || [],
     isLoading,
-    error,
+    error: error?.message,
     revalidate,
     mutate: revalidate
   }
@@ -123,7 +123,7 @@ export function useStatuses() {
   return {
     statuses: data?.status || [],
     isLoading,
-    error,
+    error: error?.message,
     revalidate,
     mutate: revalidate
   }
@@ -142,7 +142,7 @@ export function useUsers() {
   return {
     users: data || [],
     isLoading,
-    error,
+    error: error?.message,
     revalidate,
     mutate: revalidate
   }
@@ -163,7 +163,7 @@ export function useCalendarData(year: number, month: number) {
   return {
     calendarData: data || [],
     isLoading,
-    error,
+    error: error?.message,
     revalidate
   }
 }
@@ -183,7 +183,7 @@ export function useDayData(date: string | null, enabled = true) {
   return {
     dayData: data,
     isLoading,
-    error,
+    error: error?.message,
     revalidate
   }
 }

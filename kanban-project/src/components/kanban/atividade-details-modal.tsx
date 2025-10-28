@@ -22,25 +22,6 @@ interface AtividadeDetailsModalProps {
 }
 
 export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: AtividadeDetailsModalProps) {
-  atividade, 
-  isOpen, 
-  onClose, 
-  onSave,
-  contratantes = [],
-  requerentes = [],
-  selectedContratantes = [],
-  selectedRequerentes = [],
-  onContratantesChange,
-  onRequerentesChange,
-  onContratanteAdd,
-  onRequerenteAdd,
-  onContratanteView,
-  onRequerenteView
-}: AtividadeDetailsModalProps) {
-  console.log('=== AtividadeDetailsModal RENDER ===')
-  console.log('isOpen:', isOpen)
-  console.log('selectedContratantes recebido:', selectedContratantes)
-  console.log('selectedRequerentes recebido:', selectedRequerentes)
   const [nome, setNome] = useState("")
   const [descricao, setDescricao] = useState("")
   const [usuarioId, setUsuarioId] = useState<number | null>(null)
@@ -48,10 +29,6 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
   const [dataTermino, setDataTermino] = useState<Date | undefined>(undefined)
   const [arvore_id, setArvore_id] = useState<number | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  
-  // Estados locais para contratantes e requerentes - inicializados com props
-  const [localSelectedContratantes, setLocalSelectedContratantes] = useState<Contratante[]>(selectedContratantes)
-  const [localSelectedRequerentes, setLocalSelectedRequerentes] = useState<Requerente[]>(selectedRequerentes)
 
   useEffect(() => {
     if (atividade) {
@@ -72,19 +49,6 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
       setDataTermino(atividade.data_termino ? new Date(atividade.data_termino) : undefined)
     }
   }, [atividade])
-
-  // Sincronizar estados locais com props quando mudarem
-  useEffect(() => {
-    console.log('selectedContratantes mudou:', selectedContratantes)
-    setLocalSelectedContratantes(selectedContratantes)
-    console.log('localSelectedContratantes atualizado para:', selectedContratantes)
-  }, [selectedContratantes])
-
-  useEffect(() => {
-    console.log('selectedRequerentes mudou:', selectedRequerentes)
-    setLocalSelectedRequerentes(selectedRequerentes)
-    console.log('localSelectedRequerentes atualizado para:', selectedRequerentes)
-  }, [selectedRequerentes])
 
   if (!atividade) return null
 
@@ -124,52 +88,6 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
               <DialogTitle className="text-2xl font-bold text-gray-900">Editar Atividade</DialogTitle>
               <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white">{atividade.status.nome}</Badge>
             </div>
-            
-            {/* Seção de Contratante e Requerente */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-700">Contratante do Projeto</span>
-                </div>
-                <ContratanteSelector
-                  contratantes={contratantes}
-                  selectedContratante={localSelectedContratantes && localSelectedContratantes.length > 0 ? localSelectedContratantes[0] : null}
-                  onSelect={(contratante) => {
-                    console.log('ContratanteSelector onSelect chamado:', contratante)
-                    const newSelection = contratante ? [contratante] : []
-                    setLocalSelectedContratantes(newSelection)
-                    onContratantesChange?.(newSelection)
-                  }}
-                  onAdd={onContratanteAdd}
-                  onView={onContratanteView}
-                  placeholder="Selecionar contratante..."
-                  className="w-full"
-                  mode="single"
-                />
-              </div>
-              
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-700">Requerentes do Projeto</span>
-                </div>
-                <RequerenteSelector
-                  requerentes={requerentes}
-                  selectedRequerentes={localSelectedRequerentes}
-                  onSelectMultiple={(requerentes) => {
-                    console.log('RequerenteSelector onSelectMultiple chamado:', requerentes)
-                    setLocalSelectedRequerentes(requerentes)
-                    onRequerentesChange?.(requerentes)
-                  }}
-                  onAdd={onRequerenteAdd}
-                  onView={onRequerenteView}
-                  placeholder="Selecionar requerentes..."
-                  className="w-full"
-                  mode="checkbox"
-                />
-              </div>
-            </div>
           </div>
           <DialogDescription className="text-gray-600">Atualize os detalhes da atividade</DialogDescription>
         </DialogHeader>
@@ -178,7 +96,6 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">Status:</span>
             <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white">{atividade.status.nome}</Badge>
-          </div>
           </div>
 
           <div className="space-y-2">
@@ -257,6 +174,7 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
                 </Link>
               )}
             </div>
+          </div>
 
           {/* Tags - read only for now */}
           {atividade.tags && atividade.tags.length > 0 && (

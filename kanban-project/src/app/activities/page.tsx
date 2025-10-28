@@ -105,7 +105,6 @@ export default function ActivitiesPage() {
         </TabsContent>
         
         <TabsContent value="projects" className="space-y-4">
-          {/* Header para a seção de projetos */}
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-medium">Projetos</h3>
