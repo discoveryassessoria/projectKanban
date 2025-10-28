@@ -129,7 +129,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { nome, descricao, contratanteId, requerenteId } = body
+    const { nome, descricao, contratanteId, requerenteIds } = body
 
     // Preparar objeto de atualização
     const updateData: any = {}
@@ -156,10 +156,6 @@ export async function PATCH(
       updateData.contratanteId = contratanteId
     }
 
-    if (requerenteId !== undefined) {
-      updateData.requerenteId = requerenteId
-    }
-
     // Verificar se o projeto existe
     const projetoExistente = await prisma.projetoKanban.findUnique({
       where: { id }
@@ -169,19 +165,49 @@ export async function PATCH(
       return NextResponse.json({ error: 'Projeto não encontrado' }, { status: 404 })
     }
 
-    // Atualizar o projeto
-    const projetoAtualizado = await prisma.projetoKanban.update({
-      where: { id },
-      data: updateData,
-      include: {
-        contratante: true,
-        requerente: true,
-        _count: {
-          select: {
-            atividades: true
-          }
+    // Usar transação para atualizar projeto e requerentes
+    const projetoAtualizado = await prisma.$transaction(async (tx) => {
+      // Atualizar dados básicos do projeto
+      const projeto = await tx.projetoKanban.update({
+        where: { id },
+        data: updateData
+      })
+
+      // Se requerenteIds foi fornecido, atualizar os requerentes
+      if (requerenteIds !== undefined) {
+        // Remover todas as associações existentes
+        await tx.projetoRequerente.deleteMany({
+          where: { projetoId: id }
+        })
+
+        // Criar novas associações
+        if (Array.isArray(requerenteIds) && requerenteIds.length > 0) {
+          await tx.projetoRequerente.createMany({
+            data: requerenteIds.map((requerenteId: number) => ({
+              projetoId: id,
+              requerenteId: requerenteId
+            }))
+          })
         }
       }
+
+      // Buscar projeto atualizado com relações
+      return await tx.projetoKanban.findUnique({
+        where: { id },
+        include: {
+          contratante: true,
+          requerentes: {
+            include: {
+              requerente: true
+            }
+          },
+          _count: {
+            select: {
+              atividades: true
+            }
+          }
+        }
+      })
     })
 
     return NextResponse.json(projetoAtualizado)

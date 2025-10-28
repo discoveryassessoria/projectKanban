@@ -21,7 +21,7 @@ import { Plus, Trash2 } from "lucide-react"
 import { KanbanColumn } from "./kanban/kanban-column"
 import { KanbanCard } from "./kanban/kanban-card"
 import { AtividadeDetailsModal } from "./kanban/atividade-details-modal"
-import type { Atividade, AtividadeWithStatus, Projeto } from "@/src/types/kanban"
+import type { Atividade, AtividadeWithStatus, Projeto, Contratante, Requerente } from "@/src/types/kanban"
 
 interface Status {
   id: number
@@ -31,9 +31,33 @@ interface Status {
 interface KanbanBoardProps {
   projeto: Projeto
   onStatusAdd: () => void
+  // Props para contratantes e requerentes
+  contratantes?: Contratante[]
+  requerentes?: Requerente[]
+  selectedContratantes?: Contratante[]
+  selectedRequerentes?: Requerente[]
+  onContratantesChange?: (contratantes: Contratante[]) => void
+  onRequerentesChange?: (requerentes: Requerente[]) => void
+  onContratanteAdd?: () => void
+  onRequerenteAdd?: () => void
+  onContratanteView?: (contratante: Contratante) => void
+  onRequerenteView?: (requerente: Requerente) => void
 }
 
-export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
+export function KanbanBoard({ 
+  projeto, 
+  onStatusAdd,
+  contratantes = [],
+  requerentes = [],
+  selectedContratantes = [],
+  selectedRequerentes = [],
+  onContratantesChange,
+  onRequerentesChange,
+  onContratanteAdd,
+  onRequerenteAdd,
+  onContratanteView,
+  onRequerenteView
+}: KanbanBoardProps) {
   const [atividades, setAtividades] = useState<AtividadeWithStatus[]>([])
   const [newStatusName, setNewStatusName] = useState("")
   const [isAddingStatus, setIsAddingStatus] = useState(false)
@@ -436,6 +460,16 @@ export function KanbanBoard({ projeto, onStatusAdd }: KanbanBoardProps) {
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
         onSave={handleAtividadeSave}
+        contratantes={contratantes}
+        requerentes={requerentes}
+        selectedContratantes={selectedContratantes}
+        selectedRequerentes={selectedRequerentes}
+        onContratantesChange={onContratantesChange}
+        onRequerentesChange={onRequerentesChange}
+        onContratanteAdd={onContratanteAdd}
+        onRequerenteAdd={onRequerenteAdd}
+        onContratanteView={onContratanteView}
+        onRequerenteView={onRequerenteView}
       />
     </>
   )

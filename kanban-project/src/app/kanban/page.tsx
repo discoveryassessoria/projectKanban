@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation"
 import { getStoredUser, isAuthenticated } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { ProjectSelector } from "@/components/ui/project-selector"
-import { ContratanteSelector } from "@/components/ui/contratante-selector"
-import { RequerenteSelector } from "@/components/ui/requerente-selector"
 import { KanbanIcon, Trash2, Sparkles, Plus, Info } from "lucide-react"
 import ModalNovoProjeto from "@/src/components/kanban/modal-novo-projeto"
 import { KanbanBoard } from "@/src/components/kanban"
@@ -265,37 +263,41 @@ export default function KanbanPage() {
     })
   }
 
-  const handleRequerenteSelect = async (requerente: Requerente | null) => {
+  const handleRequerenteSelect = async (requerentes: Requerente[]) => {
     if (!projetoSelecionado) return
 
     try {
+      const requerenteIds = requerentes.map(r => r.id)
+      
       const response = await fetch(`/api/projetos/${projetoSelecionado.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          requerenteId: requerente?.id || null 
+          requerenteIds: requerenteIds
         }),
       })
 
       if (response.ok) {
+        const projetoAtualizado = await response.json()
+        
         // Atualizar o projeto local
         setProjetoSelecionado(prev => prev ? {
           ...prev,
-          requerente: requerente
+          requerentes: projetoAtualizado.requerentes
         } : null)
 
         // Atualizar a lista de projetos
         setProjetos(prev => prev.map(p => 
           p.id === projetoSelecionado.id 
-            ? { ...p, requerente: requerente }
+            ? { ...p, requerentes: projetoAtualizado.requerentes }
             : p
         ))
       } else {
-        throw new Error("Falha ao atualizar requerente do projeto")
+        throw new Error("Falha ao atualizar requerentes do projeto")
       }
     } catch (error) {
-      console.error("Erro ao associar requerente:", error)
-      alert("Erro ao associar requerente ao projeto.")
+      console.error("Erro ao associar requerentes:", error)
+      alert("Erro ao associar requerentes ao projeto.")
     }
   }
 
@@ -403,35 +405,6 @@ export default function KanbanPage() {
                 </TooltipProvider>
               )}
             </div>
-
-            {/* Seletores de Contratante e Requerente */}
-            {projetoSelecionado && (
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex flex-col">
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Contratante</span>
-                  <ContratanteSelector
-                    contratantes={contratantes}
-                    selectedContratante={projetoSelecionado.contratante || null}
-                    onSelect={handleContratanteSelect}
-                    onAdd={handleContratanteAdd}
-                    onView={handleContratanteView}
-                    className="w-[180px]"
-                  />
-                </div>
-                
-                <div className="flex flex-col">
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Requerente</span>
-                  <RequerenteSelector
-                    requerentes={requerentes}
-                    selectedRequerente={projetoSelecionado.requerente || null}
-                    onSelect={handleRequerenteSelect}
-                    onAdd={handleRequerenteAdd}
-                    onView={handleRequerenteView}
-                    className="w-[180px]"
-                  />
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -441,7 +414,37 @@ export default function KanbanPage() {
         <div className="space-y-4">
           <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-sm">
             <div className="p-6">
-              <KanbanBoard projeto={projetoSelecionado} onStatusAdd={handleStatusAdd} />
+              <KanbanBoard 
+                projeto={projetoSelecionado} 
+                onStatusAdd={handleStatusAdd}
+                contratantes={contratantes}
+                requerentes={requerentes}
+                selectedContratantes={projetoSelecionado.contratante ? [projetoSelecionado.contratante] : []}
+                selectedRequerentes={projetoSelecionado.requerentes?.map(r => r.requerente) || []}
+                onContratantesChange={async (contratantes) => {
+                  // Atualizar o contratante do projeto (apenas um)
+                  console.log('onContratantesChange chamado com:', contratantes)
+                  const contratante = contratantes.length > 0 ? contratantes[0] : null
+                  await handleContratanteSelect(contratante)
+                  // Recarregar os dados do projeto após a atualização
+                  if (user) {
+                    buscarProjetos(user.id)
+                  }
+                }}
+                onRequerentesChange={async (requerentes) => {
+                  // Atualizar os requerentes do projeto (múltiplos)
+                  console.log('onRequerentesChange chamado com:', requerentes)
+                  await handleRequerenteSelect(requerentes)
+                  // Recarregar os dados do projeto após a atualização
+                  if (user) {
+                    buscarProjetos(user.id)
+                  }
+                }}
+                onContratanteAdd={handleContratanteAdd}
+                onRequerenteAdd={handleRequerenteAdd}
+                onContratanteView={handleContratanteView}
+                onRequerenteView={handleRequerenteView}
+              />
             </div>
           </div>
         </div>

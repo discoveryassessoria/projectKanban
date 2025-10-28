@@ -73,7 +73,7 @@ export async function PUT(request: NextRequest, context: { params: { atividadeId
 
 export async function DELETE(request: NextRequest, { params }: { params: { atividadeId: string } }) {
   try {
-    const { atividadeId } = params
+    const { atividadeId } = await params
 
     await prisma.atividade.delete({
       where: {
