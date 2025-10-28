@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge"
 import { Clock, Calendar as CalendarIcon, User } from "lucide-react"
 import { useCalendarData, useDayData } from "@/src/hooks/useActivitiesData"
+import { AtividadeDetailsModal } from "@/src/components/kanban/atividade-details-modal"
+import type { Atividade } from "@/src/hooks/useActivitiesData"
 
 interface CalendarActivity {
   date: string // YYYY-MM-DD
@@ -43,6 +45,10 @@ export default function CalendarioActivities() {
   // Estados para o modal
   const [modalOpen, setModalOpen] = useState(false)
   
+  // Estados para o modal de detalhes da atividade
+  const [selectedAtividade, setSelectedAtividade] = useState<Atividade | null>(null)
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  
   // Usar hooks de cache para buscar dados do calendário
   const year = value.getFullYear()
   const month = value.getMonth() + 1
@@ -50,6 +56,27 @@ export default function CalendarioActivities() {
   
   // Buscar dados do dia selecionado apenas quando o modal estiver aberto
   const { dayData, isLoading: isLoadingDay } = useDayData(selectedDate, modalOpen)
+
+  // Handler para clicar em uma atividade e abrir o modal de detalhes
+  const handleActivityClick = async (activityId: number) => {
+    try {
+      // Buscar dados completos da atividade
+      const response = await fetch(`/api/activities/${activityId}`)
+      if (response.ok) {
+        const activity = await response.json()
+        setSelectedAtividade(activity)
+        setIsDetailsModalOpen(true)
+      }
+    } catch (error) {
+      console.error("Erro ao buscar atividade:", error)
+    }
+  }
+
+  const handleAtividadeSave = () => {
+    // Revalidar dados do calendário após salvar
+    setIsDetailsModalOpen(false)
+    // O useDayData já vai revalidar automaticamente quando o modal de dia reabrir
+  }
 
   // Função para lidar com clique em um dia
   const handleDayClick = (date: Date) => {
@@ -243,9 +270,13 @@ export default function CalendarioActivities() {
                   <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-border"></div>
                   
                   {dayData.activities.map((activity: any, index: number) => (
-                    <div key={`${activity.id}-${activity.tipo_evento}-${index}`} className="relative flex items-start space-x-4 pb-4">
+                    <div 
+                      key={`${activity.id}-${activity.tipo_evento}-${index}`} 
+                      className="relative flex items-start space-x-4 pb-4 cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => handleActivityClick(activity.id)}
+                    >
                       {/* Indicador de tempo */}
-                      <div className={`relative z-10 flex-shrink-0 w-16 h-16 rounded-full border-4 border-background flex items-center justify-center text-xs font-bold ${
+                      <div className={`relative z-10 shrink-0 w-16 h-16 rounded-full border-4 border-background flex items-center justify-center text-xs font-bold ${
                         activity.tipo_evento === 'criacao' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
                       }`}>
                         <div className="text-center">
@@ -321,6 +352,13 @@ export default function CalendarioActivities() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AtividadeDetailsModal
+        atividade={selectedAtividade as any}
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        onSave={handleAtividadeSave}
+      />
     </div>
   )
 }

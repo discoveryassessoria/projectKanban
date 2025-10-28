@@ -1,12 +1,14 @@
 ﻿"use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useActivities, useStatuses, invalidateActivities } from "@/src/hooks/useActivitiesData"
+import { useActivities, useStatuses, useContratantes, useRequerentes, useProject, invalidateActivities, invalidateProject } from "@/src/hooks/useActivitiesData"
 import type { Atividade, Status, Usuario, Projeto } from "@/src/hooks/useActivitiesData"
+import { AtividadeDetailsModal } from "@/src/components/kanban/atividade-details-modal"
+import type { Contratante, Requerente } from "@/src/types/kanban"
 
 interface UserAtv {
   usuario: Usuario
@@ -20,11 +22,57 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   // Usar hooks de cache para buscar dados
   const { activities = [], isLoading, error, mutate } = useActivities(filters)
   const { statuses = [] } = useStatuses()
+  const { contratantes = [] } = useContratantes()
+  const { requerentes = [] } = useRequerentes()
   
   const [selectedItems, setSelectedItems] = useState<number[]>([])
   const [selectedAction, setSelectedAction] = useState<string>('')
   const [selectedStatus, setSelectedStatus] = useState<string>('')
   const [isActionLoading, setIsActionLoading] = useState(false)
+  const [selectedAtividade, setSelectedAtividade] = useState<Atividade | null>(null)
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  
+  // Buscar projeto da atividade selecionada
+  const { project: selectedProject, mutate: mutateProject, isLoading: isLoadingProject } = useProject(selectedAtividade?.projeto?.id)
+
+  // Revalidar projeto quando o modal abrir
+  useEffect(() => {
+    console.log('=== useEffect Modal ===')
+    console.log('isDetailsModalOpen:', isDetailsModalOpen)
+    console.log('selectedAtividade?.projeto?.id:', selectedAtividade?.projeto?.id)
+    console.log('selectedProject atual:', selectedProject)
+    console.log('isLoadingProject:', isLoadingProject)
+    
+    if (isDetailsModalOpen && selectedAtividade?.projeto?.id) {
+      console.log('Revalidando projeto:', selectedAtividade.projeto.id)
+      mutateProject(undefined, { revalidate: true })
+    }
+  }, [isDetailsModalOpen, selectedAtividade?.projeto?.id, mutateProject, isLoadingProject])
+
+  // Debug: Log do projeto quando ele mudar
+  useEffect(() => {
+    if (selectedProject) {
+      console.log('selectedProject atualizado:', {
+        id: selectedProject.id,
+        nome: selectedProject.nome,
+        contratante: selectedProject.contratante,
+        requerentes: selectedProject.requerentes
+      })
+    }
+  }, [selectedProject])
+
+  // Memoizar contratantes e requerentes selecionados
+  const memoizedSelectedContratantes = useMemo(() => {
+    const result = selectedProject?.contratante ? [selectedProject.contratante] : []
+    console.log('=== memoizedSelectedContratantes ===', result)
+    return result
+  }, [selectedProject?.contratante])
+
+  const memoizedSelectedRequerentes = useMemo(() => {
+    const result = selectedProject?.requerentes?.map((r: any) => r.requerente) || []
+    console.log('=== memoizedSelectedRequerentes ===', result)
+    return result
+  }, [selectedProject?.requerentes])
 
   // Alias para manter compatibilidade com código existente
   const atividades = activities
@@ -219,6 +267,21 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
     }
   }
 
+  const handleAtividadeClick = (atividade: Atividade) => {
+    console.log('=== handleAtividadeClick ===')
+    console.log('Atividade clicada:', atividade)
+    console.log('atividade.projeto:', atividade.projeto)
+    console.log('atividade.projeto?.id:', atividade.projeto?.id)
+    setSelectedAtividade(atividade)
+    setIsDetailsModalOpen(true)
+  }
+
+  const handleAtividadeSave = () => {
+    // Revalidar dados após salvar
+    mutate()
+    setIsDetailsModalOpen(false)
+  }
+
   if (isLoading) {
     return (
       <div className="border rounded-lg">
@@ -276,7 +339,8 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
           atividades.filter((atividade: Atividade) => atividade && atividade.nome).map((atividade: Atividade) => (
             <div
               key={atividade.id}
-              className="px-4 py-3 hover:bg-gray-50 transition-colors bg-white"
+              className="px-4 py-3 hover:bg-gray-50 transition-colors bg-white cursor-pointer"
+              onClick={() => handleAtividadeClick(atividade)}
             >
               <div className="grid grid-cols-12 gap-4 items-center text-gray-900">
                 <div className="col-span-1">
@@ -284,6 +348,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                     type="checkbox"
                     checked={selectedItems.includes(atividade.id)}
                     onChange={() => toggleSelectItem(atividade.id)}
+                    onClick={(e) => e.stopPropagation()}
                     className="rounded border-gray-300"
                   />
                 </div>
@@ -412,6 +477,63 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
           </div>
         </div>
       </div>
+
+      <AtividadeDetailsModal
+        atividade={selectedAtividade as any}
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        onSave={handleAtividadeSave}
+        contratantes={contratantes}
+        requerentes={requerentes}
+        selectedContratantes={memoizedSelectedContratantes}
+        selectedRequerentes={memoizedSelectedRequerentes}
+        onContratantesChange={async (contratantes) => {
+          // Atualizar contratante do projeto
+          if (selectedProject) {
+            try {
+              const response = await fetch(`/api/projetos/${selectedProject.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                  contratanteId: contratantes.length > 0 ? contratantes[0].id : null 
+                }),
+              })
+              if (response.ok) {
+                // Revalidar dados do projeto
+                if (selectedProject?.id) {
+                  invalidateProject(selectedProject.id)
+                }
+                mutate()
+              }
+            } catch (error) {
+              console.error("Erro ao atualizar contratante:", error)
+            }
+          }
+        }}
+        onRequerentesChange={async (requerentes) => {
+          // Atualizar requerentes do projeto
+          if (selectedProject) {
+            try {
+              const response = await fetch(`/api/projetos/${selectedProject.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                  requerenteIds: requerentes.map(r => r.id)
+                }),
+              })
+              if (response.ok) {
+                // Revalidar dados do projeto
+                if (selectedProject?.id) {
+                  invalidateProject(selectedProject.id)
+                }
+                mutate()
+              }
+            } catch (error) {
+              console.error("Erro ao atualizar requerentes:", error)
+            }
+          }
+        }}
+      />
     </div>
   )
 }

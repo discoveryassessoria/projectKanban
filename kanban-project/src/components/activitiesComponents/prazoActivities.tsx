@@ -35,8 +35,10 @@ import DroppableColumn from "./DroppableColumn"
 import QuickAddModal, { QuickAddFormData } from "./QuickAddModal"
 import { useActivityOperations } from "@/src/hooks/useActivityOperations"
 import { useQuickAddActivity } from "@/src/hooks/useQuickAddActivity"
-import { useActivities, invalidateActivities } from "@/src/hooks/useActivitiesData"
+import { useActivities, useContratantes, useRequerentes, useProject, invalidateActivities, invalidateProject } from "@/src/hooks/useActivitiesData"
 import type { Atividade, Usuario, Projeto, Status } from "@/src/hooks/useActivitiesData"
+import { AtividadeDetailsModal } from "@/src/components/kanban/atividade-details-modal"
+import type { Contratante, Requerente } from "@/src/types/kanban"
 import "@/src/styles/kanban.css"
 
 interface UserAtv {
@@ -46,9 +48,23 @@ interface UserAtv {
 export default function PrazoActivities() {
   // Usar hook de cache para buscar todas as atividades
   const { activities = [], isLoading, error, mutate } = useActivities()
+  const { contratantes = [] } = useContratantes()
+  const { requerentes = [] } = useRequerentes()
   
   const [selectedActivity, setSelectedActivity] = useState<Atividade | null>(null)
   const [activeTab, setActiveTab] = useState("kanban")
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  
+  // Buscar projeto da atividade selecionada
+  const { project: selectedProject, mutate: mutateProject } = useProject(selectedActivity?.projeto?.id)
+  
+  // Revalidar projeto quando o modal abrir
+  useEffect(() => {
+    if (isDetailsModalOpen && selectedActivity?.projeto?.id) {
+      console.log('Modal aberto, revalidando projeto:', selectedActivity.projeto.id)
+      mutateProject(undefined, { revalidate: true })
+    }
+  }, [isDetailsModalOpen, selectedActivity?.projeto?.id, mutateProject])
   
   // Alias para manter compatibilidade com código existente
   const atividades = activities
@@ -94,8 +110,13 @@ export default function PrazoActivities() {
 
   const handleActivityClick = (activity: Atividade) => {
     setSelectedActivity(activity)
-    // Aqui você pode implementar um modal ou drawer para mostrar detalhes
-    console.log('Activity clicked:', activity)
+    setIsDetailsModalOpen(true)
+  }
+
+  const handleAtividadeSave = () => {
+    // Revalidar cache após salvar
+    mutate()
+    setIsDetailsModalOpen(false)
   }
 
   const handleRefresh = () => {
@@ -447,6 +468,64 @@ export default function PrazoActivities() {
           isLoading={isCreatingActivity}
         />
       )}
+
+      {/* Activity Details Modal */}
+      <AtividadeDetailsModal
+        atividade={selectedActivity as any}
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        onSave={handleAtividadeSave}
+        contratantes={contratantes}
+        requerentes={requerentes}
+        selectedContratantes={selectedProject?.contratante ? [selectedProject.contratante] : []}
+        selectedRequerentes={selectedProject?.requerentes?.map((r: any) => r.requerente) || []}
+        onContratantesChange={async (contratantes) => {
+          // Atualizar contratante do projeto
+          if (selectedProject) {
+            try {
+              const response = await fetch(`/api/projetos/${selectedProject.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                  contratanteId: contratantes.length > 0 ? contratantes[0].id : null 
+                }),
+              })
+              if (response.ok) {
+                // Revalidar dados do projeto
+                if (selectedProject?.id) {
+                  invalidateProject(selectedProject.id)
+                }
+                mutate()
+              }
+            } catch (error) {
+              console.error("Erro ao atualizar contratante:", error)
+            }
+          }
+        }}
+        onRequerentesChange={async (requerentes) => {
+          // Atualizar requerentes do projeto
+          if (selectedProject) {
+            try {
+              const response = await fetch(`/api/projetos/${selectedProject.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                  requerenteIds: requerentes.map(r => r.id)
+                }),
+              })
+              if (response.ok) {
+                // Revalidar dados do projeto
+                if (selectedProject?.id) {
+                  invalidateProject(selectedProject.id)
+                }
+                mutate()
+              }
+            } catch (error) {
+              console.error("Erro ao atualizar requerentes:", error)
+            }
+          }
+        }}
+      />
     </div>
   )
 }
