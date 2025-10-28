@@ -99,6 +99,9 @@ model Arvore {
 
   // Relacionamento: Uma árvore contém várias pessoas
   pessoas Pessoa[] @relation("PessoasNaArvore")
+
+  // Relacionamento: Uma árvore pode estar vinculada a várias atividades
+  atividades Atividade[]
 }
 
 // Modelo para o Projeto (Kanban)
@@ -140,6 +143,10 @@ model Atividade {
 
   // Relacionamento: Uma atividade pode ter vários usuários associados
   usuarios UserAtv[]
+
+  // Relacionamento: Uma atividade pode estar vinculada a uma árvore genealógica
+  arvore_id Int?
+  arvore    Arvore? @relation(fields: [arvore_id], references: [id], onDelete: SetNull)
 }
 
 // Tabela pivot para o relacionamento Muitos-para-Muitos entre Usuario e Atividade

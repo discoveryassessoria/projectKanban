@@ -8,9 +8,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import { UserSelector } from "@/components/ui/user-selector"
-import { Calendar, User, FileText, Tag, Save } from "lucide-react"
+import { TreeSelector } from "../ui/tree-selector"
+import { Calendar, User, FileText, Tag, Save, TreePine, ArrowUpRight } from "lucide-react"
 import type { AtividadeWithStatus } from "@/src/types/kanban"
-import { useState, useEffect } from "react"
+import Link from "next/link"
+import { useState, useEffect, useCallback } from "react"
 
 interface AtividadeDetailsModalProps {
   atividade: AtividadeWithStatus | null
@@ -25,34 +27,15 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
   const [usuarioId, setUsuarioId] = useState<number | null>(null)
   const [usuarioNome, setUsuarioNome] = useState("")
   const [dataTermino, setDataTermino] = useState<Date | undefined>(undefined)
+  const [arvore_id, setArvore_id] = useState<number | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-
-  const handleUserSelect = async (selectedUserId: number | null) => {
-    setUsuarioId(selectedUserId)
-    
-    if (selectedUserId) {
-      try {
-        const response = await fetch(`/api/usuarios?search=`)
-        if (response.ok) {
-          const data = await response.json()
-          const user = data.usuarios.find((u: any) => u.id === selectedUserId)
-          if (user) {
-            setUsuarioNome(user.nome)
-          }
-        }
-      } catch (error) {
-        console.error("Erro ao buscar usuário:", error)
-      }
-    } else {
-      setUsuarioNome("")
-    }
-  }
 
   useEffect(() => {
     if (atividade) {
       setNome(atividade.nome)
       setDescricao(atividade.descricao || "")
-      
+      setArvore_id(atividade.arvore_id || null)
+
       // Carregar usuário responsável se existir
       const primeiroUsuario = atividade.usuarios?.[0]
       if (primeiroUsuario) {
@@ -62,7 +45,7 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
         setUsuarioId(null)
         setUsuarioNome("")
       }
-      
+
       setDataTermino(atividade.data_termino ? new Date(atividade.data_termino) : undefined)
     }
   }, [atividade])
@@ -80,6 +63,7 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
           descricao: descricao || null,
           usuarioId: usuarioId,
           data_termino: dataTermino ? dataTermino.toISOString().split('T')[0] : null,
+          arvore_id: arvore_id,
         }),
       })
 
@@ -107,6 +91,7 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">Status:</span>
             <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white">{atividade.status.nome}</Badge>
+          </div>
           </div>
 
           <div className="space-y-2">
@@ -161,17 +146,30 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
                   Responsável
                 </Label>
               </div>
-              <UserSelector
-                value={usuarioId?.toString()}
-                onChange={handleUserSelect}
-                placeholder="Selecione um usuário..."
-                className="bg-white border-gray-300 text-gray-900 w-full"
-              />
+              <UserSelector value={usuarioId?.toString()} onChange={setUsuarioId} placeholder="Selecione um usuário..." className="bg-white border-gray-300 text-gray-900 w-full" />
               {usuarioNome && (
                 <p className="text-xs text-gray-500">Selecionado: {usuarioNome}</p>
               )}
             </div>
           </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-gray-600">
+              <TreePine className="h-4 w-4" />
+              <Label htmlFor="arvore" className="text-sm font-medium text-gray-700">
+                Árvore Genealógica Vinculada
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <TreeSelector value={arvore_id?.toString()} onChange={setArvore_id} placeholder="Vincular a uma árvore..." className="bg-white border-gray-300 text-gray-900 w-full" />
+              {arvore_id && (
+                <Link href={`/genealogy?treeId=${arvore_id}`} passHref legacyBehavior>
+                  <a target="" rel="noopener noreferrer" title="Abrir árvore em nova aba" className="flex items-center justify-center p-2 rounded-md border border-gray-300 bg-white hover:bg-gray-100 transition-colors">
+                    <ArrowUpRight className="h-5 w-5 text-gray-600" />
+                  </a>
+                </Link>
+              )}
+            </div>
 
           {/* Tags - read only for now */}
           {atividade.tags && atividade.tags.length > 0 && (

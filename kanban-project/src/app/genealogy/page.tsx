@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef, createRef } from "react"
+import React, { useState, useEffect, useRef, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { genealogicalTree as GenealogicalTree } from "@/src/components/genealogical-tree" // Renomeado para evitar conflito
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,7 +20,7 @@ type Arvore = PrismaArvore & {
 }
 import { Edit3 } from "lucide-react"
 
-export default function GenealogyPage() {
+function GenealogyContent() {
   const [arvores, setArvores] = useState<Arvore[]>([])
   const [arvoreAtual, setArvoreAtual] = useState<Arvore | null>(null)
   const [loading, setLoading] = useState(true)
@@ -29,9 +30,12 @@ export default function GenealogyPage() {
   const treeRef = useRef<GenealogicalTreeHandle>(null)
 
   const MySwal = withReactContent(Swal)
+  const searchParams = useSearchParams()
+  const initialTreeId = searchParams.get("treeId")
 
   useEffect(() => {
-    fetchAllArvores(true)
+    // Passa o ID da URL para carregar a árvore correta inicialmente
+    fetchAllArvores(true, initialTreeId ? Number(initialTreeId) : undefined)
 
     // Inicializa o WebSocket
     const initializeSocket = async () => {
@@ -57,15 +61,19 @@ export default function GenealogyPage() {
     return () => {
       socketRef.current?.disconnect()
     }
-  }, [])
+  }, [initialTreeId]) // Adiciona initialTreeId como dependência
 
-  const fetchAllArvores = async (setFirstAsCurrent = false) => {
+  const fetchAllArvores = async (setInitial = false, initialId?: number) => {
     try {
       const response = await fetch("/api/arvore")
       if (response.ok) {
         const data = await response.json()
         setArvores(data)
-        if (setFirstAsCurrent && data.length > 0) {
+        if (setInitial && data.length > 0) {
+          // Prioriza o ID da URL, se não houver, usa o primeiro da lista
+          const idToLoad = initialId && data.some((a: Arvore) => a.id === initialId) ? initialId : data[0].id
+          fetchFullTree(idToLoad)
+        } else if (data.length === 0) {
           fetchFullTree(data[0].id)
         } else {
           setLoading(false)
@@ -217,7 +225,7 @@ export default function GenealogyPage() {
         if (response.ok) {
           MySwal.fire({ title: "Excluída!", text: "Sua árvore foi excluída com sucesso.", icon: "success", customClass: { popup: "font-sans" } })
           setArvoreAtual(null) // Limpa a árvore atual
-          await fetchAllArvores(true) // Recarrega as árvores e define a primeira como atual
+          await fetchAllArvores(true) // Recarrega as árvores e define a primeira como atual (sem ID específico)
         } else {
           const error = await response.json()
           MySwal.fire({ title: "Erro", text: error.error || "Não foi possível excluir a árvore.", icon: "error", customClass: { popup: "font-sans" } })
@@ -343,5 +351,13 @@ export default function GenealogyPage() {
 
       {arvoreAtual && !showOnboarding && <GenealogicalTree ref={treeRef} arvore={arvoreAtual} onUpdate={handleTreeUpdate} />}
     </div>
+  )
+}
+
+export default function GenealogyPage() {
+  return (
+    <Suspense fallback={<div className="flex h-screen w-full items-center justify-center">Carregando...</div>}>
+      <GenealogyContent />
+    </Suspense>
   )
 }
