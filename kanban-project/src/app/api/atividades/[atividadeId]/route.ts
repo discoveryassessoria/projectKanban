@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
-export async function PUT(request: NextRequest, { params }: { params: { atividadeId: string } }) {
+export async function PUT(request: NextRequest, context: { params: { atividadeId: string } }) {
   try {
-    const { atividadeId } = await params
+    const { atividadeId } = context.params
     const body = await request.json()
-    const { statusId, nome, descricao, data_termino, usuarioId } = body
+    const { statusId, nome, descricao, data_termino, usuarioId, arvore_id } = body
 
     const updateData: any = {}
 
@@ -20,6 +20,7 @@ export async function PUT(request: NextRequest, { params }: { params: { atividad
     if (nome !== undefined) updateData.nome = nome
     if (descricao !== undefined) updateData.descricao = descricao
     if (data_termino !== undefined) updateData.data_termino = data_termino ? new Date(data_termino) : null
+    if (arvore_id !== undefined) updateData.arvore_id = arvore_id
 
     const atividadeId_parsed = Number.parseInt(atividadeId)
 

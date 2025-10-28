@@ -25,6 +25,7 @@ export interface Atividade {
 }
 
 export interface AtividadeWithStatus extends Atividade {
+  arvore_id: null
   status: Status
 }
 
