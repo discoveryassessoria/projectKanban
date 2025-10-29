@@ -66,8 +66,11 @@ export default function PrazoActivities() {
     }
   }, [isDetailsModalOpen, selectedActivity?.projeto?.id, mutateProject])
   
-  // Alias para manter compatibilidade com código existente
-  const atividades = activities
+  // Filtrar apenas atividades não concluídas
+  const atividades = activities.filter(activity => {
+    const statusNome = activity.status?.nome?.toLowerCase() || ''
+    return statusNome !== 'concluído' && statusNome !== 'concluido'
+  })
   
   // Estados para drag and drop
   const [draggedActivity, setDraggedActivity] = useState<Atividade | null>(null)
