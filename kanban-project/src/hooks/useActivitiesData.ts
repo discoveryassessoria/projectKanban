@@ -53,7 +53,6 @@ const fetcher = async (url: string) => {
 const swrConfig = {
   revalidateOnFocus: false, // Não revalidar ao focar na janela
   revalidateOnReconnect: true, // Revalidar ao reconectar
-  dedupingInterval: 2000, // Evitar requisições duplicadas em 2 segundos
   keepPreviousData: true, // Manter dados anteriores durante revalidação (evita flicker)
 }
 

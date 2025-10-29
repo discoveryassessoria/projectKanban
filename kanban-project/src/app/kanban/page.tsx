@@ -56,9 +56,14 @@ export default function KanbanPage() {
       return
     }
     setUser(userData)
-    buscarProjetos(userData.id)
-    buscarContratantes()
-    buscarRequerentes()
+    // Executar todas as requisições em paralelo
+    Promise.all([
+      buscarProjetos(userData.id),
+      buscarContratantes(),
+      buscarRequerentes()
+    ]).finally(() => {
+      setLoading(false)
+    })
   }, [router])
 
   const buscarProjetos = async (userId: number) => {
@@ -82,8 +87,6 @@ export default function KanbanPage() {
     } catch (error) {
       console.error("Erro na requisição:", error)
       setProjetos([])
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -323,10 +326,24 @@ export default function KanbanPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-white dark:bg-gray-900">
-        <div className="text-center">
-          <KanbanIcon className="h-12 w-12 animate-pulse text-indigo-500 dark:text-indigo-400 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Carregando...</p>
+      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between space-y-2">
+          <div className="space-y-2">
+            <div className="h-9 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            <div className="h-5 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+          </div>
+          <div className="h-10 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        </div>
+        
+        {/* Project Selection Skeleton */}
+        <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg p-4 shadow-sm">
+          <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        </div>
+        
+        {/* Kanban Board Skeleton */}
+        <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg p-6 shadow-sm">
+          <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
         </div>
       </div>
     )
