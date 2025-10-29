@@ -196,7 +196,31 @@ export default function PrazoActivities() {
     try {
       // Chamar API para persistir mudança
       const success = await updateDeadline(activeId, newDate)
-      
+            {tasks.map((task, index) => (
+        <React.Fragment key={task.id}>
+          <TaskCard task={task} />
+          
+          {/* Área de Drop Entre Cards */}
+          <div
+            data-drop-zone={`${column}-${index}`}
+            onDragOver={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              e.currentTarget.classList.add('h-16', 'bg-primary/10', 'border-primary')
+            }}
+            onDragLeave={(e) => {
+              e.currentTarget.classList.remove('h-16', 'bg-primary/10', 'border-primary')
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              e.currentTarget.classList.remove('h-16', 'bg-primary/10', 'border-primary')
+              handleDropBetween(e, column, index)
+            }}
+            className="h-2 border border-dashed border-transparent rounded transition-all duration-200 cursor-pointer"
+          />
+        </React.Fragment>
+      ))}
       if (!success) {
         // Reverter mudança em caso de erro
         mutate(
