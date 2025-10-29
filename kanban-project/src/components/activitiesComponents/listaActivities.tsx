@@ -284,18 +284,18 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
 
   if (isLoading) {
     return (
-      <div className="border rounded-lg bg-white shadow-sm">
+      <div className="border rounded-lg bg-background shadow-sm">
         {/* Table Header Skeleton */}
-        <div className="bg-gray-50 px-4 py-3 border-b">
+        <div className="bg-muted/50 px-4 py-3 border-b">
           <div className="grid grid-cols-12 gap-4 items-center">
-            <div className="col-span-1 h-4 bg-gray-200 rounded animate-pulse"></div>
-            <div className="col-span-3 h-4 bg-gray-200 rounded animate-pulse"></div>
-            <div className="col-span-2 h-4 bg-gray-200 rounded animate-pulse"></div>
-            <div className="col-span-2 h-4 bg-gray-200 rounded animate-pulse"></div>
-            <div className="col-span-1 h-4 bg-gray-200 rounded animate-pulse"></div>
-            <div className="col-span-1 h-4 bg-gray-200 rounded animate-pulse"></div>
-            <div className="col-span-1 h-4 bg-gray-200 rounded animate-pulse"></div>
-            <div className="col-span-1 h-4 bg-gray-200 rounded animate-pulse"></div>
+            <div className="col-span-1 h-4 bg-muted rounded animate-pulse"></div>
+            <div className="col-span-3 h-4 bg-muted rounded animate-pulse"></div>
+            <div className="col-span-2 h-4 bg-muted rounded animate-pulse"></div>
+            <div className="col-span-2 h-4 bg-muted rounded animate-pulse"></div>
+            <div className="col-span-1 h-4 bg-muted rounded animate-pulse"></div>
+            <div className="col-span-1 h-4 bg-muted rounded animate-pulse"></div>
+            <div className="col-span-1 h-4 bg-muted rounded animate-pulse"></div>
+            <div className="col-span-1 h-4 bg-muted rounded animate-pulse"></div>
           </div>
         </div>
         
@@ -304,27 +304,27 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
           {[1, 2, 3, 4, 5].map(i => (
             <div key={i} className="px-4 py-3">
               <div className="grid grid-cols-12 gap-4 items-center">
-                <div className="col-span-1 h-4 w-4 bg-gray-200 rounded animate-pulse"></div>
+                <div className="col-span-1 h-4 w-4 bg-muted rounded animate-pulse"></div>
                 <div className="col-span-3 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                  <div className="h-3 bg-gray-200 rounded animate-pulse w-3/4"></div>
+                  <div className="h-4 bg-muted rounded animate-pulse"></div>
+                  <div className="h-3 bg-muted rounded animate-pulse w-3/4"></div>
                 </div>
-                <div className="col-span-2 h-4 bg-gray-200 rounded animate-pulse"></div>
-                <div className="col-span-2 h-4 bg-gray-200 rounded animate-pulse"></div>
-                <div className="col-span-1 h-6 bg-gray-200 rounded-full animate-pulse"></div>
-                <div className="col-span-1 h-6 w-6 bg-gray-200 rounded-full animate-pulse"></div>
-                <div className="col-span-1 h-6 w-6 bg-gray-200 rounded-full animate-pulse"></div>
-                <div className="col-span-1 h-4 bg-gray-200 rounded animate-pulse"></div>
+                <div className="col-span-2 h-4 bg-muted rounded animate-pulse"></div>
+                <div className="col-span-2 h-4 bg-muted rounded animate-pulse"></div>
+                <div className="col-span-1 h-6 bg-muted rounded-full animate-pulse"></div>
+                <div className="col-span-1 h-6 w-6 bg-muted rounded-full animate-pulse"></div>
+                <div className="col-span-1 h-6 w-6 bg-muted rounded-full animate-pulse"></div>
+                <div className="col-span-1 h-4 bg-muted rounded animate-pulse"></div>
               </div>
             </div>
           ))}
         </div>
         
         {/* Footer Skeleton */}
-        <div className="bg-gray-50 px-4 py-3 border-t">
+        <div className="bg-muted/30 px-4 py-3 border-t">
           <div className="flex items-center justify-between">
-            <div className="h-4 w-48 bg-gray-200 rounded animate-pulse"></div>
-            <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-4 w-48 bg-muted rounded animate-pulse"></div>
+            <div className="h-4 w-32 bg-muted rounded animate-pulse"></div>
           </div>
         </div>
       </div>
@@ -344,10 +344,10 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   }
 
   return (
-    <div className="border rounded-lg bg-white shadow-sm">
+    <div className="border rounded-lg bg-background shadow-sm">
       {/* Table Header */}
-      <div className="bg-gray-50 px-4 py-3 border-b">
-        <div className="grid grid-cols-12 gap-4 items-center text-sm font-medium text-gray-700">
+      <div className="bg-muted/50 px-4 py-3 border-b">
+        <div className="grid grid-cols-12 gap-4 items-center text-sm font-medium">
           <div className="col-span-1">
             <input
               type="checkbox"
@@ -370,16 +370,16 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       <div className="divide-y">
         {atividades.length === 0 ? (
           <div className="p-8 text-center">
-            <p className="text-gray-500">Nenhuma atividade encontrada</p>
+            <p className="text-muted-foreground">Nenhuma atividade encontrada</p>
           </div>
         ) : (
           atividades.filter((atividade: Atividade) => atividade && atividade.nome).map((atividade: Atividade) => (
             <div
               key={atividade.id}
-              className="px-4 py-3 hover:bg-gray-50 transition-colors bg-white cursor-pointer"
+              className="px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
               onClick={() => handleAtividadeClick(atividade)}
             >
-              <div className="grid grid-cols-12 gap-4 items-center text-gray-900">
+              <div className="grid grid-cols-12 gap-4 items-center">
                 <div className="col-span-1">
                   <input
                     type="checkbox"
@@ -392,21 +392,21 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 
                 <div className="col-span-3">
                   <div className="space-y-1">
-                    <div className="font-medium text-sm text-gray-900">{atividade.nome}</div>
-                    <div className="text-xs text-gray-500">
+                    <div className="font-medium text-sm">{atividade.nome}</div>
+                    <div className="text-xs text-muted-foreground">
                       {atividade.descricao || 'Sem descrição'}
                     </div>
                   </div>
                 </div>
                 
                 <div className="col-span-2">
-                  <div className="text-sm text-gray-700">
+                  <div className="text-sm">
                     {formatDateOnly(atividade.data_criacao)}
                   </div>
                 </div>
                 
                 <div className="col-span-2">
-                  <div className="text-sm text-gray-700">
+                  <div className="text-sm">
                     {formatDate(atividade.data_termino)}
                   </div>
                 </div>
@@ -446,7 +446,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 </div>
                 
                 <div className="col-span-1">
-                  <div className="text-sm font-medium text-gray-900">{atividade.projeto.nome}</div>
+                  <div className="text-sm font-medium">{atividade.projeto.nome}</div>
                 </div>
               </div>
             </div>
@@ -455,8 +455,8 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       </div>
 
       {/* Footer */}
-      <div className="bg-gray-50 px-4 py-3 border-t">
-        <div className="flex items-center justify-between text-sm text-gray-600">
+      <div className="bg-muted/30 px-4 py-3 border-t">
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
           <div className="flex items-center space-x-4">
             <span>Selecionado: {selectedItems.length} / {atividades.length}</span>
             <span>Total mostrando: {atividades.length}</span>
