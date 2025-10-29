@@ -20,7 +20,11 @@ export async function PUT(request: NextRequest, context: { params: { atividadeId
     if (nome !== undefined) updateData.nome = nome
     if (descricao !== undefined) updateData.descricao = descricao
     if (data_termino !== undefined) updateData.data_termino = data_termino ? new Date(data_termino) : null
-    if (arvore_id !== undefined) updateData.arvore_id = arvore_id
+    
+    // Corrigir o campo arvore_id - pode ser null
+    if (arvore_id !== undefined) {
+      updateData.arvore_id = arvore_id ? Number.parseInt(arvore_id) : null
+    }
 
     const atividadeId_parsed = Number.parseInt(atividadeId)
 

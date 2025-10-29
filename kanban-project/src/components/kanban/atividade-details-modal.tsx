@@ -81,40 +81,39 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-white border-gray-200 text-gray-900 max-w-2xl">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-3">
-              <DialogTitle className="text-2xl font-bold text-gray-900">Editar Atividade</DialogTitle>
+              <DialogTitle className="text-2xl font-bold">Editar Atividade</DialogTitle>
               <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white">{atividade.status.nome}</Badge>
             </div>
           </div>
-          <DialogDescription className="text-gray-600">Atualize os detalhes da atividade</DialogDescription>
+          <DialogDescription>Atualize os detalhes da atividade</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Status:</span>
+            <span className="text-sm text-muted-foreground">Status:</span>
             <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white">{atividade.status.nome}</Badge>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="nome" className="text-sm font-medium text-gray-700">
+            <Label htmlFor="nome" className="text-sm font-medium">
               Nome da Atividade
             </Label>
             <Input
               id="nome"
               value={nome}
               onChange={(e) => setNome(e.target.value)}
-              className="bg-white border-gray-300 text-gray-900"
               placeholder="Digite o nome da atividade..."
             />
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-gray-600">
+            <div className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              <Label htmlFor="descricao" className="text-sm font-medium text-gray-700">
+              <Label htmlFor="descricao" className="text-sm font-medium">
                 Descrição
               </Label>
             </div>
@@ -122,16 +121,16 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
               id="descricao"
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
-              className="bg-white border-gray-300 text-gray-900 min-h-[100px]"
+              className="min-h-[100px]"
               placeholder="Adicione uma descrição detalhada..."
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-gray-600">
+              <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                <Label htmlFor="data" className="text-sm font-medium text-gray-700">
+                <Label htmlFor="data" className="text-sm font-medium">
                   Data de Término
                 </Label>
               </div>
@@ -139,37 +138,37 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
                 value={dataTermino}
                 onChange={setDataTermino}
                 placeholder="Selecione uma data"
-                className="bg-white border-gray-300 text-gray-900 w-full"
+                className="w-full"
               />
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-gray-600">
+              <div className="flex items-center gap-2">
                 <User className="h-4 w-4" />
-                <Label htmlFor="responsavel" className="text-sm font-medium text-gray-700">
+                <Label htmlFor="responsavel" className="text-sm font-medium">
                   Responsável
                 </Label>
               </div>
-              <UserSelector value={usuarioId?.toString()} onChange={setUsuarioId} placeholder="Selecione um usuário..." className="bg-white border-gray-300 text-gray-900 w-full" />
+              <UserSelector value={usuarioId?.toString()} onChange={setUsuarioId} placeholder="Selecione um usuário..." className="w-full" />
               {usuarioNome && (
-                <p className="text-xs text-gray-500">Selecionado: {usuarioNome}</p>
+                <p className="text-xs text-muted-foreground">Selecionado: {usuarioNome}</p>
               )}
             </div>
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-gray-600">
+            <div className="flex items-center gap-2">
               <TreePine className="h-4 w-4" />
-              <Label htmlFor="arvore" className="text-sm font-medium text-gray-700">
+              <Label htmlFor="arvore" className="text-sm font-medium">
                 Árvore Genealógica Vinculada
               </Label>
             </div>
             <div className="flex items-center gap-2">
-              <TreeSelector value={arvore_id?.toString()} onChange={setArvore_id} placeholder="Vincular a uma árvore..." className="bg-white border-gray-300 text-gray-900 w-full" />
+              <TreeSelector value={arvore_id?.toString()} onChange={setArvore_id} placeholder="Vincular a uma árvore..." className="w-full" />
               {arvore_id && (
                 <Link href={`/genealogy?treeId=${arvore_id}`} passHref legacyBehavior>
-                  <a target="" rel="noopener noreferrer" title="Abrir árvore em nova aba" className="flex items-center justify-center p-2 rounded-md border border-gray-300 bg-white hover:bg-gray-100 transition-colors">
-                    <ArrowUpRight className="h-5 w-5 text-gray-600" />
+                  <a target="" rel="noopener noreferrer" title="Abrir árvore em nova aba" className="flex items-center justify-center p-2 rounded-md border hover:bg-accent transition-colors">
+                    <ArrowUpRight className="h-5 w-5" />
                   </a>
                 </Link>
               )}
@@ -179,7 +178,7 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
           {/* Tags - read only for now */}
           {atividade.tags && atividade.tags.length > 0 && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-gray-600">
+              <div className="flex items-center gap-2">
                 <Tag className="h-4 w-4" />
                 <span className="text-sm font-medium">Tags</span>
               </div>
@@ -201,10 +200,10 @@ export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: At
             </div>
           )}
 
-          <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-            <span className="text-xs text-gray-500">ID da Atividade: #{atividade.id}</span>
+          <div className="flex justify-between items-center pt-4 border-t">
+            <span className="text-xs text-muted-foreground">ID da Atividade: #{atividade.id}</span>
             <div className="flex gap-2">
-              <Button variant="ghost" onClick={onClose} className="hover:bg-gray-100">
+              <Button variant="ghost" onClick={onClose}>
                 Cancelar
               </Button>
               <Button onClick={handleSave} disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-700">
