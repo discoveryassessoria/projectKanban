@@ -177,7 +177,7 @@ export function ContratanteSelector({
                           e.stopPropagation()
                           handleCheckboxToggle(contratante)
                         }}
-                        className="h-4 w-4 rounded border-gray-300"
+                        className="h-4 w-4 rounded border"
                       />
                     </div>
                   )}
@@ -214,7 +214,7 @@ export function ContratanteSelector({
               <CommandItem
                 value="add-new"
                 onSelect={handleSelect}
-                className="text-blue-600 font-medium"
+                className="text-primary font-medium"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 + Adicionar contratante

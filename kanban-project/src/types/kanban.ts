@@ -20,12 +20,13 @@ export interface Atividade {
   descricao: string | null
   statusId: number
   data_termino?: string
+  data_criacao?: string
+  arvore_id?: number | null
   usuarios?: UserAtv[]
   tags?: { texto: string; cor: string }[]
 }
 
 export interface AtividadeWithStatus extends Atividade {
-  arvore_id: null
   status: Status
 }
 

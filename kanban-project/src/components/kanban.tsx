@@ -21,6 +21,8 @@ import { Plus, Trash2 } from "lucide-react"
 import { KanbanColumn } from "./kanban/kanban-column"
 import { KanbanCard } from "./kanban/kanban-card"
 import { AtividadeDetailsModal } from "./kanban/atividade-details-modal"
+import { ContratanteSelector } from "@/components/ui/contratante-selector"
+import { RequerenteSelector } from "@/components/ui/requerente-selector"
 import type { Atividade, AtividadeWithStatus, Projeto, Contratante, Requerente } from "@/src/types/kanban"
 
 interface Status {
@@ -344,8 +346,8 @@ export function KanbanBoard({
     <>
       <div className="flex justify-between items-center mb-4">
         <div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Board do Projeto</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <h3 className="text-lg font-medium">Board do Projeto</h3>
+          <p className="text-sm text-muted-foreground">
             Arraste e solte as atividades entre as colunas
           </p>
         </div>
@@ -358,6 +360,38 @@ export function KanbanBoard({
           <Trash2 className="mr-2 h-4 w-4" />
           Limpar Concluídas
         </Button>
+      </div>
+
+      {/* Seletores de Contratante e Requerente */}
+      <div className="mb-6 p-4 rounded-lg border bg-card">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Contratante</label>
+            <ContratanteSelector
+              contratantes={contratantes}
+              selectedContratantes={selectedContratantes}
+              onSelectMultiple={onContratantesChange}
+              onAdd={onContratanteAdd}
+              onView={onContratanteView}
+              placeholder="Selecione o(s) contratante(s)"
+              mode="checkbox"
+              className="w-full"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Requerente(s)</label>
+            <RequerenteSelector
+              requerentes={requerentes}
+              selectedRequerentes={selectedRequerentes}
+              onSelectMultiple={onRequerentesChange}
+              onAdd={onRequerenteAdd}
+              onView={onRequerenteView}
+              placeholder="Selecione o(s) requerente(s)"
+              mode="checkbox"
+              className="w-full"
+            />
+          </div>
+        </div>
       </div>
 
       <DndContext
@@ -460,16 +494,6 @@ export function KanbanBoard({
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
         onSave={handleAtividadeSave}
-        contratantes={contratantes}
-        requerentes={requerentes}
-        selectedContratantes={selectedContratantes}
-        selectedRequerentes={selectedRequerentes}
-        onContratantesChange={onContratantesChange}
-        onRequerentesChange={onRequerentesChange}
-        onContratanteAdd={onContratanteAdd}
-        onRequerenteAdd={onRequerenteAdd}
-        onContratanteView={onContratanteView}
-        onRequerenteView={onRequerenteView}
       />
     </>
   )
