@@ -16,7 +16,7 @@ import {
   useSensor,
   PointerSensor,
   KeyboardSensor,
-  closestCorners,
+  closestCenter,
 } from "@dnd-kit/core"
 import {
   sortableKeyboardCoordinates,
@@ -408,7 +408,7 @@ export default function PrazoActivities() {
           {/* Kanban Board */}
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCorners}
+            collisionDetection={closestCenter}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
