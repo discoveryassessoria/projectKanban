@@ -157,9 +157,9 @@ export function RequerenteSelector({
               {requerentes.map((requerente) => (
                 <CommandItem
                   key={requerente.id}
-                  value={requerente.nome}
+                  value={`${requerente.nome} ${requerente.cpf || ''}`}
                   onSelect={mode === 'single' ? () => handleSelect(requerente.id.toString()) : undefined}
-                  className="cursor-pointer relative"
+                  className="cursor-pointer relative hover:bg-accent/50"
                   onClick={mode === 'checkbox' ? (e) => {
                     e.preventDefault()
                     e.stopPropagation()
@@ -207,16 +207,22 @@ export function RequerenteSelector({
                   )}
                 </CommandItem>
               ))}
-              <CommandItem
-                value="add-new"
-                onSelect={handleSelect}
-                className="text-primary font-medium"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                + Adicionar requerente
-              </CommandItem>
             </CommandGroup>
           </CommandList>
+          {/* Botão Adicionar fixo na parte inferior */}
+          <div className="border-t p-2">
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-primary font-medium hover:bg-accent/50"
+              onClick={() => {
+                onAdd?.()
+                setOpen(false)
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              + Adicionar requerente
+            </Button>
+          </div>
         </Command>
       </PopoverContent>
     </Popover>

@@ -86,9 +86,11 @@ export function ContratanteSelector({
       let newSelection: Contratante[]
       
       if (isSelected) {
+        // Se já está selecionado, remove
         newSelection = selectedContratantes.filter(c => c.id !== contratante.id)
       } else {
-        newSelection = [...selectedContratantes, contratante]
+        // Se não está selecionado, substitui a seleção anterior (apenas 1 contratante)
+        newSelection = [contratante]
       }
       
       console.log('New selection:', newSelection)
@@ -159,9 +161,9 @@ export function ContratanteSelector({
               {contratantes.map((contratante) => (
                 <CommandItem
                   key={contratante.id}
-                  value={contratante.nome}
+                  value={`${contratante.nome} ${contratante.cpf || ''}`}
                   onSelect={mode === 'single' ? () => handleSelect(contratante.id.toString()) : undefined}
-                  className="cursor-pointer relative"
+                  className="cursor-pointer relative hover:bg-accent/50"
                   onClick={mode === 'checkbox' ? (e) => {
                     e.preventDefault()
                     e.stopPropagation()
@@ -211,16 +213,22 @@ export function ContratanteSelector({
                   )}
                 </CommandItem>
               ))}
-              <CommandItem
-                value="add-new"
-                onSelect={handleSelect}
-                className="text-primary font-medium"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                + Adicionar contratante
-              </CommandItem>
             </CommandGroup>
           </CommandList>
+          {/* Botão Adicionar fixo na parte inferior */}
+          <div className="border-t p-2">
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-primary font-medium hover:bg-accent/50"
+              onClick={() => {
+                onAdd?.()
+                setOpen(false)
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              + Adicionar contratante
+            </Button>
+          </div>
         </Command>
       </PopoverContent>
     </Popover>
