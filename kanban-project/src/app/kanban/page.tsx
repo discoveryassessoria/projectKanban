@@ -324,6 +324,28 @@ export default function KanbanPage() {
     }
   }
 
+  const handleRequerenteUpdate = async (requerenteData: Omit<Requerente, 'id'>) => {
+    if (!requerenteModal.requerente) return
+    
+    try {
+      const response = await fetch(`/api/requerentes/${requerenteModal.requerente.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requerenteData),
+      })
+
+      if (response.ok) {
+        const { requerente } = await response.json()
+        setRequerentes(prev => prev.map(r => r.id === requerente.id ? requerente : r))
+        
+        // Fechar o modal após salvar
+        setRequerenteModal(prev => ({ ...prev, isOpen: false }))
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar requerente:", error)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
@@ -513,7 +535,13 @@ export default function KanbanPage() {
         requerente={requerenteModal.requerente}
         isOpen={requerenteModal.isOpen}
         onClose={() => setRequerenteModal(prev => ({ ...prev, isOpen: false }))}
-        onSave={requerenteModal.mode === 'create' ? handleRequerenteSave : undefined}
+        onSave={
+          requerenteModal.mode === 'create' 
+            ? handleRequerenteSave 
+            : requerenteModal.mode === 'edit' 
+              ? handleRequerenteUpdate 
+              : undefined
+        }
         mode={requerenteModal.mode}
       />
     </div>

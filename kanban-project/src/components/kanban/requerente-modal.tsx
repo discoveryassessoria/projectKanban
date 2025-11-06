@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -14,6 +14,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { User, MapPin, Phone, CreditCard } from "lucide-react"
 import { applyCPFMask, applyRGMask, applyTelefoneMask, removeMask } from "@/src/utils/masks"
+import { CamposPersonalizadosEditor } from "./campos-personalizados-editor"
+import { CampoPersonalizado, CamposPersonalizados } from "@/src/types/campoPersonalizado"
+import { Separator } from "@/components/ui/separator"
 
 interface Requerente {
   id: number
@@ -22,6 +25,7 @@ interface Requerente {
   rg?: string | null
   endereco?: string | null
   telefone?: string | null
+  campos_personalizados?: any
 }
 
 interface RequerenteModalProps {
@@ -47,15 +51,58 @@ export function RequerenteModal({
     telefone: requerente?.telefone ? (mode === 'view' ? requerente.telefone : applyTelefoneMask(requerente.telefone)) : '',
   })
 
+  const [camposPersonalizados, setCamposPersonalizados] = useState<CampoPersonalizado[]>([])
+
+  // Atualizar campos personalizados quando o requerente mudar
+  useEffect(() => {
+    if (requerente?.campos_personalizados) {
+      try {
+        const dados = typeof requerente.campos_personalizados === 'string' 
+          ? JSON.parse(requerente.campos_personalizados)
+          : requerente.campos_personalizados
+        
+        if (dados?.campos && Array.isArray(dados.campos)) {
+          setCamposPersonalizados(dados.campos)
+        } else {
+          setCamposPersonalizados([])
+        }
+      } catch (error) {
+        console.error('Erro ao parsear campos personalizados:', error)
+        setCamposPersonalizados([])
+      }
+    } else {
+      setCamposPersonalizados([])
+    }
+  }, [requerente])
+
+  // Atualizar formData quando requerente mudar
+  useEffect(() => {
+    if (requerente) {
+      setFormData({
+        nome: requerente.nome || '',
+        cpf: requerente.cpf ? (mode === 'view' ? requerente.cpf : applyCPFMask(requerente.cpf)) : '',
+        rg: requerente.rg ? (mode === 'view' ? requerente.rg : applyRGMask(requerente.rg)) : '',
+        endereco: requerente.endereco || '',
+        telefone: requerente.telefone ? (mode === 'view' ? requerente.telefone : applyTelefoneMask(requerente.telefone)) : '',
+      })
+    }
+  }, [requerente, mode])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (onSave && formData.nome.trim()) {
+      const campos_personalizados: CamposPersonalizados | undefined = 
+        camposPersonalizados.length > 0 
+          ? { campos: camposPersonalizados }
+          : undefined
+
       onSave({
         nome: formData.nome.trim(),
         cpf: formData.cpf ? removeMask(formData.cpf) : null,
         rg: formData.rg ? removeMask(formData.rg) : null,
         endereco: formData.endereco.trim() || null,
         telefone: formData.telefone ? removeMask(formData.telefone) : null,
+        campos_personalizados,
       })
       onClose()
     }
@@ -69,6 +116,7 @@ export function RequerenteModal({
       endereco: '',
       telefone: '',
     })
+    setCamposPersonalizados([])
     onClose()
   }
 
@@ -92,7 +140,7 @@ export function RequerenteModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <User className="h-5 w-5 text-green-600" />
@@ -180,6 +228,14 @@ export function RequerenteModal({
               maxLength={15}
             />
           </div>
+
+          <Separator className="my-4" />
+
+          <CamposPersonalizadosEditor
+            campos={camposPersonalizados}
+            onChange={setCamposPersonalizados}
+            disabled={isViewMode}
+          />
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose}>
