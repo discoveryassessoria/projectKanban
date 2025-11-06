@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -46,6 +46,19 @@ export function ContratanteModal({
     endereco: contratante?.endereco || '',
     telefone: contratante?.telefone ? (mode === 'view' ? contratante.telefone : applyTelefoneMask(contratante.telefone)) : '',
   })
+
+  // Sincronizar formData quando contratante ou mode mudam
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        nome: contratante?.nome || '',
+        cpf: contratante?.cpf ? (mode === 'view' ? contratante.cpf : applyCPFMask(contratante.cpf)) : '',
+        rg: contratante?.rg ? (mode === 'view' ? contratante.rg : applyRGMask(contratante.rg)) : '',
+        endereco: contratante?.endereco || '',
+        telefone: contratante?.telefone ? (mode === 'view' ? contratante.telefone : applyTelefoneMask(contratante.telefone)) : '',
+      })
+    }
+  }, [contratante, mode, isOpen])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

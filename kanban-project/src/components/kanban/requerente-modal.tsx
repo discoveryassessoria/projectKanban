@@ -53,40 +53,54 @@ export function RequerenteModal({
 
   const [camposPersonalizados, setCamposPersonalizados] = useState<CampoPersonalizado[]>([])
 
-  // Atualizar campos personalizados quando o requerente mudar
+  // Atualizar campos personalizados quando o requerente, mode ou isOpen mudarem
   useEffect(() => {
-    if (requerente?.campos_personalizados) {
-      try {
-        const dados = typeof requerente.campos_personalizados === 'string' 
-          ? JSON.parse(requerente.campos_personalizados)
-          : requerente.campos_personalizados
-        
-        if (dados?.campos && Array.isArray(dados.campos)) {
-          setCamposPersonalizados(dados.campos)
-        } else {
+    if (isOpen) {
+      if (requerente?.campos_personalizados && (mode === 'view' || mode === 'edit')) {
+        try {
+          const dados = typeof requerente.campos_personalizados === 'string' 
+            ? JSON.parse(requerente.campos_personalizados)
+            : requerente.campos_personalizados
+          
+          if (dados?.campos && Array.isArray(dados.campos)) {
+            setCamposPersonalizados(dados.campos)
+          } else {
+            setCamposPersonalizados([])
+          }
+        } catch (error) {
+          console.error('Erro ao parsear campos personalizados:', error)
           setCamposPersonalizados([])
         }
-      } catch (error) {
-        console.error('Erro ao parsear campos personalizados:', error)
+      } else {
+        // Resetar campos personalizados para modo de criação ou se não houver dados
         setCamposPersonalizados([])
       }
-    } else {
-      setCamposPersonalizados([])
     }
-  }, [requerente])
+  }, [requerente, mode, isOpen])
 
-  // Atualizar formData quando requerente mudar
+  // Atualizar formData quando requerente, mode ou isOpen mudarem
   useEffect(() => {
-    if (requerente) {
-      setFormData({
-        nome: requerente.nome || '',
-        cpf: requerente.cpf ? (mode === 'view' ? requerente.cpf : applyCPFMask(requerente.cpf)) : '',
-        rg: requerente.rg ? (mode === 'view' ? requerente.rg : applyRGMask(requerente.rg)) : '',
-        endereco: requerente.endereco || '',
-        telefone: requerente.telefone ? (mode === 'view' ? requerente.telefone : applyTelefoneMask(requerente.telefone)) : '',
-      })
+    if (isOpen) {
+      if (requerente && (mode === 'view' || mode === 'edit')) {
+        setFormData({
+          nome: requerente.nome || '',
+          cpf: requerente.cpf ? (mode === 'view' ? requerente.cpf : applyCPFMask(requerente.cpf)) : '',
+          rg: requerente.rg ? (mode === 'view' ? requerente.rg : applyRGMask(requerente.rg)) : '',
+          endereco: requerente.endereco || '',
+          telefone: requerente.telefone ? (mode === 'view' ? requerente.telefone : applyTelefoneMask(requerente.telefone)) : '',
+        })
+      } else if (mode === 'create') {
+        // Resetar formulário para modo de criação
+        setFormData({
+          nome: '',
+          cpf: '',
+          rg: '',
+          endereco: '',
+          telefone: '',
+        })
+      }
     }
-  }, [requerente, mode])
+  }, [requerente, mode, isOpen])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

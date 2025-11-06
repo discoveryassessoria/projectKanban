@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown, Plus, User } from "lucide-react"
+import { Check, ChevronsUpDown, Plus, User, Pencil } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -36,6 +36,7 @@ interface RequerenteSelectorProps {
   onSelectMultiple?: (requerentes: Requerente[]) => void
   onAdd?: () => void
   onView?: (requerente: Requerente) => void
+  onEdit?: (requerente: Requerente) => void
   placeholder?: string
   className?: string
   disabled?: boolean
@@ -50,6 +51,7 @@ export function RequerenteSelector({
   onSelectMultiple,
   onAdd,
   onView,
+  onEdit,
   placeholder = "Requerente",
   className,
   disabled = false,
@@ -99,6 +101,12 @@ export function RequerenteSelector({
   const handleView = (e: React.MouseEvent, requerente: Requerente) => {
     e.stopPropagation()
     onView?.(requerente)
+    setOpen(false)
+  }
+
+  const handleEdit = (e: React.MouseEvent, requerente: Requerente) => {
+    e.stopPropagation()
+    onEdit?.(requerente)
     setOpen(false)
   }
 
@@ -159,7 +167,7 @@ export function RequerenteSelector({
                   key={requerente.id}
                   value={`${requerente.nome} ${requerente.cpf || ''}`}
                   onSelect={mode === 'single' ? () => handleSelect(requerente.id.toString()) : undefined}
-                  className="cursor-pointer relative hover:bg-accent/50"
+                  className="cursor-pointer relative hover:bg-gray-100 dark:hover:bg-gray-800"
                   onClick={mode === 'checkbox' ? (e) => {
                     e.preventDefault()
                     e.stopPropagation()
@@ -195,14 +203,14 @@ export function RequerenteSelector({
                       </span>
                     )}
                   </div>
-                  {onView && (
+                  {onEdit && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                      onClick={(e) => handleView(e, requerente)}
+                      className="h-7 w-7 p-0 ml-auto hover:bg-gray-200 dark:hover:bg-gray-700"
+                      onClick={(e) => handleEdit(e, requerente)}
                     >
-                      <User className="h-3 w-3" />
+                      <Pencil className="h-3.5 w-3.5" />
                     </Button>
                   )}
                 </CommandItem>
@@ -213,7 +221,7 @@ export function RequerenteSelector({
           <div className="border-t p-2">
             <Button
               variant="ghost"
-              className="w-full justify-start text-primary font-medium hover:bg-accent/50"
+              className="w-full justify-start text-primary font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
               onClick={() => {
                 onAdd?.()
                 setOpen(false)

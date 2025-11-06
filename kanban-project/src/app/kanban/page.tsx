@@ -182,6 +182,14 @@ export default function KanbanPage() {
     })
   }
 
+  const handleContratanteEdit = (contratante: Contratante) => {
+    setContratanteModal({
+      isOpen: true,
+      mode: 'edit',
+      contratante
+    })
+  }
+
   const handleContratanteSelect = async (contratante: Contratante | null) => {
     if (!projetoSelecionado) return
 
@@ -218,18 +226,44 @@ export default function KanbanPage() {
 
   const handleContratanteSave = async (contratanteData: Omit<Contratante, 'id'>) => {
     try {
-      const response = await fetch("/api/contratantes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(contratanteData),
-      })
+      // Se estamos no modo de edição, usar PUT ao invés de POST
+      if (contratanteModal.mode === 'edit' && contratanteModal.contratante) {
+        const response = await fetch(`/api/contratantes/${contratanteModal.contratante.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(contratanteData),
+        })
 
-      if (response.ok) {
-        const { contratante } = await response.json()
-        setContratantes(prev => [...prev, contratante])
-        
-        // Fechar o modal após salvar
-        setContratanteModal(prev => ({ ...prev, isOpen: false }))
+        if (response.ok) {
+          const { contratante } = await response.json()
+          setContratantes(prev => prev.map(c => c.id === contratante.id ? contratante : c))
+          
+          // Atualizar também no projeto selecionado se for o contratante atual
+          if (projetoSelecionado?.contratante?.id === contratante.id) {
+            setProjetoSelecionado(prev => prev ? { ...prev, contratante } : null)
+          }
+          
+          // Fechar o modal após salvar
+          setContratanteModal(prev => ({ ...prev, isOpen: false }))
+          
+          // Recarregar contratantes para garantir sincronização
+          await buscarContratantes()
+        }
+      } else {
+        // Modo de criação
+        const response = await fetch("/api/contratantes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(contratanteData),
+        })
+
+        if (response.ok) {
+          const { contratante } = await response.json()
+          setContratantes(prev => [...prev, contratante])
+          
+          // Fechar o modal após salvar
+          setContratanteModal(prev => ({ ...prev, isOpen: false }))
+        }
       }
     } catch (error) {
       console.error("Erro ao salvar contratante:", error)
@@ -262,6 +296,14 @@ export default function KanbanPage() {
     setRequerenteModal({
       isOpen: true,
       mode: 'view',
+      requerente
+    })
+  }
+
+  const handleRequerenteEdit = (requerente: Requerente) => {
+    setRequerenteModal({
+      isOpen: true,
+      mode: 'edit',
       requerente
     })
   }
@@ -306,43 +348,50 @@ export default function KanbanPage() {
 
   const handleRequerenteSave = async (requerenteData: Omit<Requerente, 'id'>) => {
     try {
-      const response = await fetch("/api/requerentes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requerenteData),
-      })
+      // Se estamos no modo de edição, usar PUT ao invés de POST
+      if (requerenteModal.mode === 'edit' && requerenteModal.requerente) {
+        const response = await fetch(`/api/requerentes/${requerenteModal.requerente.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requerenteData),
+        })
 
-      if (response.ok) {
-        const { requerente } = await response.json()
-        setRequerentes(prev => [...prev, requerente])
-        
-        // Fechar o modal após salvar
-        setRequerenteModal(prev => ({ ...prev, isOpen: false }))
+        if (response.ok) {
+          const { requerente } = await response.json()
+          setRequerentes(prev => prev.map(r => r.id === requerente.id ? requerente : r))
+          
+          // Atualizar também no projeto selecionado se for um dos requerentes
+          if (projetoSelecionado?.requerentes?.some(r => r.requerente.id === requerente.id)) {
+            setProjetoSelecionado(prev => prev ? {
+              ...prev,
+              requerentes: prev.requerentes?.map(r => r.requerente.id === requerente.id ? { requerente } : r)
+            } : null)
+          }
+          
+          // Fechar o modal após salvar
+          setRequerenteModal(prev => ({ ...prev, isOpen: false }))
+          
+          // Recarregar requerentes para garantir sincronização
+          await buscarRequerentes()
+        }
+      } else {
+        // Modo de criação
+        const response = await fetch("/api/requerentes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requerenteData),
+        })
+
+        if (response.ok) {
+          const { requerente } = await response.json()
+          setRequerentes(prev => [...prev, requerente])
+          
+          // Fechar o modal após salvar
+          setRequerenteModal(prev => ({ ...prev, isOpen: false }))
+        }
       }
     } catch (error) {
       console.error("Erro ao salvar requerente:", error)
-    }
-  }
-
-  const handleRequerenteUpdate = async (requerenteData: Omit<Requerente, 'id'>) => {
-    if (!requerenteModal.requerente) return
-    
-    try {
-      const response = await fetch(`/api/requerentes/${requerenteModal.requerente.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requerenteData),
-      })
-
-      if (response.ok) {
-        const { requerente } = await response.json()
-        setRequerentes(prev => prev.map(r => r.id === requerente.id ? requerente : r))
-        
-        // Fechar o modal após salvar
-        setRequerenteModal(prev => ({ ...prev, isOpen: false }))
-      }
-    } catch (error) {
-      console.error("Erro ao atualizar requerente:", error)
     }
   }
 
@@ -481,8 +530,8 @@ export default function KanbanPage() {
                 }}
                 onContratanteAdd={handleContratanteAdd}
                 onRequerenteAdd={handleRequerenteAdd}
-                onContratanteView={handleContratanteView}
-                onRequerenteView={handleRequerenteView}
+                onContratanteView={handleContratanteEdit}
+                onRequerenteView={handleRequerenteEdit}
               />
             </div>
           </div>
@@ -527,7 +576,7 @@ export default function KanbanPage() {
         contratante={contratanteModal.contratante}
         isOpen={contratanteModal.isOpen}
         onClose={() => setContratanteModal(prev => ({ ...prev, isOpen: false }))}
-        onSave={contratanteModal.mode === 'create' ? handleContratanteSave : undefined}
+        onSave={handleContratanteSave}
         mode={contratanteModal.mode}
       />
 
@@ -535,13 +584,7 @@ export default function KanbanPage() {
         requerente={requerenteModal.requerente}
         isOpen={requerenteModal.isOpen}
         onClose={() => setRequerenteModal(prev => ({ ...prev, isOpen: false }))}
-        onSave={
-          requerenteModal.mode === 'create' 
-            ? handleRequerenteSave 
-            : requerenteModal.mode === 'edit' 
-              ? handleRequerenteUpdate 
-              : undefined
-        }
+        onSave={handleRequerenteSave}
         mode={requerenteModal.mode}
       />
     </div>
