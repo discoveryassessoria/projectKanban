@@ -68,6 +68,9 @@ export function KanbanColumn({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   const atividadesIds = useMemo(() => atividades.map((a) => a.id), [atividades])
+  
+  // Verificar se é a coluna "Concluído" (não pode ser movida)
+  const isConcluido = title.toLowerCase() === "concluído"
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -119,17 +122,20 @@ export function KanbanColumn({
   const handleMoveStatus = async (direction: "up" | "down") => {
     try {
       const response = await fetch(`/api/status/${id}/move`, {
-        method: "POST",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ direction, projetoId }),
       })
 
-      if (!response.ok) throw new Error("Falha ao mover status")
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Falha ao mover status")
+      }
 
       onStatusUpdate?.()
     } catch (error) {
       console.error(error)
-      alert("Não foi possível mover o status.")
+      alert(error instanceof Error ? error.message : "Não foi possível mover o status.")
     }
   }
 
@@ -182,19 +188,19 @@ export function KanbanColumn({
                   <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
                   <DropdownMenuItem
                     onClick={() => handleMoveStatus("up")}
-                    disabled={isFirst}
+                    disabled={isFirst || isConcluido}
                     className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ArrowUp className="h-4 w-4 mr-2" />
-                    Mover para cima
+                    Mover para esquerda
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => handleMoveStatus("down")}
-                    disabled={isLast}
+                    disabled={isLast || isConcluido}
                     className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ArrowDown className="h-4 w-4 mr-2" />
-                    Mover para baixo
+                    Mover para direita
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
                   <DropdownMenuItem
