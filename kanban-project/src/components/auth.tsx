@@ -1,33 +1,38 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useTheme } from "@/src/hooks/use-theme"
-import { Moon, Sun } from "lucide-react"
 
 interface AuthProps {
   onAuthSuccess?: () => void
   redirectTo?: string
 }
 
-export function AuthComponent({ onAuthSuccess, redirectTo = "/dashboard" }: AuthProps) {
+export default function AuthComponent({
+  onAuthSuccess,
+  redirectTo = "/dashboard",
+}: AuthProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
-  const { theme, toggleTheme } = useTheme()
   const router = useRouter()
 
+  // redirecionar se já estiver logado
   useEffect(() => {
     const token = localStorage.getItem("authToken")
-    if (token) {
-      router.push(redirectTo)
-    }
+    if (token) router.push(redirectTo)
   }, [router, redirectTo])
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -45,22 +50,16 @@ export function AuthComponent({ onAuthSuccess, redirectTo = "/dashboard" }: Auth
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, senha }),
       })
-
       const data = await response.json()
 
       if (response.ok) {
         localStorage.setItem("authToken", data.token)
         localStorage.setItem("user", JSON.stringify(data.user))
-
-        if (onAuthSuccess) {
-          onAuthSuccess()
-        } else {
-          router.push(redirectTo)
-        }
+        onAuthSuccess ? onAuthSuccess() : router.push(redirectTo)
       } else {
         setError(data.error || "Erro ao fazer login")
       }
-    } catch (error) {
+    } catch {
       setError("Erro de conexão. Tente novamente.")
     } finally {
       setIsLoading(false)
@@ -68,94 +67,117 @@ export function AuthComponent({ onAuthSuccess, redirectTo = "/dashboard" }: Auth
   }
 
   return (
-    <>
-      <Card className="w-full max-w-md mx-auto border-border/50 shadow-xl bg-card/95 backdrop-blur-sm">
-        <CardHeader className="text-center space-y-3 pb-6 relative">
-          <div className="absolute top-4 right-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={toggleTheme}
-              className="h-8 w-8 bg-background/80 backdrop-blur-sm border-border/50 hover:bg-muted/50 transition-colors"
-              title={theme === 'light' ? 'Alternar para modo escuro' : 'Alternar para modo claro'}
-              aria-label={theme === 'light' ? 'Alternar para modo escuro' : 'Alternar para modo claro'}
-            >
-              {theme === 'light' ? (
-                <Moon className="h-3.5 w-3.5" />
-              ) : (
-                <Sun className="h-3.5 w-3.5" />
-              )}
-            </Button>
-          </div>
-          
-          <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-            Bem-vindo
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Faça login para continuar
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div className="space-y-3">
-              <Label htmlFor="login-email" className="text-sm font-medium">
-                Email
-              </Label>
-              <Input
-                id="login-email"
-                name="email"
-                type="email"
-                placeholder="seu@email.com"
-                required
-                disabled={isLoading}
-                className="h-11 bg-background border-input/50 focus:border-primary focus:ring-1 focus:ring-primary/20"
-              />
-            </div>
-            <div className="space-y-3">
-              <Label htmlFor="login-senha" className="text-sm font-medium">
-                Senha
-              </Label>
-              <Input
-                id="login-senha"
-                name="senha"
-                type="password"
-                placeholder="Sua senha"
-                required
-                disabled={isLoading}
-                className="h-11 bg-background border-input/50 focus:border-primary focus:ring-1 focus:ring-primary/20"
-              />
-            </div>
+  <Card
+    className="
+      w-full max-w-sm mx-auto
+      bg-white text-slate-900 dark:bg-white
+      rounded-[24px] shadow-2xl border border-slate-200
+    "
+  >
+    {/* Cabeçalho */}
+    <CardHeader className="text-center pt-4 pb-1 px-8">
+      <CardTitle className="text-[28px] font-semibold text-slate-900 leading-tight">
+        Bem-vindo!
+      </CardTitle>
+      <CardDescription className="mt-1 text-[14px] text-slate-500 leading-tight">
+        Faça login para continuar.
+      </CardDescription>
+    </CardHeader>
 
-            {error && (
-              <Alert variant="destructive" className="border-destructive/50 bg-destructive/5">
-                <AlertDescription className="text-sm">{error}</AlertDescription>
-              </Alert>
-            )}
+    {/* Conteúdo */}
+    <CardContent className="px-8 pt-3 pb-4">
+      <form onSubmit={handleLogin} className="space-y-3">
+        {/* EMAIL */}
+        <div className="space-y-1">
+          <Label
+            htmlFor="login-email"
+            className="text-sm font-medium text-slate-900"
+          >
+            Email
+          </Label>
+          <Input
+            id="login-email"
+            name="email"
+            type="email"
+            placeholder="seu@email.com"
+            required
+            disabled={isLoading}
+            className="
+              h-12 text-[15px]
+              !bg-white dark:!bg-white
+              border border-slate-300
+              !text-slate-900 dark:!text-slate-900
+              placeholder:text-slate-400
+              rounded-md
+              focus-visible:ring-2
+              focus-visible:ring-[#123C73]/30
+              focus-visible:border-[#123C73]
+              transition-all duration-150
+            "
+          />
+        </div>
 
-            <Button 
-              type="submit" 
-              className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200" 
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Entrando...
-                </>
-              ) : (
-                "Entrar"
-              )}
-            </Button>
-          </form>
+        {/* SENHA */}
+        <div className="space-y-1">
+          <Label
+            htmlFor="login-senha"
+            className="text-sm font-medium text-slate-900"
+          >
+            Senha
+          </Label>
+          <Input
+            id="login-senha"
+            name="senha"
+            type="password"
+            placeholder="Sua senha"
+            required
+            disabled={isLoading}
+            className="
+              h-12 text-[15px]
+              !bg-white dark:!bg-white
+              border border-slate-300
+              !text-slate-900 dark:!text-slate-900
+              placeholder:text-slate-400
+              rounded-md
+              focus-visible:ring-2
+              focus-visible:ring-[#123C73]/30
+              focus-visible:border-[#123C73]
+              transition-all duration-150
+            "
+          />
+        </div>
 
-          <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>Não possui uma conta?</p>
-            <p className="mt-1">Entre em contato com um administrador.</p>
-          </div>
-        </CardContent>
-      </Card>
-    </>
+        {/* ERRO */}
+        {error && (
+          <Alert className="border-red-200 bg-red-50">
+            <AlertDescription className="text-sm text-red-700">
+              {error}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* BOTÃO */}
+        <Button
+          type="submit"
+          className="
+            w-full h-12
+            bg-[#123C73] hover:bg-[#0f315f]
+            text-white font-medium text-[15px]
+            rounded-md
+            transition-all duration-150
+          "
+          disabled={isLoading}
+        >
+          {isLoading ? "Entrando..." : "Entrar"}
+        </Button>
+
+        {/* TEXTO FINAL */}
+        <div className="pt-2 text-center text-[13px] text-slate-500 leading-tight">
+          <p className="italic mb-[2px]">Não possui uma conta?</p>
+          <p>Entre em contato com um administrador.</p>
+        </div>
+      </form>
+    </CardContent>
+  </Card>
   )
 }
-
-export default AuthComponent
