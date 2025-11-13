@@ -373,6 +373,7 @@ export function KanbanBoard({
               onSelectMultiple={onContratantesChange}
               onAdd={onContratanteAdd}
               onView={onContratanteView}
+              onEdit={onContratanteView}
               placeholder="Selecione o(s) contratante(s)"
               mode="checkbox"
               className="w-full"
@@ -386,6 +387,7 @@ export function KanbanBoard({
               onSelectMultiple={onRequerentesChange}
               onAdd={onRequerenteAdd}
               onView={onRequerenteView}
+              onEdit={onRequerenteView}
               placeholder="Selecione o(s) requerente(s)"
               mode="checkbox"
               className="w-full"

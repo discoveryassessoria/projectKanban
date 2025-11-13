@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown, Plus, Building2 } from "lucide-react"
+import { Check, ChevronsUpDown, Plus, Building2, Pencil } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -36,6 +36,7 @@ interface ContratanteSelectorProps {
   onSelectMultiple?: (contratantes: Contratante[]) => void
   onAdd?: () => void
   onView?: (contratante: Contratante) => void
+  onEdit?: (contratante: Contratante) => void
   placeholder?: string
   className?: string
   disabled?: boolean
@@ -50,6 +51,7 @@ export function ContratanteSelector({
   onSelectMultiple,
   onAdd,
   onView,
+  onEdit,
   placeholder = "Contratante",
   className,
   disabled = false,
@@ -86,9 +88,11 @@ export function ContratanteSelector({
       let newSelection: Contratante[]
       
       if (isSelected) {
+        // Se já está selecionado, remove
         newSelection = selectedContratantes.filter(c => c.id !== contratante.id)
       } else {
-        newSelection = [...selectedContratantes, contratante]
+        // Se não está selecionado, substitui a seleção anterior (apenas 1 contratante)
+        newSelection = [contratante]
       }
       
       console.log('New selection:', newSelection)
@@ -99,6 +103,12 @@ export function ContratanteSelector({
   const handleView = (e: React.MouseEvent, contratante: Contratante) => {
     e.stopPropagation()
     onView?.(contratante)
+    setOpen(false)
+  }
+
+  const handleEdit = (e: React.MouseEvent, contratante: Contratante) => {
+    e.stopPropagation()
+    onEdit?.(contratante)
     setOpen(false)
   }
 
@@ -159,9 +169,9 @@ export function ContratanteSelector({
               {contratantes.map((contratante) => (
                 <CommandItem
                   key={contratante.id}
-                  value={contratante.nome}
+                  value={`${contratante.nome} ${contratante.cpf || ''}`}
                   onSelect={mode === 'single' ? () => handleSelect(contratante.id.toString()) : undefined}
-                  className="cursor-pointer relative"
+                  className="cursor-pointer relative hover:bg-gray-100 dark:hover:bg-gray-800"
                   onClick={mode === 'checkbox' ? (e) => {
                     e.preventDefault()
                     e.stopPropagation()
@@ -199,28 +209,34 @@ export function ContratanteSelector({
                       </span>
                     )}
                   </div>
-                  {onView && (
+                  {onEdit && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                      onClick={(e) => handleView(e, contratante)}
+                      className="h-7 w-7 p-0 ml-auto hover:bg-gray-200 dark:hover:bg-gray-700"
+                      onClick={(e) => handleEdit(e, contratante)}
                     >
-                      <Building2 className="h-3 w-3" />
+                      <Pencil className="h-3.5 w-3.5" />
                     </Button>
                   )}
                 </CommandItem>
               ))}
-              <CommandItem
-                value="add-new"
-                onSelect={handleSelect}
-                className="text-primary font-medium"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                + Adicionar contratante
-              </CommandItem>
             </CommandGroup>
           </CommandList>
+          {/* Botão Adicionar fixo na parte inferior */}
+          <div className="border-t p-2">
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-primary font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
+              onClick={() => {
+                onAdd?.()
+                setOpen(false)
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              + Adicionar contratante
+            </Button>
+          </div>
         </Command>
       </PopoverContent>
     </Popover>

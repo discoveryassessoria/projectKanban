@@ -174,12 +174,13 @@ model Status {
 // Os modelos abaixo (Requerente, Contratante) são baseados na estrutura do
 // seu diagrama. Eles parecem representar pessoas ou empresas com papéis específicos.
 model Requerente {
-  id       Int     @id @default(autoincrement())
-  nome     String  @db.VarChar(50)
-  cpf      String? @db.VarChar(11)
-  rg       String? @db.VarChar(10)
-  endereco String? @db.VarChar(100)
-  telefone String? @db.VarChar(11)
+  id                    Int     @id @default(autoincrement())
+  nome                  String  @db.VarChar(50)
+  cpf                   String? @db.VarChar(11)
+  rg                    String? @db.VarChar(10)
+  endereco              String? @db.VarChar(100)
+  telefone              String? @db.VarChar(11)
+  campos_personalizados Json?
 
   projetos ProjetoRequerente[]
 }
