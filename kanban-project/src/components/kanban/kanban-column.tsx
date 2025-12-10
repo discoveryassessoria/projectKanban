@@ -69,7 +69,6 @@ export function KanbanColumn({
 
   const atividadesIds = useMemo(() => atividades.map((a) => a.id), [atividades])
   
-  // Verificar se é a coluna "Concluído" (não pode ser movida)
   const isConcluido = title.toLowerCase() === "concluído"
 
   const handleAddSubmit = (e: React.FormEvent) => {
@@ -143,15 +142,15 @@ export function KanbanColumn({
     <>
       <div
         ref={setNodeRef}
-        className={`flex flex-col min-h-[500px] bg-white dark:bg-gray-800 rounded-lg border transition-all ${
-          isOver ? "border-indigo-500 ring-2 ring-indigo-500/20" : "border-gray-200 dark:border-gray-700"
+        className={`flex flex-col min-h-[450px] bg-white/5 backdrop-blur-xl rounded-lg border transition-all ${
+          isOver ? "border-blue-400/50 ring-2 ring-blue-400/30 shadow-lg" : "border-white/10"
         }`}
       >
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 rounded-t-lg" style={{ backgroundColor: headerColor }}>
+        <div className="p-3 border-b border-white/10 rounded-t-lg bg-gradient-to-r from-indigo-500/80 to-indigo-600/80 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-sm text-white">{title}</h3>
-              <span className="px-2 py-0.5 text-xs font-medium bg-gray-600 dark:bg-gray-700 text-gray-200 rounded-full">
+              <span className="px-2 py-0.5 text-xs font-medium bg-white/20 text-white rounded-full backdrop-blur-sm">
                 {atividades.length}
               </span>
             </div>
@@ -160,7 +159,7 @@ export function KanbanColumn({
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsAdding(true)}
-                className="h-7 px-2 hover:bg-gray-600 dark:hover:bg-gray-700 text-gray-200 hover:text-white"
+                className="h-7 px-2 hover:bg-white/20 text-white"
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -169,27 +168,27 @@ export function KanbanColumn({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 px-2 hover:bg-gray-600 dark:hover:bg-gray-700 text-gray-200 hover:text-white"
+                    className="h-7 px-2 hover:bg-white/20 text-white"
                   >
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                <DropdownMenuContent align="end" className="bg-gray-900/95 backdrop-blur-xl border-white/20 text-white">
                   <DropdownMenuItem
                     onClick={() => {
                       setEditedStatusName(title)
                       setIsEditDialogOpen(true)
                     }}
-                    className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                    className="text-white hover:bg-white/10 cursor-pointer"
                   >
                     <Edit2 className="h-4 w-4 mr-2" />
                     Editar nome
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+                  <DropdownMenuSeparator className="bg-white/10" />
                   <DropdownMenuItem
                     onClick={() => handleMoveStatus("up")}
                     disabled={isFirst || isConcluido}
-                    className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="text-white hover:bg-white/10 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ArrowUp className="h-4 w-4 mr-2" />
                     Mover para esquerda
@@ -197,15 +196,15 @@ export function KanbanColumn({
                   <DropdownMenuItem
                     onClick={() => handleMoveStatus("down")}
                     disabled={isLast || isConcluido}
-                    className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="text-white hover:bg-white/10 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ArrowDown className="h-4 w-4 mr-2" />
                     Mover para direita
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+                  <DropdownMenuSeparator className="bg-white/10" />
                   <DropdownMenuItem
                     onClick={() => setIsDeleteDialogOpen(true)}
-                    className="text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-red-700 dark:hover:text-red-300 cursor-pointer"
+                    className="text-red-400 hover:bg-white/10 hover:text-red-300 cursor-pointer"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Excluir status
@@ -216,7 +215,7 @@ export function KanbanColumn({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 min-h-[200px]">
+        <div className="flex-1 overflow-y-auto p-3 min-h-[200px] scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
           <SortableContext items={atividadesIds} strategy={verticalListSortingStrategy}>
             {atividades.map((atividade) => (
               <KanbanCard key={atividade.id} {...atividade} onClick={() => onAtividadeClick?.(atividade)} />
@@ -230,7 +229,7 @@ export function KanbanColumn({
                 placeholder="Nome da atividade..."
                 value={newAtividadeName}
                 onChange={(e) => setNewAtividadeName(e.target.value)}
-                className="mb-2 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                className="mb-2 bg-white/10 border-white/20 text-white placeholder:text-white/60 backdrop-blur-sm"
               />
               <div className="flex justify-end gap-2">
                 <Button
@@ -238,7 +237,7 @@ export function KanbanColumn({
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsAdding(false)}
-                  className="hover:bg-gray-100 dark:hover:bg-gray-700"
+                  className="hover:bg-white/10 text-white"
                 >
                   Cancelar
                 </Button>
@@ -252,10 +251,10 @@ export function KanbanColumn({
       </div>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
+        <DialogContent className="bg-gray-900/95 backdrop-blur-xl border-white/20 text-white">
           <DialogHeader>
             <DialogTitle>Editar Status</DialogTitle>
-            <DialogDescription className="text-gray-600 dark:text-gray-400">Altere o nome do status</DialogDescription>
+            <DialogDescription className="text-white/70">Altere o nome do status</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -264,12 +263,12 @@ export function KanbanColumn({
                 id="status-name"
                 value={editedStatusName}
                 onChange={(e) => setEditedStatusName(e.target.value)}
-                className="bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/60 backdrop-blur-sm"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)} className="hover:bg-gray-100 dark:hover:bg-gray-700">
+            <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)} className="hover:bg-white/10 text-white">
               Cancelar
             </Button>
             <Button onClick={handleEditStatus} className="bg-indigo-600 hover:bg-indigo-700">
@@ -280,20 +279,20 @@ export function KanbanColumn({
       </Dialog>
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
+        <DialogContent className="bg-gray-900/95 backdrop-blur-xl border-white/20 text-white">
           <DialogHeader>
             <DialogTitle>Excluir Status</DialogTitle>
-            <DialogDescription className="text-gray-600 dark:text-gray-400">
+            <DialogDescription className="text-white/70">
               Tem certeza que deseja excluir o status "{title}"? Esta ação não pode ser desfeita.
               {atividades.length > 0 && (
-                <span className="block mt-2 text-red-600 dark:text-red-400">
+                <span className="block mt-2 text-red-400">
                   Atenção: Este status possui {atividades.length} atividade(s). Elas também serão excluídas.
                 </span>
               )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="hover:bg-gray-100 dark:hover:bg-gray-700">
+            <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="hover:bg-white/10 text-white">
               Cancelar
             </Button>
             <Button onClick={handleDeleteStatus} className="bg-red-600 hover:bg-red-700">

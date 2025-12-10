@@ -6,7 +6,7 @@ export function useSidebarVisibility() {
   const pathname = usePathname()
 
   // Hide sidebar on auth pages
-  if (pathname.startsWith("/auth")) {
+  if (pathname.startsWith("/login")) {
     return false
   }
 

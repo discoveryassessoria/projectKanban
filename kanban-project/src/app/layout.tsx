@@ -32,14 +32,13 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden overflow-y-hidden`}
-        suppressHydrationWarning
+      suppressHydrationWarning
       >
         <Providers>
           <SidebarWrapper>
             {children}
           </SidebarWrapper>
-          <Toaster />
+            <Toaster />
         </Providers>
       </body>
     </html>

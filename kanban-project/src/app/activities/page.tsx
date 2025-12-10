@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Filter, ChevronDown } from "lucide-react"
+import { Plus, Search, Filter, ChevronDown, LogOut, Bell, BarChart3, FolderOpen, ClipboardList } from "lucide-react"
+import { useRouter } from "next/navigation"
 import ListaActivities from "@/src/components/activitiesComponents/listaActivities"
 import ListaProjects from "@/src/components/activitiesComponents/listaProjects"
 import PrazoActivities from "@/src/components/activitiesComponents/prazoActivities"
@@ -18,11 +19,21 @@ import CalendarioActivities from "@/src/components/activitiesComponents/calendar
 import { useProjects, useStatuses, useUsers, useActivities, invalidateActivities, invalidateProjects } from "@/src/hooks/useActivitiesData"
 import type { Atividade, Projeto, Status, Usuario } from "@/src/hooks/useActivitiesData"
 
-interface UserAtv {
-  usuario: Usuario
+// Interfaces
+interface UserData {
+  nome: string
+  tipo?: string
 }
 
-interface FormData {
+interface Filters {
+  dataInicio: string
+  dataFim: string
+  projeto: string
+  status: string
+  responsavel: string
+}
+
+interface ActivityFormData {
   nome: string
   descricao: string
   data_termino: string
@@ -30,140 +41,396 @@ interface FormData {
   status_id: string
 }
 
+interface ProjectFormData {
+  nome: string
+  descricao: string
+}
+
 export default function ActivitiesPage() {
+  const router = useRouter()
   const [searchModalOpen, setSearchModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filteredActivities, setFilteredActivities] = useState<Atividade[]>([])
   const [filterModalOpen, setFilterModalOpen] = useState(false)
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<Filters>({
     dataInicio: '',
     dataFim: '',
     projeto: 'all',
     status: 'all',
     responsavel: 'all'
   })
+  const [mounted, setMounted] = useState(false)
+  const [user, setUser] = useState<UserData>({ nome: "Usuário" })
 
-  return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      {/* Header */}
-      <div className="flex items-center justify-between space-y-2">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Minhas Tarefas</h2>
-          <p className="text-muted-foreground">
-            Gerencie suas atividades e projetos
-          </p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <CreateActivityModal />
+  // Estados para pesquisa do header
+  const [headerSearchQuery, setHeaderSearchQuery] = useState("")
+  const [showHeaderSearchResults, setShowHeaderSearchResults] = useState(false)
+
+  // Estado para notificações
+  const [showNotifications, setShowNotifications] = useState(false)
+
+  // Dados
+  const { activities } = useActivities()
+  const { projects } = useProjects()
+
+  useEffect(() => {
+    setMounted(true)
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('user')
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser))
+        } catch {
+          setUser({ nome: "Usuário" })
+        }
+      }
+    }
+  }, [])
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken")
+    localStorage.removeItem("user")
+    router.push("/login")
+  }
+
+  const getInitials = (nome: string) => {
+    if (!nome) return "US"
+    return nome
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
+  // Handlers para os modais
+  const handleFiltersChange = useCallback((newFilters: Filters) => {
+    setFilters(newFilters)
+  }, [])
+
+  const handleSearchTermChange = useCallback((term: string) => {
+    setSearchTerm(term)
+  }, [])
+
+  const handleFilteredActivitiesChange = useCallback((activities: Atividade[]) => {
+    setFilteredActivities(activities)
+  }, [])
+
+  // Pesquisa do header
+  const getHeaderSearchResults = () => {
+    if (!headerSearchQuery.trim()) {
+      return { activities: [], projects: [] }
+    }
+
+    const queryLower = headerSearchQuery.toLowerCase()
+
+    const filteredActivities = (activities || []).filter(a =>
+      a.nome.toLowerCase().includes(queryLower) ||
+      a.descricao?.toLowerCase().includes(queryLower)
+    ).slice(0, 5)
+
+    const filteredProjects = (projects || []).filter(p =>
+      p.nome.toLowerCase().includes(queryLower) ||
+      p.descricao?.toLowerCase().includes(queryLower)
+    ).slice(0, 5)
+
+    return { activities: filteredActivities, projects: filteredProjects }
+  }
+
+  const headerSearchResults = getHeaderSearchResults()
+  const hasResults = headerSearchResults.activities.length > 0 || headerSearchResults.projects.length > 0
+
+  // Tela de carregamento
+  if (!mounted) {
+    return (
+      <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
+        <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
+        <div className="min-h-screen bg-black/40 backdrop-blur-sm flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin h-12 w-12 border-4 border-white border-t-transparent rounded-full mx-auto mb-4" />
+            <p className="text-white/70">Carregando atividades...</p>
+          </div>
         </div>
       </div>
+    )
+  }
 
-      {/* Top Tabs */}
-      <Tabs defaultValue="activities" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="activities">Atividades</TabsTrigger>
-          <TabsTrigger value="projects">Projetos</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="activities" className="space-y-4">
-          {/* Secondary Tabs */}
-          <Tabs defaultValue="list" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <TabsList>
-                <TabsTrigger value="list">Lista</TabsTrigger>
-                <TabsTrigger value="deadline">Prazo</TabsTrigger>
-                <TabsTrigger value="calendar">Calendário</TabsTrigger>
-              </TabsList>
-              
-              {/* Filters and Actions */}
-              <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm" onClick={() => setFilterModalOpen(true)}>
-                  <Filter className="mr-2 h-4 w-4" />
-                  Filtro
-                  <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setSearchModalOpen(true)}>
-                  <Search className="mr-2 h-4 w-4" />
-                  Pesquisar
-                </Button>
+  return (
+    <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
+      {/* BACKGROUND FIXO */}
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
+
+      {/* HEADER PADRONIZADO - IGUAL AO DASHBOARD */}
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-black/40 backdrop-blur-md shadow-lg">
+        <div className="px-6 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold leading-tight text-white">
+              Grupo Discovery · Minhas Tarefas
+            </h1>
+            <p className="text-xs text-white/70">
+              Gerencie suas atividades e projetos
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Barra de pesquisa funcional */}
+            <div className="relative hidden md:block">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-full border border-white/30">
+                <Search className="h-4 w-4 text-white/70" />
+                <input
+                  className="bg-transparent text-xs outline-none placeholder:text-white/60 w-40 text-white"
+                  placeholder="Pesquisar no sistema..."
+                  value={headerSearchQuery}
+                  onChange={(e) => setHeaderSearchQuery(e.target.value)}
+                  onFocus={() => setShowHeaderSearchResults(true)}
+                  onBlur={() => setTimeout(() => setShowHeaderSearchResults(false), 200)}
+                />
+              </div>
+
+              {/* Dropdown de resultados */}
+              {showHeaderSearchResults && (
+                <div className="absolute top-full mt-2 left-0 right-0 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
+                  {!hasResults ? (
+                    <div className="px-4 py-6 text-center text-gray-400">
+                      <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm text-gray-600">Nenhum resultado encontrado</p>
+                      <p className="text-xs mt-1 text-gray-400">Tente buscar por outro termo</p>
+                    </div>
+                  ) : (
+                    <div className="max-h-80 overflow-y-auto">
+                      {headerSearchResults.activities.length > 0 && (
+                        <>
+                          <div className="px-3 py-2 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500 font-medium">
+                            Atividades
+                          </div>
+                          {headerSearchResults.activities.map(activity => (
+                            <button
+                              key={`activity-${activity.id}`}
+                              className="w-full px-3 py-2 flex items-center gap-3 hover:bg-gray-100 transition text-left"
+                              onClick={() => {
+                                setShowHeaderSearchResults(false)
+                                setHeaderSearchQuery("")
+                              }}
+                            >
+                              <ClipboardList className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-gray-800 truncate">{activity.nome}</p>
+                                <p className="text-[10px] text-gray-400 truncate">{activity.descricao || "Sem descrição"}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      {headerSearchResults.projects.length > 0 && (
+                        <>
+                          <div className="px-3 py-2 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500 font-medium">
+                            Projetos
+                          </div>
+                          {headerSearchResults.projects.map(project => (
+                            <button
+                              key={`project-${project.id}`}
+                              className="w-full px-3 py-2 flex items-center gap-3 hover:bg-gray-100 transition text-left"
+                              onClick={() => {
+                                setShowHeaderSearchResults(false)
+                                setHeaderSearchQuery("")
+                              }}
+                            >
+                              <FolderOpen className="h-4 w-4 text-sky-500 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-gray-800 truncate">{project.nome}</p>
+                                <p className="text-[10px] text-gray-400 truncate">{project.descricao || "Sem descrição"}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Botão de notificações */}
+            <div className="relative hidden md:block">
+              <button 
+                className="relative inline-flex items-center justify-center rounded-full p-2 border border-white/30 hover:bg-white/10 transition"
+                onClick={() => setShowNotifications(!showNotifications)}
+                onBlur={() => setTimeout(() => setShowNotifications(false), 200)}
+              >
+                <Bell className="h-4 w-4 text-white" />
+              </button>
+
+              {/* Dropdown de notificações */}
+              {showNotifications && (
+                <div className="absolute top-full mt-2 right-0 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
+                  <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                    <h3 className="font-semibold text-gray-800 text-sm">Notificações</h3>
+                    <p className="text-xs text-gray-500">0 pendentes</p>
+                  </div>
+
+                  <div className="px-4 py-8 text-center">
+                    <Bell className="h-10 w-10 mx-auto mb-2 text-gray-300" />
+                    <p className="text-sm text-gray-500">Nenhuma notificação</p>
+                    <p className="text-xs text-gray-400 mt-1">Você está em dia!</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Avatar className="h-9 w-9 border border-white/30">
+                <AvatarFallback className="bg-transparent text-xs font-medium text-white">
+                  {getInitials(user.nome)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="hidden md:block">
+                <p className="text-xs font-medium leading-tight text-white">
+                  {user.nome}
+                </p>
+                <p className="text-[11px] text-white/70 leading-tight">
+                  {user.tipo === 'admin' ? 'Administrador' : user.tipo || 'Usuário'}
+                </p>
               </div>
             </div>
-            
-            {/* Renderizar todos os conteúdos, mas controlar visibilidade via CSS */}
-            <TabsContent value="list" className="space-y-4">
-              <ListaActivities filters={filters} />
-            </TabsContent>
-            
-            <TabsContent value="deadline" className="space-y-4">
-              <PrazoActivities />
-            </TabsContent>
-            
-            <TabsContent value="calendar" className="space-y-4">
-              <CalendarioActivities />
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
-        
-        <TabsContent value="projects" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium">Projetos</h3>
-              <p className="text-sm text-muted-foreground">
-                Gerencie seus projetos
-              </p>
-            </div>
-            <CreateProjectModal />
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              className="border-white/30 text-xs bg-transparent hover:bg-red-500/20 hover:border-red-400/50 text-white hover:text-red-400 flex items-center justify-center gap-1.5"
+            >
+              <LogOut className="h-3 w-3" />
+              Sair
+            </Button>
           </div>
-          <ListaProjects />
-        </TabsContent>
-      </Tabs>
+        </div>
+      </header>
 
-      {/* Modal de Pesquisa */}
-      <SearchModal 
-        open={searchModalOpen}
-        onOpenChange={setSearchModalOpen}
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        filteredActivities={filteredActivities}
-        setFilteredActivities={setFilteredActivities}
-      />
+      {/* CONTEÚDO COM OVERLAY ESCURO IGUAL DASHBOARD */}
+      <div className="min-h-screen relative">
+        {/* Overlay apenas na área do conteúdo */}
+        <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+        <main className="relative px-4 py-4 max-w-full">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <CreateActivityModal />
+          </div>
+        </div>
 
-      {/* Modal de Filtros */}
-      <FilterModal 
-        open={filterModalOpen}
-        onOpenChange={setFilterModalOpen}
-        filters={filters}
-        setFilters={setFilters}
-      />
+        {/* Top Tabs */}
+        <Tabs defaultValue="activities" className="space-y-4">
+          <TabsList className="bg-transparent border border-white/30">
+            <TabsTrigger value="activities" className="data-[state=active]:bg-white/20 text-white">Atividades</TabsTrigger>
+            <TabsTrigger value="projects" className="data-[state=active]:bg-white/20 text-white">Projetos</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="activities" className="space-y-4">
+            {/* Secondary Tabs */}
+            <Tabs defaultValue="list" className="space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <TabsList className="bg-transparent border border-white/30">
+                  <TabsTrigger value="list" className="data-[state=active]:bg-white/20 text-white">Lista</TabsTrigger>
+                  <TabsTrigger value="deadline" className="data-[state=active]:bg-white/20 text-white">Prazo</TabsTrigger>
+                  <TabsTrigger value="calendar" className="data-[state=active]:bg-white/20 text-white">Calendário</TabsTrigger>
+                </TabsList>
+                
+                {/* Filters and Actions */}
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" onClick={() => setFilterModalOpen(true)} className="bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white">
+                    <Filter className="mr-2 h-4 w-4" />
+                    Filtro
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setSearchModalOpen(true)} className="bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white">
+                    <Search className="mr-2 h-4 w-4" />
+                    Pesquisar
+                  </Button>
+                </div>
+              </div>
+              
+              <TabsContent value="list" className="space-y-4">
+                <div className="p-4">
+                  <ListaActivities filters={filters} />
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="deadline" className="space-y-4">
+                <div className="p-4">
+                  <PrazoActivities />
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="calendar" className="space-y-4">
+                <div className="p-4">
+                  <CalendarioActivities />
+                </div>
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
+          
+          <TabsContent value="projects" className="space-y-4">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-medium text-white">Projetos</h3>
+                  <p className="text-sm text-white/70">
+                    Gerencie seus projetos
+                  </p>
+                </div>
+                <CreateProjectModal />
+              </div>
+              <ListaProjects />
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Modal de Pesquisa */}
+        <SearchModal 
+          open={searchModalOpen}
+          onOpenChange={setSearchModalOpen}
+          searchTerm={searchTerm}
+          onSearchTermChange={handleSearchTermChange}
+          filteredActivities={filteredActivities}
+          onFilteredActivitiesChange={handleFilteredActivitiesChange}
+        />
+
+        {/* Modal de Filtros */}
+        <FilterModal 
+          open={filterModalOpen}
+          onOpenChange={setFilterModalOpen}
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+        />
+      </main>
+      </div>
     </div>
   )
+}
+
+// COMPONENTE: FilterModal
+interface FilterModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  filters: Filters
+  onFiltersChange: (filters: Filters) => void
 }
 
 function FilterModal({ 
   open, 
   onOpenChange, 
   filters, 
-  setFilters
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  filters: any
-  setFilters: (filters: any) => void
-}) {
-  // Usar hooks de cache para carregar dados
+  onFiltersChange 
+}: FilterModalProps) {
   const { projects } = useProjects()
   const { statuses } = useStatuses()
   const { users } = useUsers()
 
-  const handleFilterChange = (field: string, value: string) => {
-    setFilters((prev: any) => ({
-      ...prev,
-      [field]: value
-    }))
+  const handleApplyFilters = () => {
+    onOpenChange(false)
   }
 
-  const clearFilters = () => {
-    setFilters({
+  const handleClearFilters = () => {
+    onFiltersChange({
       dataInicio: '',
       dataFim: '',
       projeto: 'all',
@@ -172,77 +439,65 @@ function FilterModal({
     })
   }
 
-  const applyFilters = () => {
-    onOpenChange(false)
-    // Não precisa mais forçar re-render, o SWR vai detectar mudança de filtros automaticamente
+  const updateFilter = (key: keyof Filters, value: string) => {
+    onFiltersChange({ ...filters, [key]: value })
   }
-
-  const hasActiveFilters = Object.values(filters).some(filter => filter !== '' && filter !== 'all')
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="bg-white/10 border-white/20 backdrop-blur-xl text-white">
         <DialogHeader>
-          <DialogTitle>Filtrar Atividades</DialogTitle>
+          <DialogTitle className="text-white">Filtrar Atividades</DialogTitle>
         </DialogHeader>
-        
-        <div className="space-y-6">
-          {/* Filtros de Data de Criação */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Data de Criação</Label>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="dataInicio" className="text-xs">De:</Label>
-                <Input
-                  id="dataInicio"
-                  type="date"
-                  value={filters.dataInicio}
-                  onChange={(e) => handleFilterChange('dataInicio', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dataFim" className="text-xs">Até:</Label>
-                <Input
-                  id="dataFim"
-                  type="date"
-                  value={filters.dataFim}
-                  onChange={(e) => handleFilterChange('dataFim', e.target.value)}
-                />
-              </div>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-white/90">Data Início</Label>
+              <Input
+                type="date"
+                value={filters.dataInicio}
+                onChange={(e) => updateFilter('dataInicio', e.target.value)}
+                className="bg-white/10 border-white/20 text-white"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-white/90">Data Fim</Label>
+              <Input
+                type="date"
+                value={filters.dataFim}
+                onChange={(e) => updateFilter('dataFim', e.target.value)}
+                className="bg-white/10 border-white/20 text-white"
+              />
             </div>
           </div>
-
-          {/* Filtros de Projeto e Status */}
-
-          {/* Filtro por Projeto */}
+          
           <div className="space-y-2">
-            <Label htmlFor="projeto">Projeto</Label>
-            <Select value={filters.projeto} onValueChange={(value) => handleFilterChange('projeto', value)}>
-              <SelectTrigger>
+            <Label className="text-white/90">Projeto</Label>
+            <Select value={filters.projeto} onValueChange={(value) => updateFilter('projeto', value)}>
+              <SelectTrigger className="bg-white/10 border-white/20 text-white">
                 <SelectValue placeholder="Selecione um projeto" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os projetos</SelectItem>
-                {projects.map((projeto) => (
-                  <SelectItem key={projeto.id} value={projeto.id?.toString() || ''}>
-                    {projeto.nome}
+              <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
+                <SelectItem value="all">Todos os Projetos</SelectItem>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={String(project.id)}>
+                    {project.nome}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Filtro por Status */}
           <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
-            <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>
-              <SelectTrigger>
+            <Label className="text-white/90">Status</Label>
+            <Select value={filters.status} onValueChange={(value) => updateFilter('status', value)}>
+              <SelectTrigger className="bg-white/10 border-white/20 text-white">
                 <SelectValue placeholder="Selecione um status" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os status</SelectItem>
+              <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
+                <SelectItem value="all">Todos os Status</SelectItem>
                 {statuses.map((status) => (
-                  <SelectItem key={status.id} value={status.id?.toString() || ''}>
+                  <SelectItem key={status.id} value={String(status.id)}>
                     {status.nome}
                   </SelectItem>
                 ))}
@@ -250,41 +505,35 @@ function FilterModal({
             </Select>
           </div>
 
-          {/* Filtro por Responsável */}
           <div className="space-y-2">
-            <Label htmlFor="responsavel">Responsável</Label>
-            <Select value={filters.responsavel} onValueChange={(value) => handleFilterChange('responsavel', value)}>
-              <SelectTrigger>
+            <Label className="text-white/90">Responsável</Label>
+            <Select value={filters.responsavel} onValueChange={(value) => updateFilter('responsavel', value)}>
+              <SelectTrigger className="bg-white/10 border-white/20 text-white">
                 <SelectValue placeholder="Selecione um responsável" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os responsáveis</SelectItem>
-                {users.map((usuario) => (
-                  <SelectItem key={usuario.email} value={usuario.email}>
-                    {usuario.nome}
+              <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
+                <SelectItem value="all">Todos os Responsáveis</SelectItem>
+                {users.map((u) => (
+                  <SelectItem key={u.email} value={u.email}>
+                    {u.nome}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Indicador de filtros ativos */}
-          {hasActiveFilters && (
-            <div className="text-sm text-blue-600 bg-blue-50 p-2 rounded">
-              ⚠️ Filtros ativos - {Object.values(filters).filter(f => f !== '').length} filtro(s) aplicado(s)
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-between pt-4">
-          <Button type="button" variant="outline" onClick={clearFilters}>
-            Limpar Filtros
-          </Button>
-          <div className="space-x-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
+          <div className="flex gap-2 pt-4">
+            <Button 
+              onClick={handleClearFilters}
+              variant="outline" 
+              className="flex-1 bg-white/10 border-white/20 text-white hover:bg-white/20"
+            >
+              Limpar Filtros
             </Button>
-            <Button type="button" onClick={applyFilters}>
+            <Button 
+              onClick={handleApplyFilters}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+            >
               Aplicar Filtros
             </Button>
           </div>
@@ -294,166 +543,96 @@ function FilterModal({
   )
 }
 
+// COMPONENTE: SearchModal
+interface SearchModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  searchTerm: string
+  onSearchTermChange: (term: string) => void
+  filteredActivities: Atividade[]
+  onFilteredActivitiesChange: (activities: Atividade[]) => void
+}
+
 function SearchModal({ 
   open, 
   onOpenChange, 
   searchTerm, 
-  setSearchTerm, 
-  filteredActivities, 
-  setFilteredActivities 
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  searchTerm: string
-  setSearchTerm: (term: string) => void
-  filteredActivities: Atividade[]
-  setFilteredActivities: (activities: Atividade[]) => void
-}) {
-  // Usar hook de cache para carregar todas as atividades
-  const { activities = [], isLoading: isSearching } = useActivities()
+  onSearchTermChange,
+  filteredActivities,
+  onFilteredActivitiesChange
+}: SearchModalProps) {
+  const { activities } = useActivities()
 
-  // Calcular resultados filtrados diretamente (sem useEffect para evitar loops)
-  const searchResults = searchTerm.trim() === '' 
-    ? activities 
-    : activities.filter(atividade => 
-        atividade.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        atividade.descricao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        atividade.projeto.nome.toLowerCase().includes(searchTerm.toLowerCase())
+  useEffect(() => {
+    if (searchTerm && activities && activities.length > 0) {
+      const filtered = activities.filter((activity) =>
+        activity.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (activity.descricao && activity.descricao.toLowerCase().includes(searchTerm.toLowerCase()))
       )
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'Sem prazo'
-    
-    const date = new Date(dateString)
-    return date.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    })
-  }
-
-  const handleClose = () => {
-    setSearchTerm('')
-    onOpenChange(false)
-  }
+      onFilteredActivitiesChange(filtered)
+    } else {
+      onFilteredActivitiesChange([])
+    }
+  }, [searchTerm, activities, onFilteredActivitiesChange])
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[800px] max-h-[80vh]">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-white/10 border-white/20 backdrop-blur-xl text-white max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Pesquisar Atividades</DialogTitle>
+          <DialogTitle className="text-white">Pesquisar Atividades</DialogTitle>
         </DialogHeader>
-        
         <div className="space-y-4">
-          {/* Campo de pesquisa */}
-          <div className="space-y-2">
-            <Label htmlFor="search">Pesquisar por nome, descrição ou projeto</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
             <Input
-              id="search"
-              type="text"
               placeholder="Digite para pesquisar..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full"
+              onChange={(e) => onSearchTermChange(e.target.value)}
+              className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/60"
             />
           </div>
 
-          {/* Resultados da pesquisa */}
-          <div className="border rounded-lg max-h-[400px] overflow-y-auto">
-            {isSearching ? (
-              <div className="p-4 text-center">
-                <p className="text-sm text-muted-foreground">Carregando atividades...</p>
-              </div>
-            ) : searchResults.length === 0 ? (
-              <div className="p-4 text-center">
-                <p className="text-sm text-muted-foreground">
-                  {searchTerm ? 'Nenhuma atividade encontrada' : 'Digite algo para pesquisar'}
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y">
-                {/* Cabeçalho da tabela */}
-                <div className="bg-muted/50 px-4 py-2 text-sm font-medium">
-                  <div className="grid grid-cols-12 gap-2">
-                    <div className="col-span-4">Nome</div>
-                    <div className="col-span-2">Projeto</div>
-                    <div className="col-span-2">Status</div>
-                    <div className="col-span-2">Criação</div>
-                    <div className="col-span-2">Prazo</div>
+          <div className="max-h-96 overflow-y-auto space-y-2">
+            {filteredActivities.length > 0 ? (
+              filteredActivities.map((activity) => (
+                <div 
+                  key={activity.id}
+                  className="p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition cursor-pointer"
+                >
+                  <h4 className="font-medium text-white">{activity.nome}</h4>
+                  {activity.descricao && (
+                    <p className="text-sm text-white/70 mt-1">{activity.descricao}</p>
+                  )}
+                  <div className="flex items-center gap-2 mt-2">
+                    {activity.projeto?.nome && (
+                      <Badge variant="outline" className="text-xs bg-white/10 border-white/20 text-white">
+                        {activity.projeto.nome}
+                      </Badge>
+                    )}
+                    {activity.status?.nome && (
+                      <Badge variant="outline" className="text-xs bg-white/10 border-white/20 text-white">
+                        {activity.status.nome}
+                      </Badge>
+                    )}
                   </div>
                 </div>
-                
-                {/* Linhas dos resultados */}
-                {searchResults.map((atividade) => (
-                  <div key={atividade.id} className="px-4 py-3 hover:bg-muted/30 transition-colors">
-                    <div className="grid grid-cols-12 gap-2 items-center">
-                      <div className="col-span-4">
-                        <div className="space-y-1">
-                          <div className="font-medium text-sm">{atividade.nome}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {atividade.descricao || 'Sem descrição'}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="col-span-2">
-                        <div className="text-sm">{atividade.projeto.nome}</div>
-                      </div>
-                      
-                      <div className="col-span-2">
-                        <Badge 
-                          className={
-                            atividade.status.nome.toLowerCase() === 'concluído' || atividade.status.nome.toLowerCase() === 'concluido'
-                              ? "bg-green-100 text-green-800 hover:bg-green-200 border-green-200"
-                              : atividade.status.nome.toLowerCase() === 'em andamento'
-                              ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200"
-                              : "bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200"
-                          }
-                        >
-                          {atividade.status.nome}
-                        </Badge>
-                      </div>
-                      
-                      <div className="col-span-2">
-                        <div className="text-sm">{formatDate(atividade.data_criacao)}</div>
-                      </div>
-                      
-                      <div className="col-span-2">
-                        <div className="text-sm">{formatDate(atividade.data_termino)}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              ))
+            ) : searchTerm ? (
+              <p className="text-center text-white/60 py-8">Nenhuma atividade encontrada</p>
+            ) : (
+              <p className="text-center text-white/60 py-8">Digite para pesquisar atividades</p>
             )}
           </div>
-
-          {/* Rodapé com informações */}
-          {searchResults.length > 0 && (
-            <div className="text-sm text-muted-foreground text-center">
-              {searchTerm ? (
-                <span>Encontradas {searchResults.length} atividade(s) para "{searchTerm}"</span>
-              ) : (
-                <span>Total: {searchResults.length} atividade(s)</span>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end pt-4">
-          <Button type="button" variant="outline" onClick={handleClose}>
-            Fechar
-          </Button>
         </div>
       </DialogContent>
     </Dialog>
   )
 }
 
+// COMPONENTE: CreateActivityModal
 function CreateActivityModal() {
   const [open, setOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<ActivityFormData>({
     nome: '',
     descricao: '',
     data_termino: '',
@@ -461,31 +640,30 @@ function CreateActivityModal() {
     status_id: ''
   })
 
-  // Usar hooks de cache para carregar dados
   const { projects } = useProjects()
   const { statuses } = useStatuses()
 
+  const updateFormData = (key: keyof ActivityFormData, value: string) => {
+    setFormData(prev => ({ ...prev, [key]: value }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
-
+    
     try {
-      const response = await fetch('/api/activities', {
+      const token = localStorage.getItem('authToken')
+      const response = await fetch('/api/atividades', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          nome: formData.nome,
-          descricao: formData.descricao,
-          data_termino: formData.data_termino ? new Date(formData.data_termino).toISOString() : null,
-          projeto_id: parseInt(formData.projeto_id),
-          status_id: parseInt(formData.status_id)
-        })
+        body: JSON.stringify(formData)
       })
 
       if (response.ok) {
-        // Resetar form
+        invalidateActivities()
+        setOpen(false)
         setFormData({
           nome: '',
           descricao: '',
@@ -493,81 +671,71 @@ function CreateActivityModal() {
           projeto_id: '',
           status_id: ''
         })
-        setOpen(false)
-        // Invalidar cache de atividades para recarregar
-        invalidateActivities()
-      } else {
-        console.error('Erro ao criar atividade')
       }
     } catch (error) {
       console.error('Erro ao criar atividade:', error)
-    } finally {
-      setIsLoading(false)
     }
-  }
-
-  const handleInputChange = (field: keyof FormData, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Criar
+        <Button className="bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center justify-center gap-1.5 h-9">
+          <span className="-mt-[2px]">+</span>
+          <span>Nova Atividade</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="bg-white/10 border-white/20 backdrop-blur-xl text-white">
         <DialogHeader>
-          <DialogTitle>Criar Nova Atividade</DialogTitle>
+          <DialogTitle className="text-white">Criar Nova Atividade</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="nome">Nome da Atividade</Label>
+            <Label className="text-white/90">Nome da Atividade</Label>
             <Input
-              id="nome"
-              value={formData.nome}
-              onChange={(e) => handleInputChange('nome', e.target.value)}
-              placeholder="Digite o nome da atividade"
               required
+              value={formData.nome}
+              onChange={(e) => updateFormData('nome', e.target.value)}
+              className="bg-white/10 border-white/20 text-white"
+              placeholder="Digite o nome da atividade"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="descricao">Descrição</Label>
+            <Label className="text-white/90">Descrição</Label>
             <Textarea
-              id="descricao"
               value={formData.descricao}
-              onChange={(e) => handleInputChange('descricao', e.target.value)}
-              placeholder="Digite a descrição da atividade"
-              rows={3}
+              onChange={(e) => updateFormData('descricao', e.target.value)}
+              className="bg-white/10 border-white/20 text-white"
+              placeholder="Descreva a atividade"
+              rows={4}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="data_termino">Data de Término</Label>
+            <Label className="text-white/90">Data de Término</Label>
             <Input
-              id="data_termino"
-              type="datetime-local"
+              type="date"
+              required
               value={formData.data_termino}
-              onChange={(e) => handleInputChange('data_termino', e.target.value)}
+              onChange={(e) => updateFormData('data_termino', e.target.value)}
+              className="bg-white/10 border-white/20 text-white"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="projeto">Projeto</Label>
-            <Select value={formData.projeto_id} onValueChange={(value) => handleInputChange('projeto_id', value)}>
-              <SelectTrigger>
+            <Label className="text-white/90">Projeto</Label>
+            <Select 
+              value={formData.projeto_id} 
+              onValueChange={(value) => updateFormData('projeto_id', value)}
+            >
+              <SelectTrigger className="bg-white/10 border-white/20 text-white">
                 <SelectValue placeholder="Selecione um projeto" />
               </SelectTrigger>
-              <SelectContent>
-                {projects.map((projeto) => (
-                  <SelectItem key={projeto.id} value={projeto.id?.toString() || ''}>
-                    {projeto.nome}
+              <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={String(project.id)}>
+                    {project.nome}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -575,148 +743,112 @@ function CreateActivityModal() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
-            <Select value={formData.status_id} onValueChange={(value) => handleInputChange('status_id', value)}>
-              <SelectTrigger>
+            <Label className="text-white/90">Status</Label>
+            <Select 
+              value={formData.status_id} 
+              onValueChange={(value) => updateFormData('status_id', value)}
+            >
+              <SelectTrigger className="bg-white/10 border-white/20 text-white">
                 <SelectValue placeholder="Selecione um status" />
               </SelectTrigger>
-              <SelectContent>
-                {statuses.map((st) => (
-                  <SelectItem key={st.id} value={st.id?.toString() || ''}>
-                    {st.nome}
+              <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
+                {statuses.map((status) => (
+                  <SelectItem key={status.id} value={String(status.id)}>
+                    {status.nome}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Criando...' : 'Criar Atividade'}
-            </Button>
-          </div>
+          <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+            Criar Atividade
+          </Button>
         </form>
       </DialogContent>
     </Dialog>
   )
 }
 
+// COMPONENTE: CreateProjectModal
 function CreateProjectModal() {
   const [open, setOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ProjectFormData>({
     nome: '',
     descricao: ''
   })
 
+  const updateFormData = (key: keyof ProjectFormData, value: string) => {
+    setFormData(prev => ({ ...prev, [key]: value }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
-
+    
     try {
+      const token = localStorage.getItem('authToken')
       const response = await fetch('/api/projetos', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          nome: formData.nome,
-          descricao: formData.descricao
-        })
+        body: JSON.stringify(formData)
       })
 
       if (response.ok) {
-        // Resetar form
+        invalidateProjects()
+        setOpen(false)
         setFormData({
           nome: '',
           descricao: ''
         })
-        setOpen(false)
-        // Invalidar cache de projetos para recarregar
-        invalidateProjects()
-      } else {
-        const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }))
-        alert(`Erro ao criar projeto: ${errorData.error || 'Erro desconhecido'}`)
-        console.error('Erro ao criar projeto:', errorData)
       }
     } catch (error) {
-      alert('Erro ao criar projeto: Erro de conexão')
       console.error('Erro ao criar projeto:', error)
-    } finally {
-      setIsLoading(false)
     }
-  }
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Criar Projeto
+        <Button className="bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center justify-center gap-1.5 h-9">
+          <span className="-mt-[2px]">+</span>
+          <span>Novo Projeto</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="bg-white/10 border-white/20 backdrop-blur-xl text-white">
         <DialogHeader>
-          <DialogTitle>Criar Novo Projeto</DialogTitle>
+          <DialogTitle className="text-white">Criar Novo Projeto</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="nome">Nome do Projeto</Label>
+            <Label className="text-white/90">Nome do Projeto</Label>
             <Input
-              id="nome"
-              value={formData.nome}
-              onChange={(e) => handleInputChange('nome', e.target.value)}
-              placeholder="Digite o nome do projeto"
               required
+              value={formData.nome}
+              onChange={(e) => updateFormData('nome', e.target.value)}
+              className="bg-white/10 border-white/20 text-white"
+              placeholder="Digite o nome do projeto"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="descricao">Descrição</Label>
+            <Label className="text-white/90">Descrição</Label>
             <Textarea
-              id="descricao"
               value={formData.descricao}
-              onChange={(e) => handleInputChange('descricao', e.target.value)}
-              placeholder="Digite a descrição do projeto"
-              rows={3}
+              onChange={(e) => updateFormData('descricao', e.target.value)}
+              className="bg-white/10 border-white/20 text-white"
+              placeholder="Descreva o projeto"
+              rows={4}
             />
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Criando...' : 'Criar Projeto'}
-            </Button>
-          </div>
+          <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+            Criar Projeto
+          </Button>
         </form>
       </DialogContent>
     </Dialog>
-  )
-}
-
-function DevelopmentMessage({ feature }: { feature: string }) {
-  return (
-    <div className="border rounded-lg">
-      <div className="p-8">
-        <div className="flex items-center justify-center h-32">
-          <div className="text-center space-y-2">
-            <h3 className="text-lg font-medium">{feature}</h3>
-            <p className="text-muted-foreground">Em desenvolvimento</p>
-          </div>
-        </div>
-      </div>
-    </div>
   )
 }

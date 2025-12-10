@@ -7,13 +7,6 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface AuthProps {
@@ -67,31 +60,34 @@ export default function AuthComponent({
   }
 
   return (
-  <Card
-    className="
-      w-full max-w-sm mx-auto
-      bg-white text-slate-900 dark:bg-white
-      rounded-[24px] shadow-2xl border border-slate-200
-    "
-  >
-    {/* Cabeçalho */}
-    <CardHeader className="text-center pt-4 pb-1 px-8">
-      <CardTitle className="text-[28px] font-semibold text-slate-900 leading-tight">
-        Bem-vindo!
-      </CardTitle>
-      <CardDescription className="mt-1 text-[14px] text-slate-500 leading-tight">
-        Faça login para continuar.
-      </CardDescription>
-    </CardHeader>
+    <div
+      className="
+        w-full max-w-md mx-auto
+        bg-white
+        text-slate-900
+        rounded-[20px] 
+        shadow-2xl 
+        border border-slate-200
+        p-8
+      "
+    >
+      {/* Cabeçalho */}
+      <div className="text-center mb-6">
+        <h1 className="text-[28px] font-semibold text-slate-900">
+          Bem-vindo!
+        </h1>
+        <p className="text-[14px] text-slate-500 mt-0.5">
+          Faça login para continuar.
+        </p>
+      </div>
 
-    {/* Conteúdo */}
-    <CardContent className="px-8 pt-3 pb-4">
-      <form onSubmit={handleLogin} className="space-y-3">
+      {/* Formulário */}
+      <form onSubmit={handleLogin} className="space-y-4">
         {/* EMAIL */}
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <Label
             htmlFor="login-email"
-            className="text-sm font-medium text-slate-900"
+            className="text-sm font-medium text-slate-700"
           >
             Email
           </Label>
@@ -104,11 +100,11 @@ export default function AuthComponent({
             disabled={isLoading}
             className="
               h-12 text-[15px]
-              !bg-white dark:!bg-white
-              border border-slate-300
-              !text-slate-900 dark:!text-slate-900
+              bg-white
+              border border-slate-200
+              text-slate-900
               placeholder:text-slate-400
-              rounded-md
+              rounded-lg
               focus-visible:ring-2
               focus-visible:ring-[#123C73]/30
               focus-visible:border-[#123C73]
@@ -118,10 +114,10 @@ export default function AuthComponent({
         </div>
 
         {/* SENHA */}
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <Label
             htmlFor="login-senha"
-            className="text-sm font-medium text-slate-900"
+            className="text-sm font-medium text-slate-700"
           >
             Senha
           </Label>
@@ -134,11 +130,11 @@ export default function AuthComponent({
             disabled={isLoading}
             className="
               h-12 text-[15px]
-              !bg-white dark:!bg-white
-              border border-slate-300
-              !text-slate-900 dark:!text-slate-900
+              bg-white
+              border border-slate-200
+              text-slate-900
               placeholder:text-slate-400
-              rounded-md
+              rounded-lg
               focus-visible:ring-2
               focus-visible:ring-[#123C73]/30
               focus-visible:border-[#123C73]
@@ -163,8 +159,9 @@ export default function AuthComponent({
             w-full h-12
             bg-[#123C73] hover:bg-[#0f315f]
             text-white font-medium text-[15px]
-            rounded-md
+            rounded-lg
             transition-all duration-150
+            mt-2
           "
           disabled={isLoading}
         >
@@ -172,12 +169,11 @@ export default function AuthComponent({
         </Button>
 
         {/* TEXTO FINAL */}
-        <div className="pt-2 text-center text-[13px] text-slate-500 leading-tight">
-          <p className="italic mb-[2px]">Não possui uma conta?</p>
+        <div className="pt-3 text-center text-[13px] text-slate-500">
+          <p className="italic">Não possui uma conta?</p>
           <p>Entre em contato com um administrador.</p>
         </div>
       </form>
-    </CardContent>
-  </Card>
+    </div>
   )
 }

@@ -33,7 +33,6 @@ interface Status {
 interface KanbanBoardProps {
   projeto: Projeto
   onStatusAdd: () => void
-  // Props para contratantes e requerentes
   contratantes?: Contratante[]
   requerentes?: Requerente[]
   selectedContratantes?: Contratante[]
@@ -74,13 +73,12 @@ export function KanbanBoard({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 3, // Reduced activation distance to 3px for easier dragging
+        distance: 3,
       },
     }),
   )
 
   useEffect(() => {
-    // Convert Atividade[] to AtividadeWithStatus[] by adding status object
     const atividadesWithStatus: AtividadeWithStatus[] = projeto.atividades.map(atividade => ({
       ...atividade,
       status: projeto.status.find(status => status.id === atividade.statusId) || {
@@ -93,7 +91,6 @@ export function KanbanBoard({
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!scrollContainerRef.current) return
-    // Only start panning if clicking on the container itself, not on interactive elements
     if ((e.target as HTMLElement).closest('button, input, [role="button"]')) return
 
     setIsPanning(true)
@@ -107,7 +104,7 @@ export function KanbanBoard({
     if (!isPanning || !scrollContainerRef.current) return
     e.preventDefault()
     const x = e.pageX - scrollContainerRef.current.offsetLeft
-    const walk = (x - startX) * 1.5 // Multiply by 1.5 for faster scrolling
+    const walk = (x - startX) * 1.5
     scrollContainerRef.current.scrollLeft = scrollLeft - walk
   }
 
@@ -163,7 +160,6 @@ export function KanbanBoard({
 
       const { atividade } = await response.json()
       
-      // Convert to AtividadeWithStatus
       const atividadeWithStatus: AtividadeWithStatus = {
         ...atividade,
         status: projeto.status.find(status => status.id === statusId) || {
@@ -183,9 +179,6 @@ export function KanbanBoard({
     const { active } = event
     const activeId = typeof active.id === 'string' ? parseInt(active.id) : active.id as number
     const atividade = atividades.find((a) => a.id === activeId)
-    
-
-    
     setActiveAtividade(atividade || null)
   }
 
@@ -195,60 +188,38 @@ export function KanbanBoard({
     const { active, over } = event
     if (!over) return
 
-    // Convert IDs to numbers
     const activeId = typeof active.id === 'string' ? parseInt(active.id) : active.id as number
     const overId = typeof over.id === 'string' ? parseInt(over.id) : over.id as number
 
-
-
-    // Find the active activity
     const activeAtividade = atividades.find((a) => a.id === activeId)
-    if (!activeAtividade) {
-      console.error("Active atividade not found:", activeId)
-      return
-    }
+    if (!activeAtividade) return
 
-    // Determine the target status ID
     let targetStatusId: number
 
-    // Check if we're dropping directly on a droppable container (column)
-    // or if the over element has statusId data
     if (over.data.current?.statusId) {
       targetStatusId = over.data.current.statusId
     } else if (!isNaN(overId)) {
-      // Check if this overId belongs to a status (column) or an atividade (card)
       const isColumnDrop = projeto.status.some(status => status.id === overId)
       
       if (isColumnDrop) {
         targetStatusId = overId
       } else {
-        // If dropping on another card, find which column it belongs to
         const overAtividade = atividades.find((a) => a.id === overId)
         if (overAtividade) {
           targetStatusId = overAtividade.statusId
         } else {
-          console.error("Could not determine target status ID")
           return
         }
       }
     } else {
-      console.error("Invalid overId:", overId)
       return
     }
 
-
-
-    // If dropping in a different status, update it
     if (activeAtividade.statusId !== targetStatusId) {
-      // Find the new status object
       const newStatus = projeto.status.find(status => status.id === targetStatusId)
       
-      if (!newStatus) {
-        console.error("New status not found:", targetStatusId)
-        return
-      }
+      if (!newStatus) return
 
-      // Update local state immediately for better UX
       setAtividades((prev) => 
         prev.map((item) => 
           item.id === activeId 
@@ -261,9 +232,6 @@ export function KanbanBoard({
         )
       )
 
-
-
-      // Update in database
       fetch(`/api/atividades/${activeId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -273,12 +241,10 @@ export function KanbanBoard({
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
-
         return response.json()
       })
       .catch(error => {
         console.error("Error updating atividade status:", error)
-        // Revert the change if the API call fails - restore original status
         const originalStatus = projeto.status.find(status => status.id === activeAtividade.statusId)
         setAtividades((prev) => 
           prev.map((item) => 
@@ -302,7 +268,6 @@ export function KanbanBoard({
   }
 
   const handleAtividadeSave = () => {
-    // Refresh the project data
     onStatusAdd()
   }
 
@@ -322,7 +287,6 @@ export function KanbanBoard({
     }
 
     try {
-      // Delete all completed activities
       await Promise.all(
         completedAtividades.map((atividade) =>
           fetch(`/api/atividades/${atividade.id}`, {
@@ -331,10 +295,7 @@ export function KanbanBoard({
         ),
       )
 
-      // Update local state
       setAtividades((prev) => prev.filter((a) => a.statusId !== concluidoStatus.id))
-
-      // Refresh project data
       onStatusAdd()
     } catch (error) {
       console.error("Erro ao limpar atividades concluídas:", error)
@@ -346,8 +307,8 @@ export function KanbanBoard({
     <>
       <div className="flex justify-between items-center mb-4">
         <div>
-          <h3 className="text-lg font-medium">Board do Projeto</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="text-lg font-medium text-white">Board do Projeto</h3>
+          <p className="text-sm text-white/70">
             Arraste e solte as atividades entre as colunas
           </p>
         </div>
@@ -355,7 +316,7 @@ export function KanbanBoard({
           variant="outline"
           size="sm"
           onClick={handleClearCompleted}
-          className="hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-800"
+          className="border-red-400/40 text-red-300 bg-red-500/10 hover:bg-red-500/20 backdrop-blur-sm"
         >
           <Trash2 className="mr-2 h-4 w-4" />
           Limpar Concluídas
@@ -363,10 +324,10 @@ export function KanbanBoard({
       </div>
 
       {/* Seletores de Contratante e Requerente */}
-      <div className="mb-6 p-4 rounded-lg border bg-card">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/15 backdrop-blur-xl">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Contratante</label>
+            <label className="text-sm font-medium text-white">Contratante</label>
             <ContratanteSelector
               contratantes={contratantes}
               selectedContratantes={selectedContratantes}
@@ -380,7 +341,7 @@ export function KanbanBoard({
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Requerente(s)</label>
+            <label className="text-sm font-medium text-white">Requerente(s)</label>
             <RequerenteSelector
               requerentes={requerentes}
               selectedRequerentes={selectedRequerentes}
@@ -404,30 +365,26 @@ export function KanbanBoard({
       >
         <div
           ref={scrollContainerRef}
-          className="overflow-hidden cursor-grab active:cursor-grabbing"
+          className="overflow-x-auto overflow-y-visible cursor-grab active:cursor-grabbing w-full scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
+          style={{ scrollbarWidth: 'thin' }}
         >
-          <div className="flex gap-4 pb-4 min-h-[600px]">
+          <div className="flex gap-2 pb-4 min-h-[450px] w-max">
             {projeto.status
               .sort((a, b) => {
-                // Check if either status is "CONCLUÍDO" (case insensitive)
                 const aIsConcluido = a.nome.toLowerCase() === "concluído"
                 const bIsConcluido = b.nome.toLowerCase() === "concluído"
 
-                // If a is CONCLUÍDO, it should come after b
                 if (aIsConcluido) return 1
-                // If b is CONCLUÍDO, it should come after a
                 if (bIsConcluido) return -1
-                // Otherwise, sort by ordem
                 return (a.ordem ?? 0) - (b.ordem ?? 0)
               })
               .map((status, index) => (
-                <div className="w-80 flex-shrink-0">
+                <div key={status.id} className="w-56 flex-shrink-0">
                   <KanbanColumn
-                    key={status.id}
                     id={status.id}
                     title={status.nome}
                     atividades={atividades.filter((a) => a.statusId === status.id)}
@@ -442,16 +399,16 @@ export function KanbanBoard({
                 </div>
               ))}
 
-            <div className="flex-shrink-0 w-80">
+            <div className="flex-shrink-0 w-56">
               {isAddingStatus ? (
-                <div className="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <div className="p-3 rounded-lg bg-white/10 border border-white/20 backdrop-blur-xl">
                   <form onSubmit={handleAddNewStatus}>
                     <Input
                       autoFocus
                       placeholder="Nome da nova coluna..."
                       value={newStatusName}
                       onChange={(e) => setNewStatusName(e.target.value)}
-                      className="mb-2 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                      className="mb-2 bg-white/10 border-white/20 text-white placeholder:text-white/60 backdrop-blur-sm"
                     />
                     <div className="flex justify-end gap-2">
                       <Button
@@ -459,7 +416,7 @@ export function KanbanBoard({
                         variant="ghost"
                         size="sm"
                         onClick={() => setIsAddingStatus(false)}
-                        className="hover:bg-gray-100 dark:hover:bg-gray-700"
+                        className="hover:bg-white/10 text-white/80"
                       >
                         Cancelar
                       </Button>
@@ -472,7 +429,7 @@ export function KanbanBoard({
               ) : (
                 <Button
                   variant="ghost"
-                  className="w-full h-full min-h-[100px] border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                  className="w-full h-full min-h-[100px] border-2 border-dashed border-white/30 hover:border-white/50 hover:bg-white/5 text-white/70 hover:text-white backdrop-blur-sm"
                   onClick={() => setIsAddingStatus(true)}
                 >
                   <Plus className="mr-2 h-4 w-4" /> Adicionar coluna

@@ -2,7 +2,16 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { KanbanIcon, Home, Settings, Users, Inbox, Calendar, Search, Shield } from "lucide-react"
+import {
+  KanbanIcon,
+  Home,
+  Settings,
+  Inbox,
+  Calendar,
+  Search,
+  Shield,
+  Menu,
+} from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -13,12 +22,14 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { useIsAdmin } from "@/src/hooks/use-is-admin"
 
 const menuItems = [
   {
-    title: "Dashboard",
+    title: "Painel Principal",
     url: "/dashboard",
     icon: Home,
   },
@@ -28,17 +39,17 @@ const menuItems = [
     icon: Inbox,
   },
   {
-    title: "Activities and projects",
+    title: "Atividades e Projetos",
     url: "/activities",
     icon: Calendar,
   },
   {
-    title: "Genealogical Tree",
+    title: "Árvore Genealógica",
     url: "/genealogy",
     icon: Search,
   },
   {
-    title: "Settings",
+    title: "Configurações",
     url: "/settings",
     icon: Settings,
   },
@@ -56,52 +67,94 @@ const adminMenuItems = [
 export function AppSidebar() {
   const pathname = usePathname()
   const { isAdmin } = useIsAdmin()
+  const { state } = useSidebar()
+  const isCollapsed = state === "collapsed"
 
   return (
-    <Sidebar>
-      <SidebarHeader className="border-b border-zinc-800">
-        <div className="flex items-center gap-2 px-2 py-2">
-          <div className="p-1.5 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg">
-            <KanbanIcon className="h-5 w-5 text-white" />
-          </div>
-          <span className="font-semibold text-lg">Kanban App</span>
+    <Sidebar
+      collapsible="icon"
+      className="bg-[#050B2A]/80 backdrop-blur-xl text-white border-r border-white/10 shadow-xl"
+    >
+      <SidebarHeader className="border-b border-white/10 px-3 py-3">
+        <div className="flex items-center justify-between gap-2">
+          <SidebarTrigger className="hover:bg-white/10 rounded-lg p-2 transition-colors">
+            <Menu className="h-5 w-5 text-white" />
+          </SidebarTrigger>
+          
+          {!isCollapsed && (
+            <div className="flex items-center gap-2 flex-1 overflow-hidden">
+              <div className="flex flex-col leading-tight whitespace-nowrap">
+                <span className="font-semibold text-sm">Grupo Discovery</span>
+              </div>
+            </div>
+          )}
         </div>
       </SidebarHeader>
-      <SidebarContent>
+
+      <SidebarContent className="px-2 py-3 space-y-4">
         <SidebarGroup>
-          <SidebarGroupLabel>Navegação</SidebarGroupLabel>
+          {!isCollapsed && (
+            <SidebarGroupLabel className="text-[11px] uppercase tracking-wide text-white/60 px-2">
+              Navegação
+            </SidebarGroupLabel>
+          )}
           <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={pathname === item.url}>
-                    <Link href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+            <SidebarMenu className="space-y-1">
+              {menuItems.map((item) => {
+                const isActive = pathname === item.url
+
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      tooltip={item.title}
+                      className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition
+                      hover:bg-white/10 hover:text-white
+                      ${isActive ? "bg-white/12 text-white shadow-inner border border-white/10" : "text-white/75"}`}
+                    >
+                      <Link href={item.url}>
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        {!isCollapsed && <span className="whitespace-nowrap overflow-hidden">{item.title}</span>}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Menu administrativo - apenas para admins */}
         {isAdmin && (
           <SidebarGroup>
-            <SidebarGroupLabel>Administração</SidebarGroupLabel>
+            {!isCollapsed && (
+              <SidebarGroupLabel className="text-[11px] uppercase tracking-wide text-white/60 px-2">
+                Administração
+              </SidebarGroupLabel>
+            )}
             <SidebarGroupContent>
-              <SidebarMenu>
-                {adminMenuItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={pathname === item.url}>
-                      <Link href={item.url}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+              <SidebarMenu className="space-y-1">
+                {adminMenuItems.map((item) => {
+                  const isActive = pathname === item.url
+
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        tooltip={item.title}
+                        className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition
+                        hover:bg-white/10 hover:text-white
+                        ${isActive ? "bg-white/12 text-white shadow-inner border border-white/10" : "text-white/75"}`}
+                      >
+                        <Link href={item.url}>
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          {!isCollapsed && <span className="whitespace-nowrap overflow-hidden">{item.title}</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -110,4 +163,3 @@ export function AppSidebar() {
     </Sidebar>
   )
 }
-

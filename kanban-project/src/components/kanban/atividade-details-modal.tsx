@@ -10,7 +10,7 @@ import { DatePickerField } from "@/components/ui/date-picker-field"
 import { UserSelector } from "@/components/ui/user-selector"
 import { TreeSelector } from "../ui/tree-selector"
 import { Calendar, User, FileText, Tag, Save, TreePine, ArrowUpRight } from "lucide-react"
-import type { AtividadeWithStatus } from "@/src/types/kanban"
+import type { AtividadeWithStatus, Contratante, Requerente } from "@/src/types/kanban"
 import Link from "next/link"
 import { useState, useEffect, useCallback } from "react"
 
@@ -19,9 +19,27 @@ interface AtividadeDetailsModalProps {
   isOpen: boolean
   onClose: () => void
   onSave?: () => void
+  // Props opcionais para contratantes e requerentes
+  contratantes?: Contratante[]
+  requerentes?: Requerente[]
+  selectedContratantes?: Contratante[]
+  selectedRequerentes?: Requerente[]
+  onContratantesChange?: (contratantes: Contratante[]) => void
+  onRequerentesChange?: (requerentes: Requerente[]) => void
 }
 
-export function AtividadeDetailsModal({ atividade, isOpen, onClose, onSave }: AtividadeDetailsModalProps) {
+export function AtividadeDetailsModal({ 
+  atividade, 
+  isOpen, 
+  onClose, 
+  onSave,
+  contratantes,
+  requerentes,
+  selectedContratantes,
+  selectedRequerentes,
+  onContratantesChange,
+  onRequerentesChange
+}: AtividadeDetailsModalProps) {
   const [nome, setNome] = useState("")
   const [descricao, setDescricao] = useState("")
   const [usuarioId, setUsuarioId] = useState<number | null>(null)

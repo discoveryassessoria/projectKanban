@@ -8,7 +8,7 @@ export function middleware(request: NextRequest) {
   // Proteger rotas que requerem autenticação
   if (request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/administrator")) {
     if (!token) {
-      return NextResponse.redirect(new URL("/auth", request.url))
+      return NextResponse.redirect(new URL("/login", request.url))
     }
 
     try {
@@ -17,7 +17,7 @@ export function middleware(request: NextRequest) {
 
       // Verificar se o token não expirou
       if (decoded.exp && Date.now() > decoded.exp) {
-        return NextResponse.redirect(new URL("/auth", request.url))
+        return NextResponse.redirect(new URL("/login", request.url))
       }
 
       // Proteção específica para rota administrator - apenas admins
@@ -29,7 +29,7 @@ export function middleware(request: NextRequest) {
 
       return NextResponse.next()
     } catch (error) {
-      return NextResponse.redirect(new URL("/auth", request.url))
+      return NextResponse.redirect(new URL("/login", request.url))
     }
   }
 

@@ -37,40 +37,19 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
 
   // Revalidar projeto quando o modal abrir
   useEffect(() => {
-    console.log('=== useEffect Modal ===')
-    console.log('isDetailsModalOpen:', isDetailsModalOpen)
-    console.log('selectedAtividade?.projeto?.id:', selectedAtividade?.projeto?.id)
-    console.log('selectedProject atual:', selectedProject)
-    console.log('isLoadingProject:', isLoadingProject)
-    
     if (isDetailsModalOpen && selectedAtividade?.projeto?.id) {
-      console.log('Revalidando projeto:', selectedAtividade.projeto.id)
       mutateProject(undefined, { revalidate: true })
     }
   }, [isDetailsModalOpen, selectedAtividade?.projeto?.id, mutateProject, isLoadingProject])
 
-  // Debug: Log do projeto quando ele mudar
-  useEffect(() => {
-    if (selectedProject) {
-      console.log('selectedProject atualizado:', {
-        id: selectedProject.id,
-        nome: selectedProject.nome,
-        contratante: selectedProject.contratante,
-        requerentes: selectedProject.requerentes
-      })
-    }
-  }, [selectedProject])
-
   // Memoizar contratantes e requerentes selecionados
   const memoizedSelectedContratantes = useMemo(() => {
     const result = selectedProject?.contratante ? [selectedProject.contratante] : []
-    console.log('=== memoizedSelectedContratantes ===', result)
     return result
   }, [selectedProject?.contratante])
 
   const memoizedSelectedRequerentes = useMemo(() => {
-    const result = selectedProject?.requerentes?.map((r: any) => r.requerente) || []
-    console.log('=== memoizedSelectedRequerentes ===', result)
+    const result = selectedProject?.requerentes?.map((r: { requerente: Requerente }) => r.requerente) || []
     return result
   }, [selectedProject?.requerentes])
 
@@ -95,14 +74,11 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
     if (!dateString) return 'Data inválida'
     
     try {
-      // Tentar diferentes formas de parsing
       let date: Date
       
       if (typeof dateString === 'string') {
-        // Se for string ISO (ex: "2025-09-29T21:41:44.893Z")
         date = new Date(dateString)
       } else {
-        // Se for outro formato
         date = new Date(String(dateString))
       }
       
@@ -110,7 +86,6 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
         return 'Data inválida'
       }
       
-      // Usar Intl.DateTimeFormat para melhor compatibilidade
       const formatted = new Intl.DateTimeFormat('pt-BR', {
         day: '2-digit',
         month: '2-digit',
@@ -166,7 +141,6 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
 
     setIsActionLoading(true)
     try {
-      // Fazer as requisições uma por uma para melhor controle de erro
       const results = []
       for (const id of selectedItems) {
         try {
@@ -186,7 +160,6 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
         }
       }
       
-      // Verificar resultados
       const successfulDeletes = results.filter(r => r.success).map(r => r.id)
       const failedDeletes = results.filter(r => !r.success)
       
@@ -194,14 +167,11 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
         alert(`Erro ao excluir ${failedDeletes.length} atividade(s).`)
       }
       
-      // Atualizar a lista removendo apenas os itens excluídos com sucesso
       if (successfulDeletes.length > 0) {
-        // Usar mutate otimista para atualizar o cache
         mutate(
           atividades.filter((atividade: Atividade) => !successfulDeletes.includes(atividade.id)),
           { revalidate: false }
         )
-        // Revalidar no servidor para garantir sincronização
         setTimeout(() => mutate(), 100)
       }
       
@@ -233,7 +203,6 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       
       await Promise.all(updatePromises)
       
-      // Atualizar a lista localmente usando mutate otimista
       const newStatus = statusList.find((s: Status) => s.id?.toString() === selectedStatus)
       if (newStatus) {
         mutate(
@@ -244,7 +213,6 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
           ),
           { revalidate: false }
         )
-        // Revalidar no servidor para garantir sincronização
         setTimeout(() => mutate(), 100)
       }
       
@@ -268,75 +236,72 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   }
 
   const handleAtividadeClick = (atividade: Atividade) => {
-    console.log('=== handleAtividadeClick ===')
-    console.log('Atividade clicada:', atividade)
-    console.log('atividade.projeto:', atividade.projeto)
-    console.log('atividade.projeto?.id:', atividade.projeto?.id)
     setSelectedAtividade(atividade)
     setIsDetailsModalOpen(true)
   }
 
   const handleAtividadeSave = () => {
-    // Revalidar dados após salvar
     mutate()
     setIsDetailsModalOpen(false)
   }
 
+  // Loading state - transparente
   if (isLoading) {
     return (
-      <div className="border rounded-lg bg-background shadow-sm">
+      <div className="rounded-2xl">
         {/* Table Header Skeleton */}
-        <div className="bg-muted/50 px-4 py-3 border-b">
+        <div className="px-4 py-3 border-b border-white/10">
           <div className="grid grid-cols-12 gap-4 items-center">
-            <div className="col-span-1 h-4 bg-muted rounded animate-pulse"></div>
-            <div className="col-span-3 h-4 bg-muted rounded animate-pulse"></div>
-            <div className="col-span-2 h-4 bg-muted rounded animate-pulse"></div>
-            <div className="col-span-2 h-4 bg-muted rounded animate-pulse"></div>
-            <div className="col-span-1 h-4 bg-muted rounded animate-pulse"></div>
-            <div className="col-span-1 h-4 bg-muted rounded animate-pulse"></div>
-            <div className="col-span-1 h-4 bg-muted rounded animate-pulse"></div>
-            <div className="col-span-1 h-4 bg-muted rounded animate-pulse"></div>
+            <div className="col-span-1 h-4 bg-white/10 rounded animate-pulse"></div>
+            <div className="col-span-3 h-4 bg-white/10 rounded animate-pulse"></div>
+            <div className="col-span-2 h-4 bg-white/10 rounded animate-pulse"></div>
+            <div className="col-span-2 h-4 bg-white/10 rounded animate-pulse"></div>
+            <div className="col-span-1 h-4 bg-white/10 rounded animate-pulse"></div>
+            <div className="col-span-1 h-4 bg-white/10 rounded animate-pulse"></div>
+            <div className="col-span-1 h-4 bg-white/10 rounded animate-pulse"></div>
+            <div className="col-span-1 h-4 bg-white/10 rounded animate-pulse"></div>
           </div>
         </div>
         
         {/* Table Body Skeleton */}
-        <div className="divide-y">
+        <div className="divide-y divide-white/10">
           {[1, 2, 3, 4, 5].map(i => (
             <div key={i} className="px-4 py-3">
               <div className="grid grid-cols-12 gap-4 items-center">
-                <div className="col-span-1 h-4 w-4 bg-muted rounded animate-pulse"></div>
+                <div className="col-span-1 h-4 w-4 bg-white/10 rounded animate-pulse"></div>
                 <div className="col-span-3 space-y-2">
-                  <div className="h-4 bg-muted rounded animate-pulse"></div>
-                  <div className="h-3 bg-muted rounded animate-pulse w-3/4"></div>
+                  <div className="h-4 bg-white/10 rounded animate-pulse"></div>
+                  <div className="h-3 bg-white/10 rounded animate-pulse w-3/4"></div>
                 </div>
-                <div className="col-span-2 h-4 bg-muted rounded animate-pulse"></div>
-                <div className="col-span-2 h-4 bg-muted rounded animate-pulse"></div>
-                <div className="col-span-1 h-6 bg-muted rounded-full animate-pulse"></div>
-                <div className="col-span-1 h-6 w-6 bg-muted rounded-full animate-pulse"></div>
-                <div className="col-span-1 h-6 w-6 bg-muted rounded-full animate-pulse"></div>
-                <div className="col-span-1 h-4 bg-muted rounded animate-pulse"></div>
+                <div className="col-span-2 h-4 bg-white/10 rounded animate-pulse"></div>
+                <div className="col-span-2 h-4 bg-white/10 rounded animate-pulse"></div>
+                <div className="col-span-1 h-6 bg-white/10 rounded-full animate-pulse"></div>
+                <div className="col-span-1 h-6 w-6 bg-white/10 rounded-full animate-pulse"></div>
+                <div className="col-span-1 h-6 w-6 bg-white/10 rounded-full animate-pulse"></div>
+                <div className="col-span-1 h-4 bg-white/10 rounded animate-pulse"></div>
               </div>
             </div>
           ))}
         </div>
         
         {/* Footer Skeleton */}
-        <div className="bg-muted/30 px-4 py-3 border-t">
+        <div className="px-4 py-3 border-t border-white/10">
           <div className="flex items-center justify-between">
-            <div className="h-4 w-48 bg-muted rounded animate-pulse"></div>
-            <div className="h-4 w-32 bg-muted rounded animate-pulse"></div>
+            <div className="h-4 w-48 bg-white/10 rounded animate-pulse"></div>
+            <div className="h-4 w-32 bg-white/10 rounded animate-pulse"></div>
           </div>
         </div>
       </div>
     )
   }
 
+  // Error state - transparente
   if (error) {
     return (
-      <div className="border rounded-lg">
+      <div className="rounded-2xl">
         <div className="p-6">
           <div className="flex items-center justify-center h-32">
-            <p className="text-sm text-destructive">Erro: {error}</p>
+            <p className="text-sm text-red-400">Erro: {error}</p>
           </div>
         </div>
       </div>
@@ -344,16 +309,16 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   }
 
   return (
-    <div className="border rounded-lg bg-background shadow-sm">
+    <div className="rounded-2xl">
       {/* Table Header */}
-      <div className="bg-muted/50 px-4 py-3 border-b">
-        <div className="grid grid-cols-12 gap-4 items-center text-sm font-medium">
+      <div className="px-4 py-3 border-b border-white/10">
+        <div className="grid grid-cols-12 gap-4 items-center text-sm font-medium text-white">
           <div className="col-span-1">
             <input
               type="checkbox"
               checked={selectedItems.length === atividades.length && atividades.length > 0}
               onChange={toggleSelectAll}
-              className="rounded border-gray-300"
+              className="rounded border-white/30 bg-transparent"
             />
           </div>
           <div className="col-span-3">Nome</div>
@@ -367,46 +332,46 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       </div>
 
       {/* Table Body */}
-      <div className="divide-y">
+      <div className="divide-y divide-white/10">
         {atividades.length === 0 ? (
           <div className="p-8 text-center">
-            <p className="text-muted-foreground">Nenhuma atividade encontrada</p>
+            <p className="text-white/60">Nenhuma atividade encontrada</p>
           </div>
         ) : (
           atividades.filter((atividade: Atividade) => atividade && atividade.nome).map((atividade: Atividade) => (
             <div
               key={atividade.id}
-              className="px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
+              className="px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer"
               onClick={() => handleAtividadeClick(atividade)}
             >
-              <div className="grid grid-cols-12 gap-4 items-center">
+              <div className="grid grid-cols-12 gap-4 items-center text-white">
                 <div className="col-span-1">
                   <input
                     type="checkbox"
                     checked={selectedItems.includes(atividade.id)}
                     onChange={() => toggleSelectItem(atividade.id)}
                     onClick={(e) => e.stopPropagation()}
-                    className="rounded border-gray-300"
+                    className="rounded border-white/30 bg-transparent"
                   />
                 </div>
                 
                 <div className="col-span-3">
                   <div className="space-y-1">
                     <div className="font-medium text-sm">{atividade.nome}</div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-white/60">
                       {atividade.descricao || 'Sem descrição'}
                     </div>
                   </div>
                 </div>
                 
                 <div className="col-span-2">
-                  <div className="text-sm">
+                  <div className="text-sm text-white/80">
                     {formatDateOnly(atividade.data_criacao)}
                   </div>
                 </div>
                 
                 <div className="col-span-2">
-                  <div className="text-sm">
+                  <div className="text-sm text-white/80">
                     {formatDate(atividade.data_termino)}
                   </div>
                 </div>
@@ -415,10 +380,10 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                   <Badge 
                     className={
                       atividade.status.nome.toLowerCase() === 'concluído' || atividade.status.nome.toLowerCase() === 'concluido'
-                        ? "bg-green-100 text-green-800 hover:bg-green-200 border-green-200"
+                        ? "bg-green-500/20 text-green-300 hover:bg-green-500/30 border-green-500/30"
                         : atividade.status.nome.toLowerCase() === 'em andamento'
-                        ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200"
-                        : "bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200"
+                        ? "bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 border-yellow-500/30"
+                        : "bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border-blue-500/30"
                     }
                   >
                     {atividade.status.nome}
@@ -427,8 +392,8 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 
                 <div className="col-span-1">
                   <div className="flex items-center">
-                    <Avatar className="h-6 w-6">
-                      <AvatarFallback className="text-xs">
+                    <Avatar className="h-6 w-6 border border-white/20">
+                      <AvatarFallback className="text-xs bg-white/10 text-white">
                         {atividade.usuarios[0]?.usuario.nome?.slice(0, 2).toUpperCase() || 'NA'}
                       </AvatarFallback>
                     </Avatar>
@@ -437,8 +402,8 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 
                 <div className="col-span-1">
                   <div className="flex items-center">
-                    <Avatar className="h-6 w-6">
-                      <AvatarFallback className="text-xs">
+                    <Avatar className="h-6 w-6 border border-white/20">
+                      <AvatarFallback className="text-xs bg-white/10 text-white">
                         {atividade.usuarios[0]?.usuario.nome?.slice(0, 2).toUpperCase() || 'NA'}
                       </AvatarFallback>
                     </Avatar>
@@ -446,7 +411,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 </div>
                 
                 <div className="col-span-1">
-                  <div className="text-sm font-medium">{atividade.projeto.nome}</div>
+                  <div className="text-sm font-medium text-white/80">{atividade.projeto.nome}</div>
                 </div>
               </div>
             </div>
@@ -455,18 +420,18 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       </div>
 
       {/* Footer */}
-      <div className="bg-muted/30 px-4 py-3 border-t">
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div className="px-4 py-3 border-t border-white/10">
+        <div className="flex items-center justify-between text-sm text-white/60">
           <div className="flex items-center space-x-4">
             <span>Selecionado: {selectedItems.length} / {atividades.length}</span>
             <span>Total mostrando: {atividades.length}</span>
             {selectedItems.length > 0 && (
               <div className="flex items-center space-x-2">
                 <Select value={selectedAction} onValueChange={setSelectedAction}>
-                  <SelectTrigger className="w-40">
+                  <SelectTrigger className="w-40 bg-white/10 border-white/20 text-white">
                     <SelectValue placeholder="Selecionar ação" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
                     <SelectItem value="delete">Excluir</SelectItem>
                     <SelectItem value="status">Marcar como...</SelectItem>
                   </SelectContent>
@@ -474,10 +439,10 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 
                 {selectedAction === 'status' && (
                   <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-32 bg-white/10 border-white/20 text-white">
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
                       {statusList.map((status: Status) => (
                         <SelectItem key={status.id} value={status.id?.toString() || ''}>
                           {status.nome}
@@ -492,6 +457,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                   size="sm" 
                   onClick={applyAction}
                   disabled={isActionLoading || (!selectedAction || (selectedAction === 'status' && !selectedStatus))}
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
                 >
                   {isActionLoading ? 'Aplicando...' : 'Aplicar'}
                 </Button>
@@ -499,7 +465,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 <label className="flex items-center space-x-2">
                   <input 
                     type="checkbox" 
-                    className="rounded" 
+                    className="rounded border-white/30 bg-transparent" 
                     checked={selectedItems.length === atividades.length && atividades.length > 0}
                     onChange={toggleSelectAll}
                   />
@@ -524,7 +490,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
         requerentes={requerentes}
         selectedContratantes={memoizedSelectedContratantes}
         selectedRequerentes={memoizedSelectedRequerentes}
-        onContratantesChange={async (contratantes) => {
+        onContratantesChange={async (contratantesParam: Contratante[]) => {
           // Atualizar contratante do projeto
           if (selectedProject) {
             try {
@@ -532,7 +498,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ 
-                  contratanteId: contratantes.length > 0 ? contratantes[0].id : null 
+                  contratanteId: contratantesParam.length > 0 ? contratantesParam[0].id : null 
                 }),
               })
               if (response.ok) {
@@ -547,7 +513,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
             }
           }
         }}
-        onRequerentesChange={async (requerentes) => {
+        onRequerentesChange={async (requerentesParam: Requerente[]) => {
           // Atualizar requerentes do projeto
           if (selectedProject) {
             try {
@@ -555,7 +521,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ 
-                  requerenteIds: requerentes.map(r => r.id)
+                  requerenteIds: requerentesParam.map((r: Requerente) => r.id)
                 }),
               })
               if (response.ok) {

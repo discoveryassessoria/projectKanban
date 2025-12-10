@@ -1,37 +1,52 @@
 // src/components/sidebar-wrapper.tsx
-'use client'
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/src/components/app-sidebar";
-import { useSidebarVisibility } from "@/src/hooks/use-sidebar-visibility";
-import { usePathname } from 'next/navigation';
+"use client"
+
+import { BitrixSidebar } from "@/src/components/bitrix-sidebar"
+import { SidebarProvider, useSidebarContext } from "@/src/contexts/sidebar-context"
+import { useSidebarVisibility } from "@/src/hooks/use-sidebar-visibility"
+import { useIsAdmin } from "@/src/hooks/use-is-admin"
+import { usePathname } from "next/navigation"
+
+function SidebarContent({ children }: { children: React.ReactNode }) {
+  const { isCollapsed } = useSidebarContext()
+  const { isAdmin } = useIsAdmin()
+
+  return (
+    <div className="flex min-h-screen w-full bg-transparent">
+      <BitrixSidebar isAdmin={isAdmin} />
+      
+      {/* Main content - margem baseada apenas no estado colapsado real, não no hover */}
+      <div 
+        className={`
+          flex-1 transition-all duration-300 ease-in-out
+          ${isCollapsed ? "ml-16" : "ml-64"}
+        `}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
 
 export function SidebarWrapper({ children }: { children: React.ReactNode }) {
   const shouldShowSidebar = useSidebarVisibility()
   const pathname = usePathname()
 
   if (!shouldShowSidebar) {
-    const isAuthPage = pathname.startsWith('/auth')
-    
+    const isAuthPage = pathname.startsWith("/login")
+
     if (isAuthPage) {
-      // Layout específico para páginas de auth - deixa a página controlar completamente o layout
+      // páginas de login/registro controlam o próprio layout
       return <>{children}</>
     }
-    
-    // Para outras páginas sem sidebar - layout normal
-    return (
-      <div className="min-h-screen w-full">
-        {children}
-      </div>
-    )
+
+    // páginas sem sidebar
+    return <div className="min-h-screen w-full">{children}</div>
   }
 
   return (
     <SidebarProvider>
-      <AppSidebar />
-      <main className="flex-1 w-full">
-        <SidebarTrigger />
-        {children}
-      </main>
+      <SidebarContent>{children}</SidebarContent>
     </SidebarProvider>
   )
 }

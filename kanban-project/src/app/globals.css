@@ -68,14 +68,16 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  
+  /* SIDEBAR - Azul escuro estilo Bitrix24 */
+  --sidebar: oklch(0.15 0.05 250);
+  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar-primary: oklch(0.55 0.15 250);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.25 0.03 250);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.55 0.15 250);
 }
 
 .dark {
@@ -102,14 +104,26 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  
+  /* SIDEBAR MODO ESCURO - Azul muito escuro */
+  --sidebar: oklch(0.12 0.05 250);
+  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar-primary: oklch(0.55 0.18 250);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.20 0.03 250);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.55 0.18 250);
+}
+
+/* Base layer - apenas uma vez */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }
 
 /* Enhanced genealogical tree styles with exact color specifications */
@@ -126,11 +140,11 @@
 .tree-node:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(18, 60, 115, 0.15);
-  border-color: var(--color-tree-gold);
+  border-color: #d4a853;
 }
 
 .tree-connection {
-  stroke: var(--color-tree-medium-blue);
+  stroke: #3b82f6;
   stroke-width: 2;
   fill: none;
 }
@@ -149,68 +163,35 @@
 }
 
 .tree-action-button:hover {
-  background-color: var(--color-tree-gold);
+  background-color: #d4a853;
   color: white;
-  border-color: var(--color-tree-gold);
+  border-color: #d4a853;
 }
 
 .tree-action-button.delete:hover {
-  background-color: var(--color-tree-red);
-  border-color: var(--color-tree-red);
+  background-color: #ef4444;
+  border-color: #ef4444;
 }
 
 /* Added specific styles for genealogical tree text colors */
 .tree-person-name {
-  color: var(--color-tree-institutional-blue);
+  color: #1e3a5f;
 }
 
 .tree-person-dates {
-  color: var(--color-tree-gray);
+  color: #6b7280;
 }
 
 .tree-success {
-  color: var(--color-tree-green);
+  color: #10b981;
 }
 
 .tree-warning {
-  color: var(--color-tree-orange);
+  color: #f59e0b;
 }
 
 .tree-error {
-  color: var(--color-tree-red);
-}
-
-@layer base {
-  :root {
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-  }
-
-  .dark {
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.439 0 0);
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+  color: #ef4444;
 }
 
 /* Padrão de grade sutil para background */
@@ -223,6 +204,7 @@
 .dark .bg-grid-pattern {
   background-image: radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
 }
+
 /* Custom scrollbar styling for better aesthetics */
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
@@ -406,4 +388,31 @@
 .dark .react-calendar-custom .react-calendar__tile {
   border-color: hsl(var(--border));
   color: hsl(var(--foreground));
+}
+
+html, body {
+  overscroll-behavior: none;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: none;
+  overflow-x: hidden;
+}
+
+/* ============================================
+   CORREÇÃO: Evita pulo da tela quando modal abre
+   Remove padding que o Radix UI adiciona
+   ============================================ */
+html[style*="padding"],
+html[style*="margin"],
+body[style*="padding"],
+body[style*="margin"],
+body[data-scroll-locked] {
+  padding-right: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Garante que header não pule */
+header[style*="padding"],
+header[style*="margin"] {
+  padding-right: 0 !important;
+  margin-right: 0 !important;
 }

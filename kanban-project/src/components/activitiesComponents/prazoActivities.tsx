@@ -61,7 +61,6 @@ export default function PrazoActivities() {
   // Revalidar projeto quando o modal abrir
   useEffect(() => {
     if (isDetailsModalOpen && selectedActivity?.projeto?.id) {
-      console.log('Modal aberto, revalidando projeto:', selectedActivity.projeto.id)
       mutateProject(undefined, { revalidate: true })
     }
   }, [isDetailsModalOpen, selectedActivity?.projeto?.id, mutateProject])
@@ -87,7 +86,6 @@ export default function PrazoActivities() {
   // Hook para criação rápida
   const { createQuickActivity, isLoading: isCreatingActivity, error: createError, clearError: clearCreateError } = useQuickAddActivity({
     onSuccess: () => {
-      // Invalidar cache para recarregar atividades
       invalidateActivities()
       setIsQuickAddOpen(false)
     },
@@ -117,28 +115,23 @@ export default function PrazoActivities() {
   }
 
   const handleAtividadeSave = () => {
-    // Revalidar cache após salvar
     mutate()
     setIsDetailsModalOpen(false)
   }
 
   const handleRefresh = () => {
-    // Revalidar cache para recarregar atividades
     mutate()
   }
 
   const handleStatusCreated = () => {
-    // Invalidar cache para recarregar atividades quando um novo status for criado
     invalidateActivities()
   }
 
-  // Handler para Quick Add
   const handleQuickAdd = (category: string) => {
     setQuickAddCategory(category as PrazoCategory)
     setIsQuickAddOpen(true)
   }
 
-  // Handlers para controlar hover global
   const handleColumnHover = (columnId: string) => {
     setHoveredColumn(columnId)
   }
@@ -177,8 +170,8 @@ export default function PrazoActivities() {
     const overId = over.id as string
     
     // Encontrar a atividade sendo movida
-    const draggedActivity = atividades.find(a => a.id === activeId)
-    if (!draggedActivity) return
+    const draggedActivityItem = atividades.find(a => a.id === activeId)
+    if (!draggedActivityItem) return
 
     // Calcular nova data baseada na categoria de destino
     const newDate = calculateNewDateForCategory(overId as PrazoCategory)
@@ -199,37 +192,13 @@ export default function PrazoActivities() {
     try {
       // Chamar API para persistir mudança
       const success = await updateDeadline(activeId, newDate)
-            {tasks.map((task, index) => (
-        <React.Fragment key={task.id}>
-          <TaskCard task={task} />
-          
-          {/* Área de Drop Entre Cards */}
-          <div
-            data-drop-zone={`${column}-${index}`}
-            onDragOver={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              e.currentTarget.classList.add('h-16', 'bg-primary/10', 'border-primary')
-            }}
-            onDragLeave={(e) => {
-              e.currentTarget.classList.remove('h-16', 'bg-primary/10', 'border-primary')
-            }}
-            onDrop={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              e.currentTarget.classList.remove('h-16', 'bg-primary/10', 'border-primary')
-              handleDropBetween(e, column, index)
-            }}
-            className="h-2 border border-dashed border-transparent rounded transition-all duration-200 cursor-pointer"
-          />
-        </React.Fragment>
-      ))}
+      
       if (!success) {
         // Reverter mudança em caso de erro
         mutate(
           atividades.map(activity => 
             activity.id === activeId 
-              ? { ...activity, data_termino: draggedActivity.data_termino }
+              ? { ...activity, data_termino: draggedActivityItem.data_termino }
               : activity
           ),
           { revalidate: false }
@@ -237,8 +206,7 @@ export default function PrazoActivities() {
         
         console.error('Falha ao atualizar prazo no servidor:', updateError)
       } else {
-        console.log(`Prazo atualizado com sucesso para atividade "${draggedActivity.nome}"`)
-        // Revalidar no servidor para garantir sincronização
+        console.log(`Prazo atualizado com sucesso para atividade "${draggedActivityItem.nome}"`)
         setTimeout(() => mutate(), 100)
       }
     } catch (error) {
@@ -246,7 +214,7 @@ export default function PrazoActivities() {
       mutate(
         atividades.map(activity => 
           activity.id === activeId 
-            ? { ...activity, data_termino: draggedActivity.data_termino }
+            ? { ...activity, data_termino: draggedActivityItem.data_termino }
             : activity
         ),
         { revalidate: false }
@@ -268,35 +236,29 @@ export default function PrazoActivities() {
     
     switch (category) {
       case 'vencido':
-        // Um dia atrás
         const yesterday = new Date(now)
         yesterday.setDate(now.getDate() - 1)
         return yesterday.toISOString()
         
       case 'hoje':
-        // Hoje
         return now.toISOString()
         
       case 'proximos-3-dias':
-        // Em 2 dias (dentro dos próximos 3)
         const in2Days = new Date(now)
         in2Days.setDate(now.getDate() + 2)
         return in2Days.toISOString()
         
       case 'proxima-semana':
-        // Em 5 dias (próxima semana)
         const in5Days = new Date(now)
         in5Days.setDate(now.getDate() + 5)
         return in5Days.toISOString()
         
       case 'futuro':
-        // Em 15 dias
         const in15Days = new Date(now)
         in15Days.setDate(now.getDate() + 15)
         return in15Days.toISOString()
         
       case 'sem-prazo':
-        // Sem prazo
         return null
         
       default:
@@ -326,8 +288,8 @@ export default function PrazoActivities() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2" />
-          <p>Carregando atividades...</p>
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-white" />
+          <p className="text-white/70">Carregando atividades...</p>
         </div>
       </div>
     )
@@ -335,10 +297,10 @@ export default function PrazoActivities() {
 
   if (error) {
     return (
-      <Card className="p-6">
+      <Card className="p-6 bg-transparent border-white/20">
         <div className="text-center">
-          <p className="text-destructive mb-4">Erro: {error}</p>
-          <Button onClick={handleRefresh} variant="outline">
+          <p className="text-red-400 mb-4">Erro: {error}</p>
+          <Button onClick={handleRefresh} variant="outline" className="border-white/30 text-white hover:bg-white/10">
             <RefreshCw className="h-4 w-4 mr-2" />
             Tentar novamente
           </Button>
@@ -348,31 +310,31 @@ export default function PrazoActivities() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
+    <div className="space-y-3">
+      {/* Header - mais compacto */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Gestão de Atividades</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-xl font-bold text-white">Gestão de Atividades</h1>
+          <p className="text-sm text-white/60">
             Organize suas atividades por proximidade do prazo e gerencie status
           </p>
           {updateError && (
-            <p className="text-sm text-red-600 mt-1">
+            <p className="text-xs text-red-400 mt-1">
               Erro ao atualizar: {updateError}
               <button 
                 onClick={clearError}
-                className="ml-2 text-red-800 hover:text-red-900 underline"
+                className="ml-2 text-red-300 hover:text-red-200 underline"
               >
                 Dispensar
               </button>
             </p>
           )}
           {createError && (
-            <p className="text-sm text-red-600 mt-1">
+            <p className="text-xs text-red-400 mt-1">
               Erro ao criar atividade: {createError}
               <button 
                 onClick={clearCreateError}
-                className="ml-2 text-red-800 hover:text-red-900 underline"
+                className="ml-2 text-red-300 hover:text-red-200 underline"
               >
                 Dispensar
               </button>
@@ -380,35 +342,35 @@ export default function PrazoActivities() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-sm">
+          <Badge variant="outline" className="text-xs border-white/30 text-white">
             {totalActivities} atividade(s)
           </Badge>
           {isUpdating && (
-            <Badge variant="secondary" className="text-xs animate-pulse">
+            <Badge variant="secondary" className="text-xs animate-pulse bg-white/10 text-white">
               Atualizando...
             </Badge>
           )}
           {isCreatingActivity && (
-            <Badge variant="secondary" className="text-xs animate-pulse">
-              Criando atividade...
+            <Badge variant="secondary" className="text-xs animate-pulse bg-white/10 text-white">
+              Criando...
             </Badge>
           )}
-          <Button variant="outline" size="sm" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={handleRefresh} className="border-white/30 text-white hover:bg-white/10 h-8 text-xs">
+            <RefreshCw className="h-3 w-3 mr-1" />
             Atualizar
           </Button>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs - mais compactas */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
-          <TabsTrigger value="kanban">Kanban por Prazo</TabsTrigger>
-          <TabsTrigger value="status">Gerenciar Status</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 lg:w-[300px] bg-transparent border border-white/30 h-9">
+          <TabsTrigger value="kanban" className="data-[state=active]:bg-white/20 text-white text-xs">Kanban por Prazo</TabsTrigger>
+          <TabsTrigger value="status" className="data-[state=active]:bg-white/20 text-white text-xs">Gerenciar Status</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="kanban" className="space-y-4">
-          {/* Kanban Board */}
+        <TabsContent value="kanban" className="space-y-3 mt-3">
+          {/* Kanban Board - colunas mais compactas */}
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -416,9 +378,9 @@ export default function PrazoActivities() {
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
           >
-            <div className="overflow-x-auto pb-4 kanban-scroll">
-              <div className="flex gap-4 min-w-full">
-                {Object.entries(PRAZO_CATEGORIES).map(([categoryKey, classification]) => {
+            <div className="overflow-x-auto pb-2 kanban-scroll">
+              <div className="grid grid-cols-4 gap-2 min-w-[800px]">
+                {Object.entries(PRAZO_CATEGORIES).slice(0, 4).map(([categoryKey, classification]) => {
                   const category = categoryKey as PrazoCategory
                   const activities = sortedGroupedActivities[category] || []
                   
@@ -461,18 +423,16 @@ export default function PrazoActivities() {
             </DragOverlay>
           </DndContext>
 
-
-
-          {/* Empty State - sem atividades */}
+          {/* Empty State */}
           {totalActivities === 0 && (
-            <Card className="p-12">
+            <Card className="p-8 bg-transparent border-white/20">
               <div className="text-center">
-                <h3 className="text-lg font-semibold mb-2">Nenhuma atividade encontrada</h3>
-                <p className="text-muted-foreground mb-4">
+                <h3 className="text-base font-semibold mb-2 text-white">Nenhuma atividade encontrada</h3>
+                <p className="text-sm text-white/60 mb-4">
                   Comece criando uma nova atividade.
                 </p>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
+                <Button className="bg-emerald-500 hover:bg-emerald-600 text-white h-8 text-xs">
+                  <Plus className="h-3 w-3 mr-1" />
                   Nova Atividade
                 </Button>
               </div>
@@ -480,7 +440,7 @@ export default function PrazoActivities() {
           )}
         </TabsContent>
 
-        <TabsContent value="status" className="space-y-4">
+        <TabsContent value="status" className="space-y-3 mt-3">
           <CustomStatusManager onStatusCreated={handleStatusCreated} />
         </TabsContent>
       </Tabs>
@@ -505,20 +465,18 @@ export default function PrazoActivities() {
         contratantes={contratantes}
         requerentes={requerentes}
         selectedContratantes={selectedProject?.contratante ? [selectedProject.contratante] : []}
-        selectedRequerentes={selectedProject?.requerentes?.map((r: any) => r.requerente) || []}
-        onContratantesChange={async (contratantes) => {
-          // Atualizar contratante do projeto
+        selectedRequerentes={selectedProject?.requerentes?.map((r: { requerente: Requerente }) => r.requerente) || []}
+        onContratantesChange={async (contratantesParam: Contratante[]) => {
           if (selectedProject) {
             try {
               const response = await fetch(`/api/projetos/${selectedProject.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ 
-                  contratanteId: contratantes.length > 0 ? contratantes[0].id : null 
+                  contratanteId: contratantesParam.length > 0 ? contratantesParam[0].id : null 
                 }),
               })
               if (response.ok) {
-                // Revalidar dados do projeto
                 if (selectedProject?.id) {
                   invalidateProject(selectedProject.id)
                 }
@@ -529,19 +487,17 @@ export default function PrazoActivities() {
             }
           }
         }}
-        onRequerentesChange={async (requerentes) => {
-          // Atualizar requerentes do projeto
+        onRequerentesChange={async (requerentesParam: Requerente[]) => {
           if (selectedProject) {
             try {
               const response = await fetch(`/api/projetos/${selectedProject.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ 
-                  requerenteIds: requerentes.map(r => r.id)
+                  requerenteIds: requerentesParam.map((r: Requerente) => r.id)
                 }),
               })
               if (response.ok) {
-                // Revalidar dados do projeto
                 if (selectedProject?.id) {
                   invalidateProject(selectedProject.id)
                 }
