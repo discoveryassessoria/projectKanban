@@ -30,7 +30,7 @@ function verifyAdmin(request: NextRequest): { isAdmin: boolean; userId?: number 
 }
 
 // PUT - Atualizar usuário
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { isAdmin, userId: requesterId } = verifyAdmin(request)
 
@@ -38,7 +38,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Acesso negado. Apenas administradores podem atualizar usuários." }, { status: 403 })
     }
 
-    const userId = parseInt(params.id)
+    const { id: idParam } = await params
+    const userId = parseInt(idParam)
     if (isNaN(userId)) {
       return NextResponse.json({ error: "ID de usuário inválido" }, { status: 400 })
     }
@@ -108,7 +109,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // DELETE - Deletar usuário
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { isAdmin, userId: requesterId } = verifyAdmin(request)
 
@@ -116,7 +117,8 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return NextResponse.json({ error: "Acesso negado. Apenas administradores podem deletar usuários." }, { status: 403 })
     }
 
-    const userId = parseInt(params.id)
+    const { id: idParam } = await params
+    const userId = parseInt(idParam)
     if (isNaN(userId)) {
       return NextResponse.json({ error: "ID de usuário inválido" }, { status: 400 })
     }

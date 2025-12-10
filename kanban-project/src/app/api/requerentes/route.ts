@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
         rg: rg?.trim() || null,
         endereco: endereco?.trim() || null,
         telefone: telefone?.trim() || null,
-        campos_personalizados: camposPersonalizadosData,
+        ...(camposPersonalizadosData && { campos_personalizados: camposPersonalizadosData }),
       },
     })
 

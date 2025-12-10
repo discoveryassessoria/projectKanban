@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
-export async function PUT(request: NextRequest, context: { params: { atividadeId: string } }) {
+export async function PUT(request: NextRequest, context: { params: Promise<{ atividadeId: string }> }) {
   try {
-    const { atividadeId } = context.params
+    const { atividadeId } = await context.params
     const body = await request.json()
     const { statusId, nome, descricao, data_termino, usuarioId, arvore_id } = body
 
@@ -75,7 +75,7 @@ export async function PUT(request: NextRequest, context: { params: { atividadeId
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { atividadeId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ atividadeId: string }> }) {
   try {
     const { atividadeId } = await params
 

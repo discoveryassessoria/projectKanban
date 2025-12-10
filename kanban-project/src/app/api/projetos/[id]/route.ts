@@ -6,10 +6,11 @@ const prisma = new PrismaClient()
 // GET - Buscar um projeto específico
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id)
+    const { id: idParam } = await params
+    const id = parseInt(idParam)
     
     if (isNaN(id)) {
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
@@ -46,13 +47,14 @@ export async function GET(
 // DELETE - Excluir um projeto específico
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('DELETE request params:', params)
-    console.log('ID recebido:', params.id)
+    const { id: idParam } = await params
+    console.log('DELETE request params:', idParam)
+    console.log('ID recebido:', idParam)
     
-    const id = parseInt(params.id)
+    const id = parseInt(idParam)
     console.log('ID parseado:', id, 'isNaN:', isNaN(id))
     
     if (isNaN(id)) {
@@ -115,17 +117,18 @@ export async function DELETE(
 // PUT/PATCH - Atualizar um projeto específico
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return PATCH(request, { params })
 }
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id)
+    const { id: idParam } = await params
+    const id = parseInt(idParam)
     
     if (isNaN(id)) {
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })

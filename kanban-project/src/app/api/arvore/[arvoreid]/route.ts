@@ -1,9 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
-export async function GET(request: NextRequest, { params }: { params: { arvoreid: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ arvoreid: string }> }) {
   try {
-    const id = Number.parseInt(params.arvoreid)
+    const { arvoreid } = await params
+    const id = Number.parseInt(arvoreid)
 
     if (isNaN(id)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
@@ -44,9 +45,10 @@ export async function GET(request: NextRequest, { params }: { params: { arvoreid
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { arvoreid: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ arvoreid: string }> }) {
   try {
-    const id = Number.parseInt(params.arvoreid)
+    const { arvoreid } = await params
+    const id = Number.parseInt(arvoreid)
     const { nome, descricao, pessoaPrincipalId, commentPosX, commentPosY } = await request.json()
 
     if (isNaN(id)) {
@@ -77,9 +79,10 @@ export async function PUT(request: NextRequest, { params }: { params: { arvoreid
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { arvoreid: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ arvoreid: string }> }) {
   try {
-    const id = Number.parseInt(params.arvoreid)
+    const { arvoreid } = await params
+    const id = Number.parseInt(arvoreid)
 
     if (isNaN(id)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
