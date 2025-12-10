@@ -38,21 +38,28 @@ export default function AuthComponent({
     const senha = formData.get("senha") as string
 
     try {
+      console.log("Tentando fazer login com email:", email)
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, senha }),
       })
+      
+      console.log("Status da resposta:", response.status)
       const data = await response.json()
+      console.log("Dados da resposta:", data)
 
       if (response.ok) {
+        console.log("Login bem-sucedido!")
         localStorage.setItem("authToken", data.token)
         localStorage.setItem("user", JSON.stringify(data.user))
         onAuthSuccess ? onAuthSuccess() : router.push(redirectTo)
       } else {
+        console.log("Erro no login:", data.error)
         setError(data.error || "Erro ao fazer login")
       }
-    } catch {
+    } catch (error) {
+      console.error("Erro de conexão:", error)
       setError("Erro de conexão. Tente novamente.")
     } finally {
       setIsLoading(false)
