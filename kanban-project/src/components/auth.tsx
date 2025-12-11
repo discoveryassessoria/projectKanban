@@ -53,7 +53,12 @@ export default function AuthComponent({
         console.log("Login bem-sucedido!")
         localStorage.setItem("authToken", data.token)
         localStorage.setItem("user", JSON.stringify(data.user))
-        onAuthSuccess ? onAuthSuccess() : router.push(redirectTo)
+        if (onAuthSuccess) {
+          onAuthSuccess()
+        } else {
+          window.location.href = redirectTo
+        }
+        
       } else {
         console.log("Erro no login:", data.error)
         setError(data.error || "Erro ao fazer login")
