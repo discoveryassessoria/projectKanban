@@ -25,7 +25,7 @@ export default function AuthComponent({
   // redirecionar se já estiver logado
   useEffect(() => {
     const token = localStorage.getItem("authToken")
-    if (token) router.push(redirectTo)
+    if (token) window.location.href = redirectTo
   }, [router, redirectTo])
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
