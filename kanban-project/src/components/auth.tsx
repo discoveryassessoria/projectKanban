@@ -53,6 +53,9 @@ export default function AuthComponent({
         console.log("Login bem-sucedido!")
         localStorage.setItem("authToken", data.token)
         localStorage.setItem("user", JSON.stringify(data.user))
+
+        // Salvar também no cookie para o middleware funcionar
+        document.cookie = `authToken=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}` // 7 dias
         if (onAuthSuccess) {
           onAuthSuccess()
         } else {
