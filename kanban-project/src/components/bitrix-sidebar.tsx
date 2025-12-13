@@ -3,42 +3,57 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useRef } from "react"
+// Remove House do import do lucide-react
 import {
-  Home,
-  Inbox,
-  Calendar,
-  Search,
+  LayoutGrid,
+  SquareCheck,
+  Users,
+  Zap,
   Settings,
-  Shield,
+  ShieldCheck,
   Menu,
 } from "lucide-react"
+
+// Adiciona o import do ícone customizado
+import { HouseIcon } from "@/src/components/icons/house-icon"
 import { useSidebarContext } from "@/src/contexts/sidebar-context"
 
 const menuItems = [
   {
-    title: "Painel Principal",
+    title: "Página Inicial",
     url: "/dashboard",
-    icon: Home,
+    icon: null,
+    textOffset: "",
   },
   {
-    title: "Kanban",
+    title: "Processos",
     url: "/kanban",
-    icon: Inbox,
+    icon: LayoutGrid,
+    textOffset: "",
   },
   {
-    title: "Atividades e Projetos",
+    title: "Tarefas e Projetos",
     url: "/activities",
-    icon: Calendar,
+    icon: SquareCheck,
+    textOffset: "",
   },
   {
     title: "Árvore Genealógica",
     url: "/genealogy",
-    icon: Search,
+    icon: Users,
+    textOffset: "-translate-y-[1px]",
   },
+  {
+  title: "Automação",
+  url: "/automation",
+  icon: Zap,
+  textOffset: "-translate-y-[1.3px]",
+},
   {
     title: "Configurações",
     url: "/settings",
     icon: Settings,
+    textOffset: "",
   },
 ]
 
@@ -46,7 +61,8 @@ const adminMenuItems = [
   {
     title: "Gerenciar Usuários",
     url: "/administrator",
-    icon: Shield,
+    icon: ShieldCheck,
+    textOffset: "-translate-y-[1px]",
   },
 ]
 
@@ -60,12 +76,10 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pathname = usePathname()
 
-  // Sidebar expande se NÃO está colapsada OU se está em hover
   const isExpanded = !isCollapsed || isHovered
 
   const handleMouseEnter = () => {
     if (isCollapsed) {
-      // Delay de 200ms antes de expandir
       hoverTimeoutRef.current = setTimeout(() => {
         setIsHovered(true)
       }, 200)
@@ -73,12 +87,18 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
   }
 
   const handleMouseLeave = () => {
-    // Cancela o timeout se o mouse sair antes do delay
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current)
       hoverTimeoutRef.current = null
     }
     setIsHovered(false)
+  }
+
+  const getIconClasses = (isActive: boolean) => {
+    if (isActive) {
+      return "h-5 w-5 flex-shrink-0 fill-white stroke-black/40 stroke-[1.5]"
+    }
+    return "h-5 w-5 flex-shrink-0 text-white"
   }
 
   return (
@@ -95,7 +115,7 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
       `}
     >
       {/* Header com botão toggle */}
-      <div className="py-3 px-3 flex items-center">
+      <div className="py-4 px-3 flex items-center">
         <button
           onClick={() => {
             if (hoverTimeoutRef.current) {
@@ -108,11 +128,11 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
           className="hover:bg-white/10 rounded-lg p-2 transition-colors flex items-center justify-center flex-shrink-0"
           aria-label="Toggle sidebar"
         >
-          <Menu className="h-5 w-5 text-white" />
+          <Menu className="h-6 w-6 text-white" />
         </button>
 
         {isExpanded && (
-          <span className="font-semibold text-sm text-white ml-2 leading-none whitespace-nowrap">
+          <span className="font-semibold text-base text-white ml-1 leading-none whitespace-nowrap">
             {isHovered ? "Expandir menu" : "Grupo Discovery"}
           </span>
         )}
@@ -120,42 +140,45 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
 
       {/* Linha divisória */}
       <div className="px-4">
-        <div className="border-b border-white" />
+        <div className="border-b border-white/20" />
       </div>
 
       {/* Menu de Navegação */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-2 space-y-5">
         {/* Seção Navegação */}
         <div>
           {isExpanded && (
-            <div className="text-[11px] uppercase tracking-wide text-white font-medium px-2 mb-2 whitespace-nowrap">
+            <div className="text-xs uppercase tracking-wide text-white/70 font-medium px-3 mb-3 whitespace-nowrap">
               Navegação
             </div>
           )}
           <nav className="space-y-1">
             {menuItems.map((item) => {
-              const isActive = pathname === item.url
-              const Icon = item.icon
+  const isActive = pathname === item.url
 
-              return (
-                <Link
-                  key={item.url}
-                  href={item.url}
-                  className={`
-                    flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm font-medium transition-colors
-                    hover:bg-white/10
-                    ${isActive ? "bg-white/15 text-white" : "text-white"}
-                    ${!isExpanded ? "justify-center" : ""}
-                  `}
-                  title={!isExpanded ? item.title : undefined}
-                >
-                  <Icon className="h-4 w-4 flex-shrink-0 text-white" />
-                  {isExpanded && (
-                    <span className="whitespace-nowrap leading-none">{item.title}</span>
-                  )}
-                </Link>
-              )
-            })}
+  return (
+    <Link
+      key={item.url}
+      href={item.url}
+      className={`
+        flex items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium transition-colors
+        hover:bg-white/10
+        ${isActive ? "bg-white/15 text-white" : "text-white/90"}
+        ${!isExpanded ? "justify-center" : ""}
+      `}
+      title={!isExpanded ? item.title : undefined}
+    >
+      {item.icon === null ? (
+        <HouseIcon className="h-5 w-5 flex-shrink-0 text-white" filled={isActive} />
+      ) : (
+        <item.icon className={getIconClasses(isActive)} />
+      )}
+      {isExpanded && (
+        <span className={`whitespace-nowrap leading-none ${item.textOffset}`}>{item.title}</span>
+      )}
+    </Link>
+  )
+})}
           </nav>
         </div>
 
@@ -163,7 +186,7 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
         {isAdmin && (
           <div>
             {isExpanded && (
-              <div className="text-[11px] uppercase tracking-wide text-white font-medium px-2 mb-2 whitespace-nowrap">
+              <div className="text-xs uppercase tracking-wide text-white/70 font-medium px-3 mb-3 whitespace-nowrap">
                 Administração
               </div>
             )}
@@ -177,16 +200,16 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
                     key={item.url}
                     href={item.url}
                     className={`
-                      flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm font-medium transition-colors
+                      flex items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium transition-colors
                       hover:bg-white/10
-                      ${isActive ? "bg-white/15 text-white" : "text-white"}
+                      ${isActive ? "bg-white/15 text-white" : "text-white/90"}
                       ${!isExpanded ? "justify-center" : ""}
                     `}
                     title={!isExpanded ? item.title : undefined}
                   >
-                    <Icon className="h-4 w-4 flex-shrink-0 text-white" />
+                    <Icon className={getIconClasses(isActive)} />
                     {isExpanded && (
-                      <span className="whitespace-nowrap leading-none">{item.title}</span>
+                      <span className={`whitespace-nowrap leading-none ${item.textOffset}`}>{item.title}</span>
                     )}
                   </Link>
                 )
