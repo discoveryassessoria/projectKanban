@@ -9,22 +9,14 @@ import {
   KanbanIcon, 
   Trash2, 
   Sparkles, 
-  Plus, 
   Info, 
-  Search, 
-  Bell, 
-  LogOut,
-  Settings,
-  BarChart3,
-  FolderOpen,
-  TreeDeciduous
 } from "lucide-react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import ModalNovoProjeto from "@/src/components/kanban/modal-novo-projeto"
 import { KanbanBoard } from "@/src/components/kanban"
 import { ContratanteModal } from "@/src/components/kanban/contratante-modal"
 import { RequerenteModal } from "@/src/components/kanban/requerente-modal"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { HeaderBar } from "@/src/components/header-bar"
 import type { Projeto, Contratante, Requerente } from "@/src/types/kanban"
 
 interface User {
@@ -42,15 +34,9 @@ export default function KanbanPage() {
   const [loading, setLoading] = useState(true)
   const [isModalNovoProjetoOpen, setIsModalNovoProjetoOpen] = useState(false)
   
-  // Estados para pesquisa
-  const [searchQuery, setSearchQuery] = useState("")
-  const [searchResults, setSearchResults] = useState<{
-    projetos: Projeto[]
-  }>({ projetos: [] })
-  const [showSearchResults, setShowSearchResults] = useState(false)
-
-  // Estados para notificações
-  const [showNotifications, setShowNotifications] = useState(false)
+  // Estados para atividades e árvores (para o HeaderBar)
+  const [atividades, setAtividades] = useState<any[]>([])
+  const [arvores, setArvores] = useState<any[]>([])
   
   const [contratantes, setContratantes] = useState<Contratante[]>([])
   const [requerentes, setRequerentes] = useState<Requerente[]>([])
@@ -67,40 +53,10 @@ export default function KanbanPage() {
     requerente: null as Requerente | null
   })
 
-  const getInitials = (nome: string) => {
-    return nome
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
-  }
-
   const handleLogout = () => {
     localStorage.removeItem("authToken")
     localStorage.removeItem("user")
     router.push("/login")
-  }
-
-  // Função de pesquisa
-  const handleSearch = (query: string) => {
-    setSearchQuery(query)
-    
-    if (query.trim() === "") {
-      setSearchResults({ projetos: [] })
-      return
-    }
-
-    const queryLower = query.toLowerCase()
-
-    const projetosFiltrados = projetos.filter(p => 
-      p.nome.toLowerCase().includes(queryLower) ||
-      p.descricao?.toLowerCase().includes(queryLower)
-    )
-
-    setSearchResults({
-      projetos: projetosFiltrados.slice(0, 5)
-    })
   }
 
   useEffect(() => {
@@ -117,7 +73,9 @@ export default function KanbanPage() {
     Promise.all([
       buscarProjetos(userData.id),
       buscarContratantes(),
-      buscarRequerentes()
+      buscarRequerentes(),
+      buscarAtividades(),
+      buscarArvores()
     ]).finally(() => {
       setLoading(false)
     })
@@ -144,6 +102,30 @@ export default function KanbanPage() {
     } catch (error) {
       console.error("Erro na requisição:", error)
       setProjetos([])
+    }
+  }
+
+  const buscarAtividades = async () => {
+    try {
+      const response = await fetch("/api/activities")
+      if (response.ok) {
+        const data = await response.json()
+        setAtividades(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error("Erro ao buscar atividades:", error)
+    }
+  }
+
+  const buscarArvores = async () => {
+    try {
+      const response = await fetch("/api/arvore")
+      if (response.ok) {
+        const data = await response.json()
+        setArvores(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error("Erro ao buscar árvores:", error)
     }
   }
 
@@ -432,129 +414,18 @@ export default function KanbanPage() {
       {/* BACKGROUND FIXO */}
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
 
-      {/* HEADER PADRONIZADO */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-black/40 backdrop-blur-md shadow-lg">
-        <div className="px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold leading-tight text-white">
-              Grupo Discovery · Kanban
-            </h1>
-            <p className="text-xs text-white/70">
-              Gerencie seus projetos em formato Kanban
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {/* Barra de pesquisa funcional */}
-            <div className="relative hidden md:block">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-full border border-white/30">
-                <Search className="h-4 w-4 text-white/70" />
-                <input
-                  className="bg-transparent text-xs outline-none placeholder:text-white/60 w-40 text-white"
-                  placeholder="Pesquisar projetos..."
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  onFocus={() => setShowSearchResults(true)}
-                  onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
-                />
-              </div>
-
-              {/* Dropdown de resultados */}
-              {showSearchResults && (
-                <div className="absolute top-full mt-2 left-0 right-0 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
-                  {searchResults.projetos.length === 0 ? (
-                    <div className="px-4 py-6 text-center text-gray-400">
-                      <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm text-gray-600">Nenhum resultado encontrado</p>
-                      <p className="text-xs mt-1 text-gray-400">Tente buscar por outro termo</p>
-                    </div>
-                  ) : (
-                    <div className="max-h-80 overflow-y-auto">
-                      <div className="px-3 py-2 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500 font-medium">
-                        Projetos
-                      </div>
-                      {searchResults.projetos.map(projeto => (
-                        <button
-                          key={`projeto-${projeto.id}`}
-                          className="w-full px-3 py-2 flex items-center gap-3 hover:bg-gray-100 transition text-left"
-                          onClick={() => {
-                            setProjetoSelecionado(projeto)
-                            setShowSearchResults(false)
-                            setSearchQuery("")
-                          }}
-                        >
-                          <BarChart3 className="h-4 w-4 text-sky-500 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-800 truncate">{projeto.nome}</p>
-                            <p className="text-[10px] text-gray-400 truncate">{projeto.descricao || "Sem descrição"}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Botão de notificações funcional */}
-            <div className="relative hidden md:block">
-              <button 
-                className="relative inline-flex items-center justify-center rounded-full p-2 border border-white/30 hover:bg-white/10 transition"
-                onClick={() => setShowNotifications(!showNotifications)}
-                onBlur={() => setTimeout(() => setShowNotifications(false), 200)}
-              >
-                <Bell className="h-4 w-4 text-white" />
-              </button>
-
-              {/* Dropdown de notificações */}
-              {showNotifications && (
-                <div className="absolute top-full mt-2 right-0 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
-                  <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-                    <h3 className="font-semibold text-gray-800 text-sm">Notificações</h3>
-                    <p className="text-xs text-gray-500">0 pendentes</p>
-                  </div>
-
-                  <div className="px-4 py-8 text-center">
-                    <Bell className="h-10 w-10 mx-auto mb-2 text-gray-300" />
-                    <p className="text-sm text-gray-500">Nenhuma notificação</p>
-                    <p className="text-xs text-gray-400 mt-1">Você está em dia!</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {user && (
-              <>
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-9 w-9 border border-white/30">
-                    <AvatarFallback className="bg-transparent text-xs font-medium text-white">
-                      {getInitials(user.nome)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="hidden md:block">
-                    <p className="text-xs font-medium leading-tight text-white">
-                      {user.nome}
-                    </p>
-                    <p className="text-[11px] text-white/70 leading-tight">
-                      {user.tipo === 'admin' ? 'Administrador' : user.tipo}
-                    </p>
-                  </div>
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleLogout}
-                  className="border-white/30 text-xs bg-transparent hover:bg-red-500/20 hover:border-red-400/50 text-white hover:text-red-400 flex items-center justify-center gap-1.5"
-                >
-                  <LogOut className="h-3 w-3" />
-                  Sair
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
+      {/* HEADER - Componente reutilizável */}
+      <HeaderBar
+        title="Processos"
+        subtitle="Gerencie seus projetos em formato Kanban"
+        userName={user?.nome || "Usuário"}
+        userRole={user?.tipo === 'admin' ? 'Administrador' : user?.tipo || "Usuário"}
+        userEmail={user?.email || ""}
+        projetos={projetos}
+        atividades={atividades}
+        arvores={arvores}
+        onLogout={handleLogout}
+      />
 
       {/* CONTEÚDO */}
       <div className="min-h-screen relative">

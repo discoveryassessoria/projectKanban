@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -10,18 +9,20 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Filter, ChevronDown, LogOut, Bell, BarChart3, FolderOpen, ClipboardList } from "lucide-react"
+import { Search, Filter, ChevronDown } from "lucide-react"
 import { useRouter } from "next/navigation"
 import ListaActivities from "@/src/components/activitiesComponents/listaActivities"
 import ListaProjects from "@/src/components/activitiesComponents/listaProjects"
 import PrazoActivities from "@/src/components/activitiesComponents/prazoActivities"
 import CalendarioActivities from "@/src/components/activitiesComponents/calendarioActivities"
+import { HeaderBar } from "@/src/components/header-bar"
 import { useProjects, useStatuses, useUsers, useActivities, invalidateActivities, invalidateProjects } from "@/src/hooks/useActivitiesData"
 import type { Atividade, Projeto, Status, Usuario } from "@/src/hooks/useActivitiesData"
 
 // Interfaces
 interface UserData {
   nome: string
+  email?: string
   tipo?: string
 }
 
@@ -62,12 +63,8 @@ export default function ActivitiesPage() {
   const [mounted, setMounted] = useState(false)
   const [user, setUser] = useState<UserData>({ nome: "Usuário" })
 
-  // Estados para pesquisa do header
-  const [headerSearchQuery, setHeaderSearchQuery] = useState("")
-  const [showHeaderSearchResults, setShowHeaderSearchResults] = useState(false)
-
-  // Estado para notificações
-  const [showNotifications, setShowNotifications] = useState(false)
+  // Estados para árvores (para o HeaderBar)
+  const [arvores, setArvores] = useState<any[]>([])
 
   // Dados
   const { activities } = useActivities()
@@ -85,22 +82,26 @@ export default function ActivitiesPage() {
         }
       }
     }
+    // Buscar árvores para o HeaderBar
+    buscarArvores()
   }, [])
+
+  const buscarArvores = async () => {
+    try {
+      const response = await fetch("/api/arvore")
+      if (response.ok) {
+        const data = await response.json()
+        setArvores(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error("Erro ao buscar árvores:", error)
+    }
+  }
 
   const handleLogout = () => {
     localStorage.removeItem("authToken")
     localStorage.removeItem("user")
     router.push("/login")
-  }
-
-  const getInitials = (nome: string) => {
-    if (!nome) return "US"
-    return nome
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
   }
 
   // Handlers para os modais
@@ -116,29 +117,33 @@ export default function ActivitiesPage() {
     setFilteredActivities(activities)
   }, [])
 
-  // Pesquisa do header
-  const getHeaderSearchResults = () => {
-    if (!headerSearchQuery.trim()) {
-      return { activities: [], projects: [] }
-    }
+  // Converter atividades para o formato do HeaderBar
+  const atividadesParaHeader = (activities || [])
+    .filter(a => a.id !== undefined)
+    .map(a => ({
+      id: a.id as number,
+      nome: a.nome,
+      descricao: a.descricao || null,
+      data_criacao: a.data_criacao || new Date().toISOString(),
+      data_termino: a.data_termino || null,
+      projeto: a.projeto ? { nome: a.projeto.nome } : null,
+      status: a.status ? { nome: a.status.nome } : null,
+      usuarios: a.usuarios?.map(u => ({
+        usuario: {
+          nome: u.usuario?.nome || '',
+          email: u.usuario?.email || ''
+        }
+      }))
+    }))
 
-    const queryLower = headerSearchQuery.toLowerCase()
-
-    const filteredActivities = (activities || []).filter(a =>
-      a.nome.toLowerCase().includes(queryLower) ||
-      a.descricao?.toLowerCase().includes(queryLower)
-    ).slice(0, 5)
-
-    const filteredProjects = (projects || []).filter(p =>
-      p.nome.toLowerCase().includes(queryLower) ||
-      p.descricao?.toLowerCase().includes(queryLower)
-    ).slice(0, 5)
-
-    return { activities: filteredActivities, projects: filteredProjects }
-  }
-
-  const headerSearchResults = getHeaderSearchResults()
-  const hasResults = headerSearchResults.activities.length > 0 || headerSearchResults.projects.length > 0
+  // Converter projetos para o formato do HeaderBar
+  const projetosParaHeader = (projects || [])
+    .filter(p => p.id !== undefined)
+    .map(p => ({
+      id: p.id as number,
+      nome: p.nome,
+      descricao: p.descricao || null
+    }))
 
   // Tela de carregamento
   if (!mounted) {
@@ -160,151 +165,18 @@ export default function ActivitiesPage() {
       {/* BACKGROUND FIXO */}
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
 
-      {/* HEADER PADRONIZADO - IGUAL AO DASHBOARD */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-black/40 backdrop-blur-md shadow-lg">
-        <div className="px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold leading-tight text-white">
-              Grupo Discovery · Minhas Tarefas
-            </h1>
-            <p className="text-xs text-white/70">
-              Gerencie suas atividades e projetos
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {/* Barra de pesquisa funcional */}
-            <div className="relative hidden md:block">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-full border border-white/30">
-                <Search className="h-4 w-4 text-white/70" />
-                <input
-                  className="bg-transparent text-xs outline-none placeholder:text-white/60 w-40 text-white"
-                  placeholder="Pesquisar no sistema..."
-                  value={headerSearchQuery}
-                  onChange={(e) => setHeaderSearchQuery(e.target.value)}
-                  onFocus={() => setShowHeaderSearchResults(true)}
-                  onBlur={() => setTimeout(() => setShowHeaderSearchResults(false), 200)}
-                />
-              </div>
-
-              {/* Dropdown de resultados */}
-              {showHeaderSearchResults && (
-                <div className="absolute top-full mt-2 left-0 right-0 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
-                  {!hasResults ? (
-                    <div className="px-4 py-6 text-center text-gray-400">
-                      <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm text-gray-600">Nenhum resultado encontrado</p>
-                      <p className="text-xs mt-1 text-gray-400">Tente buscar por outro termo</p>
-                    </div>
-                  ) : (
-                    <div className="max-h-80 overflow-y-auto">
-                      {headerSearchResults.activities.length > 0 && (
-                        <>
-                          <div className="px-3 py-2 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500 font-medium">
-                            Atividades
-                          </div>
-                          {headerSearchResults.activities.map(activity => (
-                            <button
-                              key={`activity-${activity.id}`}
-                              className="w-full px-3 py-2 flex items-center gap-3 hover:bg-gray-100 transition text-left"
-                              onClick={() => {
-                                setShowHeaderSearchResults(false)
-                                setHeaderSearchQuery("")
-                              }}
-                            >
-                              <ClipboardList className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm text-gray-800 truncate">{activity.nome}</p>
-                                <p className="text-[10px] text-gray-400 truncate">{activity.descricao || "Sem descrição"}</p>
-                              </div>
-                            </button>
-                          ))}
-                        </>
-                      )}
-                      {headerSearchResults.projects.length > 0 && (
-                        <>
-                          <div className="px-3 py-2 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500 font-medium">
-                            Projetos
-                          </div>
-                          {headerSearchResults.projects.map(project => (
-                            <button
-                              key={`project-${project.id}`}
-                              className="w-full px-3 py-2 flex items-center gap-3 hover:bg-gray-100 transition text-left"
-                              onClick={() => {
-                                setShowHeaderSearchResults(false)
-                                setHeaderSearchQuery("")
-                              }}
-                            >
-                              <FolderOpen className="h-4 w-4 text-sky-500 flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm text-gray-800 truncate">{project.nome}</p>
-                                <p className="text-[10px] text-gray-400 truncate">{project.descricao || "Sem descrição"}</p>
-                              </div>
-                            </button>
-                          ))}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Botão de notificações */}
-            <div className="relative hidden md:block">
-              <button 
-                className="relative inline-flex items-center justify-center rounded-full p-2 border border-white/30 hover:bg-white/10 transition"
-                onClick={() => setShowNotifications(!showNotifications)}
-                onBlur={() => setTimeout(() => setShowNotifications(false), 200)}
-              >
-                <Bell className="h-4 w-4 text-white" />
-              </button>
-
-              {/* Dropdown de notificações */}
-              {showNotifications && (
-                <div className="absolute top-full mt-2 right-0 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
-                  <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-                    <h3 className="font-semibold text-gray-800 text-sm">Notificações</h3>
-                    <p className="text-xs text-gray-500">0 pendentes</p>
-                  </div>
-
-                  <div className="px-4 py-8 text-center">
-                    <Bell className="h-10 w-10 mx-auto mb-2 text-gray-300" />
-                    <p className="text-sm text-gray-500">Nenhuma notificação</p>
-                    <p className="text-xs text-gray-400 mt-1">Você está em dia!</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Avatar className="h-9 w-9 border border-white/30">
-                <AvatarFallback className="bg-transparent text-xs font-medium text-white">
-                  {getInitials(user.nome)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="hidden md:block">
-                <p className="text-xs font-medium leading-tight text-white">
-                  {user.nome}
-                </p>
-                <p className="text-[11px] text-white/70 leading-tight">
-                  {user.tipo === 'admin' ? 'Administrador' : user.tipo || 'Usuário'}
-                </p>
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleLogout}
-              className="border-white/30 text-xs bg-transparent hover:bg-red-500/20 hover:border-red-400/50 text-white hover:text-red-400 flex items-center justify-center gap-1.5"
-            >
-              <LogOut className="h-3 w-3" />
-              Sair
-            </Button>
-          </div>
-        </div>
-      </header>
+      {/* HEADER - Componente reutilizável */}
+      <HeaderBar
+        title="Tarefas e Projetos"
+        subtitle="Gerencie suas tarefas e projetos"
+        userName={user.nome}
+        userRole={user.tipo === 'admin' ? 'Administrador' : user.tipo || 'Usuário'}
+        userEmail={user.email || ''}
+        projetos={projetosParaHeader}
+        atividades={atividadesParaHeader}
+        arvores={arvores}
+        onLogout={handleLogout}
+      />
 
       {/* CONTEÚDO COM OVERLAY ESCURO IGUAL DASHBOARD */}
       <div className="min-h-screen relative">

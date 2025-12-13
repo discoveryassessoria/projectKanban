@@ -7,12 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useTheme } from '@/src/hooks/use-theme'
 import { useToast } from '@/src/contexts/toast-context'
 import { getStoredUser, logout } from '@/lib/auth'
-import { Moon, Sun, User, Lock, Mail, LogOut, Bell, Search, Settings } from 'lucide-react'
+import { Moon, Sun, User, Lock, Mail, LogOut, Settings } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { HeaderBar } from '@/src/components/header-bar'
 
 interface UserData {
   id: string | number
@@ -28,6 +28,11 @@ export default function SettingsPage() {
   const [user, setUser] = useState<UserData | null>(getStoredUser())
   const [mounted, setMounted] = useState(false)
   
+  // Estados para dados do HeaderBar
+  const [projetos, setProjetos] = useState<any[]>([])
+  const [atividades, setAtividades] = useState<any[]>([])
+  const [arvores, setArvores] = useState<any[]>([])
+  
   const [emailForm, setEmailForm] = useState({
     newEmail: '',
     loading: false
@@ -42,15 +47,28 @@ export default function SettingsPage() {
   
   useEffect(() => {
     setMounted(true)
+    fetchHeaderData()
   }, [])
 
-  const getInitials = (nome: string) => {
-    return nome
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
+  const fetchHeaderData = async () => {
+    try {
+      const [projetosRes, atividadesRes, arvoresRes] = await Promise.all([
+        fetch("/api/projetos"),
+        fetch("/api/activities"),
+        fetch("/api/arvore")
+      ])
+
+      const projetosData = await projetosRes.json()
+      setProjetos(projetosData.projetos || [])
+
+      const atividadesData = await atividadesRes.json()
+      setAtividades(Array.isArray(atividadesData) ? atividadesData : [])
+
+      const arvoresData = await arvoresRes.json()
+      setArvores(Array.isArray(arvoresData) ? arvoresData : [])
+    } catch (error) {
+      console.error("Erro ao buscar dados:", error)
+    }
   }
 
   const handleLogout = () => {
@@ -61,9 +79,9 @@ export default function SettingsPage() {
   
   if (!mounted) {
     return (
-      <div className="text-white w-full">
-        <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-fixed" />
-        <div className="min-h-screen bg-black/40 backdrop-blur-sm w-full flex items-center justify-center">
+      <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
+        <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
+        <div className="min-h-screen bg-black/40 backdrop-blur-sm flex items-center justify-center">
           <div className="text-center">
             <Settings className="h-12 w-12 mx-auto mb-4 text-white animate-pulse" />
             <p className="text-lg text-white">Carregando configurações...</p>
@@ -171,72 +189,28 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="text-white w-full">
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-fixed" />
+    <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
+      {/* BACKGROUND FIXO */}
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
 
-      <div className="min-h-screen bg-black/40 backdrop-blur-sm w-full">
-        {/* HEADER TRANSLÚCIDO */}
-        <header className="border-b border-white/10 bg-gradient-to-r from-[#102A6B]/70 via-[#14357F]/70 to-[#1E4AA0]/70 backdrop-blur-xl shadow-lg sticky top-0 z-10">
-          <div className="px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-white/20 flex items-center justify-center text-sm font-bold backdrop-blur-sm">
-                GD
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold leading-tight">
-                  Grupo Discovery · Configurações
-                </h1>
-                <p className="text-xs text-white/70">
-                  Gerencie suas preferências e informações da conta
-                </p>
-              </div>
-            </div>
+      {/* HEADER */}
+      <HeaderBar
+        title="Configurações"
+        subtitle="Gerencie suas preferências e informações da conta"
+        userName={user?.nome || 'Usuário'}
+        userRole={user?.tipo === 'admin' ? 'Administrador' : user?.tipo || 'Usuário'}
+        userEmail={user?.email || ''}
+        projetos={projetos}
+        atividades={atividades}
+        arvores={arvores}
+        onLogout={handleLogout}
+      />
 
-            <div className="flex items-center gap-4">
-              <div className="hidden md:flex items-center gap-2 px-3 py-2 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm">
-                <Search className="h-4 w-4 text-white/70" />
-                <input
-                  className="bg-transparent text-xs outline-none placeholder:text-white/60 w-40"
-                  placeholder="Pesquisar no sistema..."
-                />
-              </div>
-
-              <button className="relative hidden md:inline-flex items-center justify-center rounded-full p-2 bg-white/10 border border-white/20 hover:bg-white/20 transition backdrop-blur-sm">
-                <Bell className="h-4 w-4" />
-                <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 border border-white" />
-              </button>
-
-              <div className="flex items-center gap-2">
-                <Avatar className="h-9 w-9 border border-white/40">
-                  <AvatarFallback className="bg-white/20 text-xs font-medium backdrop-blur-sm">
-                    {user?.nome ? getInitials(user.nome) : 'US'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="hidden md:block text-right">
-                  <p className="text-xs font-medium leading-tight">
-                    {user?.nome || 'Usuário'}
-                  </p>
-                  <p className="text-[11px] text-white/70 leading-tight">
-                    {user?.tipo || 'Usuário'}
-                  </p>
-                </div>
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLogout}
-                className="border-white/40 text-xs bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm"
-              >
-                <LogOut className="h-3 w-3 mr-1.5" />
-                Sair
-              </Button>
-            </div>
-          </div>
-        </header>
-
-        {/* CONTEÚDO PRINCIPAL */}
-        <main className="px-6 py-8 max-w-4xl mx-auto">
+      {/* CONTEÚDO COM OVERLAY */}
+      <div className="min-h-screen relative">
+        <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+        
+        <main className="relative px-6 py-8 max-w-4xl mx-auto">
           <Tabs defaultValue="appearance" className="w-full">
             <TabsList className="grid w-full grid-cols-4 bg-white/10 border border-white/20 backdrop-blur-xl">
               <TabsTrigger value="appearance" className="flex items-center gap-2 data-[state=active]:bg-white/20 text-white">

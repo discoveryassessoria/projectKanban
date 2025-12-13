@@ -27,10 +27,10 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { UserPlus, Pencil, Trash2, Search, Shield, User, Users, LogOut, Bell } from "lucide-react"
+import { UserPlus, Pencil, Trash2, Search, Shield, User, Users } from "lucide-react"
 import { UserType, userTypeLabels } from "@/src/utils/userTypes"
 import { getUsers, createUser, updateUser, deleteUser } from "@/src/services/userService"
+import { HeaderBar } from "@/src/components/header-bar"
 
 interface Usuario {
   id: number
@@ -41,6 +41,7 @@ interface Usuario {
 
 interface UserData {
   nome: string
+  email?: string
   tipo?: string
 }
 
@@ -53,6 +54,12 @@ export default function AdministratorPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [user, setUser] = useState<UserData>({ nome: "Usuário" })
+
+  // Estados para dados do HeaderBar
+  const [projetos, setProjetos] = useState<any[]>([])
+  const [atividades, setAtividades] = useState<any[]>([])
+  const [arvores, setArvores] = useState<any[]>([])
 
   // Estados para modal de criar/editar
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -70,19 +77,6 @@ export default function AdministratorPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<Usuario | null>(null)
 
-  const getInitials = (nome: string) => {
-    return nome
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
-  }
-
-  const user: UserData = typeof window !== 'undefined' 
-    ? JSON.parse(localStorage.getItem('user') || '{"nome":"Usuário"}') 
-    : { nome: "Usuário" }
-
   const handleLogout = () => {
     localStorage.removeItem("authToken")
     localStorage.removeItem("user")
@@ -90,6 +84,18 @@ export default function AdministratorPage() {
   }
 
   useEffect(() => {
+    // Carregar usuário do localStorage
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('user')
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser))
+        } catch {
+          setUser({ nome: "Usuário" })
+        }
+      }
+    }
+
     const token = localStorage.getItem("authToken")
     if (!token) {
       router.push("/login")
@@ -99,7 +105,30 @@ export default function AdministratorPage() {
     if (!isAdminLoading && !isAdmin) {
       router.push("/dashboard")
     }
+
+    fetchHeaderData()
   }, [isAdmin, isAdminLoading, router])
+
+  const fetchHeaderData = async () => {
+    try {
+      const [projetosRes, atividadesRes, arvoresRes] = await Promise.all([
+        fetch("/api/projetos"),
+        fetch("/api/activities"),
+        fetch("/api/arvore")
+      ])
+
+      const projetosData = await projetosRes.json()
+      setProjetos(projetosData.projetos || [])
+
+      const atividadesData = await atividadesRes.json()
+      setAtividades(Array.isArray(atividadesData) ? atividadesData : [])
+
+      const arvoresData = await arvoresRes.json()
+      setArvores(Array.isArray(arvoresData) ? arvoresData : [])
+    } catch (error) {
+      console.error("Erro ao buscar dados:", error)
+    }
+  }
 
   // Carregar usuários
   const loadUsers = async () => {
@@ -262,9 +291,9 @@ export default function AdministratorPage() {
 
   if (isAdminLoading) {
     return (
-      <div className="text-white w-full">
-        <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-fixed" />
-        <div className="min-h-screen bg-black/40 backdrop-blur-sm w-full flex items-center justify-center">
+      <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
+        <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
+        <div className="min-h-screen bg-black/40 backdrop-blur-sm flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
             <p className="text-lg text-white">Verificando permissões...</p>
@@ -279,64 +308,28 @@ export default function AdministratorPage() {
   }
 
   return (
-    <div className="text-white w-full">
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-fixed" />
+    <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
+      {/* BACKGROUND FIXO */}
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
 
-      <div className="min-h-screen bg-black/40 backdrop-blur-sm w-full">
-        {/* HEADER TRANSLÚCIDO */}
-        <header className="border-b border-white/10 bg-gradient-to-r from-[#102A6B]/70 via-[#14357F]/70 to-[#1E4AA0]/70 backdrop-blur-xl shadow-lg sticky top-0 z-10">
-          <div className="px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-white/20 flex items-center justify-center text-sm font-bold backdrop-blur-sm">
-                GD
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold leading-tight">
-                  Grupo Discovery · Gerenciamento de Usuários
-                </h1>
-                <p className="text-xs text-white/70">
-                  Crie e gerencie usuários do sistema
-                </p>
-              </div>
-            </div>
+      {/* HEADER */}
+      <HeaderBar
+        title="Gerenciar Usuários"
+        subtitle="Crie e gerencie usuários do sistema"
+        userName={user.nome}
+        userRole="Administrador"
+        userEmail={user.email || ''}
+        projetos={projetos}
+        atividades={atividades}
+        arvores={arvores}
+        onLogout={handleLogout}
+      />
 
-            <div className="flex items-center gap-4">
-              <button className="relative hidden md:inline-flex items-center justify-center rounded-full p-2 bg-white/10 border border-white/20 hover:bg-white/20 transition backdrop-blur-sm">
-                <Bell className="h-4 w-4" />
-                <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 border border-white" />
-              </button>
-
-              <div className="flex items-center gap-2">
-                <Avatar className="h-9 w-9 border border-white/40">
-                  <AvatarFallback className="bg-white/20 text-xs font-medium backdrop-blur-sm">
-                    {getInitials(user.nome)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="hidden md:block text-right">
-                  <p className="text-xs font-medium leading-tight">
-                    {user.nome}
-                  </p>
-                  <p className="text-[11px] text-white/70 leading-tight">
-                    {user.tipo || 'Administrador'}
-                  </p>
-                </div>
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLogout}
-                className="border-white/40 text-xs bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm"
-              >
-                <LogOut className="h-3 w-3 mr-1.5" />
-                Sair
-              </Button>
-            </div>
-          </div>
-        </header>
-
-        {/* CONTEÚDO PRINCIPAL */}
-        <main className="px-6 py-8 max-w-7xl mx-auto space-y-6">
+      {/* CONTEÚDO COM OVERLAY */}
+      <div className="min-h-screen relative">
+        <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+        
+        <main className="relative px-6 py-8 max-w-7xl mx-auto space-y-6">
           {/* Ações do topo */}
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-end">
             <Button onClick={handleCreate} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white">

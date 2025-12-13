@@ -1,14 +1,11 @@
 import React from "react"
 
-interface HouseIconProps {
+interface ZapIconProps {
   className?: string
   filled?: boolean
 }
 
-export function HouseIcon({ className = "h-5 w-5", filled = false }: HouseIconProps) {
-  // Path da casa - ajustado para ser maior
-  const housePath = "M3 10.5L12 3L21 10.5H18V20H14V14H10V20H6V10.5H3Z"
-
+export function ZapIcon({ className = "h-5 w-5", filled = false }: ZapIconProps) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -16,10 +13,10 @@ export function HouseIcon({ className = "h-5 w-5", filled = false }: HouseIconPr
       xmlns="http://www.w3.org/2000/svg"
     >
       <path
-        d={housePath}
+        d="M13 2L3 14H12L11 22L21 10H12L13 2Z"
         fill={filled ? "currentColor" : "none"}
         stroke="currentColor"
-        strokeWidth="1.8"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
