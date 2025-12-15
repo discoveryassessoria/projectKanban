@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useActivities, useStatuses, useContratantes, useRequerentes, useProject, invalidateActivities, invalidateProject } from "@/src/hooks/useActivitiesData"
 import type { Atividade, Status, Usuario, Projeto } from "@/src/hooks/useActivitiesData"
-import { AtividadeDetailsModal } from "@/src/components/kanban/atividade-details-modal"
+import { ProcessoDetailsModal } from "@/src/components/kanban/atividade-details-modal"
 import type { Contratante, Requerente } from "@/src/types/kanban"
 
 interface UserAtv {
@@ -481,8 +481,8 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
         </div>
       </div>
 
-      <AtividadeDetailsModal
-        atividade={selectedAtividade as any}
+      <ProcessoDetailsModal
+        processo={selectedAtividade as any}
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
         onSave={handleAtividadeSave}
