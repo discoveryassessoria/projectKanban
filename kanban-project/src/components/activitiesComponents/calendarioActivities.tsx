@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge"
 import { Clock, Calendar as CalendarIcon, User } from "lucide-react"
 import { useCalendarData, useDayData } from "@/src/hooks/useActivitiesData"
-import { AtividadeDetailsModal } from "@/src/components/kanban/atividade-details-modal"
+import { ProcessoDetailsModal } from "@/src/components/kanban/atividade-details-modal"
 import type { Atividade } from "@/src/hooks/useActivitiesData"
 
 interface CalendarActivity {
@@ -353,8 +353,8 @@ export default function CalendarioActivities() {
         </DialogContent>
       </Dialog>
 
-      <AtividadeDetailsModal
-        atividade={selectedAtividade as any}
+      <ProcessoDetailsModal
+        processo={selectedAtividade as any}
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
         onSave={handleAtividadeSave}
