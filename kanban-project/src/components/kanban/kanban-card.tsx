@@ -1,13 +1,9 @@
 "use client"
 
 import type React from "react"
-
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { Calendar, User, Clock, FileText } from "lucide-react"
+import { Phone, Mail, MessageCircle } from "lucide-react"
 
 interface KanbanCardProps {
   id: number
@@ -27,54 +23,28 @@ interface KanbanCardProps {
     nome: string
   }
   tags?: { texto: string; cor: string }[]
+  // Novos campos para o estilo Bitrix
+  telefone?: string
+  email?: string
+  atividadesCount?: number
   onClick?: () => void
-}
-
-function formatDate(dateString: string) {
-  const date = new Date(dateString)
-  const now = new Date()
-  
-  const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  
-  const diffTime = nowOnly.getTime() - dateOnly.getTime()
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
-
-  if (diffDays === 0) return "Hoje"
-  if (diffDays === 1) return "Ontem"
-  if (diffDays < 7) return `${diffDays} dias atrás`
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} semanas atrás`
-  
-  return date.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  })
-}
-
-function getStatusColor(statusNome?: string) {
-  if (!statusNome) return "bg-white/10 text-white/80"
-  
-  const status = statusNome.toLowerCase()
-  if (status.includes('concluí') || status.includes('finaliz')) return "bg-green-500/20 text-green-300"
-  if (status.includes('andamento') || status.includes('progresso')) return "bg-blue-500/20 text-blue-300"
-  if (status.includes('pendente') || status.includes('aguard')) return "bg-yellow-500/20 text-yellow-300"
-  if (status.includes('pausad') || status.includes('suspend')) return "bg-orange-500/20 text-orange-300"
-  if (status.includes('cancelad') || status.includes('rejeit')) return "bg-red-500/20 text-red-300"
-  
-  return "bg-white/10 text-white/80"
+  onAddAtividade?: () => void
 }
 
 export function KanbanCard({
   id,
   nome,
   descricao,
-  data_termino = "",
+  data_termino,
   data_criacao,
   usuarios = [],
   status,
   tags = [],
-  onClick
+  telefone,
+  email,
+  atividadesCount = 0,
+  onClick,
+  onAddAtividade
 }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
     id: id,
@@ -96,115 +66,103 @@ export function KanbanCard({
     }
   }
 
-  const responsavel = usuarios?.[0]?.usuario
+  const handleAddAtividade = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (onAddAtividade) {
+      onAddAtividade()
+    }
+  }
+
+  const handlePhoneClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (telefone) {
+      window.open(`tel:${telefone}`, '_blank')
+    }
+  }
+
+  const handleEmailClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (email) {
+      window.open(`mailto:${email}`, '_blank')
+    }
+  }
+
+  const handleChatClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    // Futuro: integração com WhatsApp ou chat interno
+    if (telefone) {
+      const whatsappNumber = telefone.replace(/\D/g, '')
+      window.open(`https://wa.me/55${whatsappNumber}`, '_blank')
+    }
+  }
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <Card
-        className={`mb-3 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/15 hover:border-white/30 transition-all cursor-grab active:cursor-grabbing ${isDragging ? "shadow-2xl ring-2 ring-blue-400/50 rotate-2" : "shadow-md hover:shadow-lg"}`}
+      <div
+        className={`
+          mb-3 bg-white rounded-lg shadow-sm border border-gray-200
+          hover:shadow-md transition-all cursor-grab active:cursor-grabbing
+          ${isDragging ? "shadow-xl ring-2 ring-blue-400/50 rotate-2" : ""}
+        `}
         onClick={handleCardClick}
       >
-        <CardContent className="p-3 space-y-2.5">
-          {/* Header com título e status */}
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold text-sm text-white leading-tight line-clamp-2 flex-1">
+        {/* Conteúdo principal */}
+        <div className="p-3">
+          {/* Header: Nome + Contador */}
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <h3 className="font-medium text-sm text-gray-900 leading-tight flex-1">
               {nome}
             </h3>
-            {status && (
-              <Badge 
-                variant="secondary" 
-                className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap backdrop-blur-sm ${getStatusColor(status.nome)}`}
-              >
-                {status.nome}
-              </Badge>
-            )}
-          </div>
-
-          {/* Descrição se existir */}
-          {descricao && (
-            <div className="flex items-start gap-2">
-              <FileText className="h-3 w-3 text-white/60 mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-white/80 line-clamp-2 leading-relaxed">
-                {descricao}
-              </p>
-            </div>
-          )}
-
-          {/* Responsável */}
-          {responsavel && (
-            <div className="flex items-center gap-2">
-              <Avatar className="h-6 w-6 border border-white/20">
-                <AvatarFallback className="text-xs bg-blue-500/30 text-blue-200 font-medium backdrop-blur-sm">
-                  {responsavel.nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-white truncate">
-                  {responsavel.nome}
-                </p>
-                <p className="text-xs text-white/70 truncate">
-                  {responsavel.email}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Datas */}
-          <div className="space-y-1">
-            {data_termino && (
-              <div className="flex items-center gap-2 text-xs">
-                <Calendar className="h-3 w-3 text-red-400" />
-                <span className="text-white/70">Entrega:</span>
-                <span className="font-medium text-red-300">
-                  {new Date(data_termino).toLocaleDateString('pt-BR')}
-                </span>
-              </div>
-            )}
             
-            {data_criacao && (
-              <div className="flex items-center gap-2 text-xs">
-                <Clock className="h-3 w-3 text-white/60" />
-                <span className="text-white/70">
-                  Criado {formatDate(data_criacao)}
-                </span>
-              </div>
+            {/* Contador de atividades (estilo Bitrix) */}
+            {atividadesCount > 0 && (
+              <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 bg-blue-100 text-blue-600 text-xs font-medium rounded flex items-center justify-center">
+                {atividadesCount}
+              </span>
             )}
           </div>
 
-          {/* Tags */}
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {tags.slice(0, 3).map((tag, index) => (
-                <Badge
-                  key={index}
-                  variant="outline"
-                  className="text-xs px-2 py-0.5 rounded-full backdrop-blur-sm"
-                  style={{
-                    backgroundColor: `${tag.cor}30`,
-                    borderColor: `${tag.cor}80`,
-                    color: tag.cor
-                  }}
-                >
-                  {tag.texto}
-                </Badge>
-              ))}
-              {tags.length > 3 && (
-                <Badge variant="outline" className="text-xs px-2 py-0.5 rounded-full text-white/70 bg-white/10 backdrop-blur-sm">
-                  +{tags.length - 3}
-                </Badge>
-              )}
-            </div>
-          )}
+          {/* Ícones de ação */}
+          <div className="flex items-center justify-end gap-1">
+            <button
+              onClick={handlePhoneClick}
+              className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${telefone ? 'text-gray-500 hover:text-blue-600' : 'text-gray-300 cursor-not-allowed'}`}
+              disabled={!telefone}
+              title={telefone || 'Sem telefone'}
+            >
+              <Phone className="h-4 w-4" />
+            </button>
+            
+            <button
+              onClick={handleEmailClick}
+              className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${email ? 'text-gray-500 hover:text-blue-600' : 'text-gray-300 cursor-not-allowed'}`}
+              disabled={!email}
+              title={email || 'Sem email'}
+            >
+              <Mail className="h-4 w-4" />
+            </button>
+            
+            <button
+              onClick={handleChatClick}
+              className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${telefone ? 'text-gray-500 hover:text-green-600' : 'text-gray-300 cursor-not-allowed'}`}
+              disabled={!telefone}
+              title={telefone ? 'WhatsApp' : 'Sem telefone'}
+            >
+              <MessageCircle className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
 
-          {/* Indicador de múltiplos usuários */}
-          {usuarios.length > 1 && (
-            <div className="flex items-center gap-1 text-xs text-white/70">
-              <User className="h-3 w-3" />
-              <span>+{usuarios.length - 1} colaboradores</span>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {/* Footer: + Atividade */}
+        <div className="border-t border-gray-100">
+          <button
+            onClick={handleAddAtividade}
+            className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:text-blue-600 hover:bg-gray-50 transition-colors"
+          >
+            + Atividade
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

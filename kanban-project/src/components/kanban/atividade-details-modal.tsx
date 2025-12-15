@@ -1,237 +1,445 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
+import { useState, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { DatePickerField } from "@/components/ui/date-picker-field"
-import { UserSelector } from "@/components/ui/user-selector"
-import { TreeSelector } from "../ui/tree-selector"
-import { Calendar, User, FileText, Tag, Save, TreePine, ArrowUpRight } from "lucide-react"
-import type { AtividadeWithStatus, Contratante, Requerente } from "@/src/types/kanban"
-import Link from "next/link"
-import { useState, useEffect, useCallback } from "react"
+import { 
+  X, 
+  Phone, 
+  Mail, 
+  Settings, 
+  ChevronDown,
+  Plus,
+  MessageSquare,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Filter
+} from "lucide-react"
 
-interface AtividadeDetailsModalProps {
-  atividade: AtividadeWithStatus | null
+// Tipos temporários (depois vão vir do banco)
+interface Contratante {
+  id: number
+  nome: string
+  telefone?: string
+  email?: string
+  endereco?: string
+  cidade?: string
+  estado?: string
+  cep?: string
+}
+
+interface Requerente {
+  id: number
+  nome: string
+  telefone?: string
+  email?: string
+}
+
+interface Tarefa {
+  id: number
+  titulo: string
+  prazo?: string
+  responsavel?: string
+  concluida: boolean
+  criadoEm: string
+}
+
+interface Processo {
+  id: number
+  nome: string
+  etapaAtual: string
+  contratante?: Contratante
+  requerentes?: Requerente[]
+  tarefas?: Tarefa[]
+  criadoEm: string
+}
+
+const ETAPAS = [
+  { id: 1, nome: "Busca documental", cor: "bg-blue-500" },
+  { id: 2, nome: "Emissão documentos", cor: "bg-blue-400" },
+  { id: 3, nome: "Análise documental", cor: "bg-cyan-500" },
+  { id: 4, nome: "Retificação", cor: "bg-teal-500" },
+  { id: 5, nome: "Tradução juramentada", cor: "bg-green-500" },
+  { id: 6, nome: "Apostilamento", cor: "bg-emerald-500" },
+  { id: 7, nome: "Aguardando protocolo", cor: "bg-yellow-500" },
+  { id: 8, nome: "Protocolado", cor: "bg-orange-500" },
+  { id: 9, nome: "Fechar negócio", cor: "bg-red-500" },
+]
+
+interface ProcessoDetailsModalProps {
+  processo: Processo | null
   isOpen: boolean
   onClose: () => void
   onSave?: () => void
-  // Props opcionais para contratantes e requerentes
-  contratantes?: Contratante[]
-  requerentes?: Requerente[]
-  selectedContratantes?: Contratante[]
-  selectedRequerentes?: Requerente[]
-  onContratantesChange?: (contratantes: Contratante[]) => void
-  onRequerentesChange?: (requerentes: Requerente[]) => void
 }
 
-export function AtividadeDetailsModal({ 
-  atividade, 
+export function ProcessoDetailsModal({ 
+  processo, 
   isOpen, 
   onClose, 
-  onSave,
-  contratantes,
-  requerentes,
-  selectedContratantes,
-  selectedRequerentes,
-  onContratantesChange,
-  onRequerentesChange
-}: AtividadeDetailsModalProps) {
-  const [nome, setNome] = useState("")
-  const [descricao, setDescricao] = useState("")
-  const [usuarioId, setUsuarioId] = useState<number | null>(null)
-  const [usuarioNome, setUsuarioNome] = useState("")
-  const [dataTermino, setDataTermino] = useState<Date | undefined>(undefined)
-  const [arvore_id, setArvore_id] = useState<number | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
+  onSave 
+}: ProcessoDetailsModalProps) {
+  const [activeTab, setActiveTab] = useState<"geral" | "faturas" | "historico">("geral")
+  const [activeRightTab, setActiveRightTab] = useState<"atividade" | "tarefa" | "comentario">("atividade")
+  const [novaTarefa, setNovaTarefa] = useState("")
 
+  // Fechar com ESC
   useEffect(() => {
-    if (atividade) {
-      setNome(atividade.nome)
-      setDescricao(atividade.descricao || "")
-      setArvore_id(atividade.arvore_id || null)
-
-      // Carregar usuário responsável se existir
-      const primeiroUsuario = atividade.usuarios?.[0]
-      if (primeiroUsuario) {
-        setUsuarioId(primeiroUsuario.usuario.id)
-        setUsuarioNome(primeiroUsuario.usuario.nome)
-      } else {
-        setUsuarioId(null)
-        setUsuarioNome("")
-      }
-
-      setDataTermino(atividade.data_termino ? new Date(atividade.data_termino) : undefined)
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
     }
-  }, [atividade])
+    if (isOpen) {
+      document.addEventListener('keydown', handleEsc)
+      document.body.style.overflow = 'hidden'
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEsc)
+      document.body.style.overflow = 'auto'
+    }
+  }, [isOpen, onClose])
 
-  if (!atividade) return null
+  if (!isOpen || !processo) return null
 
-  const handleSave = async () => {
-    setIsSaving(true)
-    try {
-      const response = await fetch(`/api/atividades/${atividade.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nome,
-          descricao: descricao || null,
-          usuarioId: usuarioId,
-          data_termino: dataTermino ? dataTermino.toISOString().split('T')[0] : null,
-          arvore_id: arvore_id,
-        }),
-      })
+  const etapaAtualIndex = ETAPAS.findIndex(e => e.nome === processo.etapaAtual)
 
-      if (!response.ok) throw new Error("Falha ao atualizar atividade")
-
-      onSave?.()
-      onClose()
-    } catch (error) {
-      console.error(error)
-      alert("Não foi possível salvar as alterações.")
-    } finally {
-      setIsSaving(false)
+  const handleAddTarefa = () => {
+    if (novaTarefa.trim()) {
+      console.log("Nova tarefa:", novaTarefa)
+      setNovaTarefa("")
     }
   }
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <DialogTitle className="text-2xl font-bold">Editar Atividade</DialogTitle>
-              <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white">{atividade.status.nome}</Badge>
+  const modalContent = (
+    <>
+      {/* Overlay escuro - cobre tudo */}
+      <div 
+        className="fixed inset-0 bg-black/50 z-[9998]"
+        onClick={onClose}
+      />
+
+      {/* Modal - com margens específicas */}
+      <div 
+        className="fixed z-[9999] bg-white shadow-2xl flex flex-col overflow-hidden rounded-tl-xl rounded-tr-xl"
+        style={{
+          left: '155px',
+          top: '45px',
+          right: '35px',
+          bottom: '0px',
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-white flex-shrink-0">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={onClose}
+              className="w-10 h-10 bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center justify-center transition-colors"
+            >
+              <X className="h-5 w-5 text-white" />
+            </button>
+            
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900">{processo.nome}</h1>
+              <span className="text-sm text-gray-500">Itália</span>
             </div>
           </div>
-          <DialogDescription>Atualize os detalhes da atividade</DialogDescription>
-        </DialogHeader>
 
-        <div className="space-y-6 mt-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Status:</span>
-            <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white">{atividade.status.nome}</Badge>
+            <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700">
+              <Phone className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700">
+              <Mail className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700">
+              <Settings className="h-5 w-5" />
+            </Button>
+            <Button className="bg-red-500 hover:bg-red-600 text-white">
+              Orçamento
+              <ChevronDown className="h-4 w-4 ml-2" />
+            </Button>
           </div>
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="nome" className="text-sm font-medium">
-              Nome da Atividade
-            </Label>
-            <Input
-              id="nome"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Digite o nome da atividade..."
-            />
-          </div>
+        {/* Barra de Etapas */}
+        <div className="flex border-b bg-gray-50 overflow-x-auto flex-shrink-0">
+          {ETAPAS.map((etapa, index) => {
+            const isActive = index === etapaAtualIndex
+            const isPast = index < etapaAtualIndex
+            
+            return (
+              <button
+                key={etapa.id}
+                className={`
+                  flex-shrink-0 px-4 py-3 text-sm font-medium transition-colors relative
+                  ${isActive 
+                    ? `${etapa.cor} text-white` 
+                    : isPast 
+                      ? 'bg-gray-200 text-gray-600' 
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }
+                `}
+              >
+                {etapa.nome}
+              </button>
+            )
+          })}
+        </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              <Label htmlFor="descricao" className="text-sm font-medium">
-                Descrição
-              </Label>
-            </div>
-            <Textarea
-              id="descricao"
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-              className="min-h-[100px]"
-              placeholder="Adicione uma descrição detalhada..."
-            />
-          </div>
+        {/* Abas principais */}
+        <div className="flex border-b bg-white px-6 flex-shrink-0">
+          {[
+            { id: "geral", label: "Geral" },
+            { id: "faturas", label: "Faturas" },
+            { id: "historico", label: "Histórico" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`
+                px-4 py-3 text-sm font-medium border-b-2 transition-colors
+                ${activeTab === tab.id 
+                  ? 'border-blue-500 text-blue-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                }
+              `}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <Label htmlFor="data" className="text-sm font-medium">
-                  Data de Término
-                </Label>
+        {/* Conteúdo principal - Grid de 2 colunas */}
+        <div className="flex-1 overflow-hidden">
+          <div className="grid grid-cols-2 h-full">
+            
+            {/* Coluna Esquerda - Sobre o Negócio */}
+            <div className="border-r overflow-y-auto p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                  Sobre o Negócio
+                </h2>
+                <button className="text-sm text-blue-600 hover:text-blue-700">
+                  editar
+                </button>
               </div>
-              <DatePickerField
-                value={dataTermino}
-                onChange={setDataTermino}
-                placeholder="Selecione uma data"
-                className="w-full"
-              />
-            </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4" />
-                <Label htmlFor="responsavel" className="text-sm font-medium">
-                  Responsável
-                </Label>
+              {/* Etapa */}
+              <div className="mb-6">
+                <label className="text-xs text-gray-500 uppercase">Etapa</label>
+                <p className="text-gray-900 font-medium">{processo.etapaAtual || "Não definida"}</p>
               </div>
-              <UserSelector value={usuarioId?.toString()} onChange={setUsuarioId} placeholder="Selecione um usuário..." className="w-full" />
-              {usuarioNome && (
-                <p className="text-xs text-muted-foreground">Selecionado: {usuarioNome}</p>
+
+              {/* Requerente */}
+              <div className="mb-6">
+                <label className="text-xs text-gray-500 uppercase">Requerente</label>
+                {processo.requerentes && processo.requerentes.length > 0 ? (
+                  processo.requerentes.map((req) => (
+                    <p key={req.id} className="text-gray-900">{req.nome}</p>
+                  ))
+                ) : (
+                  <p className="text-gray-400 italic">Nenhum requerente</p>
+                )}
+              </div>
+
+              {/* Contato (Contratante) */}
+              {processo.contratante && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <label className="text-xs text-gray-500 uppercase">Contato</label>
+                  
+                  <div className="mt-2 space-y-2">
+                    <p className="text-gray-900 font-semibold text-lg">
+                      {processo.contratante.nome}
+                    </p>
+                    
+                    {processo.contratante.telefone && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Phone className="h-4 w-4" />
+                        <span>{processo.contratante.telefone}</span>
+                      </div>
+                    )}
+                    
+                    {processo.contratante.email && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Mail className="h-4 w-4" />
+                        <span>{processo.contratante.email}</span>
+                      </div>
+                    )}
+                    
+                    {processo.contratante.endereco && (
+                      <div className="mt-3 text-sm text-gray-600">
+                        <p className="font-medium">Endereço de entrega:</p>
+                        <p>{processo.contratante.endereco}</p>
+                        {processo.contratante.cidade && <p>{processo.contratante.cidade}</p>}
+                        {processo.contratante.estado && <p>{processo.contratante.estado}</p>}
+                        {processo.contratante.cep && <p>{processo.contratante.cep}</p>}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 mt-4">
+                    <Button variant="outline" size="sm" className="text-gray-600">
+                      <Phone className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" className="text-gray-600">
+                      <Mail className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" className="text-gray-600">
+                      <MessageSquare className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               )}
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <TreePine className="h-4 w-4" />
-              <Label htmlFor="arvore" className="text-sm font-medium">
-                Árvore Genealógica Vinculada
-              </Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <TreeSelector value={arvore_id?.toString()} onChange={setArvore_id} placeholder="Vincular a uma árvore..." className="w-full" />
-              {arvore_id && (
-                <Link href={`/genealogy?treeId=${arvore_id}`} passHref legacyBehavior>
-                  <a target="" rel="noopener noreferrer" title="Abrir árvore em nova aba" className="flex items-center justify-center p-2 rounded-md border hover:bg-accent transition-colors">
-                    <ArrowUpRight className="h-5 w-5" />
-                  </a>
-                </Link>
-              )}
-            </div>
-          </div>
-
-          {/* Tags - read only for now */}
-          {atividade.tags && atividade.tags.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Tag className="h-4 w-4" />
-                <span className="text-sm font-medium">Tags</span>
+              {/* Botões de ação */}
+              <div className="flex gap-2 text-sm">
+                <button className="text-blue-600 hover:text-blue-700">
+                  Selecionar campo
+                </button>
+                <span className="text-gray-300">|</span>
+                <button className="text-blue-600 hover:text-blue-700">
+                  Criar campo
+                </button>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {atividade.tags.map((tag, index) => (
-                  <span
-                    key={index}
-                    className="px-3 py-1.5 text-sm font-medium rounded-lg"
-                    style={{
-                      backgroundColor: tag.cor + "20",
-                      color: tag.cor,
-                      border: `1px solid ${tag.cor}40`,
-                    }}
+            </div>
+
+            {/* Coluna Direita - Timeline de Atividades */}
+            <div className="overflow-y-auto flex flex-col">
+              {/* Abas da timeline */}
+              <div className="flex border-b bg-white px-4 sticky top-0 flex-shrink-0">
+                {[
+                  { id: "atividade", label: "Atividade" },
+                  { id: "tarefa", label: "Tarefa" },
+                  { id: "comentario", label: "Comentário" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveRightTab(tab.id as any)}
+                    className={`
+                      px-4 py-3 text-sm font-medium border-b-2 transition-colors
+                      ${activeRightTab === tab.id 
+                        ? 'border-blue-500 text-blue-600' 
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                      }
+                    `}
                   >
-                    {tag.texto}
-                  </span>
+                    {tab.label}
+                  </button>
                 ))}
               </div>
-            </div>
-          )}
 
-          <div className="flex justify-between items-center pt-4 border-t">
-            <span className="text-xs text-muted-foreground">ID da Atividade: #{atividade.id}</span>
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={onClose}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSave} disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-700">
-                <Save className="h-4 w-4 mr-2" />
-                {isSaving ? "Salvando..." : "Salvar"}
-              </Button>
+              {/* Input de nova atividade/tarefa */}
+              <div className="p-4 border-b flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Coisas a fazer"
+                    value={novaTarefa}
+                    onChange={(e) => setNovaTarefa(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button variant="ghost" size="sm" className="text-gray-500">
+                    ações
+                    <ChevronDown className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Área de adicionar atividade */}
+              <div className="p-4 border-b bg-blue-50 flex-shrink-0">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Plus className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Adicionar uma nova atividade</p>
+                    <p className="text-sm text-gray-500">
+                      Planeje sua próxima ação no negócio para nunca esquecer o cliente
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filtro de data */}
+              <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b flex-shrink-0">
+                <button className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  15 de dezembro
+                </button>
+                <button className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+                  <Filter className="h-4 w-4" />
+                  FILTRO
+                </button>
+              </div>
+
+              {/* Lista de tarefas/atividades */}
+              <div className="flex-1 p-4 space-y-3 overflow-y-auto">
+                {processo.tarefas && processo.tarefas.length > 0 ? (
+                  processo.tarefas.map((tarefa) => (
+                    <div 
+                      key={tarefa.id}
+                      className="flex items-start gap-3 p-3 bg-white rounded-lg border hover:shadow-sm transition-shadow"
+                    >
+                      <div className={`
+                        w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0
+                        ${tarefa.concluida ? 'bg-green-100' : 'bg-blue-100'}
+                      `}>
+                        {tarefa.concluida ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <Clock className="h-4 w-4 text-blue-600" />
+                        )}
+                      </div>
+                      
+                      <div className="flex-1">
+                        <p className={`font-medium ${tarefa.concluida ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                          {tarefa.titulo}
+                        </p>
+                        {tarefa.prazo && (
+                          <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                            <Calendar className="h-3 w-3" />
+                            Prazo: {tarefa.prazo}
+                          </p>
+                        )}
+                      </div>
+
+                      {!tarefa.concluida && (
+                        <span className="px-2 py-1 bg-green-500 text-white text-xs rounded-full flex-shrink-0">
+                          Coisas a fazer
+                        </span>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <MessageSquare className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                    <p>Nenhuma atividade ainda</p>
+                    <p className="text-sm">Adicione tarefas para acompanhar o progresso</p>
+                  </div>
+                )}
+
+                {/* Item de histórico - Negócio criado */}
+                <div className="flex items-start gap-3 p-3 text-sm text-gray-500">
+                  <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs">i</span>
+                  </div>
+                  <div>
+                    <p>Negócio criado <span className="text-gray-400">{processo.criadoEm || ""}</span></p>
+                    <p className="font-medium text-gray-700">{processo.nome}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </>
   )
+
+  // Renderiza no body usando Portal para escapar de qualquer container
+  if (typeof window !== 'undefined') {
+    return createPortal(modalContent, document.body)
+  }
+  
+  return null
 }

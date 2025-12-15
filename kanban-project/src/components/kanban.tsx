@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input"
 import { Plus, Trash2 } from "lucide-react"
 import { KanbanColumn } from "./kanban/kanban-column"
 import { KanbanCard } from "./kanban/kanban-card"
-import { AtividadeDetailsModal } from "./kanban/atividade-details-modal"
+import { ProcessoDetailsModal } from "./kanban/atividade-details-modal"
 import { ContratanteSelector } from "@/components/ui/contratante-selector"
 import { RequerenteSelector } from "@/components/ui/requerente-selector"
 import type { Atividade, AtividadeWithStatus, Projeto, Contratante, Requerente } from "@/src/types/kanban"
@@ -448,12 +448,12 @@ export function KanbanBoard({
         </DragOverlay>
       </DndContext>
 
-      <AtividadeDetailsModal
-        atividade={selectedAtividade}
-        isOpen={isDetailsModalOpen}
-        onClose={() => setIsDetailsModalOpen(false)}
-        onSave={handleAtividadeSave}
-      />
+      <ProcessoDetailsModal
+  processo={selectedAtividade}
+  isOpen={isDetailsModalOpen}
+  onClose={() => setIsDetailsModalOpen(false)}
+  onSave={handleAtividadeSave}
+/>
     </>
   )
 }
