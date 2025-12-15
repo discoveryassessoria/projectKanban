@@ -328,17 +328,6 @@ export function KanbanBoard({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <div className="space-y-2">
             <label className="text-sm font-medium text-white">Contratante</label>
-            <ContratanteSelector
-              contratantes={contratantes}
-              selectedContratantes={selectedContratantes}
-              onSelectMultiple={onContratantesChange}
-              onAdd={onContratanteAdd}
-              onView={onContratanteView}
-              onEdit={onContratanteView}
-              placeholder="Selecione o(s) contratante(s)"
-              mode="checkbox"
-              className="w-full"
-            />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-white">Requerente(s)</label>

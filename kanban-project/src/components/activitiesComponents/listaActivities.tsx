@@ -486,56 +486,6 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
         onSave={handleAtividadeSave}
-        contratantes={contratantes}
-        requerentes={requerentes}
-        selectedContratantes={memoizedSelectedContratantes}
-        selectedRequerentes={memoizedSelectedRequerentes}
-        onContratantesChange={async (contratantesParam: Contratante[]) => {
-          // Atualizar contratante do projeto
-          if (selectedProject) {
-            try {
-              const response = await fetch(`/api/projetos/${selectedProject.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                  contratanteId: contratantesParam.length > 0 ? contratantesParam[0].id : null 
-                }),
-              })
-              if (response.ok) {
-                // Revalidar dados do projeto
-                if (selectedProject?.id) {
-                  invalidateProject(selectedProject.id)
-                }
-                mutate()
-              }
-            } catch (error) {
-              console.error("Erro ao atualizar contratante:", error)
-            }
-          }
-        }}
-        onRequerentesChange={async (requerentesParam: Requerente[]) => {
-          // Atualizar requerentes do projeto
-          if (selectedProject) {
-            try {
-              const response = await fetch(`/api/projetos/${selectedProject.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                  requerenteIds: requerentesParam.map((r: Requerente) => r.id)
-                }),
-              })
-              if (response.ok) {
-                // Revalidar dados do projeto
-                if (selectedProject?.id) {
-                  invalidateProject(selectedProject.id)
-                }
-                mutate()
-              }
-            } catch (error) {
-              console.error("Erro ao atualizar requerentes:", error)
-            }
-          }
-        }}
       />
     </div>
   )

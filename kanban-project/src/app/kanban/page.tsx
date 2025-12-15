@@ -507,27 +507,6 @@ export default function KanbanPage() {
               <KanbanBoard 
                 projeto={projetoSelecionado} 
                 onStatusAdd={handleStatusAdd}
-                contratantes={contratantes}
-                requerentes={requerentes}
-                selectedContratantes={projetoSelecionado.contratante ? [projetoSelecionado.contratante] : []}
-                selectedRequerentes={projetoSelecionado.requerentes?.map(r => r.requerente) || []}
-                onContratantesChange={async (contratantes) => {
-                  const contratante = contratantes.length > 0 ? contratantes[0] : null
-                  await handleContratanteSelect(contratante)
-                  if (user) {
-                    buscarProjetos(user.id)
-                  }
-                }}
-                onRequerentesChange={async (requerentes) => {
-                  await handleRequerenteSelect(requerentes)
-                  if (user) {
-                    buscarProjetos(user.id)
-                  }
-                }}
-                onContratanteAdd={handleContratanteAdd}
-                onRequerenteAdd={handleRequerenteAdd}
-                onContratanteView={handleContratanteEdit}
-                onRequerenteView={handleRequerenteEdit}
               />
             </div>
           ) : (

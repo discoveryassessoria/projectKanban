@@ -462,52 +462,6 @@ export default function PrazoActivities() {
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
         onSave={handleAtividadeSave}
-        contratantes={contratantes}
-        requerentes={requerentes}
-        selectedContratantes={selectedProject?.contratante ? [selectedProject.contratante] : []}
-        selectedRequerentes={selectedProject?.requerentes?.map((r: { requerente: Requerente }) => r.requerente) || []}
-        onContratantesChange={async (contratantesParam: Contratante[]) => {
-          if (selectedProject) {
-            try {
-              const response = await fetch(`/api/projetos/${selectedProject.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                  contratanteId: contratantesParam.length > 0 ? contratantesParam[0].id : null 
-                }),
-              })
-              if (response.ok) {
-                if (selectedProject?.id) {
-                  invalidateProject(selectedProject.id)
-                }
-                mutate()
-              }
-            } catch (error) {
-              console.error("Erro ao atualizar contratante:", error)
-            }
-          }
-        }}
-        onRequerentesChange={async (requerentesParam: Requerente[]) => {
-          if (selectedProject) {
-            try {
-              const response = await fetch(`/api/projetos/${selectedProject.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                  requerenteIds: requerentesParam.map((r: Requerente) => r.id)
-                }),
-              })
-              if (response.ok) {
-                if (selectedProject?.id) {
-                  invalidateProject(selectedProject.id)
-                }
-                mutate()
-              }
-            } catch (error) {
-              console.error("Erro ao atualizar requerentes:", error)
-            }
-          }
-        }}
       />
     </div>
   )
