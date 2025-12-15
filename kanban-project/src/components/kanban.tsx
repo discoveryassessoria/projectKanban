@@ -438,7 +438,7 @@ export function KanbanBoard({
       </DndContext>
 
       <ProcessoDetailsModal
-  processo={selectedAtividade}
+  processo={selectedAtividade as any}
   isOpen={isDetailsModalOpen}
   onClose={() => setIsDetailsModalOpen(false)}
   onSave={handleAtividadeSave}
