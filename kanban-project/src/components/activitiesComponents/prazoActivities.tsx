@@ -37,7 +37,7 @@ import { useActivityOperations } from "@/src/hooks/useActivityOperations"
 import { useQuickAddActivity } from "@/src/hooks/useQuickAddActivity"
 import { useActivities, useContratantes, useRequerentes, useProject, invalidateActivities, invalidateProject } from "@/src/hooks/useActivitiesData"
 import type { Atividade, Usuario, Projeto, Status } from "@/src/hooks/useActivitiesData"
-import { AtividadeDetailsModal } from "@/src/components/kanban/atividade-details-modal"
+import { ProcessoDetailsModal } from "@/src/components/kanban/atividade-details-modal"
 import type { Contratante, Requerente } from "@/src/types/kanban"
 import "@/src/styles/kanban.css"
 
@@ -457,8 +457,8 @@ export default function PrazoActivities() {
       )}
 
       {/* Activity Details Modal */}
-      <AtividadeDetailsModal
-        atividade={selectedActivity as any}
+      <ProcessoDetailsModal
+        processo={selectedActivity as any}
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
         onSave={handleAtividadeSave}
