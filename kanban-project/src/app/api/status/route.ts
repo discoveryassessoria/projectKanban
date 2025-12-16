@@ -1,64 +1,87 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { Pais } from "@prisma/client"
 
-export async function GET() {
+// GET - Buscar status (filtrado por país)
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const pais = searchParams.get("pais") as Pais | null
+
+    const where = pais ? { pais } : {}
+
     const status = await prisma.status.findMany({
-      orderBy: {
-        ordem: 'asc'
+      where,
+      orderBy: { ordem: "asc" },
+      include: {
+        _count: {
+          select: { atividades: true }
+        }
       }
     })
 
     return NextResponse.json({ status })
   } catch (error) {
-    console.error('Erro ao buscar status:', error)
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
+    console.error("Erro ao buscar status:", error)
+    return NextResponse.json(
+      { error: "Erro ao buscar status" },
+      { status: 500 }
+    )
   }
 }
 
-export async function POST(request: NextRequest) {
+// POST - Criar novo status
+export async function POST(request: Request) {
   try {
-    const { nome } = await request.json()
+    const body = await request.json()
+    const { nome, pais } = body
 
-    if (!nome) {
-      return NextResponse.json({ error: "Nome do status é obrigatório" }, { status: 400 })
+    if (!nome || !pais) {
+      return NextResponse.json(
+        { error: "Nome e país são obrigatórios" },
+        { status: 400 }
+      )
     }
 
-    // Validação de comprimento
-    if (nome.length > 20) {
-      return NextResponse.json({ error: 'Nome deve ter no máximo 20 caracteres' }, { status: 400 })
+    // Validar se o país é válido
+    if (!Object.values(Pais).includes(pais)) {
+      return NextResponse.json(
+        { error: "País inválido" },
+        { status: 400 }
+      )
     }
 
-    // Verificar se já existe um status com o mesmo nome
-    const existingStatus = await prisma.status.findFirst({
-      where: {
-        nome: {
-          equals: nome.trim(),
-          mode: 'insensitive'
-        }
-      }
+    // Buscar a maior ordem para este país
+    const maxOrdem = await prisma.status.aggregate({
+      where: { pais },
+      _max: { ordem: true }
     })
 
-    if (existingStatus) {
-      return NextResponse.json({ error: 'Já existe um status com este nome' }, { status: 409 })
-    }
+    const novaOrdem = (maxOrdem._max.ordem ?? -1) + 1
 
-    // Pegar a maior ordem atual
-    const lastStatus = await prisma.status.findFirst({
-      orderBy: { ordem: 'desc' }
-    })
-    const nextOrdem = (lastStatus?.ordem ?? -1) + 1
-
-    const newStatus = await prisma.status.create({
+    const status = await prisma.status.create({
       data: {
-        nome: nome.trim(),
-        ordem: nextOrdem
+        nome,
+        pais,
+        ordem: novaOrdem
       }
     })
 
-    return NextResponse.json({ status: newStatus }, { status: 201 })
-  } catch (error) {
+    return NextResponse.json({ status }, { status: 201 })
+  } catch (error: any) {
     console.error("Erro ao criar status:", error)
-    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+    
+    // Erro de unique constraint
+    if (error.code === "P2002") {
+      return NextResponse.json(
+        { error: "Já existe um status com esse nome neste país" },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(
+      { error: "Erro ao criar status" },
+      { status: 500 }
+    )
   }
 }

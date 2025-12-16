@@ -1,10 +1,9 @@
-import { NextRequest, NextResponse } from "next/server"
-import { PrismaClient, Pais } from "@prisma/client"
+import { NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
+import { Pais } from "@prisma/client"
 
-const prisma = new PrismaClient()
-
-// GET - Buscar atividades
-export async function GET(request: NextRequest) {
+// GET - Buscar atividades (filtrado por país opcionalmente)
+export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const pais = searchParams.get("pais") as Pais | null
@@ -16,35 +15,23 @@ export async function GET(request: NextRequest) {
       include: {
         status: true,
         contratante: true,
-        usuarios: {
-          include: {
-            usuario: {
-              select: {
-                id: true,
-                nome: true,
-                email: true
-              }
-            }
-          }
-        },
+        arvore: true,
         requerentes: {
           include: {
             requerente: true
           }
-        },
-        arvore: {
-          select: {
-            id: true,
-            nome: true
-          }
         }
       },
-      orderBy: {
-        data_criacao: 'desc'
-      }
+      orderBy: { data_criacao: "desc" }
     })
 
-    return NextResponse.json({ atividades })
+    // Formatar para incluir requerentes como array simples
+    const atividadesFormatadas = atividades.map(a => ({
+      ...a,
+      requerentes: a.requerentes.map(r => r.requerente)
+    }))
+
+    return NextResponse.json({ atividades: atividadesFormatadas })
   } catch (error) {
     console.error("Erro ao buscar atividades:", error)
     return NextResponse.json(
@@ -55,30 +42,14 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Criar nova atividade
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { 
-      nome, 
-      descricao, 
-      pais,
-      statusId, 
-      contratanteId,
-      requerenteIds,
-      arvore_id,
-      data_termino 
-    } = body
+    const { nome, descricao, statusId, pais, contratanteId, arvore_id } = body
 
     if (!nome) {
       return NextResponse.json(
         { error: "Nome é obrigatório" },
-        { status: 400 }
-      )
-    }
-
-    if (!pais || !Object.values(Pais).includes(pais)) {
-      return NextResponse.json(
-        { error: "País inválido. Use: PORTUGAL, ESPANHA, ALEMANHA ou ITALIA" },
         { status: 400 }
       )
     }
@@ -90,31 +61,52 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!pais) {
+      return NextResponse.json(
+        { error: "País é obrigatório" },
+        { status: 400 }
+      )
+    }
+
+    // Validar se o país é válido
+    if (!Object.values(Pais).includes(pais)) {
+      return NextResponse.json(
+        { error: "País inválido" },
+        { status: 400 }
+      )
+    }
+
+    // Verificar se o status existe e pertence ao país correto
+    const status = await prisma.status.findUnique({
+      where: { id: statusId }
+    })
+
+    if (!status) {
+      return NextResponse.json(
+        { error: "Status não encontrado" },
+        { status: 404 }
+      )
+    }
+
+    if (status.pais !== pais) {
+      return NextResponse.json(
+        { error: "Status não pertence a este país" },
+        { status: 400 }
+      )
+    }
+
     const atividade = await prisma.atividade.create({
       data: {
         nome,
-        descricao,
+        descricao: descricao || null,
         pais,
         statusId,
         contratanteId: contratanteId || null,
-        arvore_id: arvore_id || null,
-        data_termino: data_termino ? new Date(data_termino) : null,
-        ...(requerenteIds?.length > 0 && {
-          requerentes: {
-            create: requerenteIds.map((requerenteId: number) => ({
-              requerenteId
-            }))
-          }
-        })
+        arvore_id: arvore_id || null
       },
       include: {
         status: true,
-        contratante: true,
-        requerentes: {
-          include: {
-            requerente: true
-          }
-        }
+        contratante: true
       }
     })
 

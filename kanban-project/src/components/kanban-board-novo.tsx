@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import {
   DndContext,
   type DragEndEvent,
@@ -14,7 +14,7 @@ import {
 } from "@dnd-kit/core"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Trash2 } from "lucide-react"
+import { Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react"
 import { KanbanColumn } from "./kanban/kanban-column"
 import { KanbanCard } from "./kanban/kanban-card"
 import { ProcessoDetailsModal } from "./kanban/atividade-details-modal"
@@ -49,10 +49,16 @@ export function KanbanBoard({
   const [activeAtividade, setActiveAtividade] = useState<AtividadeWithStatus | null>(null)
   const [selectedAtividade, setSelectedAtividade] = useState<AtividadeWithStatus | null>(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  const [isPanning, setIsPanning] = useState(false)
-  const [startX, setStartX] = useState(0)
-  const [scrollLeft, setScrollLeft] = useState(0)
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  
+  // Estado para navegação por setas
+  const [startIndex, setStartIndex] = useState(0)
+  const [isHoveringLeft, setIsHoveringLeft] = useState(false)
+  const [isHoveringRight, setIsHoveringRight] = useState(false)
+  const hoverIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Quantas colunas cabem na tela (padrão conservador: 4)
+  const [visibleColumns, setVisibleColumns] = useState(4)
 
   const paisConfig = PAISES_CONFIG[pais]
 
@@ -62,42 +68,86 @@ export function KanbanBoard({
     }),
   )
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!scrollContainerRef.current) return
-    if ((e.target as HTMLElement).closest('button, input, [role="button"]')) return
+  // Ordenar status
+  const sortedStatusList = [...statusList].sort((a, b) => {
+    const aIsConcluido = a.nome.toLowerCase() === "concluído"
+    const bIsConcluido = b.nome.toLowerCase() === "concluído"
+    if (aIsConcluido) return 1
+    if (bIsConcluido) return -1
+    return (a.ordem ?? 0) - (b.ordem ?? 0)
+  })
 
-    setIsPanning(true)
-    setStartX(e.pageX - scrollContainerRef.current.offsetLeft)
-    setScrollLeft(scrollContainerRef.current.scrollLeft)
-    scrollContainerRef.current.style.cursor = "grabbing"
-    scrollContainerRef.current.style.userSelect = "none"
-  }
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isPanning || !scrollContainerRef.current) return
-    e.preventDefault()
-    const x = e.pageX - scrollContainerRef.current.offsetLeft
-    const walk = (x - startX) * 1.5
-    scrollContainerRef.current.scrollLeft = scrollLeft - walk
-  }
-
-  const handleMouseUp = () => {
-    setIsPanning(false)
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.style.cursor = "grab"
-      scrollContainerRef.current.style.userSelect = "auto"
-    }
-  }
-
-  const handleMouseLeave = () => {
-    if (isPanning) {
-      setIsPanning(false)
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.style.cursor = "grab"
-        scrollContainerRef.current.style.userSelect = "auto"
+  // Total de colunas (status + botão adicionar)
+  const totalColumns = sortedStatusList.length + 1
+  
+  // Calcula quantas colunas cabem na tela
+  useEffect(() => {
+    const updateVisibleColumns = () => {
+      if (containerRef.current) {
+        const containerWidth = containerRef.current.offsetWidth
+        // Cada coluna precisa de ~220px (incluindo gap), mais conservador
+        const availableWidth = containerWidth - 80 // espaço para setas
+        const cols = Math.floor(availableWidth / 220)
+        // Mínimo 3, máximo 5
+        setVisibleColumns(Math.max(3, Math.min(5, cols)))
       }
     }
-  }
+    
+    // Pequeno delay para garantir que o container foi renderizado
+    setTimeout(updateVisibleColumns, 100)
+    window.addEventListener('resize', updateVisibleColumns)
+    return () => window.removeEventListener('resize', updateVisibleColumns)
+  }, [])
+
+  // Navegação
+  const canGoLeft = startIndex > 0
+  const canGoRight = startIndex + visibleColumns < totalColumns
+
+  const handlePrev = useCallback(() => {
+    setStartIndex(prev => Math.max(0, prev - 1))
+  }, [])
+
+  const handleNext = useCallback(() => {
+    setStartIndex(prev => Math.min(Math.max(0, totalColumns - visibleColumns), prev + 1))
+  }, [totalColumns, visibleColumns])
+
+  // Hover navigation
+  const startHoverNavigation = useCallback((direction: 'left' | 'right') => {
+    if (hoverIntervalRef.current) {
+      clearInterval(hoverIntervalRef.current)
+    }
+
+    if (direction === 'left') {
+      handlePrev()
+    } else {
+      handleNext()
+    }
+
+    hoverIntervalRef.current = setInterval(() => {
+      if (direction === 'left') {
+        setStartIndex(prev => Math.max(0, prev - 1))
+      } else {
+        setStartIndex(prev => Math.min(Math.max(0, totalColumns - visibleColumns), prev + 1))
+      }
+    }, 500)
+  }, [totalColumns, visibleColumns, handlePrev, handleNext])
+
+  const stopHoverNavigation = useCallback(() => {
+    if (hoverIntervalRef.current) {
+      clearInterval(hoverIntervalRef.current)
+      hoverIntervalRef.current = null
+    }
+    setIsHoveringLeft(false)
+    setIsHoveringRight(false)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (hoverIntervalRef.current) {
+        clearInterval(hoverIntervalRef.current)
+      }
+    }
+  }, [])
 
   const handleAddNewStatus = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -107,17 +157,20 @@ export function KanbanBoard({
       const response = await fetch("/api/status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome: newStatusName }),
+        body: JSON.stringify({ nome: newStatusName, pais }),
       })
 
-      if (!response.ok) throw new Error("Falha ao criar novo status")
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Falha ao criar novo status")
+      }
 
       setNewStatusName("")
       setIsAddingStatus(false)
       onRefresh()
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
-      alert("Não foi possível adicionar a coluna.")
+      alert(error.message || "Não foi possível adicionar a coluna.")
     }
   }
 
@@ -238,6 +291,10 @@ export function KanbanBoard({
     }
   }
 
+  // Colunas visíveis (slice do array)
+  const visibleStatusList = sortedStatusList.slice(startIndex, startIndex + visibleColumns)
+  const showAddButton = startIndex + visibleColumns >= sortedStatusList.length
+
   return (
     <>
       <div className="flex justify-between items-center mb-4">
@@ -267,34 +324,50 @@ export function KanbanBoard({
         onDragEnd={onDragEnd}
         collisionDetection={rectIntersection}
       >
-        <div
-          ref={scrollContainerRef}
-          className="overflow-x-auto overflow-y-visible cursor-grab active:cursor-grabbing w-full scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseLeave}
-          style={{ scrollbarWidth: 'thin' }}
-        >
-          <div className="flex gap-2 pb-4 min-h-[450px] w-max">
-            {statusList
-              .sort((a, b) => {
-                const aIsConcluido = a.nome.toLowerCase() === "concluído"
-                const bIsConcluido = b.nome.toLowerCase() === "concluído"
+        {/* Container com setas de navegação */}
+        <div ref={containerRef} className="relative flex items-stretch">
+          {/* Seta Esquerda */}
+          <div
+            onMouseEnter={() => {
+              if (canGoLeft) {
+                setIsHoveringLeft(true)
+                startHoverNavigation('left')
+              }
+            }}
+            onMouseLeave={stopHoverNavigation}
+            className={`
+              flex-shrink-0 w-10 flex items-center justify-center
+              transition-all duration-200 rounded-l-lg
+              ${canGoLeft 
+                ? 'cursor-pointer bg-white/5 hover:bg-white/20' 
+                : 'cursor-default bg-transparent'}
+              ${isHoveringLeft ? 'bg-white/20' : ''}
+            `}
+          >
+            <ChevronLeft className={`h-6 w-6 transition-all ${canGoLeft ? 'text-white' : 'text-white/10'} ${isHoveringLeft ? 'scale-125' : ''}`} />
+          </div>
 
-                if (aIsConcluido) return 1
-                if (bIsConcluido) return -1
-                return (a.ordem ?? 0) - (b.ordem ?? 0)
-              })
-              .map((status, index) => (
-                <div key={status.id} className="w-56 flex-shrink-0">
+          {/* Área das colunas - usando Grid para controle preciso */}
+          <div className="flex-1 min-w-0 overflow-hidden">
+            <div 
+              className="grid pb-4 min-h-[450px] gap-2"
+              style={{
+                gridTemplateColumns: `repeat(${visibleStatusList.length + (showAddButton ? 1 : 0)}, 1fr)`
+              }}
+            >
+              {visibleStatusList.map((status, index) => (
+                <div 
+                  key={status.id} 
+                  className="min-w-0"
+                  style={{ animation: 'fadeSlide 0.3s ease-out' }}
+                >
                   <KanbanColumn
                     id={status.id}
                     title={status.nome}
                     atividades={atividades.filter((a) => a.statusId === status.id)}
                     headerColor={paisConfig.cor}
-                    isFirst={index === 0}
-                    isLast={index === statusList.length - 1}
+                    isFirst={startIndex + index === 0}
+                    isLast={startIndex + index === sortedStatusList.length - 1}
                     onAtividadeAdd={handleAddNewAtividade}
                     onAtividadeClick={handleAtividadeClick}
                     onStatusUpdate={onRefresh}
@@ -303,43 +376,71 @@ export function KanbanBoard({
                 </div>
               ))}
 
-            <div className="flex-shrink-0 w-56">
-              {isAddingStatus ? (
-                <div className="p-3 rounded-lg bg-white/10 border border-white/20 backdrop-blur-xl">
-                  <form onSubmit={handleAddNewStatus}>
-                    <Input
-                      autoFocus
-                      placeholder="Nome da nova coluna..."
-                      value={newStatusName}
-                      onChange={(e) => setNewStatusName(e.target.value)}
-                      className="mb-2 bg-white/10 border-white/20 text-white placeholder:text-white/60 backdrop-blur-sm"
-                    />
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsAddingStatus(false)}
-                        className="hover:bg-white/10 text-white/80"
-                      >
-                        Cancelar
-                      </Button>
-                      <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700">
-                        Adicionar
-                      </Button>
-                    </div>
-                  </form>
-                </div>
-              ) : (
-                <Button
-                  variant="ghost"
-                  className="w-full h-full min-h-[100px] border-2 border-dashed border-white/30 hover:border-white/50 hover:bg-white/5 text-white/70 hover:text-white backdrop-blur-sm"
-                  onClick={() => setIsAddingStatus(true)}
+              {/* Botão Adicionar Coluna */}
+              {showAddButton && (
+                <div 
+                  className="min-w-0"
+                  style={{ animation: 'fadeSlide 0.3s ease-out' }}
                 >
-                  <Plus className="mr-2 h-4 w-4" /> Adicionar coluna
-                </Button>
+                  {isAddingStatus ? (
+                    <div className="p-3 rounded-lg bg-white/10 border border-white/20 backdrop-blur-xl h-full">
+                      <form onSubmit={handleAddNewStatus}>
+                        <Input
+                          autoFocus
+                          placeholder="Nome da nova coluna..."
+                          value={newStatusName}
+                          onChange={(e) => setNewStatusName(e.target.value)}
+                          className="mb-2 bg-white/10 border-white/20 text-white placeholder:text-white/60 backdrop-blur-sm"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsAddingStatus(false)}
+                            className="hover:bg-white/10 text-white/80"
+                          >
+                            Cancelar
+                          </Button>
+                          <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                            Adicionar
+                          </Button>
+                        </div>
+                      </form>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      className="w-full h-full min-h-[100px] border-2 border-dashed border-white/30 hover:border-white/50 hover:bg-white/5 text-white/70 hover:text-white backdrop-blur-sm"
+                      onClick={() => setIsAddingStatus(true)}
+                    >
+                      <Plus className="mr-2 h-4 w-4" /> Adicionar coluna
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
+          </div>
+
+          {/* Seta Direita */}
+          <div
+            onMouseEnter={() => {
+              if (canGoRight) {
+                setIsHoveringRight(true)
+                startHoverNavigation('right')
+              }
+            }}
+            onMouseLeave={stopHoverNavigation}
+            className={`
+              flex-shrink-0 w-10 flex items-center justify-center
+              transition-all duration-200 rounded-r-lg
+              ${canGoRight 
+                ? 'cursor-pointer bg-white/5 hover:bg-white/20' 
+                : 'cursor-default bg-transparent'}
+              ${isHoveringRight ? 'bg-white/20' : ''}
+            `}
+          >
+            <ChevronRight className={`h-6 w-6 transition-all ${canGoRight ? 'text-white' : 'text-white/10'} ${isHoveringRight ? 'scale-125' : ''}`} />
           </div>
         </div>
 
@@ -352,11 +453,26 @@ export function KanbanBoard({
         </DragOverlay>
       </DndContext>
 
+      {/* CSS para animação */}
+      <style jsx global>{`
+        @keyframes fadeSlide {
+          from {
+            opacity: 0.5;
+            transform: translateX(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+      `}</style>
+
       <ProcessoDetailsModal
         processo={selectedAtividade as any}
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
         onSave={handleAtividadeSave}
+        statusList={statusList}
       />
     </>
   )

@@ -28,6 +28,7 @@ import {
   GitBranch,
 } from "lucide-react"
 import { HeaderBar } from "@/src/components/header-bar"
+import { Pais, PAISES_CONFIG } from "@/src/types/kanban"
 
 interface Usuario {
   id: number
@@ -36,12 +37,11 @@ interface Usuario {
   tipo: string
 }
 
-interface Projeto {
+interface Status {
   id: number
   nome: string
-  descricao?: string
-  atividades: Atividade[]
-  status: Status[]
+  ordem: number
+  pais: Pais
 }
 
 interface Atividade {
@@ -50,14 +50,15 @@ interface Atividade {
   descricao?: string
   data_criacao: string
   data_termino?: string
-  projeto?: { nome: string }
-  status?: { nome: string }
-  usuarios?: {
-    usuario: {
-      nome: string
-      email: string
-    }
-  }[]
+  pais: Pais
+  status?: { 
+    id: number
+    nome: string 
+  }
+  contratante?: {
+    id: number
+    nome: string
+  }
 }
 
 interface Arvore {
@@ -65,12 +66,6 @@ interface Arvore {
   nome: string
   descricao?: string
   pessoas: any[]
-}
-
-interface Status {
-  id: number
-  nome: string
-  ordem: number
 }
 
 interface LogAuditoria {
@@ -94,7 +89,6 @@ interface LogAuditoria {
 export default function DashboardPage() {
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [projetos, setProjetos] = useState<Projeto[]>([])
   const [atividades, setAtividades] = useState<Atividade[]>([])
   const [arvores, setArvores] = useState<Arvore[]>([])
   const [logs, setLogs] = useState<LogAuditoria[]>([])
@@ -121,13 +115,10 @@ export default function DashboardPage() {
 
   const fetchDashboardData = async () => {
     try {
-      const projetosRes = await fetch("/api/projetos")
-      const projetosData = await projetosRes.json()
-      setProjetos(projetosData.projetos || [])
-
-      const atividadesRes = await fetch("/api/activities")
+      // Buscar todas as atividades (processos)
+      const atividadesRes = await fetch("/api/atividades")
       const atividadesData = await atividadesRes.json()
-      setAtividades(Array.isArray(atividadesData) ? atividadesData : [])
+      setAtividades(atividadesData.atividades || [])
 
       // Buscar logs de auditoria
       try {
@@ -135,10 +126,10 @@ export default function DashboardPage() {
         const logsData = await logsRes.json()
         setLogs(Array.isArray(logsData) ? logsData : [])
       } catch (e) {
-        // API de logs ainda não existe, usar array vazio
         setLogs([])
       }
 
+      // Buscar árvores
       const arvoresRes = await fetch("/api/arvore")
       const arvoresData = await arvoresRes.json()
       setArvores(Array.isArray(arvoresData) ? arvoresData : [])
@@ -185,6 +176,14 @@ export default function DashboardPage() {
     prazo.setHours(0, 0, 0, 0)
     return prazo > hoje && prazo <= proximaSemana
   })
+
+  // Agrupar por país
+  const atividadesPorPais = atividades.reduce((acc, atividade) => {
+    const pais = atividade.pais
+    if (!acc[pais]) acc[pais] = []
+    acc[pais].push(atividade)
+    return acc
+  }, {} as Record<Pais, Atividade[]>)
 
   // Agrupar por status
   const atividadesPorStatus = atividades.reduce((acc, atividade) => {
@@ -236,6 +235,9 @@ export default function DashboardPage() {
 
   if (!usuario) return null
 
+  // Lista de países para exibição
+  const paisesParaExibir: Pais[] = [Pais.ITALIA, Pais.PORTUGAL, Pais.ESPANHA, Pais.ALEMANHA]
+
   // ===== DASHBOARD =====
   return (
     <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
@@ -247,7 +249,7 @@ export default function DashboardPage() {
         userName={usuario.nome}
         userRole={usuario.tipo === 'admin' ? 'Administrador' : usuario.tipo}
         userEmail={usuario.email}
-        projetos={projetos}
+        projetos={[]}
         atividades={atividades}
         arvores={arvores}
         onLogout={handleLogout}
@@ -300,7 +302,7 @@ export default function DashboardPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs text-white/60 font-medium">Total de Processos</p>
-                    <p className="text-3xl font-bold mt-2">{projetos.length}</p>
+                    <p className="text-3xl font-bold mt-2">{atividades.length}</p>
                     <p className="text-xs text-white/50 mt-1">famílias ativas</p>
                   </div>
                   <BarChart3 className="h-5 w-5 text-teal-400" />
@@ -363,53 +365,30 @@ export default function DashboardPage() {
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {projetos.length === 0 ? (
-                <Card className="col-span-full bg-white/5 backdrop-blur-sm border border-white/10">
-                  <CardContent className="py-8 text-center">
-                    <FolderOpen className="h-10 w-10 mx-auto mb-3 text-white/30" />
-                    <p className="text-white/50 text-sm">Nenhum processo cadastrado</p>
-                    <Button 
-                      className="mt-4 bg-emerald-500 hover:bg-emerald-600 text-sm"
-                      onClick={() => router.push('/kanban')}
-                    >
-                      Criar primeiro processo
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : (
-                projetos.map((projeto) => {
-                  const qtdAtividades = projeto.atividades?.length || 0
-                  
-                  // Cores por país (tons únicos)
-                  const coresIcone: Record<string, string> = {
-                    "Itália": "text-emerald-500",
-                    "Portugal": "text-sky-500",
-                    "Espanha": "text-rose-500",
-                    "Alemanha": "text-amber-500",
-                  }
-                  const corIcone = coresIcone[projeto.nome] || "text-violet-500"
-                  
-                  return (
-                    <Card 
-                      key={projeto.id}
-                      className="bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer"
-                      onClick={() => router.push(`/kanban?projeto=${projeto.id}`)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                          <Users className={`h-5 w-5 ${corIcone}`} />
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-white text-sm">{projeto.nome}</h4>
-                            <p className="text-xs text-white/50 mt-0.5">
-                              {qtdAtividades} {qtdAtividades === 1 ? 'processo' : 'processos'}
-                            </p>
-                          </div>
+              {paisesParaExibir.map((pais) => {
+                const config = PAISES_CONFIG[pais]
+                const qtdAtividades = atividadesPorPais[pais]?.length || 0
+                
+                return (
+                  <Card 
+                    key={pais}
+                    className="bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer"
+                    onClick={() => router.push(`/kanban`)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{config.bandeira}</span>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-white text-sm">{config.label}</h4>
+                          <p className="text-xs text-white/50 mt-0.5">
+                            {qtdAtividades} {qtdAtividades === 1 ? 'processo' : 'processos'}
+                          </p>
                         </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })
-              )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           </section>
 
@@ -466,18 +445,22 @@ export default function DashboardPage() {
                           
                           {/* Cards da coluna */}
                           <div className="space-y-2">
-                            {atividadesStatus.slice(0, 3).map(atividade => (
-                              <div 
-                                key={atividade.id} 
-                                className="rounded-lg bg-white/5 hover:bg-white/10 transition-colors p-3 cursor-pointer border border-white/5"
-                                onClick={() => router.push('/kanban')}
-                              >
-                                <p className="text-sm font-medium text-white truncate">{atividade.nome}</p>
-                                <p className="text-xs text-white/40 mt-1 truncate">
-                                  {atividade.projeto?.nome || "Sem projeto"}
-                                </p>
-                              </div>
-                            ))}
+                            {atividadesStatus.slice(0, 3).map(atividade => {
+                              const paisConfig = PAISES_CONFIG[atividade.pais]
+                              return (
+                                <div 
+                                  key={atividade.id} 
+                                  className="rounded-lg bg-white/5 hover:bg-white/10 transition-colors p-3 cursor-pointer border border-white/5"
+                                  onClick={() => router.push('/kanban')}
+                                >
+                                  <p className="text-sm font-medium text-white truncate">{atividade.nome}</p>
+                                  <p className="text-xs text-white/40 mt-1 truncate flex items-center gap-1">
+                                    <span>{paisConfig?.bandeira}</span>
+                                    {paisConfig?.label || atividade.pais}
+                                  </p>
+                                </div>
+                              )
+                            })}
                             {atividadesStatus.length > 3 && (
                               <p className="text-xs text-white/40 text-center pt-1">
                                 +{atividadesStatus.length - 3} mais
@@ -608,6 +591,7 @@ export default function DashboardPage() {
                     {proximosPrazos.map((atividade) => {
                       const prazo = new Date(atividade.data_termino!)
                       const diffDias = Math.ceil((prazo.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
+                      const paisConfig = PAISES_CONFIG[atividade.pais]
                       
                       let corBorda = "border-white/20"
                       let corTexto = "text-white/70"
@@ -623,7 +607,7 @@ export default function DashboardPage() {
                         <div 
                           key={atividade.id}
                           className={`p-4 rounded-xl bg-white/5 border ${corBorda} hover:bg-white/10 transition-colors cursor-pointer`}
-                          onClick={() => router.push('/activities')}
+                          onClick={() => router.push('/kanban')}
                         >
                           <div className="flex items-center justify-between mb-2">
                             <span className={`text-xs font-medium ${corTexto}`}>
@@ -634,8 +618,9 @@ export default function DashboardPage() {
                             )}
                           </div>
                           <p className="text-sm font-medium text-white truncate">{atividade.nome}</p>
-                          <p className="text-xs text-white/50 truncate mt-1">
-                            {atividade.projeto?.nome || "Sem projeto"}
+                          <p className="text-xs text-white/50 truncate mt-1 flex items-center gap-1">
+                            <span>{paisConfig?.bandeira}</span>
+                            {paisConfig?.label || atividade.pais}
                           </p>
                         </div>
                       )

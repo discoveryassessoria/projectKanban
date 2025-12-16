@@ -101,12 +101,17 @@ model Arvore {
 // ========================================
 model Status {
   id    Int    @id @default(autoincrement())
-  nome  String @db.VarChar(20)
+  nome  String @db.VarChar(50)
   ordem Int    @default(0)
+
+  // PAÍS - cada país tem suas próprias etapas
+  pais Pais
 
   atividades Atividade[]
 
-  @@unique([nome]) // Cada status é único globalmente
+  // Nome único por país
+  @@unique([nome, pais])
+  @@index([pais])
 }
 
 // ========================================
@@ -176,7 +181,7 @@ model Contratante {
   endereco String? @db.VarChar(200)
   telefone String? @db.VarChar(15)
   email    String? @db.VarChar(100)
-
+  createdAt DateTime @default(now())
   atividades Atividade[]
 }
 
@@ -188,6 +193,6 @@ model Requerente {
   endereco String? @db.VarChar(200)
   telefone String? @db.VarChar(15)
   email    String? @db.VarChar(100)
-
+  createdAt DateTime @default(now())
   atividades AtividadeRequerente[]
 }
