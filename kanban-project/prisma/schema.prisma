@@ -1,5 +1,5 @@
 // Schema atualizado com PAIS como enum fixo
-// Isso elimina a necessidade de criar "projetos" para cada país
+// Contratante e Requerente com campos expandidos
 
 generator client {
   provider = "prisma-client-js"
@@ -97,19 +97,17 @@ model Arvore {
 }
 
 // ========================================
-// STATUS - AGORA É GLOBAL (não por projeto)
+// STATUS - POR PAÍS
 // ========================================
 model Status {
   id    Int    @id @default(autoincrement())
   nome  String @db.VarChar(50)
   ordem Int    @default(0)
 
-  // PAÍS - cada país tem suas próprias etapas
   pais Pais
 
   atividades Atividade[]
 
-  // Nome único por país
   @@unique([nome, pais])
   @@index([pais])
 }
@@ -124,25 +122,19 @@ model Atividade {
   data_termino DateTime?
   data_criacao DateTime  @default(now())
 
-  // PAÍS COMO ENUM FIXO - substitui o projetoId
   pais Pais
 
-  // Status da atividade
   statusId Int
   status   Status @relation(fields: [statusId], references: [id], onDelete: Cascade)
 
-  // Contratante direto na atividade (1 para 1)
   contratanteId Int?
   contratante   Contratante? @relation(fields: [contratanteId], references: [id], onDelete: SetNull)
 
-  // Usuários associados
   usuarios UserAtv[]
 
-  // Árvore genealógica vinculada
   arvore_id Int?
   arvore    Arvore? @relation(fields: [arvore_id], references: [id], onDelete: SetNull)
 
-  // Requerentes (many-to-many)
   requerentes AtividadeRequerente[]
 
   @@index([pais])
@@ -171,28 +163,109 @@ model AtividadeRequerente {
 }
 
 // ========================================
-// CONTRATANTE E REQUERENTE
+// CONTRATANTE - EXPANDIDO
 // ========================================
 model Contratante {
-  id       Int     @id @default(autoincrement())
-  nome     String  @db.VarChar(50)
-  cpf      String? @db.VarChar(14)
-  rg       String? @db.VarChar(15)
-  endereco String? @db.VarChar(200)
-  telefone String? @db.VarChar(15)
-  email    String? @db.VarChar(100)
-  createdAt DateTime @default(now())
-  atividades Atividade[]
+  id              Int       @id @default(autoincrement())
+  nome            String    @db.VarChar(100)
+  cpf             String?   @db.VarChar(14)
+  rg              String?   @db.VarChar(20)
+  dataNascimento  DateTime?
+  sexo            String?   @db.VarChar(20)
+  estadoCivil     String?   @db.VarChar(20)
+  nacionalidade   String?   @db.VarChar(50)
+  telefone        String?   @db.VarChar(20)
+  email           String?   @db.VarChar(100)
+  
+  // Endereço
+  endereco        String?   @db.VarChar(200)
+  numero          String?   @db.VarChar(20)
+  complemento     String?   @db.VarChar(100)
+  bairro          String?   @db.VarChar(100)
+  cidade          String?   @db.VarChar(100)
+  estado          String?   @db.VarChar(2)
+  cep             String?   @db.VarChar(10)
+  
+  // Observações
+  observacoes     String?   @db.Text
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  atividades      Atividade[]
+  anexos          AnexoContratante[]
 }
 
+// ========================================
+// REQUERENTE - EXPANDIDO
+// ========================================
 model Requerente {
-  id       Int     @id @default(autoincrement())
-  nome     String  @db.VarChar(50)
-  cpf      String? @db.VarChar(14)
-  rg       String? @db.VarChar(15)
-  endereco String? @db.VarChar(200)
-  telefone String? @db.VarChar(15)
-  email    String? @db.VarChar(100)
-  createdAt DateTime @default(now())
-  atividades AtividadeRequerente[]
+  id              Int       @id @default(autoincrement())
+  nome            String    @db.VarChar(100)
+  cpf             String?   @db.VarChar(14)
+  rg              String?   @db.VarChar(20)
+  dataNascimento  DateTime?
+  sexo            String?   @db.VarChar(20)
+  estadoCivil     String?   @db.VarChar(20)
+  nacionalidade   String?   @db.VarChar(50)
+  telefone        String?   @db.VarChar(20)
+  email           String?   @db.VarChar(100)
+  
+  // Endereço
+  endereco        String?   @db.VarChar(200)
+  numero          String?   @db.VarChar(20)
+  complemento     String?   @db.VarChar(100)
+  bairro          String?   @db.VarChar(100)
+  cidade          String?   @db.VarChar(100)
+  estado          String?   @db.VarChar(2)
+  cep             String?   @db.VarChar(10)
+  
+  // Observações
+  observacoes     String?   @db.Text
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  atividades      AtividadeRequerente[]
+  anexos          AnexoRequerente[]
+}
+
+// ========================================
+// ANEXOS - CONTRATANTE
+// ========================================
+model AnexoContratante {
+  id            Int      @id @default(autoincrement())
+  nome          String   @db.VarChar(200)
+  tipo          String   @db.VarChar(50)
+  nomeArquivo   String   @db.VarChar(300)
+  urlArquivo    String   @db.Text
+  tamanho       Int?
+  mimeType      String?  @db.VarChar(100)
+  
+  contratanteId Int
+  contratante   Contratante @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime @default(now())
+
+  @@index([contratanteId])
+}
+
+// ========================================
+// ANEXOS - REQUERENTE
+// ========================================
+model AnexoRequerente {
+  id            Int      @id @default(autoincrement())
+  nome          String   @db.VarChar(200)
+  tipo          String   @db.VarChar(50)
+  nomeArquivo   String   @db.VarChar(300)
+  urlArquivo    String   @db.Text
+  tamanho       Int?
+  mimeType      String?  @db.VarChar(100)
+  
+  requerenteId  Int
+  requerente    Requerente @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime @default(now())
+
+  @@index([requerenteId])
 }
