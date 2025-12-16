@@ -9,7 +9,7 @@ interface CalendarActivity {
   activities: {
     id: number
     nome: string
-    projeto: string
+    pais: string
     hora: string // HH:MM
     data_completa: string // ISO string completa
     tipo_evento: 'criacao' | 'prazo'
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     }
 
     const whereClause: any = {}
-    
+
     // Buscar atividades que tenham data de criação ou data de término no período
     if (startDate && endDate) {
       whereClause.OR = [
@@ -53,13 +53,6 @@ export async function GET(request: NextRequest) {
 
     const atividades = await prisma.atividade.findMany({
       where: whereClause,
-      include: {
-        projeto: {
-          select: {
-            nome: true
-          }
-        }
-      },
       orderBy: {
         data_criacao: 'asc'
       }
@@ -84,11 +77,11 @@ export async function GET(request: NextRequest) {
         } else {
           calendarData[creationDate].hasCreation = true
         }
-        
+
         calendarData[creationDate].activities.push({
           id: atividade.id,
           nome: atividade.nome,
-          projeto: atividade.projeto.nome,
+          pais: atividade.pais,
           hora: new Date(atividade.data_criacao).toLocaleTimeString('pt-BR', { 
             hour: '2-digit', 
             minute: '2-digit',
@@ -114,11 +107,11 @@ export async function GET(request: NextRequest) {
         } else {
           calendarData[deadlineDate].hasDeadline = true
         }
-        
+
         calendarData[deadlineDate].activities.push({
           id: atividade.id,
           nome: atividade.nome,
-          projeto: atividade.projeto.nome,
+          pais: atividade.pais,
           hora: new Date(atividade.data_termino).toLocaleTimeString('pt-BR', { 
             hour: '2-digit', 
             minute: '2-digit',

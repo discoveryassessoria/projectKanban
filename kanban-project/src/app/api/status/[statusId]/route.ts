@@ -13,7 +13,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const status = await prisma.status.findUnique({
       where: { id: parsedStatusId },
       include: {
-        projeto: true,
         _count: {
           select: {
             atividades: true
@@ -38,6 +37,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { statusId } = await params
     const body = await request.json()
     const { nome } = body
+
     const parsedStatusId = Number.parseInt(statusId)
 
     if (isNaN(parsedStatusId)) {
@@ -62,14 +62,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Status não encontrado' }, { status: 404 })
     }
 
-    // Verificar se já existe outro status com o mesmo nome no mesmo projeto
+    // Verificar se já existe outro status com o mesmo nome (global)
     const duplicateStatus = await prisma.status.findFirst({
       where: {
         nome: {
           equals: nome.trim(),
           mode: 'insensitive'
         },
-        projetoId: existingStatus.projetoId,
         id: {
           not: parsedStatusId
         }
@@ -77,7 +76,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     })
 
     if (duplicateStatus) {
-      return NextResponse.json({ error: 'Já existe um status com este nome neste projeto' }, { status: 409 })
+      return NextResponse.json({ error: 'Já existe um status com este nome' }, { status: 409 })
     }
 
     const statusAtualizado = await prisma.status.update({
@@ -88,7 +87,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         nome: nome.trim(),
       },
       include: {
-        projeto: true,
         _count: {
           select: {
             atividades: true
@@ -131,19 +129,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: "Status não encontrado" }, { status: 404 })
     }
 
-    // Verificar se há atividades associadas - oferecer opção de deletar ou não
+    // Verificar se há atividades associadas
     if (statusExists._count.atividades > 0) {
       // Por enquanto, vamos deletar as atividades junto (cascade delete)
-      // Se quiser proteger, descomente as linhas abaixo:
-      /*
-      return NextResponse.json(
-        { 
-          error: 'Não é possível deletar um status que possui atividades associadas',
-          activitiesCount: statusExists._count.atividades
-        }, 
-        { status: 409 }
-      )
-      */
     }
 
     // Use transaction to ensure data consistency

@@ -6,7 +6,7 @@ const prisma = new PrismaClient()
 interface DayActivity {
   id: number
   nome: string
-  projeto: string
+  pais: string
   hora: string
   data_completa: string
   tipo_evento: 'criacao' | 'prazo'
@@ -33,13 +33,6 @@ export async function GET(request: NextRequest) {
           gte: startDate,
           lte: endDate
         }
-      },
-      include: {
-        projeto: {
-          select: {
-            nome: true
-          }
-        }
       }
     })
 
@@ -49,13 +42,6 @@ export async function GET(request: NextRequest) {
         data_termino: {
           gte: startDate,
           lte: endDate
-        }
-      },
-      include: {
-        projeto: {
-          select: {
-            nome: true
-          }
         }
       }
     })
@@ -68,7 +54,7 @@ export async function GET(request: NextRequest) {
       allActivities.push({
         id: atividade.id,
         nome: atividade.nome,
-        projeto: atividade.projeto.nome,
+        pais: atividade.pais,
         hora: new Date(atividade.data_criacao).toLocaleTimeString('pt-BR', { 
           hour: '2-digit', 
           minute: '2-digit',
@@ -84,12 +70,13 @@ export async function GET(request: NextRequest) {
     atividadesPrazo.forEach(atividade => {
       // Verificar se não é duplicata (mesma atividade criada e com prazo no mesmo dia)
       const existingIndex = allActivities.findIndex(a => a.id === atividade.id)
+      
       if (existingIndex !== -1) {
         // Se já existe, adicionar como entrada separada para o prazo
         allActivities.push({
           id: atividade.id,
           nome: atividade.nome,
-          projeto: atividade.projeto.nome,
+          pais: atividade.pais,
           hora: new Date(atividade.data_termino!).toLocaleTimeString('pt-BR', { 
             hour: '2-digit', 
             minute: '2-digit',
@@ -103,7 +90,7 @@ export async function GET(request: NextRequest) {
         allActivities.push({
           id: atividade.id,
           nome: atividade.nome,
-          projeto: atividade.projeto.nome,
+          pais: atividade.pais,
           hora: new Date(atividade.data_termino!).toLocaleTimeString('pt-BR', { 
             hour: '2-digit', 
             minute: '2-digit',
@@ -120,7 +107,6 @@ export async function GET(request: NextRequest) {
     allActivities.sort((a, b) => {
       const timeA = a.hora.split(':').map(Number)
       const timeB = b.hora.split(':').map(Number)
-      
       if (timeA[0] !== timeB[0]) {
         return timeA[0] - timeB[0]
       }

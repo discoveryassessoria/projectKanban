@@ -2,22 +2,13 @@
  * Hooks para gerenciamento de dados com cache usando SWR
  * Centraliza fetches e evita requisições redundantes
  */
-
 import useSWR, { mutate } from 'swr'
+import { Pais } from '@prisma/client'
 
 // Tipos compartilhados
 interface Usuario {
   nome: string
   email: string
-}
-
-interface Projeto {
-  id?: number
-  nome: string
-  descricao: string | null
-  _count?: {
-    atividades: number
-  }
 }
 
 interface Status {
@@ -29,14 +20,21 @@ interface UserAtv {
   usuario: Usuario
 }
 
+interface Contratante {
+  id: number
+  nome: string
+  email: string | null
+}
+
 interface Atividade {
   id: number
   nome: string
   descricao: string | null
   data_termino: string | null
   data_criacao: string
-  projeto: Projeto
+  pais: Pais
   status: Status
+  contratante: Contratante | null
   usuarios: UserAtv[]
 }
 
@@ -51,9 +49,9 @@ const fetcher = async (url: string) => {
 
 // Configuração padrão do SWR
 const swrConfig = {
-  revalidateOnFocus: false, // Não revalidar ao focar na janela
-  revalidateOnReconnect: true, // Revalidar ao reconectar
-  keepPreviousData: true, // Manter dados anteriores durante revalidação (evita flicker)
+  revalidateOnFocus: false,
+  revalidateOnReconnect: true,
+  keepPreviousData: true,
 }
 
 /**
@@ -74,38 +72,33 @@ export function useActivities(filters?: any) {
   
   const queryString = params.toString()
   const url = `/api/activities${queryString ? `?${queryString}` : ''}`
-  
+
   const { data, error, isLoading, mutate: revalidate } = useSWR<Atividade[]>(
     url,
     fetcher,
     swrConfig
   )
-  
+
   return {
     activities: data,
     isLoading,
     error: error?.message,
     revalidate,
-    mutate: revalidate // Alias para compatibilidade
+    mutate: revalidate
   }
 }
 
 /**
- * Hook para buscar projetos
+ * Hook para obter lista de países (enum fixo)
  */
-export function useProjects() {
-  const { data, error, isLoading, mutate: revalidate } = useSWR<{ projetos: Projeto[] }>(
-    '/api/projetos',
-    fetcher,
-    swrConfig
-  )
+export function usePaises() {
+  // Países são fixos, não precisam de fetch
+  const paises = Object.values(Pais)
   
   return {
-    projects: data?.projetos || [],
-    isLoading,
-    error: error?.message,
-    revalidate,
-    mutate: revalidate
+    paises,
+    isLoading: false,
+    error: null
   }
 }
 
@@ -118,7 +111,7 @@ export function useStatuses() {
     fetcher,
     swrConfig
   )
-  
+
   return {
     statuses: data?.status || [],
     isLoading,
@@ -137,7 +130,7 @@ export function useUsers() {
     fetcher,
     swrConfig
   )
-  
+
   return {
     users: data || [],
     isLoading,
@@ -158,7 +151,7 @@ export function useCalendarData(year: number, month: number) {
     fetcher,
     swrConfig
   )
-  
+
   return {
     calendarData: data || [],
     isLoading,
@@ -178,7 +171,7 @@ export function useDayData(date: string | null, enabled = true) {
     fetcher,
     swrConfig
   )
-  
+
   return {
     dayData: data,
     isLoading,
@@ -194,11 +187,6 @@ export function useDayData(date: string | null, enabled = true) {
 // Invalidar cache de atividades (todas as queries de activities)
 export function invalidateActivities() {
   mutate((key) => typeof key === 'string' && key.startsWith('/api/activities'))
-}
-
-// Invalidar cache de projetos
-export function invalidateProjects() {
-  mutate('/api/projetos')
 }
 
 // Invalidar cache de status
@@ -220,7 +208,7 @@ export function useContratantes() {
     fetcher,
     swrConfig
   )
-  
+
   return {
     contratantes: data?.contratantes || [],
     isLoading,
@@ -238,7 +226,7 @@ export function useRequerentes() {
     fetcher,
     swrConfig
   )
-  
+
   return {
     requerentes: data?.requerentes || [],
     isLoading,
@@ -247,36 +235,12 @@ export function useRequerentes() {
   }
 }
 
-/**
- * Hook para buscar dados de um projeto específico
- */
-export function useProject(projectId: number | null | undefined) {
-  const { data, error, isLoading, mutate: revalidate } = useSWR(
-    projectId ? `/api/projetos/${projectId}` : null,
-    fetcher,
-    swrConfig
-  )
-  
-  return {
-    project: data || null,
-    isLoading,
-    error: error?.message,
-    mutate: revalidate
-  }
-}
-
-// Invalidar cache de um projeto específico
-export function invalidateProject(projectId: number) {
-  mutate(`/api/projetos/${projectId}`, undefined, { revalidate: true })
-}
-
 // Invalidar tudo
 export function invalidateAll() {
   invalidateActivities()
-  invalidateProjects()
   invalidateStatuses()
   invalidateUsers()
 }
 
 // Tipos exportados
-export type { Atividade, Projeto, Status, Usuario, UserAtv }
+export type { Atividade, Status, Usuario, UserAtv, Contratante }

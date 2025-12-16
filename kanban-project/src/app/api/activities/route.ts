@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Pais } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     // Extrair parâmetros de filtro
     const dataInicio = searchParams.get('dataInicio')
     const dataFim = searchParams.get('dataFim')
-    const projetoId = searchParams.get('projeto')
+    const pais = searchParams.get('pais')
     const statusId = searchParams.get('status')
     const responsavel = searchParams.get('responsavel')
 
@@ -28,9 +28,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Filtro por projeto
-    if (projetoId && projetoId !== '' && projetoId !== 'all') {
-      whereClause.projetoId = parseInt(projetoId)
+    // Filtro por país
+    if (pais && pais !== '' && pais !== 'all') {
+      whereClause.pais = pais as Pais
     }
 
     // Filtro por status
@@ -52,15 +52,15 @@ export async function GET(request: NextRequest) {
     const atividades = await prisma.atividade.findMany({
       where: whereClause,
       include: {
-        projeto: {
-          select: {
-            nome: true,
-            descricao: true
-          }
-        },
         status: {
           select: {
             nome: true
+          }
+        },
+        contratante: {
+          select: {
+            nome: true,
+            email: true
           }
         },
         usuarios: {
@@ -94,12 +94,20 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { nome, descricao, data_termino, projeto_id, status_id, prazo_category } = body
+    const { nome, descricao, data_termino, pais, status_id, prazo_category } = body
 
     // Validações básicas
-    if (!nome || !projeto_id || !status_id) {
+    if (!nome || !pais || !status_id) {
       return NextResponse.json(
-        { error: 'Nome, projeto e status são obrigatórios' },
+        { error: 'Nome, país e status são obrigatórios' },
+        { status: 400 }
+      )
+    }
+
+    // Validar se o país é válido
+    if (!Object.values(Pais).includes(pais)) {
+      return NextResponse.json(
+        { error: 'País inválido' },
         { status: 400 }
       )
     }
@@ -117,19 +125,19 @@ export async function POST(request: NextRequest) {
         nome,
         descricao: descricao || null,
         data_termino: calculatedDataTermino,
-        projetoId: parseInt(projeto_id),
+        pais: pais as Pais,
         statusId: parseInt(status_id)
       },
       include: {
-        projeto: {
-          select: {
-            nome: true,
-            descricao: true
-          }
-        },
         status: {
           select: {
             nome: true
+          }
+        },
+        contratante: {
+          select: {
+            nome: true,
+            email: true
           }
         },
         usuarios: {
@@ -163,40 +171,34 @@ function calculateDateForCategory(category: string): Date | null {
   
   switch (category) {
     case 'vencido':
-      // Um dia atrás
       const yesterday = new Date(now)
       yesterday.setDate(now.getDate() - 1)
       return yesterday
       
     case 'hoje':
-      // Hoje, mas no final do dia
       const today = new Date(now)
       today.setHours(23, 59, 59, 999)
       return today
       
     case 'proximos-3-dias':
-      // Em 2 dias (dentro dos próximos 3)
       const in2Days = new Date(now)
       in2Days.setDate(now.getDate() + 2)
       in2Days.setHours(23, 59, 59, 999)
       return in2Days
       
     case 'proxima-semana':
-      // Em 5 dias (próxima semana)
       const in5Days = new Date(now)
       in5Days.setDate(now.getDate() + 5)
       in5Days.setHours(23, 59, 59, 999)
       return in5Days
       
     case 'futuro':
-      // Em 15 dias
       const in15Days = new Date(now)
       in15Days.setDate(now.getDate() + 15)
       in15Days.setHours(23, 59, 59, 999)
       return in15Days
       
     case 'sem-prazo':
-      // Sem prazo
       return null
       
     default:
