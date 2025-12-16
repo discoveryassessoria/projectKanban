@@ -4,7 +4,9 @@
   "description": "Este arquivo serve como uma referência rápida para os comandos mais utilizados do Prisma e do Next.js no desenvolvimento de aplicações.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "prisma generate",
+    "build": "next build"
   },
   "repository": {
     "type": "git",
