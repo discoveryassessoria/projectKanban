@@ -1,93 +1,172 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { NextRequest, NextResponse } from "next/server"
+import { PrismaClient, Pais } from "@prisma/client"
 
-export async function PUT(request: NextRequest, context: { params: Promise<{ atividadeId: string }> }) {
+const prisma = new PrismaClient()
+
+// GET - Buscar atividade por ID
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const { atividadeId } = await context.params
+    const { id } = await params
+    const atividadeId = parseInt(id)
+
+    const atividade = await prisma.atividade.findUnique({
+      where: { id: atividadeId },
+      include: {
+        status: true,
+        contratante: true,
+        usuarios: {
+          include: {
+            usuario: {
+              select: {
+                id: true,
+                nome: true,
+                email: true
+              }
+            }
+          }
+        },
+        requerentes: {
+          include: {
+            requerente: true
+          }
+        },
+        arvore: true
+      }
+    })
+
+    if (!atividade) {
+      return NextResponse.json(
+        { error: "Atividade não encontrada" },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({ atividade })
+  } catch (error) {
+    console.error("Erro ao buscar atividade:", error)
+    return NextResponse.json(
+      { error: "Erro ao buscar atividade" },
+      { status: 500 }
+    )
+  }
+}
+
+// PUT - Atualizar atividade
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const atividadeId = parseInt(id)
     const body = await request.json()
-    const { statusId, nome, descricao, data_termino, usuarioId, arvore_id } = body
+
+    const { 
+      nome, 
+      descricao, 
+      pais,
+      statusId, 
+      contratanteId,
+      requerenteIds,
+      arvore_id,
+      data_termino 
+    } = body
+
+    if (pais && !Object.values(Pais).includes(pais)) {
+      return NextResponse.json(
+        { error: "País inválido" },
+        { status: 400 }
+      )
+    }
 
     const updateData: any = {}
-
-    if (statusId !== undefined && statusId !== null) {
-      const parsedStatusId = Number.parseInt(statusId, 10)
-      if (isNaN(parsedStatusId)) {
-        return NextResponse.json({ error: `O ID do status é inválido: ${statusId}` }, { status: 400 })
-      }
-      updateData.statusId = parsedStatusId
-    }
-
+    
     if (nome !== undefined) updateData.nome = nome
     if (descricao !== undefined) updateData.descricao = descricao
-    if (data_termino !== undefined) updateData.data_termino = data_termino ? new Date(data_termino) : null
-    
-    // Corrigir o campo arvore_id - pode ser null
-    if (arvore_id !== undefined) {
-      updateData.arvore_id = arvore_id ? Number.parseInt(arvore_id) : null
+    if (pais !== undefined) updateData.pais = pais
+    if (statusId !== undefined) updateData.statusId = statusId
+    if (contratanteId !== undefined) updateData.contratanteId = contratanteId
+    if (arvore_id !== undefined) updateData.arvore_id = arvore_id
+    if (data_termino !== undefined) {
+      updateData.data_termino = data_termino ? new Date(data_termino) : null
     }
 
-    const atividadeId_parsed = Number.parseInt(atividadeId)
-
-    // Usar transação para atualizar atividade e gerenciar usuários
-    const result = await prisma.$transaction(async (tx) => {
-      // Atualizar os dados básicos da atividade
-      const atividadeAtualizada = await tx.atividade.update({
-        where: { id: atividadeId_parsed },
-        data: updateData,
-      })
-
-      // Gerenciar usuários responsáveis
-      if (usuarioId !== undefined) {
-        // Primeiro, remover todas as associações existentes
-        await tx.userAtv.deleteMany({
-          where: { atividadeId: atividadeId_parsed }
-        })
-
-        // Se usuarioId não é null, criar nova associação
-        if (usuarioId !== null) {
-          await tx.userAtv.create({
-            data: {
-              usuarioId: Number.parseInt(usuarioId),
-              atividadeId: atividadeId_parsed
-            }
-          })
+    const atividade = await prisma.atividade.update({
+      where: { id: atividadeId },
+      data: updateData,
+      include: {
+        status: true,
+        contratante: true,
+        requerentes: {
+          include: {
+            requerente: true
+          }
         }
       }
+    })
 
-      // Buscar a atividade atualizada com os usuários e status
-      return await tx.atividade.findUnique({
-        where: { id: atividadeId_parsed },
+    if (requerenteIds !== undefined) {
+      await prisma.atividadeRequerente.deleteMany({
+        where: { atividadeId }
+      })
+
+      if (requerenteIds.length > 0) {
+        await prisma.atividadeRequerente.createMany({
+          data: requerenteIds.map((requerenteId: number) => ({
+            atividadeId,
+            requerenteId
+          }))
+        })
+      }
+
+      const atividadeAtualizada = await prisma.atividade.findUnique({
+        where: { id: atividadeId },
         include: {
           status: true,
-          usuarios: {
+          contratante: true,
+          requerentes: {
             include: {
-              usuario: true
+              requerente: true
             }
           }
         }
       })
-    })
 
-    return NextResponse.json({ atividade: result }, { status: 200 })
+      return NextResponse.json({ atividade: atividadeAtualizada })
+    }
+
+    return NextResponse.json({ atividade })
   } catch (error) {
     console.error("Erro ao atualizar atividade:", error)
-    return NextResponse.json({ error: "Erro interno do servidor ao atualizar atividade" }, { status: 500 })
+    return NextResponse.json(
+      { error: "Erro ao atualizar atividade" },
+      { status: 500 }
+    )
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ atividadeId: string }> }) {
+// DELETE - Excluir atividade
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const { atividadeId } = await params
+    const { id } = await params
+    const atividadeId = parseInt(id)
 
     await prisma.atividade.delete({
-      where: {
-        id: Number.parseInt(atividadeId),
-      },
+      where: { id: atividadeId }
     })
 
-    return NextResponse.json({ success: true }, { status: 200 })
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Erro ao deletar atividade:", error)
-    return NextResponse.json({ error: "Erro interno do servidor ao deletar atividade" }, { status: 500 })
+    console.error("Erro ao excluir atividade:", error)
+    return NextResponse.json(
+      { error: "Erro ao excluir atividade" },
+      { status: 500 }
+    )
   }
 }

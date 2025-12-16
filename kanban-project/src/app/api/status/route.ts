@@ -4,14 +4,6 @@ import { prisma } from "@/lib/prisma"
 export async function GET() {
   try {
     const status = await prisma.status.findMany({
-      include: {
-        projeto: true,
-        _count: {
-          select: {
-            atividades: true
-          }
-        }
-      },
       orderBy: {
         ordem: 'asc'
       }
@@ -26,10 +18,10 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { nome, projetoId } = await request.json()
+    const { nome } = await request.json()
 
-    if (!nome || !projetoId) {
-      return NextResponse.json({ error: "Nome do status e ID do projeto são obrigatórios" }, { status: 400 })
+    if (!nome) {
+      return NextResponse.json({ error: "Nome do status é obrigatório" }, { status: 400 })
     }
 
     // Validação de comprimento
@@ -37,46 +29,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nome deve ter no máximo 20 caracteres' }, { status: 400 })
     }
 
-    // Verificar se já existe um status com o mesmo nome no mesmo projeto
+    // Verificar se já existe um status com o mesmo nome
     const existingStatus = await prisma.status.findFirst({
       where: {
         nome: {
           equals: nome.trim(),
           mode: 'insensitive'
-        },
-        projetoId: projetoId
+        }
       }
     })
 
     if (existingStatus) {
-      return NextResponse.json({ error: 'Já existe um status com este nome neste projeto' }, { status: 409 })
+      return NextResponse.json({ error: 'Já existe um status com este nome' }, { status: 409 })
     }
 
-    // Get the highest ordem value for this project to set the new status at the end
+    // Pegar a maior ordem atual
     const lastStatus = await prisma.status.findFirst({
-      where: { projetoId },
       orderBy: { ordem: 'desc' }
     })
-
     const nextOrdem = (lastStatus?.ordem ?? -1) + 1
 
     const newStatus = await prisma.status.create({
       data: {
         nome: nome.trim(),
-        ordem: nextOrdem,
-        projeto: {
-          connect: {
-            id: projetoId,
-          },
-        },
-      },
-      include: {
-        projeto: true,
-        _count: {
-          select: {
-            atividades: true
-          }
-        }
+        ordem: nextOrdem
       }
     })
 

@@ -1,12 +1,8 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Schema atualizado com PAIS como enum fixo
+// Isso elimina a necessidade de criar "projetos" para cada país
 
 generator client {
   provider = "prisma-client-js"
-  // output   = "../src/generated/prisma" // O caminho de saída foi comentado para usar o padrão, corrija se necessário.
 }
 
 datasource db {
@@ -14,194 +10,184 @@ datasource db {
   url      = env("PRISMA_DATABASE_URL")
 }
 
-// Modelo para o usuário do sistema
+// ========================================
+// ENUM FIXO PARA PAÍSES
+// ========================================
+enum Pais {
+  PORTUGAL
+  ESPANHA
+  ALEMANHA
+  ITALIA
+}
+
+// ========================================
+// USUÁRIOS
+// ========================================
 model Usuario {
   id    Int    @id @default(autoincrement())
   nome  String @db.VarChar(50)
   email String @unique @db.VarChar(30)
-  senha String @db.VarChar(255) // Em um projeto real, armazene o hash da senha, não a senha em si.
+  senha String @db.VarChar(255)
   tipo  String @db.VarChar(15)
 
-  // Relacionamento: Um usuário pode estar associado a várias atividades
   atividades UserAtv[]
 }
 
-// Modelo para as Pessoas da árvore genealógica
+// ========================================
+// ÁRVORE GENEALÓGICA
+// ========================================
 model Pessoa {
   id         Int       @id @default(autoincrement())
   nome       String    @db.VarChar(50)
   sobrenome  String?   @db.VarChar(40)
-  sexo       String?   @db.VarChar(10) // Adicionado para 'Masculino' ou 'Feminino'
+  sexo       String?   @db.VarChar(10)
   data_nasc  DateTime?
   local_nasc String?   @db.VarChar(30)
   data_obito DateTime?
   batizado   String?   @db.VarChar(10)
-  comentario String?   @db.Text // Adicionado para comentários
+  comentario String?   @db.Text
 
-  // Campos para salvar a posição do nó na árvore
   x Int?
   y Int?
 
-  // Chave estrangeira para a Árvore a que a pessoa pertence
   arvoreId Int
   arvore   Arvore @relation("PessoasNaArvore", fields: [arvoreId], references: [id], onDelete: Cascade)
 
-  // --- Auto-relacionamentos para pai e mãe ---
-  // Uma pessoa pode ter um pai, que também é uma Pessoa
   paiId Int?
   pai   Pessoa? @relation("FilhosPai", fields: [paiId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  // Uma pessoa pode ter uma mãe, que também é uma Pessoa
   maeId Int?
   mae   Pessoa? @relation("FilhosMae", fields: [maeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  // Back-relations: Uma pessoa pode ser pai ou mãe de vários filhos
   filhosComoPai Pessoa[] @relation("FilhosPai")
   filhosComoMae Pessoa[] @relation("FilhosMae")
 
-  // Relacionamento com União: Uma pessoa pode estar em várias uniões (como pessoa1 ou pessoa2)
   unioesComoPessoa1 Uniao[] @relation("Pessoa1")
   unioesComoPessoa2 Uniao[] @relation("Pessoa2")
 
-  // Relação inversa para identificar se esta pessoa é a principal de alguma árvore
   arvorePrincipal Arvore? @relation("ArvorePrincipal")
 }
 
-// Modelo para representar a união (casamento, etc.) entre duas pessoas
 model Uniao {
   id          Int       @id @default(autoincrement())
   data_inicio DateTime?
   data_fim    DateTime?
   tipo        String?   @db.VarChar(10)
 
-  // Chave estrangeira para a primeira pessoa na união
   pessoa1Id Int
   pessoa1   Pessoa @relation("Pessoa1", fields: [pessoa1Id], references: [id], onDelete: Cascade)
 
-  // Chave estrangeira para a segunda pessoa na união
   pessoa2Id Int
   pessoa2   Pessoa @relation("Pessoa2", fields: [pessoa2Id], references: [id], onDelete: Cascade)
 }
 
-// Modelo para a Árvore Genealógica
 model Arvore {
   id        Int     @id @default(autoincrement())
   nome      String  @db.VarChar(50)
   descricao String? @db.VarChar(200)
 
-  // Campos para a posição do comentário
-  commentPosX     Float?   @default(0)
-  commentPosY     Float?   @default(0)
+  commentPosX Float? @default(0)
+  commentPosY Float? @default(0)
 
-  // Referência para a pessoa principal da árvore
   pessoaPrincipalId Int?    @unique
   pessoaPrincipal   Pessoa? @relation("ArvorePrincipal", fields: [pessoaPrincipalId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
-  // Relacionamento: Uma árvore contém várias pessoas
-  pessoas Pessoa[] @relation("PessoasNaArvore")
-
-  // Relacionamento: Uma árvore pode estar vinculada a várias atividades
+  pessoas    Pessoa[]    @relation("PessoasNaArvore")
   atividades Atividade[]
 }
 
-// Modelo para o Projeto (Kanban)
-model ProjetoKanban {
-  id        Int     @id @default(autoincrement())
-  nome      String  @db.VarChar(50)
-  descricao String? @db.VarChar(40)
+// ========================================
+// STATUS - AGORA É GLOBAL (não por projeto)
+// ========================================
+model Status {
+  id    Int    @id @default(autoincrement())
+  nome  String @db.VarChar(20)
+  ordem Int    @default(0)
 
-  // Relacionamento: Um projeto tem várias atividades
   atividades Atividade[]
-  
-  // Relacionamento: Um projeto pode ter vários status
-  status Status[]
 
-  // O modelo conceitual sugere entidades "Contratante" e "Requerente"
-  // que podem ser vinculadas a um projeto.
-  contratanteId Int?
-  contratante Contratante? @relation(fields: [contratanteId], references: [id])
-  
-  // Relacionamento Many-to-Many com Requerentes
-  requerentes ProjetoRequerente[]
+  @@unique([nome]) // Cada status é único globalmente
 }
 
-// Modelo para as atividades dentro de um projeto Kanban
+// ========================================
+// ATIVIDADE (PROCESSO) - COM PAÍS FIXO
+// ========================================
 model Atividade {
   id           Int       @id @default(autoincrement())
-  nome         String    @db.VarChar(20)
-  descricao    String?   @db.VarChar(40)
+  nome         String    @db.VarChar(100)
+  descricao    String?   @db.VarChar(500)
   data_termino DateTime?
   data_criacao DateTime  @default(now())
 
-  // Chave estrangeira para o Projeto a que pertence
-  projetoId Int
-  projeto   ProjetoKanban @relation(fields: [projetoId], references: [id], onDelete: Cascade)
+  // PAÍS COMO ENUM FIXO - substitui o projetoId
+  pais Pais
 
-  // Chave estrangeira para o Status da atividade
+  // Status da atividade
   statusId Int
   status   Status @relation(fields: [statusId], references: [id], onDelete: Cascade)
 
-  // Relacionamento: Uma atividade pode ter vários usuários associados
+  // Contratante direto na atividade (1 para 1)
+  contratanteId Int?
+  contratante   Contratante? @relation(fields: [contratanteId], references: [id], onDelete: SetNull)
+
+  // Usuários associados
   usuarios UserAtv[]
 
-  // Relacionamento: Uma atividade pode estar vinculada a uma árvore genealógica
+  // Árvore genealógica vinculada
   arvore_id Int?
   arvore    Arvore? @relation(fields: [arvore_id], references: [id], onDelete: SetNull)
+
+  // Requerentes (many-to-many)
+  requerentes AtividadeRequerente[]
+
+  @@index([pais])
+  @@index([statusId])
 }
 
-// Tabela pivot para o relacionamento Muitos-para-Muitos entre Usuario e Atividade
+// ========================================
+// RELACIONAMENTOS
+// ========================================
 model UserAtv {
   usuarioId   Int
   atividadeId Int
   usuario     Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   atividade   Atividade @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
 
-  @@id([usuarioId, atividadeId]) // Chave primária composta
+  @@id([usuarioId, atividadeId])
 }
 
-// Modelo para o Status de uma atividade (Ex: "A Fazer", "Em Andamento")
-model Status {
-  id   Int    @id @default(autoincrement())
-  nome String @db.VarChar(20)
-  ordem Int   @default(0) // Ordem de exibição dos status
-  projetoId Int?
-  projeto   ProjetoKanban? @relation(fields: [projetoId], references: [id])
+model AtividadeRequerente {
+  atividadeId  Int
+  requerenteId Int
+  atividade    Atividade  @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
+  requerente   Requerente @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
 
-  // Relacionamento: Um status pode ser usado em várias atividades
-  atividades Atividade[]
+  @@id([atividadeId, requerenteId])
 }
 
-// Os modelos abaixo (Requerente, Contratante) são baseados na estrutura do
-// seu diagrama. Eles parecem representar pessoas ou empresas com papéis específicos.
-model Requerente {
-  id                    Int     @id @default(autoincrement())
-  nome                  String  @db.VarChar(50)
-  cpf                   String? @db.VarChar(11)
-  rg                    String? @db.VarChar(10)
-  endereco              String? @db.VarChar(100)
-  telefone              String? @db.VarChar(11)
-  campos_personalizados Json?
-
-  projetos ProjetoRequerente[]
-}
-
+// ========================================
+// CONTRATANTE E REQUERENTE
+// ========================================
 model Contratante {
   id       Int     @id @default(autoincrement())
   nome     String  @db.VarChar(50)
-  cpf      String? @db.VarChar(11)
-  rg       String? @db.VarChar(10)
-  endereco String? @db.VarChar(100) // No seu modelo, o varchar era 10
-  telefone String? @db.VarChar(11)
+  cpf      String? @db.VarChar(14)
+  rg       String? @db.VarChar(15)
+  endereco String? @db.VarChar(200)
+  telefone String? @db.VarChar(15)
+  email    String? @db.VarChar(100)
 
-  projetos ProjetoKanban[]
+  atividades Atividade[]
 }
 
-// Tabela pivot para relacionamento Many-to-Many entre Projeto e Requerente
-model ProjetoRequerente {
-  projetoId    Int
-  requerenteId Int
-  projeto      ProjetoKanban @relation(fields: [projetoId], references: [id], onDelete: Cascade)
-  requerente   Requerente    @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+model Requerente {
+  id       Int     @id @default(autoincrement())
+  nome     String  @db.VarChar(50)
+  cpf      String? @db.VarChar(14)
+  rg       String? @db.VarChar(15)
+  endereco String? @db.VarChar(200)
+  telefone String? @db.VarChar(15)
+  email    String? @db.VarChar(100)
 
-  @@id([projetoId, requerenteId])
+  atividades AtividadeRequerente[]
 }
