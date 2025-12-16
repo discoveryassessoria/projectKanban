@@ -70,6 +70,7 @@ export interface UserAtv {
 // ========================================
 export interface Contratante {
   id: number
+  tipo?: string | null
   nome: string
   cpf?: string | null
   rg?: string | null

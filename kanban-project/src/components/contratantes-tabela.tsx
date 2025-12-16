@@ -32,6 +32,7 @@ import {
 
 interface Contratante {
   id: number
+  tipo?: string | null
   nome: string
   cpf?: string | null
   rg?: string | null
@@ -61,6 +62,7 @@ interface ContratantesTabelaProps {
 }
 
 const initialFormData = {
+  tipo: "contratante",
   nome: "",
   cpf: "",
   rg: "",
@@ -80,6 +82,10 @@ const initialFormData = {
   observacoes: "",
 }
 
+const TIPO_OPTIONS = [
+  { value: "contratante", label: "Contratante" },
+  { value: "requerente", label: "Requerente" },
+]
 const SEXO_OPTIONS = ["Masculino", "Feminino", "Outro"]
 const ESTADO_CIVIL_OPTIONS = ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável", "Separado(a)"]
 const NACIONALIDADE_OPTIONS = ["Brasileiro(a)", "Português(a)", "Italiano(a)", "Espanhol(a)", "Alemão(ã)", "Outro"]
@@ -174,10 +180,10 @@ function ContratanteModal({
             </div>
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
-                {isViewMode ? formData.nome || "Visualizar Contratante" : editingId ? "Editar Contratante" : "Novo Contratante"}
+                {isViewMode ? formData.nome || "Visualizar Cliente" : editingId ? "Editar Cliente" : "Novo Cliente"}
               </h2>
               <p className="text-sm text-gray-500">
-                {isViewMode ? "Detalhes do contratante" : "Preencha os dados do contratante"}
+                {isViewMode ? "Detalhes do cliente" : "Preencha os dados do cliente"}
               </p>
             </div>
           </div>
@@ -197,7 +203,7 @@ function ContratanteModal({
                 disabled={isLoading}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"
               >
-                {isLoading ? "Salvando..." : editingId ? "Salvar Alterações" : "Criar Contratante"}
+                {isLoading ? "Salvando..." : editingId ? "Salvar Alterações" : "Criar Cliente"}
               </Button>
             )}
             <button
@@ -248,18 +254,35 @@ function ContratanteModal({
                   </h3>
                   
                   <div className="space-y-4">
-                    {/* Nome */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Nome Completo <span className="text-red-500">*</span>
-                      </label>
-                      <Input
-                        value={formData.nome}
-                        onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                        placeholder="Nome completo"
-                        disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
-                      />
+                    {/* Tipo e Nome */}
+                    <div className="grid grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Tipo <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={formData.tipo}
+                          onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+                          disabled={isViewMode}
+                          className="w-full h-10 px-3 rounded-md bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100"
+                        >
+                          {TIPO_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-span-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Nome Completo <span className="text-red-500">*</span>
+                        </label>
+                        <Input
+                          value={formData.nome}
+                          onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                          placeholder="Nome completo"
+                          disabled={isViewMode}
+                          className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                        />
+                      </div>
                     </div>
 
                     {/* CPF e RG */}
@@ -584,6 +607,7 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
   // Abrir modal para editar
   const handleEdit = (contratante: Contratante) => {
     setFormData({
+      tipo: contratante.tipo || "contratante",
       nome: contratante.nome || "",
       cpf: contratante.cpf || "",
       rg: contratante.rg || "",
@@ -612,6 +636,7 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
   // Abrir modal para visualizar
   const handleView = (contratante: Contratante) => {
     setFormData({
+      tipo: contratante.tipo || "contratante",
       nome: contratante.nome || "",
       cpf: contratante.cpf || "",
       rg: contratante.rg || "",
@@ -669,7 +694,7 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
       setEditingId(null)
       onRefresh()
     } catch (error: any) {
-      alert(error.message || "Erro ao salvar contratante")
+      alert(error.message || "Erro ao salvar cliente")
     } finally {
       setIsLoading(false)
     }
@@ -677,7 +702,7 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
 
   // Excluir
   const handleDelete = async (id: number) => {
-    if (!confirm("Tem certeza que deseja excluir este contratante?")) return
+    if (!confirm("Tem certeza que deseja excluir este cliente?")) return
 
     try {
       const response = await fetch(`/api/contratantes/${id}`, {
@@ -691,7 +716,7 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
 
       onRefresh()
     } catch (error: any) {
-      alert(error.message || "Erro ao excluir contratante")
+      alert(error.message || "Erro ao excluir cliente")
     }
   }
 
@@ -707,7 +732,7 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
           <Input
-            placeholder="Buscar contratante..."
+            placeholder="Buscar cliente..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value)
@@ -722,7 +747,7 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
           className="bg-emerald-600 hover:bg-emerald-700 text-white"
         >
           <Plus className="h-4 w-4 mr-2" />
-          Novo Contratante
+          Novo Cliente
         </Button>
       </div>
 
@@ -731,6 +756,7 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
         <table className="w-full">
           <thead className="bg-white/10">
             <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Tipo</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Nome</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">CPF</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Telefone</th>
@@ -743,8 +769,8 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
           <tbody className="divide-y divide-white/10">
             {paginatedContratantes.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-white/50">
-                  {searchTerm ? "Nenhum contratante encontrado" : "Nenhum contratante cadastrado"}
+                <td colSpan={8} className="px-4 py-8 text-center text-white/50">
+                  {searchTerm ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"}
                 </td>
               </tr>
             ) : (
@@ -754,6 +780,17 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
                   className="hover:bg-white/5 transition-colors cursor-pointer"
                   onClick={() => handleView(contratante)}
                 >
+                  <td className="px-4 py-3">
+                    <span className={`
+                      px-2 py-1 rounded text-xs font-medium
+                      ${contratante.tipo === 'requerente' 
+                        ? 'bg-purple-500/20 text-purple-300' 
+                        : 'bg-blue-500/20 text-blue-300'
+                      }
+                    `}>
+                      {contratante.tipo === 'requerente' ? 'Requerente' : 'Contratante'}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-medium">

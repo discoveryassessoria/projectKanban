@@ -166,8 +166,8 @@ export default function ProcessosPage() {
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
 
       <HeaderBar
-        title={tabPrincipal === "processos" ? "Processos" : "Contratantes"}
-        subtitle={tabPrincipal === "processos" ? "Gerencie seus processos de cidadania" : "Gerencie seus contratantes"}
+        title={tabPrincipal === "processos" ? "Processos" : "Clientes"}
+        subtitle={tabPrincipal === "processos" ? "Gerencie seus processos de cidadania" : "Gerencie seus clientes"}
         userName={user?.nome || "Usuário"}
         userRole={user?.tipo === 'admin' ? 'Administrador' : user?.tipo || "Usuário"}
         userEmail={user?.email || ""}
@@ -185,7 +185,7 @@ export default function ProcessosPage() {
           <div className="bg-white/5 border border-white/15 rounded-2xl p-4 backdrop-blur-xl shadow-lg mb-4">
             <div className="flex items-center justify-between flex-wrap gap-4">
               
-              {/* Tabs Processos / Contratantes */}
+              {/* Tabs Processos / Clientes */}
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setTabPrincipal("processos")}
@@ -209,7 +209,7 @@ export default function ProcessosPage() {
                     }
                   `}
                 >
-                  Contratantes
+                  Clientes
                 </button>
               </div>
 
@@ -260,13 +260,13 @@ export default function ProcessosPage() {
                 </div>
               )}
 
-              {/* Contador Contratantes */}
+              {/* Contador Clientes */}
               {tabPrincipal === "contratantes" && (
                 <div className="flex flex-col items-center px-4 py-2 bg-white/10 rounded-lg">
                   <span className="text-2xl font-bold text-white">
                     {contratantes.length}
                   </span>
-                  <span className="text-xs text-white/60">contratante(s)</span>
+                  <span className="text-xs text-white/60">cliente(s)</span>
                 </div>
               )}
             </div>
@@ -297,7 +297,7 @@ export default function ProcessosPage() {
               />
             )}
 
-            {/* Contratantes - Tabela */}
+            {/* Clientes - Tabela */}
             {tabPrincipal === "contratantes" && (
               <ContratantesTabela
                 contratantes={contratantes}

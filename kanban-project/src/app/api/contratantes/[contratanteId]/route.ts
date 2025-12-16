@@ -78,6 +78,7 @@ export async function PUT(
     // Montar objeto de dados para update
     const updateData: Record<string, unknown> = {}
 
+    if (body.tipo !== undefined) updateData.tipo = body.tipo || null
     if (body.nome !== undefined) updateData.nome = body.nome?.trim() || null
     if (body.cpf !== undefined) updateData.cpf = body.cpf || null
     if (body.rg !== undefined) updateData.rg = body.rg || null

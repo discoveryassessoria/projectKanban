@@ -167,6 +167,7 @@ model AtividadeRequerente {
 // ========================================
 model Contratante {
   id              Int       @id @default(autoincrement())
+  tipo            String?   @db.VarChar(20)
   nome            String    @db.VarChar(100)
   cpf             String?   @db.VarChar(14)
   rg              String?   @db.VarChar(20)
