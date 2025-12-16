@@ -3,37 +3,7 @@
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import ActivityCard from "./ActivityCard"
-
-interface Usuario {
-  nome: string
-  email: string
-}
-
-interface Projeto {
-  id?: number
-  nome: string
-  descricao: string | null
-}
-
-interface Status {
-  id?: number
-  nome: string
-}
-
-interface UserAtv {
-  usuario: Usuario
-}
-
-interface Atividade {
-  id: number
-  nome: string
-  descricao: string | null
-  data_termino: string | null
-  data_criacao: string
-  projeto: Projeto
-  status: Status
-  usuarios: UserAtv[]
-}
+import type { Atividade } from "@/src/hooks/useActivitiesData"
 
 interface DraggableActivityCardProps {
   activity: Atividade

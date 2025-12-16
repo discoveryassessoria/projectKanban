@@ -3,38 +3,17 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { CalendarDays, Clock, User, Building2 } from "lucide-react"
+import { CalendarDays, Clock, User, Flag } from "lucide-react"
 import { classifyByDeadline, getUrgencyColor } from "@/src/utils/prazoUtils"
+import { Pais } from "@prisma/client"
+import type { Atividade } from "@/src/hooks/useActivitiesData"
 
-interface Usuario {
-  nome: string
-  email: string
-}
-
-interface Projeto {
-  id?: number
-  nome: string
-  descricao: string | null
-}
-
-interface Status {
-  id?: number
-  nome: string
-}
-
-interface UserAtv {
-  usuario: Usuario
-}
-
-interface Atividade {
-  id: number
-  nome: string
-  descricao: string | null
-  data_termino: string | null
-  data_criacao: string
-  projeto: Projeto
-  status: Status
-  usuarios: UserAtv[]
+// Mapeamento de países para exibição
+const PAIS_LABELS: Record<Pais, string> = {
+  PORTUGAL: 'Portugal',
+  ESPANHA: 'Espanha',
+  ALEMANHA: 'Alemanha',
+  ITALIA: 'Itália'
 }
 
 interface ActivityCardProps {
@@ -119,10 +98,10 @@ export default function ActivityCard({ activity, onClick, isDragging = false }: 
           )}
         </div>
 
-        {/* Projeto */}
+        {/* País */}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Building2 className="h-3 w-3" />
-          <span className="truncate">{activity.projeto.nome}</span>
+          <Flag className="h-3 w-3" />
+          <span className="truncate">{PAIS_LABELS[activity.pais]}</span>
         </div>
 
         {/* Prazo */}

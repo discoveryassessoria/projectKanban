@@ -5,10 +5,18 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useActivities, useStatuses, useContratantes, useRequerentes, useProject, invalidateActivities, invalidateProject } from "@/src/hooks/useActivitiesData"
-import type { Atividade, Status, Usuario, Projeto } from "@/src/hooks/useActivitiesData"
+import { useActivities, useStatuses, useContratantes, useRequerentes, invalidateActivities } from "@/src/hooks/useActivitiesData"
+import type { Atividade, Status, Usuario } from "@/src/hooks/useActivitiesData"
 import { ProcessoDetailsModal } from "@/src/components/kanban/atividade-details-modal"
 import type { Contratante, Requerente } from "@/src/types/kanban"
+
+// Mapeamento de países para exibição
+const PAIS_LABELS: Record<string, string> = {
+  PORTUGAL: 'Portugal',
+  ESPANHA: 'Espanha',
+  ALEMANHA: 'Alemanha',
+  ITALIA: 'Itália'
+}
 
 interface UserAtv {
   usuario: Usuario
@@ -31,27 +39,6 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [selectedAtividade, setSelectedAtividade] = useState<Atividade | null>(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  
-  // Buscar projeto da atividade selecionada
-  const { project: selectedProject, mutate: mutateProject, isLoading: isLoadingProject } = useProject(selectedAtividade?.projeto?.id)
-
-  // Revalidar projeto quando o modal abrir
-  useEffect(() => {
-    if (isDetailsModalOpen && selectedAtividade?.projeto?.id) {
-      mutateProject(undefined, { revalidate: true })
-    }
-  }, [isDetailsModalOpen, selectedAtividade?.projeto?.id, mutateProject, isLoadingProject])
-
-  // Memoizar contratantes e requerentes selecionados
-  const memoizedSelectedContratantes = useMemo(() => {
-    const result = selectedProject?.contratante ? [selectedProject.contratante] : []
-    return result
-  }, [selectedProject?.contratante])
-
-  const memoizedSelectedRequerentes = useMemo(() => {
-    const result = selectedProject?.requerentes?.map((r: { requerente: Requerente }) => r.requerente) || []
-    return result
-  }, [selectedProject?.requerentes])
 
   // Alias para manter compatibilidade com código existente
   const atividades = activities
@@ -99,20 +86,6 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
     }
   }
 
-  const getStatusBadge = (status: string, dataTermino: string | null) => {
-    const prazoFormatado = formatDate(dataTermino)
-    
-    switch (status.toLowerCase()) {
-      case 'concluído':
-      case 'concluido':
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-200 border-green-200">{prazoFormatado}</Badge>
-      case 'em andamento':
-        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200">{prazoFormatado}</Badge>
-      default:
-        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200">{prazoFormatado}</Badge>
-    }
-  }
-
   const toggleSelectAll = () => {
     if (selectedItems.length === atividades.length) {
       setSelectedItems([])
@@ -153,7 +126,6 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
             throw new Error(`Erro ${response.status}: ${errorText}`)
           }
           
-          const result = await response.json()
           results.push({ id, success: true })
         } catch (error) {
           results.push({ id, success: false, error: error instanceof Error ? error.message : 'Erro desconhecido' })
@@ -245,11 +217,10 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
     setIsDetailsModalOpen(false)
   }
 
-  // Loading state - transparente
+  // Loading state
   if (isLoading) {
     return (
       <div className="rounded-2xl">
-        {/* Table Header Skeleton */}
         <div className="px-4 py-3 border-b border-white/10">
           <div className="grid grid-cols-12 gap-4 items-center">
             <div className="col-span-1 h-4 bg-white/10 rounded animate-pulse"></div>
@@ -263,7 +234,6 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
           </div>
         </div>
         
-        {/* Table Body Skeleton */}
         <div className="divide-y divide-white/10">
           {[1, 2, 3, 4, 5].map(i => (
             <div key={i} className="px-4 py-3">
@@ -283,19 +253,11 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
             </div>
           ))}
         </div>
-        
-        {/* Footer Skeleton */}
-        <div className="px-4 py-3 border-t border-white/10">
-          <div className="flex items-center justify-between">
-            <div className="h-4 w-48 bg-white/10 rounded animate-pulse"></div>
-            <div className="h-4 w-32 bg-white/10 rounded animate-pulse"></div>
-          </div>
-        </div>
       </div>
     )
   }
 
-  // Error state - transparente
+  // Error state
   if (error) {
     return (
       <div className="rounded-2xl">
@@ -327,7 +289,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
           <div className="col-span-1">Status</div>
           <div className="col-span-1">Criado por</div>
           <div className="col-span-1">Responsável</div>
-          <div className="col-span-1">Projeto</div>
+          <div className="col-span-1">País</div>
         </div>
       </div>
 
@@ -411,7 +373,9 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 </div>
                 
                 <div className="col-span-1">
-                  <div className="text-sm font-medium text-white/80">{atividade.projeto.nome}</div>
+                  <div className="text-sm font-medium text-white/80">
+                    {PAIS_LABELS[atividade.pais] || atividade.pais}
+                  </div>
                 </div>
               </div>
             </div>

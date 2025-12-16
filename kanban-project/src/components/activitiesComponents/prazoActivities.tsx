@@ -1,15 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, RefreshCw } from "lucide-react"
 import {
   DndContext,
   DragEndEvent,
-  DragOverEvent,
   DragStartEvent,
   DragOverlay,
   useSensors,
@@ -27,7 +26,6 @@ import {
   sortActivitiesInCategory,
   PrazoCategory 
 } from "@/src/utils/prazoUtils"
-import StatusCard from "./StatusCard"
 import ActivityCard from "./ActivityCard"
 import CustomStatusManager from "./CustomStatusManager"
 import DraggableActivityCard from "./DraggableActivityCard"
@@ -35,8 +33,8 @@ import DroppableColumn from "./DroppableColumn"
 import QuickAddModal, { QuickAddFormData } from "./QuickAddModal"
 import { useActivityOperations } from "@/src/hooks/useActivityOperations"
 import { useQuickAddActivity } from "@/src/hooks/useQuickAddActivity"
-import { useActivities, useContratantes, useRequerentes, useProject, invalidateActivities, invalidateProject } from "@/src/hooks/useActivitiesData"
-import type { Atividade, Usuario, Projeto, Status } from "@/src/hooks/useActivitiesData"
+import { useActivities, useContratantes, useRequerentes, invalidateActivities } from "@/src/hooks/useActivitiesData"
+import type { Atividade, Usuario, Status } from "@/src/hooks/useActivitiesData"
 import { ProcessoDetailsModal } from "@/src/components/kanban/atividade-details-modal"
 import type { Contratante, Requerente } from "@/src/types/kanban"
 import "@/src/styles/kanban.css"
@@ -54,16 +52,6 @@ export default function PrazoActivities() {
   const [selectedActivity, setSelectedActivity] = useState<Atividade | null>(null)
   const [activeTab, setActiveTab] = useState("kanban")
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  
-  // Buscar projeto da atividade selecionada
-  const { project: selectedProject, mutate: mutateProject } = useProject(selectedActivity?.projeto?.id)
-  
-  // Revalidar projeto quando o modal abrir
-  useEffect(() => {
-    if (isDetailsModalOpen && selectedActivity?.projeto?.id) {
-      mutateProject(undefined, { revalidate: true })
-    }
-  }, [isDetailsModalOpen, selectedActivity?.projeto?.id, mutateProject])
   
   // Filtrar apenas atividades não concluídas
   const atividades = activities.filter(activity => {
@@ -311,7 +299,7 @@ export default function PrazoActivities() {
 
   return (
     <div className="space-y-3">
-      {/* Header - mais compacto */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">Gestão de Atividades</h1>
@@ -362,7 +350,7 @@ export default function PrazoActivities() {
         </div>
       </div>
 
-      {/* Tabs - mais compactas */}
+      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 lg:w-[300px] bg-transparent border border-white/30 h-9">
           <TabsTrigger value="kanban" className="data-[state=active]:bg-white/20 text-white text-xs">Kanban por Prazo</TabsTrigger>
@@ -370,7 +358,7 @@ export default function PrazoActivities() {
         </TabsList>
 
         <TabsContent value="kanban" className="space-y-3 mt-3">
-          {/* Kanban Board - colunas mais compactas */}
+          {/* Kanban Board */}
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}

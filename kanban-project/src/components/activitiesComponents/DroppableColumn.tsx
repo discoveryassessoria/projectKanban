@@ -1,42 +1,11 @@
 "use client"
 
-import { useState } from "react"
 import { useDroppable } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import StatusCard from "./StatusCard"
 import QuickAddButton from "./QuickAddButton"
 import { PrazoClassification } from "@/src/utils/prazoUtils"
-
-interface Usuario {
-  nome: string
-  email: string
-}
-
-interface Projeto {
-  id?: number
-  nome: string
-  descricao: string | null
-}
-
-interface Status {
-  id?: number
-  nome: string
-}
-
-interface UserAtv {
-  usuario: Usuario
-}
-
-interface Atividade {
-  id: number
-  nome: string
-  descricao: string | null
-  data_termino: string | null
-  data_criacao: string
-  projeto: Projeto
-  status: Status
-  usuarios: UserAtv[]
-}
+import type { Atividade } from "@/src/hooks/useActivitiesData"
 
 interface DroppableColumnProps {
   id: string
