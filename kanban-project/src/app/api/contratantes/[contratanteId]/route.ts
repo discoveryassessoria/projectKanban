@@ -4,13 +4,13 @@ import { prisma } from "@/lib/prisma"
 // GET - Buscar contratante por ID
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ contratanteId: string }> }
 ) {
   try {
-    const { id } = await params
-    const contratanteId = parseInt(id)
+    const { contratanteId } = await params
+    const id = parseInt(contratanteId)
 
-    if (isNaN(contratanteId)) {
+    if (isNaN(id)) {
       return NextResponse.json(
         { error: "ID inválido" },
         { status: 400 }
@@ -18,7 +18,7 @@ export async function GET(
     }
 
     const contratante = await prisma.contratante.findUnique({
-      where: { id: contratanteId },
+      where: { id },
       include: {
         anexos: true,
         atividades: {
@@ -49,13 +49,13 @@ export async function GET(
 // PUT - Atualizar contratante
 export async function PUT(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ contratanteId: string }> }
 ) {
   try {
-    const { id } = await params
-    const contratanteId = parseInt(id)
+    const { contratanteId } = await params
+    const id = parseInt(contratanteId)
 
-    if (isNaN(contratanteId)) {
+    if (isNaN(id)) {
       return NextResponse.json(
         { error: "ID inválido" },
         { status: 400 }
@@ -85,7 +85,7 @@ export async function PUT(
 
     // Verificar se existe
     const existente = await prisma.contratante.findUnique({
-      where: { id: contratanteId },
+      where: { id },
     })
 
     if (!existente) {
@@ -96,7 +96,7 @@ export async function PUT(
     }
 
     const contratante = await prisma.contratante.update({
-      where: { id: contratanteId },
+      where: { id },
       data: {
         nome: nome !== undefined ? nome.trim() : undefined,
         cpf: cpf !== undefined ? cpf || null : undefined,
@@ -136,13 +136,13 @@ export async function PUT(
 // DELETE - Excluir contratante
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ contratanteId: string }> }
 ) {
   try {
-    const { id } = await params
-    const contratanteId = parseInt(id)
+    const { contratanteId } = await params
+    const id = parseInt(contratanteId)
 
-    if (isNaN(contratanteId)) {
+    if (isNaN(id)) {
       return NextResponse.json(
         { error: "ID inválido" },
         { status: 400 }
@@ -151,7 +151,7 @@ export async function DELETE(
 
     // Verificar se existe e se está em uso
     const contratante = await prisma.contratante.findUnique({
-      where: { id: contratanteId },
+      where: { id },
       include: {
         _count: { select: { atividades: true } }
       },
@@ -172,7 +172,7 @@ export async function DELETE(
     }
 
     await prisma.contratante.delete({
-      where: { id: contratanteId },
+      where: { id },
     })
 
     return NextResponse.json({ success: true })
