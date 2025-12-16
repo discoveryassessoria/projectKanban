@@ -8,7 +8,7 @@ export async function PUT(
   try {
     const { contratanteId: contratanteIdStr } = await params
     const contratanteId = Number.parseInt(contratanteIdStr)
-    
+
     if (Number.isNaN(contratanteId)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
@@ -53,7 +53,7 @@ export async function DELETE(
   try {
     const { contratanteId: contratanteIdStr } = await params
     const contratanteId = Number.parseInt(contratanteIdStr)
-    
+
     if (Number.isNaN(contratanteId)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
@@ -67,14 +67,14 @@ export async function DELETE(
       return NextResponse.json({ error: "Contratante não encontrado" }, { status: 404 })
     }
 
-    // Verificar se o contratante está sendo usado em algum projeto
-    const projetosComContratante = await prisma.projetoKanban.count({
+    // Verificar se o contratante está sendo usado em alguma atividade
+    const atividadesComContratante = await prisma.atividade.count({
       where: { contratanteId: contratanteId }
     })
 
-    if (projetosComContratante > 0) {
+    if (atividadesComContratante > 0) {
       return NextResponse.json(
-        { error: "Não é possível excluir este contratante pois ele está associado a um ou mais projetos" },
+        { error: "Não é possível excluir este contratante pois ele está associado a uma ou mais atividades" },
         { status: 400 }
       )
     }
