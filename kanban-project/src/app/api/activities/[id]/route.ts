@@ -5,12 +5,12 @@ const prisma = new PrismaClient()
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ atividadeId: string }> }  // ← Aqui
 ) {
   try {
-    const { id: idParam } = await params
-    const id = parseInt(idParam)
-
+    const { atividadeId } = await params  // ← Aqui
+    const id = parseInt(atividadeId)      // ← Aqui
+    
     if (isNaN(id)) {
       return NextResponse.json(
         { error: 'ID inválido' },
@@ -57,11 +57,11 @@ export async function DELETE(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ atividadeId: string }> }  // ← Aqui
 ) {
   try {
-    const { id: idParam } = await params
-    const id = parseInt(idParam)
+    const { atividadeId } = await params  // ← Aqui
+    const id = parseInt(atividadeId)      // ← Aqui
     const body = await request.json()
     const { statusId, data_termino } = body
 
@@ -101,34 +101,34 @@ export async function PATCH(
       updateData.data_termino = data_termino ? new Date(data_termino) : null
     }
 
-    // Atualizar a atividade
-    const atividadeAtualizada = await prisma.atividade.update({
-      where: { id },
-      data: updateData,
+// Atualizar a atividade
+const atividadeAtualizada = await prisma.atividade.update({
+  where: { id },
+  data: updateData,
+  include: {
+    status: {
+      select: {
+        nome: true
+      }
+    },
+    contratante: {
+      select: {
+        nome: true,
+        email: true
+      }
+    },
+    usuarios: {
       include: {
-        projeto: {
+        usuario: {
           select: {
             nome: true,
-            descricao: true
-          }
-        },
-        status: {
-          select: {
-            nome: true
-          }
-        },
-        usuarios: {
-          include: {
-            usuario: {
-              select: {
-                nome: true,
-                email: true
-              }
-            }
+            email: true
           }
         }
       }
-    })
+    }
+  }
+})
 
     return NextResponse.json({
       success: true,
