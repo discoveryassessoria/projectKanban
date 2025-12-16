@@ -5,7 +5,7 @@ import type React from "react"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { useDroppable } from "@dnd-kit/core"
 import { Button } from "@/components/ui/button"
-import { Plus, MoreVertical, Edit2, Trash2, ArrowUp, ArrowDown } from "lucide-react"
+import { Plus, MoreVertical, Edit2, Trash2 } from "lucide-react"
 import { useMemo, useState } from "react"
 import { KanbanCard } from "./kanban-card"
 import { Input } from "@/components/ui/input"
@@ -25,7 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import type { Atividade, AtividadeWithStatus } from "@/src/types/kanban"
+import type { AtividadeWithStatus, Pais } from "@/src/types/kanban"
 
 interface KanbanColumnProps {
   id: number
@@ -37,7 +37,7 @@ interface KanbanColumnProps {
   onAtividadeAdd: (nome: string, statusId: number) => void
   onAtividadeClick?: (atividade: AtividadeWithStatus) => void
   onStatusUpdate?: () => void
-  projetoId?: number
+  pais?: Pais
 }
 
 export function KanbanColumn({
@@ -50,7 +50,7 @@ export function KanbanColumn({
   onAtividadeAdd,
   onAtividadeClick,
   onStatusUpdate,
-  projetoId,
+  pais,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ 
     id: id,
@@ -118,26 +118,6 @@ export function KanbanColumn({
     }
   }
 
-  const handleMoveStatus = async (direction: "up" | "down") => {
-    try {
-      const response = await fetch(`/api/status/${id}/move`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ direction, projetoId }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Falha ao mover status")
-      }
-
-      onStatusUpdate?.()
-    } catch (error) {
-      console.error(error)
-      alert(error instanceof Error ? error.message : "Não foi possível mover o status.")
-    }
-  }
-
   return (
     <>
       <div
@@ -183,23 +163,6 @@ export function KanbanColumn({
                   >
                     <Edit2 className="h-4 w-4 mr-2" />
                     Editar nome
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/10" />
-                  <DropdownMenuItem
-                    onClick={() => handleMoveStatus("up")}
-                    disabled={isFirst || isConcluido}
-                    className="text-white hover:bg-white/10 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ArrowUp className="h-4 w-4 mr-2" />
-                    Mover para esquerda
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => handleMoveStatus("down")}
-                    disabled={isLast || isConcluido}
-                    className="text-white hover:bg-white/10 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ArrowDown className="h-4 w-4 mr-2" />
-                    Mover para direita
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-white/10" />
                   <DropdownMenuItem

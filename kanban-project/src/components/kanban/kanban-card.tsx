@@ -9,7 +9,7 @@ interface KanbanCardProps {
   id: number
   nome: string
   descricao?: string | null
-  data_termino?: string
+  data_termino?: string | null
   data_criacao?: string
   usuarios?: Array<{
     usuario: {
@@ -29,6 +29,11 @@ interface KanbanCardProps {
   atividadesCount?: number
   onClick?: () => void
   onAddAtividade?: () => void
+  // Campos adicionais que podem vir do AtividadeWithStatus
+  pais?: string
+  statusId?: number
+  contratante?: any
+  key?: number
 }
 
 export function KanbanCard({
