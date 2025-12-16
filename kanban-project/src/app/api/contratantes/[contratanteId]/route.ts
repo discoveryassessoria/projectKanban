@@ -20,7 +20,6 @@ export async function GET(
     const contratante = await prisma.contratante.findUnique({
       where: { id },
       include: {
-        anexos: true,
         atividades: {
           include: {
             status: true,
@@ -63,25 +62,6 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const {
-      nome,
-      cpf,
-      rg,
-      dataNascimento,
-      sexo,
-      estadoCivil,
-      nacionalidade,
-      telefone,
-      email,
-      endereco,
-      numero,
-      complemento,
-      bairro,
-      cidade,
-      estado,
-      cep,
-      observacoes,
-    } = body
 
     // Verificar se existe
     const existente = await prisma.contratante.findUnique({
@@ -95,32 +75,32 @@ export async function PUT(
       )
     }
 
+    // Montar objeto de dados para update
+    const updateData: Record<string, unknown> = {}
+
+    if (body.nome !== undefined) updateData.nome = body.nome?.trim() || null
+    if (body.cpf !== undefined) updateData.cpf = body.cpf || null
+    if (body.rg !== undefined) updateData.rg = body.rg || null
+    if (body.dataNascimento !== undefined) {
+      updateData.dataNascimento = body.dataNascimento ? new Date(body.dataNascimento) : null
+    }
+    if (body.sexo !== undefined) updateData.sexo = body.sexo || null
+    if (body.estadoCivil !== undefined) updateData.estadoCivil = body.estadoCivil || null
+    if (body.nacionalidade !== undefined) updateData.nacionalidade = body.nacionalidade || null
+    if (body.telefone !== undefined) updateData.telefone = body.telefone || null
+    if (body.email !== undefined) updateData.email = body.email || null
+    if (body.endereco !== undefined) updateData.endereco = body.endereco || null
+    if (body.numero !== undefined) updateData.numero = body.numero || null
+    if (body.complemento !== undefined) updateData.complemento = body.complemento || null
+    if (body.bairro !== undefined) updateData.bairro = body.bairro || null
+    if (body.cidade !== undefined) updateData.cidade = body.cidade || null
+    if (body.estado !== undefined) updateData.estado = body.estado || null
+    if (body.cep !== undefined) updateData.cep = body.cep || null
+    if (body.observacoes !== undefined) updateData.observacoes = body.observacoes || null
+
     const contratante = await prisma.contratante.update({
       where: { id },
-      data: {
-        nome: nome !== undefined ? nome.trim() : undefined,
-        cpf: cpf !== undefined ? cpf || null : undefined,
-        rg: rg !== undefined ? rg || null : undefined,
-        dataNascimento: dataNascimento !== undefined 
-          ? (dataNascimento ? new Date(dataNascimento) : null) 
-          : undefined,
-        sexo: sexo !== undefined ? sexo || null : undefined,
-        estadoCivil: estadoCivil !== undefined ? estadoCivil || null : undefined,
-        nacionalidade: nacionalidade !== undefined ? nacionalidade || null : undefined,
-        telefone: telefone !== undefined ? telefone || null : undefined,
-        email: email !== undefined ? email || null : undefined,
-        endereco: endereco !== undefined ? endereco || null : undefined,
-        numero: numero !== undefined ? numero || null : undefined,
-        complemento: complemento !== undefined ? complemento || null : undefined,
-        bairro: bairro !== undefined ? bairro || null : undefined,
-        cidade: cidade !== undefined ? cidade || null : undefined,
-        estado: estado !== undefined ? estado || null : undefined,
-        cep: cep !== undefined ? cep || null : undefined,
-        observacoes: observacoes !== undefined ? observacoes || null : undefined,
-      },
-      include: {
-        anexos: true,
-      },
+      data: updateData,
     })
 
     return NextResponse.json({ contratante })

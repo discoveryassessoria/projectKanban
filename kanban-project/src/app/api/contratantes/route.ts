@@ -21,7 +21,6 @@ export async function GET(request: Request) {
     const contratantes = await prisma.contratante.findMany({
       where,
       include: {
-        anexos: true,
         _count: {
           select: { atividades: true }
         }
@@ -43,56 +42,38 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const {
-      nome,
-      cpf,
-      rg,
-      dataNascimento,
-      sexo,
-      estadoCivil,
-      nacionalidade,
-      telefone,
-      email,
-      endereco,
-      numero,
-      complemento,
-      bairro,
-      cidade,
-      estado,
-      cep,
-      observacoes,
-    } = body
 
-    if (!nome || nome.trim() === "") {
+    if (!body.nome || body.nome.trim() === "") {
       return NextResponse.json(
         { error: "Nome é obrigatório" },
         { status: 400 }
       )
     }
 
+    // Montar objeto de dados para create
+    const createData: Record<string, unknown> = {
+      nome: body.nome.trim(),
+    }
+
+    if (body.cpf) createData.cpf = body.cpf
+    if (body.rg) createData.rg = body.rg
+    if (body.dataNascimento) createData.dataNascimento = new Date(body.dataNascimento)
+    if (body.sexo) createData.sexo = body.sexo
+    if (body.estadoCivil) createData.estadoCivil = body.estadoCivil
+    if (body.nacionalidade) createData.nacionalidade = body.nacionalidade
+    if (body.telefone) createData.telefone = body.telefone
+    if (body.email) createData.email = body.email
+    if (body.endereco) createData.endereco = body.endereco
+    if (body.numero) createData.numero = body.numero
+    if (body.complemento) createData.complemento = body.complemento
+    if (body.bairro) createData.bairro = body.bairro
+    if (body.cidade) createData.cidade = body.cidade
+    if (body.estado) createData.estado = body.estado
+    if (body.cep) createData.cep = body.cep
+    if (body.observacoes) createData.observacoes = body.observacoes
+
     const contratante = await prisma.contratante.create({
-      data: {
-        nome: nome.trim(),
-        cpf: cpf || null,
-        rg: rg || null,
-        dataNascimento: dataNascimento ? new Date(dataNascimento) : null,
-        sexo: sexo || null,
-        estadoCivil: estadoCivil || null,
-        nacionalidade: nacionalidade || null,
-        telefone: telefone || null,
-        email: email || null,
-        endereco: endereco || null,
-        numero: numero || null,
-        complemento: complemento || null,
-        bairro: bairro || null,
-        cidade: cidade || null,
-        estado: estado || null,
-        cep: cep || null,
-        observacoes: observacoes || null,
-      },
-      include: {
-        anexos: true,
-      },
+      data: createData as any,
     })
 
     return NextResponse.json({ contratante }, { status: 201 })

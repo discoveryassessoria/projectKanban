@@ -47,6 +47,7 @@ export const PAISES_LISTA = Object.values(Pais)
 // ========================================
 // INTERFACES
 // ========================================
+
 export interface Status {
   id: number
   nome: string
@@ -64,24 +65,59 @@ export interface UserAtv {
   usuario: Usuario
 }
 
+// ========================================
+// CONTRATANTE - EXPANDIDO
+// ========================================
 export interface Contratante {
   id: number
   nome: string
   cpf?: string | null
   rg?: string | null
-  endereco?: string | null
+  dataNascimento?: string | null
+  sexo?: string | null
+  estadoCivil?: string | null
+  nacionalidade?: string | null
   telefone?: string | null
   email?: string | null
+  endereco?: string | null
+  numero?: string | null
+  complemento?: string | null
+  bairro?: string | null
+  cidade?: string | null
+  estado?: string | null
+  cep?: string | null
+  observacoes?: string | null
+  createdAt: string
+  updatedAt?: string
+  _count?: {
+    atividades: number
+  }
 }
 
+// ========================================
+// REQUERENTE - EXPANDIDO
+// ========================================
 export interface Requerente {
   id: number
   nome: string
   cpf?: string | null
   rg?: string | null
-  endereco?: string | null
+  dataNascimento?: string | null
+  sexo?: string | null
+  estadoCivil?: string | null
+  nacionalidade?: string | null
   telefone?: string | null
   email?: string | null
+  endereco?: string | null
+  numero?: string | null
+  complemento?: string | null
+  bairro?: string | null
+  cidade?: string | null
+  estado?: string | null
+  cep?: string | null
+  observacoes?: string | null
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface AtividadeRequerente {

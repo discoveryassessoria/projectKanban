@@ -167,8 +167,8 @@ export function ProcessosLista({
                   <span className="text-white/60">-</span>
                 </td>
                 <td className="py-3 px-4 text-white/60 text-sm">
-                  {atividade.createdAt 
-                    ? new Date(atividade.createdAt).toLocaleDateString('pt-BR')
+                  {atividade.data_criacao 
+                    ? new Date(atividade.data_criacao).toLocaleDateString('pt-BR')
                     : '-'
                   }
                 </td>
