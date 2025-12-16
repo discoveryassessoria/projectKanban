@@ -12,12 +12,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Filter, ChevronDown } from "lucide-react"
 import { useRouter } from "next/navigation"
 import ListaActivities from "@/src/components/activitiesComponents/listaActivities"
-import ListaProjects from "@/src/components/activitiesComponents/listaProjects"
 import PrazoActivities from "@/src/components/activitiesComponents/prazoActivities"
 import CalendarioActivities from "@/src/components/activitiesComponents/calendarioActivities"
 import { HeaderBar } from "@/src/components/header-bar"
-import { useProjects, useStatuses, useUsers, useActivities, invalidateActivities, invalidateProjects } from "@/src/hooks/useActivitiesData"
-import type { Atividade, Projeto, Status, Usuario } from "@/src/hooks/useActivitiesData"
+import { usePaises, useStatuses, useUsers, useActivities, invalidateActivities } from "@/src/hooks/useActivitiesData"
+import type { Atividade, Status } from "@/src/hooks/useActivitiesData"
+
+// Mapeamento de países para exibição
+const PAIS_LABELS: Record<string, string> = {
+  PORTUGAL: 'Portugal',
+  ESPANHA: 'Espanha',
+  ALEMANHA: 'Alemanha',
+  ITALIA: 'Itália'
+}
 
 // Interfaces
 interface UserData {
@@ -29,7 +36,7 @@ interface UserData {
 interface Filters {
   dataInicio: string
   dataFim: string
-  projeto: string
+  pais: string
   status: string
   responsavel: string
 }
@@ -38,13 +45,8 @@ interface ActivityFormData {
   nome: string
   descricao: string
   data_termino: string
-  projeto_id: string
+  pais: string
   status_id: string
-}
-
-interface ProjectFormData {
-  nome: string
-  descricao: string
 }
 
 export default function ActivitiesPage() {
@@ -56,7 +58,7 @@ export default function ActivitiesPage() {
   const [filters, setFilters] = useState<Filters>({
     dataInicio: '',
     dataFim: '',
-    projeto: 'all',
+    pais: 'all',
     status: 'all',
     responsavel: 'all'
   })
@@ -68,7 +70,7 @@ export default function ActivitiesPage() {
 
   // Dados
   const { activities } = useActivities()
-  const { projects } = useProjects()
+  const { paises } = usePaises()
 
   useEffect(() => {
     setMounted(true)
@@ -126,7 +128,7 @@ export default function ActivitiesPage() {
       descricao: a.descricao || null,
       data_criacao: a.data_criacao || new Date().toISOString(),
       data_termino: a.data_termino || null,
-      projeto: a.projeto ? { nome: a.projeto.nome } : null,
+      pais: a.pais,
       status: a.status ? { nome: a.status.nome } : null,
       usuarios: a.usuarios?.map(u => ({
         usuario: {
@@ -134,15 +136,6 @@ export default function ActivitiesPage() {
           email: u.usuario?.email || ''
         }
       }))
-    }))
-
-  // Converter projetos para o formato do HeaderBar
-  const projetosParaHeader = (projects || [])
-    .filter(p => p.id !== undefined)
-    .map(p => ({
-      id: p.id as number,
-      nome: p.nome,
-      descricao: p.descricao || null
     }))
 
   // Tela de carregamento
@@ -167,12 +160,12 @@ export default function ActivitiesPage() {
 
       {/* HEADER - Componente reutilizável */}
       <HeaderBar
-        title="Tarefas e Projetos"
-        subtitle="Gerencie suas tarefas e projetos"
+        title="Tarefas"
+        subtitle="Gerencie suas tarefas"
         userName={user.nome}
         userRole={user.tipo === 'admin' ? 'Administrador' : user.tipo || 'Usuário'}
         userEmail={user.email || ''}
-        projetos={projetosParaHeader}
+        projetos={[]}
         atividades={atividadesParaHeader}
         arvores={arvores}
         onLogout={handleLogout}
@@ -189,69 +182,44 @@ export default function ActivitiesPage() {
           </div>
         </div>
 
-        {/* Top Tabs */}
-        <Tabs defaultValue="activities" className="space-y-4">
-          <TabsList className="bg-transparent border border-white/30">
-            <TabsTrigger value="activities" className="data-[state=active]:bg-white/20 text-white">Atividades</TabsTrigger>
-            <TabsTrigger value="projects" className="data-[state=active]:bg-white/20 text-white">Projetos</TabsTrigger>
-          </TabsList>
+        {/* Tabs de visualização */}
+        <Tabs defaultValue="list" className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <TabsList className="bg-transparent border border-white/30">
+              <TabsTrigger value="list" className="data-[state=active]:bg-white/20 text-white">Lista</TabsTrigger>
+              <TabsTrigger value="deadline" className="data-[state=active]:bg-white/20 text-white">Prazo</TabsTrigger>
+              <TabsTrigger value="calendar" className="data-[state=active]:bg-white/20 text-white">Calendário</TabsTrigger>
+            </TabsList>
+            
+            {/* Filters and Actions */}
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="sm" onClick={() => setFilterModalOpen(true)} className="bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white">
+                <Filter className="mr-2 h-4 w-4" />
+                Filtro
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setSearchModalOpen(true)} className="bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white">
+                <Search className="mr-2 h-4 w-4" />
+                Pesquisar
+              </Button>
+            </div>
+          </div>
           
-          <TabsContent value="activities" className="space-y-4">
-            {/* Secondary Tabs */}
-            <Tabs defaultValue="list" className="space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <TabsList className="bg-transparent border border-white/30">
-                  <TabsTrigger value="list" className="data-[state=active]:bg-white/20 text-white">Lista</TabsTrigger>
-                  <TabsTrigger value="deadline" className="data-[state=active]:bg-white/20 text-white">Prazo</TabsTrigger>
-                  <TabsTrigger value="calendar" className="data-[state=active]:bg-white/20 text-white">Calendário</TabsTrigger>
-                </TabsList>
-                
-                {/* Filters and Actions */}
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm" onClick={() => setFilterModalOpen(true)} className="bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white">
-                    <Filter className="mr-2 h-4 w-4" />
-                    Filtro
-                    <ChevronDown className="ml-2 h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setSearchModalOpen(true)} className="bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white">
-                    <Search className="mr-2 h-4 w-4" />
-                    Pesquisar
-                  </Button>
-                </div>
-              </div>
-              
-              <TabsContent value="list" className="space-y-4">
-                <div className="p-4">
-                  <ListaActivities filters={filters} />
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="deadline" className="space-y-4">
-                <div className="p-4">
-                  <PrazoActivities />
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="calendar" className="space-y-4">
-                <div className="p-4">
-                  <CalendarioActivities />
-                </div>
-              </TabsContent>
-            </Tabs>
+          <TabsContent value="list" className="space-y-4">
+            <div className="p-4">
+              <ListaActivities filters={filters} />
+            </div>
           </TabsContent>
           
-          <TabsContent value="projects" className="space-y-4">
+          <TabsContent value="deadline" className="space-y-4">
             <div className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-medium text-white">Projetos</h3>
-                  <p className="text-sm text-white/70">
-                    Gerencie seus projetos
-                  </p>
-                </div>
-                <CreateProjectModal />
-              </div>
-              <ListaProjects />
+              <PrazoActivities />
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="calendar" className="space-y-4">
+            <div className="p-4">
+              <CalendarioActivities />
             </div>
           </TabsContent>
         </Tabs>
@@ -293,7 +261,7 @@ function FilterModal({
   filters, 
   onFiltersChange 
 }: FilterModalProps) {
-  const { projects } = useProjects()
+  const { paises } = usePaises()
   const { statuses } = useStatuses()
   const { users } = useUsers()
 
@@ -305,7 +273,7 @@ function FilterModal({
     onFiltersChange({
       dataInicio: '',
       dataFim: '',
-      projeto: 'all',
+      pais: 'all',
       status: 'all',
       responsavel: 'all'
     })
@@ -344,16 +312,16 @@ function FilterModal({
           </div>
           
           <div className="space-y-2">
-            <Label className="text-white/90">Projeto</Label>
-            <Select value={filters.projeto} onValueChange={(value) => updateFilter('projeto', value)}>
+            <Label className="text-white/90">País</Label>
+            <Select value={filters.pais} onValueChange={(value) => updateFilter('pais', value)}>
               <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                <SelectValue placeholder="Selecione um projeto" />
+                <SelectValue placeholder="Selecione um país" />
               </SelectTrigger>
               <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
-                <SelectItem value="all">Todos os Projetos</SelectItem>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={String(project.id)}>
-                    {project.nome}
+                <SelectItem value="all">Todos os Países</SelectItem>
+                {paises.map((pais) => (
+                  <SelectItem key={pais} value={pais}>
+                    {PAIS_LABELS[pais] || pais}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -476,9 +444,9 @@ function SearchModal({
                     <p className="text-sm text-white/70 mt-1">{activity.descricao}</p>
                   )}
                   <div className="flex items-center gap-2 mt-2">
-                    {activity.projeto?.nome && (
+                    {activity.pais && (
                       <Badge variant="outline" className="text-xs bg-white/10 border-white/20 text-white">
-                        {activity.projeto.nome}
+                        {PAIS_LABELS[activity.pais] || activity.pais}
                       </Badge>
                     )}
                     {activity.status?.nome && (
@@ -508,11 +476,11 @@ function CreateActivityModal() {
     nome: '',
     descricao: '',
     data_termino: '',
-    projeto_id: '',
+    pais: '',
     status_id: ''
   })
 
-  const { projects } = useProjects()
+  const { paises } = usePaises()
   const { statuses } = useStatuses()
 
   const updateFormData = (key: keyof ActivityFormData, value: string) => {
@@ -524,7 +492,7 @@ function CreateActivityModal() {
     
     try {
       const token = localStorage.getItem('authToken')
-      const response = await fetch('/api/atividades', {
+      const response = await fetch('/api/activities', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -540,7 +508,7 @@ function CreateActivityModal() {
           nome: '',
           descricao: '',
           data_termino: '',
-          projeto_id: '',
+          pais: '',
           status_id: ''
         })
       }
@@ -596,18 +564,18 @@ function CreateActivityModal() {
           </div>
 
           <div className="space-y-2">
-            <Label className="text-white/90">Projeto</Label>
+            <Label className="text-white/90">País</Label>
             <Select 
-              value={formData.projeto_id} 
-              onValueChange={(value) => updateFormData('projeto_id', value)}
+              value={formData.pais} 
+              onValueChange={(value) => updateFormData('pais', value)}
             >
               <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                <SelectValue placeholder="Selecione um projeto" />
+                <SelectValue placeholder="Selecione um país" />
               </SelectTrigger>
               <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={String(project.id)}>
-                    {project.nome}
+                {paises.map((pais) => (
+                  <SelectItem key={pais} value={pais}>
+                    {PAIS_LABELS[pais] || pais}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -635,89 +603,6 @@ function CreateActivityModal() {
 
           <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
             Criar Atividade
-          </Button>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// COMPONENTE: CreateProjectModal
-function CreateProjectModal() {
-  const [open, setOpen] = useState(false)
-  const [formData, setFormData] = useState<ProjectFormData>({
-    nome: '',
-    descricao: ''
-  })
-
-  const updateFormData = (key: keyof ProjectFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [key]: value }))
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    try {
-      const token = localStorage.getItem('authToken')
-      const response = await fetch('/api/projetos', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      })
-
-      if (response.ok) {
-        invalidateProjects()
-        setOpen(false)
-        setFormData({
-          nome: '',
-          descricao: ''
-        })
-      }
-    } catch (error) {
-      console.error('Erro ao criar projeto:', error)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center justify-center gap-1.5 h-9">
-          <span className="-mt-[2px]">+</span>
-          <span>Novo Projeto</span>
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="bg-white/10 border-white/20 backdrop-blur-xl text-white">
-        <DialogHeader>
-          <DialogTitle className="text-white">Criar Novo Projeto</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label className="text-white/90">Nome do Projeto</Label>
-            <Input
-              required
-              value={formData.nome}
-              onChange={(e) => updateFormData('nome', e.target.value)}
-              className="bg-white/10 border-white/20 text-white"
-              placeholder="Digite o nome do projeto"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-white/90">Descrição</Label>
-            <Textarea
-              value={formData.descricao}
-              onChange={(e) => updateFormData('descricao', e.target.value)}
-              className="bg-white/10 border-white/20 text-white"
-              placeholder="Descreva o projeto"
-              rows={4}
-            />
-          </div>
-
-          <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-            Criar Projeto
           </Button>
         </form>
       </DialogContent>
