@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { getStoredUser, isAuthenticated } from "@/lib/auth"
 import { KanbanBoard } from "@/src/components/kanban-board-novo"
 import { ProcessosLista } from "@/src/components/processos-lista"
@@ -28,6 +28,7 @@ type SubTab = "kanban" | "lista"
 
 export default function ProcessosPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   
@@ -35,13 +36,24 @@ export default function ProcessosPage() {
   const [tabPrincipal, setTabPrincipal] = useState<TabPrincipal>("processos")
   const [subTab, setSubTab] = useState<SubTab>("kanban")
   
-  const [paisSelecionado, setPaisSelecionado] = useState<Pais>(Pais.PORTUGAL)
+  // Ler país da URL ou usar Portugal como padrão
+  const paisDaUrl = searchParams.get("pais") as Pais | null
+  const paisInicial = paisDaUrl && Object.values(Pais).includes(paisDaUrl) ? paisDaUrl : Pais.PORTUGAL
+  
+  const [paisSelecionado, setPaisSelecionado] = useState<Pais>(paisInicial)
   
   const [atividades, setAtividades] = useState<AtividadeWithStatus[]>([])
   const [statusList, setStatusList] = useState<Status[]>([])
   const [contratantes, setContratantes] = useState<Contratante[]>([])
   const [requerentes, setRequerentes] = useState<Requerente[]>([])
   const [arvores, setArvores] = useState<any[]>([])
+
+  // Atualizar país quando URL mudar
+  useEffect(() => {
+    if (paisDaUrl && Object.values(Pais).includes(paisDaUrl)) {
+      setPaisSelecionado(paisDaUrl)
+    }
+  }, [paisDaUrl])
 
   const handleLogout = () => {
     localStorage.removeItem("authToken")

@@ -1,4 +1,4 @@
-// Schema atualizado com PAIS como enum fixo
+// Schema atualizado - Processo (cards Kanban) e Tarefa (afazeres) separados
 // Contratante e Requerente com campos expandidos
 
 generator client {
@@ -11,13 +11,20 @@ datasource db {
 }
 
 // ========================================
-// ENUM FIXO PARA PAÍSES
+// ENUMS
 // ========================================
 enum Pais {
   PORTUGAL
   ESPANHA
   ALEMANHA
   ITALIA
+}
+
+enum PrioridadeTarefa {
+  BAIXA
+  MEDIA
+  ALTA
+  URGENTE
 }
 
 // ========================================
@@ -30,7 +37,11 @@ model Usuario {
   senha String @db.VarChar(255)
   tipo  String @db.VarChar(15)
 
-  atividades UserAtv[]
+  // Tarefas atribuídas ao usuário
+  tarefas Tarefa[]
+  
+  // Logs de auditoria
+  logs LogAuditoria[]
 }
 
 // ========================================
@@ -92,12 +103,12 @@ model Arvore {
   pessoaPrincipalId Int?    @unique
   pessoaPrincipal   Pessoa? @relation("ArvorePrincipal", fields: [pessoaPrincipalId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
-  pessoas    Pessoa[]    @relation("PessoasNaArvore")
-  atividades Atividade[]
+  pessoas   Pessoa[]   @relation("PessoasNaArvore")
+  processos Processo[]
 }
 
 // ========================================
-// STATUS - POR PAÍS
+// STATUS - ETAPAS DO KANBAN POR PAÍS
 // ========================================
 model Status {
   id    Int    @id @default(autoincrement())
@@ -106,68 +117,104 @@ model Status {
 
   pais Pais
 
-  atividades Atividade[]
+  processos Processo[]
 
   @@unique([nome, pais])
   @@index([pais])
 }
 
 // ========================================
-// ATIVIDADE (PROCESSO) - COM PAÍS FIXO
+// PROCESSO - CARD DO KANBAN (FAMÍLIA)
+// Representa uma família no processo de cidadania
 // ========================================
-model Atividade {
+model Processo {
   id           Int       @id @default(autoincrement())
-  nome         String    @db.VarChar(100)
+  nome         String    @db.VarChar(100)  // Ex: "Família Rovatti"
   descricao    String?   @db.VarChar(500)
-  data_termino DateTime?
-  data_criacao DateTime  @default(now())
-
-  pais Pais
-
-  statusId Int
-  status   Status @relation(fields: [statusId], references: [id], onDelete: Cascade)
-
+  observacoes  String?   @db.Text
+  
+  pais         Pais
+  
+  // Etapa atual no Kanban
+  statusId     Int
+  status       Status    @relation(fields: [statusId], references: [id], onDelete: Cascade)
+  
+  // Cliente que contratou o serviço
   contratanteId Int?
   contratante   Contratante? @relation(fields: [contratanteId], references: [id], onDelete: SetNull)
+  
+  // Árvore genealógica vinculada
+  arvoreId     Int?
+  arvore       Arvore?   @relation(fields: [arvoreId], references: [id], onDelete: SetNull)
+  
+  // Datas
+  dataInicio   DateTime  @default(now())
+  previsaoTermino DateTime?
+  dataConclusao DateTime?
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  usuarios UserAtv[]
-
-  arvore_id Int?
-  arvore    Arvore? @relation(fields: [arvore_id], references: [id], onDelete: SetNull)
-
-  requerentes AtividadeRequerente[]
+  // Relacionamentos
+  requerentes  ProcessoRequerente[]
+  tarefas      Tarefa[]
+  anexos       AnexoProcesso[]
 
   @@index([pais])
   @@index([statusId])
+  @@index([contratanteId])
 }
 
 // ========================================
-// RELACIONAMENTOS
+// TAREFA - AFAZERES DOS FUNCIONÁRIOS
+// Tarefas dentro de um processo específico
 // ========================================
-model UserAtv {
-  usuarioId   Int
-  atividadeId Int
-  usuario     Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  atividade   Atividade @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
+model Tarefa {
+  id          Int       @id @default(autoincrement())
+  titulo      String    @db.VarChar(200)
+  descricao   String?   @db.Text
+  
+  // Vinculada a qual processo/família
+  processoId  Int
+  processo    Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  
+  // Responsável pela tarefa
+  responsavelId Int?
+  responsavel   Usuario? @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
+  
+  // Status e prioridade
+  concluida   Boolean   @default(false)
+  prioridade  PrioridadeTarefa @default(MEDIA)
+  
+  // Datas
+  dataPrazo   DateTime?
+  dataConclusao DateTime?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  @@id([usuarioId, atividadeId])
+  @@index([processoId])
+  @@index([responsavelId])
+  @@index([concluida])
 }
 
-model AtividadeRequerente {
-  atividadeId  Int
+// ========================================
+// RELACIONAMENTO PROCESSO <-> REQUERENTE
+// ========================================
+model ProcessoRequerente {
+  processoId   Int
   requerenteId Int
-  atividade    Atividade  @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
+  processo     Processo   @relation(fields: [processoId], references: [id], onDelete: Cascade)
   requerente   Requerente @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
 
-  @@id([atividadeId, requerenteId])
+  @@id([processoId, requerenteId])
 }
 
 // ========================================
-// CONTRATANTE - EXPANDIDO
+// CONTRATANTE - CLIENTE QUE CONTRATA
 // ========================================
 model Contratante {
   id              Int       @id @default(autoincrement())
-  tipo            String?   @db.VarChar(20)
   nome            String    @db.VarChar(100)
   cpf             String?   @db.VarChar(14)
   rg              String?   @db.VarChar(20)
@@ -193,12 +240,12 @@ model Contratante {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  atividades      Atividade[]
+  processos       Processo[]
   anexos          AnexoContratante[]
 }
 
 // ========================================
-// REQUERENTE - EXPANDIDO
+// REQUERENTE - QUEM VAI RECEBER CIDADANIA
 // ========================================
 model Requerente {
   id              Int       @id @default(autoincrement())
@@ -227,13 +274,30 @@ model Requerente {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  atividades      AtividadeRequerente[]
+  processos       ProcessoRequerente[]
   anexos          AnexoRequerente[]
 }
 
 // ========================================
-// ANEXOS - CONTRATANTE
+// ANEXOS
 // ========================================
+model AnexoProcesso {
+  id            Int      @id @default(autoincrement())
+  nome          String   @db.VarChar(200)
+  tipo          String   @db.VarChar(50)   // Categoria: "Documento", "Certidão", etc.
+  nomeArquivo   String   @db.VarChar(300)
+  urlArquivo    String   @db.Text
+  tamanho       Int?
+  mimeType      String?  @db.VarChar(100)
+  
+  processoId    Int
+  processo      Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime @default(now())
+
+  @@index([processoId])
+}
+
 model AnexoContratante {
   id            Int      @id @default(autoincrement())
   nome          String   @db.VarChar(200)
@@ -251,9 +315,6 @@ model AnexoContratante {
   @@index([contratanteId])
 }
 
-// ========================================
-// ANEXOS - REQUERENTE
-// ========================================
 model AnexoRequerente {
   id            Int      @id @default(autoincrement())
   nome          String   @db.VarChar(200)
@@ -269,4 +330,25 @@ model AnexoRequerente {
   createdAt     DateTime @default(now())
 
   @@index([requerenteId])
+}
+
+// ========================================
+// LOG DE AUDITORIA
+// ========================================
+model LogAuditoria {
+  id          Int      @id @default(autoincrement())
+  acao        String   @db.VarChar(50)   // criou, editou, excluiu, moveu
+  entidade    String   @db.VarChar(50)   // processo, tarefa, contratante, etc.
+  entidadeId  Int?
+  descricao   String   @db.Text
+  detalhes    Json?
+  
+  usuarioId   Int?
+  usuario     Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  
+  criadoEm    DateTime @default(now())
+
+  @@index([entidade])
+  @@index([usuarioId])
+  @@index([criadoEm])
 }

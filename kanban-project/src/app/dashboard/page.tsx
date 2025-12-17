@@ -19,7 +19,6 @@ import {
   Users,
   FolderOpen,
   ArrowRight,
-  History,
   Plus,
   Edit,
   Trash2,
@@ -28,6 +27,7 @@ import {
   GitBranch,
 } from "lucide-react"
 import { HeaderBar } from "@/src/components/header-bar"
+import { HistoryIcon } from "@/src/components/icons/history-icon"
 import { Pais, PAISES_CONFIG } from "@/src/types/kanban"
 
 interface Usuario {
@@ -235,8 +235,8 @@ export default function DashboardPage() {
 
   if (!usuario) return null
 
-  // Lista de países para exibição
-  const paisesParaExibir: Pais[] = [Pais.ITALIA, Pais.PORTUGAL, Pais.ESPANHA, Pais.ALEMANHA]
+  // Lista de países para exibição - ORDEM ALFABÉTICA
+  const paisesParaExibir: Pais[] = [Pais.ALEMANHA, Pais.ESPANHA, Pais.ITALIA, Pais.PORTUGAL]
 
   // ===== DASHBOARD =====
   return (
@@ -285,18 +285,18 @@ export default function DashboardPage() {
               </Button>
               <Button
                 variant="outline"
-                className="border-white/30 bg-transparent text-xs text-white/80 hover:bg-white/10 hover:text-white h-9 px-4"
+                className="border-white/30 bg-transparent text-xs text-white/80 hover:bg-white/10 hover:text-white h-9 px-2.5 gap-1.5"
                 onClick={() => router.push('/settings')}
               >
-                <Settings className="h-3.5 w-3.5 mr-1.5" />
-                Configurações
+                <Settings className="h-3.5 w-3.5" />
+                <span className="mt-px">Configurações</span>
               </Button>
             </div>
           </section>
 
           {/* ===== CARDS DE MÉTRICAS PRINCIPAIS ===== */}
           <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Total de Processos */}
+            {/* Total de Processos - AZUL (informativo/dados) */}
             <Card className="bg-white/10 backdrop-blur-sm border border-white/20 text-white">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
@@ -305,13 +305,13 @@ export default function DashboardPage() {
                     <p className="text-3xl font-bold mt-2">{atividades.length}</p>
                     <p className="text-xs text-white/50 mt-1">famílias ativas</p>
                   </div>
-                  <BarChart3 className="h-5 w-5 text-teal-400" />
+                  <BarChart3 className="h-6 w-6 text-blue-500" />
                 </div>
               </CardContent>
             </Card>
 
-            {/* Tarefas Vencidas */}
-            <Card className={`backdrop-blur-sm border text-white ${tarefasVencidas.length > 0 ? 'bg-yellow-500/15 border-yellow-500/30' : 'bg-white/10 border-white/20'}`}>
+            {/* Tarefas Vencidas - VERMELHO (perigo/urgente) */}
+            <Card className={`backdrop-blur-sm border text-white ${tarefasVencidas.length > 0 ? 'bg-red-500/20 border-red-500/40' : 'bg-white/10 border-white/20'}`}>
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
                   <div>
@@ -321,13 +321,13 @@ export default function DashboardPage() {
                       {tarefasVencidas.length > 0 ? 'requer atenção!' : 'tudo em dia'}
                     </p>
                   </div>
-                  <AlertTriangle className="h-5 w-5 text-yellow-400" />
+                  <AlertTriangle className="h-6 w-6 text-red-500" />
                 </div>
               </CardContent>
             </Card>
 
-            {/* Tarefas para Hoje */}
-            <Card className={`backdrop-blur-sm border text-white ${tarefasHoje.length > 0 ? 'bg-amber-700/15 border-amber-700/30' : 'bg-white/10 border-white/20'}`}>
+            {/* Tarefas para Hoje - VERDE (ação/fazer agora) */}
+            <Card className={`backdrop-blur-sm border text-white ${tarefasHoje.length > 0 ? 'bg-emerald-500/20 border-emerald-500/40' : 'bg-white/10 border-white/20'}`}>
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
                   <div>
@@ -337,12 +337,12 @@ export default function DashboardPage() {
                       {tarefasHoje.length > 0 ? 'a fazer hoje' : 'nada agendado'}
                     </p>
                   </div>
-                  <Calendar className="h-5 w-5 text-amber-600" />
+                  <Calendar className="h-6 w-6 text-emerald-500" />
                 </div>
               </CardContent>
             </Card>
 
-            {/* Próxima Semana */}
+            {/* Próxima Semana - ÂMBAR (atenção/se aproximando) */}
             <Card className="bg-white/10 backdrop-blur-sm border border-white/20 text-white">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
@@ -351,7 +351,7 @@ export default function DashboardPage() {
                     <p className="text-3xl font-bold mt-2">{tarefasProximaSemana.length}</p>
                     <p className="text-xs text-white/50 mt-1">tarefas agendadas</p>
                   </div>
-                  <Clock className="h-5 w-5 text-fuchsia-400" />
+                  <Clock className="h-6 w-6 text-yellow-500" />
                 </div>
               </CardContent>
             </Card>
@@ -373,7 +373,7 @@ export default function DashboardPage() {
                   <Card 
                     key={pais}
                     className="bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer"
-                    onClick={() => router.push(`/kanban`)}
+                    onClick={() => router.push(`/kanban?pais=${pais}`)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
@@ -481,7 +481,7 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="text-base text-white flex items-center gap-2">
-                      <History className="h-4 w-4 text-white/60" />
+                      <HistoryIcon className="h-4 w-4 text-white/60" />
                       Histórico
                     </CardTitle>
                     <CardDescription className="text-xs text-white/50">
@@ -493,7 +493,7 @@ export default function DashboardPage() {
               <CardContent>
                 {logs.length === 0 ? (
                   <div className="text-center py-8">
-                    <History className="h-10 w-10 mx-auto mb-3 text-white/30" />
+                    <HistoryIcon className="h-10 w-10 mx-auto mb-3 text-white/30" />
                     <p className="text-sm text-white/50">Nenhuma atividade registrada</p>
                     <p className="text-xs text-white/30 mt-1">As alterações aparecerão aqui</p>
                   </div>
@@ -576,7 +576,7 @@ export default function DashboardPage() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Clock className="h-5 w-5 text-fuchsia-400" />
+                      <Clock className="h-5 w-5 text-yellow-500" />
                       <div>
                         <CardTitle className="text-base text-white">Próximos Prazos</CardTitle>
                         <CardDescription className="text-xs text-white/50">
@@ -596,11 +596,11 @@ export default function DashboardPage() {
                       let corBorda = "border-white/20"
                       let corTexto = "text-white/70"
                       if (diffDias <= 1) {
-                        corBorda = "border-yellow-400/50"
-                        corTexto = "text-yellow-400"
+                        corBorda = "border-red-500/50"
+                        corTexto = "text-red-500"
                       } else if (diffDias <= 3) {
-                        corBorda = "border-amber-600/50"
-                        corTexto = "text-amber-600"
+                        corBorda = "border-yellow-500/50"
+                        corTexto = "text-yellow-500"
                       }
                       
                       return (
@@ -614,7 +614,7 @@ export default function DashboardPage() {
                               {formatarData(atividade.data_termino!)}
                             </span>
                             {diffDias <= 1 && (
-                              <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                              <AlertTriangle className="h-4 w-4 text-red-500" />
                             )}
                           </div>
                           <p className="text-sm font-medium text-white truncate">{atividade.nome}</p>
