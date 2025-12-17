@@ -20,7 +20,7 @@ export async function GET(
     const contratante = await prisma.contratante.findUnique({
       where: { id },
       include: {
-        atividades: {
+        processos: {
           include: {
             status: true,
           }
@@ -134,7 +134,7 @@ export async function DELETE(
     const contratante = await prisma.contratante.findUnique({
       where: { id },
       include: {
-        _count: { select: { atividades: true } }
+        _count: { select: { processos: true } }
       },
     })
 
@@ -145,9 +145,9 @@ export async function DELETE(
       )
     }
 
-    if (contratante._count.atividades > 0) {
+    if (contratante._count.processos > 0) {
       return NextResponse.json(
-        { error: `Este contratante está vinculado a ${contratante._count.atividades} processo(s). Desvincule primeiro.` },
+        { error: `Este contratante está vinculado a ${contratante._count.processos} processo(s). Desvincule primeiro.` },
         { status: 400 }
       )
     }

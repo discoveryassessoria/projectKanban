@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       where,
       include: {
         _count: {
-          select: { atividades: true }
+          select: { processos: true }
         }
       },
       orderBy: { nome: "asc" },
