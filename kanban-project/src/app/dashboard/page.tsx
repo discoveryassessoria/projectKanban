@@ -28,37 +28,13 @@ import {
 } from "lucide-react"
 import { HeaderBar } from "@/src/components/header-bar"
 import { HistoryIcon } from "@/src/components/icons/history-icon"
-import { Pais, PAISES_CONFIG } from "@/src/types/kanban"
+import { Pais, PAISES_CONFIG, type ProcessoWithStatus } from "@/src/types/kanban"
 
 interface Usuario {
   id: number
   nome: string
   email: string
   tipo: string
-}
-
-interface Status {
-  id: number
-  nome: string
-  ordem: number
-  pais: Pais
-}
-
-interface Atividade {
-  id: number
-  nome: string
-  descricao?: string
-  data_criacao: string
-  data_termino?: string
-  pais: Pais
-  status?: { 
-    id: number
-    nome: string 
-  }
-  contratante?: {
-    id: number
-    nome: string
-  }
 }
 
 interface Arvore {
@@ -89,9 +65,10 @@ interface LogAuditoria {
 export default function DashboardPage() {
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [atividades, setAtividades] = useState<Atividade[]>([])
+  const [processos, setProcessos] = useState<ProcessoWithStatus[]>([])
   const [arvores, setArvores] = useState<Arvore[]>([])
   const [logs, setLogs] = useState<LogAuditoria[]>([])
+
   const router = useRouter()
 
   useEffect(() => {
@@ -115,10 +92,10 @@ export default function DashboardPage() {
 
   const fetchDashboardData = async () => {
     try {
-      // Buscar todas as atividades (processos)
-      const atividadesRes = await fetch("/api/atividades")
-      const atividadesData = await atividadesRes.json()
-      setAtividades(atividadesData.atividades || [])
+      // Buscar todos os processos
+      const processosRes = await fetch("/api/processos")
+      const processosData = await processosRes.json()
+      setProcessos(processosData.processos || [])
 
       // Buscar logs de auditoria
       try {
@@ -133,6 +110,7 @@ export default function DashboardPage() {
       const arvoresRes = await fetch("/api/arvore")
       const arvoresData = await arvoresRes.json()
       setArvores(Array.isArray(arvoresData) ? arvoresData : [])
+
     } catch (error) {
       console.error("Erro ao buscar dados do dashboard:", error)
     } finally {
@@ -150,18 +128,27 @@ export default function DashboardPage() {
   const hoje = new Date()
   hoje.setHours(0, 0, 0, 0)
 
-  // Tarefas vencidas (data_termino < hoje)
-  const tarefasVencidas = atividades.filter(a => {
-    if (!a.data_termino) return false
-    const prazo = new Date(a.data_termino)
+  // Coletar todas as tarefas de todos os processos
+  const todasTarefas = processos.flatMap(p => 
+    (p.tarefas || []).map(t => ({
+      ...t,
+      processoNome: p.nome,
+      pais: p.pais
+    }))
+  )
+
+  // Tarefas vencidas
+  const tarefasVencidas = todasTarefas.filter(t => {
+    if (!t.dataPrazo || t.concluida) return false
+    const prazo = new Date(t.dataPrazo)
     prazo.setHours(0, 0, 0, 0)
     return prazo < hoje
   })
 
   // Tarefas para hoje
-  const tarefasHoje = atividades.filter(a => {
-    if (!a.data_termino) return false
-    const prazo = new Date(a.data_termino)
+  const tarefasHoje = todasTarefas.filter(t => {
+    if (!t.dataPrazo || t.concluida) return false
+    const prazo = new Date(t.dataPrazo)
     prazo.setHours(0, 0, 0, 0)
     return prazo.getTime() === hoje.getTime()
   })
@@ -169,34 +156,34 @@ export default function DashboardPage() {
   // Tarefas próximos 7 dias
   const proximaSemana = new Date(hoje)
   proximaSemana.setDate(proximaSemana.getDate() + 7)
-  
-  const tarefasProximaSemana = atividades.filter(a => {
-    if (!a.data_termino) return false
-    const prazo = new Date(a.data_termino)
+
+  const tarefasProximaSemana = todasTarefas.filter(t => {
+    if (!t.dataPrazo || t.concluida) return false
+    const prazo = new Date(t.dataPrazo)
     prazo.setHours(0, 0, 0, 0)
     return prazo > hoje && prazo <= proximaSemana
   })
 
   // Agrupar por país
-  const atividadesPorPais = atividades.reduce((acc, atividade) => {
-    const pais = atividade.pais
+  const processosPorPais = processos.reduce((acc, processo) => {
+    const pais = processo.pais
     if (!acc[pais]) acc[pais] = []
-    acc[pais].push(atividade)
+    acc[pais].push(processo)
     return acc
-  }, {} as Record<Pais, Atividade[]>)
+  }, {} as Record<Pais, ProcessoWithStatus[]>)
 
   // Agrupar por status
-  const atividadesPorStatus = atividades.reduce((acc, atividade) => {
-    const statusNome = atividade.status?.nome || "Sem Status"
+  const processosPorStatus = processos.reduce((acc, processo) => {
+    const statusNome = processo.status?.nome || "Sem Status"
     if (!acc[statusNome]) acc[statusNome] = []
-    acc[statusNome].push(atividade)
+    acc[statusNome].push(processo)
     return acc
-  }, {} as Record<string, Atividade[]>)
+  }, {} as Record<string, ProcessoWithStatus[]>)
 
-  // Próximos prazos (ordenados por data)
-  const proximosPrazos = atividades
-    .filter(a => a.data_termino && new Date(a.data_termino) >= hoje)
-    .sort((a, b) => new Date(a.data_termino!).getTime() - new Date(b.data_termino!).getTime())
+  // Próximos prazos (tarefas com prazo chegando)
+  const proximosPrazos = todasTarefas
+    .filter(t => t.dataPrazo && !t.concluida && new Date(t.dataPrazo) >= hoje)
+    .sort((a, b) => new Date(a.dataPrazo!).getTime() - new Date(b.dataPrazo!).getTime())
     .slice(0, 5)
 
   // Formatar data
@@ -242,23 +229,23 @@ export default function DashboardPage() {
   return (
     <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
-
+      
       <HeaderBar
         title="Painel Principal"
-        subtitle="Visão geral dos processos e atividades"
+        subtitle="Visão geral dos processos e tarefas"
         userName={usuario.nome}
         userRole={usuario.tipo === 'admin' ? 'Administrador' : usuario.tipo}
         userEmail={usuario.email}
         projetos={[]}
-        atividades={atividades}
+        processos={processos}
         arvores={arvores}
         onLogout={handleLogout}
       />
 
       <div className="min-h-screen relative">
         <div className="absolute inset-0 bg-black/40 pointer-events-none" />
-        
         <main className="relative px-6 py-6 space-y-6">
+
           {/* ===== BOAS-VINDAS + AÇÕES ===== */}
           <section className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
@@ -269,7 +256,6 @@ export default function DashboardPage() {
                 Aqui está o resumo dos seus processos e tarefas.
               </p>
             </div>
-
             <div className="flex flex-wrap items-center gap-2">
               <Button 
                 className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-9 px-4"
@@ -279,7 +265,7 @@ export default function DashboardPage() {
               </Button>
               <Button 
                 className="bg-sky-600 hover:bg-sky-700 text-white text-xs h-9 px-4"
-                onClick={() => router.push('/activities')}
+                onClick={() => router.push('/tarefas')}
               >
                 + Nova Tarefa
               </Button>
@@ -296,13 +282,13 @@ export default function DashboardPage() {
 
           {/* ===== CARDS DE MÉTRICAS PRINCIPAIS ===== */}
           <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Total de Processos - AZUL (informativo/dados) */}
+            {/* Total de Processos */}
             <Card className="bg-white/10 backdrop-blur-sm border border-white/20 text-white">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs text-white/60 font-medium">Total de Processos</p>
-                    <p className="text-3xl font-bold mt-2">{atividades.length}</p>
+                    <p className="text-3xl font-bold mt-2">{processos.length}</p>
                     <p className="text-xs text-white/50 mt-1">famílias ativas</p>
                   </div>
                   <BarChart3 className="h-6 w-6 text-blue-500" />
@@ -310,7 +296,7 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Tarefas Vencidas - VERMELHO (perigo/urgente) */}
+            {/* Tarefas Vencidas */}
             <Card className={`backdrop-blur-sm border text-white ${tarefasVencidas.length > 0 ? 'bg-red-500/20 border-red-500/40' : 'bg-white/10 border-white/20'}`}>
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
@@ -326,7 +312,7 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Tarefas para Hoje - VERDE (ação/fazer agora) */}
+            {/* Tarefas para Hoje */}
             <Card className={`backdrop-blur-sm border text-white ${tarefasHoje.length > 0 ? 'bg-emerald-500/20 border-emerald-500/40' : 'bg-white/10 border-white/20'}`}>
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
@@ -342,7 +328,7 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Próxima Semana - ÂMBAR (atenção/se aproximando) */}
+            {/* Próxima Semana */}
             <Card className="bg-white/10 backdrop-blur-sm border border-white/20 text-white">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
@@ -363,12 +349,11 @@ export default function DashboardPage() {
               <h3 className="text-lg font-semibold text-white">Processos por País</h3>
               <p className="text-xs text-white/50">Distribuição dos processos ativos</p>
             </div>
-            
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {paisesParaExibir.map((pais) => {
                 const config = PAISES_CONFIG[pais]
-                const qtdAtividades = atividadesPorPais[pais]?.length || 0
-                
+                const qtdProcessos = processosPorPais[pais]?.length || 0
+
                 return (
                   <Card 
                     key={pais}
@@ -381,7 +366,7 @@ export default function DashboardPage() {
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-white text-sm">{config.label}</h4>
                           <p className="text-xs text-white/50 mt-0.5">
-                            {qtdAtividades} {qtdAtividades === 1 ? 'processo' : 'processos'}
+                            {qtdProcessos} {qtdProcessos === 1 ? 'processo' : 'processos'}
                           </p>
                         </div>
                       </div>
@@ -392,7 +377,7 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          {/* ===== VISÃO PROCESSOS + ATIVIDADES RECENTES ===== */}
+          {/* ===== VISÃO PROCESSOS + HISTÓRICO ===== */}
           <section className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             {/* Visão Processos - 3 colunas */}
             <Card className="lg:col-span-3 bg-white/5 backdrop-blur-sm border border-white/10">
@@ -415,55 +400,54 @@ export default function DashboardPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {Object.keys(atividadesPorStatus).length === 0 ? (
+                {Object.keys(processosPorStatus).length === 0 ? (
                   <div className="text-center py-8">
                     <FolderOpen className="h-10 w-10 mx-auto mb-3 text-white/30" />
                     <p className="text-sm text-white/50">Nenhum processo cadastrado</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {Object.entries(atividadesPorStatus).slice(0, 3).map(([statusNome, atividadesStatus], index) => {
+                    {Object.entries(processosPorStatus).slice(0, 3).map(([statusNome, processosStatus], index) => {
                       const cores = [
                         { dot: "bg-sky-400", border: "border-sky-500/30", bg: "bg-sky-500/5" },
                         { dot: "bg-emerald-400", border: "border-emerald-500/30", bg: "bg-emerald-500/5" },
                         { dot: "bg-amber-400", border: "border-amber-500/30", bg: "bg-amber-500/5" }
                       ]
                       const cor = cores[index % 3]
-                      
+
                       return (
                         <div key={statusNome} className={`rounded-xl border backdrop-blur-sm p-4 ${cor.bg} ${cor.border}`}>
-                          {/* Header da coluna */}
                           <div className="flex items-center gap-2 mb-3">
                             <div className={`w-2 h-2 rounded-full ${cor.dot}`} />
                             <span className="text-xs font-medium text-white/80 uppercase tracking-wide flex-1">
                               {statusNome}
                             </span>
                             <span className="text-xs text-white/50">
-                              {atividadesStatus.length}
+                              {processosStatus.length}
                             </span>
                           </div>
-                          
-                          {/* Cards da coluna */}
+
                           <div className="space-y-2">
-                            {atividadesStatus.slice(0, 3).map(atividade => {
-                              const paisConfig = PAISES_CONFIG[atividade.pais]
+                            {processosStatus.slice(0, 3).map(processo => {
+                              const paisConfig = PAISES_CONFIG[processo.pais]
                               return (
                                 <div 
-                                  key={atividade.id} 
+                                  key={processo.id} 
                                   className="rounded-lg bg-white/5 hover:bg-white/10 transition-colors p-3 cursor-pointer border border-white/5"
                                   onClick={() => router.push('/kanban')}
                                 >
-                                  <p className="text-sm font-medium text-white truncate">{atividade.nome}</p>
+                                  <p className="text-sm font-medium text-white truncate">{processo.nome}</p>
                                   <p className="text-xs text-white/40 mt-1 truncate flex items-center gap-1">
                                     <span>{paisConfig?.bandeira}</span>
-                                    {paisConfig?.label || atividade.pais}
+                                    {paisConfig?.label || processo.pais}
                                   </p>
                                 </div>
                               )
                             })}
-                            {atividadesStatus.length > 3 && (
+
+                            {processosStatus.length > 3 && (
                               <p className="text-xs text-white/40 text-center pt-1">
-                                +{atividadesStatus.length - 3} mais
+                                +{processosStatus.length - 3} mais
                               </p>
                             )}
                           </div>
@@ -475,7 +459,7 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Histórico de Atividades - 2 colunas */}
+            {/* Histórico - 2 colunas */}
             <Card className="lg:col-span-2 bg-white/5 backdrop-blur-sm border border-white/10">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -500,10 +484,9 @@ export default function DashboardPage() {
                 ) : (
                   <div className="space-y-2">
                     {logs.map((log) => {
-                      // Ícone e cor baseado na ação
                       let IconeAcao = GitBranch
                       let corIcone = "text-white/50"
-                      
+
                       if (log.acao === 'criou') {
                         IconeAcao = Plus
                         corIcone = "text-emerald-400"
@@ -518,16 +501,6 @@ export default function DashboardPage() {
                         corIcone = "text-amber-400"
                       }
 
-                      // Ícone da entidade
-                      let IconeEntidade = FolderOpen
-                      if (log.entidade === 'arvore') {
-                        IconeEntidade = TreeDeciduous
-                      } else if (log.entidade === 'processo' || log.entidade === 'card') {
-                        IconeEntidade = FolderOpen
-                      } else if (log.entidade === 'usuario') {
-                        IconeEntidade = Users
-                      }
-                      
                       return (
                         <div 
                           key={log.id} 
@@ -588,13 +561,14 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-                    {proximosPrazos.map((atividade) => {
-                      const prazo = new Date(atividade.data_termino!)
+                    {proximosPrazos.map((tarefa) => {
+                      const prazo = new Date(tarefa.dataPrazo!)
                       const diffDias = Math.ceil((prazo.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
-                      const paisConfig = PAISES_CONFIG[atividade.pais]
-                      
+                      const paisConfig = PAISES_CONFIG[tarefa.pais]
+
                       let corBorda = "border-white/20"
                       let corTexto = "text-white/70"
+
                       if (diffDias <= 1) {
                         corBorda = "border-red-500/50"
                         corTexto = "text-red-500"
@@ -602,25 +576,25 @@ export default function DashboardPage() {
                         corBorda = "border-yellow-500/50"
                         corTexto = "text-yellow-500"
                       }
-                      
+
                       return (
                         <div 
-                          key={atividade.id}
+                          key={tarefa.id}
                           className={`p-4 rounded-xl bg-white/5 border ${corBorda} hover:bg-white/10 transition-colors cursor-pointer`}
                           onClick={() => router.push('/kanban')}
                         >
                           <div className="flex items-center justify-between mb-2">
                             <span className={`text-xs font-medium ${corTexto}`}>
-                              {formatarData(atividade.data_termino!)}
+                              {formatarData(tarefa.dataPrazo!)}
                             </span>
                             {diffDias <= 1 && (
                               <AlertTriangle className="h-4 w-4 text-red-500" />
                             )}
                           </div>
-                          <p className="text-sm font-medium text-white truncate">{atividade.nome}</p>
+                          <p className="text-sm font-medium text-white truncate">{tarefa.titulo}</p>
                           <p className="text-xs text-white/50 truncate mt-1 flex items-center gap-1">
                             <span>{paisConfig?.bandeira}</span>
-                            {paisConfig?.label || atividade.pais}
+                            {tarefa.processoNome}
                           </p>
                         </div>
                       )

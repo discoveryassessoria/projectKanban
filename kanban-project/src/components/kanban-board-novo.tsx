@@ -21,7 +21,7 @@ import { ProcessoDetailsModal } from "./kanban/atividade-details-modal"
 import { 
   Pais, 
   PAISES_CONFIG,
-  type AtividadeWithStatus, 
+  type ProcessoWithStatus, 
   type Status,
   type Contratante, 
   type Requerente 
@@ -29,7 +29,7 @@ import {
 
 interface KanbanBoardProps {
   pais: Pais
-  atividades: AtividadeWithStatus[]
+  processos: ProcessoWithStatus[]
   statusList: Status[]
   contratantes?: Contratante[]
   requerentes?: Requerente[]
@@ -38,7 +38,7 @@ interface KanbanBoardProps {
 
 export function KanbanBoard({ 
   pais,
-  atividades,
+  processos,
   statusList,
   contratantes = [],
   requerentes = [],
@@ -46,8 +46,8 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const [newStatusName, setNewStatusName] = useState("")
   const [isAddingStatus, setIsAddingStatus] = useState(false)
-  const [activeAtividade, setActiveAtividade] = useState<AtividadeWithStatus | null>(null)
-  const [selectedAtividade, setSelectedAtividade] = useState<AtividadeWithStatus | null>(null)
+  const [activeProcesso, setActiveProcesso] = useState<ProcessoWithStatus | null>(null)
+  const [selectedProcesso, setSelectedProcesso] = useState<ProcessoWithStatus | null>(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   
   // Estado para navegação por setas
@@ -56,7 +56,7 @@ export function KanbanBoard({
   const [isHoveringRight, setIsHoveringRight] = useState(false)
   const hoverIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-
+  
   // Quantas colunas cabem na tela (padrão conservador: 4)
   const [visibleColumns, setVisibleColumns] = useState(4)
 
@@ -79,21 +79,18 @@ export function KanbanBoard({
 
   // Total de colunas (status + botão adicionar)
   const totalColumns = sortedStatusList.length + 1
-  
+
   // Calcula quantas colunas cabem na tela
   useEffect(() => {
     const updateVisibleColumns = () => {
       if (containerRef.current) {
         const containerWidth = containerRef.current.offsetWidth
-        // Cada coluna precisa de ~220px (incluindo gap), mais conservador
-        const availableWidth = containerWidth - 80 // espaço para setas
+        const availableWidth = containerWidth - 80
         const cols = Math.floor(availableWidth / 220)
-        // Mínimo 3, máximo 5
         setVisibleColumns(Math.max(3, Math.min(5, cols)))
       }
     }
-    
-    // Pequeno delay para garantir que o container foi renderizado
+
     setTimeout(updateVisibleColumns, 100)
     window.addEventListener('resize', updateVisibleColumns)
     return () => window.removeEventListener('resize', updateVisibleColumns)
@@ -174,9 +171,9 @@ export function KanbanBoard({
     }
   }
 
-  const handleAddNewAtividade = async (nome: string, statusId: number) => {
+  const handleAddNewProcesso = async (nome: string, statusId: number) => {
     try {
-      const response = await fetch("/api/atividades", {
+      const response = await fetch("/api/processos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -186,21 +183,20 @@ export function KanbanBoard({
         }),
       })
 
-      if (!response.ok) throw new Error("Falha ao criar nova atividade")
-      
+      if (!response.ok) throw new Error("Falha ao criar novo processo")
       onRefresh()
     } catch (error) {
       console.error(error)
-      alert("Não foi possível adicionar a atividade.")
+      alert("Não foi possível adicionar o processo.")
     }
   }
 
-  const handleAtividadeClick = (atividade: AtividadeWithStatus) => {
-    setSelectedAtividade(atividade)
+  const handleProcessoClick = (processo: ProcessoWithStatus) => {
+    setSelectedProcesso(processo)
     setIsDetailsModalOpen(true)
   }
 
-  const handleAtividadeSave = () => {
+  const handleProcessoSave = () => {
     onRefresh()
     setIsDetailsModalOpen(false)
   }
@@ -208,21 +204,20 @@ export function KanbanBoard({
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
     const activeId = typeof active.id === 'string' ? parseInt(active.id) : active.id as number
-    const atividade = atividades.find((a) => a.id === activeId)
-    setActiveAtividade(atividade || null)
+    const processo = processos.find((p) => p.id === activeId)
+    setActiveProcesso(processo || null)
   }
 
   const onDragEnd = async (event: DragEndEvent) => {
-    setActiveAtividade(null)
-
+    setActiveProcesso(null)
     const { active, over } = event
     if (!over) return
 
     const activeId = typeof active.id === 'string' ? parseInt(active.id) : active.id as number
     const overId = typeof over.id === 'string' ? parseInt(over.id) : over.id as number
 
-    const activeAtividade = atividades.find((a) => a.id === activeId)
-    if (!activeAtividade) return
+    const activeProcesso = processos.find((p) => p.id === activeId)
+    if (!activeProcesso) return
 
     let targetStatusId: number
 
@@ -230,13 +225,12 @@ export function KanbanBoard({
       targetStatusId = over.data.current.statusId
     } else if (!isNaN(overId)) {
       const isColumnDrop = statusList.some(status => status.id === overId)
-      
       if (isColumnDrop) {
         targetStatusId = overId
       } else {
-        const overAtividade = atividades.find((a) => a.id === overId)
-        if (overAtividade) {
-          targetStatusId = overAtividade.statusId
+        const overProcesso = processos.find((p) => p.id === overId)
+        if (overProcesso) {
+          targetStatusId = overProcesso.statusId
         } else {
           return
         }
@@ -245,20 +239,19 @@ export function KanbanBoard({
       return
     }
 
-    if (activeAtividade.statusId !== targetStatusId) {
+    if (activeProcesso.statusId !== targetStatusId) {
       try {
-        const response = await fetch(`/api/atividades/${activeId}`, {
+        const response = await fetch(`/api/processos/${activeId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ statusId: targetStatusId }),
         })
 
-        if (!response.ok) throw new Error("Erro ao mover atividade")
-        
+        if (!response.ok) throw new Error("Erro ao mover processo")
         onRefresh()
       } catch (error) {
-        console.error("Error updating atividade status:", error)
-        alert("Erro ao mover a atividade. Tente novamente.")
+        console.error("Error updating processo status:", error)
+        alert("Erro ao mover o processo. Tente novamente.")
       }
     }
   }
@@ -267,27 +260,27 @@ export function KanbanBoard({
     const concluidoStatus = statusList.find((s) => s.nome.toLowerCase() === "concluído")
     if (!concluidoStatus) return
 
-    const completedAtividades = atividades.filter((a) => a.statusId === concluidoStatus.id)
+    const completedProcessos = processos.filter((p) => p.statusId === concluidoStatus.id)
 
-    if (completedAtividades.length === 0) {
-      alert("Não há atividades concluídas para limpar.")
+    if (completedProcessos.length === 0) {
+      alert("Não há processos concluídos para limpar.")
       return
     }
 
-    if (!confirm(`Tem certeza que deseja deletar ${completedAtividades.length} atividade(s) concluída(s)?`)) {
+    if (!confirm(`Tem certeza que deseja deletar ${completedProcessos.length} processo(s) concluído(s)?`)) {
       return
     }
 
     try {
       await Promise.all(
-        completedAtividades.map((atividade) =>
-          fetch(`/api/atividades/${atividade.id}`, { method: "DELETE" }),
+        completedProcessos.map((processo) =>
+          fetch(`/api/processos/${processo.id}`, { method: "DELETE" }),
         ),
       )
       onRefresh()
     } catch (error) {
-      console.error("Erro ao limpar atividades concluídas:", error)
-      alert("Não foi possível limpar as atividades concluídas.")
+      console.error("Erro ao limpar processos concluídos:", error)
+      alert("Não foi possível limpar os processos concluídos.")
     }
   }
 
@@ -364,12 +357,12 @@ export function KanbanBoard({
                   <KanbanColumn
                     id={status.id}
                     title={status.nome}
-                    atividades={atividades.filter((a) => a.statusId === status.id)}
+                    processos={processos.filter((p) => p.statusId === status.id)}
                     headerColor={paisConfig.cor}
                     isFirst={startIndex + index === 0}
                     isLast={startIndex + index === sortedStatusList.length - 1}
-                    onAtividadeAdd={handleAddNewAtividade}
-                    onAtividadeClick={handleAtividadeClick}
+                    onProcessoAdd={handleAddNewProcesso}
+                    onProcessoClick={handleProcessoClick}
                     onStatusUpdate={onRefresh}
                     pais={pais}
                   />
@@ -445,9 +438,9 @@ export function KanbanBoard({
         </div>
 
         <DragOverlay>
-          {activeAtividade ? (
+          {activeProcesso ? (
             <div className="rotate-3 scale-105">
-              <KanbanCard {...activeAtividade} />
+              <KanbanCard processo={activeProcesso} />
             </div>
           ) : null}
         </DragOverlay>
@@ -468,10 +461,10 @@ export function KanbanBoard({
       `}</style>
 
       <ProcessoDetailsModal
-        processo={selectedAtividade as any}
+        processo={selectedProcesso}
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
-        onSave={handleAtividadeSave}
+        onSave={handleProcessoSave}
         statusList={statusList}
       />
     </>

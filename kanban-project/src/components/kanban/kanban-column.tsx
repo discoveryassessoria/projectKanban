@@ -25,17 +25,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import type { AtividadeWithStatus, Pais } from "@/src/types/kanban"
+import type { ProcessoWithStatus, Pais } from "@/src/types/kanban"
 
 interface KanbanColumnProps {
   id: number
   title: string
-  atividades: AtividadeWithStatus[]
+  processos: ProcessoWithStatus[]
   headerColor?: string
   isFirst?: boolean
   isLast?: boolean
-  onAtividadeAdd: (nome: string, statusId: number) => void
-  onAtividadeClick?: (atividade: AtividadeWithStatus) => void
+  onProcessoAdd: (nome: string, statusId: number) => void
+  onProcessoClick?: (processo: ProcessoWithStatus) => void
   onStatusUpdate?: () => void
   pais?: Pais
 }
@@ -43,12 +43,12 @@ interface KanbanColumnProps {
 export function KanbanColumn({
   id,
   title,
-  atividades,
+  processos,
   headerColor = "#3f3f46",
   isFirst,
   isLast,
-  onAtividadeAdd,
-  onAtividadeClick,
+  onProcessoAdd,
+  onProcessoClick,
   onStatusUpdate,
   pais,
 }: KanbanColumnProps) {
@@ -60,22 +60,22 @@ export function KanbanColumn({
     },
   })
   const [isAdding, setIsAdding] = useState(false)
-  const [newAtividadeName, setNewAtividadeName] = useState("")
+  const [newProcessoName, setNewProcessoName] = useState("")
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editedStatusName, setEditedStatusName] = useState(title)
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
-  const atividadesIds = useMemo(() => atividades.map((a) => a.id), [atividades])
+  const processosIds = useMemo(() => processos.map((p) => p.id), [processos])
   
   const isConcluido = title.toLowerCase() === "concluído"
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newAtividadeName.trim()) return
-    onAtividadeAdd(newAtividadeName, id)
-    setNewAtividadeName("")
+    if (!newProcessoName.trim()) return
+    onProcessoAdd(newProcessoName, id)
+    setNewProcessoName("")
     setIsAdding(false)
   }
 
@@ -131,7 +131,7 @@ export function KanbanColumn({
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-sm text-white">{title}</h3>
               <span className="px-2 py-0.5 text-xs font-medium bg-white/20 text-white rounded-full backdrop-blur-sm">
-                {atividades.length}
+                {processos.length}
               </span>
             </div>
             <div className="flex items-center gap-1">
@@ -179,9 +179,13 @@ export function KanbanColumn({
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 min-h-[200px] scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-          <SortableContext items={atividadesIds} strategy={verticalListSortingStrategy}>
-            {atividades.map((atividade) => (
-              <KanbanCard key={atividade.id} {...atividade} onClick={() => onAtividadeClick?.(atividade)} />
+          <SortableContext items={processosIds} strategy={verticalListSortingStrategy}>
+            {processos.map((processo) => (
+              <KanbanCard 
+                key={processo.id} 
+                processo={processo} 
+                onClick={() => onProcessoClick?.(processo)} 
+              />
             ))}
           </SortableContext>
 
@@ -189,9 +193,9 @@ export function KanbanColumn({
             <form onSubmit={handleAddSubmit} className="mt-2">
               <Input
                 autoFocus
-                placeholder="Nome da atividade..."
-                value={newAtividadeName}
-                onChange={(e) => setNewAtividadeName(e.target.value)}
+                placeholder="Nome do processo..."
+                value={newProcessoName}
+                onChange={(e) => setNewProcessoName(e.target.value)}
                 className="mb-2 bg-white/10 border-white/20 text-white placeholder:text-white/60 backdrop-blur-sm"
               />
               <div className="flex justify-end gap-2">
@@ -247,9 +251,9 @@ export function KanbanColumn({
             <DialogTitle>Excluir Status</DialogTitle>
             <DialogDescription className="text-white/70">
               Tem certeza que deseja excluir o status "{title}"? Esta ação não pode ser desfeita.
-              {atividades.length > 0 && (
+              {processos.length > 0 && (
                 <span className="block mt-2 text-red-400">
-                  Atenção: Este status possui {atividades.length} atividade(s). Elas também serão excluídas.
+                  Atenção: Este status possui {processos.length} processo(s). Eles também serão excluídos.
                 </span>
               )}
             </DialogDescription>

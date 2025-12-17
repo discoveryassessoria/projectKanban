@@ -27,12 +27,12 @@ export default function SettingsPage() {
   const router = useRouter()
   const [user, setUser] = useState<UserData | null>(getStoredUser())
   const [mounted, setMounted] = useState(false)
-  
+
   // Estados para dados do HeaderBar
   const [projetos, setProjetos] = useState<any[]>([])
-  const [atividades, setAtividades] = useState<any[]>([])
+  const [processos, setProcessos] = useState<any[]>([])
   const [arvores, setArvores] = useState<any[]>([])
-  
+
   const [emailForm, setEmailForm] = useState({
     newEmail: '',
     loading: false
@@ -44,7 +44,7 @@ export default function SettingsPage() {
     confirmPassword: '',
     loading: false
   })
-  
+
   useEffect(() => {
     setMounted(true)
     fetchHeaderData()
@@ -52,17 +52,17 @@ export default function SettingsPage() {
 
   const fetchHeaderData = async () => {
     try {
-      const [projetosRes, atividadesRes, arvoresRes] = await Promise.all([
+      const [projetosRes, processosRes, arvoresRes] = await Promise.all([
         fetch("/api/projetos"),
-        fetch("/api/activities"),
+        fetch("/api/processos"),
         fetch("/api/arvore")
       ])
 
       const projetosData = await projetosRes.json()
       setProjetos(projetosData.projetos || [])
 
-      const atividadesData = await atividadesRes.json()
-      setAtividades(Array.isArray(atividadesData) ? atividadesData : [])
+      const processosData = await processosRes.json()
+      setProcessos(processosData.processos || [])
 
       const arvoresData = await arvoresRes.json()
       setArvores(Array.isArray(arvoresData) ? arvoresData : [])
@@ -76,7 +76,7 @@ export default function SettingsPage() {
     showToast('Logout realizado com sucesso!', 'success')
     router.push('/login')
   }
-  
+
   if (!mounted) {
     return (
       <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
@@ -90,12 +90,11 @@ export default function SettingsPage() {
       </div>
     )
   }
-  
+
   const validatePasswordStrength = (password: string) => {
     const minLength = password.length >= 8
     const hasNumber = /\d/.test(password)
     const hasLetter = /[a-zA-Z]/.test(password)
-    
     return {
       isStrong: minLength && hasNumber && hasLetter,
       suggestions: [
@@ -105,11 +104,11 @@ export default function SettingsPage() {
       ].filter(Boolean)
     }
   }
-  
+
   const handleEmailUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
     setEmailForm(prev => ({ ...prev, loading: true }))
-    
+
     try {
       const response = await fetch('/api/user/update-email', {
         method: 'PUT',
@@ -141,7 +140,7 @@ export default function SettingsPage() {
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       showToast('As senhas não coincidem', 'error')
       return
@@ -154,7 +153,7 @@ export default function SettingsPage() {
     }
 
     setPasswordForm(prev => ({ ...prev, loading: true }))
-    
+
     try {
       const response = await fetch('/api/user/update-password', {
         method: 'PUT',
@@ -192,7 +191,7 @@ export default function SettingsPage() {
     <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
       {/* BACKGROUND FIXO */}
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
-
+      
       {/* HEADER */}
       <HeaderBar
         title="Configurações"
@@ -201,7 +200,7 @@ export default function SettingsPage() {
         userRole={user?.tipo === 'admin' ? 'Administrador' : user?.tipo || 'Usuário'}
         userEmail={user?.email || ''}
         projetos={projetos}
-        atividades={atividades}
+        processos={processos}
         arvores={arvores}
         onLogout={handleLogout}
       />
@@ -209,8 +208,8 @@ export default function SettingsPage() {
       {/* CONTEÚDO COM OVERLAY */}
       <div className="min-h-screen relative">
         <div className="absolute inset-0 bg-black/40 pointer-events-none" />
-        
         <main className="relative px-6 py-8 max-w-4xl mx-auto">
+
           <Tabs defaultValue="appearance" className="w-full">
             <TabsList className="grid w-full grid-cols-4 bg-white/10 border border-white/20 backdrop-blur-xl">
               <TabsTrigger value="appearance" className="flex items-center gap-2 data-[state=active]:bg-white/20 text-white">
@@ -338,7 +337,6 @@ export default function SettingsPage() {
                         className="bg-white border-gray-300"
                       />
                     </div>
-
                     <div className="space-y-2">
                       <Label htmlFor="newPassword" className="text-gray-700">Nova Senha</Label>
                       <Input
@@ -355,7 +353,6 @@ export default function SettingsPage() {
                         A senha deve ter pelo menos 8 caracteres, incluindo letras e números
                       </p>
                     </div>
-
                     <div className="space-y-2">
                       <Label htmlFor="confirmPassword" className="text-gray-700">Confirmar Nova Senha</Label>
                       <Input
@@ -369,7 +366,6 @@ export default function SettingsPage() {
                         className="bg-white border-gray-300"
                       />
                     </div>
-
                     <Button 
                       type="submit" 
                       disabled={

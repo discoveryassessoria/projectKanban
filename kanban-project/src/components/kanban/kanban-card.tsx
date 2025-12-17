@@ -3,59 +3,30 @@
 import type React from "react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { Phone, Mail, MessageCircle } from "lucide-react"
+import { Phone, Mail, MessageCircle, Users, CheckSquare } from "lucide-react"
+import type { ProcessoWithStatus } from "@/src/types/kanban"
 
 interface KanbanCardProps {
-  id: number
-  nome: string
-  descricao?: string | null
-  data_termino?: string | null
-  data_criacao?: string
-  usuarios?: Array<{
-    usuario: {
-      id: number
-      nome: string
-      email: string
-    }
-  }>
-  status?: {
-    id: number
-    nome: string
-  }
-  tags?: { texto: string; cor: string }[]
-  // Novos campos para o estilo Bitrix
-  telefone?: string
-  email?: string
-  atividadesCount?: number
+  processo: ProcessoWithStatus
   onClick?: () => void
-  onAddAtividade?: () => void
-  // Campos adicionais que podem vir do AtividadeWithStatus
-  pais?: string
-  statusId?: number
-  contratante?: any
-  key?: number
 }
 
-export function KanbanCard({
-  id,
-  nome,
-  descricao,
-  data_termino,
-  data_criacao,
-  usuarios = [],
-  status,
-  tags = [],
-  telefone,
-  email,
-  atividadesCount = 0,
-  onClick,
-  onAddAtividade
-}: KanbanCardProps) {
+export function KanbanCard({ processo, onClick }: KanbanCardProps) {
+  const { 
+    id, 
+    nome, 
+    descricao, 
+    contratante,
+    requerentes = [],
+    tarefas = [],
+    _count
+  } = processo
+
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
     id: id,
     data: {
       type: "Card",
-      atividade: { id, nome, descricao, data_termino, data_criacao, usuarios, status, tags },
+      processo: processo,
     },
   })
 
@@ -65,16 +36,20 @@ export function KanbanCard({
     opacity: isDragging ? 0.5 : 1,
   }
 
+  // Dados do contratante para contato
+  const telefone = contratante?.telefone
+  const email = contratante?.email
+
+  // Contagem de tarefas
+  const tarefasCount = _count?.tarefas ?? tarefas?.length ?? 0
+  const tarefasConcluidas = tarefas?.filter(t => t.concluida)?.length ?? 0
+
+  // Contagem de requerentes
+  const requerentesCount = requerentes?.length ?? 0
+
   const handleCardClick = (e: React.MouseEvent) => {
     if (!isDragging && onClick) {
       onClick()
-    }
-  }
-
-  const handleAddAtividade = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (onAddAtividade) {
-      onAddAtividade()
     }
   }
 
@@ -94,7 +69,6 @@ export function KanbanCard({
 
   const handleChatClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    // Futuro: integração com WhatsApp ou chat interno
     if (telefone) {
       const whatsappNumber = telefone.replace(/\D/g, '')
       window.open(`https://wa.me/55${whatsappNumber}`, '_blank')
@@ -113,16 +87,32 @@ export function KanbanCard({
       >
         {/* Conteúdo principal */}
         <div className="p-3">
-          {/* Header: Nome + Contador */}
+          {/* Header: Nome */}
           <div className="flex items-start justify-between gap-2 mb-2">
             <h3 className="font-medium text-sm text-gray-900 leading-tight flex-1">
               {nome}
             </h3>
-            
-            {/* Contador de atividades (estilo Bitrix) */}
-            {atividadesCount > 0 && (
-              <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 bg-blue-100 text-blue-600 text-xs font-medium rounded flex items-center justify-center">
-                {atividadesCount}
+          </div>
+
+          {/* Contratante */}
+          {contratante && (
+            <p className="text-xs text-gray-500 mb-2 truncate">
+              {contratante.nome}
+            </p>
+          )}
+
+          {/* Badges: Requerentes e Tarefas */}
+          <div className="flex items-center gap-2 mb-2">
+            {requerentesCount > 0 && (
+              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-600 text-xs font-medium rounded">
+                <Users className="h-3 w-3" />
+                {requerentesCount}
+              </span>
+            )}
+            {tarefasCount > 0 && (
+              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-600 text-xs font-medium rounded">
+                <CheckSquare className="h-3 w-3" />
+                {tarefasConcluidas}/{tarefasCount}
               </span>
             )}
           </div>
@@ -137,7 +127,6 @@ export function KanbanCard({
             >
               <Phone className="h-4 w-4" />
             </button>
-            
             <button
               onClick={handleEmailClick}
               className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${email ? 'text-gray-500 hover:text-blue-600' : 'text-gray-300 cursor-not-allowed'}`}
@@ -146,7 +135,6 @@ export function KanbanCard({
             >
               <Mail className="h-4 w-4" />
             </button>
-            
             <button
               onClick={handleChatClick}
               className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${telefone ? 'text-gray-500 hover:text-green-600' : 'text-gray-300 cursor-not-allowed'}`}
@@ -156,16 +144,6 @@ export function KanbanCard({
               <MessageCircle className="h-4 w-4" />
             </button>
           </div>
-        </div>
-
-        {/* Footer: + Atividade */}
-        <div className="border-t border-gray-100">
-          <button
-            onClick={handleAddAtividade}
-            className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:text-blue-600 hover:bg-gray-50 transition-colors"
-          >
-            + Atividade
-          </button>
         </div>
       </div>
     </div>

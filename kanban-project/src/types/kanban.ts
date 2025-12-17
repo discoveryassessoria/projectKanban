@@ -8,6 +8,14 @@ export enum Pais {
   ITALIA = 'ITALIA'
 }
 
+// Enum de Prioridade de Tarefa
+export enum PrioridadeTarefa {
+  BAIXA = 'BAIXA',
+  MEDIA = 'MEDIA',
+  ALTA = 'ALTA',
+  URGENTE = 'URGENTE'
+}
+
 // Configuração visual de cada país (cores, ícones, etc)
 export const PAISES_CONFIG: Record<Pais, {
   label: string
@@ -41,17 +49,49 @@ export const PAISES_CONFIG: Record<Pais, {
   }
 }
 
+// Configuração visual de prioridades
+export const PRIORIDADE_CONFIG: Record<PrioridadeTarefa, {
+  label: string
+  cor: string
+  corBg: string
+}> = {
+  [PrioridadeTarefa.BAIXA]: {
+    label: 'Baixa',
+    cor: '#6b7280',
+    corBg: '#6b728020'
+  },
+  [PrioridadeTarefa.MEDIA]: {
+    label: 'Média',
+    cor: '#3b82f6',
+    corBg: '#3b82f620'
+  },
+  [PrioridadeTarefa.ALTA]: {
+    label: 'Alta',
+    cor: '#f59e0b',
+    corBg: '#f59e0b20'
+  },
+  [PrioridadeTarefa.URGENTE]: {
+    label: 'Urgente',
+    cor: '#ef4444',
+    corBg: '#ef444420'
+  }
+}
+
 // Helper para obter lista de países
 export const PAISES_LISTA = Object.values(Pais)
 
 // ========================================
-// INTERFACES
+// INTERFACES BASE
 // ========================================
 
 export interface Status {
   id: number
   nome: string
   ordem?: number
+  pais?: Pais
+  _count?: {
+    processos: number
+  }
 }
 
 export interface Usuario {
@@ -61,16 +101,11 @@ export interface Usuario {
   tipo?: string
 }
 
-export interface UserAtv {
-  usuario: Usuario
-}
-
 // ========================================
-// CONTRATANTE - EXPANDIDO
+// CONTRATANTE - CLIENTE QUE CONTRATA
 // ========================================
 export interface Contratante {
   id: number
-  tipo?: string | null
   nome: string
   cpf?: string | null
   rg?: string | null
@@ -88,15 +123,15 @@ export interface Contratante {
   estado?: string | null
   cep?: string | null
   observacoes?: string | null
-  createdAt: string
+  createdAt?: string
   updatedAt?: string
   _count?: {
-    atividades: number
+    processos: number
   }
 }
 
 // ========================================
-// REQUERENTE - EXPANDIDO
+// REQUERENTE - QUEM VAI RECEBER CIDADANIA
 // ========================================
 export interface Requerente {
   id: number
@@ -121,13 +156,124 @@ export interface Requerente {
   updatedAt?: string
 }
 
-export interface AtividadeRequerente {
-  requerente: Requerente
+// ========================================
+// TAREFA - AFAZERES DOS FUNCIONÁRIOS
+// ========================================
+export interface Tarefa {
+  id: number
+  titulo: string
+  descricao?: string | null
+  processoId: number
+  responsavelId?: number | null
+  responsavel?: Usuario | null
+  concluida: boolean
+  prioridade: PrioridadeTarefa
+  dataPrazo?: string | null
+  dataConclusao?: string | null
+  createdAt?: string
+  updatedAt?: string
+  processo?: {
+    id: number
+    nome: string
+    pais: Pais
+  }
 }
 
 // ========================================
-// ATIVIDADE (PROCESSO)
+// PROCESSO - CARD DO KANBAN (FAMÍLIA)
 // ========================================
+export interface Processo {
+  id: number
+  nome: string
+  descricao?: string | null
+  observacoes?: string | null
+  pais: Pais
+  statusId: number
+  status?: Status
+  contratanteId?: number | null
+  contratante?: Contratante | null
+  arvoreId?: number | null
+  arvore?: {
+    id: number
+    nome: string
+  } | null
+  dataInicio?: string
+  previsaoTermino?: string | null
+  dataConclusao?: string | null
+  createdAt?: string
+  updatedAt?: string
+  requerentes?: Requerente[]
+  tarefas?: Tarefa[]
+  _count?: {
+    tarefas: number
+    anexos: number
+  }
+}
+
+export interface ProcessoWithStatus extends Processo {
+  status: Status
+}
+
+// ========================================
+// DADOS AGREGADOS POR PAÍS (para o Kanban)
+// ========================================
+export interface DadosPais {
+  pais: Pais
+  config: typeof PAISES_CONFIG[Pais]
+  processos: ProcessoWithStatus[]
+  statusList: Status[]
+}
+
+// ========================================
+// TIPOS PARA CRIAÇÃO/EDIÇÃO
+// ========================================
+export interface CriarProcesso {
+  nome: string
+  descricao?: string
+  observacoes?: string
+  pais: Pais
+  statusId: number
+  contratanteId?: number
+  requerenteIds?: number[]
+  arvoreId?: number
+  previsaoTermino?: string
+}
+
+export interface AtualizarProcesso {
+  nome?: string
+  descricao?: string
+  observacoes?: string
+  statusId?: number
+  contratanteId?: number | null
+  requerenteIds?: number[]
+  arvoreId?: number | null
+  previsaoTermino?: string | null
+  dataConclusao?: string | null
+}
+
+export interface CriarTarefa {
+  titulo: string
+  descricao?: string
+  processoId: number
+  responsavelId?: number
+  prioridade?: PrioridadeTarefa
+  dataPrazo?: string
+}
+
+export interface AtualizarTarefa {
+  titulo?: string
+  descricao?: string
+  responsavelId?: number | null
+  prioridade?: PrioridadeTarefa
+  dataPrazo?: string | null
+  concluida?: boolean
+}
+
+// ========================================
+// LEGADO - Manter para compatibilidade temporária
+// ========================================
+
+/** @deprecated Use Processo ao invés de Atividade */
 export interface Atividade {
   id: number
   nome: string
@@ -139,60 +285,10 @@ export interface Atividade {
   arvore_id?: number | null
   contratanteId?: number | null
   contratante?: Contratante | null
-  usuarios?: UserAtv[]
-  requerentes?: AtividadeRequerente[]
-  tags?: { texto: string; cor: string }[]
+  requerentes?: Requerente[]
 }
 
+/** @deprecated Use ProcessoWithStatus ao invés de AtividadeWithStatus */
 export interface AtividadeWithStatus extends Atividade {
   status: Status
-}
-
-// ========================================
-// DADOS AGREGADOS POR PAÍS (para o Kanban)
-// ========================================
-export interface DadosPais {
-  pais: Pais
-  config: typeof PAISES_CONFIG[Pais]
-  atividades: AtividadeWithStatus[]
-  statusList: Status[]
-}
-
-// ========================================
-// TIPOS PARA CRIAÇÃO/EDIÇÃO
-// ========================================
-export interface CriarAtividade {
-  nome: string
-  descricao?: string
-  pais: Pais
-  statusId: number
-  contratanteId?: number
-  requerenteIds?: number[]
-  arvore_id?: number
-  data_termino?: string
-}
-
-export interface AtualizarAtividade {
-  nome?: string
-  descricao?: string
-  pais?: Pais
-  statusId?: number
-  contratanteId?: number | null
-  requerenteIds?: number[]
-  arvore_id?: number | null
-  data_termino?: string | null
-}
-
-// ========================================
-// LEGADO - Manter para compatibilidade temporária
-// ========================================
-/** @deprecated Use Atividade com pais ao invés de Projeto */
-export interface Projeto {
-  id: number
-  nome: string
-  descricao: string | null
-  status: Status[]
-  atividades: Atividade[]
-  contratante?: Contratante | null
-  requerentes?: { requerente: Requerente }[]
 }

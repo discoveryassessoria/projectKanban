@@ -10,7 +10,7 @@ import { PaisTabs } from "@/src/components/ui/pais-selector"
 import { HeaderBar } from "@/src/components/header-bar"
 import { 
   Pais, 
-  type AtividadeWithStatus, 
+  type ProcessoWithStatus, 
   type Status,
   type Contratante, 
   type Requerente 
@@ -29,20 +29,20 @@ type SubTab = "kanban" | "lista"
 export default function ProcessosPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  
+
   // Tabs
   const [tabPrincipal, setTabPrincipal] = useState<TabPrincipal>("processos")
   const [subTab, setSubTab] = useState<SubTab>("kanban")
-  
+
   // Ler país da URL ou usar Portugal como padrão
   const paisDaUrl = searchParams.get("pais") as Pais | null
   const paisInicial = paisDaUrl && Object.values(Pais).includes(paisDaUrl) ? paisDaUrl : Pais.PORTUGAL
-  
   const [paisSelecionado, setPaisSelecionado] = useState<Pais>(paisInicial)
-  
-  const [atividades, setAtividades] = useState<AtividadeWithStatus[]>([])
+
+  const [processos, setProcessos] = useState<ProcessoWithStatus[]>([])
   const [statusList, setStatusList] = useState<Status[]>([])
   const [contratantes, setContratantes] = useState<Contratante[]>([])
   const [requerentes, setRequerentes] = useState<Requerente[]>([])
@@ -74,16 +74,16 @@ export default function ProcessosPage() {
     }
   }, [])
 
-  // Buscar atividades por país
-  const buscarAtividades = useCallback(async (pais: Pais) => {
+  // Buscar processos por país
+  const buscarProcessos = useCallback(async (pais: Pais) => {
     try {
-      const response = await fetch(`/api/atividades?pais=${pais}`)
+      const response = await fetch(`/api/processos?pais=${pais}`)
       if (response.ok) {
         const data = await response.json()
-        setAtividades(data.atividades || [])
+        setProcessos(data.processos || [])
       }
     } catch (error) {
-      console.error("Erro ao buscar atividades:", error)
+      console.error("Erro ao buscar processos:", error)
     }
   }, [])
 
@@ -129,13 +129,15 @@ export default function ProcessosPage() {
       router.push("/login")
       return
     }
+
     const userData = getStoredUser()
     if (!userData) {
       router.push("/login")
       return
     }
+
     setUser(userData)
-    
+
     // Buscar dados globais (não dependem do país)
     Promise.all([
       buscarContratantes(),
@@ -146,18 +148,18 @@ export default function ProcessosPage() {
     })
   }, [router])
 
-  // Efeito quando país muda - buscar status e atividades do país
+  // Efeito quando país muda - buscar status e processos do país
   useEffect(() => {
     buscarStatus(paisSelecionado)
-    buscarAtividades(paisSelecionado)
-  }, [paisSelecionado, buscarStatus, buscarAtividades])
+    buscarProcessos(paisSelecionado)
+  }, [paisSelecionado, buscarStatus, buscarProcessos])
 
   // Refresh apenas do país atual
   const handleRefresh = useCallback(() => {
     buscarStatus(paisSelecionado)
-    buscarAtividades(paisSelecionado)
+    buscarProcessos(paisSelecionado)
     buscarContratantes()
-  }, [paisSelecionado, buscarStatus, buscarAtividades])
+  }, [paisSelecionado, buscarStatus, buscarProcessos])
 
   if (loading) {
     return (
@@ -176,7 +178,7 @@ export default function ProcessosPage() {
   return (
     <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
-
+      
       <HeaderBar
         title={tabPrincipal === "processos" ? "Processos" : "Clientes"}
         subtitle={tabPrincipal === "processos" ? "Gerencie seus processos de cidadania" : "Gerencie seus clientes"}
@@ -184,19 +186,18 @@ export default function ProcessosPage() {
         userRole={user?.tipo === 'admin' ? 'Administrador' : user?.tipo || "Usuário"}
         userEmail={user?.email || ""}
         projetos={[]}
-        atividades={atividades}
+        processos={processos}
         arvores={arvores}
         onLogout={handleLogout}
       />
 
       <div className="min-h-screen relative">
         <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+        
         <main className="relative px-6 py-6 max-w-full">
-          
           {/* TABS PRINCIPAIS */}
           <div className="bg-white/5 border border-white/15 rounded-2xl p-4 backdrop-blur-xl shadow-lg mb-4">
             <div className="flex items-center justify-between flex-wrap gap-4">
-              
               {/* Tabs Processos / Clientes */}
               <div className="flex items-center gap-2">
                 <button
@@ -260,11 +261,10 @@ export default function ProcessosPage() {
                 <div className="flex items-center gap-4">
                   <div className="flex flex-col items-center px-4 py-2 bg-white/10 rounded-lg">
                     <span className="text-2xl font-bold text-white">
-                      {atividades.length}
+                      {processos.length}
                     </span>
                     <span className="text-xs text-white/60">processo(s)</span>
                   </div>
-
                   <PaisTabs
                     selectedPais={paisSelecionado}
                     onSelect={setPaisSelecionado}
@@ -286,12 +286,11 @@ export default function ProcessosPage() {
 
           {/* CONTEÚDO */}
           <div className="bg-white/5 border border-white/15 rounded-2xl p-4 backdrop-blur-xl shadow-lg w-full overflow-hidden">
-            
             {/* Processos - Kanban */}
             {tabPrincipal === "processos" && subTab === "kanban" && (
               <KanbanBoard 
                 pais={paisSelecionado}
-                atividades={atividades}
+                processos={processos}
                 statusList={statusList}
                 contratantes={contratantes}
                 requerentes={requerentes}
@@ -302,7 +301,7 @@ export default function ProcessosPage() {
             {/* Processos - Lista */}
             {tabPrincipal === "processos" && subTab === "lista" && (
               <ProcessosLista
-                atividades={atividades}
+                processos={processos}
                 statusList={statusList}
                 contratantes={contratantes}
                 onRefresh={handleRefresh}
@@ -312,7 +311,7 @@ export default function ProcessosPage() {
             {/* Clientes - Tabela */}
             {tabPrincipal === "contratantes" && (
               <ContratantesTabela
-                contratantes={contratantes}
+                contratantes={contratantes as any}
                 onRefresh={handleRefresh}
               />
             )}

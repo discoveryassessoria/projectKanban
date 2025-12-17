@@ -43,7 +43,7 @@ function GenealogyContent() {
 
   // Estados para dados do HeaderBar
   const [projetos, setProjetos] = useState<any[]>([])
-  const [atividades, setAtividades] = useState<any[]>([])
+  const [processos, setProcessos] = useState<any[]>([])
 
   const handleLogout = () => {
     localStorage.removeItem("authToken")
@@ -99,9 +99,9 @@ function GenealogyContent() {
       const projetosData = await projetosRes.json()
       setProjetos(projetosData.projetos || [])
 
-      const atividadesRes = await fetch("/api/activities")
-      const atividadesData = await atividadesRes.json()
-      setAtividades(Array.isArray(atividadesData) ? atividadesData : [])
+      const processosRes = await fetch("/api/processos")
+      const processosData = await processosRes.json()
+      setProcessos(processosData.processos || [])
     } catch (error) {
       console.error("Erro ao buscar dados para header:", error)
     }
@@ -338,7 +338,7 @@ function GenealogyContent() {
           userRole={user.tipo || 'Usuário'}
           userEmail={user.email || ''}
           projetos={projetos}
-          atividades={atividades}
+          processos={processos}
           arvores={arvoresParaHeader}
           onLogout={handleLogout}
         />
@@ -396,7 +396,7 @@ function GenealogyContent() {
         userRole={user.tipo || 'Usuário'}
         userEmail={user.email || ''}
         projetos={projetos}
-        atividades={atividades}
+        processos={processos}
         arvores={arvoresParaHeader}
         onLogout={handleLogout}
       />

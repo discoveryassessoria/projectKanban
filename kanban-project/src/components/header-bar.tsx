@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Search, Bell, LogOut, BarChart3, FolderOpen, TreeDeciduous } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import type { ProcessoWithStatus } from "@/src/types/kanban"
 
 interface HeaderBarProps {
   title: string
@@ -17,21 +18,7 @@ interface HeaderBarProps {
     nome: string
     descricao?: string | null
   }>
-  atividades?: Array<{
-    id: number | string
-    nome: string
-    descricao?: string | null
-    data_criacao?: string
-    data_termino?: string | null
-    projeto?: { nome: string } | null
-    status?: { nome: string } | null
-    usuarios?: Array<{
-      usuario: {
-        nome: string
-        email: string
-      }
-    }>
-  }>
+  processos?: ProcessoWithStatus[]
   arvores?: Array<{
     id: number | string
     nome: string
@@ -48,7 +35,7 @@ export function HeaderBar({
   userRole = "Usuário",
   userEmail = "",
   projetos = [],
-  atividades = [],
+  processos = [],
   arvores = [],
   onLogout 
 }: HeaderBarProps) {
@@ -59,9 +46,9 @@ export function HeaderBar({
   const [showNotifications, setShowNotifications] = useState(false)
   const [searchResults, setSearchResults] = useState<{
     projetos: any[]
-    atividades: any[]
+    processos: any[]
     arvores: any[]
-  }>({ projetos: [], atividades: [], arvores: [] })
+  }>({ projetos: [], processos: [], arvores: [] })
   
   const router = useRouter()
 
@@ -107,7 +94,7 @@ export function HeaderBar({
     
     if (query.trim() === "") {
       setShowSearchResults(false)
-      setSearchResults({ projetos: [], atividades: [], arvores: [] })
+      setSearchResults({ projetos: [], processos: [], arvores: [] })
       return
     }
 
@@ -118,10 +105,10 @@ export function HeaderBar({
       p.descricao?.toLowerCase().includes(queryLower)
     )
 
-    const atividadesFiltradas = atividades.filter(a => 
-      a.nome.toLowerCase().includes(queryLower) ||
-      a.descricao?.toLowerCase().includes(queryLower) ||
-      a.projeto?.nome.toLowerCase().includes(queryLower)
+    const processosFiltrados = processos.filter(p => 
+      p.nome.toLowerCase().includes(queryLower) ||
+      p.descricao?.toLowerCase().includes(queryLower) ||
+      p.contratante?.nome.toLowerCase().includes(queryLower)
     )
 
     const arvoresFiltradas = arvores.filter(a => 
@@ -131,49 +118,53 @@ export function HeaderBar({
 
     setSearchResults({
       projetos: projetosFiltrados.slice(0, 3),
-      atividades: atividadesFiltradas.slice(0, 3),
+      processos: processosFiltrados.slice(0, 3),
       arvores: arvoresFiltradas.slice(0, 3)
     })
     setShowSearchResults(true)
   }
 
-  const totalResults = searchResults.projetos.length + searchResults.atividades.length + searchResults.arvores.length
+  const totalResults = searchResults.projetos.length + searchResults.processos.length + searchResults.arvores.length
 
-  // Notificações
+  // Notificações baseadas em tarefas dos processos
   const hoje = new Date()
   hoje.setHours(0, 0, 0, 0)
 
-  const minhasAtividades = atividades.filter(a => 
-    a.usuarios?.some(u => u.usuario.email === userEmail)
+  // Coletar todas as tarefas de todos os processos
+  const todasTarefas = processos.flatMap(p => 
+    (p.tarefas || []).map(t => ({
+      ...t,
+      processoNome: p.nome
+    }))
   )
 
   const notificacoes = {
-    vencidas: minhasAtividades.filter(a => {
-      if (!a.data_termino) return false
-      const prazo = new Date(a.data_termino)
+    vencidas: todasTarefas.filter(t => {
+      if (!t.dataPrazo || t.concluida) return false
+      const prazo = new Date(t.dataPrazo)
       prazo.setHours(0, 0, 0, 0)
       return prazo < hoje
     }),
-    hoje: minhasAtividades.filter(a => {
-      if (!a.data_termino) return false
-      const prazo = new Date(a.data_termino)
+    hoje: todasTarefas.filter(t => {
+      if (!t.dataPrazo || t.concluida) return false
+      const prazo = new Date(t.dataPrazo)
       prazo.setHours(0, 0, 0, 0)
       return prazo.getTime() === hoje.getTime()
     }),
-    proximos3Dias: minhasAtividades.filter(a => {
-      if (!a.data_termino) return false
-      const prazo = new Date(a.data_termino)
+    proximos3Dias: todasTarefas.filter(t => {
+      if (!t.dataPrazo || t.concluida) return false
+      const prazo = new Date(t.dataPrazo)
       prazo.setHours(0, 0, 0, 0)
       const em3Dias = new Date(hoje)
       em3Dias.setDate(hoje.getDate() + 3)
       return prazo > hoje && prazo <= em3Dias
     }),
-    novas: minhasAtividades.filter(a => {
-      if (!a.data_criacao) return false
-      const criacao = new Date(a.data_criacao)
+    novas: todasTarefas.filter(t => {
+      if (!t.createdAt) return false
+      const criacao = new Date(t.createdAt)
       const umDiaAtras = new Date()
       umDiaAtras.setDate(umDiaAtras.getDate() - 1)
-      return criacao >= umDiaAtras
+      return criacao >= umDiaAtras && !t.concluida
     })
   }
 
@@ -228,14 +219,14 @@ export function HeaderBar({
                   </div>
                 ) : (
                   <div className="max-h-80 overflow-y-auto">
-                    {searchResults.projetos.length > 0 && (
+                    {searchResults.processos.length > 0 && (
                       <div>
                         <div className="px-3 py-2 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500 font-medium">
-                          Projetos
+                          Processos
                         </div>
-                        {searchResults.projetos.map(projeto => (
+                        {searchResults.processos.map(processo => (
                           <button
-                            key={`projeto-${projeto.id}`}
+                            key={`processo-${processo.id}`}
                             className="w-full px-3 py-2 flex items-center gap-3 hover:bg-gray-100 transition text-left"
                             onClick={() => {
                               router.push('/kanban')
@@ -243,35 +234,12 @@ export function HeaderBar({
                               setSearchQuery("")
                             }}
                           >
-                            <BarChart3 className="h-4 w-4 text-sky-500 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-gray-800 truncate">{projeto.nome}</p>
-                              <p className="text-[10px] text-gray-400 truncate">{projeto.descricao || "Sem descrição"}</p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {searchResults.atividades.length > 0 && (
-                      <div>
-                        <div className="px-3 py-2 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500 font-medium">
-                          Atividades
-                        </div>
-                        {searchResults.atividades.map(atividade => (
-                          <button
-                            key={`atividade-${atividade.id}`}
-                            className="w-full px-3 py-2 flex items-center gap-3 hover:bg-gray-100 transition text-left"
-                            onClick={() => {
-                              router.push('/activities')
-                              setShowSearchResults(false)
-                              setSearchQuery("")
-                            }}
-                          >
                             <FolderOpen className="h-4 w-4 text-amber-500 flex-shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm text-gray-800 truncate">{atividade.nome}</p>
-                              <p className="text-[10px] text-gray-400 truncate">{atividade.projeto?.nome || "Sem projeto"}</p>
+                              <p className="text-sm text-gray-800 truncate">{processo.nome}</p>
+                              <p className="text-[10px] text-gray-400 truncate">
+                                {processo.contratante?.nome || "Sem contratante"}
+                              </p>
                             </div>
                           </button>
                         ))}
@@ -343,25 +311,19 @@ export function HeaderBar({
                       <div>
                         <div className="px-3 py-2 bg-red-50 text-[10px] uppercase tracking-wide text-red-600 font-medium flex items-center gap-1">
                           <span className="h-2 w-2 rounded-full bg-red-500"></span>
-                          Vencidas ({notificacoes.vencidas.length})
+                          Tarefas Vencidas ({notificacoes.vencidas.length})
                         </div>
-                        {notificacoes.vencidas.map(atividade => (
-                          <button
-                            key={`vencida-${atividade.id}`}
-                            className="w-full px-3 py-2 flex items-start gap-3 hover:bg-gray-50 transition text-left border-l-4 border-red-500"
-                            onClick={() => {
-                              router.push('/activities')
-                              setShowNotifications(false)
-                            }}
+                        {notificacoes.vencidas.slice(0, 3).map(tarefa => (
+                          <div
+                            key={`vencida-${tarefa.id}`}
+                            className="px-3 py-2 border-l-4 border-red-500 hover:bg-gray-50"
                           >
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-gray-800 truncate font-medium">{atividade.nome}</p>
-                              <p className="text-[10px] text-gray-500">{atividade.projeto?.nome}</p>
-                              <p className="text-[10px] text-red-500 font-medium">
-                                Venceu em {new Date(atividade.data_termino!).toLocaleDateString('pt-BR')}
-                              </p>
-                            </div>
-                          </button>
+                            <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
+                            <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
+                            <p className="text-[10px] text-red-500 font-medium">
+                              Venceu em {new Date(tarefa.dataPrazo!).toLocaleDateString('pt-BR')}
+                            </p>
+                          </div>
                         ))}
                       </div>
                     )}
@@ -372,21 +334,15 @@ export function HeaderBar({
                           <span className="h-2 w-2 rounded-full bg-amber-500"></span>
                           Vencem hoje ({notificacoes.hoje.length})
                         </div>
-                        {notificacoes.hoje.map(atividade => (
-                          <button
-                            key={`hoje-${atividade.id}`}
-                            className="w-full px-3 py-2 flex items-start gap-3 hover:bg-gray-50 transition text-left border-l-4 border-amber-500"
-                            onClick={() => {
-                              router.push('/activities')
-                              setShowNotifications(false)
-                            }}
+                        {notificacoes.hoje.slice(0, 3).map(tarefa => (
+                          <div
+                            key={`hoje-${tarefa.id}`}
+                            className="px-3 py-2 border-l-4 border-amber-500 hover:bg-gray-50"
                           >
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-gray-800 truncate font-medium">{atividade.nome}</p>
-                              <p className="text-[10px] text-gray-500">{atividade.projeto?.nome}</p>
-                              <p className="text-[10px] text-amber-600 font-medium">Vence hoje!</p>
-                            </div>
-                          </button>
+                            <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
+                            <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
+                            <p className="text-[10px] text-amber-600 font-medium">Vence hoje!</p>
+                          </div>
                         ))}
                       </div>
                     )}
@@ -397,65 +353,20 @@ export function HeaderBar({
                           <span className="h-2 w-2 rounded-full bg-orange-500"></span>
                           Próximos 3 dias ({notificacoes.proximos3Dias.length})
                         </div>
-                        {notificacoes.proximos3Dias.map(atividade => (
-                          <button
-                            key={`proximos-${atividade.id}`}
-                            className="w-full px-3 py-2 flex items-start gap-3 hover:bg-gray-50 transition text-left border-l-4 border-orange-500"
-                            onClick={() => {
-                              router.push('/activities')
-                              setShowNotifications(false)
-                            }}
+                        {notificacoes.proximos3Dias.slice(0, 3).map(tarefa => (
+                          <div
+                            key={`proximos-${tarefa.id}`}
+                            className="px-3 py-2 border-l-4 border-orange-500 hover:bg-gray-50"
                           >
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-gray-800 truncate font-medium">{atividade.nome}</p>
-                              <p className="text-[10px] text-gray-500">{atividade.projeto?.nome}</p>
-                              <p className="text-[10px] text-orange-600 font-medium">
-                                Vence em {new Date(atividade.data_termino!).toLocaleDateString('pt-BR')}
-                              </p>
-                            </div>
-                          </button>
+                            <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
+                            <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
+                            <p className="text-[10px] text-orange-600 font-medium">
+                              Vence em {new Date(tarefa.dataPrazo!).toLocaleDateString('pt-BR')}
+                            </p>
+                          </div>
                         ))}
                       </div>
                     )}
-
-                    {notificacoes.novas.length > 0 && (
-                      <div>
-                        <div className="px-3 py-2 bg-blue-50 text-[10px] uppercase tracking-wide text-blue-600 font-medium flex items-center gap-1">
-                          <span className="h-2 w-2 rounded-full bg-blue-500"></span>
-                          Novas atribuições ({notificacoes.novas.length})
-                        </div>
-                        {notificacoes.novas.map(atividade => (
-                          <button
-                            key={`nova-${atividade.id}`}
-                            className="w-full px-3 py-2 flex items-start gap-3 hover:bg-gray-50 transition text-left border-l-4 border-blue-500"
-                            onClick={() => {
-                              router.push('/activities')
-                              setShowNotifications(false)
-                            }}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-gray-800 truncate font-medium">{atividade.nome}</p>
-                              <p className="text-[10px] text-gray-500">{atividade.projeto?.nome}</p>
-                              <p className="text-[10px] text-blue-600 font-medium">Nova tarefa atribuída a você</p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {totalNotificacoes > 0 && (
-                  <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">
-                    <button 
-                      className="w-full text-center text-xs text-blue-600 hover:text-blue-800 font-medium"
-                      onClick={() => {
-                        router.push('/activities')
-                        setShowNotifications(false)
-                      }}
-                    >
-                      Ver todas as atividades
-                    </button>
                   </div>
                 )}
               </div>

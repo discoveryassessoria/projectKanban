@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       include: {
         _count: {
           select: {
-            atividades: true
+            processos: true
           }
         }
       }
@@ -44,7 +44,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
     }
 
-    // Validações
     if (!nome || typeof nome !== 'string') {
       return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 })
     }
@@ -53,7 +52,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Nome deve ter no máximo 20 caracteres' }, { status: 400 })
     }
 
-    // Verificar se o status existe
     const existingStatus = await prisma.status.findUnique({
       where: { id: parsedStatusId }
     })
@@ -62,13 +60,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Status não encontrado' }, { status: 404 })
     }
 
-    // Verificar se já existe outro status com o mesmo nome (global)
     const duplicateStatus = await prisma.status.findFirst({
       where: {
         nome: {
           equals: nome.trim(),
           mode: 'insensitive'
         },
+        pais: existingStatus.pais,
         id: {
           not: parsedStatusId
         }
@@ -76,7 +74,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     })
 
     if (duplicateStatus) {
-      return NextResponse.json({ error: 'Já existe um status com este nome' }, { status: 409 })
+      return NextResponse.json({ error: 'Já existe um status com este nome neste país' }, { status: 409 })
     }
 
     const statusAtualizado = await prisma.status.update({
@@ -89,7 +87,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       include: {
         _count: {
           select: {
-            atividades: true
+            processos: true
           }
         }
       }
@@ -111,7 +109,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
     }
 
-    // First check if status exists
     const statusExists = await prisma.status.findUnique({
       where: {
         id: parsedStatusId,
@@ -119,7 +116,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       include: {
         _count: {
           select: {
-            atividades: true
+            processos: true
           }
         }
       }
@@ -129,30 +126,34 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: "Status não encontrado" }, { status: 404 })
     }
 
-    // Verificar se há atividades associadas
-    if (statusExists._count.atividades > 0) {
-      // Por enquanto, vamos deletar as atividades junto (cascade delete)
-    }
-
-    // Use transaction to ensure data consistency
+    // Usar transaction para garantir consistência
     await prisma.$transaction(async (tx) => {
-      // Delete all UserAtv relations for activities in this status
-      await tx.userAtv.deleteMany({
-        where: {
-          atividade: {
+      // Se houver processos neste status, deletar em cascata
+      if (statusExists._count.processos > 0) {
+        // Buscar todos os processos deste status
+        const processos = await tx.processo.findMany({
+          where: { statusId: parsedStatusId },
+          select: { id: true }
+        })
+
+        const processoIds = processos.map(p => p.id)
+
+        // Deletar tarefas dos processos
+        await tx.tarefa.deleteMany({
+          where: {
+            processoId: { in: processoIds }
+          }
+        })
+
+        // Deletar os processos
+        await tx.processo.deleteMany({
+          where: {
             statusId: parsedStatusId,
           },
-        },
-      })
+        })
+      }
 
-      // Delete all activities in this status
-      await tx.atividade.deleteMany({
-        where: {
-          statusId: parsedStatusId,
-        },
-      })
-
-      // Finally delete the status
+      // Finalmente deletar o status
       await tx.status.delete({
         where: {
           id: parsedStatusId,

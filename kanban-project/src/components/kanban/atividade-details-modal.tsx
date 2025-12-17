@@ -18,54 +18,16 @@ import {
   Filter,
   GitBranch
 } from "lucide-react"
-import { Pais, PAISES_CONFIG, type Status } from "@/src/types/kanban"
-
-// Tipos
-interface Contratante {
-  id: number
-  nome: string
-  telefone?: string
-  email?: string
-  endereco?: string
-  cidade?: string
-  estado?: string
-  cep?: string
-}
-
-interface Requerente {
-  id: number
-  nome: string
-  telefone?: string
-  email?: string
-}
-
-interface Tarefa {
-  id: number
-  titulo: string
-  prazo?: string
-  responsavel?: string
-  concluida: boolean
-  criadoEm: string
-}
-
-interface Processo {
-  id: number
-  nome: string
-  pais: Pais
-  statusId: number
-  status?: {
-    id: number
-    nome: string
-  }
-  contratante?: Contratante
-  requerentes?: Requerente[]
-  tarefas?: Tarefa[]
-  data_criacao?: string
-  createdAt?: string
-}
+import { 
+  Pais, 
+  PAISES_CONFIG, 
+  type Status,
+  type ProcessoWithStatus,
+  type Processo
+} from "@/src/types/kanban"
 
 interface ProcessoDetailsModalProps {
-  processo: Processo | null
+  processo: ProcessoWithStatus | Processo | null
   isOpen: boolean
   onClose: () => void
   onSave?: () => void
@@ -157,10 +119,15 @@ export function ProcessoDetailsModal({
   }
 
   // Formatar data de criação
-  const dataCriacao = processo.data_criacao || processo.createdAt
+  const dataCriacao = processo.createdAt
   const dataFormatada = dataCriacao 
     ? new Date(dataCriacao).toLocaleDateString('pt-BR')
     : ""
+
+  // Dados do processo
+  const contratante = processo.contratante
+  const requerentes = processo.requerentes || []
+  const tarefas = processo.tarefas || []
 
   const modalContent = (
     <>
@@ -304,11 +271,11 @@ export function ProcessoDetailsModal({
                   </p>
                 </div>
 
-                {/* Requerente */}
+                {/* Requerentes */}
                 <div className="mb-6">
-                  <label className="text-xs text-gray-500 uppercase">Requerente</label>
-                  {processo.requerentes && processo.requerentes.length > 0 ? (
-                    processo.requerentes.map((req) => (
+                  <label className="text-xs text-gray-500 uppercase">Requerentes</label>
+                  {requerentes.length > 0 ? (
+                    requerentes.map((req) => (
                       <p key={req.id} className="text-gray-900">{req.nome}</p>
                     ))
                   ) : (
@@ -317,36 +284,36 @@ export function ProcessoDetailsModal({
                 </div>
 
                 {/* Contato (Contratante) */}
-                {processo.contratante && (
+                {contratante && (
                   <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                     <label className="text-xs text-gray-500 uppercase">Contato</label>
                     
                     <div className="mt-2 space-y-2">
                       <p className="text-gray-900 font-semibold text-lg">
-                        {processo.contratante.nome}
+                        {contratante.nome}
                       </p>
                       
-                      {processo.contratante.telefone && (
+                      {contratante.telefone && (
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <Phone className="h-4 w-4" />
-                          <span>{processo.contratante.telefone}</span>
+                          <span>{contratante.telefone}</span>
                         </div>
                       )}
                       
-                      {processo.contratante.email && (
+                      {contratante.email && (
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <Mail className="h-4 w-4" />
-                          <span>{processo.contratante.email}</span>
+                          <span>{contratante.email}</span>
                         </div>
                       )}
                       
-                      {processo.contratante.endereco && (
+                      {contratante.endereco && (
                         <div className="mt-3 text-sm text-gray-600">
                           <p className="font-medium">Endereço de entrega:</p>
-                          <p>{processo.contratante.endereco}</p>
-                          {processo.contratante.cidade && <p>{processo.contratante.cidade}</p>}
-                          {processo.contratante.estado && <p>{processo.contratante.estado}</p>}
-                          {processo.contratante.cep && <p>{processo.contratante.cep}</p>}
+                          <p>{contratante.endereco}</p>
+                          {contratante.cidade && <p>{contratante.cidade}</p>}
+                          {contratante.estado && <p>{contratante.estado}</p>}
+                          {contratante.cep && <p>{contratante.cep}</p>}
                         </div>
                       )}
                     </div>
@@ -425,9 +392,9 @@ export function ProcessoDetailsModal({
                       <Plus className="h-4 w-4 text-white" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">Adicionar uma nova atividade</p>
+                      <p className="font-medium text-gray-900">Adicionar uma nova tarefa</p>
                       <p className="text-sm text-gray-500">
-                        Planeje sua próxima ação no negócio para nunca esquecer o cliente
+                        Planeje sua próxima ação no processo para nunca esquecer o cliente
                       </p>
                     </div>
                   </div>
@@ -445,10 +412,10 @@ export function ProcessoDetailsModal({
                   </button>
                 </div>
 
-                {/* Lista de tarefas/atividades */}
+                {/* Lista de tarefas */}
                 <div className="flex-1 p-4 space-y-3 overflow-y-auto">
-                  {processo.tarefas && processo.tarefas.length > 0 ? (
-                    processo.tarefas.map((tarefa) => (
+                  {tarefas.length > 0 ? (
+                    tarefas.map((tarefa) => (
                       <div 
                         key={tarefa.id}
                         className="flex items-start gap-3 p-3 bg-white rounded-lg border hover:shadow-sm transition-shadow"
@@ -468,17 +435,22 @@ export function ProcessoDetailsModal({
                           <p className={`font-medium ${tarefa.concluida ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
                             {tarefa.titulo}
                           </p>
-                          {tarefa.prazo && (
+                          {tarefa.dataPrazo && (
                             <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
                               <Calendar className="h-3 w-3" />
-                              Prazo: {tarefa.prazo}
+                              Prazo: {new Date(tarefa.dataPrazo).toLocaleDateString('pt-BR')}
+                            </p>
+                          )}
+                          {tarefa.responsavel && (
+                            <p className="text-sm text-gray-500 mt-1">
+                              Responsável: {tarefa.responsavel.nome}
                             </p>
                           )}
                         </div>
 
                         {!tarefa.concluida && (
                           <span className="px-2 py-1 bg-green-500 text-white text-xs rounded-full flex-shrink-0">
-                            Coisas a fazer
+                            Pendente
                           </span>
                         )}
                       </div>
@@ -486,18 +458,18 @@ export function ProcessoDetailsModal({
                   ) : (
                     <div className="text-center py-8 text-gray-500">
                       <MessageSquare className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                      <p>Nenhuma atividade ainda</p>
+                      <p>Nenhuma tarefa ainda</p>
                       <p className="text-sm">Adicione tarefas para acompanhar o progresso</p>
                     </div>
                   )}
 
-                  {/* Item de histórico - Negócio criado */}
+                  {/* Item de histórico - Processo criado */}
                   <div className="flex items-start gap-3 p-3 text-sm text-gray-500">
                     <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
                       <span className="text-xs">i</span>
                     </div>
                     <div>
-                      <p>Negócio criado {dataFormatada && <span className="text-gray-400">{dataFormatada}</span>}</p>
+                      <p>Processo criado {dataFormatada && <span className="text-gray-400">{dataFormatada}</span>}</p>
                       <p className="font-medium text-gray-700">{processo.nome}</p>
                     </div>
                   </div>

@@ -19,7 +19,7 @@ export default function AutomationPage() {
 
   // Estados para dados do HeaderBar
   const [projetos, setProjetos] = useState<any[]>([])
-  const [atividades, setAtividades] = useState<any[]>([])
+  const [processos, setProcessos] = useState<any[]>([])
   const [arvores, setArvores] = useState<any[]>([])
 
   const handleLogout = () => {
@@ -49,17 +49,17 @@ export default function AutomationPage() {
 
   const fetchHeaderData = async () => {
     try {
-      const [projetosRes, atividadesRes, arvoresRes] = await Promise.all([
+      const [projetosRes, processosRes, arvoresRes] = await Promise.all([
         fetch("/api/projetos"),
-        fetch("/api/activities"),
+        fetch("/api/processos"),
         fetch("/api/arvore")
       ])
 
       const projetosData = await projetosRes.json()
       setProjetos(projetosData.projetos || [])
 
-      const atividadesData = await atividadesRes.json()
-      setAtividades(Array.isArray(atividadesData) ? atividadesData : [])
+      const processosData = await processosRes.json()
+      setProcessos(processosData.processos || [])
 
       const arvoresData = await arvoresRes.json()
       setArvores(Array.isArray(arvoresData) ? arvoresData : [])
@@ -75,7 +75,7 @@ export default function AutomationPage() {
     {
       icon: Clock,
       titulo: "Lembretes Automáticos",
-      descricao: "Notificações automáticas para prazos de atividades",
+      descricao: "Notificações automáticas para prazos de tarefas",
       cor: "from-amber-500 to-orange-600"
     },
     {
@@ -87,7 +87,7 @@ export default function AutomationPage() {
     {
       icon: GitBranch,
       titulo: "Fluxos de Trabalho",
-      descricao: "Automatize a transição de status em projetos",
+      descricao: "Automatize a transição de status em processos",
       cor: "from-purple-500 to-pink-600"
     },
     {
@@ -138,7 +138,7 @@ export default function AutomationPage() {
         userRole={user.tipo === 'admin' ? 'Administrador' : user.tipo || 'Usuário'}
         userEmail={user.email || ''}
         projetos={projetos}
-        atividades={atividades}
+        processos={processos}
         arvores={arvores}
         onLogout={handleLogout}
       />
