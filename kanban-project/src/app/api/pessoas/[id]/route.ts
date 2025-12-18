@@ -67,6 +67,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.local_nasc !== undefined) dataToUpdate.local_nasc = body.local_nasc
     if (body.data_obito !== undefined) dataToUpdate.data_obito = body.data_obito ? new Date(body.data_obito) : null
     if (body.batizado !== undefined) dataToUpdate.batizado = body.batizado
+    if (body.comentario !== undefined) dataToUpdate.comentario = body.comentario
     if (body.paiId !== undefined)
       dataToUpdate.pai = body.paiId ? { connect: { id: Number(body.paiId) } } : { disconnect: true }
     if (body.maeId !== undefined)

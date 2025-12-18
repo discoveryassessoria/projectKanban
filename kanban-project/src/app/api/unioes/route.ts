@@ -45,13 +45,14 @@ export async function POST(request: NextRequest) {
     }
 
     const novaUniao = await prisma.uniao.create({
-      data: {
-        pessoa1Id: Number(body.pessoa1Id),
-        pessoa2Id: Number(body.pessoa2Id),
-        tipo: body.tipo || "Casamento",
-        data_inicio: body.data_inicio ? new Date(body.data_inicio) : null,
-        data_fim: body.data_fim ? new Date(body.data_fim) : null,
-      },
+  data: {
+    pessoa1Id: Number(body.pessoa1Id),
+    pessoa2Id: Number(body.pessoa2Id),
+    tipo: body.tipo || "Casamento",
+    data_inicio: body.data_inicio ? new Date(body.data_inicio) : null,
+    data_fim: body.data_fim ? new Date(body.data_fim) : null,
+    local: body.local || null,
+    },
       include: {
         pessoa1: true,
         pessoa2: true,

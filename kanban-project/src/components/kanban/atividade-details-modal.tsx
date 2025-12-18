@@ -5,6 +5,7 @@ import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { MapTooltip } from "../ui/map-tooltip"
+import { ArvoreGenealogicaView } from "../arvore"
 import { 
   X, 
   Phone, 
@@ -73,6 +74,9 @@ export function ProcessoDetailsModal({
   const [contratantes, setContratantes] = useState<Contratante[]>(contratantesProp)
   const [requerentes, setRequerentes] = useState<Requerente[]>(requerentesProp)
   
+  // Árvore genealógica
+  const [arvoreIdLocal, setArvoreIdLocal] = useState<number | null>(processo?.arvoreId || null)
+  
   const contratanteRef = useRef<HTMLDivElement>(null)
   const requerenteRef = useRef<HTMLDivElement>(null)
 
@@ -82,6 +86,7 @@ export function ProcessoDetailsModal({
     setNomeEditado(processo?.nome || "")
     setContratantesSelecionados(processo?.contratantes || [])
     setRequerentesSelecionados(processo?.requerentes || [])
+    setArvoreIdLocal(processo?.arvoreId || null)
   }, [processo])
 
   // Buscar contatos se não foram passados como prop
@@ -848,14 +853,14 @@ export function ProcessoDetailsModal({
           )}
 
           {activeTab === "arvore" && (
-            <div className="h-full flex items-center justify-center text-gray-500">
-              <div className="text-center">
-                <GitBranch className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                <h3 className="text-lg font-medium text-gray-700">Árvore Genealógica</h3>
-                <p className="text-sm mt-2">Visualize e gerencie a árvore genealógica deste processo</p>
-                <Button className="mt-4" variant="outline">Vincular Árvore</Button>
-              </div>
-            </div>
+            <ArvoreGenealogicaView 
+              processoId={processo.id}
+              arvoreId={arvoreIdLocal}
+              onArvoreCreated={(novoArvoreId) => {
+                setArvoreIdLocal(novoArvoreId)
+                onSave?.()
+              }}
+            />
           )}
 
           {activeTab === "faturas" && (

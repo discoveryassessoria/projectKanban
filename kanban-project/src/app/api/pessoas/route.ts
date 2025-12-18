@@ -36,7 +36,9 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-
+    
+    const arvoreId = body.arvoreId ? Number(body.arvoreId) : 1
+    
     const novaPessoa = await prisma.pessoa.create({
       data: {
         nome: body.nome,
@@ -50,7 +52,7 @@ export async function POST(request: NextRequest) {
         maeId: body.maeId ? Number(body.maeId) : null,
         x: body.x || 0,
         y: body.y || 0,
-        arvoreId: body.arvoreId ? Number(body.arvoreId) : 1, // Default tree ID
+        arvoreId,
       },
       include: {
         pai: true,
@@ -58,6 +60,33 @@ export async function POST(request: NextRequest) {
         arvore: true,
       },
     })
+
+    // Se está adicionando como pai ou mãe de um filho existente
+    if (body.filhoId && body.tipoPai) {
+      const updateData: any = {}
+      if (body.tipoPai === 'pai') {
+        updateData.paiId = novaPessoa.id
+      } else if (body.tipoPai === 'mae') {
+        updateData.maeId = novaPessoa.id
+      }
+
+      await prisma.pessoa.update({
+        where: { id: Number(body.filhoId) },
+        data: updateData
+      })
+    }
+
+    // Se é a primeira pessoa da árvore, definir como pessoa principal
+    const arvore = await prisma.arvore.findUnique({
+      where: { id: arvoreId }
+    })
+    
+    if (arvore && !arvore.pessoaPrincipalId) {
+      await prisma.arvore.update({
+        where: { id: arvoreId },
+        data: { pessoaPrincipalId: novaPessoa.id }
+      })
+    }
 
     return NextResponse.json(novaPessoa, { status: 201 })
   } catch (error) {

@@ -1,0 +1,5 @@
+export { ArvoreGenealogicaView } from "./arvore-genealogica-view"
+export { PessoaCard, type PessoaArvore, type UniaoArvore } from "./pessoa-card"
+export { PessoaSidebar } from "./pessoa-sidebar"
+export { PessoaDetailsPage } from "./pessoa-details-page"
+export { PersonIcon } from "./pessoa-icon"

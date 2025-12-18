@@ -84,6 +84,7 @@ model Uniao {
   data_inicio DateTime?
   data_fim    DateTime?
   tipo        String?   @db.VarChar(10)
+  local       String?
 
   pessoa1Id Int
   pessoa1   Pessoa @relation("Pessoa1", fields: [pessoa1Id], references: [id], onDelete: Cascade)
