@@ -138,8 +138,7 @@ model Processo {
   statusId     Int
   status       Status    @relation(fields: [statusId], references: [id], onDelete: Cascade)
   
-  contratanteId Int?
-  contratante   Contratante? @relation(fields: [contratanteId], references: [id], onDelete: SetNull)
+  contratantes ProcessoContratante[]
   
   arvoreId     Int?
   arvore       Arvore?   @relation(fields: [arvoreId], references: [id], onDelete: SetNull)
@@ -157,7 +156,18 @@ model Processo {
 
   @@index([pais])
   @@index([statusId])
-  @@index([contratanteId])
+}
+
+// ========================================
+// RELACIONAMENTO PROCESSO <-> CONTRATANTE
+// ========================================
+model ProcessoContratante {
+  processoId    Int
+  contratanteId Int
+  processo      Processo    @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  contratante   Contratante @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
+
+  @@id([processoId, contratanteId])
 }
 
 // ========================================
@@ -228,7 +238,7 @@ model Contratante {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  processos       Processo[]
+  processos       ProcessoContratante[]
   anexos          AnexoContratante[]
 }
 

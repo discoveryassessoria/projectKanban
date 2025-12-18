@@ -190,8 +190,7 @@ export interface Processo {
   pais: Pais
   statusId: number
   status?: Status
-  contratanteId?: number | null
-  contratante?: Contratante | null
+  contratantes?: Contratante[]
   arvoreId?: number | null
   arvore?: {
     id: number
@@ -233,7 +232,7 @@ export interface CriarProcesso {
   observacoes?: string
   pais: Pais
   statusId: number
-  contratanteId?: number
+  contratanteIds?: number[]
   requerenteIds?: number[]
   arvoreId?: number
   previsaoTermino?: string
@@ -244,7 +243,7 @@ export interface AtualizarProcesso {
   descricao?: string
   observacoes?: string
   statusId?: number
-  contratanteId?: number | null
+  contratanteIds?: number[]
   requerenteIds?: number[]
   arvoreId?: number | null
   previsaoTermino?: string | null

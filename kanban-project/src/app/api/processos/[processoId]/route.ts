@@ -21,7 +21,11 @@ export async function GET(
       where: { id },
       include: {
         status: true,
-        contratante: true,
+        contratantes: {
+          include: {
+            contratante: true
+          }
+        },
         arvore: true,
         requerentes: {
           include: {
@@ -50,6 +54,7 @@ export async function GET(
     // Formatar resposta
     const processoFormatado = {
       ...processo,
+      contratantes: processo.contratantes.map(c => c.contratante),
       requerentes: processo.requerentes.map(r => r.requerente)
     }
 
@@ -85,7 +90,7 @@ export async function PUT(
       descricao, 
       observacoes,
       statusId, 
-      contratanteId, 
+      contratanteIds, // Array de IDs de contratantes
       arvoreId,
       previsaoTermino,
       dataConclusao,
@@ -125,6 +130,24 @@ export async function PUT(
       }
     }
 
+    // Atualizar contratantes se fornecidos
+    if (contratanteIds !== undefined) {
+      // Remover todos os contratantes atuais
+      await prisma.processoContratante.deleteMany({
+        where: { processoId: id }
+      })
+
+      // Adicionar os novos
+      if (contratanteIds.length > 0) {
+        await prisma.processoContratante.createMany({
+          data: contratanteIds.map((contratanteId: number) => ({
+            processoId: id,
+            contratanteId
+          }))
+        })
+      }
+    }
+
     // Atualizar requerentes se fornecidos
     if (requerenteIds !== undefined) {
       // Remover todos os requerentes atuais
@@ -143,15 +166,14 @@ export async function PUT(
       }
     }
 
-    // Atualizar o processo
-    const processo = await prisma.processo.update({
+    // Atualizar o processo (campos básicos)
+    await prisma.processo.update({
       where: { id },
       data: {
         nome: nome !== undefined ? nome : undefined,
         descricao: descricao !== undefined ? descricao : undefined,
         observacoes: observacoes !== undefined ? observacoes : undefined,
         statusId: statusId !== undefined ? statusId : undefined,
-        contratanteId: contratanteId !== undefined ? contratanteId : undefined,
         arvoreId: arvoreId !== undefined ? arvoreId : undefined,
         previsaoTermino: previsaoTermino !== undefined 
           ? (previsaoTermino ? new Date(previsaoTermino) : null) 
@@ -159,10 +181,19 @@ export async function PUT(
         dataConclusao: dataConclusao !== undefined 
           ? (dataConclusao ? new Date(dataConclusao) : null) 
           : undefined
-      },
+      }
+    })
+
+    // Buscar processo atualizado com todos os relacionamentos
+    const processoAtualizado = await prisma.processo.findUnique({
+      where: { id },
       include: {
         status: true,
-        contratante: true,
+        contratantes: {
+          include: {
+            contratante: true
+          }
+        },
         arvore: true,
         requerentes: {
           include: {
@@ -179,8 +210,9 @@ export async function PUT(
 
     // Formatar resposta
     const processoFormatado = {
-      ...processo,
-      requerentes: processo.requerentes.map(r => r.requerente)
+      ...processoAtualizado,
+      contratantes: processoAtualizado?.contratantes.map(c => c.contratante) || [],
+      requerentes: processoAtualizado?.requerentes.map(r => r.requerente) || []
     }
 
     return NextResponse.json({ processo: processoFormatado })
@@ -221,7 +253,7 @@ export async function DELETE(
       )
     }
 
-    // Excluir (cascade vai deletar tarefas, requerentes e anexos)
+    // Excluir (cascade vai deletar tarefas, requerentes, contratantes e anexos)
     await prisma.processo.delete({
       where: { id }
     })

@@ -14,7 +14,11 @@ export async function GET(request: Request) {
       where,
       include: {
         status: true,
-        contratante: true,
+        contratantes: {
+          include: {
+            contratante: true
+          }
+        },
         arvore: true,
         requerentes: {
           include: {
@@ -37,9 +41,10 @@ export async function GET(request: Request) {
       orderBy: { createdAt: "desc" }
     })
 
-    // Formatar para incluir requerentes como array simples
+    // Formatar para incluir contratantes e requerentes como arrays simples
     const processosFormatados = processos.map(p => ({
       ...p,
+      contratantes: p.contratantes.map(c => c.contratante),
       requerentes: p.requerentes.map(r => r.requerente)
     }))
 
@@ -63,7 +68,7 @@ export async function POST(request: Request) {
       observacoes,
       statusId, 
       pais, 
-      contratanteId, 
+      contratanteIds, // Array de IDs de contratantes
       arvoreId,
       previsaoTermino,
       requerenteIds // Array de IDs de requerentes
@@ -125,19 +130,41 @@ export async function POST(request: Request) {
         observacoes: observacoes || null,
         pais,
         statusId,
-        contratanteId: contratanteId || null,
         arvoreId: arvoreId || null,
         previsaoTermino: previsaoTermino ? new Date(previsaoTermino) : null,
-        // Criar relacionamentos com requerentes se fornecidos
-        requerentes: requerenteIds?.length > 0 ? {
-          create: requerenteIds.map((id: number) => ({
-            requerenteId: id
-          }))
-        } : undefined
-      },
+      }
+    })
+
+    // Criar relacionamentos com contratantes se fornecidos
+    if (contratanteIds?.length > 0) {
+      await prisma.processoContratante.createMany({
+        data: contratanteIds.map((contratanteId: number) => ({
+          processoId: processo.id,
+          contratanteId
+        }))
+      })
+    }
+
+    // Criar relacionamentos com requerentes se fornecidos
+    if (requerenteIds?.length > 0) {
+      await prisma.processoRequerente.createMany({
+        data: requerenteIds.map((requerenteId: number) => ({
+          processoId: processo.id,
+          requerenteId
+        }))
+      })
+    }
+
+    // Buscar processo completo com relacionamentos
+    const processoCompleto = await prisma.processo.findUnique({
+      where: { id: processo.id },
       include: {
         status: true,
-        contratante: true,
+        contratantes: {
+          include: {
+            contratante: true
+          }
+        },
         arvore: true,
         requerentes: {
           include: {
@@ -149,8 +176,9 @@ export async function POST(request: Request) {
 
     // Formatar resposta
     const processoFormatado = {
-      ...processo,
-      requerentes: processo.requerentes.map(r => r.requerente)
+      ...processoCompleto,
+      contratantes: processoCompleto?.contratantes.map(c => c.contratante) || [],
+      requerentes: processoCompleto?.requerentes.map(r => r.requerente) || []
     }
 
     return NextResponse.json({ processo: processoFormatado }, { status: 201 })
