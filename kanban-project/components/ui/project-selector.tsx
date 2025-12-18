@@ -1,8 +1,6 @@
 "use client"
-
 import * as React from "react"
 import { Check, ChevronsUpDown } from "lucide-react"
-
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,12 +16,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import type { Projeto } from "@/src/types/kanban"
+import type { Processo } from "@/src/types/kanban"
 
 interface ProjectSelectorProps {
-  projetos: Projeto[]
-  selectedProject: Projeto | null
-  onSelect: (projeto: Projeto) => void
+  projetos: Processo[]
+  selectedProject: Processo | null
+  onSelect: (projeto: Processo) => void
   placeholder?: string
   className?: string
   disabled?: boolean
