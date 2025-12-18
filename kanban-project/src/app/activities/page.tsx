@@ -166,7 +166,6 @@ export default function ActivitiesPage() {
         userRole={user.tipo === 'admin' ? 'Administrador' : user.tipo || 'Usuário'}
         userEmail={user.email || ''}
         projetos={[]}
-        atividades={atividadesParaHeader}
         arvores={arvores}
         onLogout={handleLogout}
       />
