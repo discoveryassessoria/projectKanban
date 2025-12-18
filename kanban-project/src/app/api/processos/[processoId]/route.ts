@@ -4,10 +4,11 @@ import { prisma } from "@/lib/prisma"
 // GET - Buscar processo por ID
 export async function GET(
   request: Request,
-  { params }: { params: { processoId: string } }
+  { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
-    const id = parseInt(params.processoId)
+    const { processoId } = await params
+    const id = parseInt(processoId)
 
     if (isNaN(id)) {
       return NextResponse.json(
@@ -65,10 +66,11 @@ export async function GET(
 // PUT - Atualizar processo
 export async function PUT(
   request: Request,
-  { params }: { params: { processoId: string } }
+  { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
-    const id = parseInt(params.processoId)
+    const { processoId } = await params
+    const id = parseInt(processoId)
 
     if (isNaN(id)) {
       return NextResponse.json(
@@ -194,10 +196,11 @@ export async function PUT(
 // DELETE - Excluir processo
 export async function DELETE(
   request: Request,
-  { params }: { params: { processoId: string } }
+  { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
-    const id = parseInt(params.processoId)
+    const { processoId } = await params
+    const id = parseInt(processoId)
 
     if (isNaN(id)) {
       return NextResponse.json(

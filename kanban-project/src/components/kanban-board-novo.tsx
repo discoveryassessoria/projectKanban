@@ -198,7 +198,6 @@ export function KanbanBoard({
 
   const handleProcessoSave = () => {
     onRefresh()
-    setIsDetailsModalOpen(false)
   }
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -257,7 +256,7 @@ export function KanbanBoard({
   }
 
   const handleClearCompleted = async () => {
-    const concluidoStatus = statusList.find((s) => s.nome.toLowerCase() === "concluído")
+    const concluidoStatus = statusList.find((s) => s.nome.toLowerCase() === "transcrição")
     if (!concluidoStatus) return
 
     const completedProcessos = processos.filter((p) => p.statusId === concluidoStatus.id)

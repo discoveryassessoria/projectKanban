@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       nome: body.nome.trim(),
     }
 
-    if (body.tipo) createData.tipo = body.tipo
+    // Campos que existem no modelo Contratante
     if (body.cpf) createData.cpf = body.cpf
     if (body.rg) createData.rg = body.rg
     if (body.dataNascimento) createData.dataNascimento = new Date(body.dataNascimento)

@@ -45,6 +45,20 @@ export function ProcessoDetailsModal({
   const [activeRightTab, setActiveRightTab] = useState<"atividade" | "tarefa" | "comentario">("atividade")
   const [novaTarefa, setNovaTarefa] = useState("")
   const [etapas, setEtapas] = useState<Status[]>([])
+  const [statusIdAtual, setStatusIdAtual] = useState(processo?.statusId)
+  const [mudouEtapa, setMudouEtapa] = useState(false)
+
+// Atualizar quando o processo mudar
+useEffect(() => {
+  setStatusIdAtual(processo?.statusId)
+}, [processo?.statusId])
+
+const handleClose = () => {
+  if (mudouEtapa) {
+    onSave?.()
+  }
+  onClose()
+}
 
   // Buscar etapas do país quando o modal abre
   useEffect(() => {
@@ -69,7 +83,7 @@ export function ProcessoDetailsModal({
   // Fechar com ESC
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') handleClose()
     }
     if (isOpen) {
       document.addEventListener('keydown', handleEsc)
@@ -79,7 +93,7 @@ export function ProcessoDetailsModal({
       document.removeEventListener('keydown', handleEsc)
       document.body.style.overflow = 'auto'
     }
-  }, [isOpen, onClose])
+  }, [isOpen, handleClose])
 
   if (!isOpen || !processo) return null
 
@@ -90,7 +104,7 @@ export function ProcessoDetailsModal({
   const sortedEtapas = [...etapas].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
   
   // Encontrar índice da etapa atual
-  const etapaAtualIndex = sortedEtapas.findIndex(e => e.id === processo.statusId)
+  const etapaAtualIndex = sortedEtapas.findIndex(e => e.id === statusIdAtual)
   const etapaAtual = sortedEtapas.find(e => e.id === processo.statusId)
 
   // Cores para as etapas baseadas no índice
@@ -134,7 +148,7 @@ export function ProcessoDetailsModal({
       {/* Overlay escuro - cobre tudo */}
       <div 
         className="fixed inset-0 bg-black/50 z-[9998]"
-        onClick={onClose}
+        onClick={handleClose}
       />
 
       {/* Modal - com margens específicas */}
@@ -151,7 +165,7 @@ export function ProcessoDetailsModal({
         <div className="flex items-center justify-between px-6 py-4 border-b bg-white flex-shrink-0">
           <div className="flex items-center gap-4">
             <button 
-              onClick={onClose}
+              onClick={handleClose}
               className="w-10 h-10 bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center justify-center transition-colors"
             >
               <X className="h-5 w-5 text-white" />
@@ -182,23 +196,44 @@ export function ProcessoDetailsModal({
           </div>
         </div>
 
-        {/* Barra de Etapas - Dinâmica */}
+{/* Barra de Etapas - Dinâmica */}
         <div className="flex border-b bg-gray-50 overflow-x-auto flex-shrink-0">
           {sortedEtapas.length > 0 ? (
             sortedEtapas.map((etapa, index) => {
-              const isActive = etapa.id === processo.statusId
+              const isActive = etapa.id === statusIdAtual
               const isPast = index < etapaAtualIndex
               const cor = getEtapaCor(index, sortedEtapas.length)
-              
               return (
                 <button
                   key={etapa.id}
+                  onClick={async () => {
+  if (etapa.id === statusIdAtual) return
+  
+  try {
+    const response = await fetch(`/api/processos/${processo.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ statusId: etapa.id })
+    })
+    
+    if (response.ok) {
+      setStatusIdAtual(etapa.id)
+      setMudouEtapa(true)  // <-- Marca que mudou
+      onSave?.()
+    } else {
+      alert('Erro ao mover processo')
+    }
+  } catch (error) {
+    console.error('Erro ao mover processo:', error)
+    alert('Erro ao mover processo')
+  }
+}}
                   className={`
-                    flex-shrink-0 px-4 py-3 text-sm font-medium transition-colors relative
+                    flex-shrink-0 px-4 py-3 text-sm font-medium transition-colors relative cursor-pointer
                     ${isActive 
                       ? `${cor} text-white` 
                       : isPast 
-                        ? 'bg-gray-200 text-gray-600' 
+                        ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' 
                         : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                     }
                   `}
@@ -218,7 +253,7 @@ export function ProcessoDetailsModal({
         <div className="flex border-b bg-white px-6 flex-shrink-0">
           {[
             { id: "geral", label: "Geral", icon: null },
-            { id: "arvore", label: "Árvore Genealógica", icon: GitBranch },
+            { id: "arvore", label: "Árvore Genealógica", icon: null },
             { id: "faturas", label: "Faturas", icon: null },
             { id: "historico", label: "Histórico", icon: null },
           ].map((tab) => (
@@ -233,7 +268,6 @@ export function ProcessoDetailsModal({
                 }
               `}
             >
-              {tab.icon && <tab.icon className="h-4 w-4" />}
               {tab.label}
             </button>
           ))}

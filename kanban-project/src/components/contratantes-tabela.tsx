@@ -21,7 +21,8 @@ import {
   X,
   Eye,
   Globe,
-  Heart
+  Heart,
+  Loader2
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -29,6 +30,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useUploadThing } from "@/src/lib/uploadthing"
+import { PDFThumbnail } from "./pdf-thumbnail"
 
 interface Contratante {
   id: number
@@ -52,8 +55,17 @@ interface Contratante {
   observacoes?: string | null
   createdAt: string
   _count?: {
-    atividades: number
+    processos: number
   }
+}
+
+interface Anexo {
+  id: number
+  nome: string
+  nomeArquivo: string
+  urlArquivo: string
+  tamanho?: number | null
+  mimeType?: string | null
 }
 
 interface ContratantesTabelaProps {
@@ -97,6 +109,7 @@ function ContratanteModal({
   isViewMode,
   setIsViewMode,
   editingId,
+  editingTipo,
   formData,
   setFormData,
   onSave,
@@ -107,6 +120,7 @@ function ContratanteModal({
   isViewMode: boolean
   setIsViewMode: (v: boolean) => void
   editingId: number | null
+  editingTipo: string
   formData: typeof initialFormData
   setFormData: (data: typeof initialFormData) => void
   onSave: () => void
@@ -114,10 +128,151 @@ function ContratanteModal({
 }) {
   const [activeTab, setActiveTab] = useState<"dados" | "endereco" | "observacoes">("dados")
   const [mounted, setMounted] = useState(false)
+  const [buscandoCep, setBuscandoCep] = useState(false)
+  
+  // Estados para upload de arquivos
+  const [arquivos, setArquivos] = useState<File[]>([])
+  const [anexosExistentes, setAnexosExistentes] = useState<Anexo[]>([])
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [carregandoAnexos, setCarregandoAnexos] = useState(false)
+
+  // Carregar anexos existentes quando abrir para editar/visualizar
+  useEffect(() => {
+    if (isOpen && editingId) {
+      carregarAnexos()
+    }
+  }, [isOpen, editingId])
+
+  const carregarAnexos = async () => {
+    if (!editingId) return
+    
+    setCarregandoAnexos(true)
+    try {
+      const response = await fetch(`/api/anexos?tipoCliente=${editingTipo}&id=${editingId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setAnexosExistentes(data.anexos || [])
+      }
+    } catch (error) {
+      console.error("Erro ao carregar anexos:", error)
+    } finally {
+      setCarregandoAnexos(false)
+    }
+  }
+
+  const { startUpload, isUploading } = useUploadThing("anexoUploader", {
+    onUploadProgress: (progress) => {
+      setUploadProgress(progress)
+    },
+    onClientUploadComplete: async (res) => {
+      if (res && editingId) {
+        // Salvar cada arquivo no banco de dados
+        for (const file of res) {
+          try {
+            const response = await fetch("/api/anexos", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                nome: file.name,
+                nomeArquivo: file.name,
+                urlArquivo: file.url,
+                tamanho: file.size,
+                mimeType: file.type,
+                tipoCliente: editingTipo,
+                contratanteId: editingTipo === "contratante" ? editingId : undefined,
+                requerenteId: editingTipo === "requerente" ? editingId : undefined,
+              }),
+            })
+            
+            if (response.ok) {
+              const data = await response.json()
+              setAnexosExistentes(prev => [...prev, data.anexo])
+            }
+          } catch (error) {
+            console.error("Erro ao salvar anexo:", error)
+          }
+        }
+        setArquivos([])
+        setUploadProgress(0)
+      } else if (res && !editingId) {
+        // Se ainda não salvou o cliente, guarda temporariamente
+        const novosAnexos = res.map(file => ({
+          id: Date.now() + Math.random(),
+          nome: file.name,
+          nomeArquivo: file.name,
+          urlArquivo: file.url,
+          tamanho: file.size,
+          mimeType: file.type,
+        }))
+        setAnexosExistentes(prev => [...prev, ...novosAnexos] as Anexo[])
+        setArquivos([])
+        setUploadProgress(0)
+      }
+    },
+    onUploadError: (error) => {
+      alert(`Erro no upload: ${error.message}`)
+      setUploadProgress(0)
+    },
+  })
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const novosArquivos = Array.from(e.target.files)
+      setArquivos(prev => [...prev, ...novosArquivos])
+    }
+  }
+
+  const handleUpload = async () => {
+    if (arquivos.length === 0) return
+    await startUpload(arquivos)
+  }
+
+  const removerArquivo = (index: number) => {
+    setArquivos(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const removerAnexoExistente = async (anexo: Anexo, index: number) => {
+    if (editingId && anexo.id) {
+      try {
+        const response = await fetch(`/api/anexos?tipoCliente=${editingTipo}&id=${anexo.id}`, {
+          method: "DELETE",
+        })
+        
+        if (response.ok) {
+          setAnexosExistentes(prev => prev.filter((_, i) => i !== index))
+        } else {
+          alert("Erro ao excluir anexo")
+        }
+      } catch (error) {
+        console.error("Erro ao excluir anexo:", error)
+        alert("Erro ao excluir anexo")
+      }
+    } else {
+      setAnexosExistentes(prev => prev.filter((_, i) => i !== index))
+    }
+  }
+
+  const formatFileSize = (bytes: number | null | undefined) => {
+    if (!bytes || bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Limpar arquivos quando fechar o modal
+  useEffect(() => {
+    if (!isOpen) {
+      setArquivos([])
+      setAnexosExistentes([])
+      setUploadProgress(0)
+      setActiveTab("dados")
+    }
+  }, [isOpen])
 
   // Formatar CPF
   const formatCPF = (value: string) => {
@@ -146,8 +301,48 @@ function ContratanteModal({
       .replace(/(-\d{3})\d+?$/, "$1")
   }
 
-  if (!isOpen || !mounted) return null
+  // Buscar CEP na API ViaCEP
+  const buscarCEP = async (cep: string) => {
+    const cepLimpo = cep.replace(/\D/g, "")
+    
+    if (cepLimpo.length !== 8) return
+    
+    setBuscandoCep(true)
+    
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`)
+      const data = await response.json()
+      
+      if (!data.erro) {
+        setFormData({
+          ...formData,
+          cep: formatCEP(cepLimpo),
+          endereco: data.logradouro || "",
+          bairro: data.bairro || "",
+          cidade: data.localidade || "",
+          estado: data.uf || "",
+          complemento: data.complemento || formData.complemento,
+        })
+      }
+    } catch (error) {
+      console.error("Erro ao buscar CEP:", error)
+    } finally {
+      setBuscandoCep(false)
+    }
+  }
 
+  // Handler do CEP com busca automática
+  const handleCEPChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCEP(e.target.value)
+    setFormData({ ...formData, cep: formatted })
+    
+    // Buscar quando completar 9 caracteres (00000-000)
+    if (formatted.length === 9) {
+      buscarCEP(formatted)
+    }
+  }
+
+  if (!isOpen || !mounted) return null
   const modalContent = (
     <div 
       className="fixed inset-0 z-[9999] flex items-center justify-center"
@@ -175,7 +370,9 @@ function ContratanteModal({
         {/* Header do Modal */}
         <div className="flex items-center justify-between px-8 py-5 border-b border-gray-200 bg-gray-50 shrink-0">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xl font-semibold">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-xl font-semibold ${
+              formData.tipo === 'requerente' ? 'bg-purple-600' : 'bg-indigo-600'
+            }`}>
               {formData.nome ? formData.nome.charAt(0).toUpperCase() : <User className="h-6 w-6" />}
             </div>
             <div>
@@ -263,13 +460,23 @@ function ContratanteModal({
                         <select
                           value={formData.tipo}
                           onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
-                          disabled={isViewMode}
-                          className="w-full h-10 px-3 rounded-md bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100"
+                          disabled={isViewMode || !!editingId}
+                          className={`w-full h-10 px-3 rounded-md border text-gray-900 disabled:bg-gray-100 ${
+                            formData.tipo === 'requerente' 
+                              ? 'bg-purple-50 border-purple-300' 
+                              : 'bg-white border-gray-300'
+                          }`}
                         >
                           {TIPO_OPTIONS.map(opt => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                           ))}
                         </select>
+                        {!editingId && !isViewMode && (
+                          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                            <span>⚠️</span>
+                            O tipo não poderá ser alterado após a criação
+                          </p>
+                        )}
                       </div>
                       <div className="col-span-3">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -434,17 +641,25 @@ function ContratanteModal({
                 </h3>
                 
                 <div className="space-y-4">
-                  {/* CEP */}
+                  {/* CEP com busca automática */}
                   <div className="w-1/3">
                     <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
-                    <Input
-                      value={formData.cep}
-                      onChange={(e) => setFormData({ ...formData, cep: formatCEP(e.target.value) })}
-                      placeholder="00000-000"
-                      maxLength={9}
-                      disabled={isViewMode}
-                      className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
-                    />
+                    <div className="relative">
+                      <Input
+                        value={formData.cep}
+                        onChange={handleCEPChange}
+                        placeholder="00000-000"
+                        maxLength={9}
+                        disabled={isViewMode}
+                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 pr-10"
+                      />
+                      {buscandoCep && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Digite o CEP para preencher automaticamente</p>
                   </div>
 
                   {/* Endereço e Número */}
@@ -550,12 +765,176 @@ function ContratanteModal({
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <FileText className="h-4 w-4 text-indigo-600" />
                     Anexos
+                    {carregandoAnexos && <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />}
                   </h3>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                    <FileText className="h-10 w-10 mx-auto mb-3 text-gray-400" />
-                    <p className="text-sm text-gray-500">Área de anexos</p>
-                    <p className="text-xs text-gray-400 mt-1">Em breve: upload de documentos</p>
-                  </div>
+
+                  {/* Aviso para salvar primeiro */}
+                  {!editingId && (
+                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-sm text-amber-700">
+                        ⚠️ Salve o cliente primeiro para poder adicionar anexos.
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Anexos já enviados - Grid com Preview */}
+                  {anexosExistentes.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-sm text-gray-600 font-medium mb-3">Arquivos enviados:</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                        {anexosExistentes.map((anexo, index) => {
+                          const fileName = anexo.nomeArquivo || anexo.nome || ''
+                          const isImage = anexo.mimeType?.startsWith('image/') || 
+                            /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName)
+                          const isPDF = anexo.mimeType === 'application/pdf' || 
+                            /\.pdf$/i.test(fileName)
+                          const isWord = /\.(doc|docx)$/i.test(fileName)
+                          const isExcel = /\.(xls|xlsx)$/i.test(fileName)
+                          
+                          return (
+                            <div 
+                              key={anexo.id || index} 
+                              className="group relative bg-gray-50 rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
+                            >
+                              {/* Thumbnail/Preview */}
+                              <a 
+                                href={anexo.urlArquivo} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="block aspect-square relative overflow-hidden"
+                              >
+                                {isImage ? (
+                                  <img 
+                                    src={anexo.urlArquivo} 
+                                    alt={fileName}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : isPDF ? (
+                                  <PDFThumbnail 
+                                    url={anexo.urlArquivo} 
+                                    className="w-full h-full"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                    {isWord ? (
+                                      <div className="text-center">
+                                        <div className="w-12 h-14 mx-auto bg-blue-600 rounded-sm flex items-center justify-center text-white text-xs font-bold">
+                                          DOC
+                                        </div>
+                                      </div>
+                                    ) : isExcel ? (
+                                      <div className="text-center">
+                                        <div className="w-12 h-14 mx-auto bg-green-600 rounded-sm flex items-center justify-center text-white text-xs font-bold">
+                                          XLS
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <FileText className="h-12 w-12 text-gray-400" />
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {/* Overlay no hover */}
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                  <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                              </a>
+                              
+                              {/* Nome do arquivo */}
+                              <div className="p-2 border-t border-gray-200">
+                                <p className="text-xs text-gray-700 truncate" title={fileName}>
+                                  {fileName}
+                                </p>
+                                {anexo.tamanho && (
+                                  <p className="text-xs text-gray-400">{formatFileSize(anexo.tamanho)}</p>
+                                )}
+                              </div>
+                              
+                              {/* Botão de remover */}
+                              {!isViewMode && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    removerAnexoExistente(anexo, index)
+                                  }}
+                                  className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Arquivos selecionados para upload */}
+                  {arquivos.length > 0 && editingId && (
+                    <div className="mb-4 space-y-2">
+                      <p className="text-sm text-gray-600 font-medium">Arquivos selecionados:</p>
+                      {arquivos.map((arquivo, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
+                          <div className="flex items-center gap-3">
+                            <FileText className="h-5 w-5 text-amber-600" />
+                            <div>
+                              <p className="text-sm font-medium text-gray-700">{arquivo.name}</p>
+                              <p className="text-xs text-gray-500">{formatFileSize(arquivo.size)}</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removerArquivo(index)}
+                            className="p-1 hover:bg-red-100 rounded text-red-500"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                      
+                      {/* Botão de Upload */}
+                      <button
+                        type="button"
+                        onClick={handleUpload}
+                        disabled={isUploading}
+                        className="mt-2 w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg font-medium transition-colors"
+                      >
+                        {isUploading ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Enviando... {uploadProgress}%
+                          </span>
+                        ) : (
+                          `Enviar ${arquivos.length} arquivo(s)`
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Área de drop/seleção */}
+                  {!isViewMode && editingId && (
+                    <label className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors block">
+                      <input
+                        type="file"
+                        multiple
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                      />
+                      <FileText className="h-10 w-10 mx-auto mb-3 text-gray-400" />
+                      <p className="text-sm text-gray-600 font-medium">Clique para selecionar arquivos</p>
+                      <p className="text-xs text-gray-400 mt-1">Imagens, PDF, Word, Excel (máx. 64MB cada)</p>
+                    </label>
+                  )}
+
+                  {/* Mensagem quando não há anexos no modo visualização */}
+                  {isViewMode && anexosExistentes.length === 0 && !carregandoAnexos && (
+                    <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
+                      <FileText className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+                      <p className="text-sm text-gray-400">Nenhum anexo</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -568,13 +947,13 @@ function ContratanteModal({
   // Usar createPortal para renderizar no body
   return createPortal(modalContent, document.body)
 }
-
 export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabelaProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isViewMode, setIsViewMode] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingTipo, setEditingTipo] = useState<string>("contratante")
   const [formData, setFormData] = useState(initialFormData)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -600,14 +979,16 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
   const handleNew = () => {
     setFormData(initialFormData)
     setEditingId(null)
+    setEditingTipo("contratante")
     setIsViewMode(false)
     setIsModalOpen(true)
   }
 
   // Abrir modal para editar
   const handleEdit = (contratante: Contratante) => {
+    const tipo = contratante.tipo || "contratante"
     setFormData({
-      tipo: contratante.tipo || "contratante",
+      tipo,
       nome: contratante.nome || "",
       cpf: contratante.cpf || "",
       rg: contratante.rg || "",
@@ -629,14 +1010,16 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
       observacoes: contratante.observacoes || "",
     })
     setEditingId(contratante.id)
+    setEditingTipo(tipo)
     setIsViewMode(false)
     setIsModalOpen(true)
   }
 
   // Abrir modal para visualizar
   const handleView = (contratante: Contratante) => {
+    const tipo = contratante.tipo || "contratante"
     setFormData({
-      tipo: contratante.tipo || "contratante",
+      tipo,
       nome: contratante.nome || "",
       cpf: contratante.cpf || "",
       rg: contratante.rg || "",
@@ -658,6 +1041,7 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
       observacoes: contratante.observacoes || "",
     })
     setEditingId(contratante.id)
+    setEditingTipo(tipo)
     setIsViewMode(true)
     setIsModalOpen(true)
   }
@@ -672,16 +1056,21 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
     setIsLoading(true)
 
     try {
+      const isRequerente = formData.tipo === "requerente"
+      const baseUrl = isRequerente ? "/api/requerentes" : "/api/contratantes"
+      
       const url = editingId 
-        ? `/api/contratantes/${editingId}` 
-        : "/api/contratantes"
+        ? `${editingTipo === "requerente" ? "/api/requerentes" : "/api/contratantes"}/${editingId}` 
+        : baseUrl
       
       const method = editingId ? "PUT" : "POST"
+
+      const { tipo, ...dataToSend } = formData
 
       const response = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(dataToSend),
       })
 
       if (!response.ok) {
@@ -701,11 +1090,12 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
   }
 
   // Excluir
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: number, tipo?: string | null) => {
     if (!confirm("Tem certeza que deseja excluir este cliente?")) return
 
     try {
-      const response = await fetch(`/api/contratantes/${id}`, {
+      const baseUrl = tipo === "requerente" ? "/api/requerentes" : "/api/contratantes"
+      const response = await fetch(`${baseUrl}/${id}`, {
         method: "DELETE",
       })
 
@@ -776,7 +1166,7 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
             ) : (
               paginatedContratantes.map((contratante) => (
                 <tr 
-                  key={contratante.id} 
+                  key={`${contratante.tipo}-${contratante.id}`} 
                   className="hover:bg-white/5 transition-colors cursor-pointer"
                   onClick={() => handleView(contratante)}
                 >
@@ -793,7 +1183,9 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-medium">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${
+                        contratante.tipo === 'requerente' ? 'bg-purple-600' : 'bg-indigo-600'
+                      }`}>
                         {contratante.nome.charAt(0).toUpperCase()}
                       </div>
                       <span className="text-white font-medium">{contratante.nome}</span>
@@ -824,7 +1216,7 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
                   </td>
                   <td className="px-4 py-3">
                     <span className="px-2 py-1 bg-white/10 rounded text-xs text-white/70">
-                      {contratante._count?.atividades || 0}
+                      {contratante._count?.processos || 0}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-white/50 text-sm">
@@ -853,7 +1245,7 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
                           Editar
                         </DropdownMenuItem>
                         <DropdownMenuItem 
-                          onClick={() => handleDelete(contratante.id)}
+                          onClick={() => handleDelete(contratante.id, contratante.tipo)}
                           className="text-red-400 hover:text-red-300 hover:bg-red-500/10 cursor-pointer"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
@@ -908,6 +1300,7 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
         isViewMode={isViewMode}
         setIsViewMode={setIsViewMode}
         editingId={editingId}
+        editingTipo={editingTipo}
         formData={formData}
         setFormData={setFormData}
         onSave={handleSave}

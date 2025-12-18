@@ -273,14 +273,14 @@ export default function ProcessosPage() {
               )}
 
               {/* Contador Clientes */}
-              {tabPrincipal === "contratantes" && (
-                <div className="flex flex-col items-center px-4 py-2 bg-white/10 rounded-lg">
-                  <span className="text-2xl font-bold text-white">
-                    {contratantes.length}
-                  </span>
-                  <span className="text-xs text-white/60">cliente(s)</span>
-                </div>
-              )}
+{tabPrincipal === "contratantes" && (
+  <div className="flex flex-col items-center px-4 py-2 bg-white/10 rounded-lg">
+    <span className="text-2xl font-bold text-white">
+      {contratantes.length + requerentes.length}
+    </span>
+    <span className="text-xs text-white/60">cliente(s)</span>
+  </div>
+)}
             </div>
           </div>
 
@@ -309,12 +309,18 @@ export default function ProcessosPage() {
             )}
 
             {/* Clientes - Tabela */}
-            {tabPrincipal === "contratantes" && (
-              <ContratantesTabela
-                contratantes={contratantes as any}
-                onRefresh={handleRefresh}
-              />
-            )}
+{tabPrincipal === "contratantes" && (
+  <ContratantesTabela
+    contratantes={[
+      ...contratantes.map(c => ({ ...c, tipo: "contratante" })),
+      ...requerentes.map(r => ({ ...r, tipo: "requerente" }))
+    ] as any}
+    onRefresh={() => {
+      buscarContratantes()
+      buscarRequerentes()
+    }}
+  />
+)}
           </div>
         </main>
       </div>

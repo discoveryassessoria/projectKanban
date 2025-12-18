@@ -129,25 +129,21 @@ model Status {
 // ========================================
 model Processo {
   id           Int       @id @default(autoincrement())
-  nome         String    @db.VarChar(100)  // Ex: "Família Rovatti"
+  nome         String    @db.VarChar(100)
   descricao    String?   @db.VarChar(500)
   observacoes  String?   @db.Text
   
   pais         Pais
   
-  // Etapa atual no Kanban
   statusId     Int
   status       Status    @relation(fields: [statusId], references: [id], onDelete: Cascade)
   
-  // Cliente que contratou o serviço
   contratanteId Int?
   contratante   Contratante? @relation(fields: [contratanteId], references: [id], onDelete: SetNull)
   
-  // Árvore genealógica vinculada
   arvoreId     Int?
   arvore       Arvore?   @relation(fields: [arvoreId], references: [id], onDelete: SetNull)
   
-  // Datas
   dataInicio   DateTime  @default(now())
   previsaoTermino DateTime?
   dataConclusao DateTime?
@@ -155,7 +151,6 @@ model Processo {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  // Relacionamentos
   requerentes  ProcessoRequerente[]
   tarefas      Tarefa[]
   anexos       AnexoProcesso[]
@@ -167,26 +162,21 @@ model Processo {
 
 // ========================================
 // TAREFA - AFAZERES DOS FUNCIONÁRIOS
-// Tarefas dentro de um processo específico
 // ========================================
 model Tarefa {
   id          Int       @id @default(autoincrement())
   titulo      String    @db.VarChar(200)
   descricao   String?   @db.Text
   
-  // Vinculada a qual processo/família
   processoId  Int
   processo    Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
   
-  // Responsável pela tarefa
   responsavelId Int?
   responsavel   Usuario? @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
   
-  // Status e prioridade
   concluida   Boolean   @default(false)
   prioridade  PrioridadeTarefa @default(MEDIA)
   
-  // Datas
   dataPrazo   DateTime?
   dataConclusao DateTime?
   
@@ -225,7 +215,6 @@ model Contratante {
   telefone        String?   @db.VarChar(20)
   email           String?   @db.VarChar(100)
   
-  // Endereço
   endereco        String?   @db.VarChar(200)
   numero          String?   @db.VarChar(20)
   complemento     String?   @db.VarChar(100)
@@ -234,7 +223,6 @@ model Contratante {
   estado          String?   @db.VarChar(2)
   cep             String?   @db.VarChar(10)
   
-  // Observações
   observacoes     String?   @db.Text
   
   createdAt       DateTime  @default(now())
@@ -259,7 +247,6 @@ model Requerente {
   telefone        String?   @db.VarChar(20)
   email           String?   @db.VarChar(100)
   
-  // Endereço
   endereco        String?   @db.VarChar(200)
   numero          String?   @db.VarChar(20)
   complemento     String?   @db.VarChar(100)
@@ -268,7 +255,6 @@ model Requerente {
   estado          String?   @db.VarChar(2)
   cep             String?   @db.VarChar(10)
   
-  // Observações
   observacoes     String?   @db.Text
   
   createdAt       DateTime  @default(now())
@@ -284,7 +270,7 @@ model Requerente {
 model AnexoProcesso {
   id            Int      @id @default(autoincrement())
   nome          String   @db.VarChar(200)
-  tipo          String   @db.VarChar(50)   // Categoria: "Documento", "Certidão", etc.
+  tipo          String   @db.VarChar(50)
   nomeArquivo   String   @db.VarChar(300)
   urlArquivo    String   @db.Text
   tamanho       Int?
@@ -301,7 +287,7 @@ model AnexoProcesso {
 model AnexoContratante {
   id            Int      @id @default(autoincrement())
   nome          String   @db.VarChar(200)
-  tipo          String   @db.VarChar(50)
+  tipo          String?  @db.VarChar(50)
   nomeArquivo   String   @db.VarChar(300)
   urlArquivo    String   @db.Text
   tamanho       Int?
@@ -318,7 +304,7 @@ model AnexoContratante {
 model AnexoRequerente {
   id            Int      @id @default(autoincrement())
   nome          String   @db.VarChar(200)
-  tipo          String   @db.VarChar(50)
+  tipo          String?  @db.VarChar(50)
   nomeArquivo   String   @db.VarChar(300)
   urlArquivo    String   @db.Text
   tamanho       Int?
@@ -337,8 +323,8 @@ model AnexoRequerente {
 // ========================================
 model LogAuditoria {
   id          Int      @id @default(autoincrement())
-  acao        String   @db.VarChar(50)   // criou, editou, excluiu, moveu
-  entidade    String   @db.VarChar(50)   // processo, tarefa, contratante, etc.
+  acao        String   @db.VarChar(50)
+  entidade    String   @db.VarChar(50)
   entidadeId  Int?
   descricao   String   @db.Text
   detalhes    Json?
