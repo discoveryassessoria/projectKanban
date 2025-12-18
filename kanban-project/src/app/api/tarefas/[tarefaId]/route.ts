@@ -5,10 +5,11 @@ import { PrioridadeTarefa } from "@prisma/client"
 // GET - Buscar tarefa por ID
 export async function GET(
   request: Request,
-  { params }: { params: { tarefaId: string } }
+  { params }: { params: Promise<{ tarefaId: string }> }
 ) {
   try {
-    const id = parseInt(params.tarefaId)
+    const { tarefaId } = await params
+    const id = parseInt(tarefaId)
 
     if (isNaN(id)) {
       return NextResponse.json(
@@ -63,10 +64,11 @@ export async function GET(
 // PUT - Atualizar tarefa
 export async function PUT(
   request: Request,
-  { params }: { params: { tarefaId: string } }
+  { params }: { params: Promise<{ tarefaId: string }> }
 ) {
   try {
-    const id = parseInt(params.tarefaId)
+    const { tarefaId } = await params
+    const id = parseInt(tarefaId)
 
     if (isNaN(id)) {
       return NextResponse.json(
@@ -172,10 +174,11 @@ export async function PUT(
 // DELETE - Excluir tarefa
 export async function DELETE(
   request: Request,
-  { params }: { params: { tarefaId: string } }
+  { params }: { params: Promise<{ tarefaId: string }> }
 ) {
   try {
-    const id = parseInt(params.tarefaId)
+    const { tarefaId } = await params
+    const id = parseInt(tarefaId)
 
     if (isNaN(id)) {
       return NextResponse.json(
