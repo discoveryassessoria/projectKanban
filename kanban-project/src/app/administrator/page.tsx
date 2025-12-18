@@ -320,7 +320,6 @@ export default function AdministratorPage() {
         userRole="Administrador"
         userEmail={user.email || ''}
         projetos={projetos}
-        atividades={atividades}
         arvores={arvores}
         onLogout={handleLogout}
       />
