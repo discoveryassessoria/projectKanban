@@ -29,6 +29,10 @@ export async function GET(request: NextRequest) {
         },
         filhosComoPai: true,
         filhosComoMae: true,
+        // ✅ NOVO: Incluir documentos
+        documentos: {
+          orderBy: { createdAt: 'desc' }
+        },
       },
       orderBy: { id: 'asc' }
     })
@@ -44,7 +48,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+
     const { 
+      // Campos existentes
       nome, 
       sobrenome, 
       sexo, 
@@ -58,9 +64,29 @@ export async function POST(request: NextRequest) {
       maeId,
       x,
       y,
-      // Para adicionar pai/mãe de um filho existente
       filhoId,
-      tipoPai
+      tipoPai,
+      
+      // ✅ NOVOS CAMPOS
+      estado_nasc,
+      pais_nasc,
+      vivo,
+      data_batismo,
+      local_batismo,
+      igreja_batismo,
+      profissao,
+      nacionalidade,
+      cidadanias_outras,
+      naturalizado,
+      data_naturalizacao,
+      pais_naturalizacao,
+      data_emigracao,
+      local_emigracao,
+      porto_embarque,
+      data_chegada,
+      porto_chegada,
+      pais_destino,
+      navio,
     } = body
 
     if (!nome) {
@@ -80,9 +106,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Árvore não encontrada" }, { status: 404 })
     }
 
-    // Criar a pessoa
+    // Criar a pessoa com todos os campos
     const pessoa = await prisma.pessoa.create({
       data: {
+        // Campos existentes
         nome,
         sobrenome: sobrenome || null,
         sexo: sexo || null,
@@ -96,12 +123,34 @@ export async function POST(request: NextRequest) {
         maeId: maeId || null,
         x: x || null,
         y: y || null,
+        
+        // ✅ NOVOS CAMPOS
+        estado_nasc: estado_nasc || null,
+        pais_nasc: pais_nasc || null,
+        vivo: vivo !== undefined ? vivo : true,
+        data_batismo: data_batismo ? new Date(data_batismo) : null,
+        local_batismo: local_batismo || null,
+        igreja_batismo: igreja_batismo || null,
+        profissao: profissao || null,
+        nacionalidade: nacionalidade || null,
+        cidadanias_outras: cidadanias_outras || null,
+        naturalizado: naturalizado || false,
+        data_naturalizacao: data_naturalizacao ? new Date(data_naturalizacao) : null,
+        pais_naturalizacao: pais_naturalizacao || null,
+        data_emigracao: data_emigracao ? new Date(data_emigracao) : null,
+        local_emigracao: local_emigracao || null,
+        porto_embarque: porto_embarque || null,
+        data_chegada: data_chegada ? new Date(data_chegada) : null,
+        porto_chegada: porto_chegada || null,
+        pais_destino: pais_destino || null,
+        navio: navio || null,
       },
       include: {
         pai: true,
         mae: true,
         filhosComoPai: true,
         filhosComoMae: true,
+        documentos: true,
       }
     })
 
@@ -113,7 +162,7 @@ export async function POST(request: NextRequest) {
       } else if (tipoPai === 'mae') {
         updateData.maeId = pessoa.id
       }
-
+      
       await prisma.pessoa.update({
         where: { id: filhoId },
         data: updateData
@@ -124,7 +173,7 @@ export async function POST(request: NextRequest) {
     const countPessoas = await prisma.pessoa.count({
       where: { arvoreId }
     })
-
+    
     if (countPessoas === 1 && !arvore.pessoaPrincipalId) {
       await prisma.arvore.update({
         where: { id: arvoreId },

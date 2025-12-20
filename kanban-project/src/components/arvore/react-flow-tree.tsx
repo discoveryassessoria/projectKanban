@@ -18,7 +18,6 @@ import ReactFlow, {
 import dagre from "dagre"
 import "reactflow/dist/style.css"
 import { PessoaArvore, UniaoArvore } from "./pessoa-card"
-import { Plus } from "lucide-react"
 
 // Cores estilo FamilySearch
 const colors = {
@@ -36,8 +35,8 @@ type ViewMode = 'paisagem' | 'retrato'
 
 // Tamanhos dos nós
 const NODE_SIZES = {
-  paisagem: { width: 200, height: 100 },
-  retrato: { width: 140, height: 160 }
+  paisagem: { width: 200, height: 90 },
+  retrato: { width: 140, height: 110 }
 }
 
 // Funções auxiliares
@@ -57,50 +56,66 @@ function formatDateRange(nascimento: Date | string | null | undefined, obito: Da
   const nasc = formatYear(nascimento)
   const obit = obito ? formatYear(obito) : ""
   if (!nasc && !obit) return ""
-  if (!nasc && obit) return "Falecido"
-  if (nasc && obit) return `${nasc}–${obit}`
+  if (!nasc && obit) return `†${obit}`
+  if (nasc && obit) return `${nasc} – ${obit}`
   return nasc
 }
 
-function generatePID(id: number): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-  let pid = ''
-  const seed = id * 12345
-  for (let i = 0; i < 4; i++) {
-    pid += chars[(seed * (i + 1)) % chars.length]
+function formatDate(dateStr: string | Date | null | undefined): string | null {
+  if (!dateStr) return null
+  
+  // Se for string ISO, extrair apenas a parte da data para evitar problemas de timezone
+  if (typeof dateStr === 'string') {
+    // Formato ISO: "2025-12-08T00:00:00.000Z" -> pegar só "2025-12-08"
+    const datePart = dateStr.split('T')[0]
+    if (datePart && datePart.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [year, month, day] = datePart.split('-')
+      return `${day}/${month}/${year}`
+    }
   }
-  return `${pid.slice(0, 4)}-${pid.slice(0, 3)}`
+  
+  // Fallback para Date object
+  const date = new Date(dateStr)
+  if (isNaN(date.getTime())) return null
+  
+  // Usar UTC para evitar problemas de timezone
+  const day = String(date.getUTCDate()).padStart(2, '0')
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const year = date.getUTCFullYear()
+  
+  return `${day}/${month}/${year}`
 }
 
 // ========================================
-// CUSTOM NODE: Pessoa Individual
+// CUSTOM NODE: Pessoa Individual (SIMPLIFICADO)
 // ========================================
 interface PersonNodeData {
   pessoa: PessoaArvore
   isMain?: boolean
   isSpouse?: boolean
   mode: ViewMode
+  uniao?: UniaoArvore | null
   onPersonClick?: (pessoa: PessoaArvore) => void
-  onAddPai?: () => void
-  onAddMae?: () => void
-  hasPai?: boolean
-  hasMae?: boolean
 }
 
 function PersonNode({ data }: NodeProps<PersonNodeData>) {
-  const { pessoa, isMain, isSpouse, mode, onPersonClick, hasPai, hasMae, onAddPai, onAddMae } = data
+  const { pessoa, isMain, isSpouse, mode, uniao, onPersonClick } = data
   const genderColors = getGenderColors(pessoa.sexo)
   const nomeCompleto = pessoa.sobrenome ? `${pessoa.nome} ${pessoa.sobrenome}` : pessoa.nome
-  const initial = pessoa.nome?.charAt(0)?.toUpperCase() || '?'
-  const pid = pessoa.pid || generatePID(pessoa.id)
-  const dateRange = formatDateRange(pessoa.data_nasc, pessoa.data_obito)
-  const deceased = !!pessoa.data_obito
+  
+  // Formatar datas
+  const dataNasc = formatDate(pessoa.data_nasc)
+  const dataObito = formatDate(pessoa.data_obito)
+  const dataCasamento = formatDate(uniao?.data_inicio)
+  
+  // Verificar se pessoa é falecida (vivo === false)
+  const isFalecido = pessoa.vivo === false
 
   const handleClick = () => {
     onPersonClick?.(pessoa)
   }
 
-  // Determinar ring color baseado no tipo
+  // Ring para pessoa principal ou cônjuge
   const ringClass = isMain
     ? 'ring-2 ring-green-500 ring-offset-2'
     : isSpouse
@@ -110,7 +125,7 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
   if (mode === 'paisagem') {
     return (
       <div
-        className={`person-card relative bg-white rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-all overflow-visible ${ringClass}`}
+        className={`relative bg-white rounded-lg shadow-md cursor-pointer hover:shadow-lg transition-all ${ringClass}`}
         style={{
           width: NODE_SIZES.paisagem.width,
           height: NODE_SIZES.paisagem.height,
@@ -118,88 +133,57 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
         }}
         onClick={handleClick}
       >
-        {/* Handles para conexões - INVERTIDO para RL */}
+        {/* Handles para conexões - LR */}
         <Handle
           type="source"
-          position={Position.Left}
-          className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white"
+          position={Position.Right}
+          className="!bg-gray-400 !w-2 !h-2 !border-2 !border-white"
         />
         <Handle
           type="target"
-          position={Position.Right}
-          className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white"
+          position={Position.Left}
+          className="!bg-gray-400 !w-2 !h-2 !border-2 !border-white"
         />
 
-        {/* Ícone FS */}
-        <div className="absolute top-2 right-2">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" fill={colors.green} />
-            <path d="M12 7v10M9 10v4M15 10v4" stroke="white" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-        </div>
-
-        <div className="p-2.5 h-full flex items-center gap-2.5">
-          {/* Avatar */}
-          <div
-            className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg flex-shrink-0"
-            style={{ backgroundColor: genderColors.border }}
-          >
-            {initial}
-          </div>
-
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-gray-900 text-xs leading-tight line-clamp-2">
-              {nomeCompleto}
-            </h3>
-            <div className="flex items-center gap-1 mt-1">
-              {deceased ? (
-                <span className="px-1 py-0.5 text-[8px] font-semibold rounded bg-gray-200 text-gray-600">
-                  Falecido
-                </span>
-              ) : (
-                <span
-                  className="px-1 py-0.5 text-[8px] font-semibold rounded text-white"
-                  style={{ backgroundColor: colors.green }}
-                >
-                  Vivo
-                </span>
-              )}
-            </div>
-            {dateRange && (
-              <p className="text-[9px] text-gray-500 mt-0.5">{dateRange}</p>
+        <div className="p-2 h-full flex flex-col justify-center">
+          <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-1">
+            {nomeCompleto}
+          </h3>
+          <div className="mt-1 text-[10px] text-gray-500 space-y-0.5">
+            {/* Linha 1: Nascimento e Casamento */}
+            {(dataNasc || dataCasamento) && (
+              <div className="flex items-center gap-3">
+                {dataNasc && (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-3 text-center">★</span>
+                    <span>{dataNasc}</span>
+                  </span>
+                )}
+                {dataCasamento && (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-3 text-center">♥</span>
+                    <span>{dataCasamento}</span>
+                  </span>
+                )}
+              </div>
             )}
-            <span className="text-[8px] text-gray-400 font-mono">{pid}</span>
+            {/* Linha 2: Óbito */}
+            {(dataObito || isFalecido) && (
+              <div className="inline-flex items-center gap-1">
+                <span className="w-3 text-center">✝</span>
+                <span>{dataObito || 'Falecido(a)'}</span>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Botões de adicionar pai/mãe - à ESQUERDA no modo RL */}
-        {!hasPai && onAddPai && (
-          <button
-            className="absolute -left-2 top-1/4 w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-md hover:bg-blue-600 transition-colors z-10"
-            onClick={(e) => { e.stopPropagation(); onAddPai(); }}
-            title="Adicionar pai"
-          >
-            <Plus className="w-3 h-3" />
-          </button>
-        )}
-        {!hasMae && onAddMae && (
-          <button
-            className="absolute -left-2 bottom-1/4 w-5 h-5 rounded-full bg-pink-500 text-white flex items-center justify-center shadow-md hover:bg-pink-600 transition-colors z-10"
-            onClick={(e) => { e.stopPropagation(); onAddMae(); }}
-            title="Adicionar mãe"
-          >
-            <Plus className="w-3 h-3" />
-          </button>
-        )}
       </div>
     )
   }
 
-  // MODO RETRATO (vertical)
+  // MODO RETRATO
   return (
     <div
-      className={`person-card relative bg-white rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-all overflow-visible ${ringClass}`}
+      className={`relative bg-white rounded-lg shadow-md cursor-pointer hover:shadow-lg transition-all ${ringClass}`}
       style={{
         width: NODE_SIZES.retrato.width,
         height: NODE_SIZES.retrato.height,
@@ -207,80 +191,49 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
       }}
       onClick={handleClick}
     >
-      {/* Handles para conexões */}
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white"
-      />
+      {/* Handles para conexões - BT */}
       <Handle
         type="source"
+        position={Position.Top}
+        className="!bg-gray-400 !w-2 !h-2 !border-2 !border-white"
+      />
+      <Handle
+        type="target"
         position={Position.Bottom}
-        className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white"
+        className="!bg-gray-400 !w-2 !h-2 !border-2 !border-white"
       />
 
-      {/* Ícone FS */}
-      <div className="absolute top-2 right-2">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" fill={colors.green} />
-          <path d="M12 7v10M9 10v4M15 10v4" stroke="white" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      </div>
-
       <div className="p-2 h-full flex flex-col items-center justify-center text-center">
-        {/* Avatar */}
-        <div
-          className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg mb-1.5"
-          style={{ backgroundColor: genderColors.border }}
-        >
-          {initial}
-        </div>
-
-        {/* Nome */}
-        <h3 className="font-bold text-gray-900 text-[10px] leading-tight line-clamp-2">
+        <h3 className="font-semibold text-gray-900 text-[11px] leading-tight line-clamp-2">
           {nomeCompleto}
         </h3>
-
-        {/* Status */}
-        <div className="flex items-center gap-1 mt-1">
-          {deceased ? (
-            <span className="px-1 py-0.5 text-[8px] font-semibold rounded bg-gray-200 text-gray-600">
-              Falecido
-            </span>
-          ) : (
-            <span
-              className="px-1 py-0.5 text-[8px] font-semibold rounded text-white"
-              style={{ backgroundColor: colors.green }}
-            >
-              Vivo
-            </span>
+        <div className="mt-1 text-[9px] text-gray-500 space-y-0.5">
+          {/* Linha 1: Nascimento e Casamento */}
+          {(dataNasc || dataCasamento) && (
+            <div className="flex items-center justify-center gap-2">
+              {dataNasc && (
+                <span className="inline-flex items-center gap-0.5">
+                  <span>★</span>
+                  <span>{dataNasc}</span>
+                </span>
+              )}
+              {dataCasamento && (
+                <span className="inline-flex items-center gap-0.5">
+                  <span>♥</span>
+                  <span>{dataCasamento}</span>
+                </span>
+              )}
+            </div>
+          )}
+          {/* Linha 2: Óbito */}
+          {(dataObito || isFalecido) && (
+            <div className="inline-flex items-center justify-center gap-0.5">
+              <span>✝</span>
+              <span>{dataObito || 'Falecido(a)'}</span>
+            </div>
           )}
         </div>
-        {dateRange && (
-          <p className="text-[8px] text-gray-500 mt-0.5">{dateRange}</p>
-        )}
-        <span className="text-[7px] text-gray-400 font-mono mt-0.5">{pid}</span>
       </div>
-
-      {/* Botões de adicionar pai/mãe */}
-      {!hasPai && onAddPai && (
-        <button
-          className="absolute -top-2 left-1/4 w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-md hover:bg-blue-600 transition-colors z-10"
-          onClick={(e) => { e.stopPropagation(); onAddPai(); }}
-          title="Adicionar pai"
-        >
-          <Plus className="w-2.5 h-2.5" />
-        </button>
-      )}
-      {!hasMae && onAddMae && (
-        <button
-          className="absolute -top-2 right-1/4 w-4 h-4 rounded-full bg-pink-500 text-white flex items-center justify-center shadow-md hover:bg-pink-600 transition-colors z-10"
-          onClick={(e) => { e.stopPropagation(); onAddMae(); }}
-          title="Adicionar mãe"
-        >
-          <Plus className="w-2.5 h-2.5" />
-        </button>
-      )}
     </div>
   )
 }
@@ -298,33 +251,25 @@ function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
   const { type, mode, onClick } = data
 
   const config = {
-    pai: { label: 'ADICIONAR PAI', color: colors.male },
-    mae: { label: 'ADICIONAR MÃE', color: colors.female },
-    filho: { label: 'ADICIONAR FILHO(A)', color: colors.green },
-    conjuge: { label: 'ADICIONAR CÔNJUGE', color: colors.neutral }
+    pai: { label: 'Adicionar Pai', color: colors.neutral },
+    mae: { label: 'Adicionar Mãe', color: colors.neutral },
+    filho: { label: 'Adicionar Filho(a)', color: colors.green },
+    conjuge: { label: 'Adicionar Cônjuge', color: colors.neutral }
   }
   const { label, color } = config[type]
 
   if (mode === 'paisagem') {
     return (
       <div
-        className="relative bg-white rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all shadow-sm"
+        className="relative bg-white rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all"
         style={{ width: NODE_SIZES.paisagem.width, height: NODE_SIZES.paisagem.height }}
         onClick={onClick}
       >
-        <Handle type="source" position={Position.Left} className="!bg-gray-300 !w-3 !h-3" />
-        <Handle type="target" position={Position.Right} className="!bg-gray-300 !w-3 !h-3" />
+        <Handle type="source" position={Position.Right} className="!bg-gray-300 !w-2 !h-2" />
+        <Handle type="target" position={Position.Left} className="!bg-gray-300 !w-2 !h-2" />
 
-        <div className="h-full flex items-center gap-2 px-3">
-          <div
-            className="w-10 h-10 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: `${color}20` }}
-          >
-            <svg className="w-5 h-5" style={{ color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-          </div>
-          <span className="text-[10px] font-semibold" style={{ color }}>
+        <div className="h-full flex items-center justify-center">
+          <span className="text-xs font-medium" style={{ color }}>
             {label}
           </span>
         </div>
@@ -335,23 +280,15 @@ function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
   // RETRATO
   return (
     <div
-      className="relative bg-white rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all shadow-sm"
+      className="relative bg-white rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all"
       style={{ width: NODE_SIZES.retrato.width, height: NODE_SIZES.retrato.height }}
       onClick={onClick}
     >
-      <Handle type="target" position={Position.Top} className="!bg-gray-300 !w-3 !h-3" />
-      <Handle type="source" position={Position.Bottom} className="!bg-gray-300 !w-3 !h-3" />
+      <Handle type="source" position={Position.Top} className="!bg-gray-300 !w-2 !h-2" />
+      <Handle type="target" position={Position.Bottom} className="!bg-gray-300 !w-2 !h-2" />
 
-      <div className="h-full flex flex-col items-center justify-center text-center px-2">
-        <div
-          className="w-10 h-10 rounded-full flex items-center justify-center mb-1.5"
-          style={{ backgroundColor: `${color}20` }}
-        >
-          <svg className="w-5 h-5" style={{ color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-        </div>
-        <span className="text-[9px] font-semibold leading-tight" style={{ color }}>
+      <div className="h-full flex items-center justify-center text-center px-2">
+        <span className="text-[10px] font-medium leading-tight" style={{ color }}>
           {label}
         </span>
       </div>
@@ -377,14 +314,13 @@ const getLayoutedElements = (
   dagreGraph.setDefaultEdgeLabel(() => ({}))
 
   const isHorizontal = mode === 'paisagem'
-  // PAISAGEM: RL (direita para esquerda) - pessoa principal à direita
-  // RETRATO: TB (cima para baixo)
+  
   dagreGraph.setGraph({
-    rankdir: isHorizontal ? 'RL' : 'TB',
-    nodesep: isHorizontal ? 60 : 40,
-    ranksep: isHorizontal ? 100 : 80,
-    marginx: 50,
-    marginy: 50,
+    rankdir: isHorizontal ? 'LR' : 'BT',
+    nodesep: isHorizontal ? 50 : 30,
+    ranksep: isHorizontal ? 80 : 60,
+    marginx: 40,
+    marginy: 40,
   })
 
   const nodeSize = NODE_SIZES[mode]
@@ -444,8 +380,12 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
   const edges: Edge[] = []
   const processedIds = new Set<number>()
 
+  const findUniao = (pessoa: PessoaArvore): UniaoArvore | null => {
+    return unioes.find(u => u.pessoa1Id === pessoa.id || u.pessoa2Id === pessoa.id) || null
+  }
+
   const findConjuge = (pessoa: PessoaArvore): PessoaArvore | null => {
-    const uniao = unioes.find(u => u.pessoa1Id === pessoa.id || u.pessoa2Id === pessoa.id)
+    const uniao = findUniao(pessoa)
     if (!uniao) return null
     const conjugeId = uniao.pessoa1Id === pessoa.id ? uniao.pessoa2Id : uniao.pessoa1Id
     return pessoas.find(p => p.id === conjugeId) || null
@@ -474,8 +414,9 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
 
     const pai = findPai(pessoa)
     const mae = findMae(pessoa)
+    const uniao = findUniao(pessoa)
 
-    // Adicionar nó da pessoa
+    // Adicionar nó da pessoa (simplificado)
     nodes.push({
       id: `person-${pessoa.id}`,
       type: 'person',
@@ -485,26 +426,25 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
         isMain,
         isSpouse,
         mode,
+        uniao,
         onPersonClick,
-        hasPai: !!pai,
-        hasMae: !!mae,
-        onAddPai: () => onAddPai?.(pessoa.id),
-        onAddMae: () => onAddMae?.(pessoa.id),
       },
     })
 
     // Adicionar pai
     if (pai) {
       addPersonWithAncestors(pai, false, false, depth + 1, maxDepth)
+      // Cor baseada no sexo da pessoa (pai), não no tipo de relação
+      const paiColor = getGenderColors(pai.sexo).border
       edges.push({
         id: `edge-pai-${pessoa.id}`,
         source: `person-${pessoa.id}`,
         target: `person-${pai.id}`,
         type: 'smoothstep',
-        style: { stroke: colors.male, strokeWidth: 2 },
+        style: { stroke: paiColor, strokeWidth: 2 },
       })
     } else if (depth < maxDepth) {
-      // Placeholder para adicionar pai
+      // Placeholder para adicionar pai - linha neutra
       const addPaiId = `add-pai-${pessoa.id}`
       if (!nodes.find(n => n.id === addPaiId)) {
         nodes.push({
@@ -518,7 +458,7 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
           source: `person-${pessoa.id}`,
           target: addPaiId,
           type: 'smoothstep',
-          style: { stroke: colors.male, strokeWidth: 2, strokeDasharray: '5,5' },
+          style: { stroke: colors.neutral, strokeWidth: 2, strokeDasharray: '5,5' },
         })
       }
     }
@@ -526,15 +466,17 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
     // Adicionar mãe
     if (mae) {
       addPersonWithAncestors(mae, false, false, depth + 1, maxDepth)
+      // Cor baseada no sexo da pessoa (mãe), não no tipo de relação
+      const maeColor = getGenderColors(mae.sexo).border
       edges.push({
         id: `edge-mae-${pessoa.id}`,
         source: `person-${pessoa.id}`,
         target: `person-${mae.id}`,
         type: 'smoothstep',
-        style: { stroke: colors.female, strokeWidth: 2 },
+        style: { stroke: maeColor, strokeWidth: 2 },
       })
     } else if (depth < maxDepth) {
-      // Placeholder para adicionar mãe
+      // Placeholder para adicionar mãe - linha neutra
       const addMaeId = `add-mae-${pessoa.id}`
       if (!nodes.find(n => n.id === addMaeId)) {
         nodes.push({
@@ -548,7 +490,7 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
           source: `person-${pessoa.id}`,
           target: addMaeId,
           type: 'smoothstep',
-          style: { stroke: colors.female, strokeWidth: 2, strokeDasharray: '5,5' },
+          style: { stroke: colors.neutral, strokeWidth: 2, strokeDasharray: '5,5' },
         })
       }
     }
@@ -562,16 +504,13 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
   if (conjuge) {
     addPersonWithAncestors(conjuge, false, true, 0)
 
-    // Conectar pessoa principal ao cônjuge com linha especial
+    // Conectar pessoa principal ao cônjuge - linha neutra/roxa para união
     edges.push({
       id: `edge-casamento-${pessoaPrincipal.id}-${conjuge.id}`,
       source: `person-${pessoaPrincipal.id}`,
       target: `person-${conjuge.id}`,
       type: 'smoothstep',
-      style: { stroke: colors.green, strokeWidth: 3 },
-      label: '♥',
-      labelStyle: { fontSize: 14, fill: colors.green },
-      labelBgStyle: { fill: 'white', fillOpacity: 0.9 },
+      style: { stroke: '#9333ea', strokeWidth: 2 },
     })
   }
 
@@ -651,7 +590,7 @@ export function ReactFlowTree({
           const data = node.data as PersonNodeData
           if (data?.pessoa) {
             if (data.isMain) return colors.green
-            if (data.isSpouse) return '#9333ea' // purple
+            if (data.isSpouse) return '#9333ea'
             return getGenderColors(data.pessoa.sexo).border
           }
           return '#888'

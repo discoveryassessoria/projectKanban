@@ -1,5 +1,6 @@
 // Schema atualizado - Processo (cards Kanban) e Tarefa (afazeres) separados
 // Contratante e Requerente com campos expandidos
+// ✅ ATUALIZAÇÃO: Campos de cidadania + modelo Documento
 
 generator client {
   provider = "prisma-client-js"
@@ -27,6 +28,64 @@ enum PrioridadeTarefa {
   URGENTE
 }
 
+// ✅ NOVO: Tipos de documento para cidadania
+enum TipoDocumento {
+  // Certidões
+  CERTIDAO_NASCIMENTO
+  CERTIDAO_NASCIMENTO_INTEIRO_TEOR
+  CERTIDAO_CASAMENTO
+  CERTIDAO_CASAMENTO_INTEIRO_TEOR
+  CERTIDAO_OBITO
+  CERTIDAO_OBITO_INTEIRO_TEOR
+  CERTIDAO_BATISMO
+  
+  // Documentos específicos de cidadania
+  CNN                              // Certidão Negativa de Naturalização
+  CARTA_NATURALIZACAO
+  
+  // Documentos de identidade BR
+  RG
+  CPF
+  CNH
+  PASSAPORTE_BRASILEIRO
+  TITULO_ELEITOR
+  RESERVISTA
+  
+  // Documentos estrangeiros
+  PASSAPORTE_ESTRANGEIRO
+  CERTIDAO_CIDADANIA_ESTRANGEIRA
+  
+  // Comprovantes
+  COMPROVANTE_RESIDENCIA
+  
+  // Tradução e apostilamento
+  TRADUCAO_JURAMENTADA
+  APOSTILA_HAIA
+  
+  // Outros
+  FOTO_3X4
+  PROCURACAO
+  ARVORE_GENEALOGICA_DOC
+  OUTRO
+}
+
+// ✅ NOVO: Status do documento no processo
+enum StatusDocumento {
+  PENDENTE
+  SOLICITADO
+  EM_BUSCA
+  RECEBIDO
+  EM_ANALISE
+  RETIFICANDO
+  EM_TRADUCAO
+  TRADUZIDO
+  EM_APOSTILAMENTO
+  APOSTILADO
+  ENTREGUE
+  INVALIDO
+  NAO_ENCONTRADO
+}
+
 // ========================================
 // USUÁRIOS
 // ========================================
@@ -45,7 +104,7 @@ model Usuario {
 }
 
 // ========================================
-// ÁRVORE GENEALÓGICA
+// ÁRVORE GENEALÓGICA - PESSOA
 // ========================================
 model Pessoa {
   id         Int       @id @default(autoincrement())
@@ -53,14 +112,51 @@ model Pessoa {
   sobrenome  String?   @db.VarChar(40)
   sexo       String?   @db.VarChar(10)
   data_nasc  DateTime?
-  local_nasc String?   @db.VarChar(30)
   data_obito DateTime?
-  batizado   String?   @db.VarChar(10)
-  comentario String?   @db.Text
-
+  
+  // Local de nascimento (✅ EXPANDIDO)
+  local_nasc      String?   @db.VarChar(100)  // Cidade (aumentado de 30 para 100)
+  estado_nasc     String?   @db.VarChar(50)   // ✅ NOVO: Estado/Província  
+  pais_nasc       String?   @db.VarChar(50)   // ✅ NOVO: País - IMPORTANTE para cidadania
+  
+  // ✅ NOVO: Status vital explícito
+  vivo            Boolean   @default(true)
+  
+  // Batismo (✅ EXPANDIDO)
+  batizado        String?   @db.VarChar(50)   // Aumentado de 10 para 50
+  data_batismo    DateTime?                    // ✅ NOVO
+  local_batismo   String?   @db.VarChar(100)  // ✅ NOVO: Cidade do batismo
+  igreja_batismo  String?   @db.VarChar(150)  // ✅ NOVO: Nome da igreja/paróquia
+  
+  // ✅ NOVO: Profissão
+  profissao       String?   @db.VarChar(100)
+  
+  // ✅ NOVO: Nacionalidade e Cidadania
+  nacionalidade       String?   @db.VarChar(50)   // Nacionalidade principal
+  cidadanias_outras   String?   @db.VarChar(200)  // Outras cidadanias (separadas por vírgula)
+  
+  // ✅ NOVO: Naturalização (pode impedir cidadania por descendência)
+  naturalizado            Boolean   @default(false)
+  data_naturalizacao      DateTime?
+  pais_naturalizacao      String?   @db.VarChar(50)
+  
+  // ✅ NOVO: Emigração/Imigração (importante para rastrear linhagem)
+  data_emigracao      DateTime?
+  local_emigracao     String?   @db.VarChar(100)  // Cidade de onde emigrou
+  porto_embarque      String?   @db.VarChar(100)
+  data_chegada        DateTime?
+  porto_chegada       String?   @db.VarChar(100)
+  pais_destino        String?   @db.VarChar(50)
+  navio               String?   @db.VarChar(100)
+  
+  // Notas
+  comentario  String?   @db.Text
+  
+  // Posição no canvas (React Flow)
   x Int?
   y Int?
 
+  // Relacionamentos existentes
   arvoreId Int
   arvore   Arvore @relation("PessoasNaArvore", fields: [arvoreId], references: [id], onDelete: Cascade)
 
@@ -77,22 +173,60 @@ model Pessoa {
   unioesComoPessoa2 Uniao[] @relation("Pessoa2")
 
   arvorePrincipal Arvore? @relation("ArvorePrincipal")
+  
+  // ✅ NOVO: Relacionamento com documentos
+  documentos Documento[]
+  
+  // ✅ NOVO: Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([arvoreId])
+  @@index([pais_nasc])
 }
 
+// ========================================
+// ÁRVORE GENEALÓGICA - UNIÃO/CASAMENTO
+// ========================================
 model Uniao {
   id          Int       @id @default(autoincrement())
   data_inicio DateTime?
   data_fim    DateTime?
-  tipo        String?   @db.VarChar(10)
-  local       String?
+  tipo        String?   @db.VarChar(30)   // Aumentado de 10 para 30
+  
+  // Local do casamento (✅ EXPANDIDO)
+  local       String?   @db.VarChar(100)  // Cidade
+  estado      String?   @db.VarChar(50)   // ✅ NOVO: Estado/Província
+  pais        String?   @db.VarChar(50)   // ✅ NOVO: País
+  
+  // ✅ NOVO: Dados da certidão de casamento
+  cartorio            String?   @db.VarChar(200)
+  livro               String?   @db.VarChar(20)
+  folha               String?   @db.VarChar(20)
+  termo               String?   @db.VarChar(30)
+  numero_registro     String?   @db.VarChar(50)
+  data_registro       DateTime?
+  
+  // ✅ NOVO: Observações
+  observacoes String?   @db.Text
 
   pessoa1Id Int
   pessoa1   Pessoa @relation("Pessoa1", fields: [pessoa1Id], references: [id], onDelete: Cascade)
 
   pessoa2Id Int
   pessoa2   Pessoa @relation("Pessoa2", fields: [pessoa2Id], references: [id], onDelete: Cascade)
+  
+  // ✅ NOVO: Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([pessoa1Id])
+  @@index([pessoa2Id])
 }
 
+// ========================================
+// ÁRVORE GENEALÓGICA - ÁRVORE
+// ========================================
 model Arvore {
   id        Int     @id @default(autoincrement())
   nome      String  @db.VarChar(50)
@@ -106,6 +240,68 @@ model Arvore {
 
   pessoas   Pessoa[]   @relation("PessoasNaArvore")
   processos Processo[]
+}
+
+// ========================================
+// ✅ NOVO: DOCUMENTO (certidões, RG, passaporte, etc)
+// ========================================
+model Documento {
+  id          Int       @id @default(autoincrement())
+  
+  // Pessoa vinculada
+  pessoaId    Int
+  pessoa      Pessoa    @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  
+  // Tipo e status
+  tipo        TipoDocumento
+  status      StatusDocumento @default(PENDENTE)
+  descricao   String?   @db.VarChar(200)
+  
+  // Dados do registro (para certidões)
+  cartorio            String?   @db.VarChar(200)
+  livro               String?   @db.VarChar(20)
+  folha               String?   @db.VarChar(20)
+  termo               String?   @db.VarChar(30)
+  numero_registro     String?   @db.VarChar(50)
+  data_registro       DateTime?
+  cidade_registro     String?   @db.VarChar(100)
+  estado_registro     String?   @db.VarChar(50)
+  pais_registro       String?   @db.VarChar(50)
+  
+  // Para documentos de identidade
+  numero              String?   @db.VarChar(50)
+  orgao_emissor       String?   @db.VarChar(50)
+  data_emissao        DateTime?
+  data_validade       DateTime?
+  
+  // Arquivo digitalizado
+  arquivo_url         String?   @db.Text
+  arquivo_nome        String?   @db.VarChar(200)
+  arquivo_tamanho     Int?
+  arquivo_mime_type   String?   @db.VarChar(100)
+  
+  // Tradução
+  traduzido                   Boolean   @default(false)
+  tradutor                    String?   @db.VarChar(150)
+  data_traducao               DateTime?
+  arquivo_traducao_url        String?   @db.Text
+  arquivo_traducao_nome       String?   @db.VarChar(200)
+  
+  // Apostilamento (Convenção de Haia)
+  apostilado                  Boolean   @default(false)
+  numero_apostila             String?   @db.VarChar(50)
+  data_apostila               DateTime?
+  arquivo_apostila_url        String?   @db.Text
+  
+  // Observações
+  observacoes         String?   @db.Text
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([pessoaId])
+  @@index([tipo])
+  @@index([status])
 }
 
 // ========================================

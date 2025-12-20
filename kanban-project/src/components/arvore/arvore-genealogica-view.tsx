@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { PessoaCard, PessoaArvore, UniaoArvore } from "./pessoa-card"
+import { PessoaArvore, UniaoArvore } from "./pessoa-card"
 import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
 import { ReactFlowTree } from "./react-flow-tree"
+import { TreeOnboarding } from "./tree-onboarding"
 import {
   Plus,
   User,
@@ -21,14 +22,12 @@ interface ArvoreGenealogicaViewProps {
 
 type ViewMode = 'paisagem' | 'retrato'
 
-// Cores FamilySearch
 const fsColors = {
   male: '#3073B5',
   female: '#BF3D79',
   green: '#87B940',
   line: '#9CA3AF'
 }
-
 
 export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, onArvoreCreated }: ArvoreGenealogicaViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('paisagem')
@@ -39,34 +38,28 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
   const [creating, setCreating] = useState(false)
   const [arvoreId, setArvoreId] = useState<number | null>(initialArvoreId || null)
   
-  // Estados de seleção
+  const [showOnboarding, setShowOnboarding] = useState(false)
   const [selectedPerson, setSelectedPerson] = useState<PessoaArvore | null>(null)
   const [fullDetailsPerson, setFullDetailsPerson] = useState<PessoaArvore | null>(null)
-  
 
-  // Estado de tela cheia
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Modal de adicionar pessoa
   const [showAddPersonModal, setShowAddPersonModal] = useState(false)
   const [addPersonType, setAddPersonType] = useState<'pai' | 'mae' | 'filho' | 'pessoa' | 'conjuge' | null>(null)
   const [addPersonParentId, setAddPersonParentId] = useState<number | null>(null)
   const [addConjugeForPessoaId, setAddConjugeForPessoaId] = useState<number | null>(null)
 
-  // Modal de editar pessoa
   const [showEditPersonModal, setShowEditPersonModal] = useState(false)
   const [editingPerson, setEditingPerson] = useState<PessoaArvore | null>(null)
 
-  // Handler para editar pessoa
   const handleEditPerson = (pessoa: PessoaArvore) => {
     setEditingPerson(pessoa)
     setShowEditPersonModal(true)
     setSelectedPerson(null)
   }
 
-  // Handler para excluir pessoa
   const handleDeletePerson = async (pessoa: PessoaArvore) => {
     try {
       const response = await fetch(`/api/pessoas/${pessoa.id}`, {
@@ -77,7 +70,8 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
         await fetchArvore()
         setSelectedPerson(null)
       } else {
-        alert('Erro ao excluir pessoa')
+        const error = await response.json()
+        alert(error.error || 'Erro ao excluir pessoa')
       }
     } catch (error) {
       console.error('Erro ao excluir pessoa:', error)
@@ -85,18 +79,15 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
     }
   }
 
-  // Handler para adicionar cônjuge
   const handleAddConjuge = (pessoa: PessoaArvore) => {
     setAddPersonType('conjuge')
     setAddConjugeForPessoaId(pessoa.id)
     setShowAddPersonModal(true)
   }
 
-  // Criar árvore para o processo
   const handleCreateArvore = async () => {
     setCreating(true)
     try {
-      // Criar a árvore
       const response = await fetch('/api/arvore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -109,9 +100,12 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
       if (response.ok) {
         const data = await response.json()
         setArvoreId(data.id)
+        setShowOnboarding(true)
         onArvoreCreated?.(data.id)
       } else {
-        alert('Erro ao criar árvore')
+        const error = await response.json()
+        console.error('Erro da API:', error)
+        alert(error.error || 'Erro ao criar árvore')
       }
     } catch (error) {
       console.error('Erro ao criar árvore:', error)
@@ -121,7 +115,6 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
     }
   }
 
-  // Função para carregar dados da árvore
   const fetchArvore = async () => {
     if (!arvoreId) return
     
@@ -131,7 +124,12 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
         const data = await response.json()
         setPessoas(data.pessoas || [])
         
-        // Extrair uniões das pessoas
+        if (!data.pessoas || data.pessoas.length === 0) {
+          setShowOnboarding(true)
+        } else {
+          setShowOnboarding(false)
+        }
+        
         const todasUnioes: UniaoArvore[] = []
         data.pessoas?.forEach((p: PessoaArvore) => {
           p.unioesComoPessoa1?.forEach((u: UniaoArvore) => {
@@ -147,7 +145,6 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
         })
         setUnioes(todasUnioes)
         
-        // Encontrar pessoa principal
         if (data.pessoaPrincipalId) {
           const principal = data.pessoas?.find((p: PessoaArvore) => p.id === data.pessoaPrincipalId)
           setPessoaPrincipal(principal || null)
@@ -162,7 +159,6 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
     }
   }
 
-  // Carregar dados da árvore
   useEffect(() => {
     if (!arvoreId) {
       setLoading(false)
@@ -171,8 +167,6 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
     fetchArvore()
   }, [arvoreId])
 
-
-  // Handler de tela cheia com animação
   const handleToggleFullscreen = async () => {
     if (!containerRef.current) return
 
@@ -184,27 +178,22 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
       } else {
         await document.exitFullscreen()
       }
-      // O estado isFullscreen será atualizado pelo listener fullscreenchange
     } catch (error) {
       console.error('Erro ao alternar tela cheia:', error)
       setIsTransitioning(false)
     }
   }
 
-  // Listener para mudança de fullscreen (quando sai com ESC ou clica no botão)
   useEffect(() => {
     const handleFullscreenChange = () => {
-      // Se não estava transitioning (ESC foi pressionado), inicia transição
       setIsTransitioning(true)
       setIsFullscreen(!!document.fullscreenElement)
-      // Finaliza transição após a mudança
       setTimeout(() => setIsTransitioning(false), 250)
     }
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
   }, [])
 
-  // Handlers de seleção
   const handlePersonClick = (pessoa: PessoaArvore) => {
     setSelectedPerson(pessoa)
   }
@@ -226,7 +215,6 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
     setFullDetailsPerson(pessoa)
   }
 
-  // Encontrar cônjuge de uma pessoa
   const findConjuge = (pessoa: PessoaArvore): PessoaArvore | null => {
     const uniao = unioes.find(u => u.pessoa1Id === pessoa.id || u.pessoa2Id === pessoa.id)
     if (!uniao) return null
@@ -234,29 +222,14 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
     return pessoas.find(p => p.id === conjugeId) || null
   }
 
-  // Encontrar casamento de uma pessoa
   const findCasamento = (pessoa: PessoaArvore): UniaoArvore | null => {
     return unioes.find(u => u.pessoa1Id === pessoa.id || u.pessoa2Id === pessoa.id) || null
   }
 
-  // Encontrar pai de uma pessoa
-  const findPai = (pessoa: PessoaArvore): PessoaArvore | null => {
-    if (!pessoa.paiId) return null
-    return pessoas.find(p => p.id === pessoa.paiId) || null
-  }
-
-  // Encontrar mãe de uma pessoa
-  const findMae = (pessoa: PessoaArvore): PessoaArvore | null => {
-    if (!pessoa.maeId) return null
-    return pessoas.find(p => p.id === pessoa.maeId) || null
-  }
-
-  // Encontrar filhos de uma pessoa
   const findFilhos = (pessoa: PessoaArvore): PessoaArvore[] => {
     return pessoas.filter(p => p.paiId === pessoa.id || p.maeId === pessoa.id)
   }
 
-  // Handlers para adicionar familiares
   const handleAddPai = (pessoaId: number) => {
     setAddPersonType('pai')
     setAddPersonParentId(pessoaId)
@@ -281,12 +254,15 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
     setShowAddPersonModal(true)
   }
 
-  // Se não tem árvore vinculada
+  const handleOnboardingComplete = async () => {
+    setShowOnboarding(false)
+    await fetchArvore()
+  }
+
   if (!arvoreId && !loading) {
     return (
       <div className="h-full flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
         <div className="text-center max-w-md px-6">
-          {/* Ícone animado */}
           <div className="relative w-24 h-24 mx-auto mb-6">
             <div
               className="absolute inset-0 rounded-full opacity-20 animate-pulse"
@@ -344,24 +320,32 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
     )
   }
 
+  if (showOnboarding && arvoreId) {
+    return (
+      <div ref={containerRef} className="h-full">
+        <TreeOnboarding 
+          arvoreId={arvoreId} 
+          onComplete={handleOnboardingComplete}
+        />
+      </div>
+    )
+  }
+
   return (
     <div 
       ref={containerRef} 
       className="h-full flex flex-col bg-gradient-to-b from-gray-100 to-gray-200 relative"
     >
-      {/* Overlay de transição com fade */}
       <div 
         className={`absolute inset-0 bg-white z-[9999] pointer-events-none transition-opacity duration-300 ${isTransitioning ? 'opacity-60' : 'opacity-0'}`}
       />
       
-      {/* Controles de visualização */}
       <div className="flex items-center justify-between px-4 py-2 bg-white border-b">
         <div className="flex items-center gap-2">
           <button
             className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'paisagem' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
             onClick={() => setViewMode('paisagem')}
           >
-            {/* Ícone horizontal - árvore deitada */}
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="2" y="9" width="6" height="6" rx="1" />
               <rect x="14" y="3" width="6" height="6" rx="1" />
@@ -375,7 +359,6 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
             className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'retrato' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
             onClick={() => setViewMode('retrato')}
           >
-            {/* Ícone vertical - árvore em pé */}
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="2" width="6" height="6" rx="1" />
               <rect x="15" y="2" width="6" height="6" rx="1" />
@@ -398,13 +381,10 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
         </div>
       </div>
 
-      {/* Área da árvore */}
       <div className="flex-1 overflow-hidden relative">
-        {/* Estado vazio - centralizado */}
-        {pessoas.length === 0 && (
+        {pessoas.length === 0 && !showOnboarding && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="flex flex-col items-center gap-8 max-w-sm text-center px-4">
-              {/* Ilustração */}
               <div className="relative">
                 <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center">
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5">
@@ -430,11 +410,7 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
               <button
                 className="px-6 py-3 text-white rounded-xl font-semibold transition-all hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-2"
                 style={{ backgroundColor: fsColors.green }}
-                onClick={() => {
-                  setAddPersonType('pessoa')
-                  setAddPersonParentId(null)
-                  setShowAddPersonModal(true)
-                }}
+                onClick={() => setShowOnboarding(true)}
               >
                 <User className="w-5 h-5" />
                 Adicionar primeira pessoa
@@ -443,7 +419,6 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
           </div>
         )}
 
-        {/* React Flow Tree - só mostra quando tem pessoas */}
         {pessoas.length > 0 && pessoaPrincipal && (
           <ReactFlowTree
             pessoas={pessoas}
@@ -459,7 +434,6 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
         )}
       </div>
 
-      {/* Overlay quando sidebar está aberta */}
       {selectedPerson && (
         <div 
           className="fixed inset-0 bg-black/20 z-[10000]"
@@ -467,7 +441,6 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
         />
       )}
 
-      {/* Sidebar de detalhes */}
       <PessoaSidebar 
         pessoa={selectedPerson}
         conjuge={selectedPerson ? findConjuge(selectedPerson) : null}
@@ -476,9 +449,9 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
         onOpenFullDetails={handleOpenFullDetails}
         onEdit={handleEditPerson}
         onDelete={handleDeletePerson}
+        onAddFilho={handleAddFilho}
       />
 
-      {/* Página completa de detalhes */}
       {fullDetailsPerson && (
         <PessoaDetailsPage 
           pessoa={fullDetailsPerson}
@@ -490,21 +463,20 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
         />
       )}
 
-      {/* Modal de adicionar pessoa */}
       {showAddPersonModal && (
         <AddPersonModal 
           arvoreId={arvoreId!}
           type={addPersonType}
           parentId={addPersonParentId}
           conjugeDePessoaId={addConjugeForPessoaId}
+          pessoas={pessoas}
           onClose={() => {
             setShowAddPersonModal(false)
             setAddPersonType(null)
             setAddPersonParentId(null)
             setAddConjugeForPessoaId(null)
           }}
-          onSuccess={async (novaPessoa, novaUniao) => {
-            // Recarrega toda a árvore para pegar os vínculos atualizados
+          onSuccess={async () => {
             await fetchArvore()
             setShowAddPersonModal(false)
             setAddPersonType(null)
@@ -514,10 +486,11 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
         />
       )}
 
-      {/* Modal de editar pessoa */}
       {showEditPersonModal && editingPerson && (
         <EditPersonModal 
           pessoa={editingPerson}
+          pessoas={pessoas}
+          unioes={unioes}
           onClose={() => {
             setShowEditPersonModal(false)
             setEditingPerson(null)
@@ -533,12 +506,15 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
   )
 }
 
-// Modal de adicionar pessoa
+// ========================================
+// MODAL DE ADICIONAR PESSOA
+// ========================================
 function AddPersonModal({ 
   arvoreId, 
   type, 
   parentId,
   conjugeDePessoaId,
+  pessoas,
   onClose, 
   onSuccess 
 }: { 
@@ -546,17 +522,38 @@ function AddPersonModal({
   type: 'pai' | 'mae' | 'filho' | 'pessoa' | 'conjuge' | null
   parentId: number | null
   conjugeDePessoaId?: number | null
+  pessoas: PessoaArvore[]
   onClose: () => void
-  onSuccess: (pessoa: PessoaArvore, uniao?: UniaoArvore) => void 
+  onSuccess: () => void 
 }) {
   const [nome, setNome] = useState('')
   const [sobrenome, setSobrenome] = useState('')
   const [sexo, setSexo] = useState<string>('')
   const [dataNasc, setDataNasc] = useState('')
   const [localNasc, setLocalNasc] = useState('')
+  const [paisNasc, setPaisNasc] = useState('')
+  const [nacionalidade, setNacionalidade] = useState('')
+  
+  // Campos condicionais - Falecido
+  const [isFalecido, setIsFalecido] = useState(false)
+  const [dataObito, setDataObito] = useState('')
+  const [localObito, setLocalObito] = useState('')
+  
+  // Campos condicionais - Casado
+  const [isCasado, setIsCasado] = useState(false)
   const [dataCasamento, setDataCasamento] = useState('')
   const [localCasamento, setLocalCasamento] = useState('')
+  const [conjugeId, setConjugeId] = useState<number | string>('')
+  
+  const [comentario, setComentario] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Se estamos adicionando cônjuge, já sabemos que é casado
+  useEffect(() => {
+    if (type === 'conjuge') {
+      setIsCasado(true)
+    }
+  }, [type])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -570,10 +567,15 @@ function AddPersonModal({
         sexo: sexo || null,
         data_nasc: dataNasc ? new Date(dataNasc).toISOString() : null,
         local_nasc: localNasc.trim() || null,
+        pais_nasc: paisNasc.trim() || null,
+        nacionalidade: nacionalidade.trim() || null,
+        vivo: !isFalecido,
+        data_obito: isFalecido && dataObito ? new Date(dataObito).toISOString() : null,
+        local_emigracao: isFalecido && localObito ? localObito.trim() : null, // Usando local_emigracao temporariamente para local de óbito
+        comentario: comentario.trim() || null,
         arvoreId
       }
 
-      // Se está adicionando pai ou mãe de alguém
       if (type === 'pai' && parentId) {
         body.filhoId = parentId
         body.tipoPai = 'pai'
@@ -593,33 +595,28 @@ function AddPersonModal({
       if (response.ok) {
         const novaPessoa = await response.json()
         
-        // Se está adicionando cônjuge, criar a união
-        if (type === 'conjuge' && conjugeDePessoaId) {
-          const uniaoResponse = await fetch('/api/unioes', {
+        // Se está adicionando cônjuge ou pessoa é casada
+        if ((type === 'conjuge' && conjugeDePessoaId) || (isCasado && conjugeId)) {
+          const pessoa1Id = conjugeDePessoaId || novaPessoa.id
+          const pessoa2Id = conjugeDePessoaId ? novaPessoa.id : Number(conjugeId)
+          
+          await fetch('/api/unioes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              pessoa1Id: conjugeDePessoaId,
-              pessoa2Id: novaPessoa.id,
+              pessoa1Id,
+              pessoa2Id,
               data_inicio: dataCasamento ? new Date(dataCasamento).toISOString() : null,
               local: localCasamento.trim() || null,
               tipo: 'casamento'
             })
           })
-          
-          if (uniaoResponse.ok) {
-            const novaUniao = await uniaoResponse.json()
-            onSuccess(novaPessoa, novaUniao)
-          } else {
-            // Pessoa foi criada mas união falhou
-            onSuccess(novaPessoa)
-            alert('Pessoa criada, mas houve erro ao criar a união')
-          }
-        } else {
-          onSuccess(novaPessoa)
         }
+        
+        onSuccess()
       } else {
-        alert('Erro ao adicionar pessoa')
+        const error = await response.json()
+        alert(error.error || 'Erro ao adicionar pessoa')
       }
     } catch (error) {
       console.error('Erro ao adicionar pessoa:', error)
@@ -637,16 +634,23 @@ function AddPersonModal({
     conjuge: 'Adicionar Cônjuge'
   }
 
+  // Pessoas disponíveis para casar (exclui a própria pessoa e quem já está casado)
+  const pessoasDisponiveis = pessoas.filter(p => {
+    // Implementar lógica se necessário
+    return true
+  })
+
   return (
     <>
       <div className="fixed inset-0 bg-black/50 z-[10003]" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl z-[10004] w-full max-w-md">
-        <div className="p-6 border-b">
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl z-[10004] w-full max-w-3xl">
+        <div className="px-6 py-4 border-b">
           <h2 className="text-xl font-semibold text-gray-900">{titles[type || 'pessoa']}</h2>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-3">
+          {/* Linha 1: Nome, Sobrenome, Sexo */}
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
               <input
@@ -667,22 +671,22 @@ function AddPersonModal({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
+              <select
+                value={sexo}
+                onChange={(e) => setSexo(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="">Selecione...</option>
+                <option value="Masculino">Masculino</option>
+                <option value="Feminino">Feminino</option>
+              </select>
+            </div>
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
-            <select
-              value={sexo}
-              onChange={(e) => setSexo(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-            >
-              <option value="">Selecione...</option>
-              <option value="Masculino">Masculino</option>
-              <option value="Feminino">Feminino</option>
-            </select>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
+          {/* Linha 2: Data Nasc, Cidade Nasc, País Nasc */}
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
               <input
@@ -693,7 +697,7 @@ function AddPersonModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Local de Nascimento</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
               <input
                 type="text"
                 value={localNasc}
@@ -701,39 +705,141 @@ function AddPersonModal({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">País de Nascimento</label>
+              <input
+                type="text"
+                value={paisNasc}
+                onChange={(e) => setPaisNasc(e.target.value)}
+                placeholder="Ex: Brasil, Itália..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
           </div>
-          
-          {/* Campos de casamento - só aparecem para cônjuge */}
-          {type === 'conjuge' && (
-            <>
-              <div className="border-t pt-4 mt-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">Dados do Casamento</h3>
-                <div className="grid grid-cols-2 gap-4">
+
+          {/* Linha 3: Nacionalidade + Checkboxes */}
+          <div className="grid grid-cols-3 gap-3 items-end">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
+              <input
+                type="text"
+                value={nacionalidade}
+                onChange={(e) => setNacionalidade(e.target.value)}
+                placeholder="Ex: Brasileiro..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+            {type !== 'conjuge' && (
+              <div className="flex items-center h-[42px]">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isCasado}
+                    onChange={(e) => setIsCasado(e.target.checked)}
+                    className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Pessoa casada</span>
+                </label>
+              </div>
+            )}
+            <div className="flex items-center h-[42px]">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isFalecido}
+                  onChange={(e) => setIsFalecido(e.target.checked)}
+                  className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Pessoa falecida</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Campos de Casamento - condicional */}
+          {(isCasado || type === 'conjuge') && (
+            <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
+              <h3 className="text-sm font-medium text-purple-800 mb-2">Dados do Casamento</h3>
+              <div className="grid grid-cols-3 gap-3">
+                {type !== 'conjuge' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Data do Casamento</label>
-                    <input
-                      type="date"
-                      value={dataCasamento}
-                      onChange={(e) => setDataCasamento(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    />
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cônjuge</label>
+                    <select
+                      value={conjugeId}
+                      onChange={(e) => setConjugeId(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                    >
+                      <option value="">Selecione...</option>
+                      {pessoasDisponiveis.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.nome} {p.sobrenome || ''}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Local do Casamento</label>
-                    <input
-                      type="text"
-                      value={localCasamento}
-                      onChange={(e) => setLocalCasamento(e.target.value)}
-                      placeholder="Cidade, Estado, País"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    />
-                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data do Casamento</label>
+                  <input
+                    type="date"
+                    value={dataCasamento}
+                    onChange={(e) => setDataCasamento(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Local do Casamento</label>
+                  <input
+                    type="text"
+                    value={localCasamento}
+                    onChange={(e) => setLocalCasamento(e.target.value)}
+                    placeholder="Cidade, País"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
                 </div>
               </div>
-            </>
+            </div>
           )}
+
+          {/* Campos de Falecimento - condicional */}
+          {isFalecido && (
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Dados do Falecimento</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data de Falecimento</label>
+                  <input
+                    type="date"
+                    value={dataObito}
+                    onChange={(e) => setDataObito(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Local de Falecimento</label>
+                  <input
+                    type="text"
+                    value={localObito}
+                    onChange={(e) => setLocalObito(e.target.value)}
+                    placeholder="Cidade, País"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Observações */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+            <textarea
+              value={comentario}
+              onChange={(e) => setComentario(e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+            />
+          </div>
           
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
@@ -755,23 +861,47 @@ function AddPersonModal({
   )
 }
 
-// Modal de editar pessoa
+// ========================================
+// MODAL DE EDITAR PESSOA
+// ========================================
 function EditPersonModal({ 
   pessoa,
+  pessoas,
+  unioes,
   onClose, 
   onSuccess 
 }: { 
   pessoa: PessoaArvore
+  pessoas: PessoaArvore[]
+  unioes: UniaoArvore[]
   onClose: () => void
   onSuccess: () => void 
 }) {
+  // Encontrar união existente
+  const uniaoExistente = unioes.find(u => u.pessoa1Id === pessoa.id || u.pessoa2Id === pessoa.id)
+  const conjugeExistenteId = uniaoExistente 
+    ? (uniaoExistente.pessoa1Id === pessoa.id ? uniaoExistente.pessoa2Id : uniaoExistente.pessoa1Id)
+    : null
+
   const [nome, setNome] = useState(pessoa.nome)
   const [sobrenome, setSobrenome] = useState(pessoa.sobrenome || '')
   const [sexo, setSexo] = useState(pessoa.sexo || '')
   const [dataNasc, setDataNasc] = useState(pessoa.data_nasc ? new Date(pessoa.data_nasc).toISOString().split('T')[0] : '')
   const [localNasc, setLocalNasc] = useState(pessoa.local_nasc || '')
+  const [paisNasc, setPaisNasc] = useState(pessoa.pais_nasc || '')
+  const [nacionalidade, setNacionalidade] = useState(pessoa.nacionalidade || '')
+  
+  // Campos condicionais - Falecido
+  const [isFalecido, setIsFalecido] = useState(pessoa.vivo === false || !!pessoa.data_obito)
   const [dataObito, setDataObito] = useState(pessoa.data_obito ? new Date(pessoa.data_obito).toISOString().split('T')[0] : '')
-  const [batizado, setBatizado] = useState(pessoa.batizado || '')
+  const [localObito, setLocalObito] = useState(pessoa.local_emigracao || '') // Usando local_emigracao temporariamente
+  
+  // Campos condicionais - Casado
+  const [isCasado, setIsCasado] = useState(!!uniaoExistente)
+  const [dataCasamento, setDataCasamento] = useState(uniaoExistente?.data_inicio ? new Date(uniaoExistente.data_inicio).toISOString().split('T')[0] : '')
+  const [localCasamento, setLocalCasamento] = useState(uniaoExistente?.local || '')
+  const [conjugeId, setConjugeId] = useState<number | string>(conjugeExistenteId || '')
+  
   const [comentario, setComentario] = useState(pessoa.comentario || '')
   const [saving, setSaving] = useState(false)
 
@@ -781,6 +911,7 @@ function EditPersonModal({
 
     setSaving(true)
     try {
+      // Atualizar pessoa
       const response = await fetch(`/api/pessoas/${pessoa.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -790,17 +921,55 @@ function EditPersonModal({
           sexo: sexo || null,
           data_nasc: dataNasc ? new Date(dataNasc).toISOString() : null,
           local_nasc: localNasc.trim() || null,
-          data_obito: dataObito ? new Date(dataObito).toISOString() : null,
-          batizado: batizado.trim() || null,
+          pais_nasc: paisNasc.trim() || null,
+          nacionalidade: nacionalidade.trim() || null,
+          vivo: !isFalecido,
+          data_obito: isFalecido && dataObito ? new Date(dataObito).toISOString() : null,
+          local_emigracao: isFalecido && localObito ? localObito.trim() : null,
           comentario: comentario.trim() || null,
         })
       })
 
-      if (response.ok) {
-        onSuccess()
-      } else {
-        alert('Erro ao atualizar pessoa')
+      if (!response.ok) {
+        const error = await response.json()
+        alert(error.error || 'Erro ao atualizar pessoa')
+        return
       }
+
+      // Gerenciar união/casamento
+      if (isCasado && conjugeId) {
+        if (uniaoExistente) {
+          // Atualizar união existente
+          await fetch(`/api/unioes/${uniaoExistente.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              data_inicio: dataCasamento ? new Date(dataCasamento).toISOString() : null,
+              local: localCasamento.trim() || null,
+            })
+          })
+        } else {
+          // Criar nova união
+          await fetch('/api/unioes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pessoa1Id: pessoa.id,
+              pessoa2Id: Number(conjugeId),
+              data_inicio: dataCasamento ? new Date(dataCasamento).toISOString() : null,
+              local: localCasamento.trim() || null,
+              tipo: 'casamento'
+            })
+          })
+        }
+      } else if (!isCasado && uniaoExistente) {
+        // Remover união se desmarcou "casado"
+        await fetch(`/api/unioes/${uniaoExistente.id}`, {
+          method: 'DELETE'
+        })
+      }
+
+      onSuccess()
     } catch (error) {
       console.error('Erro ao atualizar pessoa:', error)
       alert('Erro ao atualizar pessoa')
@@ -809,16 +978,20 @@ function EditPersonModal({
     }
   }
 
+  // Pessoas disponíveis para casar (exclui a própria pessoa)
+  const pessoasDisponiveis = pessoas.filter(p => p.id !== pessoa.id)
+
   return (
     <>
       <div className="fixed inset-0 bg-black/50 z-[10003]" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl z-[10004] w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b">
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl z-[10004] w-full max-w-3xl">
+        <div className="px-6 py-4 border-b">
           <h2 className="text-xl font-semibold text-gray-900">Editar Pessoa</h2>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-3">
+          {/* Linha 1: Nome, Sobrenome, Sexo */}
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
               <input
@@ -839,22 +1012,22 @@ function EditPersonModal({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
+              <select
+                value={sexo}
+                onChange={(e) => setSexo(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="">Selecione...</option>
+                <option value="Masculino">Masculino</option>
+                <option value="Feminino">Feminino</option>
+              </select>
+            </div>
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
-            <select
-              value={sexo}
-              onChange={(e) => setSexo(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-            >
-              <option value="">Selecione...</option>
-              <option value="Masculino">Masculino</option>
-              <option value="Feminino">Feminino</option>
-            </select>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
+          {/* Linha 2: Data Nasc, Cidade Nasc, País Nasc */}
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
               <input
@@ -865,7 +1038,7 @@ function EditPersonModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Local de Nascimento</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
               <input
                 type="text"
                 value={localNasc}
@@ -873,40 +1046,135 @@ function EditPersonModal({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Data de Falecimento</label>
-              <input
-                type="date"
-                value={dataObito}
-                onChange={(e) => setDataObito(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Batizado</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">País de Nascimento</label>
               <input
                 type="text"
-                value={batizado}
-                onChange={(e) => setBatizado(e.target.value)}
+                value={paisNasc}
+                onChange={(e) => setPaisNasc(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
             </div>
           </div>
-          
+
+          {/* Linha 3: Nacionalidade + Checkboxes */}
+          <div className="grid grid-cols-3 gap-3 items-end">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
+              <input
+                type="text"
+                value={nacionalidade}
+                onChange={(e) => setNacionalidade(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+            <div className="flex items-center h-[42px]">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isCasado}
+                  onChange={(e) => setIsCasado(e.target.checked)}
+                  className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Pessoa casada</span>
+              </label>
+            </div>
+            <div className="flex items-center h-[42px]">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isFalecido}
+                  onChange={(e) => setIsFalecido(e.target.checked)}
+                  className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Pessoa falecida</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Campos de Casamento - condicional */}
+          {isCasado && (
+            <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
+              <h3 className="text-sm font-medium text-purple-800 mb-2">Dados do Casamento</h3>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cônjuge</label>
+                  <select
+                    value={conjugeId}
+                    onChange={(e) => setConjugeId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                  >
+                    <option value="">Selecione...</option>
+                    {pessoasDisponiveis.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.nome} {p.sobrenome || ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data do Casamento</label>
+                  <input
+                    type="date"
+                    value={dataCasamento}
+                    onChange={(e) => setDataCasamento(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Local do Casamento</label>
+                  <input
+                    type="text"
+                    value={localCasamento}
+                    onChange={(e) => setLocalCasamento(e.target.value)}
+                    placeholder="Cidade, País"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Campos de Falecimento - condicional */}
+          {isFalecido && (
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Dados do Falecimento</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data de Falecimento</label>
+                  <input
+                    type="date"
+                    value={dataObito}
+                    onChange={(e) => setDataObito(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Local de Falecimento</label>
+                  <input
+                    type="text"
+                    value={localObito}
+                    onChange={(e) => setLocalObito(e.target.value)}
+                    placeholder="Cidade, País"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Observações */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Comentário</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
             <textarea
               value={comentario}
               onChange={(e) => setComentario(e.target.value)}
-              rows={3}
+              rows={2}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
             />
           </div>
           
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}

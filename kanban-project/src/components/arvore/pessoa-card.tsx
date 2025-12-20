@@ -3,22 +3,67 @@
 import { PersonIcon } from "./pessoa-icon"
 import { ChevronDown, UserPlus, ExternalLink } from "lucide-react"
 
+// ✅ ATUALIZADO: Interface com todos os novos campos
 export interface PessoaArvore {
   id: number
   nome: string
   sobrenome?: string | null
   sexo?: string | null
+  
+  // Datas
   data_nasc?: Date | string | null
-  local_nasc?: string | null
   data_obito?: Date | string | null
+  
+  // Local de nascimento (expandido)
+  local_nasc?: string | null
+  estado_nasc?: string | null      // ✅ NOVO
+  pais_nasc?: string | null        // ✅ NOVO - importante para cidadania
+  
+  // Status vital
+  vivo?: boolean                   // ✅ NOVO
+  
+  // Batismo (expandido)
   batizado?: string | null
+  data_batismo?: Date | string | null    // ✅ NOVO
+  local_batismo?: string | null          // ✅ NOVO
+  igreja_batismo?: string | null         // ✅ NOVO
+  
+  // Profissão e nacionalidade
+  profissao?: string | null              // ✅ NOVO
+  nacionalidade?: string | null          // ✅ NOVO
+  cidadanias_outras?: string | null      // ✅ NOVO
+  
+  // Naturalização
+  naturalizado?: boolean                 // ✅ NOVO
+  data_naturalizacao?: Date | string | null  // ✅ NOVO
+  pais_naturalizacao?: string | null     // ✅ NOVO
+  
+  // Emigração/Imigração
+  data_emigracao?: Date | string | null  // ✅ NOVO
+  local_emigracao?: string | null        // ✅ NOVO
+  porto_embarque?: string | null         // ✅ NOVO
+  data_chegada?: Date | string | null    // ✅ NOVO
+  porto_chegada?: string | null          // ✅ NOVO
+  pais_destino?: string | null           // ✅ NOVO
+  navio?: string | null                  // ✅ NOVO
+  
+  // Notas
   comentario?: string | null
-  paiId?: number | null
-  maeId?: number | null
+  
+  // Posição no canvas
   x?: number | null
   y?: number | null
+  
+  // IDs
   arvoreId: number
-  pid?: string | null // ID estilo FamilySearch
+  paiId?: number | null
+  maeId?: number | null
+  pid?: string | null
+  
+  // Timestamps
+  createdAt?: Date | string | null       // ✅ NOVO
+  updatedAt?: Date | string | null       // ✅ NOVO
+  
   // Relacionamentos
   pai?: PessoaArvore | null
   mae?: PessoaArvore | null
@@ -26,18 +71,90 @@ export interface PessoaArvore {
   filhosComoMae?: PessoaArvore[]
   unioesComoPessoa1?: UniaoArvore[]
   unioesComoPessoa2?: UniaoArvore[]
+  documentos?: DocumentoArvore[]         // ✅ NOVO
 }
 
+// ✅ ATUALIZADO: Interface de União com campos de certidão
 export interface UniaoArvore {
   id: number
   data_inicio?: Date | string | null
   data_fim?: Date | string | null
   tipo?: string | null
+  
+  // Local (expandido)
   local?: string | null
+  estado?: string | null                 // ✅ NOVO
+  pais?: string | null                   // ✅ NOVO
+  
+  // Dados da certidão de casamento
+  cartorio?: string | null               // ✅ NOVO
+  livro?: string | null                  // ✅ NOVO
+  folha?: string | null                  // ✅ NOVO
+  termo?: string | null                  // ✅ NOVO
+  numero_registro?: string | null        // ✅ NOVO
+  data_registro?: Date | string | null   // ✅ NOVO
+  
+  // Observações
+  observacoes?: string | null            // ✅ NOVO
+  
+  // IDs
   pessoa1Id: number
   pessoa2Id: number
+  
+  // Timestamps
+  createdAt?: Date | string | null       // ✅ NOVO
+  updatedAt?: Date | string | null       // ✅ NOVO
+  
+  // Relacionamentos
   pessoa1?: PessoaArvore
   pessoa2?: PessoaArvore
+}
+
+// ✅ NOVO: Interface de Documento
+export interface DocumentoArvore {
+  id: number
+  pessoaId: number
+  tipo: string
+  status: string
+  descricao?: string | null
+  
+  // Dados do registro
+  cartorio?: string | null
+  livro?: string | null
+  folha?: string | null
+  termo?: string | null
+  numero_registro?: string | null
+  data_registro?: Date | string | null
+  cidade_registro?: string | null
+  estado_registro?: string | null
+  pais_registro?: string | null
+  
+  // Documentos de identidade
+  numero?: string | null
+  orgao_emissor?: string | null
+  data_emissao?: Date | string | null
+  data_validade?: Date | string | null
+  
+  // Arquivo
+  arquivo_url?: string | null
+  arquivo_nome?: string | null
+  
+  // Tradução
+  traduzido?: boolean
+  tradutor?: string | null
+  data_traducao?: Date | string | null
+  
+  // Apostilamento
+  apostilado?: boolean
+  numero_apostila?: string | null
+  data_apostila?: Date | string | null
+  
+  // Observações
+  observacoes?: string | null
+  
+  // Timestamps
+  createdAt?: Date | string | null
+  updatedAt?: Date | string | null
 }
 
 interface PessoaCardProps {
@@ -67,19 +184,49 @@ const colors = {
 
 function formatDate(date: Date | string | null | undefined): string {
   if (!date) return ""
+  
+  // Se for string ISO, extrair apenas a parte da data para evitar problemas de timezone
+  if (typeof date === 'string') {
+    const datePart = date.split('T')[0]
+    if (datePart && datePart.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [year] = datePart.split('-')
+      return year
+    }
+  }
+  
   const d = new Date(date)
-  return d.getFullYear().toString()
+  return d.getUTCFullYear().toString()
 }
 
 function formatFullDate(date: Date | string | null | undefined): string {
   if (!date) return ""
+  
+  const meses = [
+    'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
+  ]
+  
+  // Se for string ISO, extrair apenas a parte da data para evitar problemas de timezone
+  if (typeof date === 'string') {
+    const datePart = date.split('T')[0]
+    if (datePart && datePart.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [year, month, day] = datePart.split('-')
+      const mes = meses[parseInt(month, 10) - 1]
+      return `${parseInt(day, 10)} de ${mes} de ${year}`
+    }
+  }
+  
   const d = new Date(date)
-  return d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })
+  const day = d.getUTCDate()
+  const month = meses[d.getUTCMonth()]
+  const year = d.getUTCFullYear()
+  return `${day} de ${month} de ${year}`
 }
 
 function formatDateRange(nascimento: Date | string | null | undefined, obito: Date | string | null | undefined): string {
   const nasc = formatDate(nascimento)
   const obit = obito ? formatDate(obito) : ""
+  
   if (!nasc && !obit) return ""
   if (!nasc && obit) return `Falecido`
   if (nasc && !obit) return nasc
@@ -89,14 +236,13 @@ function formatDateRange(nascimento: Date | string | null | undefined, obito: Da
 function getGenderColors(sexo: string | null | undefined) {
   const isMale = sexo?.toLowerCase() === 'masculino' || sexo?.toLowerCase() === 'm'
   const isFemale = sexo?.toLowerCase() === 'feminino' || sexo?.toLowerCase() === 'f'
-
+  
   if (isMale) return { border: colors.male, bg: colors.maleBg, borderLight: colors.maleBorder }
   if (isFemale) return { border: colors.female, bg: colors.femaleBg, borderLight: colors.femaleBorder }
   return { border: colors.neutral, bg: colors.neutralBg, borderLight: '#D1D5DB' }
 }
 
 function generatePID(id: number): string {
-  // Gera um PID estilo FamilySearch
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
   let pid = ''
   const seed = id * 12345
@@ -106,7 +252,11 @@ function generatePID(id: number): string {
   return `${pid.slice(0, 4)}-${pid.slice(0, 3)}`
 }
 
+// ✅ ATUALIZADO: Usa campo 'vivo' se disponível, senão verifica data_obito
 function isDeceased(pessoa: PessoaArvore): boolean {
+  if (pessoa.vivo !== undefined) {
+    return !pessoa.vivo
+  }
   return !!pessoa.data_obito
 }
 
@@ -114,18 +264,25 @@ function isDeceased(pessoa: PessoaArvore): boolean {
 function PersonAvatar({ pessoa, size = 40 }: { pessoa: PessoaArvore; size?: number }) {
   const genderColors = getGenderColors(pessoa.sexo)
   const initial = pessoa.nome?.charAt(0)?.toUpperCase() || '?'
-
+  const deceased = isDeceased(pessoa)
+  
   return (
     <div
-      className="rounded-full flex items-center justify-center font-bold text-white shadow-sm"
+      className="rounded-full flex items-center justify-center font-bold text-white shadow-sm relative"
       style={{
         width: size,
         height: size,
         backgroundColor: genderColors.border,
-        fontSize: size * 0.4
+        fontSize: size * 0.4,
+        opacity: deceased ? 0.7 : 1
       }}
     >
       {initial}
+      {deceased && (
+        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-gray-500 rounded-full flex items-center justify-center">
+          <span className="text-white text-[8px]">†</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -166,6 +323,33 @@ function StatusBadge({ deceased }: { deceased: boolean }) {
   )
 }
 
+// ✅ NOVO: Badge de país de nascimento
+function CountryBadge({ pais }: { pais?: string | null }) {
+  if (!pais) return null
+  
+  // Mapeia países para bandeiras emoji
+  const flags: Record<string, string> = {
+    'brasil': '🇧🇷',
+    'brazil': '🇧🇷',
+    'itália': '🇮🇹',
+    'italia': '🇮🇹',
+    'italy': '🇮🇹',
+    'portugal': '🇵🇹',
+    'espanha': '🇪🇸',
+    'spain': '🇪🇸',
+    'alemanha': '🇩🇪',
+    'germany': '🇩🇪',
+  }
+  
+  const flag = flags[pais.toLowerCase()] || '🌍'
+  
+  return (
+    <span className="px-1.5 py-0.5 text-xs rounded bg-gray-100 text-gray-600" title={pais}>
+      {flag}
+    </span>
+  )
+}
+
 export function PessoaCard({
   pessoa,
   conjuge,
@@ -201,7 +385,7 @@ export function PessoaCard({
         <div className="flex items-start gap-3">
           {/* Avatar */}
           <PersonAvatar pessoa={pessoa} size={44} />
-
+          
           {/* Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
@@ -210,14 +394,15 @@ export function PessoaCard({
               </h3>
               <FamilySearchIcon />
             </div>
-
-            <div className="flex items-center gap-2 mt-1">
+            
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
               <StatusBadge deceased={isDeceased(pessoa)} />
+              <CountryBadge pais={pessoa.pais_nasc} />
               <span className="text-xs text-gray-400 font-mono">{pid}</span>
             </div>
           </div>
         </div>
-
+        
         {/* Info de casamento */}
         {casamento && (
           <div className="mt-3 pt-3 border-t border-gray-100">
@@ -225,10 +410,15 @@ export function PessoaCard({
               <span className="font-medium text-gray-600">Casamento:</span>
               {casamento.data_inicio ? formatFullDate(casamento.data_inicio) : 'Data não informada'}
             </p>
+            {casamento.local && (
+              <p className="text-xs text-gray-400 mt-0.5">
+                {casamento.local}{casamento.pais ? `, ${casamento.pais}` : ''}
+              </p>
+            )}
           </div>
         )}
       </div>
-
+      
       {/* Cônjuge */}
       {conjuge && conjugeGenderColors && (
         <div
@@ -252,8 +442,9 @@ export function PessoaCard({
                   </h4>
                   <FamilySearchIcon />
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <StatusBadge deceased={isDeceased(conjuge)} />
+                  <CountryBadge pais={conjuge.pais_nasc} />
                   <span className="text-xs text-gray-400 font-mono">{conjugePid}</span>
                 </div>
               </div>
@@ -261,7 +452,7 @@ export function PessoaCard({
           </div>
         </div>
       )}
-
+      
       {/* Botão de adicionar cônjuge */}
       {!conjuge && onAddConjuge && (
         <div
@@ -279,7 +470,7 @@ export function PessoaCard({
           </div>
         </div>
       )}
-
+      
       {/* Filhos dropdown */}
       {showChildrenDropdown && (
         <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
@@ -293,36 +484,65 @@ export function PessoaCard({
 
 // Botão de adicionar pessoa estilo FamilySearch
 interface AddPersonButtonProps {
-  type: 'pai' | 'mae' | 'filho' | 'pessoa'
+  type: 'pai' | 'mae' | 'filho' | 'pessoa' | 'conjuge'
   onClick?: () => void
   disabled?: boolean
+  size?: 'sm' | 'md' | 'lg'
 }
 
-export function AddPersonButton({ type, onClick, disabled }: AddPersonButtonProps) {
+export function AddPersonButton({ type, onClick, disabled, size = 'md' }: AddPersonButtonProps) {
   const config = {
     pai: { label: 'ACRESCENTAR O PAI', color: colors.male },
     mae: { label: 'ACRESCENTAR A MÃE', color: colors.female },
     filho: { label: 'ACRESCENTAR FILHO(A)', color: colors.green },
-    pessoa: { label: 'ADICIONAR PESSOA', color: colors.neutral }
+    pessoa: { label: 'ADICIONAR PESSOA', color: colors.neutral },
+    conjuge: { label: 'ADICIONAR CÔNJUGE', color: colors.greenDark }
   }
 
   const { label, color } = config[type]
+  
+  const sizeClasses = {
+    sm: 'px-3 py-2 text-xs',
+    md: 'px-4 py-3 text-sm',
+    lg: 'px-6 py-4 text-base'
+  }
+  
+  const iconSizes = {
+    sm: 32,
+    md: 40,
+    lg: 48
+  }
 
   return (
     <button
-      className="flex items-center gap-3 px-4 py-3 bg-white rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-teal-500 hover:bg-teal-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+      className={`flex items-center gap-3 ${sizeClasses[size]} bg-white rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-teal-500 hover:bg-teal-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md`}
       onClick={onClick}
       disabled={disabled}
     >
       <div
-        className="w-10 h-10 rounded-full flex items-center justify-center"
-        style={{ backgroundColor: `${color}20` }}
+        className="rounded-full flex items-center justify-center"
+        style={{ 
+          backgroundColor: `${color}20`,
+          width: iconSizes[size],
+          height: iconSizes[size]
+        }}
       >
-        <svg className="w-5 h-5" style={{ color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        <svg 
+          className="w-5 h-5" 
+          style={{ color }} 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            strokeWidth={2} 
+            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" 
+          />
         </svg>
       </div>
-      <span style={{ color }} className="font-semibold text-sm tracking-wide">
+      <span style={{ color }} className="font-semibold tracking-wide">
         {label}
       </span>
     </button>
