@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { PessoaArvore, UniaoArvore } from "./pessoa-card"
+import type { PessoaArvore, UniaoArvore } from "./types"
 import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
 import { ReactFlowTree } from "./react-flow-tree"
@@ -470,6 +470,7 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
           parentId={addPersonParentId}
           conjugeDePessoaId={addConjugeForPessoaId}
           pessoas={pessoas}
+          unioes={unioes}
           onClose={() => {
             setShowAddPersonModal(false)
             setAddPersonType(null)
@@ -515,6 +516,7 @@ function AddPersonModal({
   parentId,
   conjugeDePessoaId,
   pessoas,
+  unioes,
   onClose, 
   onSuccess 
 }: { 
@@ -523,6 +525,7 @@ function AddPersonModal({
   parentId: number | null
   conjugeDePessoaId?: number | null
   pessoas: PessoaArvore[]
+  unioes: UniaoArvore[]
   onClose: () => void
   onSuccess: () => void 
 }) {
@@ -583,7 +586,33 @@ function AddPersonModal({
         body.filhoId = parentId
         body.tipoPai = 'mae'
       } else if (type === 'filho' && parentId) {
-        body.paiId = parentId
+        // Encontrar a pessoa que está adicionando o filho
+        const pessoaPai = pessoas.find(p => p.id === parentId)
+        
+        if (pessoaPai) {
+          // Definir paiId ou maeId baseado no sexo
+          if (pessoaPai.sexo === 'Feminino') {
+            body.maeId = parentId
+          } else {
+            body.paiId = parentId
+          }
+          
+          // Se a pessoa tem cônjuge, definir o outro pai/mãe também
+          const uniaoExistente = unioes.find(u => u.pessoa1Id === parentId || u.pessoa2Id === parentId)
+          if (uniaoExistente) {
+            const conjugeId = uniaoExistente.pessoa1Id === parentId ? uniaoExistente.pessoa2Id : uniaoExistente.pessoa1Id
+            const conjuge = pessoas.find(p => p.id === conjugeId)
+            if (conjuge) {
+              if (conjuge.sexo === 'Feminino') {
+                body.maeId = conjugeId
+              } else {
+                body.paiId = conjugeId
+              }
+            }
+          }
+        } else {
+          body.paiId = parentId
+        }
       }
 
       const response = await fetch('/api/pessoas', {
