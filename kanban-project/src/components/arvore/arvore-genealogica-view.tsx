@@ -282,6 +282,18 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
     return unioes.find(u => u.pessoa1Id === pessoa.id || u.pessoa2Id === pessoa.id) || null
   }
 
+  // Encontrar pai de uma pessoa
+  const findPai = (pessoa: PessoaArvore): PessoaArvore | null => {
+    if (!pessoa.paiId) return null
+    return pessoas.find(p => p.id === pessoa.paiId) || null
+  }
+
+  // Encontrar mãe de uma pessoa
+  const findMae = (pessoa: PessoaArvore): PessoaArvore | null => {
+    if (!pessoa.maeId) return null
+    return pessoas.find(p => p.id === pessoa.maeId) || null
+  }
+
   // Encontrar filhos de uma pessoa
   const findFilhos = (pessoa: PessoaArvore): PessoaArvore[] => {
     return pessoas.filter(p => p.paiId === pessoa.id || p.maeId === pessoa.id)
@@ -537,9 +549,9 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                   <>
                     {/* Pai (y=20) */}
                     <div className="absolute" style={{ left: '600px', top: '20px' }}>
-                      {pessoaPrincipal.pai ? (
+                      {findPai(pessoaPrincipal) ? (
                         <PersonCardSimple
-                          pessoa={pessoaPrincipal.pai}
+                          pessoa={findPai(pessoaPrincipal)!}
                           mode="paisagem"
                           onClick={handlePersonClick}
                         />
@@ -558,9 +570,9 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
 
                     {/* Mãe (y=240) */}
                     <div className="absolute" style={{ left: '600px', top: '240px' }}>
-                      {pessoaPrincipal.mae ? (
+                      {findMae(pessoaPrincipal) ? (
                         <PersonCardSimple
-                          pessoa={pessoaPrincipal.mae}
+                          pessoa={findMae(pessoaPrincipal)!}
                           mode="paisagem"
                           onClick={handlePersonClick}
                         />
@@ -580,13 +592,13 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                 )}
 
                 {/* ===== COLUNA 5: Avós (x=800) - só se tiver pai ===== */}
-                {pessoaPrincipal?.pai && (
+                {pessoaPrincipal && findPai(pessoaPrincipal) && (
                   <>
                     {/* Avô paterno */}
                     <div className="absolute" style={{ left: '800px', top: '0px' }}>
-                      {pessoaPrincipal.pai.pai ? (
+                      {findPai(findPai(pessoaPrincipal)!) ? (
                         <PersonCardSimple
-                          pessoa={pessoaPrincipal.pai.pai}
+                          pessoa={findPai(findPai(pessoaPrincipal)!)!}
                           mode="paisagem"
                           onClick={handlePersonClick}
                         />
@@ -596,7 +608,7 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                           mode="paisagem"
                           onClick={() => {
                             setAddPersonType('pai')
-                            setAddPersonParentId(pessoaPrincipal.pai!.id)
+                            setAddPersonParentId(findPai(pessoaPrincipal)!.id)
                             setShowAddPersonModal(true)
                           }}
                         />
@@ -605,9 +617,9 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
 
                     {/* Avó paterna */}
                     <div className="absolute" style={{ left: '800px', top: '120px' }}>
-                      {pessoaPrincipal.pai.mae ? (
+                      {findMae(findPai(pessoaPrincipal)!) ? (
                         <PersonCardSimple
-                          pessoa={pessoaPrincipal.pai.mae}
+                          pessoa={findMae(findPai(pessoaPrincipal)!)!}
                           mode="paisagem"
                           onClick={handlePersonClick}
                         />
@@ -617,7 +629,7 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                           mode="paisagem"
                           onClick={() => {
                             setAddPersonType('mae')
-                            setAddPersonParentId(pessoaPrincipal.pai!.id)
+                            setAddPersonParentId(findPai(pessoaPrincipal)!.id)
                             setShowAddPersonModal(true)
                           }}
                         />
@@ -646,7 +658,7 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                   )}
 
                   {/* Linhas: Pai → Avós */}
-                  {pessoaPrincipal?.pai && (
+                  {pessoaPrincipal && findPai(pessoaPrincipal) && (
                     <>
                       {/* Saída do pai, bifurcação, para avô */}
                       <path d="M 780 70 L 790 70 L 790 50 L 800 50" stroke={fsColors.line} strokeWidth="2" fill="none" />
@@ -664,9 +676,9 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                 {/* ===== LINHA 1: Pais (y=0) ===== */}
                 {/* Pai da Pessoa Principal */}
                 <div className="absolute" style={{ left: '70px', top: '0px' }}>
-                  {pessoaPrincipal?.pai ? (
+                  {pessoaPrincipal && findPai(pessoaPrincipal) ? (
                     <PersonCardSimple
-                      pessoa={pessoaPrincipal.pai}
+                      pessoa={findPai(pessoaPrincipal)!}
                       mode="retrato"
                       onClick={handlePersonClick}
                     />
@@ -687,9 +699,9 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
 
                 {/* Mãe da Pessoa Principal */}
                 <div className="absolute" style={{ left: '230px', top: '0px' }}>
-                  {pessoaPrincipal?.mae ? (
+                  {pessoaPrincipal && findMae(pessoaPrincipal) ? (
                     <PersonCardSimple
-                      pessoa={pessoaPrincipal.mae}
+                      pessoa={findMae(pessoaPrincipal)!}
                       mode="retrato"
                       onClick={handlePersonClick}
                     />
@@ -712,10 +724,10 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                 {pessoaPrincipal && findConjuge(pessoaPrincipal) && (
                   <div className="absolute" style={{ left: '410px', top: '0px' }}>
                     {(() => {
-                      const conjuge = findConjuge(pessoaPrincipal)
-                      return conjuge?.pai ? (
+                      const conjuge = findConjuge(pessoaPrincipal)!
+                      return findPai(conjuge) ? (
                         <PersonCardSimple
-                          pessoa={conjuge.pai}
+                          pessoa={findPai(conjuge)!}
                           mode="retrato"
                           onClick={handlePersonClick}
                         />
@@ -724,11 +736,9 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                           type="pai"
                           mode="retrato"
                           onClick={() => {
-                            if (conjuge) {
-                              setAddPersonType('pai')
-                              setAddPersonParentId(conjuge.id)
-                              setShowAddPersonModal(true)
-                            }
+                            setAddPersonType('pai')
+                            setAddPersonParentId(conjuge.id)
+                            setShowAddPersonModal(true)
                           }}
                         />
                       )
@@ -740,10 +750,10 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                 {pessoaPrincipal && findConjuge(pessoaPrincipal) && (
                   <div className="absolute" style={{ left: '570px', top: '0px' }}>
                     {(() => {
-                      const conjuge = findConjuge(pessoaPrincipal)
-                      return conjuge?.mae ? (
+                      const conjuge = findConjuge(pessoaPrincipal)!
+                      return findMae(conjuge) ? (
                         <PersonCardSimple
-                          pessoa={conjuge.mae}
+                          pessoa={findMae(conjuge)!}
                           mode="retrato"
                           onClick={handlePersonClick}
                         />
@@ -752,11 +762,9 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                           type="mae"
                           mode="retrato"
                           onClick={() => {
-                            if (conjuge) {
-                              setAddPersonType('mae')
-                              setAddPersonParentId(conjuge.id)
-                              setShowAddPersonModal(true)
-                            }
+                            setAddPersonType('mae')
+                            setAddPersonParentId(conjuge.id)
+                            setShowAddPersonModal(true)
                           }}
                         />
                       )
