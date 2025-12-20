@@ -491,12 +491,14 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
           >
             {viewMode === 'paisagem' ? (
               // Visualização Paisagem (horizontal) - estilo FamilySearch
-              <div className="relative" style={{ minWidth: '900px', minHeight: '400px' }}>
+              // Cards: 180x100px, gap: 20px
+              <div className="relative" style={{ minWidth: '1000px', minHeight: '360px' }}>
 
-                {/* ===== COLUNA 1: Botão Filhos ===== */}
-                <div className="absolute" style={{ left: '0px', top: '160px' }}>
-                  <AddPersonButton
+                {/* ===== COLUNA 1: Botão Filhos (x=0) ===== */}
+                <div className="absolute" style={{ left: '0px', top: '130px' }}>
+                  <AddPersonButtonSimple
                     type="filho"
+                    mode="paisagem"
                     onClick={() => {
                       setAddPersonType('filho')
                       setAddPersonParentId(pessoaPrincipal?.id || null)
@@ -505,42 +507,46 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                   />
                 </div>
 
-                {/* ===== COLUNA 2: Pessoa Principal ===== */}
+                {/* ===== COLUNA 2: Pessoa Principal (x=200) ===== */}
                 {pessoaPrincipal && (
-                  <div className="absolute" style={{ left: '220px', top: '130px' }}>
+                  <div className="absolute" style={{ left: '200px', top: '130px' }}>
                     <PersonCardSimple
                       pessoa={pessoaPrincipal}
                       isMain={true}
+                      mode="paisagem"
                       onClick={handlePersonClick}
                     />
                   </div>
                 )}
 
-                {/* ===== COLUNA 3: Cônjuge ===== */}
+                {/* ===== COLUNA 3: Cônjuge (x=400) ===== */}
                 <div className="absolute" style={{ left: '400px', top: '130px' }}>
                   {pessoaPrincipal && findConjuge(pessoaPrincipal) ? (
                     <PersonCardSimple
                       pessoa={findConjuge(pessoaPrincipal)!}
+                      mode="paisagem"
                       onClick={handlePersonClick}
                     />
                   ) : pessoaPrincipal ? (
-                    <AddSpouseButton onClick={() => handleAddConjuge(pessoaPrincipal)} />
+                    <AddSpouseButton mode="paisagem" onClick={() => handleAddConjuge(pessoaPrincipal)} />
                   ) : null}
                 </div>
 
-                {/* ===== COLUNA 4: Pais da Pessoa Principal ===== */}
+                {/* ===== COLUNA 4: Pais (x=600) ===== */}
                 {pessoaPrincipal && (
                   <>
-                    {/* Pai */}
-                    <div className="absolute" style={{ left: '580px', top: '40px' }}>
+                    {/* Pai (y=20) */}
+                    <div className="absolute" style={{ left: '600px', top: '20px' }}>
                       {pessoaPrincipal.pai ? (
                         <PersonCardSimple
                           pessoa={pessoaPrincipal.pai}
+                          mode="paisagem"
                           onClick={handlePersonClick}
                         />
                       ) : (
                         <AddPersonButtonSimple
                           type="pai"
+                          mode="paisagem"
                           onClick={() => {
                             setAddPersonType('pai')
                             setAddPersonParentId(pessoaPrincipal.id)
@@ -550,16 +556,18 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                       )}
                     </div>
 
-                    {/* Mãe */}
-                    <div className="absolute" style={{ left: '580px', top: '220px' }}>
+                    {/* Mãe (y=240) */}
+                    <div className="absolute" style={{ left: '600px', top: '240px' }}>
                       {pessoaPrincipal.mae ? (
                         <PersonCardSimple
                           pessoa={pessoaPrincipal.mae}
+                          mode="paisagem"
                           onClick={handlePersonClick}
                         />
                       ) : (
                         <AddPersonButtonSimple
                           type="mae"
+                          mode="paisagem"
                           onClick={() => {
                             setAddPersonType('mae')
                             setAddPersonParentId(pessoaPrincipal.id)
@@ -571,19 +579,21 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                   </>
                 )}
 
-                {/* ===== COLUNA 5: Avós (só se tiver pai) ===== */}
+                {/* ===== COLUNA 5: Avós (x=800) - só se tiver pai ===== */}
                 {pessoaPrincipal?.pai && (
                   <>
                     {/* Avô paterno */}
-                    <div className="absolute" style={{ left: '760px', top: '0px' }}>
+                    <div className="absolute" style={{ left: '800px', top: '0px' }}>
                       {pessoaPrincipal.pai.pai ? (
                         <PersonCardSimple
                           pessoa={pessoaPrincipal.pai.pai}
+                          mode="paisagem"
                           onClick={handlePersonClick}
                         />
                       ) : (
                         <AddPersonButtonSimple
                           type="pai"
+                          mode="paisagem"
                           onClick={() => {
                             setAddPersonType('pai')
                             setAddPersonParentId(pessoaPrincipal.pai!.id)
@@ -594,15 +604,17 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                     </div>
 
                     {/* Avó paterna */}
-                    <div className="absolute" style={{ left: '760px', top: '140px' }}>
+                    <div className="absolute" style={{ left: '800px', top: '120px' }}>
                       {pessoaPrincipal.pai.mae ? (
                         <PersonCardSimple
                           pessoa={pessoaPrincipal.pai.mae}
+                          mode="paisagem"
                           onClick={handlePersonClick}
                         />
                       ) : (
                         <AddPersonButtonSimple
                           type="mae"
+                          mode="paisagem"
                           onClick={() => {
                             setAddPersonType('mae')
                             setAddPersonParentId(pessoaPrincipal.pai!.id)
@@ -615,44 +627,53 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                 )}
 
                 {/* ===== SVG: Linhas de conexão ===== */}
+                {/* Card: 180x100, centroY do card = top + 50 */}
                 <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: -1 }}>
-                  {/* Linha: Filhos → Pessoa Principal */}
-                  <path d="M 200 200 L 220 200" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                  {/* Linha: Filhos (180,180) → Pessoa Principal (200,180) */}
+                  <path d="M 180 180 L 200 180" stroke={fsColors.line} strokeWidth="2" fill="none" />
 
-                  {/* Linha: Pessoa Principal → Cônjuge */}
-                  <path d="M 380 200 L 400 200" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                  {/* Linha: Pessoa Principal (380,180) → Cônjuge (400,180) */}
+                  <path d="M 380 180 L 400 180" stroke={fsColors.line} strokeWidth="2" fill="none" />
 
-                  {/* Linha: Centro do casal → bifurcação para pais */}
+                  {/* Linhas: Cônjuge → bifurcação para Pais */}
                   {pessoaPrincipal && (
                     <>
-                      <path d="M 560 200 L 540 200 L 540 110 L 580 110" stroke={fsColors.line} strokeWidth="2" fill="none" />
-                      <path d="M 540 200 L 540 290 L 580 290" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                      {/* Saída do cônjuge, bifurcação, para pai */}
+                      <path d="M 580 180 L 590 180 L 590 70 L 600 70" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                      {/* Bifurcação para mãe */}
+                      <path d="M 590 180 L 590 290 L 600 290" stroke={fsColors.line} strokeWidth="2" fill="none" />
                     </>
                   )}
 
                   {/* Linhas: Pai → Avós */}
                   {pessoaPrincipal?.pai && (
                     <>
-                      <path d="M 740 110 L 720 110 L 720 70 L 760 70" stroke={fsColors.line} strokeWidth="2" fill="none" />
-                      <path d="M 720 110 L 720 210 L 760 210" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                      {/* Saída do pai, bifurcação, para avô */}
+                      <path d="M 780 70 L 790 70 L 790 50 L 800 50" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                      {/* Bifurcação para avó */}
+                      <path d="M 790 70 L 790 170 L 800 170" stroke={fsColors.line} strokeWidth="2" fill="none" />
                     </>
                   )}
                 </svg>
               </div>
             ) : (
               // Visualização Retrato (vertical) - Estilo FamilySearch
-              <div className="relative py-8" style={{ minWidth: '800px', minHeight: '700px' }}>
-                
-                {/* Pai do Marco */}
-                <div className="absolute" style={{ left: '80px', top: '0px' }}>
+              // Cards: 140x160px
+              <div className="relative" style={{ minWidth: '700px', minHeight: '600px' }}>
+
+                {/* ===== LINHA 1: Pais (y=0) ===== */}
+                {/* Pai da Pessoa Principal */}
+                <div className="absolute" style={{ left: '70px', top: '0px' }}>
                   {pessoaPrincipal?.pai ? (
-                    <PersonCardSimple 
+                    <PersonCardSimple
                       pessoa={pessoaPrincipal.pai}
+                      mode="retrato"
                       onClick={handlePersonClick}
                     />
                   ) : (
-                    <AddPersonButtonSimple 
+                    <AddPersonButtonSimple
                       type="pai"
+                      mode="retrato"
                       onClick={() => {
                         if (pessoaPrincipal) {
                           setAddPersonType('pai')
@@ -663,17 +684,19 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                     />
                   )}
                 </div>
-                
-                {/* Mãe do Marco */}
+
+                {/* Mãe da Pessoa Principal */}
                 <div className="absolute" style={{ left: '230px', top: '0px' }}>
                   {pessoaPrincipal?.mae ? (
-                    <PersonCardSimple 
+                    <PersonCardSimple
                       pessoa={pessoaPrincipal.mae}
+                      mode="retrato"
                       onClick={handlePersonClick}
                     />
                   ) : (
-                    <AddPersonButtonSimple 
+                    <AddPersonButtonSimple
                       type="mae"
+                      mode="retrato"
                       onClick={() => {
                         if (pessoaPrincipal) {
                           setAddPersonType('mae')
@@ -684,20 +707,22 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                     />
                   )}
                 </div>
-                
+
                 {/* Pai do Cônjuge */}
                 {pessoaPrincipal && findConjuge(pessoaPrincipal) && (
-                  <div className="absolute" style={{ left: '480px', top: '0px' }}>
+                  <div className="absolute" style={{ left: '410px', top: '0px' }}>
                     {(() => {
                       const conjuge = findConjuge(pessoaPrincipal)
                       return conjuge?.pai ? (
-                        <PersonCardSimple 
+                        <PersonCardSimple
                           pessoa={conjuge.pai}
+                          mode="retrato"
                           onClick={handlePersonClick}
                         />
                       ) : (
-                        <AddPersonButtonSimple 
+                        <AddPersonButtonSimple
                           type="pai"
+                          mode="retrato"
                           onClick={() => {
                             if (conjuge) {
                               setAddPersonType('pai')
@@ -710,20 +735,22 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                     })()}
                   </div>
                 )}
-                
+
                 {/* Mãe do Cônjuge */}
                 {pessoaPrincipal && findConjuge(pessoaPrincipal) && (
-                  <div className="absolute" style={{ left: '630px', top: '0px' }}>
+                  <div className="absolute" style={{ left: '570px', top: '0px' }}>
                     {(() => {
                       const conjuge = findConjuge(pessoaPrincipal)
                       return conjuge?.mae ? (
-                        <PersonCardSimple 
+                        <PersonCardSimple
                           pessoa={conjuge.mae}
+                          mode="retrato"
                           onClick={handlePersonClick}
                         />
                       ) : (
-                        <AddPersonButtonSimple 
+                        <AddPersonButtonSimple
                           type="mae"
+                          mode="retrato"
                           onClick={() => {
                             if (conjuge) {
                               setAddPersonType('mae')
@@ -736,100 +763,87 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                     })()}
                   </div>
                 )}
-                
-                {/* Marco */}
-                <div className="absolute" style={{ left: '155px', top: '220px' }}>
+
+                {/* ===== LINHA 2: Pessoa Principal e Cônjuge (y=220) ===== */}
+                {/* Pessoa Principal */}
+                <div className="absolute" style={{ left: '150px', top: '220px' }}>
                   {pessoaPrincipal && (
-                    <PersonCardSimple 
+                    <PersonCardSimple
                       pessoa={pessoaPrincipal}
                       isMain={true}
+                      mode="retrato"
                       onClick={handlePersonClick}
                     />
                   )}
                 </div>
-                
+
                 {/* Cônjuge */}
-                <div className="absolute" style={{ left: '555px', top: '220px' }}>
+                <div className="absolute" style={{ left: '490px', top: '220px' }}>
                   {pessoaPrincipal && (
                     findConjuge(pessoaPrincipal) ? (
-                      <PersonCardSimple 
+                      <PersonCardSimple
                         pessoa={findConjuge(pessoaPrincipal)!}
+                        mode="retrato"
                         onClick={handlePersonClick}
                       />
                     ) : (
-                      <div 
-                        className="relative bg-white rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-teal-400 hover:bg-teal-50 transition-all flex flex-col items-center justify-center"
-                        style={{ width: '140px', minHeight: '140px' }}
+                      <AddSpouseButton
+                        mode="retrato"
                         onClick={() => handleAddConjuge(pessoaPrincipal)}
-                      >
-                        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-2">
-                          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                          </svg>
-                        </div>
-                        <span className="text-xs text-gray-500 font-medium">Adicionar cônjuge</span>
-                      </div>
+                      />
                     )
                   )}
                 </div>
-                
-                {/* Filhos */}
-                <div className="absolute flex gap-4" style={{ left: '320px', top: '480px' }}>
+
+                {/* ===== LINHA 3: Filhos (y=440) ===== */}
+                <div className="absolute flex gap-4" style={{ left: '280px', top: '440px' }}>
                   {pessoaPrincipal && findFilhos(pessoaPrincipal).map((filho) => (
-                    <PersonCardSimple 
+                    <PersonCardSimple
                       key={filho.id}
                       pessoa={filho}
+                      mode="retrato"
                       onClick={handlePersonClick}
                     />
                   ))}
-                  
-                  <div 
-                    className="relative bg-white rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-teal-400 hover:bg-teal-50 transition-all flex flex-col items-center justify-center"
-                    style={{ width: '140px', minHeight: '140px' }}
+
+                  <AddPersonButtonSimple
+                    type="filho"
+                    mode="retrato"
                     onClick={() => {
                       setAddPersonType('filho')
                       setAddPersonParentId(pessoaPrincipal?.id || null)
                       setShowAddPersonModal(true)
                     }}
-                  >
-                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-2">
-                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                    </div>
-                    <span className="text-xs text-gray-500 font-medium">Adicionar filho(a)</span>
-                  </div>
+                  />
                 </div>
-                
-                {/* SVG com TODAS as linhas - estilo FamilySearch */}
-                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
-                  {/* Linhas dos pais do Marco para Marco */}
-                  {/* Pai do Marco: desce, vai pro meio, encontra com Mãe */}
-                  <path d="M 150 140 L 150 170 L 225 170" stroke="#9ca3af" strokeWidth="2" fill="none" />
-                  {/* Mãe do Marco: desce, vai pro meio */}
-                  <path d="M 300 140 L 300 170 L 225 170" stroke="#9ca3af" strokeWidth="2" fill="none" />
-                  {/* Linha central desce para Marco */}
-                  <path d="M 225 170 L 225 220" stroke="#9ca3af" strokeWidth="2" fill="none" />
-                  
-                  {/* Linhas dos pais do Cônjuge para Cônjuge */}
+
+                {/* ===== SVG: Linhas de conexão ===== */}
+                {/* Cards retrato: 140x160, centroX = left + 70, centroY = top + 80 */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: -1 }}>
+                  {/* Linhas dos pais da Pessoa Principal */}
+                  {/* Pai desce e encontra no meio */}
+                  <path d="M 140 160 L 140 180 L 220 180" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                  {/* Mãe desce e encontra no meio */}
+                  <path d="M 300 160 L 300 180 L 220 180" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                  {/* Centro desce para Pessoa Principal */}
+                  <path d="M 220 180 L 220 220" stroke={fsColors.line} strokeWidth="2" fill="none" />
+
+                  {/* Linhas dos pais do Cônjuge */}
                   {pessoaPrincipal && findConjuge(pessoaPrincipal) && (
                     <>
-                      {/* Pai do Cônjuge: desce, vai pro meio */}
-                      <path d="M 550 140 L 550 170 L 625 170" stroke="#9ca3af" strokeWidth="2" fill="none" />
-                      {/* Mãe do Cônjuge: desce, vai pro meio */}
-                      <path d="M 700 140 L 700 170 L 625 170" stroke="#9ca3af" strokeWidth="2" fill="none" />
-                      {/* Linha central desce para Cônjuge */}
-                      <path d="M 625 170 L 625 220" stroke="#9ca3af" strokeWidth="2" fill="none" />
+                      <path d="M 480 160 L 480 180 L 560 180" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                      <path d="M 640 160 L 640 180 L 560 180" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                      <path d="M 560 180 L 560 220" stroke={fsColors.line} strokeWidth="2" fill="none" />
                     </>
                   )}
-                  
-                  {/* Linha horizontal de casamento: Marco ─── Cônjuge */}
-                  <path d="M 295 290 L 555 290" stroke="#9ca3af" strokeWidth="2" fill="none" />
-                  
-                  {/* Linha vertical: Centro do casamento → Filhos */}
-                  <path d="M 425 290 L 425 480" stroke="#9ca3af" strokeWidth="2" fill="none" />
+
+                  {/* Linha horizontal de casamento */}
+                  <path d="M 290 300 L 490 300" stroke={fsColors.line} strokeWidth="2" fill="none" />
+
+                  {/* Linha vertical para Filhos */}
+                  <path d="M 390 300 L 390 440" stroke={fsColors.line} strokeWidth="2" fill="none" />
                 </svg>
-                
+
               </div>
             )}
           </div>

@@ -6,19 +6,25 @@ import { PessoaArvore } from "./pessoa-card"
 const colors = {
   male: '#3073B5',
   maleBg: '#E8F4FC',
-  maleBorder: '#B8D4EA',
   female: '#BF3D79',
   femaleBg: '#FCE8F2',
-  femaleBorder: '#E8B8D0',
   neutral: '#6B7280',
   neutralBg: '#F3F4F6',
   green: '#87B940',
-  greenDark: '#5B8A20',
 }
+
+// Tamanhos padronizados
+const cardSizes = {
+  paisagem: { width: 180, height: 100 },
+  retrato: { width: 140, height: 160 }
+}
+
+type ViewMode = 'paisagem' | 'retrato'
 
 interface PersonCardSimpleProps {
   pessoa: PessoaArvore
   isMain?: boolean
+  mode?: ViewMode
   onClick?: (pessoa: PessoaArvore) => void
 }
 
@@ -60,37 +66,18 @@ function isDeceased(pessoa: PessoaArvore): boolean {
   return !!pessoa.data_obito
 }
 
-// Ícone FamilySearch
-function FamilySearchIcon() {
-  return (
-    <div className="absolute top-2 right-2">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="10" fill={colors.green} />
-        <path
-          d="M12 6v12M8 10v4M16 10v4"
-          stroke="white"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-      </svg>
-    </div>
-  )
-}
-
 // Badge de status
-function StatusBadge({ deceased, small = false }: { deceased: boolean; small?: boolean }) {
-  const sizeClasses = small ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'
-
+function StatusBadge({ deceased }: { deceased: boolean }) {
   if (deceased) {
     return (
-      <span className={`${sizeClasses} font-medium rounded-full bg-gray-100 text-gray-600`}>
+      <span className="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-gray-200 text-gray-600">
         Falecido
       </span>
     )
   }
   return (
     <span
-      className={`${sizeClasses} font-medium rounded-full text-white`}
+      className="px-1.5 py-0.5 text-[9px] font-semibold rounded text-white"
       style={{ backgroundColor: colors.green }}
     >
       Vivo
@@ -98,112 +85,173 @@ function StatusBadge({ deceased, small = false }: { deceased: boolean; small?: b
   )
 }
 
-export function PersonCardSimple({ pessoa, isMain = false, onClick }: PersonCardSimpleProps) {
+// Ícone FamilySearch pequeno
+function FSIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" fill={colors.green} />
+      <path d="M12 7v10M9 10v4M15 10v4" stroke="white" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function PersonCardSimple({ pessoa, isMain = false, mode = 'paisagem', onClick }: PersonCardSimpleProps) {
   const nomeCompleto = pessoa.sobrenome ? `${pessoa.nome} ${pessoa.sobrenome}` : pessoa.nome
-  const dateRange = formatDateRange(pessoa.data_nasc, pessoa.data_obito)
   const genderColors = getGenderColors(pessoa.sexo)
   const pid = pessoa.pid || generatePID(pessoa.id)
   const initial = pessoa.nome?.charAt(0)?.toUpperCase() || '?'
+  const dateRange = formatDateRange(pessoa.data_nasc, pessoa.data_obito)
+  const size = cardSizes[mode]
 
-  return (
-    <div
-      className={`person-card relative bg-white rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-all hover:-translate-y-0.5 overflow-hidden ${isMain ? 'ring-2 ring-offset-2' : ''}`}
-      style={{
-        width: '160px',
-        borderLeft: `4px solid ${genderColors.border}`,
-        ...(isMain && { ringColor: colors.green })
-      }}
-      onClick={() => onClick?.(pessoa)}
-    >
-      {/* Ícone FamilySearch */}
-      <FamilySearchIcon />
+  if (mode === 'paisagem') {
+    // Card HORIZONTAL (retangular)
+    return (
+      <div
+        className={`person-card relative bg-white rounded-xl shadow-md cursor-pointer hover:shadow-lg transition-all overflow-hidden ${isMain ? 'ring-2 ring-green-500 ring-offset-2' : ''}`}
+        style={{
+          width: size.width,
+          height: size.height,
+          borderLeft: `4px solid ${genderColors.border}`,
+        }}
+        onClick={() => onClick?.(pessoa)}
+      >
+        {/* Ícone FS */}
+        <div className="absolute top-2 right-2">
+          <FSIcon />
+        </div>
 
-      {/* Conteúdo do card */}
-      <div className="p-3 pt-4">
-        {/* Avatar */}
-        <div className="flex justify-center mb-2">
+        <div className="p-3 h-full flex items-center gap-3">
+          {/* Avatar */}
           <div
-            className="rounded-full flex items-center justify-center font-bold text-white shadow-sm"
-            style={{
-              width: 48,
-              height: 48,
-              backgroundColor: genderColors.border,
-              fontSize: 18
-            }}
+            className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg flex-shrink-0"
+            style={{ backgroundColor: genderColors.border }}
           >
             {initial}
           </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-gray-900 text-sm leading-tight truncate">
+              {nomeCompleto}
+            </h3>
+            <div className="flex items-center gap-1.5 mt-1">
+              <StatusBadge deceased={isDeceased(pessoa)} />
+              <span className="text-[9px] text-gray-400 font-mono">{pid}</span>
+            </div>
+            {dateRange && (
+              <p className="text-[10px] text-gray-500 mt-0.5">{dateRange}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Card VERTICAL (quadrado)
+  return (
+    <div
+      className={`person-card relative bg-white rounded-xl shadow-md cursor-pointer hover:shadow-lg transition-all overflow-hidden ${isMain ? 'ring-2 ring-green-500 ring-offset-2' : ''}`}
+      style={{
+        width: size.width,
+        height: size.height,
+        borderLeft: `4px solid ${genderColors.border}`,
+      }}
+      onClick={() => onClick?.(pessoa)}
+    >
+      {/* Ícone FS */}
+      <div className="absolute top-2 right-2">
+        <FSIcon />
+      </div>
+
+      <div className="p-3 h-full flex flex-col items-center justify-center text-center">
+        {/* Avatar */}
+        <div
+          className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg mb-2"
+          style={{ backgroundColor: genderColors.border }}
+        >
+          {initial}
         </div>
 
         {/* Nome */}
-        <h3 className="font-bold text-gray-900 text-sm leading-tight text-center line-clamp-2 min-h-[2.5rem]">
+        <h3 className="font-bold text-gray-900 text-xs leading-tight line-clamp-2">
           {nomeCompleto}
         </h3>
 
-        {/* Status e PID */}
-        <div className="flex flex-col items-center gap-1 mt-2">
-          <StatusBadge deceased={isDeceased(pessoa)} small />
-          <span className="text-[10px] text-gray-400 font-mono">{pid}</span>
+        {/* Status + PID */}
+        <div className="flex items-center gap-1 mt-1.5">
+          <StatusBadge deceased={isDeceased(pessoa)} />
         </div>
+        <span className="text-[9px] text-gray-400 font-mono mt-0.5">{pid}</span>
 
         {/* Datas */}
         {dateRange && (
-          <p className="text-xs text-gray-500 text-center mt-1">{dateRange}</p>
+          <p className="text-[10px] text-gray-500 mt-0.5">{dateRange}</p>
         )}
       </div>
     </div>
   )
 }
 
-// Botão de adicionar pessoa (estilo FamilySearch melhorado)
+// Botão de adicionar pessoa padronizado
 interface AddPersonButtonSimpleProps {
   type: 'pai' | 'mae' | 'filho' | 'conjuge'
+  mode?: ViewMode
   onClick?: () => void
 }
 
-export function AddPersonButtonSimple({ type, onClick }: AddPersonButtonSimpleProps) {
+export function AddPersonButtonSimple({ type, mode = 'paisagem', onClick }: AddPersonButtonSimpleProps) {
   const config = {
-    pai: { label: 'ACRESCENTAR O PAI', color: colors.male, icon: 'M' },
-    mae: { label: 'ACRESCENTAR A MÃE', color: colors.female, icon: 'F' },
-    filho: { label: 'ACRESCENTAR FILHO(A)', color: colors.green, icon: '+' },
-    conjuge: { label: 'ACRESCENTAR CÔNJUGE', color: colors.neutral, icon: '♥' }
+    pai: { label: 'ACRESCENTAR O PAI', color: colors.male },
+    mae: { label: 'ACRESCENTAR A MÃE', color: colors.female },
+    filho: { label: 'ACRESCENTAR FILHO(A)', color: colors.green },
+    conjuge: { label: 'ADICIONAR CÔNJUGE', color: colors.neutral }
   }
 
-  const { label, color, icon } = config[type]
+  const { label, color } = config[type]
+  const size = cardSizes[mode]
 
+  if (mode === 'paisagem') {
+    // Botão HORIZONTAL
+    return (
+      <div
+        className="relative bg-white rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all shadow-sm"
+        style={{ width: size.width, height: size.height }}
+        onClick={onClick}
+      >
+        <div className="h-full flex items-center gap-3 px-3">
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: `${color}20` }}
+          >
+            <svg className="w-5 h-5" style={{ color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+          <span className="text-[10px] font-semibold leading-tight" style={{ color }}>
+            {label}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  // Botão VERTICAL
   return (
     <div
-      className="relative bg-white rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-teal-400 hover:bg-teal-50/50 transition-all shadow-sm hover:shadow-md group"
-      style={{ width: '160px', minHeight: '140px' }}
+      className="relative bg-white rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all shadow-sm"
+      style={{ width: size.width, height: size.height }}
       onClick={onClick}
     >
-      <div className="p-4 flex flex-col items-center justify-center h-full text-center">
-        {/* Ícone com pessoa */}
+      <div className="h-full flex flex-col items-center justify-center text-center px-2">
         <div
-          className="w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-colors"
-          style={{ backgroundColor: `${color}15` }}
+          className="w-10 h-10 rounded-full flex items-center justify-center mb-2"
+          style={{ backgroundColor: `${color}20` }}
         >
-          <svg
-            className="w-6 h-6 transition-colors"
-            style={{ color: color }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-            />
+          <svg className="w-5 h-5" style={{ color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         </div>
-
-        {/* Label */}
-        <span
-          className="text-xs font-semibold tracking-wide transition-colors"
-          style={{ color: color }}
-        >
+        <span className="text-[9px] font-semibold leading-tight" style={{ color }}>
           {label}
         </span>
       </div>
@@ -211,23 +259,46 @@ export function AddPersonButtonSimple({ type, onClick }: AddPersonButtonSimplePr
   )
 }
 
-// Botão de adicionar cônjuge inline (para dentro do card)
-export function AddSpouseButton({ onClick }: { onClick?: () => void }) {
+// Botão de adicionar cônjuge
+export function AddSpouseButton({ mode = 'paisagem', onClick }: { mode?: ViewMode; onClick?: () => void }) {
+  const size = cardSizes[mode]
+
+  if (mode === 'paisagem') {
+    return (
+      <div
+        className="relative bg-white rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all shadow-sm"
+        style={{ width: size.width, height: size.height }}
+        onClick={onClick}
+      >
+        <div className="h-full flex items-center gap-3 px-3">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 flex-shrink-0">
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+          </div>
+          <span className="text-[10px] text-gray-500 font-semibold">
+            ADICIONAR CÔNJUGE
+          </span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div
-      className="relative bg-white rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-teal-400 hover:bg-teal-50/50 transition-all shadow-sm hover:shadow-md"
-      style={{ width: '160px', minHeight: '140px' }}
+      className="relative bg-white rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all shadow-sm"
+      style={{ width: size.width, height: size.height }}
       onClick={onClick}
     >
-      <div className="p-4 flex flex-col items-center justify-center h-full text-center">
-        <div
-          className="w-12 h-12 rounded-full flex items-center justify-center mb-3 bg-gray-100"
-        >
-          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="h-full flex flex-col items-center justify-center text-center">
+        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 mb-2">
+          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
         </div>
-        <span className="text-xs text-gray-500 font-medium">Adicionar cônjuge</span>
+        <span className="text-[9px] text-gray-500 font-semibold">
+          ADICIONAR<br />CÔNJUGE
+        </span>
       </div>
     </div>
   )
