@@ -610,36 +610,11 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
           >
             {viewMode === 'paisagem' ? (
               // ========== VISUALIZAÇÃO PAISAGEM (horizontal) - Estilo FamilySearch ==========
-              // Layout: Filhos ← Pessoa+Cônjuge ← Pais ← Avós
+              // Layout: Pessoa+Cônjuge → Pais → Avós (filhos no dropdown)
               // Exclusividade: só um ramo expandido por vez (paterno OU materno)
               <div className="relative flex items-center gap-6" style={{ minHeight: '400px' }}>
 
-                {/* ===== COLUNA 1: Filhos (mais à esquerda) ===== */}
-                <div className="flex flex-col gap-2">
-                  {pessoaPrincipal && findFilhos(pessoaPrincipal).map((filho) => (
-                    <PersonCardFS
-                      key={filho.id}
-                      pessoa={filho}
-                      mode="paisagem"
-                      onClick={handlePersonClick}
-                      showExpandButtons={false}
-                    />
-                  ))}
-                  <AddPersonCardFS
-                    type="filho"
-                    mode="paisagem"
-                    onClick={() => {
-                      setAddPersonType('filho')
-                      setAddPersonParentId(pessoaPrincipal?.id || null)
-                      setShowAddPersonModal(true)
-                    }}
-                  />
-                </div>
-
-                {/* Linha conectora Filhos → Pessoa */}
-                <div className="w-8 h-0.5 bg-gray-300" />
-
-                {/* ===== COLUNA 2: Pessoa Principal + Cônjuge (CoupleCard) ===== */}
+                {/* ===== COLUNA 1: Pessoa Principal + Cônjuge (CoupleCard) ===== */}
                 {pessoaPrincipal && (
                   <CoupleCard
                     pessoa1={pessoaPrincipal}
@@ -666,7 +641,7 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                   <div className="w-8 h-0.5 bg-gray-300" />
                 )}
 
-                {/* ===== COLUNA 3: Pais (Pai e Mãe em CoupleCard) ===== */}
+                {/* ===== COLUNA 2: Pais (Pai e Mãe em CoupleCard) ===== */}
                 {pessoaPrincipal && isBranchExpanded(pessoaPrincipal.id) && (
                   <div className="flex flex-col gap-4">
                     {/* Card do Pai com cônjuge (Mãe) */}
@@ -727,52 +702,48 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                   <div className="w-8 h-0.5 bg-gray-300" />
                 )}
 
-                {/* ===== COLUNA 4: Avós (só um ramo por vez - EXCLUSIVO) ===== */}
+                {/* ===== COLUNA 3: Avós (só um ramo por vez - EXCLUSIVO) ===== */}
                 {/* Avós Paternos - só se ramo paterno expandido */}
                 {pessoaPrincipal && findPai(pessoaPrincipal) &&
                  isBranchExpanded(pessoaPrincipal.id) && isRamoExpandido('paterno') && (
-                  <div className="flex flex-col gap-4">
-                    <CoupleCard
-                      pessoa1={findPai(findPai(pessoaPrincipal)!) || { id: -1, nome: 'Avô', sexo: 'Masculino' } as PessoaArvore}
-                      pessoa2={findMae(findPai(pessoaPrincipal)!)}
-                      mode="paisagem"
-                      showFilhosDropdown={false}
-                      onPersonClick={handlePersonClick}
-                      onAddConjuge={() => {
-                        if (!findPai(findPai(pessoaPrincipal)!)) {
+                  <div className="flex flex-col gap-2">
+                    {/* Avô Paterno */}
+                    {findPai(findPai(pessoaPrincipal)!) ? (
+                      <PersonCardFS
+                        pessoa={findPai(findPai(pessoaPrincipal)!)!}
+                        mode="paisagem"
+                        onClick={handlePersonClick}
+                        showExpandButtons={false}
+                      />
+                    ) : (
+                      <AddPersonCardFS
+                        type="pai"
+                        mode="paisagem"
+                        onClick={() => {
                           setAddPersonType('pai')
                           setAddPersonParentId(findPai(pessoaPrincipal)!.id)
                           setShowAddPersonModal(true)
-                        } else if (!findMae(findPai(pessoaPrincipal)!)) {
+                        }}
+                      />
+                    )}
+                    {/* Avó Paterna */}
+                    {findMae(findPai(pessoaPrincipal)!) ? (
+                      <PersonCardFS
+                        pessoa={findMae(findPai(pessoaPrincipal)!)!}
+                        mode="paisagem"
+                        onClick={handlePersonClick}
+                        showExpandButtons={false}
+                      />
+                    ) : (
+                      <AddPersonCardFS
+                        type="mae"
+                        mode="paisagem"
+                        onClick={() => {
                           setAddPersonType('mae')
                           setAddPersonParentId(findPai(pessoaPrincipal)!.id)
                           setShowAddPersonModal(true)
-                        }
-                      }}
-                      showExpandButtons={false}
-                    />
-                    {/* Botões para adicionar avós se não existirem */}
-                    {!findPai(findPai(pessoaPrincipal)!) && !findMae(findPai(pessoaPrincipal)!) && (
-                      <div className="flex flex-col gap-2">
-                        <AddPersonCardFS
-                          type="pai"
-                          mode="paisagem"
-                          onClick={() => {
-                            setAddPersonType('pai')
-                            setAddPersonParentId(findPai(pessoaPrincipal)!.id)
-                            setShowAddPersonModal(true)
-                          }}
-                        />
-                        <AddPersonCardFS
-                          type="mae"
-                          mode="paisagem"
-                          onClick={() => {
-                            setAddPersonType('mae')
-                            setAddPersonParentId(findPai(pessoaPrincipal)!.id)
-                            setShowAddPersonModal(true)
-                          }}
-                        />
-                      </div>
+                        }}
+                      />
                     )}
                   </div>
                 )}
@@ -780,48 +751,44 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                 {/* Avós Maternos - só se ramo materno expandido */}
                 {pessoaPrincipal && findMae(pessoaPrincipal) &&
                  isBranchExpanded(pessoaPrincipal.id) && isRamoExpandido('materno') && (
-                  <div className="flex flex-col gap-4">
-                    <CoupleCard
-                      pessoa1={findPai(findMae(pessoaPrincipal)!) || { id: -2, nome: 'Avô', sexo: 'Masculino' } as PessoaArvore}
-                      pessoa2={findMae(findMae(pessoaPrincipal)!)}
-                      mode="paisagem"
-                      showFilhosDropdown={false}
-                      onPersonClick={handlePersonClick}
-                      onAddConjuge={() => {
-                        if (!findPai(findMae(pessoaPrincipal)!)) {
+                  <div className="flex flex-col gap-2">
+                    {/* Avô Materno */}
+                    {findPai(findMae(pessoaPrincipal)!) ? (
+                      <PersonCardFS
+                        pessoa={findPai(findMae(pessoaPrincipal)!)!}
+                        mode="paisagem"
+                        onClick={handlePersonClick}
+                        showExpandButtons={false}
+                      />
+                    ) : (
+                      <AddPersonCardFS
+                        type="pai"
+                        mode="paisagem"
+                        onClick={() => {
                           setAddPersonType('pai')
                           setAddPersonParentId(findMae(pessoaPrincipal)!.id)
                           setShowAddPersonModal(true)
-                        } else if (!findMae(findMae(pessoaPrincipal)!)) {
+                        }}
+                      />
+                    )}
+                    {/* Avó Materna */}
+                    {findMae(findMae(pessoaPrincipal)!) ? (
+                      <PersonCardFS
+                        pessoa={findMae(findMae(pessoaPrincipal)!)!}
+                        mode="paisagem"
+                        onClick={handlePersonClick}
+                        showExpandButtons={false}
+                      />
+                    ) : (
+                      <AddPersonCardFS
+                        type="mae"
+                        mode="paisagem"
+                        onClick={() => {
                           setAddPersonType('mae')
                           setAddPersonParentId(findMae(pessoaPrincipal)!.id)
                           setShowAddPersonModal(true)
-                        }
-                      }}
-                      showExpandButtons={false}
-                    />
-                    {/* Botões para adicionar avós se não existirem */}
-                    {!findPai(findMae(pessoaPrincipal)!) && !findMae(findMae(pessoaPrincipal)!) && (
-                      <div className="flex flex-col gap-2">
-                        <AddPersonCardFS
-                          type="pai"
-                          mode="paisagem"
-                          onClick={() => {
-                            setAddPersonType('pai')
-                            setAddPersonParentId(findMae(pessoaPrincipal)!.id)
-                            setShowAddPersonModal(true)
-                          }}
-                        />
-                        <AddPersonCardFS
-                          type="mae"
-                          mode="paisagem"
-                          onClick={() => {
-                            setAddPersonType('mae')
-                            setAddPersonParentId(findMae(pessoaPrincipal)!.id)
-                            setShowAddPersonModal(true)
-                          }}
-                        />
-                      </div>
+                        }}
+                      />
                     )}
                   </div>
                 )}
