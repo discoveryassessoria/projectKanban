@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useState, useEffect } from "react"
+import { useState, useEffect } from "react"
 import ReactFlow, {
   Node,
   Edge,
@@ -14,12 +14,11 @@ import ReactFlow, {
   NodeProps,
   MarkerType,
   ConnectionLineType,
-  Panel,
 } from "reactflow"
 import dagre from "dagre"
 import "reactflow/dist/style.css"
 import { PessoaArvore, UniaoArvore } from "./pessoa-card"
-import { ChevronDown, ChevronUp, ChevronRight, ChevronLeft, Plus } from "lucide-react"
+import { Plus } from "lucide-react"
 
 // Cores estilo FamilySearch
 const colors = {
@@ -37,8 +36,8 @@ type ViewMode = 'paisagem' | 'retrato'
 
 // Tamanhos dos nós
 const NODE_SIZES = {
-  paisagem: { width: 220, height: 120 },
-  retrato: { width: 160, height: 180 }
+  paisagem: { width: 200, height: 100 },
+  retrato: { width: 140, height: 160 }
 }
 
 // Funções auxiliares
@@ -79,18 +78,17 @@ function generatePID(id: number): string {
 interface PersonNodeData {
   pessoa: PessoaArvore
   isMain?: boolean
+  isSpouse?: boolean
   mode: ViewMode
   onPersonClick?: (pessoa: PessoaArvore) => void
   onAddPai?: () => void
   onAddMae?: () => void
-  onAddConjuge?: () => void
-  hasParents?: boolean
   hasPai?: boolean
   hasMae?: boolean
 }
 
-function PersonNode({ data, id }: NodeProps<PersonNodeData>) {
-  const { pessoa, isMain, mode, onPersonClick, hasParents, hasPai, hasMae, onAddPai, onAddMae, onAddConjuge } = data
+function PersonNode({ data }: NodeProps<PersonNodeData>) {
+  const { pessoa, isMain, isSpouse, mode, onPersonClick, hasPai, hasMae, onAddPai, onAddMae } = data
   const genderColors = getGenderColors(pessoa.sexo)
   const nomeCompleto = pessoa.sobrenome ? `${pessoa.nome} ${pessoa.sobrenome}` : pessoa.nome
   const initial = pessoa.nome?.charAt(0)?.toUpperCase() || '?'
@@ -102,10 +100,17 @@ function PersonNode({ data, id }: NodeProps<PersonNodeData>) {
     onPersonClick?.(pessoa)
   }
 
+  // Determinar ring color baseado no tipo
+  const ringClass = isMain
+    ? 'ring-2 ring-green-500 ring-offset-2'
+    : isSpouse
+      ? 'ring-2 ring-purple-400 ring-offset-1'
+      : ''
+
   if (mode === 'paisagem') {
     return (
       <div
-        className={`person-card relative bg-white rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-all overflow-visible ${isMain ? 'ring-2 ring-green-500 ring-offset-2' : ''}`}
+        className={`person-card relative bg-white rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-all overflow-visible ${ringClass}`}
         style={{
           width: NODE_SIZES.paisagem.width,
           height: NODE_SIZES.paisagem.height,
@@ -113,30 +118,30 @@ function PersonNode({ data, id }: NodeProps<PersonNodeData>) {
         }}
         onClick={handleClick}
       >
-        {/* Handles para conexões */}
+        {/* Handles para conexões - INVERTIDO para RL */}
         <Handle
-          type="target"
+          type="source"
           position={Position.Left}
           className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white"
         />
         <Handle
-          type="source"
+          type="target"
           position={Position.Right}
           className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white"
         />
 
         {/* Ícone FS */}
         <div className="absolute top-2 right-2">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" fill={colors.green} />
             <path d="M12 7v10M9 10v4M15 10v4" stroke="white" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </div>
 
-        <div className="p-3 h-full flex items-center gap-3">
+        <div className="p-2.5 h-full flex items-center gap-2.5">
           {/* Avatar */}
           <div
-            className="w-14 h-14 rounded-full flex items-center justify-center font-bold text-white text-xl flex-shrink-0"
+            className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg flex-shrink-0"
             style={{ backgroundColor: genderColors.border }}
           >
             {initial}
@@ -144,34 +149,34 @@ function PersonNode({ data, id }: NodeProps<PersonNodeData>) {
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-gray-900 text-sm leading-tight line-clamp-2">
+            <h3 className="font-bold text-gray-900 text-xs leading-tight line-clamp-2">
               {nomeCompleto}
             </h3>
-            <div className="flex items-center gap-1.5 mt-1">
+            <div className="flex items-center gap-1 mt-1">
               {deceased ? (
-                <span className="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-gray-200 text-gray-600">
+                <span className="px-1 py-0.5 text-[8px] font-semibold rounded bg-gray-200 text-gray-600">
                   Falecido
                 </span>
               ) : (
                 <span
-                  className="px-1.5 py-0.5 text-[9px] font-semibold rounded text-white"
+                  className="px-1 py-0.5 text-[8px] font-semibold rounded text-white"
                   style={{ backgroundColor: colors.green }}
                 >
                   Vivo
                 </span>
               )}
-              <span className="text-[9px] text-gray-400 font-mono">{pid}</span>
             </div>
             {dateRange && (
-              <p className="text-[10px] text-gray-500 mt-0.5">{dateRange}</p>
+              <p className="text-[9px] text-gray-500 mt-0.5">{dateRange}</p>
             )}
+            <span className="text-[8px] text-gray-400 font-mono">{pid}</span>
           </div>
         </div>
 
-        {/* Botões de adicionar pai/mãe se não tiver */}
+        {/* Botões de adicionar pai/mãe - à ESQUERDA no modo RL */}
         {!hasPai && onAddPai && (
           <button
-            className="absolute -right-2 top-1/4 w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-md hover:bg-blue-600 transition-colors z-10"
+            className="absolute -left-2 top-1/4 w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-md hover:bg-blue-600 transition-colors z-10"
             onClick={(e) => { e.stopPropagation(); onAddPai(); }}
             title="Adicionar pai"
           >
@@ -180,7 +185,7 @@ function PersonNode({ data, id }: NodeProps<PersonNodeData>) {
         )}
         {!hasMae && onAddMae && (
           <button
-            className="absolute -right-2 bottom-1/4 w-5 h-5 rounded-full bg-pink-500 text-white flex items-center justify-center shadow-md hover:bg-pink-600 transition-colors z-10"
+            className="absolute -left-2 bottom-1/4 w-5 h-5 rounded-full bg-pink-500 text-white flex items-center justify-center shadow-md hover:bg-pink-600 transition-colors z-10"
             onClick={(e) => { e.stopPropagation(); onAddMae(); }}
             title="Adicionar mãe"
           >
@@ -194,7 +199,7 @@ function PersonNode({ data, id }: NodeProps<PersonNodeData>) {
   // MODO RETRATO (vertical)
   return (
     <div
-      className={`person-card relative bg-white rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-all overflow-visible ${isMain ? 'ring-2 ring-green-500 ring-offset-2' : ''}`}
+      className={`person-card relative bg-white rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-all overflow-visible ${ringClass}`}
       style={{
         width: NODE_SIZES.retrato.width,
         height: NODE_SIZES.retrato.height,
@@ -216,313 +221,66 @@ function PersonNode({ data, id }: NodeProps<PersonNodeData>) {
 
       {/* Ícone FS */}
       <div className="absolute top-2 right-2">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="10" fill={colors.green} />
           <path d="M12 7v10M9 10v4M15 10v4" stroke="white" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </div>
 
-      <div className="p-3 h-full flex flex-col items-center justify-center text-center">
+      <div className="p-2 h-full flex flex-col items-center justify-center text-center">
         {/* Avatar */}
         <div
-          className="w-14 h-14 rounded-full flex items-center justify-center font-bold text-white text-xl mb-2"
+          className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg mb-1.5"
           style={{ backgroundColor: genderColors.border }}
         >
           {initial}
         </div>
 
         {/* Nome */}
-        <h3 className="font-bold text-gray-900 text-xs leading-tight line-clamp-2">
+        <h3 className="font-bold text-gray-900 text-[10px] leading-tight line-clamp-2">
           {nomeCompleto}
         </h3>
 
-        {/* Status + PID */}
-        <div className="flex items-center gap-1 mt-1.5">
+        {/* Status */}
+        <div className="flex items-center gap-1 mt-1">
           {deceased ? (
-            <span className="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-gray-200 text-gray-600">
+            <span className="px-1 py-0.5 text-[8px] font-semibold rounded bg-gray-200 text-gray-600">
               Falecido
             </span>
           ) : (
             <span
-              className="px-1.5 py-0.5 text-[9px] font-semibold rounded text-white"
+              className="px-1 py-0.5 text-[8px] font-semibold rounded text-white"
               style={{ backgroundColor: colors.green }}
             >
               Vivo
             </span>
           )}
         </div>
-        <span className="text-[9px] text-gray-400 font-mono mt-0.5">{pid}</span>
-
-        {/* Datas */}
         {dateRange && (
-          <p className="text-[10px] text-gray-500 mt-0.5">{dateRange}</p>
+          <p className="text-[8px] text-gray-500 mt-0.5">{dateRange}</p>
         )}
+        <span className="text-[7px] text-gray-400 font-mono mt-0.5">{pid}</span>
       </div>
 
-      {/* Botões de adicionar pai/mãe se não tiver */}
+      {/* Botões de adicionar pai/mãe */}
       {!hasPai && onAddPai && (
         <button
-          className="absolute -top-2 left-1/4 w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-md hover:bg-blue-600 transition-colors z-10"
+          className="absolute -top-2 left-1/4 w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-md hover:bg-blue-600 transition-colors z-10"
           onClick={(e) => { e.stopPropagation(); onAddPai(); }}
           title="Adicionar pai"
         >
-          <Plus className="w-3 h-3" />
+          <Plus className="w-2.5 h-2.5" />
         </button>
       )}
       {!hasMae && onAddMae && (
         <button
-          className="absolute -top-2 right-1/4 w-5 h-5 rounded-full bg-pink-500 text-white flex items-center justify-center shadow-md hover:bg-pink-600 transition-colors z-10"
+          className="absolute -top-2 right-1/4 w-4 h-4 rounded-full bg-pink-500 text-white flex items-center justify-center shadow-md hover:bg-pink-600 transition-colors z-10"
           onClick={(e) => { e.stopPropagation(); onAddMae(); }}
           title="Adicionar mãe"
         >
-          <Plus className="w-3 h-3" />
+          <Plus className="w-2.5 h-2.5" />
         </button>
       )}
-    </div>
-  )
-}
-
-// ========================================
-// CUSTOM NODE: Casal (Pessoa + Cônjuge)
-// ========================================
-interface CoupleNodeData {
-  pessoa1: PessoaArvore
-  pessoa2?: PessoaArvore | null
-  isMain?: boolean
-  mode: ViewMode
-  filhos?: PessoaArvore[]
-  onPersonClick?: (pessoa: PessoaArvore) => void
-  onAddConjuge?: () => void
-  onAddFilho?: () => void
-}
-
-function CoupleNode({ data, id }: NodeProps<CoupleNodeData>) {
-  const { pessoa1, pessoa2, isMain, mode, filhos = [], onPersonClick, onAddConjuge, onAddFilho } = data
-  const [showFilhos, setShowFilhos] = useState(false)
-
-  // Ordenar: homem primeiro
-  const isMale = (p: PessoaArvore) => p.sexo?.toLowerCase() === 'masculino' || p.sexo?.toLowerCase() === 'm'
-  let marido: PessoaArvore | null = null
-  let esposa: PessoaArvore | null = null
-
-  if (pessoa2) {
-    if (isMale(pessoa1)) {
-      marido = pessoa1
-      esposa = pessoa2
-    } else {
-      esposa = pessoa1
-      marido = pessoa2
-    }
-  } else {
-    if (isMale(pessoa1)) {
-      marido = pessoa1
-    } else {
-      esposa = pessoa1
-    }
-  }
-
-  const renderMiniCard = (pessoa: PessoaArvore | null, isPlaceholder = false) => {
-    if (!pessoa && isPlaceholder) {
-      return (
-        <div
-          className="flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-50 rounded-lg transition-colors border border-dashed border-gray-300"
-          onClick={(e) => { e.stopPropagation(); onAddConjuge?.(); }}
-        >
-          <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100">
-            <Plus className="w-4 h-4 text-gray-400" />
-          </div>
-          <span className="text-[10px] font-semibold text-gray-500">
-            ADICIONAR CÔNJUGE
-          </span>
-        </div>
-      )
-    }
-
-    if (!pessoa) return null
-
-    const genderColors = getGenderColors(pessoa.sexo)
-    const nomeCompleto = pessoa.sobrenome ? `${pessoa.nome} ${pessoa.sobrenome}` : pessoa.nome
-    const initial = pessoa.nome?.charAt(0)?.toUpperCase() || '?'
-    const deceased = !!pessoa.data_obito
-
-    return (
-      <div
-        className="flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-50 rounded-lg transition-colors"
-        onClick={(e) => { e.stopPropagation(); onPersonClick?.(pessoa); }}
-      >
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0"
-          style={{ backgroundColor: genderColors.border }}
-        >
-          {initial}
-        </div>
-        <div className="flex-1 min-w-0">
-          <h4 className="font-semibold text-gray-900 text-xs leading-tight truncate">
-            {nomeCompleto}
-          </h4>
-          <div className="flex items-center gap-1 mt-0.5">
-            {deceased ? (
-              <span className="text-[8px] text-gray-500">Falecido</span>
-            ) : (
-              <span className="text-[8px] text-green-600 flex items-center gap-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                Vivo
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (mode === 'paisagem') {
-    return (
-      <div
-        className={`relative bg-white rounded-xl shadow-lg overflow-visible ${isMain ? 'ring-2 ring-green-500 ring-offset-2' : ''}`}
-        style={{ minWidth: 200 }}
-      >
-        {/* Handles */}
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white"
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white"
-        />
-
-        {/* Marido */}
-        {marido && renderMiniCard(marido)}
-        {!marido && esposa && renderMiniCard(null, !pessoa2)}
-
-        {/* Divisor */}
-        {(marido || esposa) && <div className="border-t border-gray-100" />}
-
-        {/* Esposa */}
-        {esposa && marido && renderMiniCard(esposa)}
-        {!esposa && marido && renderMiniCard(null, !pessoa2)}
-        {esposa && !marido && renderMiniCard(esposa)}
-
-        {/* Dropdown Filhos */}
-        <div className="border-t border-gray-200">
-          <button
-            className="w-full px-3 py-2 flex items-center justify-between text-xs text-gray-600 hover:bg-gray-50 transition-colors"
-            onClick={(e) => { e.stopPropagation(); setShowFilhos(!showFilhos); }}
-          >
-            <span>Filhos ({filhos.length})</span>
-            {showFilhos ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-
-          {showFilhos && (
-            <div className="border-t border-gray-100 bg-gray-50 max-h-40 overflow-y-auto">
-              {filhos.map(filho => (
-                <div
-                  key={filho.id}
-                  className="flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={(e) => { e.stopPropagation(); onPersonClick?.(filho); }}
-                >
-                  <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center font-bold text-white text-xs"
-                    style={{ backgroundColor: getGenderColors(filho.sexo).border }}
-                  >
-                    {filho.nome?.charAt(0)?.toUpperCase() || '?'}
-                  </div>
-                  <span className="text-xs text-gray-700 truncate">
-                    {filho.sobrenome ? `${filho.nome} ${filho.sobrenome}` : filho.nome}
-                  </span>
-                </div>
-              ))}
-              <div
-                className="flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-100 transition-colors"
-                onClick={(e) => { e.stopPropagation(); onAddFilho?.(); }}
-              >
-                <div className="w-6 h-6 rounded-full flex items-center justify-center bg-green-100">
-                  <Plus className="w-3 h-3 text-green-600" />
-                </div>
-                <span className="text-xs text-green-600 font-semibold">
-                  Adicionar filho(a)
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // MODO RETRATO
-  return (
-    <div
-      className={`relative bg-white rounded-xl shadow-lg overflow-visible ${isMain ? 'ring-2 ring-green-500 ring-offset-2' : ''}`}
-      style={{ minWidth: 280 }}
-    >
-      {/* Handles */}
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white"
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white"
-      />
-
-      {/* Duas pessoas lado a lado */}
-      <div className="flex">
-        <div className="flex-1 border-r border-gray-100">
-          {marido ? renderMiniCard(marido) : (esposa ? renderMiniCard(esposa) : null)}
-        </div>
-        <div className="flex-1">
-          {esposa && marido ? renderMiniCard(esposa) : renderMiniCard(null, !pessoa2)}
-        </div>
-      </div>
-
-      {/* Dropdown Filhos */}
-      <div className="border-t border-gray-200">
-        <button
-          className="w-full px-3 py-2 flex items-center justify-between text-xs text-gray-600 hover:bg-gray-50 transition-colors"
-          onClick={(e) => { e.stopPropagation(); setShowFilhos(!showFilhos); }}
-        >
-          <span>Filhos ({filhos.length})</span>
-          {showFilhos ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
-
-        {showFilhos && (
-          <div className="border-t border-gray-100 bg-gray-50 max-h-40 overflow-y-auto">
-            {filhos.map(filho => (
-              <div
-                key={filho.id}
-                className="flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-100 transition-colors"
-                onClick={(e) => { e.stopPropagation(); onPersonClick?.(filho); }}
-              >
-                <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center font-bold text-white text-xs"
-                  style={{ backgroundColor: getGenderColors(filho.sexo).border }}
-                >
-                  {filho.nome?.charAt(0)?.toUpperCase() || '?'}
-                </div>
-                <span className="text-xs text-gray-700 truncate">
-                  {filho.sobrenome ? `${filho.nome} ${filho.sobrenome}` : filho.nome}
-                </span>
-              </div>
-            ))}
-            <div
-              className="flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-100 transition-colors"
-              onClick={(e) => { e.stopPropagation(); onAddFilho?.(); }}
-            >
-              <div className="w-6 h-6 rounded-full flex items-center justify-center bg-green-100">
-                <Plus className="w-3 h-3 text-green-600" />
-              </div>
-              <span className="text-xs text-green-600 font-semibold">
-                Adicionar filho(a)
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   )
 }
@@ -540,10 +298,10 @@ function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
   const { type, mode, onClick } = data
 
   const config = {
-    pai: { label: 'ACRESCENTAR PAI', color: colors.male },
-    mae: { label: 'ACRESCENTAR MÃE', color: colors.female },
-    filho: { label: 'ACRESCENTAR FILHO(A)', color: colors.green },
-    conjuge: { label: 'ACRESCENTAR CÔNJUGE', color: colors.neutral }
+    pai: { label: 'ADICIONAR PAI', color: colors.male },
+    mae: { label: 'ADICIONAR MÃE', color: colors.female },
+    filho: { label: 'ADICIONAR FILHO(A)', color: colors.green },
+    conjuge: { label: 'ADICIONAR CÔNJUGE', color: colors.neutral }
   }
   const { label, color } = config[type]
 
@@ -554,19 +312,19 @@ function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
         style={{ width: NODE_SIZES.paisagem.width, height: NODE_SIZES.paisagem.height }}
         onClick={onClick}
       >
-        <Handle type="target" position={Position.Left} className="!bg-gray-300 !w-3 !h-3" />
-        <Handle type="source" position={Position.Right} className="!bg-gray-300 !w-3 !h-3" />
+        <Handle type="source" position={Position.Left} className="!bg-gray-300 !w-3 !h-3" />
+        <Handle type="target" position={Position.Right} className="!bg-gray-300 !w-3 !h-3" />
 
-        <div className="h-full flex items-center gap-3 px-4">
+        <div className="h-full flex items-center gap-2 px-3">
           <div
-            className="w-12 h-12 rounded-full flex items-center justify-center"
+            className="w-10 h-10 rounded-full flex items-center justify-center"
             style={{ backgroundColor: `${color}20` }}
           >
-            <svg className="w-6 h-6" style={{ color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" style={{ color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </div>
-          <span className="text-xs font-semibold" style={{ color }}>
+          <span className="text-[10px] font-semibold" style={{ color }}>
             {label}
           </span>
         </div>
@@ -586,14 +344,14 @@ function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
 
       <div className="h-full flex flex-col items-center justify-center text-center px-2">
         <div
-          className="w-12 h-12 rounded-full flex items-center justify-center mb-2"
+          className="w-10 h-10 rounded-full flex items-center justify-center mb-1.5"
           style={{ backgroundColor: `${color}20` }}
         >
-          <svg className="w-6 h-6" style={{ color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" style={{ color }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         </div>
-        <span className="text-[10px] font-semibold leading-tight" style={{ color }}>
+        <span className="text-[9px] font-semibold leading-tight" style={{ color }}>
           {label}
         </span>
       </div>
@@ -604,7 +362,6 @@ function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
 // Tipos de nós customizados
 const nodeTypes = {
   person: PersonNode,
-  couple: CoupleNode,
   addPerson: AddPersonNode,
 }
 
@@ -620,10 +377,12 @@ const getLayoutedElements = (
   dagreGraph.setDefaultEdgeLabel(() => ({}))
 
   const isHorizontal = mode === 'paisagem'
+  // PAISAGEM: RL (direita para esquerda) - pessoa principal à direita
+  // RETRATO: TB (cima para baixo)
   dagreGraph.setGraph({
-    rankdir: isHorizontal ? 'LR' : 'TB',
-    nodesep: isHorizontal ? 80 : 60,
-    ranksep: isHorizontal ? 120 : 100,
+    rankdir: isHorizontal ? 'RL' : 'TB',
+    nodesep: isHorizontal ? 60 : 40,
+    ranksep: isHorizontal ? 100 : 80,
     marginx: 50,
     marginy: 50,
   })
@@ -675,7 +434,7 @@ interface BuildTreeOptions {
 }
 
 function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edges: Edge[] } {
-  const { pessoas, unioes, pessoaPrincipal, mode, onPersonClick, onAddPai, onAddMae, onAddFilho, onAddConjuge } = options
+  const { pessoas, unioes, pessoaPrincipal, mode, onPersonClick, onAddPai, onAddMae } = options
 
   if (!pessoaPrincipal || pessoas.length === 0) {
     return { nodes: [], edges: [] }
@@ -702,251 +461,117 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
     return pessoas.find(p => p.id === pessoa.maeId) || null
   }
 
-  const findFilhos = (pessoa: PessoaArvore): PessoaArvore[] => {
-    return pessoas.filter(p => p.paiId === pessoa.id || p.maeId === pessoa.id)
+  // Helper para adicionar pessoa e seus ancestrais
+  const addPersonWithAncestors = (
+    pessoa: PessoaArvore,
+    isMain: boolean = false,
+    isSpouse: boolean = false,
+    depth: number = 0,
+    maxDepth: number = 3
+  ) => {
+    if (processedIds.has(pessoa.id) || depth > maxDepth) return
+    processedIds.add(pessoa.id)
+
+    const pai = findPai(pessoa)
+    const mae = findMae(pessoa)
+
+    // Adicionar nó da pessoa
+    nodes.push({
+      id: `person-${pessoa.id}`,
+      type: 'person',
+      position: { x: 0, y: 0 },
+      data: {
+        pessoa,
+        isMain,
+        isSpouse,
+        mode,
+        onPersonClick,
+        hasPai: !!pai,
+        hasMae: !!mae,
+        onAddPai: () => onAddPai?.(pessoa.id),
+        onAddMae: () => onAddMae?.(pessoa.id),
+      },
+    })
+
+    // Adicionar pai
+    if (pai) {
+      addPersonWithAncestors(pai, false, false, depth + 1, maxDepth)
+      edges.push({
+        id: `edge-pai-${pessoa.id}`,
+        source: `person-${pessoa.id}`,
+        target: `person-${pai.id}`,
+        type: 'smoothstep',
+        style: { stroke: colors.male, strokeWidth: 2 },
+      })
+    } else if (depth < maxDepth) {
+      // Placeholder para adicionar pai
+      const addPaiId = `add-pai-${pessoa.id}`
+      if (!nodes.find(n => n.id === addPaiId)) {
+        nodes.push({
+          id: addPaiId,
+          type: 'addPerson',
+          position: { x: 0, y: 0 },
+          data: { type: 'pai' as const, mode, onClick: () => onAddPai?.(pessoa.id) },
+        })
+        edges.push({
+          id: `edge-add-pai-${pessoa.id}`,
+          source: `person-${pessoa.id}`,
+          target: addPaiId,
+          type: 'smoothstep',
+          style: { stroke: colors.male, strokeWidth: 2, strokeDasharray: '5,5' },
+        })
+      }
+    }
+
+    // Adicionar mãe
+    if (mae) {
+      addPersonWithAncestors(mae, false, false, depth + 1, maxDepth)
+      edges.push({
+        id: `edge-mae-${pessoa.id}`,
+        source: `person-${pessoa.id}`,
+        target: `person-${mae.id}`,
+        type: 'smoothstep',
+        style: { stroke: colors.female, strokeWidth: 2 },
+      })
+    } else if (depth < maxDepth) {
+      // Placeholder para adicionar mãe
+      const addMaeId = `add-mae-${pessoa.id}`
+      if (!nodes.find(n => n.id === addMaeId)) {
+        nodes.push({
+          id: addMaeId,
+          type: 'addPerson',
+          position: { x: 0, y: 0 },
+          data: { type: 'mae' as const, mode, onClick: () => onAddMae?.(pessoa.id) },
+        })
+        edges.push({
+          id: `edge-add-mae-${pessoa.id}`,
+          source: `person-${pessoa.id}`,
+          target: addMaeId,
+          type: 'smoothstep',
+          style: { stroke: colors.female, strokeWidth: 2, strokeDasharray: '5,5' },
+        })
+      }
+    }
   }
 
-  // Adicionar pessoa principal com cônjuge como CoupleNode
+  // Adicionar pessoa principal com ancestrais
+  addPersonWithAncestors(pessoaPrincipal, true, false, 0)
+
+  // Adicionar cônjuge e família do cônjuge
   const conjuge = findConjuge(pessoaPrincipal)
-  const filhosPrincipal = findFilhos(pessoaPrincipal)
+  if (conjuge) {
+    addPersonWithAncestors(conjuge, false, true, 0)
 
-  nodes.push({
-    id: `couple-${pessoaPrincipal.id}`,
-    type: 'couple',
-    position: { x: 0, y: 0 },
-    data: {
-      pessoa1: pessoaPrincipal,
-      pessoa2: conjuge,
-      isMain: true,
-      mode,
-      filhos: filhosPrincipal,
-      onPersonClick,
-      onAddConjuge: () => onAddConjuge?.(pessoaPrincipal.id),
-      onAddFilho: () => onAddFilho?.(pessoaPrincipal.id),
-    },
-  })
-  processedIds.add(pessoaPrincipal.id)
-  if (conjuge) processedIds.add(conjuge.id)
-
-  // Adicionar pais da pessoa principal
-  const pai = findPai(pessoaPrincipal)
-  const mae = findMae(pessoaPrincipal)
-
-  if (pai) {
-    const conjugePai = findConjuge(pai)
-    const hasMae = !!mae
-
-    nodes.push({
-      id: `person-${pai.id}`,
-      type: 'person',
-      position: { x: 0, y: 0 },
-      data: {
-        pessoa: pai,
-        mode,
-        onPersonClick,
-        hasPai: !!findPai(pai),
-        hasMae: !!findMae(pai),
-        onAddPai: () => onAddPai?.(pai.id),
-        onAddMae: () => onAddMae?.(pai.id),
-      },
-    })
-    processedIds.add(pai.id)
-
+    // Conectar pessoa principal ao cônjuge com linha especial
     edges.push({
-      id: `edge-pai-${pai.id}`,
-      source: `person-${pai.id}`,
-      target: `couple-${pessoaPrincipal.id}`,
+      id: `edge-casamento-${pessoaPrincipal.id}-${conjuge.id}`,
+      source: `person-${pessoaPrincipal.id}`,
+      target: `person-${conjuge.id}`,
       type: 'smoothstep',
-      style: { stroke: colors.line, strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: colors.line },
-    })
-
-    // Avós paternos
-    const avoPai = findPai(pai)
-    const avoPaiMae = findMae(pai)
-
-    if (avoPai) {
-      nodes.push({
-        id: `person-${avoPai.id}`,
-        type: 'person',
-        position: { x: 0, y: 0 },
-        data: { pessoa: avoPai, mode, onPersonClick },
-      })
-      edges.push({
-        id: `edge-avo-pai-${avoPai.id}`,
-        source: `person-${avoPai.id}`,
-        target: `person-${pai.id}`,
-        type: 'smoothstep',
-        style: { stroke: colors.line, strokeWidth: 2 },
-      })
-      processedIds.add(avoPai.id)
-    } else {
-      nodes.push({
-        id: `add-pai-${pai.id}`,
-        type: 'addPerson',
-        position: { x: 0, y: 0 },
-        data: { type: 'pai' as const, mode, onClick: () => onAddPai?.(pai.id) },
-      })
-      edges.push({
-        id: `edge-add-pai-${pai.id}`,
-        source: `add-pai-${pai.id}`,
-        target: `person-${pai.id}`,
-        type: 'smoothstep',
-        style: { stroke: colors.line, strokeWidth: 2, strokeDasharray: '5,5' },
-      })
-    }
-
-    if (avoPaiMae) {
-      nodes.push({
-        id: `person-${avoPaiMae.id}`,
-        type: 'person',
-        position: { x: 0, y: 0 },
-        data: { pessoa: avoPaiMae, mode, onPersonClick },
-      })
-      edges.push({
-        id: `edge-avo-mae-pai-${avoPaiMae.id}`,
-        source: `person-${avoPaiMae.id}`,
-        target: `person-${pai.id}`,
-        type: 'smoothstep',
-        style: { stroke: colors.line, strokeWidth: 2 },
-      })
-      processedIds.add(avoPaiMae.id)
-    } else {
-      nodes.push({
-        id: `add-mae-${pai.id}`,
-        type: 'addPerson',
-        position: { x: 0, y: 0 },
-        data: { type: 'mae' as const, mode, onClick: () => onAddMae?.(pai.id) },
-      })
-      edges.push({
-        id: `edge-add-mae-${pai.id}`,
-        source: `add-mae-${pai.id}`,
-        target: `person-${pai.id}`,
-        type: 'smoothstep',
-        style: { stroke: colors.line, strokeWidth: 2, strokeDasharray: '5,5' },
-      })
-    }
-  } else {
-    // Placeholder para adicionar pai
-    nodes.push({
-      id: `add-pai-principal`,
-      type: 'addPerson',
-      position: { x: 0, y: 0 },
-      data: { type: 'pai' as const, mode, onClick: () => onAddPai?.(pessoaPrincipal.id) },
-    })
-    edges.push({
-      id: `edge-add-pai-principal`,
-      source: `add-pai-principal`,
-      target: `couple-${pessoaPrincipal.id}`,
-      type: 'smoothstep',
-      style: { stroke: colors.line, strokeWidth: 2, strokeDasharray: '5,5' },
-    })
-  }
-
-  if (mae) {
-    nodes.push({
-      id: `person-${mae.id}`,
-      type: 'person',
-      position: { x: 0, y: 0 },
-      data: {
-        pessoa: mae,
-        mode,
-        onPersonClick,
-        hasPai: !!findPai(mae),
-        hasMae: !!findMae(mae),
-        onAddPai: () => onAddPai?.(mae.id),
-        onAddMae: () => onAddMae?.(mae.id),
-      },
-    })
-    processedIds.add(mae.id)
-
-    edges.push({
-      id: `edge-mae-${mae.id}`,
-      source: `person-${mae.id}`,
-      target: `couple-${pessoaPrincipal.id}`,
-      type: 'smoothstep',
-      style: { stroke: colors.line, strokeWidth: 2 },
-    })
-
-    // Avós maternos
-    const avoMae = findPai(mae)
-    const avoMaeMae = findMae(mae)
-
-    if (avoMae) {
-      nodes.push({
-        id: `person-${avoMae.id}`,
-        type: 'person',
-        position: { x: 0, y: 0 },
-        data: { pessoa: avoMae, mode, onPersonClick },
-      })
-      edges.push({
-        id: `edge-avo-pai-mae-${avoMae.id}`,
-        source: `person-${avoMae.id}`,
-        target: `person-${mae.id}`,
-        type: 'smoothstep',
-        style: { stroke: colors.line, strokeWidth: 2 },
-      })
-      processedIds.add(avoMae.id)
-    } else {
-      nodes.push({
-        id: `add-pai-mae-${mae.id}`,
-        type: 'addPerson',
-        position: { x: 0, y: 0 },
-        data: { type: 'pai' as const, mode, onClick: () => onAddPai?.(mae.id) },
-      })
-      edges.push({
-        id: `edge-add-pai-mae-${mae.id}`,
-        source: `add-pai-mae-${mae.id}`,
-        target: `person-${mae.id}`,
-        type: 'smoothstep',
-        style: { stroke: colors.line, strokeWidth: 2, strokeDasharray: '5,5' },
-      })
-    }
-
-    if (avoMaeMae) {
-      nodes.push({
-        id: `person-${avoMaeMae.id}`,
-        type: 'person',
-        position: { x: 0, y: 0 },
-        data: { pessoa: avoMaeMae, mode, onPersonClick },
-      })
-      edges.push({
-        id: `edge-avo-mae-mae-${avoMaeMae.id}`,
-        source: `person-${avoMaeMae.id}`,
-        target: `person-${mae.id}`,
-        type: 'smoothstep',
-        style: { stroke: colors.line, strokeWidth: 2 },
-      })
-      processedIds.add(avoMaeMae.id)
-    } else {
-      nodes.push({
-        id: `add-mae-mae-${mae.id}`,
-        type: 'addPerson',
-        position: { x: 0, y: 0 },
-        data: { type: 'mae' as const, mode, onClick: () => onAddMae?.(mae.id) },
-      })
-      edges.push({
-        id: `edge-add-mae-mae-${mae.id}`,
-        source: `add-mae-mae-${mae.id}`,
-        target: `person-${mae.id}`,
-        type: 'smoothstep',
-        style: { stroke: colors.line, strokeWidth: 2, strokeDasharray: '5,5' },
-      })
-    }
-  } else {
-    // Placeholder para adicionar mãe
-    nodes.push({
-      id: `add-mae-principal`,
-      type: 'addPerson',
-      position: { x: 0, y: 0 },
-      data: { type: 'mae' as const, mode, onClick: () => onAddMae?.(pessoaPrincipal.id) },
-    })
-    edges.push({
-      id: `edge-add-mae-principal`,
-      source: `add-mae-principal`,
-      target: `couple-${pessoaPrincipal.id}`,
-      type: 'smoothstep',
-      style: { stroke: colors.line, strokeWidth: 2, strokeDasharray: '5,5' },
+      style: { stroke: colors.green, strokeWidth: 3 },
+      label: '♥',
+      labelStyle: { fontSize: 14, fill: colors.green },
+      labelBgStyle: { fill: 'white', fillOpacity: 0.9 },
     })
   }
 
@@ -1022,10 +647,11 @@ export function ReactFlowTree({
       <MiniMap
         nodeStrokeWidth={3}
         nodeColor={(node) => {
-          if (node.type === 'couple') return colors.green
           if (node.type === 'addPerson') return '#ddd'
           const data = node.data as PersonNodeData
           if (data?.pessoa) {
+            if (data.isMain) return colors.green
+            if (data.isSpouse) return '#9333ea' // purple
             return getGenderColors(data.pessoa.sexo).border
           }
           return '#888'
