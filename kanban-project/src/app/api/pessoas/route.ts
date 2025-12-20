@@ -1,94 +1,138 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
-export async function GET() {
+// GET - Listar pessoas (com filtros opcionais)
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const arvoreId = searchParams.get('arvoreId')
+
+    const where: any = {}
+    if (arvoreId) {
+      where.arvoreId = parseInt(arvoreId)
+    }
+
     const pessoas = await prisma.pessoa.findMany({
+      where,
+      include: {
+        pai: {
+          include: {
+            pai: true,
+            mae: true
+          }
+        },
+        mae: {
+          include: {
+            pai: true,
+            mae: true
+          }
+        },
+        filhosComoPai: true,
+        filhosComoMae: true,
+      },
+      orderBy: { id: 'asc' }
+    })
+
+    return NextResponse.json({ pessoas })
+  } catch (error) {
+    console.error("Erro ao listar pessoas:", error)
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+  }
+}
+
+// POST - Criar nova pessoa
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { 
+      nome, 
+      sobrenome, 
+      sexo, 
+      data_nasc, 
+      local_nasc,
+      data_obito,
+      batizado,
+      comentario,
+      arvoreId,
+      paiId,
+      maeId,
+      x,
+      y,
+      // Para adicionar pai/mãe de um filho existente
+      filhoId,
+      tipoPai
+    } = body
+
+    if (!nome) {
+      return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 })
+    }
+
+    if (!arvoreId) {
+      return NextResponse.json({ error: "arvoreId é obrigatório" }, { status: 400 })
+    }
+
+    // Verificar se a árvore existe
+    const arvore = await prisma.arvore.findUnique({
+      where: { id: arvoreId }
+    })
+
+    if (!arvore) {
+      return NextResponse.json({ error: "Árvore não encontrada" }, { status: 404 })
+    }
+
+    // Criar a pessoa
+    const pessoa = await prisma.pessoa.create({
+      data: {
+        nome,
+        sobrenome: sobrenome || null,
+        sexo: sexo || null,
+        data_nasc: data_nasc ? new Date(data_nasc) : null,
+        local_nasc: local_nasc || null,
+        data_obito: data_obito ? new Date(data_obito) : null,
+        batizado: batizado || null,
+        comentario: comentario || null,
+        arvoreId,
+        paiId: paiId || null,
+        maeId: maeId || null,
+        x: x || null,
+        y: y || null,
+      },
       include: {
         pai: true,
         mae: true,
         filhosComoPai: true,
         filhosComoMae: true,
-        arvore: true,
-        unioesComoPessoa1: {
-          include: {
-            pessoa2: true,
-          },
-        },
-        unioesComoPessoa2: {
-          include: {
-            pessoa1: true,
-          },
-        },
-      },
-      orderBy: {
-        nome: "asc",
-      },
-    })
-
-    return NextResponse.json(pessoas)
-  } catch (error) {
-    console.error("Erro ao buscar pessoas:", error)
-    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    
-    const arvoreId = body.arvoreId ? Number(body.arvoreId) : 1
-    
-    const novaPessoa = await prisma.pessoa.create({
-      data: {
-        nome: body.nome,
-        sobrenome: body.sobrenome || null,
-        sexo: body.sexo || null,
-        data_nasc: body.data_nasc ? new Date(body.data_nasc) : null,
-        local_nasc: body.local_nasc || null,
-        data_obito: body.data_obito ? new Date(body.data_obito) : null,
-        batizado: body.batizado || null,
-        paiId: body.paiId ? Number(body.paiId) : null,
-        maeId: body.maeId ? Number(body.maeId) : null,
-        x: body.x || 0,
-        y: body.y || 0,
-        arvoreId,
-      },
-      include: {
-        pai: true,
-        mae: true,
-        arvore: true,
-      },
+      }
     })
 
     // Se está adicionando como pai ou mãe de um filho existente
-    if (body.filhoId && body.tipoPai) {
+    if (filhoId && tipoPai) {
       const updateData: any = {}
-      if (body.tipoPai === 'pai') {
-        updateData.paiId = novaPessoa.id
-      } else if (body.tipoPai === 'mae') {
-        updateData.maeId = novaPessoa.id
+      if (tipoPai === 'pai') {
+        updateData.paiId = pessoa.id
+      } else if (tipoPai === 'mae') {
+        updateData.maeId = pessoa.id
       }
 
       await prisma.pessoa.update({
-        where: { id: Number(body.filhoId) },
+        where: { id: filhoId },
         data: updateData
       })
     }
 
     // Se é a primeira pessoa da árvore, definir como pessoa principal
-    const arvore = await prisma.arvore.findUnique({
-      where: { id: arvoreId }
+    const countPessoas = await prisma.pessoa.count({
+      where: { arvoreId }
     })
-    
-    if (arvore && !arvore.pessoaPrincipalId) {
+
+    if (countPessoas === 1 && !arvore.pessoaPrincipalId) {
       await prisma.arvore.update({
         where: { id: arvoreId },
-        data: { pessoaPrincipalId: novaPessoa.id }
+        data: { pessoaPrincipalId: pessoa.id }
       })
     }
 
-    return NextResponse.json(novaPessoa, { status: 201 })
+    return NextResponse.json(pessoa, { status: 201 })
   } catch (error) {
     console.error("Erro ao criar pessoa:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })

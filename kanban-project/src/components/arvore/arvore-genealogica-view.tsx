@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { PessoaCard, PessoaArvore, UniaoArvore } from "./pessoa-card"
+import { PersonCardSimple, AddPersonButtonSimple } from "./person-card-simple"
 import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
 import { PersonIcon } from "./pessoa-icon"
@@ -10,11 +11,10 @@ import {
   Minus, 
   Home, 
   Maximize2, 
-  Target,
   ChevronDown,
-  Filter,
   User,
-  Loader2
+  Loader2,
+  Minimize2
 } from "lucide-react"
 import { TreeIcon } from "../icons/tree-icon"
 
@@ -67,6 +67,11 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+
+  // Estado de tela cheia
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
   
   // Modal de adicionar pessoa
   const [showAddPersonModal, setShowAddPersonModal] = useState(false)
@@ -198,6 +203,38 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
     setPosition({ x: 0, y: 0 })
   }
 
+  // Handler de tela cheia com animação
+  const handleToggleFullscreen = async () => {
+    if (!containerRef.current) return
+
+    try {
+      setIsTransitioning(true)
+      
+      if (!document.fullscreenElement) {
+        await containerRef.current.requestFullscreen()
+      } else {
+        await document.exitFullscreen()
+      }
+      // O estado isFullscreen será atualizado pelo listener fullscreenchange
+    } catch (error) {
+      console.error('Erro ao alternar tela cheia:', error)
+      setIsTransitioning(false)
+    }
+  }
+
+  // Listener para mudança de fullscreen (quando sai com ESC ou clica no botão)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      // Se não estava transitioning (ESC foi pressionado), inicia transição
+      setIsTransitioning(true)
+      setIsFullscreen(!!document.fullscreenElement)
+      // Finaliza transição após a mudança
+      setTimeout(() => setIsTransitioning(false), 250)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
+
   // Handlers de pan
   const handleMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
@@ -303,7 +340,15 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
   }
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-gray-100 to-gray-200">
+    <div 
+      ref={containerRef} 
+      className="h-full flex flex-col bg-gradient-to-b from-gray-100 to-gray-200 relative"
+    >
+      {/* Overlay de transição com fade */}
+      <div 
+        className={`absolute inset-0 bg-white z-[9999] pointer-events-none transition-opacity duration-300 ${isTransitioning ? 'opacity-60' : 'opacity-0'}`}
+      />
+      
       {/* Controles de visualização */}
       <div className="flex items-center justify-between px-4 py-2 bg-white border-b">
         <div className="flex items-center gap-2">
@@ -311,34 +356,46 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
             className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'paisagem' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
             onClick={() => setViewMode('paisagem')}
           >
-            <TreeIcon className="h-4 w-4" />
+            {/* Ícone horizontal - árvore deitada */}
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="2" y="9" width="6" height="6" rx="1" />
+              <rect x="14" y="3" width="6" height="6" rx="1" />
+              <rect x="14" y="15" width="6" height="6" rx="1" />
+              <path d="M8 12 L14 6" />
+              <path d="M8 12 L14 18" />
+            </svg>
             <span className="text-sm font-medium">PAISAGEM</span>
           </button>
           <button 
             className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'retrato' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
             onClick={() => setViewMode('retrato')}
           >
-            <TreeIcon className="h-4 w-4 rotate-90" />
+            {/* Ícone vertical - árvore em pé */}
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="2" width="6" height="6" rx="1" />
+              <rect x="15" y="2" width="6" height="6" rx="1" />
+              <rect x="9" y="16" width="6" height="6" rx="1" />
+              <path d="M6 8 L12 16" />
+              <path d="M18 8 L12 16" />
+            </svg>
             <span className="text-sm font-medium">RETRATO</span>
           </button>
         </div>
         
         <div className="flex items-center gap-1">
-          <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-            <Filter className="h-4 w-4" />
-          </button>
           <button 
             className="p-2 hover:bg-gray-100 rounded transition-colors"
             onClick={handleResetView}
-            title="Resetar visualização"
+            title="Voltar ao início"
           >
             <Home className="h-4 w-4" />
           </button>
-          <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-            <Maximize2 className="h-4 w-4" />
-          </button>
-          <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-            <Target className="h-4 w-4" />
+          <button 
+            className="p-2 hover:bg-gray-100 rounded transition-colors"
+            onClick={handleToggleFullscreen}
+            title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+          >
+            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
           <div className="w-px h-6 bg-gray-200 mx-1" />
           <button 
@@ -539,99 +596,196 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                 )}
               </div>
             ) : (
-              // Visualização Retrato (vertical)
-              <div className="flex flex-col items-center gap-8">
-                {/* Bisavós */}
-                <div className="flex gap-8">
-                  <div className="flex gap-4">
-                    <AddPersonButton type="pai" />
-                    <AddPersonButton type="mae" />
-                  </div>
-                  <div className="flex gap-4">
-                    <AddPersonButton type="pai" />
-                    <AddPersonButton type="mae" />
-                  </div>
-                </div>
+              // Visualização Retrato (vertical) - Estilo FamilySearch
+              <div className="relative py-8" style={{ minWidth: '800px', minHeight: '700px' }}>
                 
-                {/* Linha conectora */}
-                <div className="w-0.5 h-8 bg-gray-400" />
-                
-                {/* Avós */}
-                <div className="flex gap-16">
-                  {pessoaPrincipal?.pai?.pai && (
-                    <div className="person-card">
-                      <PessoaCard 
-                        pessoa={pessoaPrincipal.pai.pai}
-                        conjuge={pessoaPrincipal.pai.mae}
-                        onClick={handlePersonClick}
-                        onConjugeClick={handlePersonClick}
-                        onAddConjuge={() => handleAddConjuge(pessoaPrincipal.pai!.pai!)}
-                      />
-                    </div>
-                  )}
-                  {pessoaPrincipal?.mae?.pai && (
-                    <div className="person-card">
-                      <PessoaCard 
-                        pessoa={pessoaPrincipal.mae.pai}
-                        conjuge={pessoaPrincipal.mae.mae}
-                        onClick={handlePersonClick}
-                        onConjugeClick={handlePersonClick}
-                        onAddConjuge={() => handleAddConjuge(pessoaPrincipal.mae!.pai!)}
-                      />
-                    </div>
-                  )}
-                </div>
-                
-                {/* Linha conectora */}
-                <div className="w-0.5 h-8 bg-gray-400" />
-                
-                {/* Pais */}
-                <div className="flex gap-16">
-                  {pessoaPrincipal?.pai && (
-                    <div className="person-card">
-                      <PessoaCard 
-                        pessoa={pessoaPrincipal.pai}
-                        conjuge={pessoaPrincipal.mae}
-                        onClick={handlePersonClick}
-                        onConjugeClick={handlePersonClick}
-                        onAddConjuge={() => handleAddConjuge(pessoaPrincipal.pai!)}
-                      />
-                    </div>
-                  )}
-                </div>
-                
-                {/* Linha conectora */}
-                <div className="w-0.5 h-8 bg-gray-400" />
-                
-                {/* Pessoa principal */}
-                {pessoaPrincipal && (
-                  <div className="person-card">
-                    <PessoaCard 
-                      pessoa={pessoaPrincipal}
-                      conjuge={findConjuge(pessoaPrincipal)}
-                      casamento={findCasamento(pessoaPrincipal)}
-                      isMain={true}
+                {/* Pai do Marco */}
+                <div className="absolute" style={{ left: '80px', top: '0px' }}>
+                  {pessoaPrincipal?.pai ? (
+                    <PersonCardSimple 
+                      pessoa={pessoaPrincipal.pai}
                       onClick={handlePersonClick}
-                      onConjugeClick={handlePersonClick}
-                      onAddConjuge={() => handleAddConjuge(pessoaPrincipal)}
                     />
+                  ) : (
+                    <AddPersonButtonSimple 
+                      type="pai"
+                      onClick={() => {
+                        if (pessoaPrincipal) {
+                          setAddPersonType('pai')
+                          setAddPersonParentId(pessoaPrincipal.id)
+                          setShowAddPersonModal(true)
+                        }
+                      }}
+                    />
+                  )}
+                </div>
+                
+                {/* Mãe do Marco */}
+                <div className="absolute" style={{ left: '230px', top: '0px' }}>
+                  {pessoaPrincipal?.mae ? (
+                    <PersonCardSimple 
+                      pessoa={pessoaPrincipal.mae}
+                      onClick={handlePersonClick}
+                    />
+                  ) : (
+                    <AddPersonButtonSimple 
+                      type="mae"
+                      onClick={() => {
+                        if (pessoaPrincipal) {
+                          setAddPersonType('mae')
+                          setAddPersonParentId(pessoaPrincipal.id)
+                          setShowAddPersonModal(true)
+                        }
+                      }}
+                    />
+                  )}
+                </div>
+                
+                {/* Pai do Cônjuge */}
+                {pessoaPrincipal && findConjuge(pessoaPrincipal) && (
+                  <div className="absolute" style={{ left: '480px', top: '0px' }}>
+                    {(() => {
+                      const conjuge = findConjuge(pessoaPrincipal)
+                      return conjuge?.pai ? (
+                        <PersonCardSimple 
+                          pessoa={conjuge.pai}
+                          onClick={handlePersonClick}
+                        />
+                      ) : (
+                        <AddPersonButtonSimple 
+                          type="pai"
+                          onClick={() => {
+                            if (conjuge) {
+                              setAddPersonType('pai')
+                              setAddPersonParentId(conjuge.id)
+                              setShowAddPersonModal(true)
+                            }
+                          }}
+                        />
+                      )
+                    })()}
                   </div>
                 )}
                 
-                {/* Linha conectora */}
-                <div className="w-0.5 h-8 bg-gray-400" />
+                {/* Mãe do Cônjuge */}
+                {pessoaPrincipal && findConjuge(pessoaPrincipal) && (
+                  <div className="absolute" style={{ left: '630px', top: '0px' }}>
+                    {(() => {
+                      const conjuge = findConjuge(pessoaPrincipal)
+                      return conjuge?.mae ? (
+                        <PersonCardSimple 
+                          pessoa={conjuge.mae}
+                          onClick={handlePersonClick}
+                        />
+                      ) : (
+                        <AddPersonButtonSimple 
+                          type="mae"
+                          onClick={() => {
+                            if (conjuge) {
+                              setAddPersonType('mae')
+                              setAddPersonParentId(conjuge.id)
+                              setShowAddPersonModal(true)
+                            }
+                          }}
+                        />
+                      )
+                    })()}
+                  </div>
+                )}
+                
+                {/* Marco */}
+                <div className="absolute" style={{ left: '155px', top: '220px' }}>
+                  {pessoaPrincipal && (
+                    <PersonCardSimple 
+                      pessoa={pessoaPrincipal}
+                      isMain={true}
+                      onClick={handlePersonClick}
+                    />
+                  )}
+                </div>
+                
+                {/* Cônjuge */}
+                <div className="absolute" style={{ left: '555px', top: '220px' }}>
+                  {pessoaPrincipal && (
+                    findConjuge(pessoaPrincipal) ? (
+                      <PersonCardSimple 
+                        pessoa={findConjuge(pessoaPrincipal)!}
+                        onClick={handlePersonClick}
+                      />
+                    ) : (
+                      <div 
+                        className="relative bg-white rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-teal-400 hover:bg-teal-50 transition-all flex flex-col items-center justify-center"
+                        style={{ width: '140px', minHeight: '140px' }}
+                        onClick={() => handleAddConjuge(pessoaPrincipal)}
+                      >
+                        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-2">
+                          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                        </div>
+                        <span className="text-xs text-gray-500 font-medium">Adicionar cônjuge</span>
+                      </div>
+                    )
+                  )}
+                </div>
                 
                 {/* Filhos */}
-                <div className="flex gap-4">
-                  <AddPersonButton 
-                    type="filho" 
+                <div className="absolute flex gap-4" style={{ left: '320px', top: '480px' }}>
+                  {pessoaPrincipal && findFilhos(pessoaPrincipal).map((filho) => (
+                    <PersonCardSimple 
+                      key={filho.id}
+                      pessoa={filho}
+                      onClick={handlePersonClick}
+                    />
+                  ))}
+                  
+                  <div 
+                    className="relative bg-white rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-teal-400 hover:bg-teal-50 transition-all flex flex-col items-center justify-center"
+                    style={{ width: '140px', minHeight: '140px' }}
                     onClick={() => {
                       setAddPersonType('filho')
                       setAddPersonParentId(pessoaPrincipal?.id || null)
                       setShowAddPersonModal(true)
                     }}
-                  />
+                  >
+                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-2">
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                    </div>
+                    <span className="text-xs text-gray-500 font-medium">Adicionar filho(a)</span>
+                  </div>
                 </div>
+                
+                {/* SVG com TODAS as linhas - estilo FamilySearch */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
+                  {/* Linhas dos pais do Marco para Marco */}
+                  {/* Pai do Marco: desce, vai pro meio, encontra com Mãe */}
+                  <path d="M 150 140 L 150 170 L 225 170" stroke="#9ca3af" strokeWidth="2" fill="none" />
+                  {/* Mãe do Marco: desce, vai pro meio */}
+                  <path d="M 300 140 L 300 170 L 225 170" stroke="#9ca3af" strokeWidth="2" fill="none" />
+                  {/* Linha central desce para Marco */}
+                  <path d="M 225 170 L 225 220" stroke="#9ca3af" strokeWidth="2" fill="none" />
+                  
+                  {/* Linhas dos pais do Cônjuge para Cônjuge */}
+                  {pessoaPrincipal && findConjuge(pessoaPrincipal) && (
+                    <>
+                      {/* Pai do Cônjuge: desce, vai pro meio */}
+                      <path d="M 550 140 L 550 170 L 625 170" stroke="#9ca3af" strokeWidth="2" fill="none" />
+                      {/* Mãe do Cônjuge: desce, vai pro meio */}
+                      <path d="M 700 140 L 700 170 L 625 170" stroke="#9ca3af" strokeWidth="2" fill="none" />
+                      {/* Linha central desce para Cônjuge */}
+                      <path d="M 625 170 L 625 220" stroke="#9ca3af" strokeWidth="2" fill="none" />
+                    </>
+                  )}
+                  
+                  {/* Linha horizontal de casamento: Marco ─── Cônjuge */}
+                  <path d="M 295 290 L 555 290" stroke="#9ca3af" strokeWidth="2" fill="none" />
+                  
+                  {/* Linha vertical: Centro do casamento → Filhos */}
+                  <path d="M 425 290 L 425 480" stroke="#9ca3af" strokeWidth="2" fill="none" />
+                </svg>
+                
               </div>
             )}
           </div>
