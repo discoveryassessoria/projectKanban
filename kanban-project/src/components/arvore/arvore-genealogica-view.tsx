@@ -7,12 +7,15 @@ import { AddPersonButton } from "./pessoa-card"
 import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
 import { PersonIcon } from "./pessoa-icon"
-import { 
-  Plus, 
-  Minus, 
-  Home, 
-  Maximize2, 
+import {
+  Plus,
+  Minus,
+  Home,
+  Maximize2,
   ChevronDown,
+  ChevronRight,
+  ChevronLeft,
+  ChevronUp,
   User,
   Loader2,
   Minimize2
@@ -33,6 +36,60 @@ const fsColors = {
   female: '#BF3D79',
   green: '#87B940',
   line: '#9CA3AF'
+}
+
+// Botão de expandir/recolher branch
+interface ExpandButtonProps {
+  expanded: boolean
+  onClick: () => void
+  direction: 'right' | 'left' | 'up' | 'down'
+  hasContent: boolean // Se tem conteúdo para mostrar (ancestrais ou descendentes)
+}
+
+function ExpandButton({ expanded, onClick, direction, hasContent }: ExpandButtonProps) {
+  if (!hasContent && !expanded) return null
+
+  const getIcon = () => {
+    if (expanded) {
+      // Quando expandido, mostra seta para recolher (direção oposta)
+      switch (direction) {
+        case 'right': return <ChevronLeft className="w-3 h-3" />
+        case 'left': return <ChevronRight className="w-3 h-3" />
+        case 'up': return <ChevronDown className="w-3 h-3" />
+        case 'down': return <ChevronUp className="w-3 h-3" />
+      }
+    } else {
+      // Quando recolhido, mostra seta para expandir
+      switch (direction) {
+        case 'right': return <ChevronRight className="w-3 h-3" />
+        case 'left': return <ChevronLeft className="w-3 h-3" />
+        case 'up': return <ChevronUp className="w-3 h-3" />
+        case 'down': return <ChevronDown className="w-3 h-3" />
+      }
+    }
+  }
+
+  const getPosition = () => {
+    switch (direction) {
+      case 'right': return 'right-0 top-1/2 -translate-y-1/2 translate-x-1/2'
+      case 'left': return 'left-0 top-1/2 -translate-y-1/2 -translate-x-1/2'
+      case 'up': return 'top-0 left-1/2 -translate-x-1/2 -translate-y-1/2'
+      case 'down': return 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2'
+    }
+  }
+
+  return (
+    <button
+      className={`absolute ${getPosition()} w-6 h-6 rounded-full bg-white border-2 border-gray-300 flex items-center justify-center shadow-sm hover:bg-gray-50 hover:border-gray-400 transition-all z-10`}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+      title={expanded ? 'Recolher' : 'Expandir'}
+    >
+      {getIcon()}
+    </button>
+  )
 }
 
 export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, onArvoreCreated }: ArvoreGenealogicaViewProps) {
@@ -58,6 +115,10 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Estado de branches expandidos (controla quais ramos mostram seus ancestrais)
+  // Formato: Set de IDs de pessoas cujos PAIS estão visíveis
+  const [expandedBranches, setExpandedBranches] = useState<Set<number>>(new Set())
   
   // Modal de adicionar pessoa
   const [showAddPersonModal, setShowAddPersonModal] = useState(false)
@@ -181,6 +242,14 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
     fetchArvore()
   }, [arvoreId])
 
+  // Inicializar branches expandidos quando a pessoa principal for definida
+  useEffect(() => {
+    if (pessoaPrincipal) {
+      // Por padrão, expande o branch da pessoa principal
+      setExpandedBranches(new Set([pessoaPrincipal.id]))
+    }
+  }, [pessoaPrincipal?.id])
+
   // Handlers de zoom
   const handleZoomIn = () => setScale(prev => Math.min(prev + 0.1, 2))
   const handleZoomOut = () => setScale(prev => Math.max(prev - 0.1, 0.3))
@@ -297,6 +366,29 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
   // Encontrar filhos de uma pessoa
   const findFilhos = (pessoa: PessoaArvore): PessoaArvore[] => {
     return pessoas.filter(p => p.paiId === pessoa.id || p.maeId === pessoa.id)
+  }
+
+  // Verificar se um branch está expandido (mostrando ancestrais)
+  const isBranchExpanded = (pessoaId: number): boolean => {
+    return expandedBranches.has(pessoaId)
+  }
+
+  // Toggle expansão de branch
+  const toggleBranch = (pessoaId: number) => {
+    setExpandedBranches(prev => {
+      const next = new Set(prev)
+      if (next.has(pessoaId)) {
+        next.delete(pessoaId)
+      } else {
+        next.add(pessoaId)
+      }
+      return next
+    })
+  }
+
+  // Verificar se uma pessoa tem pais cadastrados
+  const hasPais = (pessoa: PessoaArvore): boolean => {
+    return !!(findPai(pessoa) || findMae(pessoa))
   }
 
   // Se não tem árvore vinculada
@@ -522,12 +614,21 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                 {/* ===== COLUNA 2: Pessoa Principal (x=200) ===== */}
                 {pessoaPrincipal && (
                   <div className="absolute" style={{ left: '200px', top: '130px' }}>
-                    <PersonCardSimple
-                      pessoa={pessoaPrincipal}
-                      isMain={true}
-                      mode="paisagem"
-                      onClick={handlePersonClick}
-                    />
+                    <div className="relative">
+                      <PersonCardSimple
+                        pessoa={pessoaPrincipal}
+                        isMain={true}
+                        mode="paisagem"
+                        onClick={handlePersonClick}
+                      />
+                      {/* Botão de expandir para ancestrais */}
+                      <ExpandButton
+                        expanded={isBranchExpanded(pessoaPrincipal.id)}
+                        onClick={() => toggleBranch(pessoaPrincipal.id)}
+                        direction="right"
+                        hasContent={hasPais(pessoaPrincipal) || true /* sempre pode adicionar pais */}
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -544,17 +645,26 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                   ) : null}
                 </div>
 
-                {/* ===== COLUNA 4: Pais (x=600) ===== */}
-                {pessoaPrincipal && (
+                {/* ===== COLUNA 4: Pais (x=600) - só mostra se branch expandido ===== */}
+                {pessoaPrincipal && isBranchExpanded(pessoaPrincipal.id) && (
                   <>
                     {/* Pai (y=20) */}
                     <div className="absolute" style={{ left: '600px', top: '20px' }}>
                       {findPai(pessoaPrincipal) ? (
-                        <PersonCardSimple
-                          pessoa={findPai(pessoaPrincipal)!}
-                          mode="paisagem"
-                          onClick={handlePersonClick}
-                        />
+                        <div className="relative">
+                          <PersonCardSimple
+                            pessoa={findPai(pessoaPrincipal)!}
+                            mode="paisagem"
+                            onClick={handlePersonClick}
+                          />
+                          {/* Botão de expandir para avós paternos */}
+                          <ExpandButton
+                            expanded={isBranchExpanded(findPai(pessoaPrincipal)!.id)}
+                            onClick={() => toggleBranch(findPai(pessoaPrincipal)!.id)}
+                            direction="right"
+                            hasContent={hasPais(findPai(pessoaPrincipal)!) || true}
+                          />
+                        </div>
                       ) : (
                         <AddPersonButtonSimple
                           type="pai"
@@ -571,11 +681,20 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                     {/* Mãe (y=240) */}
                     <div className="absolute" style={{ left: '600px', top: '240px' }}>
                       {findMae(pessoaPrincipal) ? (
-                        <PersonCardSimple
-                          pessoa={findMae(pessoaPrincipal)!}
-                          mode="paisagem"
-                          onClick={handlePersonClick}
-                        />
+                        <div className="relative">
+                          <PersonCardSimple
+                            pessoa={findMae(pessoaPrincipal)!}
+                            mode="paisagem"
+                            onClick={handlePersonClick}
+                          />
+                          {/* Botão de expandir para avós maternos */}
+                          <ExpandButton
+                            expanded={isBranchExpanded(findMae(pessoaPrincipal)!.id)}
+                            onClick={() => toggleBranch(findMae(pessoaPrincipal)!.id)}
+                            direction="right"
+                            hasContent={hasPais(findMae(pessoaPrincipal)!) || true}
+                          />
+                        </div>
                       ) : (
                         <AddPersonButtonSimple
                           type="mae"
@@ -591,8 +710,10 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                   </>
                 )}
 
-                {/* ===== COLUNA 5: Avós (x=800) - só se tiver pai ===== */}
-                {pessoaPrincipal && findPai(pessoaPrincipal) && (
+                {/* ===== COLUNA 5: Avós Paternos (x=800) - só se branch do pai expandido ===== */}
+                {pessoaPrincipal && findPai(pessoaPrincipal) &&
+                 isBranchExpanded(pessoaPrincipal.id) &&
+                 isBranchExpanded(findPai(pessoaPrincipal)!.id) && (
                   <>
                     {/* Avô paterno */}
                     <div className="absolute" style={{ left: '800px', top: '0px' }}>
@@ -638,6 +759,55 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                   </>
                 )}
 
+                {/* ===== COLUNA 5: Avós Maternos (x=800, y ajustado) - só se branch da mãe expandido ===== */}
+                {pessoaPrincipal && findMae(pessoaPrincipal) &&
+                 isBranchExpanded(pessoaPrincipal.id) &&
+                 isBranchExpanded(findMae(pessoaPrincipal)!.id) && (
+                  <>
+                    {/* Avô materno */}
+                    <div className="absolute" style={{ left: '800px', top: '220px' }}>
+                      {findPai(findMae(pessoaPrincipal)!) ? (
+                        <PersonCardSimple
+                          pessoa={findPai(findMae(pessoaPrincipal)!)!}
+                          mode="paisagem"
+                          onClick={handlePersonClick}
+                        />
+                      ) : (
+                        <AddPersonButtonSimple
+                          type="pai"
+                          mode="paisagem"
+                          onClick={() => {
+                            setAddPersonType('pai')
+                            setAddPersonParentId(findMae(pessoaPrincipal)!.id)
+                            setShowAddPersonModal(true)
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    {/* Avó materna */}
+                    <div className="absolute" style={{ left: '800px', top: '340px' }}>
+                      {findMae(findMae(pessoaPrincipal)!) ? (
+                        <PersonCardSimple
+                          pessoa={findMae(findMae(pessoaPrincipal)!)!}
+                          mode="paisagem"
+                          onClick={handlePersonClick}
+                        />
+                      ) : (
+                        <AddPersonButtonSimple
+                          type="mae"
+                          mode="paisagem"
+                          onClick={() => {
+                            setAddPersonType('mae')
+                            setAddPersonParentId(findMae(pessoaPrincipal)!.id)
+                            setShowAddPersonModal(true)
+                          }}
+                        />
+                      )}
+                    </div>
+                  </>
+                )}
+
                 {/* ===== SVG: Linhas de conexão ===== */}
                 {/* Card: 180x100, centroY do card = top + 50 */}
                 <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: -1 }}>
@@ -647,8 +817,8 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                   {/* Linha: Pessoa Principal (380,180) → Cônjuge (400,180) */}
                   <path d="M 380 180 L 400 180" stroke={fsColors.line} strokeWidth="2" fill="none" />
 
-                  {/* Linhas: Cônjuge → bifurcação para Pais */}
-                  {pessoaPrincipal && (
+                  {/* Linhas: Cônjuge → bifurcação para Pais - só se expandido */}
+                  {pessoaPrincipal && isBranchExpanded(pessoaPrincipal.id) && (
                     <>
                       {/* Saída do cônjuge, bifurcação, para pai */}
                       <path d="M 580 180 L 590 180 L 590 70 L 600 70" stroke={fsColors.line} strokeWidth="2" fill="none" />
@@ -657,13 +827,27 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                     </>
                   )}
 
-                  {/* Linhas: Pai → Avós */}
-                  {pessoaPrincipal && findPai(pessoaPrincipal) && (
+                  {/* Linhas: Pai → Avós Paternos - só se branch do pai expandido */}
+                  {pessoaPrincipal && findPai(pessoaPrincipal) &&
+                   isBranchExpanded(pessoaPrincipal.id) &&
+                   isBranchExpanded(findPai(pessoaPrincipal)!.id) && (
                     <>
                       {/* Saída do pai, bifurcação, para avô */}
                       <path d="M 780 70 L 790 70 L 790 50 L 800 50" stroke={fsColors.line} strokeWidth="2" fill="none" />
                       {/* Bifurcação para avó */}
                       <path d="M 790 70 L 790 170 L 800 170" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                    </>
+                  )}
+
+                  {/* Linhas: Mãe → Avós Maternos - só se branch da mãe expandido */}
+                  {pessoaPrincipal && findMae(pessoaPrincipal) &&
+                   isBranchExpanded(pessoaPrincipal.id) &&
+                   isBranchExpanded(findMae(pessoaPrincipal)!.id) && (
+                    <>
+                      {/* Saída da mãe para avós maternos */}
+                      <path d="M 780 290 L 790 290 L 790 270 L 800 270" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                      {/* Bifurcação para avó materna */}
+                      <path d="M 790 290 L 790 390 L 800 390" stroke={fsColors.line} strokeWidth="2" fill="none" />
                     </>
                   )}
                 </svg>
@@ -673,61 +857,14 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
               // Cards: 140x160px
               <div className="relative" style={{ minWidth: '700px', minHeight: '600px' }}>
 
-                {/* ===== LINHA 1: Pais (y=0) ===== */}
-                {/* Pai da Pessoa Principal */}
-                <div className="absolute" style={{ left: '70px', top: '0px' }}>
-                  {pessoaPrincipal && findPai(pessoaPrincipal) ? (
-                    <PersonCardSimple
-                      pessoa={findPai(pessoaPrincipal)!}
-                      mode="retrato"
-                      onClick={handlePersonClick}
-                    />
-                  ) : (
-                    <AddPersonButtonSimple
-                      type="pai"
-                      mode="retrato"
-                      onClick={() => {
-                        if (pessoaPrincipal) {
-                          setAddPersonType('pai')
-                          setAddPersonParentId(pessoaPrincipal.id)
-                          setShowAddPersonModal(true)
-                        }
-                      }}
-                    />
-                  )}
-                </div>
-
-                {/* Mãe da Pessoa Principal */}
-                <div className="absolute" style={{ left: '230px', top: '0px' }}>
-                  {pessoaPrincipal && findMae(pessoaPrincipal) ? (
-                    <PersonCardSimple
-                      pessoa={findMae(pessoaPrincipal)!}
-                      mode="retrato"
-                      onClick={handlePersonClick}
-                    />
-                  ) : (
-                    <AddPersonButtonSimple
-                      type="mae"
-                      mode="retrato"
-                      onClick={() => {
-                        if (pessoaPrincipal) {
-                          setAddPersonType('mae')
-                          setAddPersonParentId(pessoaPrincipal.id)
-                          setShowAddPersonModal(true)
-                        }
-                      }}
-                    />
-                  )}
-                </div>
-
-                {/* Pai do Cônjuge */}
-                {pessoaPrincipal && findConjuge(pessoaPrincipal) && (
-                  <div className="absolute" style={{ left: '410px', top: '0px' }}>
-                    {(() => {
-                      const conjuge = findConjuge(pessoaPrincipal)!
-                      return findPai(conjuge) ? (
+                {/* ===== LINHA 1: Pais (y=0) - só se branch expandido ===== */}
+                {pessoaPrincipal && isBranchExpanded(pessoaPrincipal.id) && (
+                  <>
+                    {/* Pai da Pessoa Principal */}
+                    <div className="absolute" style={{ left: '70px', top: '0px' }}>
+                      {findPai(pessoaPrincipal) ? (
                         <PersonCardSimple
-                          pessoa={findPai(conjuge)!}
+                          pessoa={findPai(pessoaPrincipal)!}
                           mode="retrato"
                           onClick={handlePersonClick}
                         />
@@ -737,23 +874,18 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                           mode="retrato"
                           onClick={() => {
                             setAddPersonType('pai')
-                            setAddPersonParentId(conjuge.id)
+                            setAddPersonParentId(pessoaPrincipal.id)
                             setShowAddPersonModal(true)
                           }}
                         />
-                      )
-                    })()}
-                  </div>
-                )}
+                      )}
+                    </div>
 
-                {/* Mãe do Cônjuge */}
-                {pessoaPrincipal && findConjuge(pessoaPrincipal) && (
-                  <div className="absolute" style={{ left: '570px', top: '0px' }}>
-                    {(() => {
-                      const conjuge = findConjuge(pessoaPrincipal)!
-                      return findMae(conjuge) ? (
+                    {/* Mãe da Pessoa Principal */}
+                    <div className="absolute" style={{ left: '230px', top: '0px' }}>
+                      {findMae(pessoaPrincipal) ? (
                         <PersonCardSimple
-                          pessoa={findMae(conjuge)!}
+                          pessoa={findMae(pessoaPrincipal)!}
                           mode="retrato"
                           onClick={handlePersonClick}
                         />
@@ -763,25 +895,87 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                           mode="retrato"
                           onClick={() => {
                             setAddPersonType('mae')
-                            setAddPersonParentId(conjuge.id)
+                            setAddPersonParentId(pessoaPrincipal.id)
                             setShowAddPersonModal(true)
                           }}
                         />
-                      )
-                    })()}
-                  </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Pais do Cônjuge - só se tiver cônjuge e branch expandido */}
+                {pessoaPrincipal && findConjuge(pessoaPrincipal) && isBranchExpanded(pessoaPrincipal.id) && (
+                  <>
+                    {/* Pai do Cônjuge */}
+                    <div className="absolute" style={{ left: '410px', top: '0px' }}>
+                      {(() => {
+                        const conjuge = findConjuge(pessoaPrincipal)!
+                        return findPai(conjuge) ? (
+                          <PersonCardSimple
+                            pessoa={findPai(conjuge)!}
+                            mode="retrato"
+                            onClick={handlePersonClick}
+                          />
+                        ) : (
+                          <AddPersonButtonSimple
+                            type="pai"
+                            mode="retrato"
+                            onClick={() => {
+                              setAddPersonType('pai')
+                              setAddPersonParentId(conjuge.id)
+                              setShowAddPersonModal(true)
+                            }}
+                          />
+                        )
+                      })()}
+                    </div>
+
+                    {/* Mãe do Cônjuge */}
+                    <div className="absolute" style={{ left: '570px', top: '0px' }}>
+                      {(() => {
+                        const conjuge = findConjuge(pessoaPrincipal)!
+                        return findMae(conjuge) ? (
+                          <PersonCardSimple
+                            pessoa={findMae(conjuge)!}
+                            mode="retrato"
+                            onClick={handlePersonClick}
+                          />
+                        ) : (
+                          <AddPersonButtonSimple
+                            type="mae"
+                            mode="retrato"
+                            onClick={() => {
+                              setAddPersonType('mae')
+                              setAddPersonParentId(conjuge.id)
+                              setShowAddPersonModal(true)
+                            }}
+                          />
+                        )
+                      })()}
+                    </div>
+                  </>
                 )}
 
                 {/* ===== LINHA 2: Pessoa Principal e Cônjuge (y=220) ===== */}
                 {/* Pessoa Principal */}
                 <div className="absolute" style={{ left: '150px', top: '220px' }}>
                   {pessoaPrincipal && (
-                    <PersonCardSimple
-                      pessoa={pessoaPrincipal}
-                      isMain={true}
-                      mode="retrato"
-                      onClick={handlePersonClick}
-                    />
+                    <div className="relative">
+                      <PersonCardSimple
+                        pessoa={pessoaPrincipal}
+                        isMain={true}
+                        mode="retrato"
+                        onClick={handlePersonClick}
+                      />
+                      {/* Botão de expandir para ancestrais */}
+                      <ExpandButton
+                        expanded={isBranchExpanded(pessoaPrincipal.id)}
+                        onClick={() => toggleBranch(pessoaPrincipal.id)}
+                        direction="up"
+                        hasContent={hasPais(pessoaPrincipal) || true}
+                      />
+                    </div>
                   )}
                 </div>
 
@@ -828,16 +1022,20 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
                 {/* ===== SVG: Linhas de conexão ===== */}
                 {/* Cards retrato: 140x160, centroX = left + 70, centroY = top + 80 */}
                 <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: -1 }}>
-                  {/* Linhas dos pais da Pessoa Principal */}
-                  {/* Pai desce e encontra no meio */}
-                  <path d="M 140 160 L 140 180 L 220 180" stroke={fsColors.line} strokeWidth="2" fill="none" />
-                  {/* Mãe desce e encontra no meio */}
-                  <path d="M 300 160 L 300 180 L 220 180" stroke={fsColors.line} strokeWidth="2" fill="none" />
-                  {/* Centro desce para Pessoa Principal */}
-                  <path d="M 220 180 L 220 220" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                  {/* Linhas dos pais da Pessoa Principal - só se expandido */}
+                  {pessoaPrincipal && isBranchExpanded(pessoaPrincipal.id) && (
+                    <>
+                      {/* Pai desce e encontra no meio */}
+                      <path d="M 140 160 L 140 180 L 220 180" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                      {/* Mãe desce e encontra no meio */}
+                      <path d="M 300 160 L 300 180 L 220 180" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                      {/* Centro desce para Pessoa Principal */}
+                      <path d="M 220 180 L 220 220" stroke={fsColors.line} strokeWidth="2" fill="none" />
+                    </>
+                  )}
 
-                  {/* Linhas dos pais do Cônjuge */}
-                  {pessoaPrincipal && findConjuge(pessoaPrincipal) && (
+                  {/* Linhas dos pais do Cônjuge - só se expandido */}
+                  {pessoaPrincipal && findConjuge(pessoaPrincipal) && isBranchExpanded(pessoaPrincipal.id) && (
                     <>
                       <path d="M 480 160 L 480 180 L 560 180" stroke={fsColors.line} strokeWidth="2" fill="none" />
                       <path d="M 640 160 L 640 180 L 560 180" stroke={fsColors.line} strokeWidth="2" fill="none" />
