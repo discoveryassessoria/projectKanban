@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from "react"
 import { PessoaCard, PessoaArvore, UniaoArvore } from "./pessoa-card"
-import { PersonCardSimple, AddPersonButtonSimple } from "./person-card-simple"
+import { PersonCardSimple, AddPersonButtonSimple, AddSpouseButton } from "./person-card-simple"
+import { AddPersonButton } from "./pessoa-card"
 import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
 import { PersonIcon } from "./pessoa-icon"
@@ -26,27 +27,12 @@ interface ArvoreGenealogicaViewProps {
 
 type ViewMode = 'paisagem' | 'retrato'
 
-// Botão de adicionar pessoa
-function AddPersonButton({ type, onClick, disabled }: { type: 'pai' | 'mae' | 'filho' | 'pessoa'; onClick?: () => void; disabled?: boolean }) {
-  const labels = {
-    pai: 'ACRESCENTAR O PAI',
-    mae: 'ACRESCENTAR A MÃE',
-    filho: 'ACRESCENTAR FILHO(A)',
-    pessoa: 'ADICIONAR PESSOA'
-  }
-  
-  return (
-    <button 
-      className="flex items-center gap-3 px-4 py-3 bg-white rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-teal-500 hover:bg-teal-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      onClick={onClick}
-      disabled={disabled}
-    >
-      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-        <User className="h-5 w-5 text-gray-400" />
-      </div>
-      <span className="text-teal-600 font-medium text-sm">{labels[type]}</span>
-    </button>
-  )
+// Cores FamilySearch
+const fsColors = {
+  male: '#3073B5',
+  female: '#BF3D79',
+  green: '#87B940',
+  line: '#9CA3AF'
 }
 
 export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, onArvoreCreated }: ArvoreGenealogicaViewProps) {
@@ -304,25 +290,50 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
   // Se não tem árvore vinculada
   if (!arvoreId && !loading) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-500">
-        <div className="text-center">
-          <TreeIcon className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-          <h3 className="text-lg font-medium text-gray-700">Árvore Genealógica</h3>
-          <p className="text-sm mt-2 mb-4">Crie a árvore genealógica para este processo</p>
-          <button 
-            className="px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 mx-auto disabled:opacity-50"
+      <div className="h-full flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
+        <div className="text-center max-w-md px-6">
+          {/* Ícone animado */}
+          <div className="relative w-24 h-24 mx-auto mb-6">
+            <div
+              className="absolute inset-0 rounded-full opacity-20 animate-pulse"
+              style={{ backgroundColor: fsColors.green }}
+            />
+            <div
+              className="absolute inset-2 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: `${fsColors.green}30` }}
+            >
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" fill={fsColors.green} />
+                <path
+                  d="M12 6v12M8 10v4M16 10v4"
+                  stroke="white"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+          </div>
+
+          <h3 className="text-2xl font-bold text-gray-800 mb-2">Árvore Genealógica</h3>
+          <p className="text-gray-500 mb-6">
+            Crie a árvore genealógica para este processo de cidadania e gerencie todos os membros da família
+          </p>
+
+          <button
+            className="px-8 py-3 text-white rounded-xl font-semibold transition-all hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ backgroundColor: fsColors.green }}
             onClick={handleCreateArvore}
             disabled={creating}
           >
             {creating ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
-                Criando...
+                Criando árvore...
               </>
             ) : (
               <>
                 <Plus className="h-5 w-5" />
-                Criar Árvore
+                Criar Árvore Genealógica
               </>
             )}
           </button>
@@ -429,20 +440,42 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
         {/* Estado vazio - centralizado */}
         {pessoas.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-6">
-              <div className="text-center">
-                <User className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                <h3 className="text-lg font-medium text-gray-700">Árvore vazia</h3>
-                <p className="text-gray-500 text-sm mt-1">Comece adicionando a primeira pessoa da árvore</p>
+            <div className="flex flex-col items-center gap-8 max-w-sm text-center px-4">
+              {/* Ilustração */}
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5">
+                    <circle cx="12" cy="7" r="4" />
+                    <path d="M5.5 21a7.5 7.5 0 0113 0" />
+                  </svg>
+                </div>
+                <div
+                  className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: fsColors.green }}
+                >
+                  <Plus className="w-4 h-4 text-white" />
+                </div>
               </div>
-              <AddPersonButton 
-                type="pessoa" 
+
+              <div>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">Comece sua árvore</h3>
+                <p className="text-gray-500 text-sm">
+                  Adicione a primeira pessoa da família para começar a construir a árvore genealógica
+                </p>
+              </div>
+
+              <button
+                className="px-6 py-3 text-white rounded-xl font-semibold transition-all hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-2"
+                style={{ backgroundColor: fsColors.green }}
                 onClick={() => {
                   setAddPersonType('pessoa')
                   setAddPersonParentId(null)
                   setShowAddPersonModal(true)
-                }} 
-              />
+                }}
+              >
+                <User className="w-5 h-5" />
+                Adicionar primeira pessoa
+              </button>
             </div>
           </div>
         )}
