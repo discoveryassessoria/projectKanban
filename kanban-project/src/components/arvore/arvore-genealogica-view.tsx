@@ -2,26 +2,16 @@
 
 import { useState, useEffect, useRef } from "react"
 import { PessoaCard, PessoaArvore, UniaoArvore } from "./pessoa-card"
-import { PersonCardSimple, AddPersonButtonSimple, AddSpouseButton } from "./person-card-simple"
-import { CoupleCard, PersonCardFS, AddPersonCardFS } from "./couple-card"
-import { AddPersonButton } from "./pessoa-card"
 import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
-import { PersonIcon } from "./pessoa-icon"
+import { ReactFlowTree } from "./react-flow-tree"
 import {
   Plus,
-  Minus,
-  Home,
-  Maximize2,
-  ChevronDown,
-  ChevronRight,
-  ChevronLeft,
-  ChevronUp,
   User,
   Loader2,
-  Minimize2
+  Minimize2,
+  Maximize2
 } from "lucide-react"
-import { TreeIcon } from "../icons/tree-icon"
 
 interface ArvoreGenealogicaViewProps {
   processoId: number
@@ -39,59 +29,6 @@ const fsColors = {
   line: '#9CA3AF'
 }
 
-// Botão de expandir/recolher branch
-interface ExpandButtonProps {
-  expanded: boolean
-  onClick: () => void
-  direction: 'right' | 'left' | 'up' | 'down'
-  hasContent: boolean // Se tem conteúdo para mostrar (ancestrais ou descendentes)
-}
-
-function ExpandButton({ expanded, onClick, direction, hasContent }: ExpandButtonProps) {
-  if (!hasContent && !expanded) return null
-
-  const getIcon = () => {
-    if (expanded) {
-      // Quando expandido, mostra seta para recolher (direção oposta)
-      switch (direction) {
-        case 'right': return <ChevronLeft className="w-3 h-3" />
-        case 'left': return <ChevronRight className="w-3 h-3" />
-        case 'up': return <ChevronDown className="w-3 h-3" />
-        case 'down': return <ChevronUp className="w-3 h-3" />
-      }
-    } else {
-      // Quando recolhido, mostra seta para expandir
-      switch (direction) {
-        case 'right': return <ChevronRight className="w-3 h-3" />
-        case 'left': return <ChevronLeft className="w-3 h-3" />
-        case 'up': return <ChevronUp className="w-3 h-3" />
-        case 'down': return <ChevronDown className="w-3 h-3" />
-      }
-    }
-  }
-
-  const getPosition = () => {
-    switch (direction) {
-      case 'right': return 'right-0 top-1/2 -translate-y-1/2 translate-x-1/2'
-      case 'left': return 'left-0 top-1/2 -translate-y-1/2 -translate-x-1/2'
-      case 'up': return 'top-0 left-1/2 -translate-x-1/2 -translate-y-1/2'
-      case 'down': return 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2'
-    }
-  }
-
-  return (
-    <button
-      className={`absolute ${getPosition()} w-6 h-6 rounded-full bg-white border-2 border-gray-300 flex items-center justify-center shadow-sm hover:bg-gray-50 hover:border-gray-400 transition-all z-10`}
-      onClick={(e) => {
-        e.stopPropagation()
-        onClick()
-      }}
-      title={expanded ? 'Recolher' : 'Expandir'}
-    >
-      {getIcon()}
-    </button>
-  )
-}
 
 export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, onArvoreCreated }: ArvoreGenealogicaViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('paisagem')
@@ -106,25 +43,12 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
   const [selectedPerson, setSelectedPerson] = useState<PessoaArvore | null>(null)
   const [fullDetailsPerson, setFullDetailsPerson] = useState<PessoaArvore | null>(null)
   
-  // Estados de zoom e pan
-  const [scale, setScale] = useState(1)
-  const [position, setPosition] = useState({ x: 0, y: 0 })
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
 
   // Estado de tela cheia
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Estado de branches expandidos (controla quais ramos mostram seus ancestrais)
-  // Formato: Set de IDs de pessoas cujos PAIS estão visíveis
-  const [expandedBranches, setExpandedBranches] = useState<Set<number>>(new Set())
-
-  // Estado para modo PAISAGEM: qual ramo está expandido (exclusivo - só um por vez)
-  // 'paterno' = mostra pais do pai, 'materno' = mostra pais da mãe, null = nenhum
-  const [expandedRamoPaisagem, setExpandedRamoPaisagem] = useState<'paterno' | 'materno' | null>(null)
-  
   // Modal de adicionar pessoa
   const [showAddPersonModal, setShowAddPersonModal] = useState(false)
   const [addPersonType, setAddPersonType] = useState<'pai' | 'mae' | 'filho' | 'pessoa' | 'conjuge' | null>(null)
@@ -247,21 +171,6 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
     fetchArvore()
   }, [arvoreId])
 
-  // Inicializar branches expandidos quando a pessoa principal for definida
-  useEffect(() => {
-    if (pessoaPrincipal) {
-      // Por padrão, expande o branch da pessoa principal
-      setExpandedBranches(new Set([pessoaPrincipal.id]))
-    }
-  }, [pessoaPrincipal?.id])
-
-  // Handlers de zoom
-  const handleZoomIn = () => setScale(prev => Math.min(prev + 0.1, 2))
-  const handleZoomOut = () => setScale(prev => Math.max(prev - 0.1, 0.3))
-  const handleResetView = () => {
-    setScale(1)
-    setPosition({ x: 0, y: 0 })
-  }
 
   // Handler de tela cheia com animação
   const handleToggleFullscreen = async () => {
@@ -294,32 +203,6 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
   }, [])
-
-  // Handlers de pan
-  const handleMouseDown = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement
-    if (target.closest('button') || target.closest('.person-card')) return
-    setIsDragging(true)
-    setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y })
-  }
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return
-    setPosition({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y
-    })
-  }
-
-  const handleMouseUp = () => setIsDragging(false)
-
-  const handleWheel = (e: React.WheelEvent) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault()
-      const delta = e.deltaY > 0 ? -0.1 : 0.1
-      setScale(prev => Math.max(0.3, Math.min(2, prev + delta)))
-    }
-  }
 
   // Handlers de seleção
   const handlePersonClick = (pessoa: PessoaArvore) => {
@@ -373,37 +256,29 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
     return pessoas.filter(p => p.paiId === pessoa.id || p.maeId === pessoa.id)
   }
 
-  // Verificar se um branch está expandido (mostrando ancestrais)
-  const isBranchExpanded = (pessoaId: number): boolean => {
-    return expandedBranches.has(pessoaId)
+  // Handlers para adicionar familiares
+  const handleAddPai = (pessoaId: number) => {
+    setAddPersonType('pai')
+    setAddPersonParentId(pessoaId)
+    setShowAddPersonModal(true)
   }
 
-  // Toggle expansão de branch
-  const toggleBranch = (pessoaId: number) => {
-    setExpandedBranches(prev => {
-      const next = new Set(prev)
-      if (next.has(pessoaId)) {
-        next.delete(pessoaId)
-      } else {
-        next.add(pessoaId)
-      }
-      return next
-    })
+  const handleAddMae = (pessoaId: number) => {
+    setAddPersonType('mae')
+    setAddPersonParentId(pessoaId)
+    setShowAddPersonModal(true)
   }
 
-  // Toggle ramo no modo PAISAGEM (exclusivo - só um por vez)
-  const toggleRamoPaisagem = (ramo: 'paterno' | 'materno') => {
-    setExpandedRamoPaisagem(prev => prev === ramo ? null : ramo)
+  const handleAddFilho = (pessoaId: number) => {
+    setAddPersonType('filho')
+    setAddPersonParentId(pessoaId)
+    setShowAddPersonModal(true)
   }
 
-  // Verificar se um ramo específico está expandido no PAISAGEM
-  const isRamoExpandido = (ramo: 'paterno' | 'materno'): boolean => {
-    return expandedRamoPaisagem === ramo
-  }
-
-  // Verificar se uma pessoa tem pais cadastrados
-  const hasPais = (pessoa: PessoaArvore): boolean => {
-    return !!(findPai(pessoa) || findMae(pessoa))
+  const handleAddConjugeById = (pessoaId: number) => {
+    setAddPersonType('conjuge')
+    setAddConjugeForPessoaId(pessoaId)
+    setShowAddPersonModal(true)
   }
 
   // Se não tem árvore vinculada
@@ -482,7 +357,7 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
       {/* Controles de visualização */}
       <div className="flex items-center justify-between px-4 py-2 bg-white border-b">
         <div className="flex items-center gap-2">
-          <button 
+          <button
             className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'paisagem' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
             onClick={() => setViewMode('paisagem')}
           >
@@ -496,7 +371,7 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
             </svg>
             <span className="text-sm font-medium">PAISAGEM</span>
           </button>
-          <button 
+          <button
             className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'retrato' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
             onClick={() => setViewMode('retrato')}
           >
@@ -511,51 +386,20 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
             <span className="text-sm font-medium">RETRATO</span>
           </button>
         </div>
-        
+
         <div className="flex items-center gap-1">
-          <button 
-            className="p-2 hover:bg-gray-100 rounded transition-colors"
-            onClick={handleResetView}
-            title="Voltar ao início"
-          >
-            <Home className="h-4 w-4" />
-          </button>
-          <button 
+          <button
             className="p-2 hover:bg-gray-100 rounded transition-colors"
             onClick={handleToggleFullscreen}
             title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
           >
             {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
-          <div className="w-px h-6 bg-gray-200 mx-1" />
-          <button 
-            className="p-2 hover:bg-gray-100 rounded transition-colors"
-            onClick={handleZoomOut}
-            title="Diminuir zoom"
-          >
-            <Minus className="h-4 w-4" />
-          </button>
-          <span className="text-xs text-gray-500 w-12 text-center">{Math.round(scale * 100)}%</span>
-          <button 
-            className="p-2 hover:bg-gray-100 rounded transition-colors"
-            onClick={handleZoomIn}
-            title="Aumentar zoom"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
         </div>
       </div>
 
       {/* Área da árvore */}
-      <div 
-        className="flex-1 overflow-hidden relative"
-        style={{ cursor: pessoas.length > 0 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
-        onMouseDown={pessoas.length > 0 ? handleMouseDown : undefined}
-        onMouseMove={pessoas.length > 0 ? handleMouseMove : undefined}
-        onMouseUp={pessoas.length > 0 ? handleMouseUp : undefined}
-        onMouseLeave={pessoas.length > 0 ? handleMouseUp : undefined}
-        onWheel={pessoas.length > 0 ? handleWheel : undefined}
-      >
+      <div className="flex-1 overflow-hidden relative">
         {/* Estado vazio - centralizado */}
         {pessoas.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -599,421 +443,19 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
           </div>
         )}
 
-        {/* Área com zoom e pan - só mostra quando tem pessoas */}
-        {pessoas.length > 0 && (
-          <div 
-            className="p-8 transition-transform duration-75 min-w-max h-full flex items-center justify-center"
-            style={{ 
-              transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-              transformOrigin: 'center center'
-            }}
-          >
-            {viewMode === 'paisagem' ? (
-              // ========== VISUALIZAÇÃO PAISAGEM (horizontal) - Estilo FamilySearch ==========
-              // Layout: Pessoa+Cônjuge → Pais → Avós (filhos no dropdown)
-              // Exclusividade: só um ramo expandido por vez (paterno OU materno)
-              <div className="relative flex items-center gap-6" style={{ minHeight: '400px' }}>
-
-                {/* ===== COLUNA 1: Pessoa Principal + Cônjuge (CoupleCard) ===== */}
-                {pessoaPrincipal && (
-                  <CoupleCard
-                    pessoa1={pessoaPrincipal}
-                    pessoa2={findConjuge(pessoaPrincipal)}
-                    filhos={findFilhos(pessoaPrincipal)}
-                    mode="paisagem"
-                    isMain={true}
-                    showFilhosDropdown={true}
-                    onPersonClick={handlePersonClick}
-                    onAddConjuge={() => handleAddConjuge(pessoaPrincipal)}
-                    onAddFilho={() => {
-                      setAddPersonType('filho')
-                      setAddPersonParentId(pessoaPrincipal.id)
-                      setShowAddPersonModal(true)
-                    }}
-                    onExpandPai={() => toggleBranch(pessoaPrincipal.id)}
-                    expandedPai={isBranchExpanded(pessoaPrincipal.id)}
-                    showExpandButtons={true}
-                  />
-                )}
-
-                {/* Linha conectora Pessoa → Pais */}
-                {pessoaPrincipal && isBranchExpanded(pessoaPrincipal.id) && (
-                  <div className="w-8 h-0.5 bg-gray-300" />
-                )}
-
-                {/* ===== COLUNA 2: Pais (Pai e Mãe em CoupleCard) ===== */}
-                {pessoaPrincipal && isBranchExpanded(pessoaPrincipal.id) && (
-                  <div className="flex flex-col gap-4">
-                    {/* Card do Pai com cônjuge (Mãe) */}
-                    {(findPai(pessoaPrincipal) || findMae(pessoaPrincipal)) ? (
-                      <CoupleCard
-                        pessoa1={findPai(pessoaPrincipal) || findMae(pessoaPrincipal)!}
-                        pessoa2={findPai(pessoaPrincipal) && findMae(pessoaPrincipal) ? findMae(pessoaPrincipal) : null}
-                        filhos={[pessoaPrincipal]}
-                        mode="paisagem"
-                        showFilhosDropdown={true}
-                        onPersonClick={handlePersonClick}
-                        onAddConjuge={() => {
-                          const pai = findPai(pessoaPrincipal)
-                          if (pai && !findMae(pessoaPrincipal)) {
-                            setAddPersonType('mae')
-                            setAddPersonParentId(pessoaPrincipal.id)
-                            setShowAddPersonModal(true)
-                          } else if (!pai && findMae(pessoaPrincipal)) {
-                            setAddPersonType('pai')
-                            setAddPersonParentId(pessoaPrincipal.id)
-                            setShowAddPersonModal(true)
-                          }
-                        }}
-                        onExpandPai={() => toggleRamoPaisagem('paterno')}
-                        onExpandMae={() => toggleRamoPaisagem('materno')}
-                        expandedPai={isRamoExpandido('paterno')}
-                        expandedMae={isRamoExpandido('materno')}
-                        showExpandButtons={true}
-                      />
-                    ) : (
-                      <div className="flex flex-col gap-2">
-                        <AddPersonCardFS
-                          type="pai"
-                          mode="paisagem"
-                          onClick={() => {
-                            setAddPersonType('pai')
-                            setAddPersonParentId(pessoaPrincipal.id)
-                            setShowAddPersonModal(true)
-                          }}
-                        />
-                        <AddPersonCardFS
-                          type="mae"
-                          mode="paisagem"
-                          onClick={() => {
-                            setAddPersonType('mae')
-                            setAddPersonParentId(pessoaPrincipal.id)
-                            setShowAddPersonModal(true)
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Linha conectora Pais → Avós */}
-                {pessoaPrincipal && isBranchExpanded(pessoaPrincipal.id) &&
-                 (isRamoExpandido('paterno') || isRamoExpandido('materno')) && (
-                  <div className="w-8 h-0.5 bg-gray-300" />
-                )}
-
-                {/* ===== COLUNA 3: Avós (só um ramo por vez - EXCLUSIVO) ===== */}
-                {/* Avós Paternos - só se ramo paterno expandido */}
-                {pessoaPrincipal && findPai(pessoaPrincipal) &&
-                 isBranchExpanded(pessoaPrincipal.id) && isRamoExpandido('paterno') && (
-                  <div className="flex flex-col gap-2">
-                    {/* Avô Paterno */}
-                    {findPai(findPai(pessoaPrincipal)!) ? (
-                      <PersonCardFS
-                        pessoa={findPai(findPai(pessoaPrincipal)!)!}
-                        mode="paisagem"
-                        onClick={handlePersonClick}
-                        showExpandButtons={false}
-                      />
-                    ) : (
-                      <AddPersonCardFS
-                        type="pai"
-                        mode="paisagem"
-                        onClick={() => {
-                          setAddPersonType('pai')
-                          setAddPersonParentId(findPai(pessoaPrincipal)!.id)
-                          setShowAddPersonModal(true)
-                        }}
-                      />
-                    )}
-                    {/* Avó Paterna */}
-                    {findMae(findPai(pessoaPrincipal)!) ? (
-                      <PersonCardFS
-                        pessoa={findMae(findPai(pessoaPrincipal)!)!}
-                        mode="paisagem"
-                        onClick={handlePersonClick}
-                        showExpandButtons={false}
-                      />
-                    ) : (
-                      <AddPersonCardFS
-                        type="mae"
-                        mode="paisagem"
-                        onClick={() => {
-                          setAddPersonType('mae')
-                          setAddPersonParentId(findPai(pessoaPrincipal)!.id)
-                          setShowAddPersonModal(true)
-                        }}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {/* Avós Maternos - só se ramo materno expandido */}
-                {pessoaPrincipal && findMae(pessoaPrincipal) &&
-                 isBranchExpanded(pessoaPrincipal.id) && isRamoExpandido('materno') && (
-                  <div className="flex flex-col gap-2">
-                    {/* Avô Materno */}
-                    {findPai(findMae(pessoaPrincipal)!) ? (
-                      <PersonCardFS
-                        pessoa={findPai(findMae(pessoaPrincipal)!)!}
-                        mode="paisagem"
-                        onClick={handlePersonClick}
-                        showExpandButtons={false}
-                      />
-                    ) : (
-                      <AddPersonCardFS
-                        type="pai"
-                        mode="paisagem"
-                        onClick={() => {
-                          setAddPersonType('pai')
-                          setAddPersonParentId(findMae(pessoaPrincipal)!.id)
-                          setShowAddPersonModal(true)
-                        }}
-                      />
-                    )}
-                    {/* Avó Materna */}
-                    {findMae(findMae(pessoaPrincipal)!) ? (
-                      <PersonCardFS
-                        pessoa={findMae(findMae(pessoaPrincipal)!)!}
-                        mode="paisagem"
-                        onClick={handlePersonClick}
-                        showExpandButtons={false}
-                      />
-                    ) : (
-                      <AddPersonCardFS
-                        type="mae"
-                        mode="paisagem"
-                        onClick={() => {
-                          setAddPersonType('mae')
-                          setAddPersonParentId(findMae(pessoaPrincipal)!.id)
-                          setShowAddPersonModal(true)
-                        }}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              // ========== VISUALIZAÇÃO RETRATO (vertical) - Estilo FamilySearch ==========
-              // Layout flexbox dinâmico: Avós → Pais → Pessoa+Cônjuge → Filhos
-              // Cards se reorganizam automaticamente sem sobreposição
-              <div className="flex flex-col items-center gap-8" style={{ minHeight: '600px' }}>
-
-                {/* ===== LINHA 1: Avós (só se expandido) ===== */}
-                {pessoaPrincipal && isBranchExpanded(pessoaPrincipal.id) && (
-                  (findPai(pessoaPrincipal) && isBranchExpanded(findPai(pessoaPrincipal)!.id)) ||
-                  (findMae(pessoaPrincipal) && isBranchExpanded(findMae(pessoaPrincipal)!.id))
-                ) && (
-                  <div className="flex items-end gap-12">
-                    {/* Avós Paternos - só se pai expandido */}
-                    {findPai(pessoaPrincipal) && isBranchExpanded(findPai(pessoaPrincipal)!.id) && (
-                      <div className="flex flex-col items-center">
-                        <div className="flex gap-4">
-                          {findPai(findPai(pessoaPrincipal)!) ? (
-                            <PersonCardFS
-                              pessoa={findPai(findPai(pessoaPrincipal)!)!}
-                              mode="retrato"
-                              onClick={handlePersonClick}
-                              showExpandButtons={false}
-                            />
-                          ) : (
-                            <AddPersonCardFS
-                              type="pai"
-                              mode="retrato"
-                              onClick={() => {
-                                setAddPersonType('pai')
-                                setAddPersonParentId(findPai(pessoaPrincipal)!.id)
-                                setShowAddPersonModal(true)
-                              }}
-                            />
-                          )}
-                          {findMae(findPai(pessoaPrincipal)!) ? (
-                            <PersonCardFS
-                              pessoa={findMae(findPai(pessoaPrincipal)!)!}
-                              mode="retrato"
-                              onClick={handlePersonClick}
-                              showExpandButtons={false}
-                            />
-                          ) : (
-                            <AddPersonCardFS
-                              type="mae"
-                              mode="retrato"
-                              onClick={() => {
-                                setAddPersonType('mae')
-                                setAddPersonParentId(findPai(pessoaPrincipal)!.id)
-                                setShowAddPersonModal(true)
-                              }}
-                            />
-                          )}
-                        </div>
-                        {/* Linha conectora */}
-                        <div className="w-0.5 h-6 bg-gray-300" />
-                      </div>
-                    )}
-
-                    {/* Avós Maternos - só se mãe expandida */}
-                    {findMae(pessoaPrincipal) && isBranchExpanded(findMae(pessoaPrincipal)!.id) && (
-                      <div className="flex flex-col items-center">
-                        <div className="flex gap-4">
-                          {findPai(findMae(pessoaPrincipal)!) ? (
-                            <PersonCardFS
-                              pessoa={findPai(findMae(pessoaPrincipal)!)!}
-                              mode="retrato"
-                              onClick={handlePersonClick}
-                              showExpandButtons={false}
-                            />
-                          ) : (
-                            <AddPersonCardFS
-                              type="pai"
-                              mode="retrato"
-                              onClick={() => {
-                                setAddPersonType('pai')
-                                setAddPersonParentId(findMae(pessoaPrincipal)!.id)
-                                setShowAddPersonModal(true)
-                              }}
-                            />
-                          )}
-                          {findMae(findMae(pessoaPrincipal)!) ? (
-                            <PersonCardFS
-                              pessoa={findMae(findMae(pessoaPrincipal)!)!}
-                              mode="retrato"
-                              onClick={handlePersonClick}
-                              showExpandButtons={false}
-                            />
-                          ) : (
-                            <AddPersonCardFS
-                              type="mae"
-                              mode="retrato"
-                              onClick={() => {
-                                setAddPersonType('mae')
-                                setAddPersonParentId(findMae(pessoaPrincipal)!.id)
-                                setShowAddPersonModal(true)
-                              }}
-                            />
-                          )}
-                        </div>
-                        {/* Linha conectora */}
-                        <div className="w-0.5 h-6 bg-gray-300" />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* ===== LINHA 2: Pais (só se pessoa expandida) ===== */}
-                {pessoaPrincipal && isBranchExpanded(pessoaPrincipal.id) && (
-                  <div className="flex flex-col items-center">
-                    <div className="flex items-end gap-8">
-                      {/* Pai */}
-                      <div className="flex flex-col items-center">
-                        {findPai(pessoaPrincipal) ? (
-                          <div className="relative">
-                            <PersonCardFS
-                              pessoa={findPai(pessoaPrincipal)!}
-                              mode="retrato"
-                              onClick={handlePersonClick}
-                              onExpandPai={() => toggleBranch(findPai(pessoaPrincipal)!.id)}
-                              expandedPai={isBranchExpanded(findPai(pessoaPrincipal)!.id)}
-                              showExpandButtons={true}
-                            />
-                          </div>
-                        ) : (
-                          <AddPersonCardFS
-                            type="pai"
-                            mode="retrato"
-                            onClick={() => {
-                              setAddPersonType('pai')
-                              setAddPersonParentId(pessoaPrincipal.id)
-                              setShowAddPersonModal(true)
-                            }}
-                          />
-                        )}
-                      </div>
-
-                      {/* Mãe */}
-                      <div className="flex flex-col items-center">
-                        {findMae(pessoaPrincipal) ? (
-                          <div className="relative">
-                            <PersonCardFS
-                              pessoa={findMae(pessoaPrincipal)!}
-                              mode="retrato"
-                              onClick={handlePersonClick}
-                              onExpandPai={() => toggleBranch(findMae(pessoaPrincipal)!.id)}
-                              expandedPai={isBranchExpanded(findMae(pessoaPrincipal)!.id)}
-                              showExpandButtons={true}
-                            />
-                          </div>
-                        ) : (
-                          <AddPersonCardFS
-                            type="mae"
-                            mode="retrato"
-                            onClick={() => {
-                              setAddPersonType('mae')
-                              setAddPersonParentId(pessoaPrincipal.id)
-                              setShowAddPersonModal(true)
-                            }}
-                          />
-                        )}
-                      </div>
-                    </div>
-                    {/* Linha conectora */}
-                    <div className="w-0.5 h-6 bg-gray-300" />
-                  </div>
-                )}
-
-                {/* ===== LINHA 3: Pessoa Principal + Cônjuge (CoupleCard) ===== */}
-                {pessoaPrincipal && (
-                  <div className="flex flex-col items-center">
-                    <CoupleCard
-                      pessoa1={pessoaPrincipal}
-                      pessoa2={findConjuge(pessoaPrincipal)}
-                      filhos={findFilhos(pessoaPrincipal)}
-                      mode="retrato"
-                      isMain={true}
-                      showFilhosDropdown={true}
-                      onPersonClick={handlePersonClick}
-                      onAddConjuge={() => handleAddConjuge(pessoaPrincipal)}
-                      onAddFilho={() => {
-                        setAddPersonType('filho')
-                        setAddPersonParentId(pessoaPrincipal.id)
-                        setShowAddPersonModal(true)
-                      }}
-                      onExpandPai={() => toggleBranch(pessoaPrincipal.id)}
-                      expandedPai={isBranchExpanded(pessoaPrincipal.id)}
-                      showExpandButtons={true}
-                    />
-                    {/* Linha conectora para filhos */}
-                    {findFilhos(pessoaPrincipal).length > 0 && (
-                      <div className="w-0.5 h-6 bg-gray-300" />
-                    )}
-                  </div>
-                )}
-
-                {/* ===== LINHA 4: Filhos ===== */}
-                {pessoaPrincipal && (
-                  <div className="flex gap-4 flex-wrap justify-center">
-                    {findFilhos(pessoaPrincipal).map((filho) => (
-                      <PersonCardFS
-                        key={filho.id}
-                        pessoa={filho}
-                        mode="retrato"
-                        onClick={handlePersonClick}
-                        showExpandButtons={false}
-                      />
-                    ))}
-                    <AddPersonCardFS
-                      type="filho"
-                      mode="retrato"
-                      onClick={() => {
-                        setAddPersonType('filho')
-                        setAddPersonParentId(pessoaPrincipal.id)
-                        setShowAddPersonModal(true)
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+        {/* React Flow Tree - só mostra quando tem pessoas */}
+        {pessoas.length > 0 && pessoaPrincipal && (
+          <ReactFlowTree
+            pessoas={pessoas}
+            unioes={unioes}
+            pessoaPrincipal={pessoaPrincipal}
+            mode={viewMode}
+            onPersonClick={handlePersonClick}
+            onAddPai={handleAddPai}
+            onAddMae={handleAddMae}
+            onAddFilho={handleAddFilho}
+            onAddConjuge={handleAddConjugeById}
+          />
         )}
       </div>
 
