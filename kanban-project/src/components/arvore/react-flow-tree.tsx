@@ -17,7 +17,7 @@ import ReactFlow, {
 } from "reactflow"
 import dagre from "dagre"
 import "reactflow/dist/style.css"
-import { PessoaArvore, UniaoArvore } from "./pessoa-card"
+import type { PessoaArvore, UniaoArvore } from "./types"
 
 // Cores estilo FamilySearch
 const colors = {
@@ -94,19 +94,24 @@ interface PersonNodeData {
   isMain?: boolean
   isSpouse?: boolean
   mode: ViewMode
-  uniao?: UniaoArvore | null
+  unioes?: UniaoArvore[]
   onPersonClick?: (pessoa: PessoaArvore) => void
 }
 
 function PersonNode({ data }: NodeProps<PersonNodeData>) {
-  const { pessoa, isMain, isSpouse, mode, uniao, onPersonClick } = data
+  const { pessoa, isMain, isSpouse, mode, unioes = [], onPersonClick } = data
   const genderColors = getGenderColors(pessoa.sexo)
   const nomeCompleto = pessoa.sobrenome ? `${pessoa.nome} ${pessoa.sobrenome}` : pessoa.nome
   
   // Formatar datas
   const dataNasc = formatDate(pessoa.data_nasc)
   const dataObito = formatDate(pessoa.data_obito)
-  const dataCasamento = formatDate(uniao?.data_inicio)
+  
+  // Múltiplas datas de casamento
+  const datasCasamento = unioes
+    .filter(u => u.data_inicio)
+    .map(u => formatDate(u.data_inicio))
+    .filter(Boolean) as string[]
   
   // Verificar se pessoa é falecida (vivo === false)
   const isFalecido = pessoa.vivo === false
@@ -150,21 +155,21 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
             {nomeCompleto}
           </h3>
           <div className="mt-1 text-[10px] text-gray-500 space-y-0.5">
-            {/* Linha 1: Nascimento e Casamento */}
-            {(dataNasc || dataCasamento) && (
-              <div className="flex items-center gap-3">
+            {/* Linha 1: Nascimento e Casamentos */}
+            {(dataNasc || datasCasamento.length > 0) && (
+              <div className="flex items-center gap-2 flex-wrap">
                 {dataNasc && (
                   <span className="inline-flex items-center gap-1">
                     <span className="w-3 text-center">★</span>
                     <span>{dataNasc}</span>
                   </span>
                 )}
-                {dataCasamento && (
-                  <span className="inline-flex items-center gap-1">
+                {datasCasamento.map((data, idx) => (
+                  <span key={idx} className="inline-flex items-center gap-1">
                     <span className="w-3 text-center">♥</span>
-                    <span>{dataCasamento}</span>
+                    <span>{data}</span>
                   </span>
-                )}
+                ))}
               </div>
             )}
             {/* Linha 2: Óbito */}
@@ -208,21 +213,21 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
           {nomeCompleto}
         </h3>
         <div className="mt-1 text-[9px] text-gray-500 space-y-0.5">
-          {/* Linha 1: Nascimento e Casamento */}
-          {(dataNasc || dataCasamento) && (
-            <div className="flex items-center justify-center gap-2">
+          {/* Linha 1: Nascimento e Casamentos */}
+          {(dataNasc || datasCasamento.length > 0) && (
+            <div className="flex items-center justify-center gap-2 flex-wrap">
               {dataNasc && (
                 <span className="inline-flex items-center gap-0.5">
                   <span>★</span>
                   <span>{dataNasc}</span>
                 </span>
               )}
-              {dataCasamento && (
-                <span className="inline-flex items-center gap-0.5">
+              {datasCasamento.map((data, idx) => (
+                <span key={idx} className="inline-flex items-center gap-0.5">
                   <span>♥</span>
-                  <span>{dataCasamento}</span>
+                  <span>{data}</span>
                 </span>
-              )}
+              ))}
             </div>
           )}
           {/* Linha 2: Óbito */}
@@ -321,6 +326,7 @@ const getLayoutedElements = (
     ranksep: isHorizontal ? 80 : 60,
     marginx: 40,
     marginy: 40,
+    align: 'UL', // Alinhar para cima/esquerda para manter ordem consistente
   })
 
   const nodeSize = NODE_SIZES[mode]
@@ -380,8 +386,25 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
   const edges: Edge[] = []
   const processedIds = new Set<number>()
 
+  // Retorna TODAS as uniões de uma pessoa
+  const findUnioes = (pessoa: PessoaArvore): UniaoArvore[] => {
+    return unioes.filter(u => u.pessoa1Id === pessoa.id || u.pessoa2Id === pessoa.id)
+  }
+
+  // Retorna a primeira união (para compatibilidade)
   const findUniao = (pessoa: PessoaArvore): UniaoArvore | null => {
     return unioes.find(u => u.pessoa1Id === pessoa.id || u.pessoa2Id === pessoa.id) || null
+  }
+
+  // Retorna TODOS os cônjuges de uma pessoa
+  const findConjuges = (pessoa: PessoaArvore): PessoaArvore[] => {
+    const unioesP = findUnioes(pessoa)
+    return unioesP
+      .map(u => {
+        const conjugeId = u.pessoa1Id === pessoa.id ? u.pessoa2Id : u.pessoa1Id
+        return pessoas.find(p => p.id === conjugeId)
+      })
+      .filter(Boolean) as PessoaArvore[]
   }
 
   const findConjuge = (pessoa: PessoaArvore): PessoaArvore | null => {
@@ -414,7 +437,7 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
 
     const pai = findPai(pessoa)
     const mae = findMae(pessoa)
-    const uniao = findUniao(pessoa)
+    const pessoaUnioes = findUnioes(pessoa)
 
     // Adicionar nó da pessoa (simplificado)
     nodes.push({
@@ -426,7 +449,7 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
         isMain,
         isSpouse,
         mode,
-        uniao,
+        unioes: pessoaUnioes,
         onPersonClick,
       },
     })
@@ -499,18 +522,181 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
   // Adicionar pessoa principal com ancestrais
   addPersonWithAncestors(pessoaPrincipal, true, false, 0)
 
-  // Adicionar cônjuge e família do cônjuge
-  const conjuge = findConjuge(pessoaPrincipal)
-  if (conjuge) {
+  // Adicionar TODOS os cônjuges e suas famílias
+  const conjuges = findConjuges(pessoaPrincipal)
+  conjuges.forEach(conjuge => {
     addPersonWithAncestors(conjuge, false, true, 0)
 
-    // Conectar pessoa principal ao cônjuge - linha neutra/roxa para união
+    // Conectar pessoa principal ao cônjuge - linha roxa para união
     edges.push({
       id: `edge-casamento-${pessoaPrincipal.id}-${conjuge.id}`,
       source: `person-${pessoaPrincipal.id}`,
       target: `person-${conjuge.id}`,
       type: 'smoothstep',
       style: { stroke: '#9333ea', strokeWidth: 2 },
+    })
+  })
+
+  // Função recursiva para adicionar filhos e descendentes
+  const addDescendants = (pessoa: PessoaArvore, depth: number = 0, maxDepth: number = 3) => {
+    if (depth > maxDepth) return
+    
+    // Encontrar filhos desta pessoa
+    const filhos = pessoas.filter(p => 
+      (p.paiId === pessoa.id || p.maeId === pessoa.id) && !processedIds.has(p.id)
+    )
+    
+    filhos.forEach(filho => {
+      if (processedIds.has(filho.id)) return
+      processedIds.add(filho.id)
+      
+      // Adicionar nó do filho
+      nodes.push({
+        id: `person-${filho.id}`,
+        type: 'person',
+        position: { x: 0, y: 0 },
+        data: {
+          pessoa: filho,
+          isMain: false,
+          isSpouse: false,
+          mode,
+          unioes: findUnioes(filho),
+          onPersonClick,
+        },
+      })
+      
+      // Conectar filho ao pai - cor baseada no sexo do filho
+      const filhoColor = getGenderColors(filho.sexo).border
+      edges.push({
+        id: `edge-filho-${filho.id}-${pessoa.id}`,
+        source: `person-${filho.id}`,
+        target: `person-${pessoa.id}`,
+        type: 'smoothstep',
+        style: { stroke: filhoColor, strokeWidth: 2 },
+      })
+      
+      // Adicionar cônjuge do filho
+      const conjugesFilho = findConjuges(filho)
+      conjugesFilho.forEach(conjugeFilho => {
+        if (!processedIds.has(conjugeFilho.id)) {
+          processedIds.add(conjugeFilho.id)
+          nodes.push({
+            id: `person-${conjugeFilho.id}`,
+            type: 'person',
+            position: { x: 0, y: 0 },
+            data: {
+              pessoa: conjugeFilho,
+              isMain: false,
+              isSpouse: true,
+              mode,
+              unioes: findUnioes(conjugeFilho),
+              onPersonClick,
+            },
+          })
+          edges.push({
+            id: `edge-casamento-${filho.id}-${conjugeFilho.id}`,
+            source: `person-${filho.id}`,
+            target: `person-${conjugeFilho.id}`,
+            type: 'smoothstep',
+            style: { stroke: '#9333ea', strokeWidth: 2 },
+          })
+        }
+      })
+      
+      // Recursivamente adicionar descendentes do filho
+      addDescendants(filho, depth + 1, maxDepth)
+    })
+  }
+
+  // Adicionar filhos da pessoa principal e descendentes
+  addDescendants(pessoaPrincipal, 0, 3)
+
+  // Adicionar irmãos da pessoa principal (outros filhos dos mesmos pais)
+  const paiPrincipal = findPai(pessoaPrincipal)
+  const maePrincipal = findMae(pessoaPrincipal)
+  
+  if (paiPrincipal || maePrincipal) {
+    const irmaos = pessoas.filter(p => {
+      if (p.id === pessoaPrincipal.id) return false
+      if (processedIds.has(p.id)) return false
+      
+      // É irmão se tem o mesmo pai OU a mesma mãe
+      const mesmoPai = paiPrincipal && p.paiId === paiPrincipal.id
+      const mesmaMae = maePrincipal && p.maeId === maePrincipal.id
+      
+      return mesmoPai || mesmaMae
+    })
+    
+    irmaos.forEach(irmao => {
+      if (processedIds.has(irmao.id)) return
+      processedIds.add(irmao.id)
+      
+      // Adicionar nó do irmão
+      nodes.push({
+        id: `person-${irmao.id}`,
+        type: 'person',
+        position: { x: 0, y: 0 },
+        data: {
+          pessoa: irmao,
+          isMain: false,
+          isSpouse: false,
+          mode,
+          unioes: findUnioes(irmao),
+          onPersonClick,
+        },
+      })
+      
+      // Conectar irmão ao pai ou mãe - cor baseada no sexo do irmão
+      const irmaoColor = getGenderColors(irmao.sexo).border
+      
+      if (paiPrincipal && irmao.paiId === paiPrincipal.id) {
+        edges.push({
+          id: `edge-irmao-pai-${irmao.id}`,
+          source: `person-${irmao.id}`,
+          target: `person-${paiPrincipal.id}`,
+          type: 'smoothstep',
+          style: { stroke: irmaoColor, strokeWidth: 2 },
+        })
+      } else if (maePrincipal && irmao.maeId === maePrincipal.id) {
+        edges.push({
+          id: `edge-irmao-mae-${irmao.id}`,
+          source: `person-${irmao.id}`,
+          target: `person-${maePrincipal.id}`,
+          type: 'smoothstep',
+          style: { stroke: irmaoColor, strokeWidth: 2 },
+        })
+      }
+      
+      // Adicionar cônjuges do irmão
+      const conjugesIrmao = findConjuges(irmao)
+      conjugesIrmao.forEach(conjugeIrmao => {
+        if (!processedIds.has(conjugeIrmao.id)) {
+          processedIds.add(conjugeIrmao.id)
+          nodes.push({
+            id: `person-${conjugeIrmao.id}`,
+            type: 'person',
+            position: { x: 0, y: 0 },
+            data: {
+              pessoa: conjugeIrmao,
+              isMain: false,
+              isSpouse: true,
+              mode,
+              unioes: findUnioes(conjugeIrmao),
+              onPersonClick,
+            },
+          })
+          edges.push({
+            id: `edge-casamento-irmao-${irmao.id}-${conjugeIrmao.id}`,
+            source: `person-${irmao.id}`,
+            target: `person-${conjugeIrmao.id}`,
+            type: 'smoothstep',
+            style: { stroke: '#9333ea', strokeWidth: 2 },
+          })
+        }
+      })
+      
+      // Adicionar descendentes do irmão (sobrinhos)
+      addDescendants(irmao, 1, 3)
     })
   }
 

@@ -1,18 +1,17 @@
 "use client"
 
 import { useState } from "react"
-import { PersonIcon } from "./pessoa-icon"
-import { PessoaArvore, UniaoArvore } from "./pessoa-card"
+import type { PessoaArvore, UniaoArvore } from "./types"
 import { 
   ChevronLeft, 
   ChevronUp, 
-  Edit2, 
-  GitBranch, 
-  Users, 
-  Star,
   Plus,
-  Minus,
-  Home
+  MapPin,
+  Calendar,
+  Heart,
+  Church,
+  FileText,
+  Users
 } from "lucide-react"
 
 interface PessoaDetailsPageProps {
@@ -22,22 +21,107 @@ interface PessoaDetailsPageProps {
   filhos?: PessoaArvore[]
   onBack: () => void
   onPersonClick?: (pessoa: PessoaArvore) => void
+  onAddPai?: (pessoaId: number) => void
+  onAddMae?: (pessoaId: number) => void
+  onAddFilho?: (pessoaId: number) => void
+  onAddConjuge?: (pessoaId: number) => void
+}
+
+// Cores por gênero
+const colors = {
+  male: '#2563EB',
+  female: '#DB2777',
+  neutral: '#6B7280',
+}
+
+function getGenderColor(sexo: string | null | undefined): string {
+  const s = sexo?.toLowerCase()
+  if (s === 'masculino' || s === 'm') return colors.male
+  if (s === 'feminino' || s === 'f') return colors.female
+  return colors.neutral
+}
+
+// Avatar com inicial
+function PersonAvatar({ pessoa, size = 56 }: { pessoa: PessoaArvore; size?: number }) {
+  const color = getGenderColor(pessoa.sexo)
+  const inicial = pessoa.nome?.charAt(0)?.toUpperCase() || '?'
+  
+  return (
+    <div
+      className="rounded-xl flex items-center justify-center font-bold text-white shadow-md"
+      style={{ 
+        width: size, 
+        height: size, 
+        backgroundColor: color,
+        fontSize: size * 0.4
+      }}
+    >
+      {inicial}
+    </div>
+  )
+}
+
+// Avatar simples para membros da família
+function SmallAvatar({ pessoa, size = 32 }: { pessoa: PessoaArvore; size?: number }) {
+  const color = getGenderColor(pessoa.sexo)
+  const inicial = pessoa.nome?.charAt(0)?.toUpperCase() || '?'
+  
+  return (
+    <div
+      className="rounded-lg flex items-center justify-center font-semibold text-white"
+      style={{ 
+        width: size, 
+        height: size, 
+        backgroundColor: color,
+        fontSize: size * 0.4
+      }}
+    >
+      {inicial}
+    </div>
+  )
 }
 
 function formatDateFull(date: Date | string | null | undefined): string {
   if (!date) return ""
+  
+  const meses = [
+    'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
+  ]
+  
+  if (typeof date === 'string') {
+    const datePart = date.split('T')[0]
+    if (datePart && datePart.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [year, month, day] = datePart.split('-')
+      const mes = meses[parseInt(month, 10) - 1]
+      return `${parseInt(day, 10)} de ${mes} de ${year}`
+    }
+  }
+  
   const d = new Date(date)
-  return d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })
+  const day = d.getUTCDate()
+  const month = meses[d.getUTCMonth()]
+  const year = d.getUTCFullYear()
+  return `${day} de ${month} de ${year}`
 }
 
 function formatYear(date: Date | string | null | undefined): string {
   if (!date) return ""
-  return new Date(date).getFullYear().toString()
+  
+  if (typeof date === 'string') {
+    const datePart = date.split('T')[0]
+    if (datePart && datePart.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [year] = datePart.split('-')
+      return year
+    }
+  }
+  
+  return new Date(date).getUTCFullYear().toString()
 }
 
-function formatDateRange(nascimento: Date | string | null | undefined, obito: Date | string | null | undefined): string {
+function formatDateRange(nascimento: Date | string | null | undefined, obito: Date | string | null | undefined, vivo?: boolean): string {
   const nasc = formatYear(nascimento)
-  const obit = obito ? formatYear(obito) : "Presente"
+  const obit = obito ? formatYear(obito) : (vivo === false ? "?" : "Presente")
   if (!nasc && !obito) return ""
   if (!nasc) return `?–${obit}`
   return `${nasc}–${obit}`
@@ -79,492 +163,416 @@ function CollapsibleSection({ title, children, defaultOpen = true }: { title: st
   )
 }
 
+// Item de informação simples (sem botão de editar)
+function InfoItem({ 
+  label, 
+  value, 
+  icon: Icon
+}: { 
+  label: string
+  value: string | null | undefined
+  icon?: React.ElementType
+}) {
+  return (
+    <div className="flex items-start gap-2 py-2">
+      {Icon && <Icon className="h-4 w-4 text-gray-400 mt-0.5" />}
+      <div>
+        <p className="text-sm text-gray-500">{label}</p>
+        <p className="font-medium text-gray-900">{value || 'Não informado'}</p>
+      </div>
+    </div>
+  )
+}
+
 export function PessoaDetailsPage({ 
   pessoa, 
   conjuge, 
   casamento, 
   filhos = [],
   onBack, 
-  onPersonClick 
+  onPersonClick,
+  onAddPai,
+  onAddMae,
+  onAddFilho,
+  onAddConjuge
 }: PessoaDetailsPageProps) {
-  const [activeTab, setActiveTab] = useState<'sobre' | 'detalhes' | 'fontes' | 'colaborar' | 'recordacoes'>('detalhes')
+  const [activeTab, setActiveTab] = useState<'sobre' | 'detalhes' | 'fontes'>('detalhes')
   const [showDetailedView, setShowDetailedView] = useState(false)
   const [showAllFamily, setShowAllFamily] = useState(false)
   const [childrenOpen, setChildrenOpen] = useState(true)
   
-  // Estado para zoom e pan
-  const [scale, setScale] = useState(1)
-  const [position, setPosition] = useState({ x: 0, y: 0 })
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
-  
   const nomeCompleto = pessoa.sobrenome ? `${pessoa.nome} ${pessoa.sobrenome}` : pessoa.nome
-  const dateRange = formatDateRange(pessoa.data_nasc, pessoa.data_obito)
+  const dateRange = formatDateRange(pessoa.data_nasc, pessoa.data_obito, pessoa.vivo)
   
-  // Handlers de zoom
-  const handleZoomIn = () => setScale(prev => Math.min(prev + 0.1, 2))
-  const handleZoomOut = () => setScale(prev => Math.max(prev - 0.1, 0.5))
-  const handleResetView = () => {
-    setScale(1)
-    setPosition({ x: 0, y: 0 })
-  }
-  
-  // Handlers de pan
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('a') || (e.target as HTMLElement).closest('input')) return
-    setIsDragging(true)
-    setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y })
-  }
-  
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return
-    setPosition({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y
-    })
-  }
-  
-  const handleMouseUp = () => setIsDragging(false)
-  
-  const handleWheel = (e: React.WheelEvent) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault()
-      const delta = e.deltaY > 0 ? -0.1 : 0.1
-      setScale(prev => Math.max(0.5, Math.min(2, prev + delta)))
-    }
-  }
+  // Construir local de nascimento
+  const localNascimento = [pessoa.local_nasc, pessoa.estado_nasc, pessoa.pais_nasc].filter(Boolean).join(', ')
 
   const tabs = [
     { id: 'sobre', label: 'Sobre' },
     { id: 'detalhes', label: 'Detalhes' },
-    { id: 'fontes', label: 'Fontes (0)' },
-    { id: 'colaborar', label: 'Colaborar (0)' },
-    { id: 'recordacoes', label: 'Recordações (0)' },
+    { id: 'fontes', label: `Fontes (${pessoa.documentos?.length || 0})` },
   ]
   
   return (
-    <div className="fixed inset-0 bg-gray-100 z-[10002] overflow-hidden">
-      {/* Controles de zoom flutuantes */}
-      <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2 bg-white rounded-lg shadow-md p-1">
-        <button 
-          className="p-2 hover:bg-gray-100 rounded transition-colors"
-          onClick={handleZoomOut}
-          title="Diminuir zoom"
-        >
-          <Minus className="h-4 w-4" />
-        </button>
-        <span className="text-xs text-gray-500 w-12 text-center">{Math.round(scale * 100)}%</span>
-        <button 
-          className="p-2 hover:bg-gray-100 rounded transition-colors"
-          onClick={handleZoomIn}
-          title="Aumentar zoom"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
-        <div className="w-px h-6 bg-gray-200" />
-        <button 
-          className="p-2 hover:bg-gray-100 rounded transition-colors"
-          onClick={handleResetView}
-          title="Resetar visualização"
-        >
-          <Home className="h-4 w-4" />
-        </button>
-      </div>
-      
-      {/* Área com zoom e pan */}
-      <div 
-        className="h-full overflow-hidden"
-        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onWheel={handleWheel}
-      >
-        <div 
-          className="min-h-full transition-transform duration-75"
-          style={{ 
-            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-            transformOrigin: 'top center'
-          }}
-        >
-          {/* Header */}
-          <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-            <div className="max-w-4xl mx-auto">
-              {/* Top section with avatar and name */}
-              <div className="p-6 pb-4">
-                <button 
-                  onClick={onBack}
-                  className="flex items-center gap-1 text-gray-600 hover:text-gray-900 mb-4"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                  <span>Voltar</span>
-                </button>
-                
-                <div className="flex items-start gap-4">
-                  <PersonIcon gender={pessoa.sexo} size={64} />
-                  <div className="flex-1">
-                    <h1 className="text-2xl font-bold text-gray-900">{nomeCompleto}</h1>
-                    <p className="text-gray-500">
-                      {dateRange} • ID: {pessoa.id}
-                    </p>
-                    
-                    {/* Action links */}
-                    <div className="flex items-center gap-6 mt-3">
-                      <button className="flex items-center gap-1 text-teal-600 hover:text-teal-700">
-                        <GitBranch className="h-4 w-4" />
-                        <span className="text-sm font-medium">VER ÁRVORE</span>
-                      </button>
-                      <button className="flex items-center gap-1 text-teal-600 hover:text-teal-700">
-                        <Users className="h-4 w-4" />
-                        <span className="text-sm font-medium">VER PARENTESCO</span>
-                      </button>
-                      <button className="flex items-center gap-1 text-teal-600 hover:text-teal-700">
-                        <Star className="h-4 w-4" />
-                        <span className="text-sm font-medium">MONITORAR</span>
-                      </button>
-                    </div>
-                  </div>
+    <div className="fixed inset-0 bg-gray-100 z-[10002] overflow-auto">
+      {/* Header fixo */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto">
+          {/* Top section with avatar and name */}
+          <div className="p-6 pb-4">
+            <button 
+              onClick={onBack}
+              className="flex items-center gap-1 text-gray-600 hover:text-gray-900 mb-4"
+            >
+              <ChevronLeft className="h-5 w-5" />
+              <span>Voltar</span>
+            </button>
+            
+            <div className="flex items-start gap-4">
+              <PersonAvatar pessoa={pessoa} size={64} />
+              <div className="flex-1">
+                <h1 className="text-2xl font-bold text-gray-900">{nomeCompleto}</h1>
+                <div className="flex items-center gap-2 text-gray-500">
+                  {dateRange && <span>{dateRange}</span>}
+                  {pessoa.vivo === false && <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">Falecido</span>}
+                  {pessoa.vivo === true && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Vivo</span>}
                 </div>
-              </div>
-              
-              {/* Tabs */}
-              <div className="flex border-b border-gray-200">
-                {tabs.map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                    className={`px-6 py-3 text-sm font-medium transition-colors relative ${
-                      activeTab === tab.id 
-                        ? 'text-teal-600' 
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    {tab.label}
-                    {activeTab === tab.id && (
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500" />
-                    )}
-                  </button>
-                ))}
               </div>
             </div>
           </div>
           
-          {/* Content */}
-          <div className="max-w-4xl mx-auto p-6">
-            {activeTab === 'detalhes' && (
-              <>
-                {/* Dados vitais */}
-                <CollapsibleSection title="Dados vitais">
-                  <ToggleSwitch 
-                    label="Visualização detalhada" 
-                    checked={showDetailedView} 
-                    onChange={() => setShowDetailedView(!showDetailedView)} 
-                  />
-                  
-                  <div className="grid grid-cols-2 gap-6 mt-4">
-                    {/* Left column */}
-                    <div className="space-y-4">
-                      {/* Nome */}
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-sm text-gray-500">Nome • 0 Fonte</p>
-                          <p className="font-medium text-gray-900">{nomeCompleto}</p>
-                        </div>
-                        <button className="p-1 text-gray-400 hover:text-gray-600">
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                      
-                      {/* Nascimento */}
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-sm text-gray-500">Nascimento • 0 Fonte</p>
-                          <p className="font-medium text-gray-900">{formatDateFull(pessoa.data_nasc) || 'Não informado'}</p>
-                          {pessoa.local_nasc && <p className="text-gray-600">{pessoa.local_nasc}</p>}
-                        </div>
-                        <button className="p-1 text-gray-400 hover:text-gray-600">
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                      
-                      {/* Falecimento */}
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-sm text-gray-500">Falecimento • 0 Fonte</p>
-                          <p className="font-medium text-gray-900">{formatDateFull(pessoa.data_obito) || 'Não informado'}</p>
-                        </div>
-                        <button className="p-1 text-gray-400 hover:text-gray-600">
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* Right column */}
-                    <div className="space-y-4">
-                      {/* Sexo */}
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-sm text-gray-500">Sexo • 0 Fonte</p>
-                          <p className="font-medium text-gray-900">{pessoa.sexo || 'Não informado'}</p>
-                        </div>
-                        <button className="p-1 text-gray-400 hover:text-gray-600">
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                      
-                      {/* Batizado */}
-                      <div>
-                        <p className="text-sm text-gray-500">Batizado</p>
-                        {pessoa.batizado ? (
-                          <p className="font-medium text-gray-900">{pessoa.batizado}</p>
-                        ) : (
-                          <button className="flex items-center gap-1 text-teal-600 hover:text-teal-700 mt-1">
-                            <Plus className="h-4 w-4" />
-                            <span className="text-sm font-medium">ACRESCENTAR</span>
-                          </button>
-                        )}
-                      </div>
-                      
-                      {/* Sepultamento */}
-                      <div>
-                        <p className="text-sm text-gray-500">Sepultamento</p>
-                        <button className="flex items-center gap-1 text-teal-600 hover:text-teal-700 mt-1">
-                          <Plus className="h-4 w-4" />
-                          <span className="text-sm font-medium">ACRESCENTAR</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </CollapsibleSection>
-                
-                {/* Outras informações */}
-                <CollapsibleSection title="Outras informações">
-                  <ToggleSwitch 
-                    label="Visualização detalhada" 
-                    checked={showDetailedView} 
-                    onChange={() => setShowDetailedView(!showDetailedView)} 
-                  />
-                  
-                  <div className="mt-4 space-y-4">
-                    {/* Nomes alternativos */}
-                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                      <span className="text-gray-700">Nomes alternativos</span>
-                      <button className="flex items-center gap-1 text-teal-600 hover:text-teal-700">
-                        <Plus className="h-4 w-4" />
-                        <span className="text-sm font-medium">ACRESCENTAR NOME ALTERNATIVO</span>
-                      </button>
-                    </div>
-                    
-                    {/* Eventos */}
-                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                      <span className="text-gray-700">Eventos</span>
-                      <button className="flex items-center gap-1 text-teal-600 hover:text-teal-700">
-                        <Plus className="h-4 w-4" />
-                        <span className="text-sm font-medium">ACRESCENTAR EVENTO</span>
-                      </button>
-                    </div>
-                    
-                    {/* Fatos */}
-                    <div className="flex items-center justify-between py-2">
-                      <span className="text-gray-700">Fatos</span>
-                      <button className="flex items-center gap-1 text-teal-600 hover:text-teal-700">
-                        <Plus className="h-4 w-4" />
-                        <span className="text-sm font-medium">ACRESCENTAR FATO</span>
-                      </button>
-                    </div>
-                  </div>
-                </CollapsibleSection>
-                
-                {/* Membros da família */}
-                <CollapsibleSection title="Membros da família">
-                  <ToggleSwitch 
-                    label="Mostrar todos os membros da família" 
-                    checked={showAllFamily} 
-                    onChange={() => setShowAllFamily(!showAllFamily)} 
-                  />
-                  
-                  <div className="grid grid-cols-2 gap-6 mt-4">
-                    {/* Cônjuges e filhos */}
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700 mb-3">Cônjuges e filhos</h4>
-                      
-                      {/* Card do casal */}
-                      <div className="border border-gray-200 rounded-lg overflow-hidden">
-                        {/* Pessoa principal */}
-                        <div className={`p-3 border-l-4 bg-gray-50 ${pessoa.sexo?.toLowerCase() === 'masculino' ? 'border-blue-500' : 'border-pink-500'}`}>
-                          <div className="flex items-center gap-2">
-                            <PersonIcon gender={pessoa.sexo} size={32} />
-                            <div>
-                              <p className="font-semibold text-gray-900">{nomeCompleto}</p>
-                              <p className="text-sm text-gray-500">{dateRange} • ID: {pessoa.id}</p>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Cônjuge */}
-                        {conjuge && (
-                          <div 
-                            className={`p-3 border-l-4 cursor-pointer hover:bg-gray-50 ${conjuge.sexo?.toLowerCase() === 'masculino' ? 'border-blue-500' : 'border-pink-500'}`}
-                            onClick={() => onPersonClick?.(conjuge)}
-                          >
-                            <div className="flex items-center gap-2">
-                              <PersonIcon gender={conjuge.sexo} size={32} />
-                              <div>
-                                <p className="font-medium text-gray-900">{conjuge.nome} {conjuge.sobrenome}</p>
-                                <p className="text-sm text-gray-500">{formatDateRange(conjuge.data_nasc, conjuge.data_obito)} • ID: {conjuge.id}</p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Casamento info */}
-                        {casamento && (
-                          <div className="p-3 flex items-start justify-between border-t border-gray-100">
-                            <div>
-                              <p className="text-sm font-medium text-gray-700">Casamento</p>
-                              <p className="text-sm text-gray-600">{formatDateFull(casamento.data_inicio)}</p>
-                            </div>
-                            <button className="p-1 text-gray-400 hover:text-gray-600">
-                              <Edit2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        )}
-                        
-                        {/* Filhos */}
-                        {filhos.length > 0 && (
-                          <div className="border-t border-gray-200">
-                            <button 
-                              className="w-full flex items-center justify-between p-3 hover:bg-gray-50"
-                              onClick={() => setChildrenOpen(!childrenOpen)}
-                            >
-                              <span className="text-sm font-medium text-gray-700">Filhos ({filhos.length})</span>
-                              <div className={`transform transition-transform ${childrenOpen ? '' : 'rotate-180'}`}>
-                                <ChevronUp className="h-5 w-5" />
-                              </div>
-                            </button>
-                            
-                            {childrenOpen && (
-                              <div className="border-t border-gray-100">
-                                {filhos.map((filho) => (
-                                  <div 
-                                    key={filho.id}
-                                    className={`p-3 flex items-center justify-between hover:bg-gray-50 cursor-pointer border-l-4 ${filho.sexo?.toLowerCase() === 'masculino' ? 'border-blue-500' : 'border-pink-500'}`}
-                                    onClick={() => onPersonClick?.(filho)}
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <PersonIcon gender={filho.sexo} size={28} />
-                                      <div>
-                                        <p className="font-medium text-gray-900">{filho.nome} {filho.sobrenome}</p>
-                                        <p className="text-sm text-gray-500">{formatDateRange(filho.data_nasc, filho.data_obito)} • ID: {filho.id}</p>
-                                      </div>
-                                    </div>
-                                    <button className="p-1 text-gray-400 hover:text-gray-600">
-                                      <Edit2 className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                ))}
-                                
-                                <button className="w-full p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 hover:bg-gray-50">
-                                  <Plus className="h-4 w-4" />
-                                  <span className="text-sm font-medium">ACRESCENTAR FILHO(A)</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Outros botões */}
-                      {!conjuge && (
-                        <button className="w-full mt-3 p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 border border-gray-200 rounded-lg hover:bg-gray-50">
-                          <Plus className="h-4 w-4" />
-                          <span className="text-sm font-medium">ACRESCENTAR O CÔNJUGE</span>
-                        </button>
-                      )}
-                      
-                      <button className="w-full mt-2 p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 border border-gray-200 rounded-lg hover:bg-gray-50">
-                        <Plus className="h-4 w-4" />
-                        <span className="text-sm font-medium">ACRESCENTAR FILHO(A)</span>
-                      </button>
-                    </div>
-                    
-                    {/* Pais e irmãos */}
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700 mb-3">Pais e irmãos</h4>
-                      
-                      {pessoa.pai || pessoa.mae ? (
-                        <div className="border border-gray-200 rounded-lg overflow-hidden">
-                          {pessoa.pai && (
-                            <div 
-                              className="p-3 border-l-4 border-blue-500 cursor-pointer hover:bg-gray-50"
-                              onClick={() => onPersonClick?.(pessoa.pai!)}
-                            >
-                              <div className="flex items-center gap-2">
-                                <PersonIcon gender="masculino" size={32} />
-                                <div>
-                                  <p className="font-medium text-gray-900">{pessoa.pai.nome} {pessoa.pai.sobrenome}</p>
-                                  <p className="text-sm text-gray-500">Pai</p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                          {pessoa.mae && (
-                            <div 
-                              className="p-3 border-l-4 border-pink-500 cursor-pointer hover:bg-gray-50 border-t border-gray-100"
-                              onClick={() => onPersonClick?.(pessoa.mae!)}
-                            >
-                              <div className="flex items-center gap-2">
-                                <PersonIcon gender="feminino" size={32} />
-                                <div>
-                                  <p className="font-medium text-gray-900">{pessoa.mae.nome} {pessoa.mae.sobrenome}</p>
-                                  <p className="text-sm text-gray-500">Mãe</p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <button className="w-full p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 border border-gray-200 rounded-lg hover:bg-gray-50">
-                          <Plus className="h-4 w-4" />
-                          <span className="text-sm font-medium">ACRESCENTAR PAI OU MÃE</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </CollapsibleSection>
-              </>
-            )}
-            
-            {activeTab === 'sobre' && (
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Sobre {nomeCompleto}</h3>
-                <p className="text-gray-600">{pessoa.comentario || 'Nenhuma informação adicional disponível.'}</p>
-              </div>
-            )}
-            
-            {activeTab === 'fontes' && (
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Fontes (0)</h3>
-                <p className="text-gray-600">Nenhuma fonte cadastrada.</p>
-              </div>
-            )}
-            
-            {activeTab === 'colaborar' && (
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Colaborar</h3>
-                <p className="text-gray-600">Nenhuma colaboração ativa.</p>
-              </div>
-            )}
-            
-            {activeTab === 'recordacoes' && (
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Recordações (0)</h3>
-                <p className="text-gray-600">Fotos, histórias e documentos da família.</p>
-              </div>
-            )}
+          {/* Tabs */}
+          <div className="flex border-b border-gray-200">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                className={`px-6 py-3 text-sm font-medium transition-colors relative ${
+                  activeTab === tab.id 
+                    ? 'text-teal-600' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                {tab.label}
+                {activeTab === tab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500" />
+                )}
+              </button>
+            ))}
           </div>
         </div>
+      </div>
+      
+      {/* Content com scroll normal */}
+      <div className="max-w-4xl mx-auto p-6">
+        {activeTab === 'detalhes' && (
+          <>
+            {/* Dados vitais */}
+            <CollapsibleSection title="Dados vitais">
+              <ToggleSwitch 
+                label="Visualização detalhada" 
+                checked={showDetailedView} 
+                onChange={() => setShowDetailedView(!showDetailedView)} 
+              />
+              
+              <div className="grid grid-cols-2 gap-x-8 gap-y-2 mt-4">
+                <InfoItem label="Nome completo" value={nomeCompleto} />
+                <InfoItem label="Sexo" value={pessoa.sexo} />
+                
+                <InfoItem 
+                  label="Nascimento" 
+                  value={formatDateFull(pessoa.data_nasc)} 
+                  icon={Calendar}
+                />
+                <InfoItem 
+                  label="Local de nascimento" 
+                  value={localNascimento} 
+                  icon={MapPin}
+                />
+                
+                {(pessoa.data_obito || pessoa.vivo === false) && (
+                  <>
+                    <InfoItem 
+                      label="Falecimento" 
+                      value={formatDateFull(pessoa.data_obito)} 
+                      icon={Calendar}
+                    />
+                    <InfoItem 
+                      label="Local de falecimento" 
+                      value={pessoa.local_obito} 
+                      icon={MapPin}
+                    />
+                  </>
+                )}
+                
+                <InfoItem label="Nacionalidade" value={pessoa.nacionalidade} />
+                {pessoa.cidadanias_outras && (
+                  <InfoItem label="Outras cidadanias" value={pessoa.cidadanias_outras} />
+                )}
+              </div>
+              
+              {/* Batismo */}
+              {showDetailedView && (pessoa.batizado || pessoa.data_batismo) && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                    <Church className="h-4 w-4" />
+                    Batismo
+                  </h4>
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                    <InfoItem label="Batizado" value={pessoa.batizado || 'Sim'} />
+                    <InfoItem label="Data do batismo" value={formatDateFull(pessoa.data_batismo)} />
+                    <InfoItem label="Local do batismo" value={pessoa.local_batismo} />
+                    <InfoItem label="Igreja" value={pessoa.igreja_batismo} />
+                  </div>
+                </div>
+              )}
+            </CollapsibleSection>
+            
+            {/* Membros da família */}
+            <CollapsibleSection title="Membros da família">
+              <ToggleSwitch 
+                label="Mostrar todos os membros da família" 
+                checked={showAllFamily} 
+                onChange={() => setShowAllFamily(!showAllFamily)} 
+              />
+              
+              <div className="grid grid-cols-2 gap-6 mt-4">
+                {/* Cônjuges e filhos */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <Heart className="h-4 w-4" />
+                    Cônjuges e filhos
+                  </h4>
+                  
+                  {/* Card do casal */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    {/* Pessoa principal */}
+                    <div className={`p-3 border-l-4 bg-gray-50 ${pessoa.sexo?.toLowerCase() === 'masculino' ? 'border-blue-500' : 'border-pink-500'}`}>
+                      <div className="flex items-center gap-2">
+                        <SmallAvatar pessoa={pessoa} size={32} />
+                        <div>
+                          <p className="font-semibold text-gray-900">{nomeCompleto}</p>
+                          <p className="text-sm text-gray-500">{dateRange}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Cônjuge */}
+                    {conjuge && (
+                      <div 
+                        className={`p-3 border-l-4 cursor-pointer hover:bg-gray-50 ${conjuge.sexo?.toLowerCase() === 'masculino' ? 'border-blue-500' : 'border-pink-500'}`}
+                        onClick={() => onPersonClick?.(conjuge)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <SmallAvatar pessoa={conjuge} size={32} />
+                          <div>
+                            <p className="font-medium text-gray-900">{conjuge.nome} {conjuge.sobrenome}</p>
+                            <p className="text-sm text-gray-500">{formatDateRange(conjuge.data_nasc, conjuge.data_obito, conjuge.vivo)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Casamento info */}
+                    {casamento && (
+                      <div className="p-3 border-t border-gray-100 bg-gray-50">
+                        <p className="text-sm font-medium text-gray-700">Casamento</p>
+                        <p className="text-sm text-gray-600">{formatDateFull(casamento.data_inicio)}</p>
+                        {casamento.local && <p className="text-sm text-gray-500">{casamento.local}{casamento.pais && `, ${casamento.pais}`}</p>}
+                        {casamento.tipo && <p className="text-xs text-gray-400">{casamento.tipo}</p>}
+                      </div>
+                    )}
+                    
+                    {/* Filhos */}
+                    {filhos.length > 0 && (
+                      <div className="border-t border-gray-200">
+                        <button 
+                          className="w-full flex items-center justify-between p-3 hover:bg-gray-50"
+                          onClick={() => setChildrenOpen(!childrenOpen)}
+                        >
+                          <span className="text-sm font-medium text-gray-700">Filhos ({filhos.length})</span>
+                          <div className={`transform transition-transform ${childrenOpen ? '' : 'rotate-180'}`}>
+                            <ChevronUp className="h-5 w-5" />
+                          </div>
+                        </button>
+                        
+                        {childrenOpen && (
+                          <div className="border-t border-gray-100">
+                            {filhos.map((filho) => (
+                              <div 
+                                key={filho.id}
+                                className={`p-3 hover:bg-gray-50 cursor-pointer border-l-4 ${filho.sexo?.toLowerCase() === 'masculino' ? 'border-blue-500' : 'border-pink-500'}`}
+                                onClick={() => onPersonClick?.(filho)}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <SmallAvatar pessoa={filho} size={28} />
+                                  <div>
+                                    <p className="font-medium text-gray-900">{filho.nome} {filho.sobrenome}</p>
+                                    <p className="text-sm text-gray-500">{formatDateRange(filho.data_nasc, filho.data_obito, filho.vivo)}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            
+                            <button 
+                              onClick={() => onAddFilho?.(pessoa.id)}
+                              className="w-full p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 hover:bg-gray-50"
+                            >
+                              <Plus className="h-4 w-4" />
+                              <span className="text-sm font-medium">ACRESCENTAR FILHO(A)</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Botões extras */}
+                  {!conjuge && (
+                    <button 
+                      onClick={() => onAddConjuge?.(pessoa.id)}
+                      className="w-full mt-3 p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span className="text-sm font-medium">ACRESCENTAR CÔNJUGE</span>
+                    </button>
+                  )}
+                  
+                  {filhos.length === 0 && (
+                    <button 
+                      onClick={() => onAddFilho?.(pessoa.id)}
+                      className="w-full mt-2 p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span className="text-sm font-medium">ACRESCENTAR FILHO(A)</span>
+                    </button>
+                  )}
+                </div>
+                
+                {/* Pais e irmãos */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Pais e irmãos
+                  </h4>
+                  
+                  {pessoa.pai || pessoa.mae ? (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      {pessoa.pai && (
+                        <div 
+                          className="p-3 border-l-4 border-blue-500 cursor-pointer hover:bg-gray-50"
+                          onClick={() => onPersonClick?.(pessoa.pai!)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <SmallAvatar pessoa={pessoa.pai} size={32} />
+                            <div>
+                              <p className="font-medium text-gray-900">{pessoa.pai.nome} {pessoa.pai.sobrenome}</p>
+                              <p className="text-sm text-gray-500">Pai</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {pessoa.mae && (
+                        <div 
+                          className="p-3 border-l-4 border-pink-500 cursor-pointer hover:bg-gray-50 border-t border-gray-100"
+                          onClick={() => onPersonClick?.(pessoa.mae!)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <SmallAvatar pessoa={pessoa.mae} size={32} />
+                            <div>
+                              <p className="font-medium text-gray-900">{pessoa.mae.nome} {pessoa.mae.sobrenome}</p>
+                              <p className="text-sm text-gray-500">Mãe</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {!pessoa.pai && (
+                        <button 
+                          onClick={() => onAddPai?.(pessoa.id)}
+                          className="w-full p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 border-t border-gray-100 hover:bg-gray-50"
+                        >
+                          <Plus className="h-4 w-4" />
+                          <span className="text-sm font-medium">ACRESCENTAR PAI</span>
+                        </button>
+                      )}
+                      {!pessoa.mae && (
+                        <button 
+                          onClick={() => onAddMae?.(pessoa.id)}
+                          className="w-full p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 border-t border-gray-100 hover:bg-gray-50"
+                        >
+                          <Plus className="h-4 w-4" />
+                          <span className="text-sm font-medium">ACRESCENTAR MÃE</span>
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <button 
+                        onClick={() => onAddPai?.(pessoa.id)}
+                        className="w-full p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span className="text-sm font-medium">ACRESCENTAR PAI</span>
+                      </button>
+                      <button 
+                        onClick={() => onAddMae?.(pessoa.id)}
+                        className="w-full p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span className="text-sm font-medium">ACRESCENTAR MÃE</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CollapsibleSection>
+          </>
+        )}
+        
+        {activeTab === 'sobre' && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Sobre {nomeCompleto}</h3>
+            <p className="text-gray-600 whitespace-pre-wrap">{pessoa.comentario || 'Nenhuma informação adicional disponível.'}</p>
+          </div>
+        )}
+        
+        {activeTab === 'fontes' && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Documentos ({pessoa.documentos?.length || 0})
+            </h3>
+            
+            {pessoa.documentos && pessoa.documentos.length > 0 ? (
+              <div className="space-y-3">
+                {pessoa.documentos.map((doc) => (
+                  <div key={doc.id} className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">{doc.tipo.replace(/_/g, ' ')}</p>
+                        {doc.descricao && <p className="text-sm text-gray-600">{doc.descricao}</p>}
+                        <p className="text-xs text-gray-400 mt-1">Status: {doc.status}</p>
+                      </div>
+                      {doc.arquivo_url && (
+                        <a 
+                          href={doc.arquivo_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-teal-600 hover:text-teal-700 text-sm"
+                        >
+                          Ver documento
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-600">Nenhum documento cadastrado.</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

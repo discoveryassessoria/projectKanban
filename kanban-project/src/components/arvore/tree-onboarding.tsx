@@ -70,7 +70,7 @@ export function TreeOnboarding({ arvoreId, onComplete }: TreeOnboardingProps) {
     <div className="h-full flex bg-white">
       {/* Lado esquerdo - Formulário */}
       <div className="w-[420px] p-10 flex flex-col justify-center border-r border-gray-200">
-        <h2 className="text-2xl font-bold text-gray-900 mb-8">Comece com</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-8">Comece com o filho</h2>
 
         {/* Seleção de sexo */}
         <div className="flex gap-8 mb-8">
@@ -154,30 +154,33 @@ export function TreeOnboarding({ arvoreId, onComplete }: TreeOnboardingProps) {
 
       {/* Lado direito - Preview da árvore (simplificado: só Pai, Mãe e Filho) */}
       <div className="flex-1 bg-gray-100 flex items-center justify-center p-8 relative overflow-hidden">
-        <div className="relative">
+        <div className="relative" style={{ width: '380px', height: '340px' }}>
           {/* SVG para linhas de conexão */}
           <svg 
-            className="absolute inset-0 w-full h-full pointer-events-none" 
-            style={{ width: '400px', height: '320px', left: '-50px', top: '-20px' }}
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            viewBox="0 0 380 340"
           >
-            {/* Linha horizontal entre pais */}
-            <line x1="120" y1="80" x2="280" y2="80" stroke="#D1D5DB" strokeWidth="2" />
+            {/* Linha vertical do pai para baixo (centro do card pai) */}
+            <line x1="110" y1="128" x2="110" y2="165" stroke="#D1D5DB" strokeWidth="2" />
             
-            {/* Linha vertical do meio (pais para filho) */}
-            <line x1="200" y1="80" x2="200" y2="140" stroke="#D1D5DB" strokeWidth="2" />
+            {/* Linha vertical da mãe para baixo (centro do card mãe) */}
+            <line x1="270" y1="128" x2="270" y2="165" stroke="#D1D5DB" strokeWidth="2" />
             
-            {/* Linha vertical para filho */}
-            <line x1="200" y1="140" x2="200" y2="180" stroke="#D1D5DB" strokeWidth="2" />
+            {/* Linha horizontal conectando pai e mãe */}
+            <line x1="110" y1="165" x2="270" y2="165" stroke="#D1D5DB" strokeWidth="2" />
+            
+            {/* Linha vertical do centro para filho */}
+            <line x1="190" y1="165" x2="190" y2="200" stroke="#D1D5DB" strokeWidth="2" />
           </svg>
 
           {/* Pais */}
-          <div className="flex justify-center gap-20 mb-16 relative z-10">
+          <div className="absolute top-0 left-0 right-0 flex justify-center gap-12">
             <PersonCard label="Pai" color={getColor('pai')} />
             <PersonCard label="Mãe" color={getColor('mae')} />
           </div>
 
           {/* Filho (pessoa principal) */}
-          <div className="flex justify-center relative z-10 mt-4">
+          <div className="absolute top-[200px] left-0 right-0 flex justify-center">
             <PersonCard 
               label={nome || 'Filho'}
               color={getColor('filho')}
@@ -208,7 +211,7 @@ function PersonCard({
       className={`flex flex-col items-center transition-transform ${isMain ? 'scale-110' : ''}`}
     >
       <div 
-        className={`w-24 h-28 rounded-lg border-2 flex flex-col items-center justify-center bg-white transition-all ${
+        className={`w-28 h-32 rounded-lg border-2 flex flex-col items-center justify-center bg-white transition-all ${
           isMain ? 'shadow-lg' : 'shadow-sm'
         } ${highlighted ? 'ring-2 ring-offset-2' : ''}`}
         style={{ 
@@ -218,8 +221,8 @@ function PersonCard({
       >
         {/* Ícone de pessoa */}
         <svg 
-          width="36" 
-          height="36" 
+          width="40" 
+          height="40" 
           viewBox="0 0 24 24" 
           fill="none"
           className="mb-2"
@@ -243,7 +246,7 @@ function PersonCard({
         </svg>
         
         <span 
-          className="text-xs font-medium text-center px-2 leading-tight truncate w-full"
+          className="text-sm font-medium text-center px-2 leading-tight truncate w-full"
           style={{ color }}
         >
           {label}

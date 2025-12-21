@@ -19,83 +19,25 @@ import {
   ChevronDown,
   ExternalLink
 } from "lucide-react"
+import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
 
 // ========================================
 // TIPOS
 // ========================================
-interface PessoaArvore {
-  id: number
-  nome: string
-  sobrenome?: string | null
-  sexo?: string | null
-  data_nasc?: Date | string | null
-  data_obito?: Date | string | null
-  local_nasc?: string | null
-  estado_nasc?: string | null
-  pais_nasc?: string | null
-  local_obito?: string | null
-  vivo?: boolean
-  batizado?: string | null
-  data_batismo?: Date | string | null
-  local_batismo?: string | null
-  igreja_batismo?: string | null
-  profissao?: string | null
-  nacionalidade?: string | null
-  naturalizado?: boolean
-  data_naturalizacao?: Date | string | null
-  data_emigracao?: Date | string | null
-  porto_embarque?: string | null
-  data_chegada?: Date | string | null
-  porto_chegada?: string | null
-  navio?: string | null
-  local_emigracao?: string | null
-  comentario?: string | null
-  paiId?: number | null
-  maeId?: number | null
-  pai?: PessoaArvore | null
-  mae?: PessoaArvore | null
-  filhosComoPai?: PessoaArvore[]
-  filhosComoMae?: PessoaArvore[]
-  documentos?: DocumentoArvore[]
-}
-
-interface UniaoArvore {
-  id: number
-  data_inicio?: Date | string | null
-  data_fim?: Date | string | null
-  tipo?: string | null
-  local?: string | null
-  estado?: string | null
-  pais?: string | null
-  cartorio?: string | null
-  livro?: string | null
-  folha?: string | null
-  termo?: string | null
-}
-
-interface DocumentoArvore {
-  id: number
-  tipo: string
-  descricao?: string | null
-  status: string
-  cartorio?: string | null
-  livro?: string | null
-  folha?: string | null
-  termo?: string | null
-  arquivo_url?: string | null
-  traduzido?: boolean
-  apostilado?: boolean
-}
-
 interface PessoaSidebarProps {
   pessoa: PessoaArvore | null
-  conjuge?: PessoaArvore | null
-  casamento?: UniaoArvore | null
+  conjuges?: PessoaArvore[]
+  casamentos?: UniaoArvore[]
   onClose: () => void
   onOpenFullDetails: (pessoa: PessoaArvore) => void
   onEdit?: (pessoa: PessoaArvore) => void
   onDelete?: (pessoa: PessoaArvore) => void
   onAddFilho?: (pessoaId: number) => void
+  onAddPai?: (pessoaId: number) => void
+  onAddMae?: (pessoaId: number) => void
+  onAddConjuge?: (pessoaId: number) => void
+  onAddDocumento?: (pessoaId: number) => void
+  onEditDocumento?: (documento: DocumentoArvore) => void
 }
 
 // ========================================
@@ -156,11 +98,8 @@ function getGenderColor(sexo: string | null | undefined): string {
 }
 
 const TIPO_DOCUMENTO_LABELS: Record<string, string> = {
-  CERTIDAO_NASCIMENTO: 'Certidão de Nascimento',
   CERTIDAO_NASCIMENTO_INTEIRO_TEOR: 'Certidão de Nascimento (Inteiro Teor)',
-  CERTIDAO_CASAMENTO: 'Certidão de Casamento',
   CERTIDAO_CASAMENTO_INTEIRO_TEOR: 'Certidão de Casamento (Inteiro Teor)',
-  CERTIDAO_OBITO: 'Certidão de Óbito',
   CERTIDAO_OBITO_INTEIRO_TEOR: 'Certidão de Óbito (Inteiro Teor)',
   CERTIDAO_BATISMO: 'Certidão de Batismo',
   CNN: 'Certidão Negativa de Naturalização',
@@ -275,12 +214,15 @@ function CollapsibleSection({
   )
 }
 
-function DocumentoCard({ documento }: { documento: DocumentoArvore }) {
+function DocumentoCard({ documento, onClick }: { documento: DocumentoArvore, onClick?: () => void }) {
   const statusConfig = STATUS_CONFIG[documento.status] || STATUS_CONFIG.PENDENTE
   const StatusIcon = statusConfig.icon
   
   return (
-    <div className="p-3 bg-white rounded-lg border border-slate-200 hover:border-slate-300 transition-colors">
+    <div 
+      className={`p-3 bg-white rounded-lg border border-slate-200 hover:border-slate-300 transition-colors ${onClick ? 'cursor-pointer hover:shadow-sm' : ''}`}
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <p className="font-medium text-slate-900 text-sm truncate">
@@ -312,8 +254,8 @@ function DocumentoCard({ documento }: { documento: DocumentoArvore }) {
         </div>
       </div>
       
-      {/* Badges de tradução e apostilamento */}
-      <div className="flex items-center gap-2 mt-2">
+      {/* Badges e links de arquivos */}
+      <div className="flex items-center gap-2 mt-2 flex-wrap">
         {documento.traduzido && (
           <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-cyan-50 text-cyan-700">
             Traduzido
@@ -324,18 +266,49 @@ function DocumentoCard({ documento }: { documento: DocumentoArvore }) {
             Apostilado
           </span>
         )}
-        {documento.arquivo_url && (
-          <a 
-            href={documento.arquivo_url} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-[10px] text-teal-600 hover:text-teal-700"
-          >
-            <ExternalLink className="w-3 h-3" />
-            Ver arquivo
-          </a>
-        )}
       </div>
+      
+      {/* Links para arquivos */}
+      {(documento.arquivo_url || documento.arquivo_traducao_url || documento.arquivo_apostila_url) && (
+        <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-100">
+          {documento.arquivo_url && (
+            <a 
+              href={documento.arquivo_url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 text-[10px] text-teal-600 hover:text-teal-700 font-medium"
+            >
+              <FileText className="w-3 h-3" />
+              Original
+            </a>
+          )}
+          {documento.arquivo_traducao_url && (
+            <a 
+              href={documento.arquivo_traducao_url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 text-[10px] text-cyan-600 hover:text-cyan-700 font-medium"
+            >
+              <FileText className="w-3 h-3" />
+              Tradução
+            </a>
+          )}
+          {documento.arquivo_apostila_url && (
+            <a 
+              href={documento.arquivo_apostila_url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 text-[10px] text-purple-600 hover:text-purple-700 font-medium"
+            >
+              <FileText className="w-3 h-3" />
+              Apostila
+            </a>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -345,13 +318,18 @@ function DocumentoCard({ documento }: { documento: DocumentoArvore }) {
 // ========================================
 export function PessoaSidebar({ 
   pessoa, 
-  conjuge, 
-  casamento, 
+  conjuges = [], 
+  casamentos = [], 
   onClose, 
   onOpenFullDetails, 
   onEdit, 
   onDelete,
-  onAddFilho
+  onAddFilho,
+  onAddPai,
+  onAddMae,
+  onAddConjuge,
+  onAddDocumento,
+  onEditDocumento
 }: PessoaSidebarProps) {
   const [activeTab, setActiveTab] = useState<"info" | "familia" | "docs">("info")
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -524,19 +502,38 @@ export function PessoaSidebar({
               </div>
             </CollapsibleSection>
             
-            {/* Seção: Casamento */}
-            <CollapsibleSection title="Casamento" icon={Heart} defaultOpen={!!casamento}>
-              <div className="space-y-1">
-                <InfoItem 
-                  icon={Calendar} 
-                  label="Data de Casamento" 
-                  value={casamento ? formatDateFull(casamento.data_inicio) : null} 
-                />
-                <InfoItem 
-                  icon={MapPin} 
-                  label="Local de Casamento" 
-                  value={casamento?.local} 
-                />
+            {/* Seção: Casamentos */}
+            <CollapsibleSection title="Casamento" icon={Heart} defaultOpen={casamentos.length > 0}>
+              <div className="space-y-3">
+                {casamentos.length > 0 ? (
+                  casamentos.map((casamento, index) => {
+                    const conjuge = conjuges.find(c => 
+                      (casamento.pessoa1Id === pessoa.id && casamento.pessoa2Id === c.id) ||
+                      (casamento.pessoa2Id === pessoa.id && casamento.pessoa1Id === c.id)
+                    )
+                    return (
+                      <div key={casamento.id} className="space-y-1">
+                        {casamentos.length > 1 && (
+                          <p className="text-xs font-medium text-slate-500">
+                            {index + 1}º Casamento {conjuge && `- ${conjuge.nome}`}
+                          </p>
+                        )}
+                        <InfoItem 
+                          icon={Calendar} 
+                          label="Data de Casamento" 
+                          value={formatDateFull(casamento.data_inicio)} 
+                        />
+                        <InfoItem 
+                          icon={MapPin} 
+                          label="Local de Casamento" 
+                          value={casamento.local} 
+                        />
+                      </div>
+                    )
+                  })
+                ) : (
+                  <p className="text-sm text-slate-400">Nenhum casamento registrado</p>
+                )}
               </div>
             </CollapsibleSection>
             
@@ -597,46 +594,92 @@ export function PessoaSidebar({
                       </div>
                     </div>
                   )}
-                </div>
-              ) : (
-                <button className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-                  <Plus className="w-4 h-4" />
-                  <span className="text-sm font-medium">Adicionar pais</span>
-                </button>
-              )}
-            </div>
-            
-            {/* Cônjuge */}
-            <div>
-              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Cônjuge</h4>
-              {conjuge ? (
-                <div className="p-3 bg-slate-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <PersonAvatar pessoa={conjuge} size={40} />
-                    <div>
-                      <p className="font-medium text-slate-900 text-sm">
-                        {conjuge.nome} {conjuge.sobrenome}
-                      </p>
-                      {casamento?.data_inicio && (
-                        <p className="text-xs text-slate-500">
-                          Casamento: {formatDateFull(casamento.data_inicio)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {casamento && (casamento.local || casamento.cartorio) && (
-                    <div className="mt-2 pt-2 border-t border-slate-200 text-xs text-slate-500">
-                      {casamento.local && <p>{casamento.local}</p>}
-                      {casamento.cartorio && <p>{casamento.cartorio}</p>}
-                    </div>
+                  {/* Botão para adicionar pai se não tem */}
+                  {!pessoa.pai && (
+                    <button 
+                      onClick={() => onAddPai?.(pessoa.id)}
+                      className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span className="text-sm font-medium">Adicionar Pai</span>
+                    </button>
+                  )}
+                  {/* Botão para adicionar mãe se não tem */}
+                  {!pessoa.mae && (
+                    <button 
+                      onClick={() => onAddMae?.(pessoa.id)}
+                      className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span className="text-sm font-medium">Adicionar Mãe</span>
+                    </button>
                   )}
                 </div>
               ) : (
-                <button className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+                <div className="space-y-2">
+                  <button 
+                    onClick={() => onAddPai?.(pessoa.id)}
+                    className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="text-sm font-medium">Adicionar Pai</span>
+                  </button>
+                  <button 
+                    onClick={() => onAddMae?.(pessoa.id)}
+                    className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="text-sm font-medium">Adicionar Mãe</span>
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            {/* Cônjuges */}
+            <div>
+              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Cônjuge</h4>
+              <div className="space-y-2">
+                {conjuges.map((conjuge, index) => {
+                  // Encontrar o casamento correspondente
+                  const casamento = casamentos.find(c => 
+                    (c.pessoa1Id === pessoa.id && c.pessoa2Id === conjuge.id) ||
+                    (c.pessoa2Id === pessoa.id && c.pessoa1Id === conjuge.id)
+                  )
+                  
+                  return (
+                    <div key={conjuge.id} className="p-3 bg-slate-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <PersonAvatar pessoa={conjuge} size={40} />
+                        <div>
+                          <p className="font-medium text-slate-900 text-sm">
+                            {conjuge.nome} {conjuge.sobrenome}
+                          </p>
+                          {casamento?.data_inicio && (
+                            <p className="text-xs text-slate-500">
+                              Casamento: {formatDateFull(casamento.data_inicio)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {casamento && (casamento.local || casamento.cartorio) && (
+                        <div className="mt-2 pt-2 border-t border-slate-200 text-xs text-slate-500">
+                          {casamento.local && <p>{casamento.local}</p>}
+                          {casamento.cartorio && <p>{casamento.cartorio}</p>}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+                
+                {/* Botão para adicionar cônjuge - sempre visível */}
+                <button 
+                  onClick={() => onAddConjuge?.(pessoa.id)}
+                  className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+                >
                   <Heart className="w-4 h-4" />
                   <span className="text-sm font-medium">Adicionar cônjuge</span>
                 </button>
-              )}
+              </div>
             </div>
             
             {/* Filhos */}
@@ -683,7 +726,11 @@ export function PessoaSidebar({
             {documentos.length > 0 ? (
               <div className="space-y-3">
                 {documentos.map((doc) => (
-                  <DocumentoCard key={doc.id} documento={doc} />
+                  <DocumentoCard 
+                    key={doc.id} 
+                    documento={doc} 
+                    onClick={() => onEditDocumento?.(doc)}
+                  />
                 ))}
               </div>
             ) : (
@@ -695,7 +742,10 @@ export function PessoaSidebar({
               </div>
             )}
             
-            <button className="w-full mt-4 flex items-center justify-center gap-2 p-3 bg-teal-50 text-teal-700 rounded-lg hover:bg-teal-100 transition-colors">
+            <button 
+              onClick={() => onAddDocumento?.(pessoa.id)}
+              className="w-full mt-4 flex items-center justify-center gap-2 p-3 bg-teal-50 text-teal-700 rounded-lg hover:bg-teal-100 transition-colors"
+            >
               <Plus className="w-4 h-4" />
               <span className="text-sm font-medium">Adicionar documento</span>
             </button>

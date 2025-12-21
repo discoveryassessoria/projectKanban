@@ -29,6 +29,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 pessoa1: true,
               },
             },
+            // ✅ ADICIONADO: Incluir documentos de cada pessoa
+            documentos: {
+              orderBy: { createdAt: 'desc' }
+            },
           },
         },
       },
