@@ -1,3 +1,5 @@
+// ESTE ARQUIVO VAI EM: src/app/administrator/page.tsx
+
 "use client"
 
 import { useEffect, useState } from "react"
@@ -117,16 +119,36 @@ export default function AdministratorPage() {
         fetch("/api/arvore")
       ])
 
-      const projetosData = await projetosRes.json()
-      setProjetos(projetosData.projetos || [])
+      // Verificar se as respostas foram bem-sucedidas antes de fazer parse
+      if (projetosRes.ok) {
+        const projetosData = await projetosRes.json()
+        setProjetos(projetosData.projetos || [])
+      } else {
+        console.warn("Erro ao buscar projetos:", projetosRes.status)
+        setProjetos([])
+      }
 
-      const atividadesData = await atividadesRes.json()
-      setAtividades(Array.isArray(atividadesData) ? atividadesData : [])
+      if (atividadesRes.ok) {
+        const atividadesData = await atividadesRes.json()
+        setAtividades(Array.isArray(atividadesData) ? atividadesData : [])
+      } else {
+        console.warn("Erro ao buscar atividades:", atividadesRes.status)
+        setAtividades([])
+      }
 
-      const arvoresData = await arvoresRes.json()
-      setArvores(Array.isArray(arvoresData) ? arvoresData : [])
+      if (arvoresRes.ok) {
+        const arvoresData = await arvoresRes.json()
+        setArvores(Array.isArray(arvoresData) ? arvoresData : [])
+      } else {
+        console.warn("Erro ao buscar árvores:", arvoresRes.status)
+        setArvores([])
+      }
     } catch (error) {
       console.error("Erro ao buscar dados:", error)
+      // Garantir que os estados são arrays vazios em caso de erro
+      setProjetos([])
+      setAtividades([])
+      setArvores([])
     }
   }
 
@@ -135,18 +157,35 @@ export default function AdministratorPage() {
     try {
       setIsLoading(true)
       setError("")
+      
+      // Verificar se tem token antes de tentar carregar
+      const token = localStorage.getItem("authToken")
+      if (!token) {
+        console.warn("Token não encontrado, aguardando autenticação...")
+        setUsuarios([])
+        return
+      }
+      
       const users = await getUsers(searchTerm)
       const validUsers = users.filter((u): u is Usuario => u.id !== undefined) as Usuario[]
       setUsuarios(validUsers)
     } catch (err: any) {
-      setError(err.message || "Erro ao carregar usuários")
+      // Não mostrar erro de autenticação na UI - apenas log
+      if (err.message?.includes("autenticado") || err.message?.includes("401")) {
+        console.warn("Erro de autenticação:", err.message)
+        setUsuarios([])
+      } else {
+        setError(err.message || "Erro ao carregar usuários")
+      }
     } finally {
       setIsLoading(false)
     }
   }
 
   useEffect(() => {
-    if (isAdmin) {
+    // Só carregar usuários quando for admin E tiver token
+    const token = localStorage.getItem("authToken")
+    if (isAdmin && token) {
       loadUsers()
     }
   }, [isAdmin])
@@ -154,7 +193,8 @@ export default function AdministratorPage() {
   // Buscar com debounce
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!isLoading && isAdmin) {
+      const token = localStorage.getItem("authToken")
+      if (!isLoading && isAdmin && token) {
         loadUsers()
       }
     }, 500)
@@ -352,48 +392,48 @@ export default function AdministratorPage() {
 
           {/* Busca */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
             <Input
               placeholder="Buscar por nome ou email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-white/95 border-white/20 text-gray-900 placeholder:text-gray-500"
+              className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/50"
             />
           </div>
 
           {/* Lista de usuários */}
-          <Card className="bg-white/95 backdrop-blur-xl border-white/20 shadow-xl">
+          <Card className="bg-white/5 backdrop-blur-xl border border-white/10">
             <CardHeader>
-              <CardTitle className="text-gray-900">Usuários Cadastrados</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-white">Usuários Cadastrados</CardTitle>
+              <CardDescription className="text-white/60">
                 {usuarios.length} {usuarios.length === 1 ? "usuário encontrado" : "usuários encontrados"}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
                 </div>
               ) : usuarios.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-white/50">
                   Nenhum usuário encontrado
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4 font-medium text-gray-700">Nome</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700">Email</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700">Tipo</th>
-                        <th className="text-right py-3 px-4 font-medium text-gray-700">Ações</th>
+                      <tr className="border-b border-white/10">
+                        <th className="text-left py-3 px-4 font-medium text-white/70">Nome</th>
+                        <th className="text-left py-3 px-4 font-medium text-white/70">Email</th>
+                        <th className="text-left py-3 px-4 font-medium text-white/70">Tipo</th>
+                        <th className="text-right py-3 px-4 font-medium text-white/70">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
                       {usuarios.map((usuario) => (
-                        <tr key={usuario.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                          <td className="py-3 px-4 text-gray-900">{usuario.nome}</td>
-                          <td className="py-3 px-4 text-gray-500">{usuario.email}</td>
+                        <tr key={usuario.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
+                          <td className="py-3 px-4 text-white">{usuario.nome}</td>
+                          <td className="py-3 px-4 text-white/70">{usuario.email}</td>
                           <td className="py-3 px-4">
                             <Badge variant={getBadgeVariant(usuario.tipo)} className="gap-1">
                               {getBadgeIcon(usuario.tipo)}
@@ -407,7 +447,7 @@ export default function AdministratorPage() {
                                 size="icon"
                                 onClick={() => handleEdit(usuario)}
                                 title="Editar"
-                                className="text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                                className="text-white/70 hover:text-white hover:bg-white/10"
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
@@ -417,7 +457,7 @@ export default function AdministratorPage() {
                                   size="icon"
                                   onClick={() => handleDeleteClick(usuario)}
                                   title="Deletar"
-                                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>

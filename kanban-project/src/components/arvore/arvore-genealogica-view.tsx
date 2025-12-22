@@ -1,3 +1,6 @@
+// ESTE ARQUIVO VAI EM: src/components/arvore/arvore-genealogica-view.tsx
+// SUBSTITUA O ARQUIVO EXISTENTE
+
 "use client"
 
 import { useState, useEffect, useRef } from "react"
@@ -19,6 +22,10 @@ interface ArvoreGenealogicaViewProps {
   processoId: number
   arvoreId?: number | null
   onArvoreCreated?: (arvoreId: number) => void
+  // NOVO: Prop para focar em pessoa específica (vinda da pesquisa)
+  pessoaIdParaFocar?: number
+  // NOVO: Prop para abrir aba específica da sidebar (ex: "documentos")
+  sidebarTabParaFocar?: string
 }
 
 type ViewMode = 'paisagem' | 'retrato'
@@ -30,7 +37,13 @@ const fsColors = {
   line: '#9CA3AF'
 }
 
-export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, onArvoreCreated }: ArvoreGenealogicaViewProps) {
+export function ArvoreGenealogicaView({ 
+  processoId, 
+  arvoreId: initialArvoreId, 
+  onArvoreCreated,
+  pessoaIdParaFocar,
+  sidebarTabParaFocar
+}: ArvoreGenealogicaViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('paisagem')
   const [pessoas, setPessoas] = useState<PessoaArvore[]>([])
   const [unioes, setUnioes] = useState<UniaoArvore[]>([])
@@ -60,6 +73,28 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
   const [documentoPessoaId, setDocumentoPessoaId] = useState<number | null>(null)
   const [documentoPessoaNome, setDocumentoPessoaNome] = useState('')
   const [editingDocumento, setEditingDocumento] = useState<DocumentoArvore | null>(null)
+
+  // NOVO: Flag para controlar se já focou na pessoa
+  const [pessoaFocada, setPessoaFocada] = useState(false)
+  const [sidebarTabInicial, setSidebarTabInicial] = useState<string | undefined>(undefined)
+
+  // NOVO: Efeito para focar na pessoa quando vier da pesquisa
+  useEffect(() => {
+    if (pessoaIdParaFocar && pessoas.length > 0 && !pessoaFocada) {
+      const pessoaParaSelecionar = pessoas.find(p => p.id === pessoaIdParaFocar)
+      if (pessoaParaSelecionar) {
+        // Pequeno delay para garantir que a árvore renderizou
+        setTimeout(() => {
+          setSelectedPerson(pessoaParaSelecionar)
+          // Se veio com tab da sidebar, setar ela
+          if (sidebarTabParaFocar) {
+            setSidebarTabInicial(sidebarTabParaFocar)
+          }
+          setPessoaFocada(true)
+        }, 300)
+      }
+    }
+  }, [pessoaIdParaFocar, sidebarTabParaFocar, pessoas, pessoaFocada])
 
   const handleAddDocumento = (pessoaId: number) => {
     const pessoa = pessoas.find(p => p.id === pessoaId)
@@ -223,6 +258,7 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
 
   const handleCloseSidebar = () => {
     setSelectedPerson(null)
+    setSidebarTabInicial(undefined) // Limpar tab inicial
   }
 
   const handleOpenFullDetails = (pessoa: PessoaArvore) => {
@@ -432,6 +468,7 @@ export function ArvoreGenealogicaView({ processoId, arvoreId: initialArvoreId, o
         onAddConjuge={handleAddConjugeById}
         onAddDocumento={handleAddDocumento}
         onEditDocumento={handleEditDocumento}
+        initialTab={sidebarTabInicial}
       />
 
       {fullDetailsPerson && (

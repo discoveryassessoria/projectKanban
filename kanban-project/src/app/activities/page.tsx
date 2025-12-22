@@ -121,8 +121,8 @@ export default function ActivitiesPage() {
 
   // Converter atividades para o formato do HeaderBar
   const atividadesParaHeader = (activities || [])
-    .filter(a => a.id !== undefined)
-    .map(a => ({
+    .filter((a: Atividade | null | undefined) => a && a.id !== undefined)
+    .map((a: Atividade) => ({
       id: a.id as number,
       nome: a.nome,
       descricao: a.descricao || null,
@@ -130,7 +130,7 @@ export default function ActivitiesPage() {
       data_termino: a.data_termino || null,
       pais: a.pais,
       status: a.status ? { nome: a.status.nome } : null,
-      usuarios: a.usuarios?.map(u => ({
+      usuarios: a.usuarios?.map((u: { usuario: { nome?: string; email?: string } }) => ({
         usuario: {
           nome: u.usuario?.nome || '',
           email: u.usuario?.email || ''
@@ -335,7 +335,7 @@ function FilterModal({
               </SelectTrigger>
               <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
                 <SelectItem value="all">Todos os Status</SelectItem>
-                {statuses.map((status) => (
+                {(statuses || []).map((status: Status) => (
                   <SelectItem key={status.id} value={String(status.id)}>
                     {status.nome}
                   </SelectItem>
@@ -352,7 +352,7 @@ function FilterModal({
               </SelectTrigger>
               <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
                 <SelectItem value="all">Todos os Responsáveis</SelectItem>
-                {users.map((u) => (
+                {(users || []).map((u: { nome: string; email: string }) => (
                   <SelectItem key={u.email} value={u.email}>
                     {u.nome}
                   </SelectItem>
@@ -404,7 +404,7 @@ function SearchModal({
 
   useEffect(() => {
     if (searchTerm && activities && activities.length > 0) {
-      const filtered = activities.filter((activity) =>
+      const filtered = activities.filter((activity: Atividade) =>
         activity.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (activity.descricao && activity.descricao.toLowerCase().includes(searchTerm.toLowerCase()))
       )
@@ -491,7 +491,7 @@ function CreateActivityModal() {
     
     try {
       const token = localStorage.getItem('authToken')
-      const response = await fetch('/api/activities', {
+      const response = await fetch('/api/tarefas', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -591,7 +591,7 @@ function CreateActivityModal() {
                 <SelectValue placeholder="Selecione um status" />
               </SelectTrigger>
               <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
-                {statuses.map((status) => (
+                {(statuses || []).map((status: Status) => (
                   <SelectItem key={status.id} value={String(status.id)}>
                     {status.nome}
                   </SelectItem>

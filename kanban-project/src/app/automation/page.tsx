@@ -1,3 +1,5 @@
+// ESTE ARQUIVO VAI EM: src/app/automation/page.tsx
+
 "use client"
 
 import { useEffect, useState } from "react"
@@ -55,16 +57,36 @@ export default function AutomationPage() {
         fetch("/api/arvore")
       ])
 
-      const projetosData = await projetosRes.json()
-      setProjetos(projetosData.projetos || [])
+      // Verificar se as respostas foram bem-sucedidas antes de fazer parse
+      if (projetosRes.ok) {
+        const projetosData = await projetosRes.json()
+        setProjetos(projetosData.projetos || [])
+      } else {
+        console.warn("Erro ao buscar projetos:", projetosRes.status)
+        setProjetos([])
+      }
 
-      const processosData = await processosRes.json()
-      setProcessos(processosData.processos || [])
+      if (processosRes.ok) {
+        const processosData = await processosRes.json()
+        setProcessos(processosData.processos || [])
+      } else {
+        console.warn("Erro ao buscar processos:", processosRes.status)
+        setProcessos([])
+      }
 
-      const arvoresData = await arvoresRes.json()
-      setArvores(Array.isArray(arvoresData) ? arvoresData : [])
+      if (arvoresRes.ok) {
+        const arvoresData = await arvoresRes.json()
+        setArvores(Array.isArray(arvoresData) ? arvoresData : [])
+      } else {
+        console.warn("Erro ao buscar árvores:", arvoresRes.status)
+        setArvores([])
+      }
     } catch (error) {
       console.error("Erro ao buscar dados:", error)
+      // Garantir que os estados são arrays vazios em caso de erro
+      setProjetos([])
+      setProcessos([])
+      setArvores([])
     } finally {
       setLoading(false)
     }

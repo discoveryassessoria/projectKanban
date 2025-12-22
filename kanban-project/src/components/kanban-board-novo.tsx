@@ -1,3 +1,6 @@
+// ESTE ARQUIVO VAI EM: src/components/kanban-board-novo.tsx
+// SUBSTITUA O ARQUIVO EXISTENTE
+
 "use client"
 
 import type React from "react"
@@ -34,6 +37,12 @@ interface KanbanBoardProps {
   contratantes?: Contratante[]
   requerentes?: Requerente[]
   onRefresh: () => void
+  // NOVO: Props para abrir modal automaticamente via URL
+  initialProcessoId?: number | null
+  initialTab?: string | null
+  initialPessoaId?: number | null
+  initialSidebarTab?: string | null
+  onModalOpened?: () => void // Callback para limpar URL params depois de abrir
 }
 
 export function KanbanBoard({ 
@@ -42,13 +51,22 @@ export function KanbanBoard({
   statusList,
   contratantes = [],
   requerentes = [],
-  onRefresh
+  onRefresh,
+  // NOVO: Props para navegação via URL
+  initialProcessoId = null,
+  initialTab = null,
+  initialPessoaId = null,
+  initialSidebarTab = null,
+  onModalOpened,
 }: KanbanBoardProps) {
   const [newStatusName, setNewStatusName] = useState("")
   const [isAddingStatus, setIsAddingStatus] = useState(false)
   const [activeProcesso, setActiveProcesso] = useState<ProcessoWithStatus | null>(null)
   const [selectedProcesso, setSelectedProcesso] = useState<ProcessoWithStatus | null>(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [modalInitialTab, setModalInitialTab] = useState<string | undefined>(undefined)
+  const [modalInitialPessoaId, setModalInitialPessoaId] = useState<number | undefined>(undefined)
+  const [modalInitialSidebarTab, setModalInitialSidebarTab] = useState<string | undefined>(undefined)
   
   // Estado para navegação por setas
   const [startIndex, setStartIndex] = useState(0)
@@ -60,6 +78,9 @@ export function KanbanBoard({
   // Quantas colunas cabem na tela (padrão conservador: 4)
   const [visibleColumns, setVisibleColumns] = useState(4)
 
+  // Flag para controlar se já processamos os params iniciais
+  const [initialParamsProcessed, setInitialParamsProcessed] = useState(false)
+
   const paisConfig = PAISES_CONFIG[pais]
 
   const sensors = useSensors(
@@ -67,6 +88,26 @@ export function KanbanBoard({
       activationConstraint: { distance: 3 },
     }),
   )
+
+  // NOVO: Efeito para abrir modal automaticamente quando recebe initialProcessoId
+  useEffect(() => {
+    if (initialProcessoId && processos.length > 0 && !initialParamsProcessed) {
+      const processo = processos.find(p => p.id === initialProcessoId)
+      if (processo) {
+        setSelectedProcesso(processo)
+        setModalInitialTab(initialTab || undefined)
+        setModalInitialPessoaId(initialPessoaId || undefined)
+        setModalInitialSidebarTab(initialSidebarTab || undefined)
+        setIsDetailsModalOpen(true)
+        setInitialParamsProcessed(true)
+        
+        // Notificar que o modal foi aberto (para limpar URL params)
+        if (onModalOpened) {
+          onModalOpened()
+        }
+      }
+    }
+  }, [initialProcessoId, initialTab, initialPessoaId, initialSidebarTab, processos, initialParamsProcessed, onModalOpened])
 
   // Ordenar status
   const sortedStatusList = [...statusList].sort((a, b) => {
@@ -193,11 +234,21 @@ export function KanbanBoard({
 
   const handleProcessoClick = (processo: ProcessoWithStatus) => {
     setSelectedProcesso(processo)
+    setModalInitialTab(undefined) // Reset quando clica manualmente
+    setModalInitialPessoaId(undefined)
+    setModalInitialSidebarTab(undefined)
     setIsDetailsModalOpen(true)
   }
 
   const handleProcessoSave = () => {
     onRefresh()
+  }
+
+  const handleModalClose = () => {
+    setIsDetailsModalOpen(false)
+    setModalInitialTab(undefined)
+    setModalInitialPessoaId(undefined)
+    setModalInitialSidebarTab(undefined)
   }
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -462,9 +513,12 @@ export function KanbanBoard({
       <ProcessoDetailsModal
         processo={selectedProcesso}
         isOpen={isDetailsModalOpen}
-        onClose={() => setIsDetailsModalOpen(false)}
+        onClose={handleModalClose}
         onSave={handleProcessoSave}
         statusList={statusList}
+        initialTab={modalInitialTab}
+        initialPessoaId={modalInitialPessoaId}
+        initialSidebarTab={modalInitialSidebarTab}
       />
     </>
   )

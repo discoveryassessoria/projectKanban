@@ -1,3 +1,5 @@
+// ESTE ARQUIVO VAI EM: src/services/userService.ts
+
 interface User {
   id?: number
   nome: string
@@ -6,24 +8,18 @@ interface User {
   tipo: string
 }
 
-interface UserResponse {
-  message?: string
-  usuario?: User
-  usuarios?: User[]
-  error?: string
-}
-
 // Função auxiliar para obter o token
 function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null
   return localStorage.getItem("authToken")
 }
 
 // Função auxiliar para fazer requisições autenticadas
-async function fetchWithAuth(url: string, options: RequestInit = {}) {
+async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<any | null> {
   const token = getAuthToken()
   
   if (!token) {
-    throw new Error("Usuário não autenticado")
+    return null
   }
 
   const headers = {
@@ -32,67 +28,88 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
     ...options.headers,
   }
 
-  const response = await fetch(url, { ...options, headers })
-  const data = await response.json()
+  try {
+    const response = await fetch(url, { ...options, headers })
+    
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return null
+      }
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `Erro na requisição: ${response.status}`)
+    }
 
-  if (!response.ok) {
-    throw new Error(data.error || "Erro na requisição")
+    return await response.json()
+  } catch (error: any) {
+    if (error.message && !error.message.includes('autenticado')) {
+      throw error
+    }
+    return null
   }
-
-  return data
 }
 
 // Buscar todos os usuários
 export async function getUsers(search?: string): Promise<User[]> {
-  try {
-    const url = search 
-      ? `/api/usuarios?search=${encodeURIComponent(search)}&all=true`
-      : '/api/usuarios?all=true'
-    
-    const data = await fetchWithAuth(url)
-    return data.usuarios || []
-  } catch (error) {
-    console.error("Erro ao buscar usuários:", error)
-    throw error
+  const url = search 
+    ? `/api/usuarios?search=${encodeURIComponent(search)}&all=true`
+    : '/api/usuarios?all=true'
+  
+  const data = await fetchWithAuth(url)
+  
+  if (data === null) {
+    return []
   }
+  
+  return data.usuarios || []
 }
 
-// Criar novo usuário
+// Criar novo usuário - rota pública, não precisa de autenticação
 export async function createUser(userData: User): Promise<User> {
   try {
-    const data = await fetchWithAuth('/api/auth/register', {
+    const response = await fetch('/api/auth/register', {
       method: 'POST',
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(userData),
     })
-    return data.user
-  } catch (error) {
+    
+    const data = await response.json()
+    
+    if (!response.ok) {
+      throw new Error(data.error || data.message || "Erro ao criar usuário")
+    }
+    
+    return data.user || data.usuario
+  } catch (error: any) {
     console.error("Erro ao criar usuário:", error)
     throw error
   }
 }
 
 // Atualizar usuário existente
-export async function updateUser(userId: number, userData: Partial<User>): Promise<User> {
-  try {
-    const data = await fetchWithAuth(`/api/usuarios/${userId}`, {
-      method: 'PUT',
-      body: JSON.stringify(userData),
-    })
-    return data.usuario
-  } catch (error) {
-    console.error("Erro ao atualizar usuário:", error)
-    throw error
+export async function updateUser(userId: number, userData: Partial<User>): Promise<User | null> {
+  const data = await fetchWithAuth(`/api/usuarios/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify(userData),
+  })
+  
+  if (data === null) {
+    throw new Error("Sessão expirada. Faça login novamente.")
   }
+  
+  return data.usuario
 }
 
 // Deletar usuário
-export async function deleteUser(userId: number): Promise<void> {
-  try {
-    await fetchWithAuth(`/api/usuarios/${userId}`, {
-      method: 'DELETE',
-    })
-  } catch (error) {
-    console.error("Erro ao deletar usuário:", error)
-    throw error
+export async function deleteUser(userId: number): Promise<boolean> {
+  const result = await fetchWithAuth(`/api/usuarios/${userId}`, {
+    method: 'DELETE',
+  })
+  
+  if (result === null) {
+    throw new Error("Sessão expirada. Faça login novamente.")
   }
+  
+  return true
 }

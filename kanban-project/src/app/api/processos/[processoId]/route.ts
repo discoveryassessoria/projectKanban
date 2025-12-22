@@ -1,3 +1,6 @@
+// ESTE ARQUIVO VAI EM: src/app/api/processos/[processoId]/route.ts
+// SUBSTITUA O ARQUIVO EXISTENTE
+
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
@@ -225,7 +228,7 @@ export async function PUT(
   }
 }
 
-// DELETE - Excluir processo
+// DELETE - Excluir processo E LIMPAR ÁRVORE ÓRFÃ
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ processoId: string }> }
@@ -241,9 +244,10 @@ export async function DELETE(
       )
     }
 
-    // Verificar se existe
+    // 1. Buscar o processo para pegar o arvoreId ANTES de deletar
     const processo = await prisma.processo.findUnique({
-      where: { id }
+      where: { id },
+      select: { arvoreId: true }
     })
 
     if (!processo) {
@@ -253,12 +257,39 @@ export async function DELETE(
       )
     }
 
-    // Excluir (cascade vai deletar tarefas, requerentes, contratantes e anexos)
+    const arvoreId = processo.arvoreId
+
+    // 2. Excluir o processo (cascade vai deletar tarefas, requerentes, contratantes e anexos)
     await prisma.processo.delete({
       where: { id }
     })
 
-    return NextResponse.json({ message: "Processo excluído com sucesso" })
+    // 3. Se tinha uma árvore vinculada, verificar se ficou órfã
+    let arvoreRemovida = false
+    if (arvoreId) {
+      // Verificar se algum outro processo usa essa árvore
+      const outrosProcessos = await prisma.processo.count({
+        where: { arvoreId }
+      })
+
+      // Se nenhum outro processo usa, deletar a árvore
+      // (cascade do Prisma vai deletar pessoas, uniões, documentos)
+      if (outrosProcessos === 0) {
+        await prisma.arvore.delete({
+          where: { id: arvoreId }
+        })
+        
+        arvoreRemovida = true
+        console.log(`✅ Árvore órfã ${arvoreId} foi deletada automaticamente`)
+      }
+    }
+
+    return NextResponse.json({ 
+      message: arvoreRemovida 
+        ? "Processo e árvore órfã excluídos com sucesso" 
+        : "Processo excluído com sucesso",
+      arvoreRemovida 
+    })
   } catch (error) {
     console.error("Erro ao excluir processo:", error)
     return NextResponse.json(

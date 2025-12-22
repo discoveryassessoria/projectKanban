@@ -1,3 +1,5 @@
+// ESTE ARQUIVO VAI EM: prisma/seed.ts
+
 import { PrismaClient, Pais } from '@prisma/client'
 import { hash } from 'bcrypt'
 
@@ -30,7 +32,6 @@ async function main() {
     console.log('⚠️  Usuário admin já existe no banco de dados')
   } else {
     const senhaHash = await hash('12345678', 10)
-
     const admin = await prisma.usuario.create({
       data: {
         nome: 'Administrador',
@@ -39,7 +40,6 @@ async function main() {
         tipo: 'admin'
       }
     })
-
     console.log('✅ Usuário admin criado com sucesso!')
     console.log('📧 Email: admin@teste.com')
     console.log('🔑 Senha: 12345678')
@@ -75,7 +75,6 @@ async function main() {
           ordem: i,
         },
       })
-
       console.log(`   ✅ "${nome}"`)
     }
   }

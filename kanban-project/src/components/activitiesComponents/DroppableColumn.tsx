@@ -62,7 +62,7 @@ export default function DroppableColumn({
       ref={setNodeRef}
       className={`
         kanban-column transition-all duration-200 relative
-        ${isOver ? 'bg-blue-50/50 ring-2 ring-blue-300 shadow-lg' : ''}
+        ${isOver ? 'bg-white/10 ring-2 ring-white/30 shadow-lg' : ''}
       `}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}

@@ -1,6 +1,8 @@
+// ESTE ARQUIVO VAI EM: src/components/arvore/pessoa-sidebar.tsx
+
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { 
   X, 
   User, 
@@ -38,6 +40,8 @@ interface PessoaSidebarProps {
   onAddConjuge?: (pessoaId: number) => void
   onAddDocumento?: (pessoaId: number) => void
   onEditDocumento?: (documento: DocumentoArvore) => void
+  // NOVO: Prop para abrir em aba específica (ex: "documentos" vindo da pesquisa)
+  initialTab?: string
 }
 
 // ========================================
@@ -329,10 +333,35 @@ export function PessoaSidebar({
   onAddMae,
   onAddConjuge,
   onAddDocumento,
-  onEditDocumento
+  onEditDocumento,
+  initialTab
 }: PessoaSidebarProps) {
   const [activeTab, setActiveTab] = useState<"info" | "familia" | "docs">("info")
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [initialTabProcessed, setInitialTabProcessed] = useState(false)
+  
+  // NOVO: Efeito para definir aba inicial quando a sidebar abre (vindo da pesquisa)
+  useEffect(() => {
+    if (pessoa && initialTab && !initialTabProcessed) {
+      if (initialTab === "documentos" || initialTab === "docs") {
+        setActiveTab("docs")
+      } else if (initialTab === "familia") {
+        setActiveTab("familia")
+      } else if (initialTab === "info") {
+        setActiveTab("info")
+      }
+      setInitialTabProcessed(true)
+    }
+  }, [pessoa, initialTab, initialTabProcessed])
+
+  // Reset quando a pessoa muda (clique manual em outra pessoa)
+  useEffect(() => {
+    if (pessoa && !initialTab) {
+      setActiveTab("info")
+    }
+    // Reset flag quando pessoa muda
+    setInitialTabProcessed(false)
+  }, [pessoa?.id])
   
   if (!pessoa) return null
   

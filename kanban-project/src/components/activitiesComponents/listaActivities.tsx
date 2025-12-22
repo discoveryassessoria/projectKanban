@@ -40,9 +40,9 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   const [selectedAtividade, setSelectedAtividade] = useState<Atividade | null>(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
 
-  // Alias para manter compatibilidade com código existente
-  const atividades = activities
-  const statusList = statuses
+  // Garantir que atividades é sempre um array
+  const atividades = Array.isArray(activities) ? activities : []
+  const statusList = Array.isArray(statuses) ? statuses : []
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Sem prazo'
@@ -117,7 +117,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       const results = []
       for (const id of selectedItems) {
         try {
-          const response = await fetch(`/api/activities/${id}`, { 
+          const response = await fetch(`/api/tarefas/${id}`, { 
             method: 'DELETE' 
           })
           
@@ -166,7 +166,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
     setIsActionLoading(true)
     try {
       const updatePromises = selectedItems.map(id => 
-        fetch(`/api/activities/${id}`, {
+        fetch(`/api/tarefas/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ statusId: parseInt(selectedStatus) })
@@ -257,13 +257,19 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
     )
   }
 
-  // Error state
+  // Error state - mostrar mensagem amigável ao invés de erro técnico
   if (error) {
     return (
       <div className="rounded-2xl">
         <div className="p-6">
-          <div className="flex items-center justify-center h-32">
-            <p className="text-sm text-red-400">Erro: {error}</p>
+          <div className="flex flex-col items-center justify-center h-32 text-center">
+            <div className="w-16 h-16 mb-4 rounded-full bg-white/10 flex items-center justify-center">
+              <svg className="w-8 h-8 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+            <p className="text-white/70 mb-2">Nenhuma atividade disponível</p>
+            <p className="text-sm text-white/50">Crie uma nova atividade para começar</p>
           </div>
         </div>
       </div>
@@ -297,7 +303,13 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       <div className="divide-y divide-white/10">
         {atividades.length === 0 ? (
           <div className="p-8 text-center">
-            <p className="text-white/60">Nenhuma atividade encontrada</p>
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-white/10 flex items-center justify-center">
+              <svg className="w-8 h-8 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+            <p className="text-white/70 mb-2">Nenhuma atividade encontrada</p>
+            <p className="text-sm text-white/50">Crie uma nova atividade clicando no botão acima</p>
           </div>
         ) : (
           atividades.filter((atividade: Atividade) => atividade && atividade.nome).map((atividade: Atividade) => (
@@ -339,24 +351,30 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 </div>
                 
                 <div className="col-span-1">
-                  <Badge 
-                    className={
-                      atividade.status.nome.toLowerCase() === 'concluído' || atividade.status.nome.toLowerCase() === 'concluido'
-                        ? "bg-green-500/20 text-green-300 hover:bg-green-500/30 border-green-500/30"
-                        : atividade.status.nome.toLowerCase() === 'em andamento'
-                        ? "bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 border-yellow-500/30"
-                        : "bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border-blue-500/30"
-                    }
-                  >
-                    {atividade.status.nome}
-                  </Badge>
+                  {atividade.status ? (
+                    <Badge 
+                      className={
+                        atividade.status.nome?.toLowerCase() === 'concluído' || atividade.status.nome?.toLowerCase() === 'concluido'
+                          ? "bg-green-500/20 text-green-300 hover:bg-green-500/30 border-green-500/30"
+                          : atividade.status.nome?.toLowerCase() === 'em andamento'
+                          ? "bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 border-yellow-500/30"
+                          : "bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border-blue-500/30"
+                      }
+                    >
+                      {atividade.status.nome}
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-gray-500/20 text-gray-300 border-gray-500/30">
+                      Sem status
+                    </Badge>
+                  )}
                 </div>
                 
                 <div className="col-span-1">
                   <div className="flex items-center">
                     <Avatar className="h-6 w-6 border border-white/20">
                       <AvatarFallback className="text-xs bg-white/10 text-white">
-                        {atividade.usuarios[0]?.usuario.nome?.slice(0, 2).toUpperCase() || 'NA'}
+                        {atividade.usuarios?.[0]?.usuario?.nome?.slice(0, 2).toUpperCase() || 'NA'}
                       </AvatarFallback>
                     </Avatar>
                   </div>
@@ -366,7 +384,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                   <div className="flex items-center">
                     <Avatar className="h-6 w-6 border border-white/20">
                       <AvatarFallback className="text-xs bg-white/10 text-white">
-                        {atividade.usuarios[0]?.usuario.nome?.slice(0, 2).toUpperCase() || 'NA'}
+                        {atividade.usuarios?.[0]?.usuario?.nome?.slice(0, 2).toUpperCase() || 'NA'}
                       </AvatarFallback>
                     </Avatar>
                   </div>

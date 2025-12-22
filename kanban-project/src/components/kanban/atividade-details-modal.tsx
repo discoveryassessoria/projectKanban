@@ -1,3 +1,6 @@
+// ESTE ARQUIVO VAI EM: src/components/kanban/atividade-details-modal.tsx
+// SUBSTITUA O ARQUIVO EXISTENTE
+
 "use client"
 
 import { useState, useEffect, useRef } from "react"
@@ -41,6 +44,10 @@ interface ProcessoDetailsModalProps {
   statusList?: Status[]
   contratantes?: Contratante[]
   requerentes?: Requerente[]
+  // NOVO: Props para abrir em aba específica (via navegação da pesquisa)
+  initialTab?: string
+  initialPessoaId?: number
+  initialSidebarTab?: string
 }
 
 export function ProcessoDetailsModal({ 
@@ -50,7 +57,11 @@ export function ProcessoDetailsModal({
   onSave,
   statusList = [],
   contratantes: contratantesProp = [],
-  requerentes: requerentesProp = []
+  requerentes: requerentesProp = [],
+  // NOVO: Props para navegação
+  initialTab,
+  initialPessoaId,
+  initialSidebarTab
 }: ProcessoDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<"geral" | "faturas" | "historico" | "arvore">("geral")
   const [novaTarefa, setNovaTarefa] = useState("")
@@ -77,8 +88,52 @@ export function ProcessoDetailsModal({
   // Árvore genealógica
   const [arvoreIdLocal, setArvoreIdLocal] = useState<number | null>(processo?.arvoreId || null)
   
+  // NOVO: Estado para pessoa selecionada na árvore
+  const [pessoaIdParaFocar, setPessoaIdParaFocar] = useState<number | undefined>(undefined)
+  const [sidebarTabParaFocar, setSidebarTabParaFocar] = useState<string | undefined>(undefined)
+  
   const contratanteRef = useRef<HTMLDivElement>(null)
   const requerenteRef = useRef<HTMLDivElement>(null)
+  
+  // Flag para controlar se já processou os params iniciais
+  const [initialParamsProcessed, setInitialParamsProcessed] = useState(false)
+
+  // NOVO: Efeito para definir aba inicial quando o modal abre
+  useEffect(() => {
+    if (isOpen && initialTab && !initialParamsProcessed) {
+      // Mapear o valor do parâmetro para o tipo correto
+      if (initialTab === "arvore") {
+        setActiveTab("arvore")
+      } else if (initialTab === "geral") {
+        setActiveTab("geral")
+      } else if (initialTab === "faturas") {
+        setActiveTab("faturas")
+      } else if (initialTab === "historico") {
+        setActiveTab("historico")
+      }
+      
+      // Definir pessoa para focar
+      if (initialPessoaId) {
+        setPessoaIdParaFocar(initialPessoaId)
+      }
+      
+      // Definir aba da sidebar para focar
+      if (initialSidebarTab) {
+        setSidebarTabParaFocar(initialSidebarTab)
+      }
+      
+      setInitialParamsProcessed(true)
+    }
+  }, [isOpen, initialTab, initialPessoaId, initialSidebarTab, initialParamsProcessed])
+
+  // Reset quando o modal fecha
+  useEffect(() => {
+    if (!isOpen) {
+      setInitialParamsProcessed(false)
+      setPessoaIdParaFocar(undefined)
+      setSidebarTabParaFocar(undefined)
+    }
+  }, [isOpen])
 
   // Atualizar quando o processo mudar
   useEffect(() => {
@@ -124,6 +179,7 @@ export function ProcessoDetailsModal({
       onSave?.()
     }
     setIsEditing(false)
+    setActiveTab("geral") // Reset para aba padrão ao fechar
     onClose()
   }
 
@@ -860,6 +916,9 @@ export function ProcessoDetailsModal({
                 setArvoreIdLocal(novoArvoreId)
                 onSave?.()
               }}
+              // NOVO: Passar pessoa para focar na árvore (vinda da pesquisa)
+              pessoaIdParaFocar={pessoaIdParaFocar}
+              sidebarTabParaFocar={sidebarTabParaFocar}
             />
           )}
 

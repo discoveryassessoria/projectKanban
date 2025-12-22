@@ -38,12 +38,38 @@ interface Atividade {
   usuarios: UserAtv[]
 }
 
-// Fetcher genérico para SWR
+// Fetcher genérico para SWR com tratamento de erro melhorado
 const fetcher = async (url: string) => {
   const response = await fetch(url)
+  
   if (!response.ok) {
+    // Se for 404 ou 401, retorna array vazio silenciosamente
+    if (response.status === 404 || response.status === 401) {
+      console.warn(`API ${url} retornou ${response.status}`)
+      return []
+    }
     throw new Error('Erro ao carregar dados')
   }
+  
+  return response.json()
+}
+
+// Fetcher com autenticação
+const fetcherWithAuth = async (url: string) => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
+  
+  const response = await fetch(url, {
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+  })
+  
+  if (!response.ok) {
+    if (response.status === 404 || response.status === 401) {
+      console.warn(`API ${url} retornou ${response.status}`)
+      return []
+    }
+    throw new Error('Erro ao carregar dados')
+  }
+  
   return response.json()
 }
 
@@ -52,11 +78,19 @@ const swrConfig = {
   revalidateOnFocus: false,
   revalidateOnReconnect: true,
   keepPreviousData: true,
+  onErrorRetry: (error: any, key: string, config: any, revalidate: any, { retryCount }: any) => {
+    // Não retentar em erros 404 ou 401
+    if (error?.status === 404 || error?.status === 401) return
+    // Máximo de 3 tentativas
+    if (retryCount >= 3) return
+    // Retentar após 5 segundos
+    setTimeout(() => revalidate({ retryCount }), 5000)
+  }
 }
 
 /**
  * Hook para buscar atividades com filtros
- * @param filters - Filtros opcionais para atividades
+ * Usa /api/tarefas (nome correto da API no sistema)
  */
 export function useActivities(filters?: any) {
   // Construir query string com filtros
@@ -71,16 +105,22 @@ export function useActivities(filters?: any) {
   }
   
   const queryString = params.toString()
-  const url = `/api/activities${queryString ? `?${queryString}` : ''}`
+  // Usar /api/tarefas (nome correto da API)
+  const url = `/api/tarefas${queryString ? `?${queryString}` : ''}`
 
-  const { data, error, isLoading, mutate: revalidate } = useSWR<Atividade[]>(
+  const { data, error, isLoading, mutate: revalidate } = useSWR<Atividade[] | { atividades: Atividade[], tarefas: Atividade[] }>(
     url,
     fetcher,
     swrConfig
   )
 
+  // Normalizar resposta (pode vir como array ou objeto com propriedade atividades/tarefas)
+  const activities = Array.isArray(data) 
+    ? data 
+    : (data as any)?.tarefas || (data as any)?.atividades || []
+
   return {
-    activities: data,
+    activities,
     isLoading,
     error: error?.message,
     revalidate,
@@ -106,14 +146,19 @@ export function usePaises() {
  * Hook para buscar status
  */
 export function useStatuses() {
-  const { data, error, isLoading, mutate: revalidate } = useSWR<{ status: Status[] }>(
+  const { data, error, isLoading, mutate: revalidate } = useSWR<{ status: Status[] } | Status[]>(
     '/api/status',
     fetcher,
     swrConfig
   )
 
+  // Normalizar resposta
+  const statuses = Array.isArray(data) 
+    ? data 
+    : (data as any)?.status || []
+
   return {
-    statuses: data?.status || [],
+    statuses,
     isLoading,
     error: error?.message,
     revalidate,
@@ -125,14 +170,19 @@ export function useStatuses() {
  * Hook para buscar usuários
  */
 export function useUsers() {
-  const { data, error, isLoading, mutate: revalidate } = useSWR<Usuario[]>(
+  const { data, error, isLoading, mutate: revalidate } = useSWR<Usuario[] | { usuarios: Usuario[] }>(
     '/api/usuarios',
-    fetcher,
+    fetcherWithAuth,
     swrConfig
   )
 
+  // Normalizar resposta
+  const users = Array.isArray(data) 
+    ? data 
+    : (data as any)?.usuarios || []
+
   return {
-    users: data || [],
+    users,
     isLoading,
     error: error?.message,
     revalidate,
@@ -147,7 +197,7 @@ export function useUsers() {
  */
 export function useCalendarData(year: number, month: number) {
   const { data, error, isLoading, mutate: revalidate } = useSWR(
-    `/api/activities/calendar?year=${year}&month=${month}`,
+    `/api/tarefas/calendar?year=${year}&month=${month}`,
     fetcher,
     swrConfig
   )
@@ -167,7 +217,7 @@ export function useCalendarData(year: number, month: number) {
  */
 export function useDayData(date: string | null, enabled = true) {
   const { data, error, isLoading, mutate: revalidate } = useSWR(
-    enabled && date ? `/api/activities/day?date=${date}` : null,
+    enabled && date ? `/api/tarefas/day?date=${date}` : null,
     fetcher,
     swrConfig
   )
@@ -184,9 +234,9 @@ export function useDayData(date: string | null, enabled = true) {
  * Funções utilitárias para invalidar cache
  */
 
-// Invalidar cache de atividades (todas as queries de activities)
+// Invalidar cache de atividades (todas as queries de tarefas)
 export function invalidateActivities() {
-  mutate((key) => typeof key === 'string' && key.startsWith('/api/activities'))
+  mutate((key) => typeof key === 'string' && key.startsWith('/api/tarefas'))
 }
 
 // Invalidar cache de status
@@ -209,8 +259,13 @@ export function useContratantes() {
     swrConfig
   )
 
+  // Normalizar resposta
+  const contratantes = Array.isArray(data) 
+    ? data 
+    : (data as any)?.contratantes || []
+
   return {
-    contratantes: data?.contratantes || [],
+    contratantes,
     isLoading,
     error: error?.message,
     mutate: revalidate
@@ -227,8 +282,13 @@ export function useRequerentes() {
     swrConfig
   )
 
+  // Normalizar resposta
+  const requerentes = Array.isArray(data) 
+    ? data 
+    : (data as any)?.requerentes || []
+
   return {
-    requerentes: data?.requerentes || [],
+    requerentes,
     isLoading,
     error: error?.message,
     mutate: revalidate

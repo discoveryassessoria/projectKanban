@@ -1,3 +1,6 @@
+// ESTE ARQUIVO VAI EM: src/app/processos/kanban-content.tsx
+// SUBSTITUA O ARQUIVO EXISTENTE
+
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
@@ -48,6 +51,38 @@ export function KanbanContent() {
   const [requerentes, setRequerentes] = useState<Requerente[]>([])
   const [arvores, setArvores] = useState<any[]>([])
 
+  // NOVO: Parâmetros para abrir modal automaticamente
+  const [initialProcessoId, setInitialProcessoId] = useState<number | null>(null)
+  const [initialTab, setInitialTab] = useState<string | null>(null)
+  const [initialPessoaId, setInitialPessoaId] = useState<number | null>(null)
+  const [initialSidebarTab, setInitialSidebarTab] = useState<string | null>(null)
+
+  // Ler parâmetros da URL para abertura automática do modal
+  useEffect(() => {
+    const processoId = searchParams.get("processoId")
+    const tab = searchParams.get("tab")
+    const pessoaId = searchParams.get("pessoaId")
+    const urlPais = searchParams.get("pais") as Pais | null
+    const sidebarTab = searchParams.get("sidebarTab")
+
+    if (processoId) {
+      setInitialProcessoId(parseInt(processoId))
+    }
+    if (tab) {
+      setInitialTab(tab)
+    }
+    if (pessoaId) {
+      setInitialPessoaId(parseInt(pessoaId))
+    }
+    if (sidebarTab) {
+      setInitialSidebarTab(sidebarTab)
+    }
+    // Se veio um país na URL, usar ele
+    if (urlPais && Object.values(Pais).includes(urlPais)) {
+      setPaisSelecionado(urlPais)
+    }
+  }, [searchParams])
+
   // Atualizar país quando URL mudar
   useEffect(() => {
     if (paisDaUrl && Object.values(Pais).includes(paisDaUrl)) {
@@ -60,6 +95,23 @@ export function KanbanContent() {
     localStorage.removeItem("user")
     router.push("/login")
   }
+
+  // Callback para limpar URL params depois que o modal abriu
+  const handleModalOpened = useCallback(() => {
+    // Limpar os parâmetros da URL sem recarregar a página
+    const newUrl = new URL(window.location.href)
+    newUrl.searchParams.delete("processoId")
+    newUrl.searchParams.delete("tab")
+    newUrl.searchParams.delete("pessoaId")
+    newUrl.searchParams.delete("sidebarTab")
+    window.history.replaceState({}, "", newUrl.toString())
+    
+    // Limpar estados
+    setInitialProcessoId(null)
+    setInitialTab(null)
+    setInitialPessoaId(null)
+    setInitialSidebarTab(null)
+  }, [])
 
   // Buscar status por país
   const buscarStatus = useCallback(async (pais: Pais) => {
@@ -295,6 +347,12 @@ export function KanbanContent() {
                 contratantes={contratantes}
                 requerentes={requerentes}
                 onRefresh={handleRefresh}
+                // NOVO: Props para abrir modal automaticamente
+                initialProcessoId={initialProcessoId}
+                initialTab={initialTab}
+                initialPessoaId={initialPessoaId}
+                initialSidebarTab={initialSidebarTab}
+                onModalOpened={handleModalOpened}
               />
             )}
 

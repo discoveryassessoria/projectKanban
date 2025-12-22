@@ -54,7 +54,7 @@ export default function PrazoActivities() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   
   // Filtrar apenas atividades não concluídas
-  const atividades = activities.filter(activity => {
+  const atividades = (activities || []).filter((activity: Atividade) => {
     const statusNome = activity.status?.nome?.toLowerCase() || ''
     return statusNome !== 'concluído' && statusNome !== 'concluido'
   })
@@ -77,7 +77,7 @@ export default function PrazoActivities() {
       invalidateActivities()
       setIsQuickAddOpen(false)
     },
-    onError: (error) => {
+    onError: (error: string) => {
       console.error('Erro ao criar atividade:', error)
     }
   })
@@ -141,7 +141,7 @@ export default function PrazoActivities() {
   // Handlers de drag and drop
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
-    const activity = atividades.find(a => a.id === Number(active.id))
+    const activity = atividades.find((a: Atividade) => a.id === Number(active.id))
     setDraggedActivity(activity || null)
     setIsDragging(true)
   }
@@ -158,7 +158,7 @@ export default function PrazoActivities() {
     const overId = over.id as string
     
     // Encontrar a atividade sendo movida
-    const draggedActivityItem = atividades.find(a => a.id === activeId)
+    const draggedActivityItem = atividades.find((a: Atividade) => a.id === activeId)
     if (!draggedActivityItem) return
 
     // Calcular nova data baseada na categoria de destino
@@ -166,7 +166,7 @@ export default function PrazoActivities() {
     
     // Optimistic Update - atualizar cache imediatamente
     mutate(
-      atividades.map(activity => 
+      atividades.map((activity: Atividade) => 
         activity.id === activeId 
           ? { ...activity, data_termino: newDate }
           : activity
@@ -184,7 +184,7 @@ export default function PrazoActivities() {
       if (!success) {
         // Reverter mudança em caso de erro
         mutate(
-          atividades.map(activity => 
+          atividades.map((activity: Atividade) => 
             activity.id === activeId 
               ? { ...activity, data_termino: draggedActivityItem.data_termino }
               : activity
@@ -200,7 +200,7 @@ export default function PrazoActivities() {
     } catch (error) {
       // Reverter em caso de erro de rede
       mutate(
-        atividades.map(activity => 
+        atividades.map((activity: Atividade) => 
           activity.id === activeId 
             ? { ...activity, data_termino: draggedActivityItem.data_termino }
             : activity
@@ -258,17 +258,15 @@ export default function PrazoActivities() {
   const groupedActivities = groupActivitiesByDeadline(atividades)
 
   // Ordenar atividades dentro de cada categoria
-  const sortedGroupedActivities = Object.keys(groupedActivities).reduce(
-    (acc, category) => {
-      const categoryKey = category as PrazoCategory
-      acc[categoryKey] = sortActivitiesInCategory(
-        groupedActivities[categoryKey], 
-        categoryKey
-      )
-      return acc
-    },
-    {} as Record<PrazoCategory, Atividade[]>
-  )
+  const sortedGroupedActivities = {} as Record<PrazoCategory, Atividade[]>
+  
+  for (const category of Object.keys(groupedActivities)) {
+    const categoryKey = category as PrazoCategory
+    sortedGroupedActivities[categoryKey] = sortActivitiesInCategory(
+      groupedActivities[categoryKey], 
+      categoryKey
+    ) as Atividade[]
+  }
 
   const totalActivities = atividades.length
 
@@ -285,7 +283,7 @@ export default function PrazoActivities() {
 
   if (error) {
     return (
-      <Card className="p-6 bg-transparent border-white/20">
+      <Card className="p-6 bg-white/5 backdrop-blur-xl border-white/10">
         <div className="text-center">
           <p className="text-red-400 mb-4">Erro: {error}</p>
           <Button onClick={handleRefresh} variant="outline" className="border-white/30 text-white hover:bg-white/10">
@@ -370,20 +368,20 @@ export default function PrazoActivities() {
               <div className="grid grid-cols-4 gap-2 min-w-[800px]">
                 {Object.entries(PRAZO_CATEGORIES).slice(0, 4).map(([categoryKey, classification]) => {
                   const category = categoryKey as PrazoCategory
-                  const activities = sortedGroupedActivities[category] || []
+                  const categoryActivities = sortedGroupedActivities[category] || []
                   
                   return (
                     <DroppableColumn
                       key={category}
                       id={category}
                       classification={classification}
-                      activities={activities}
+                      activities={categoryActivities}
                       onQuickAdd={handleQuickAdd}
                       onHover={handleColumnHover}
                       onLeave={handleColumnLeave}
                       isExpanded={hoveredColumn === category}
                     >
-                      {activities.map((activity) => (
+                      {categoryActivities.map((activity: Atividade) => (
                         <div key={activity.id} className="activity-card">
                           <DraggableActivityCard
                             activity={activity}
@@ -413,7 +411,7 @@ export default function PrazoActivities() {
 
           {/* Empty State */}
           {totalActivities === 0 && (
-            <Card className="p-8 bg-transparent border-white/20">
+            <Card className="p-8 bg-white/5 backdrop-blur-xl border-white/10">
               <div className="text-center">
                 <h3 className="text-base font-semibold mb-2 text-white">Nenhuma atividade encontrada</h3>
                 <p className="text-sm text-white/60 mb-4">
