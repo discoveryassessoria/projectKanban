@@ -60,7 +60,7 @@ export default function AdministratorPage() {
 
   // Estados para dados do HeaderBar
   const [projetos, setProjetos] = useState<any[]>([])
-  const [atividades, setAtividades] = useState<any[]>([])
+  const [processos, setProcessos] = useState<any[]>([])
   const [arvores, setArvores] = useState<any[]>([])
 
   // Estados para modal de criar/editar
@@ -113,9 +113,9 @@ export default function AdministratorPage() {
 
   const fetchHeaderData = async () => {
     try {
-      const [projetosRes, atividadesRes, arvoresRes] = await Promise.all([
+      const [projetosRes, processosRes, arvoresRes] = await Promise.all([
         fetch("/api/projetos"),
-        fetch("/api/activities"),
+        fetch("/api/processos"),
         fetch("/api/arvore")
       ])
 
@@ -128,12 +128,12 @@ export default function AdministratorPage() {
         setProjetos([])
       }
 
-      if (atividadesRes.ok) {
-        const atividadesData = await atividadesRes.json()
-        setAtividades(Array.isArray(atividadesData) ? atividadesData : [])
+      if (processosRes.ok) {
+        const processosData = await processosRes.json()
+        setProcessos(processosData.processos || [])
       } else {
-        console.warn("Erro ao buscar atividades:", atividadesRes.status)
-        setAtividades([])
+        console.warn("Erro ao buscar processos:", processosRes.status)
+        setProcessos([])
       }
 
       if (arvoresRes.ok) {
@@ -147,7 +147,7 @@ export default function AdministratorPage() {
       console.error("Erro ao buscar dados:", error)
       // Garantir que os estados são arrays vazios em caso de erro
       setProjetos([])
-      setAtividades([])
+      setProcessos([])
       setArvores([])
     }
   }
@@ -360,6 +360,7 @@ export default function AdministratorPage() {
         userRole="Administrador"
         userEmail={user.email || ''}
         projetos={projetos}
+        processos={processos}
         arvores={arvores}
         onLogout={handleLogout}
       />

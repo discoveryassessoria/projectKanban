@@ -6,42 +6,72 @@ import useSWR, { mutate } from 'swr'
 import { Pais } from '@prisma/client'
 
 // Tipos compartilhados
-interface Usuario {
+export interface Usuario {
+  id?: number
   nome: string
-  email: string
+  email?: string
 }
 
-interface Status {
+export interface Status {
   id?: number
   nome: string
 }
 
-interface UserAtv {
+export interface UserAtv {
   usuario: Usuario
 }
 
-interface Contratante {
+export interface Contratante {
   id: number
   nome: string
   email: string | null
 }
 
-interface Atividade {
+export interface Atividade {
   id: number
   nome: string
   descricao: string | null
   data_termino: string | null
   data_criacao: string
   pais: Pais
-  status: Status
+  status: Status | null
   contratante: Contratante | null
   usuarios: UserAtv[]
+  // Campos extras para compatibilidade
+  processo?: {
+    id: number
+    nome: string
+    pais?: Pais
+  }
+  responsavel?: Usuario | null
+  concluida?: boolean
+  prioridade?: string
+}
+
+// Tipo da resposta da API de tarefas
+interface TarefaAPI {
+  id: number
+  titulo: string
+  descricao: string | null
+  dataPrazo: string | null
+  createdAt: string
+  pais: Pais | null
+  status: Status | null
+  statusId: number | null
+  processo: {
+    id: number
+    nome: string
+    pais?: Pais
+  } | null
+  responsavel: Usuario | null
+  concluida: boolean
+  prioridade: string
+  subtarefas?: TarefaAPI[]
 }
 
 // Fetcher genérico para SWR com tratamento de erro melhorado
 const fetcher = async (url: string) => {
   const response = await fetch(url)
-  
   if (!response.ok) {
     // Se for 404 ou 401, retorna array vazio silenciosamente
     if (response.status === 404 || response.status === 401) {
@@ -50,18 +80,15 @@ const fetcher = async (url: string) => {
     }
     throw new Error('Erro ao carregar dados')
   }
-  
   return response.json()
 }
 
 // Fetcher com autenticação
 const fetcherWithAuth = async (url: string) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
-  
   const response = await fetch(url, {
     headers: token ? { 'Authorization': `Bearer ${token}` } : {}
   })
-  
   if (!response.ok) {
     if (response.status === 404 || response.status === 401) {
       console.warn(`API ${url} retornou ${response.status}`)
@@ -69,7 +96,6 @@ const fetcherWithAuth = async (url: string) => {
     }
     throw new Error('Erro ao carregar dados')
   }
-  
   return response.json()
 }
 
@@ -89,13 +115,46 @@ const swrConfig = {
 }
 
 /**
+ * Função para gerar status baseado no campo concluida
+ */
+function getStatusFromConcluida(concluida: boolean): Status {
+  return concluida 
+    ? { id: -1, nome: 'Concluída' }
+    : { id: -2, nome: 'Pendente' }
+}
+
+/**
+ * Função para mapear tarefa da API para o formato esperado pelo componente
+ */
+function mapTarefaToAtividade(tarefa: TarefaAPI): Atividade {
+  return {
+    id: tarefa.id,
+    nome: tarefa.titulo, // titulo -> nome
+    descricao: tarefa.descricao,
+    data_termino: tarefa.dataPrazo, // dataPrazo -> data_termino
+    data_criacao: tarefa.createdAt, // createdAt -> data_criacao
+    pais: tarefa.pais || tarefa.processo?.pais || 'PORTUGAL' as Pais,
+    // Usar status baseado em concluida ao invés do status do processo
+    status: getStatusFromConcluida(tarefa.concluida),
+    contratante: null,
+    usuarios: tarefa.responsavel 
+      ? [{ usuario: tarefa.responsavel }] 
+      : [],
+    // Campos extras
+    processo: tarefa.processo || undefined,
+    responsavel: tarefa.responsavel,
+    concluida: tarefa.concluida,
+    prioridade: tarefa.prioridade
+  }
+}
+
+/**
  * Hook para buscar atividades com filtros
  * Usa /api/tarefas (nome correto da API no sistema)
  */
 export function useActivities(filters?: any) {
   // Construir query string com filtros
   const params = new URLSearchParams()
-  
   if (filters) {
     Object.entries(filters).forEach(([key, value]) => {
       if (value && value !== '' && value !== 'all') {
@@ -107,18 +166,27 @@ export function useActivities(filters?: any) {
   const queryString = params.toString()
   // Usar /api/tarefas (nome correto da API)
   const url = `/api/tarefas${queryString ? `?${queryString}` : ''}`
-
-  const { data, error, isLoading, mutate: revalidate } = useSWR<Atividade[] | { atividades: Atividade[], tarefas: Atividade[] }>(
+  
+  const { data, error, isLoading, mutate: revalidate } = useSWR(
     url,
     fetcher,
     swrConfig
   )
-
-  // Normalizar resposta (pode vir como array ou objeto com propriedade atividades/tarefas)
-  const activities = Array.isArray(data) 
-    ? data 
-    : (data as any)?.tarefas || (data as any)?.atividades || []
-
+  
+  // Normalizar resposta e mapear campos
+  let rawTarefas: TarefaAPI[] = []
+  
+  if (Array.isArray(data)) {
+    rawTarefas = data
+  } else if (data?.tarefas) {
+    rawTarefas = data.tarefas
+  } else if (data?.atividades) {
+    rawTarefas = data.atividades
+  }
+  
+  // Mapear tarefas para o formato esperado pelo componente
+  const activities: Atividade[] = rawTarefas.map(mapTarefaToAtividade)
+  
   return {
     activities,
     isLoading,
@@ -134,7 +202,6 @@ export function useActivities(filters?: any) {
 export function usePaises() {
   // Países são fixos, não precisam de fetch
   const paises = Object.values(Pais)
-  
   return {
     paises,
     isLoading: false,
@@ -151,12 +218,12 @@ export function useStatuses() {
     fetcher,
     swrConfig
   )
-
+  
   // Normalizar resposta
   const statuses = Array.isArray(data) 
     ? data 
     : (data as any)?.status || []
-
+  
   return {
     statuses,
     isLoading,
@@ -175,12 +242,12 @@ export function useUsers() {
     fetcherWithAuth,
     swrConfig
   )
-
+  
   // Normalizar resposta
   const users = Array.isArray(data) 
     ? data 
     : (data as any)?.usuarios || []
-
+  
   return {
     users,
     isLoading,
@@ -201,7 +268,7 @@ export function useCalendarData(year: number, month: number) {
     fetcher,
     swrConfig
   )
-
+  
   return {
     calendarData: data || [],
     isLoading,
@@ -221,7 +288,7 @@ export function useDayData(date: string | null, enabled = true) {
     fetcher,
     swrConfig
   )
-
+  
   return {
     dayData: data,
     isLoading,
@@ -258,12 +325,12 @@ export function useContratantes() {
     fetcher,
     swrConfig
   )
-
+  
   // Normalizar resposta
   const contratantes = Array.isArray(data) 
     ? data 
     : (data as any)?.contratantes || []
-
+  
   return {
     contratantes,
     isLoading,
@@ -281,12 +348,12 @@ export function useRequerentes() {
     fetcher,
     swrConfig
   )
-
+  
   // Normalizar resposta
   const requerentes = Array.isArray(data) 
     ? data 
     : (data as any)?.requerentes || []
-
+  
   return {
     requerentes,
     isLoading,
@@ -301,6 +368,3 @@ export function invalidateAll() {
   invalidateStatuses()
   invalidateUsers()
 }
-
-// Tipos exportados
-export type { Atividade, Status, Usuario, UserAtv, Contratante }

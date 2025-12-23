@@ -52,11 +52,12 @@ export default function PrazoActivities() {
   const [selectedActivity, setSelectedActivity] = useState<Atividade | null>(null)
   const [activeTab, setActiveTab] = useState("kanban")
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   
-  // Filtrar apenas atividades não concluídas
+  // Filtrar apenas atividades não concluídas para o kanban
   const atividades = (activities || []).filter((activity: Atividade) => {
     const statusNome = activity.status?.nome?.toLowerCase() || ''
-    return statusNome !== 'concluído' && statusNome !== 'concluido'
+    return statusNome !== 'concluída' && statusNome !== 'concluida'
   })
   
   // Estados para drag and drop
@@ -75,6 +76,7 @@ export default function PrazoActivities() {
   const { createQuickActivity, isLoading: isCreatingActivity, error: createError, clearError: clearCreateError } = useQuickAddActivity({
     onSuccess: () => {
       invalidateActivities()
+      mutate()
       setIsQuickAddOpen(false)
     },
     onError: (error: string) => {
@@ -104,15 +106,26 @@ export default function PrazoActivities() {
 
   const handleAtividadeSave = () => {
     mutate()
+    invalidateActivities()
     setIsDetailsModalOpen(false)
   }
 
-  const handleRefresh = () => {
-    mutate()
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      // Invalida o cache e força revalidação
+      invalidateActivities()
+      await mutate()
+    } catch (error) {
+      console.error('Erro ao atualizar:', error)
+    } finally {
+      setIsRefreshing(false)
+    }
   }
 
   const handleStatusCreated = () => {
     invalidateActivities()
+    mutate()
   }
 
   const handleQuickAdd = (category: string) => {
@@ -270,7 +283,7 @@ export default function PrazoActivities() {
 
   const totalActivities = atividades.length
 
-  if (isLoading) {
+  if (isLoading && !isRefreshing) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -286,7 +299,7 @@ export default function PrazoActivities() {
       <Card className="p-6 bg-white/5 backdrop-blur-xl border-white/10">
         <div className="text-center">
           <p className="text-red-400 mb-4">Erro: {error}</p>
-          <Button onClick={handleRefresh} variant="outline" className="border-white/30 text-white hover:bg-white/10">
+          <Button onClick={handleRefresh} variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white">
             <RefreshCw className="h-4 w-4 mr-2" />
             Tentar novamente
           </Button>
@@ -341,9 +354,15 @@ export default function PrazoActivities() {
               Criando...
             </Badge>
           )}
-          <Button variant="outline" size="sm" onClick={handleRefresh} className="border-white/30 text-white hover:bg-white/10 h-8 text-xs">
-            <RefreshCw className="h-3 w-3 mr-1" />
-            Atualizar
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh} 
+            disabled={isRefreshing}
+            className="bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white h-8 text-xs"
+          >
+            <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Atualizando...' : 'Atualizar'}
           </Button>
         </div>
       </div>
@@ -409,18 +428,14 @@ export default function PrazoActivities() {
             </DragOverlay>
           </DndContext>
 
-          {/* Empty State */}
+          {/* Empty State - Sem botão redundante, texto centralizado */}
           {totalActivities === 0 && (
             <Card className="p-8 bg-white/5 backdrop-blur-xl border-white/10">
-              <div className="text-center">
+              <div className="text-center flex flex-col items-center justify-center">
                 <h3 className="text-base font-semibold mb-2 text-white">Nenhuma atividade encontrada</h3>
-                <p className="text-sm text-white/60 mb-4">
+                <p className="text-sm text-white/60">
                   Comece criando uma nova atividade.
                 </p>
-                <Button className="bg-emerald-500 hover:bg-emerald-600 text-white h-8 text-xs">
-                  <Plus className="h-3 w-3 mr-1" />
-                  Nova Atividade
-                </Button>
               </div>
             </Card>
           )}

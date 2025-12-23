@@ -1,6 +1,7 @@
 // Schema atualizado - Processo (cards Kanban) e Tarefa (afazeres) separados
 // Contratante e Requerente com campos expandidos
 // ✅ ATUALIZAÇÃO: Campos de cidadania + modelo Documento
+// ✅ ATUALIZAÇÃO: Subtarefas com auto-relacionamento
 
 generator client {
   provider = "prisma-client-js"
@@ -305,7 +306,7 @@ model Documento {
 }
 
 // ========================================
-// STATUS - ETAPAS DO KANBAN POR PAÍS
+// STATUS - ETAPAS DAS TAREFAS
 // ========================================
 model Status {
   id    Int    @id @default(autoincrement())
@@ -315,6 +316,9 @@ model Status {
   pais Pais
 
   processos Processo[]
+  
+  // ✅ NOVO: Tarefas vinculadas ao status
+  tarefas Tarefa[]
 
   @@unique([nome, pais])
   @@index([pais])
@@ -368,15 +372,23 @@ model ProcessoContratante {
 }
 
 // ========================================
-// TAREFA - AFAZERES DOS FUNCIONÁRIOS
+// TAREFA - AFAZERES (COM SUPORTE A SUBTAREFAS)
 // ========================================
 model Tarefa {
   id          Int       @id @default(autoincrement())
   titulo      String    @db.VarChar(200)
   descricao   String?   @db.Text
   
-  processoId  Int
-  processo    Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  // ✅ Vínculo opcional com processo (tarefa pode existir independente)
+  processoId  Int?
+  processo    Processo?  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  
+  // ✅ NOVO: Vínculo com status
+  statusId    Int?
+  status      Status?   @relation(fields: [statusId], references: [id], onDelete: SetNull)
+  
+  // ✅ NOVO: País da tarefa (para tarefas independentes)
+  pais        Pais?
   
   responsavelId Int?
   responsavel   Usuario? @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
@@ -387,12 +399,26 @@ model Tarefa {
   dataPrazo   DateTime?
   dataConclusao DateTime?
   
+  // ✅ NOVO: Auto-relacionamento para subtarefas
+  // Uma tarefa pode ter uma tarefa pai (ser subtarefa)
+  tarefaPaiId Int?
+  tarefaPai   Tarefa?  @relation("Subtarefas", fields: [tarefaPaiId], references: [id], onDelete: Cascade)
+  
+  // Uma tarefa pode ter várias subtarefas
+  subtarefas  Tarefa[] @relation("Subtarefas")
+  
+  // ✅ NOVO: Ordem da tarefa/subtarefa para organização
+  ordem       Int      @default(0)
+  
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@index([processoId])
   @@index([responsavelId])
   @@index([concluida])
+  @@index([tarefaPaiId])
+  @@index([statusId])
+  @@index([pais])
 }
 
 // ========================================

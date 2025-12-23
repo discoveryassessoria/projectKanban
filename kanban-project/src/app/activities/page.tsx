@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -53,7 +53,6 @@ export default function ActivitiesPage() {
   const router = useRouter()
   const [searchModalOpen, setSearchModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filteredActivities, setFilteredActivities] = useState<Atividade[]>([])
   const [filterModalOpen, setFilterModalOpen] = useState(false)
   const [filters, setFilters] = useState<Filters>({
     dataInicio: '',
@@ -65,8 +64,9 @@ export default function ActivitiesPage() {
   const [mounted, setMounted] = useState(false)
   const [user, setUser] = useState<UserData>({ nome: "Usuário" })
 
-  // Estados para árvores (para o HeaderBar)
+  // Estados para árvores e processos (para o HeaderBar)
   const [arvores, setArvores] = useState<any[]>([])
+  const [processos, setProcessos] = useState<any[]>([])
 
   // Dados
   const { activities } = useActivities()
@@ -84,8 +84,9 @@ export default function ActivitiesPage() {
         }
       }
     }
-    // Buscar árvores para o HeaderBar
+    // Buscar dados para o HeaderBar
     buscarArvores()
+    buscarProcessos()
   }, [])
 
   const buscarArvores = async () => {
@@ -97,6 +98,18 @@ export default function ActivitiesPage() {
       }
     } catch (error) {
       console.error("Erro ao buscar árvores:", error)
+    }
+  }
+
+  const buscarProcessos = async () => {
+    try {
+      const response = await fetch("/api/processos")
+      if (response.ok) {
+        const data = await response.json()
+        setProcessos(data.processos || [])
+      }
+    } catch (error) {
+      console.error("Erro ao buscar processos:", error)
     }
   }
 
@@ -114,29 +127,6 @@ export default function ActivitiesPage() {
   const handleSearchTermChange = useCallback((term: string) => {
     setSearchTerm(term)
   }, [])
-
-  const handleFilteredActivitiesChange = useCallback((activities: Atividade[]) => {
-    setFilteredActivities(activities)
-  }, [])
-
-  // Converter atividades para o formato do HeaderBar
-  const atividadesParaHeader = (activities || [])
-    .filter((a: Atividade | null | undefined) => a && a.id !== undefined)
-    .map((a: Atividade) => ({
-      id: a.id as number,
-      nome: a.nome,
-      descricao: a.descricao || null,
-      data_criacao: a.data_criacao || new Date().toISOString(),
-      data_termino: a.data_termino || null,
-      pais: a.pais,
-      status: a.status ? { nome: a.status.nome } : null,
-      usuarios: a.usuarios?.map((u: { usuario: { nome?: string; email?: string } }) => ({
-        usuario: {
-          nome: u.usuario?.nome || '',
-          email: u.usuario?.email || ''
-        }
-      }))
-    }))
 
   // Tela de carregamento
   if (!mounted) {
@@ -166,6 +156,7 @@ export default function ActivitiesPage() {
         userRole={user.tipo === 'admin' ? 'Administrador' : user.tipo || 'Usuário'}
         userEmail={user.email || ''}
         projetos={[]}
+        processos={processos}
         arvores={arvores}
         onLogout={handleLogout}
       />
@@ -229,8 +220,6 @@ export default function ActivitiesPage() {
           onOpenChange={setSearchModalOpen}
           searchTerm={searchTerm}
           onSearchTermChange={handleSearchTermChange}
-          filteredActivities={filteredActivities}
-          onFilteredActivitiesChange={handleFilteredActivitiesChange}
         />
 
         {/* Modal de Filtros */}
@@ -284,39 +273,39 @@ function FilterModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-white/10 border-white/20 backdrop-blur-xl text-white">
+      <DialogContent className="bg-white border-gray-200 text-gray-900">
         <DialogHeader>
-          <DialogTitle className="text-white">Filtrar Atividades</DialogTitle>
+          <DialogTitle className="text-gray-900">Filtrar Atividades</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-white/90">Data Início</Label>
+              <Label className="text-gray-700">Data Início</Label>
               <Input
                 type="date"
                 value={filters.dataInicio}
                 onChange={(e) => updateFilter('dataInicio', e.target.value)}
-                className="bg-white/10 border-white/20 text-white"
+                className="bg-white border-gray-300 text-gray-900"
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-white/90">Data Fim</Label>
+              <Label className="text-gray-700">Data Fim</Label>
               <Input
                 type="date"
                 value={filters.dataFim}
                 onChange={(e) => updateFilter('dataFim', e.target.value)}
-                className="bg-white/10 border-white/20 text-white"
+                className="bg-white border-gray-300 text-gray-900"
               />
             </div>
           </div>
           
           <div className="space-y-2">
-            <Label className="text-white/90">País</Label>
+            <Label className="text-gray-700">País</Label>
             <Select value={filters.pais} onValueChange={(value) => updateFilter('pais', value)}>
-              <SelectTrigger className="bg-white/10 border-white/20 text-white">
+              <SelectTrigger className="bg-white border-gray-300 text-gray-900">
                 <SelectValue placeholder="Selecione um país" />
               </SelectTrigger>
-              <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
+              <SelectContent className="bg-white border-gray-200 text-gray-900">
                 <SelectItem value="all">Todos os Países</SelectItem>
                 {paises.map((pais) => (
                   <SelectItem key={pais} value={pais}>
@@ -328,12 +317,12 @@ function FilterModal({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-white/90">Status</Label>
+            <Label className="text-gray-700">Status</Label>
             <Select value={filters.status} onValueChange={(value) => updateFilter('status', value)}>
-              <SelectTrigger className="bg-white/10 border-white/20 text-white">
+              <SelectTrigger className="bg-white border-gray-300 text-gray-900">
                 <SelectValue placeholder="Selecione um status" />
               </SelectTrigger>
-              <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
+              <SelectContent className="bg-white border-gray-200 text-gray-900">
                 <SelectItem value="all">Todos os Status</SelectItem>
                 {(statuses || []).map((status: Status) => (
                   <SelectItem key={status.id} value={String(status.id)}>
@@ -345,12 +334,12 @@ function FilterModal({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-white/90">Responsável</Label>
+            <Label className="text-gray-700">Responsável</Label>
             <Select value={filters.responsavel} onValueChange={(value) => updateFilter('responsavel', value)}>
-              <SelectTrigger className="bg-white/10 border-white/20 text-white">
+              <SelectTrigger className="bg-white border-gray-300 text-gray-900">
                 <SelectValue placeholder="Selecione um responsável" />
               </SelectTrigger>
-              <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
+              <SelectContent className="bg-white border-gray-200 text-gray-900">
                 <SelectItem value="all">Todos os Responsáveis</SelectItem>
                 {(users || []).map((u: { nome: string; email: string }) => (
                   <SelectItem key={u.email} value={u.email}>
@@ -365,7 +354,7 @@ function FilterModal({
             <Button 
               onClick={handleClearFilters}
               variant="outline" 
-              className="flex-1 bg-white/10 border-white/20 text-white hover:bg-white/20"
+              className="flex-1 bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
             >
               Limpar Filtros
             </Button>
@@ -388,68 +377,62 @@ interface SearchModalProps {
   onOpenChange: (open: boolean) => void
   searchTerm: string
   onSearchTermChange: (term: string) => void
-  filteredActivities: Atividade[]
-  onFilteredActivitiesChange: (activities: Atividade[]) => void
 }
 
 function SearchModal({ 
   open, 
   onOpenChange, 
   searchTerm, 
-  onSearchTermChange,
-  filteredActivities,
-  onFilteredActivitiesChange
+  onSearchTermChange
 }: SearchModalProps) {
   const { activities } = useActivities()
-
-  useEffect(() => {
+  
+  const filteredActivities = useMemo(() => {
     if (searchTerm && activities && activities.length > 0) {
-      const filtered = activities.filter((activity: Atividade) =>
+      return activities.filter((activity: Atividade) =>
         activity.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (activity.descricao && activity.descricao.toLowerCase().includes(searchTerm.toLowerCase()))
       )
-      onFilteredActivitiesChange(filtered)
-    } else {
-      onFilteredActivitiesChange([])
     }
-  }, [searchTerm, activities, onFilteredActivitiesChange])
+    return []
+  }, [searchTerm, activities])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-white/10 border-white/20 backdrop-blur-xl text-white max-w-2xl">
+      <DialogContent className="bg-white border-gray-200 text-gray-900 max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-white">Pesquisar Atividades</DialogTitle>
+          <DialogTitle className="text-gray-900">Pesquisar Atividades</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Digite para pesquisar..."
               value={searchTerm}
               onChange={(e) => onSearchTermChange(e.target.value)}
-              className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/60"
+              className="pl-10 bg-white border-gray-300 text-gray-900 placeholder:text-gray-400"
             />
           </div>
 
           <div className="max-h-96 overflow-y-auto space-y-2">
             {filteredActivities.length > 0 ? (
-              filteredActivities.map((activity) => (
+              filteredActivities.map((activity: Atividade) => (
                 <div 
                   key={activity.id}
-                  className="p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition cursor-pointer"
+                  className="p-3 rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 transition cursor-pointer"
                 >
-                  <h4 className="font-medium text-white">{activity.nome}</h4>
+                  <h4 className="font-medium text-gray-900">{activity.nome}</h4>
                   {activity.descricao && (
-                    <p className="text-sm text-white/70 mt-1">{activity.descricao}</p>
+                    <p className="text-sm text-gray-600 mt-1">{activity.descricao}</p>
                   )}
                   <div className="flex items-center gap-2 mt-2">
                     {activity.pais && (
-                      <Badge variant="outline" className="text-xs bg-white/10 border-white/20 text-white">
+                      <Badge variant="outline" className="text-xs bg-gray-100 border-gray-300 text-gray-700">
                         {PAIS_LABELS[activity.pais] || activity.pais}
                       </Badge>
                     )}
                     {activity.status?.nome && (
-                      <Badge variant="outline" className="text-xs bg-white/10 border-white/20 text-white">
+                      <Badge variant="outline" className="text-xs bg-gray-100 border-gray-300 text-gray-700">
                         {activity.status.nome}
                       </Badge>
                     )}
@@ -457,9 +440,9 @@ function SearchModal({
                 </div>
               ))
             ) : searchTerm ? (
-              <p className="text-center text-white/60 py-8">Nenhuma atividade encontrada</p>
+              <p className="text-center text-gray-500 py-8">Nenhuma atividade encontrada</p>
             ) : (
-              <p className="text-center text-white/60 py-8">Digite para pesquisar atividades</p>
+              <p className="text-center text-gray-500 py-8">Digite para pesquisar atividades</p>
             )}
           </div>
         </div>
@@ -497,7 +480,12 @@ function CreateActivityModal() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          titulo: formData.nome,
+          descricao: formData.descricao,
+          dataPrazo: formData.data_termino || null,
+          pais: formData.pais || 'PORTUGAL'
+        })
       })
 
       if (response.ok) {
@@ -524,76 +512,56 @@ function CreateActivityModal() {
           <span>Nova Atividade</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-white/10 border-white/20 backdrop-blur-xl text-white">
+      <DialogContent className="bg-white border-gray-200 text-gray-900">
         <DialogHeader>
-          <DialogTitle className="text-white">Criar Nova Atividade</DialogTitle>
+          <DialogTitle className="text-gray-900">Criar Nova Atividade</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-white/90">Nome da Atividade</Label>
+            <Label className="text-gray-700">Nome da Atividade</Label>
             <Input
               required
               value={formData.nome}
               onChange={(e) => updateFormData('nome', e.target.value)}
-              className="bg-white/10 border-white/20 text-white"
+              className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
               placeholder="Digite o nome da atividade"
             />
           </div>
 
           <div className="space-y-2">
-            <Label className="text-white/90">Descrição</Label>
+            <Label className="text-gray-700">Descrição</Label>
             <Textarea
               value={formData.descricao}
               onChange={(e) => updateFormData('descricao', e.target.value)}
-              className="bg-white/10 border-white/20 text-white"
+              className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
               placeholder="Descreva a atividade"
               rows={4}
             />
           </div>
 
           <div className="space-y-2">
-            <Label className="text-white/90">Data de Término</Label>
+            <Label className="text-gray-700">Data de Término</Label>
             <Input
               type="date"
-              required
               value={formData.data_termino}
               onChange={(e) => updateFormData('data_termino', e.target.value)}
-              className="bg-white/10 border-white/20 text-white"
+              className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500 [&::-webkit-calendar-picker-indicator]:opacity-50"
             />
           </div>
 
           <div className="space-y-2">
-            <Label className="text-white/90">País</Label>
+            <Label className="text-gray-700">País</Label>
             <Select 
               value={formData.pais} 
               onValueChange={(value) => updateFormData('pais', value)}
             >
-              <SelectTrigger className="bg-white/10 border-white/20 text-white">
+              <SelectTrigger className="bg-white border-gray-300 text-gray-900">
                 <SelectValue placeholder="Selecione um país" />
               </SelectTrigger>
-              <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
+              <SelectContent className="bg-white border-gray-200 text-gray-900">
                 {paises.map((pais) => (
                   <SelectItem key={pais} value={pais}>
                     {PAIS_LABELS[pais] || pais}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-white/90">Status</Label>
-            <Select 
-              value={formData.status_id} 
-              onValueChange={(value) => updateFormData('status_id', value)}
-            >
-              <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                <SelectValue placeholder="Selecione um status" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
-                {(statuses || []).map((status: Status) => (
-                  <SelectItem key={status.id} value={String(status.id)}>
-                    {status.nome}
                   </SelectItem>
                 ))}
               </SelectContent>

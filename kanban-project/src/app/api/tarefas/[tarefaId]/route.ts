@@ -2,7 +2,56 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { PrioridadeTarefa } from "@prisma/client"
 
-// GET - Buscar tarefa por ID
+async function verificarEConcluirTarefaPai(tarefaPaiId: number) {
+  const tarefaPai = await prisma.tarefa.findUnique({
+    where: { id: tarefaPaiId },
+    include: {
+      subtarefas: {
+        select: { concluida: true }
+      }
+    }
+  })
+
+  if (!tarefaPai) return
+
+  const todasConcluidas = tarefaPai.subtarefas.length > 0 && 
+    tarefaPai.subtarefas.every(sub => sub.concluida)
+
+  if (todasConcluidas && !tarefaPai.concluida) {
+    await prisma.tarefa.update({
+      where: { id: tarefaPaiId },
+      data: {
+        concluida: true,
+        dataConclusao: new Date()
+      }
+    })
+
+    if (tarefaPai.tarefaPaiId) {
+      await verificarEConcluirTarefaPai(tarefaPai.tarefaPaiId)
+    }
+  }
+}
+
+async function reabrirTarefaPaiSeNecessario(tarefaPaiId: number) {
+  const tarefaPai = await prisma.tarefa.findUnique({
+    where: { id: tarefaPaiId }
+  })
+
+  if (tarefaPai && tarefaPai.concluida) {
+    await prisma.tarefa.update({
+      where: { id: tarefaPaiId },
+      data: {
+        concluida: false,
+        dataConclusao: null
+      }
+    })
+
+    if (tarefaPai.tarefaPaiId) {
+      await reabrirTarefaPaiSeNecessario(tarefaPai.tarefaPaiId)
+    }
+  }
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ tarefaId: string }> }
@@ -26,10 +75,14 @@ export async function GET(
             id: true,
             nome: true,
             pais: true,
-            contratante: {
+            contratantes: {
               select: {
-                id: true,
-                nome: true
+                contratante: {
+                  select: {
+                    id: true,
+                    nome: true
+                  }
+                }
               }
             }
           }
@@ -39,6 +92,48 @@ export async function GET(
             id: true,
             nome: true,
             email: true
+          }
+        },
+        status: {
+          select: {
+            id: true,
+            nome: true
+          }
+        },
+        subtarefas: {
+          include: {
+            responsavel: {
+              select: {
+                id: true,
+                nome: true,
+                email: true
+              }
+            },
+            subtarefas: {
+              include: {
+                responsavel: {
+                  select: {
+                    id: true,
+                    nome: true,
+                    email: true
+                  }
+                }
+              },
+              orderBy: [
+                { ordem: "asc" },
+                { createdAt: "asc" }
+              ]
+            }
+          },
+          orderBy: [
+            { ordem: "asc" },
+            { createdAt: "asc" }
+          ]
+        },
+        tarefaPai: {
+          select: {
+            id: true,
+            titulo: true
           }
         }
       }
@@ -61,7 +156,6 @@ export async function GET(
   }
 }
 
-// PUT - Atualizar tarefa
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ tarefaId: string }> }
@@ -84,12 +178,19 @@ export async function PUT(
       responsavelId,
       prioridade,
       dataPrazo,
-      concluida
+      concluida,
+      statusId,
+      pais,
+      ordem
     } = body
 
-    // Verificar se a tarefa existe
     const tarefaExistente = await prisma.tarefa.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        subtarefas: {
+          select: { id: true, concluida: true }
+        }
+      }
     })
 
     if (!tarefaExistente) {
@@ -99,7 +200,6 @@ export async function PUT(
       )
     }
 
-    // Verificar se o responsável existe (se fornecido)
     if (responsavelId) {
       const responsavel = await prisma.usuario.findUnique({
         where: { id: responsavelId }
@@ -113,7 +213,6 @@ export async function PUT(
       }
     }
 
-    // Validar prioridade se fornecida
     if (prioridade && !Object.values(PrioridadeTarefa).includes(prioridade)) {
       return NextResponse.json(
         { error: "Prioridade inválida" },
@@ -121,7 +220,6 @@ export async function PUT(
       )
     }
 
-    // Preparar dados de atualização
     const dataAtualizacao: any = {}
 
     if (titulo !== undefined) dataAtualizacao.titulo = titulo
@@ -129,13 +227,26 @@ export async function PUT(
     if (responsavelId !== undefined) dataAtualizacao.responsavelId = responsavelId
     if (prioridade !== undefined) dataAtualizacao.prioridade = prioridade
     if (dataPrazo !== undefined) dataAtualizacao.dataPrazo = dataPrazo ? new Date(dataPrazo) : null
-    
-    // Se marcando como concluída, registrar data de conclusão
+    if (statusId !== undefined) dataAtualizacao.statusId = statusId
+    if (pais !== undefined) dataAtualizacao.pais = pais
+    if (ordem !== undefined) dataAtualizacao.ordem = ordem
+
     if (concluida !== undefined) {
-      dataAtualizacao.concluida = concluida
       if (concluida && !tarefaExistente.concluida) {
+        if (tarefaExistente.subtarefas.length > 0) {
+          const subtarefasPendentes = tarefaExistente.subtarefas.filter(s => !s.concluida)
+          if (subtarefasPendentes.length > 0) {
+            return NextResponse.json(
+              { error: `Não é possível concluir. Existem ${subtarefasPendentes.length} subtarefa(s) pendente(s).` },
+              { status: 400 }
+            )
+          }
+        }
+        dataAtualizacao.concluida = true
         dataAtualizacao.dataConclusao = new Date()
-      } else if (!concluida) {
+      } 
+      else if (!concluida && tarefaExistente.concluida) {
+        dataAtualizacao.concluida = false
         dataAtualizacao.dataConclusao = null
       }
     }
@@ -157,9 +268,43 @@ export async function PUT(
             nome: true,
             email: true
           }
+        },
+        status: {
+          select: {
+            id: true,
+            nome: true
+          }
+        },
+        subtarefas: {
+          include: {
+            responsavel: {
+              select: {
+                id: true,
+                nome: true
+              }
+            }
+          },
+          orderBy: [
+            { ordem: "asc" },
+            { createdAt: "asc" }
+          ]
+        },
+        tarefaPai: {
+          select: {
+            id: true,
+            titulo: true
+          }
         }
       }
     })
+
+    if (concluida && tarefaExistente.tarefaPaiId) {
+      await verificarEConcluirTarefaPai(tarefaExistente.tarefaPaiId)
+    }
+
+    if (concluida === false && tarefaExistente.tarefaPaiId) {
+      await reabrirTarefaPaiSeNecessario(tarefaExistente.tarefaPaiId)
+    }
 
     return NextResponse.json({ tarefa })
   } catch (error) {
@@ -171,7 +316,6 @@ export async function PUT(
   }
 }
 
-// DELETE - Excluir tarefa
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ tarefaId: string }> }
@@ -187,9 +331,13 @@ export async function DELETE(
       )
     }
 
-    // Verificar se existe
     const tarefa = await prisma.tarefa.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        subtarefas: {
+          select: { id: true }
+        }
+      }
     })
 
     if (!tarefa) {
@@ -199,11 +347,20 @@ export async function DELETE(
       )
     }
 
+    const tarefaPaiId = tarefa.tarefaPaiId
+
     await prisma.tarefa.delete({
       where: { id }
     })
 
-    return NextResponse.json({ message: "Tarefa excluída com sucesso" })
+    if (tarefaPaiId) {
+      await verificarEConcluirTarefaPai(tarefaPaiId)
+    }
+
+    return NextResponse.json({ 
+      message: "Tarefa excluída com sucesso",
+      subtarefasExcluidas: tarefa.subtarefas.length
+    })
   } catch (error) {
     console.error("Erro ao excluir tarefa:", error)
     return NextResponse.json(

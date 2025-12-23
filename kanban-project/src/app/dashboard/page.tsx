@@ -291,13 +291,15 @@ export default function DashboardPage() {
                     <p className="text-3xl font-bold mt-2">{processos.length}</p>
                     <p className="text-xs text-white/50 mt-1">famílias ativas</p>
                   </div>
-                  <BarChart3 className="h-6 w-6 text-blue-500" />
+                  <div className="p-2.5 rounded-xl bg-blue-500">
+                    <BarChart3 className="h-6 w-6 text-white" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Tarefas Vencidas */}
-            <Card className={`backdrop-blur-sm border text-white ${tarefasVencidas.length > 0 ? 'bg-red-500/20 border-red-500/40' : 'bg-white/10 border-white/20'}`}>
+            <Card className="bg-white/10 backdrop-blur-sm border border-white/20 text-white">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
                   <div>
@@ -307,13 +309,15 @@ export default function DashboardPage() {
                       {tarefasVencidas.length > 0 ? 'requer atenção!' : 'tudo em dia'}
                     </p>
                   </div>
-                  <AlertTriangle className="h-6 w-6 text-red-500" />
+                  <div className="p-2.5 rounded-xl bg-red-500">
+                    <AlertTriangle className="h-6 w-6 text-white" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Tarefas para Hoje */}
-            <Card className={`backdrop-blur-sm border text-white ${tarefasHoje.length > 0 ? 'bg-emerald-500/20 border-emerald-500/40' : 'bg-white/10 border-white/20'}`}>
+            <Card className="bg-white/10 backdrop-blur-sm border border-white/20 text-white">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
                   <div>
@@ -323,7 +327,9 @@ export default function DashboardPage() {
                       {tarefasHoje.length > 0 ? 'a fazer hoje' : 'nada agendado'}
                     </p>
                   </div>
-                  <Calendar className="h-6 w-6 text-emerald-500" />
+                  <div className="p-2.5 rounded-xl bg-emerald-500">
+                    <Calendar className="h-6 w-6 text-white" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -337,7 +343,9 @@ export default function DashboardPage() {
                     <p className="text-3xl font-bold mt-2">{tarefasProximaSemana.length}</p>
                     <p className="text-xs text-white/50 mt-1">tarefas agendadas</p>
                   </div>
-                  <Clock className="h-6 w-6 text-yellow-500" />
+                  <div className="p-2.5 rounded-xl bg-yellow-500">
+                    <Clock className="h-6 w-6 text-white" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -549,7 +557,9 @@ export default function DashboardPage() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Clock className="h-5 w-5 text-yellow-500" />
+                      <div className="p-2 rounded-xl bg-yellow-500">
+                        <Clock className="h-5 w-5 text-white" />
+                      </div>
                       <div>
                         <CardTitle className="text-base text-white">Próximos Prazos</CardTitle>
                         <CardDescription className="text-xs text-white/50">

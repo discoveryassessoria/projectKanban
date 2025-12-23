@@ -1,8 +1,8 @@
 "use client"
 
 /**
- * Modal para criação rápida de atividades
- * Permite criar uma atividade com prazo pré-definido baseado na coluna do kanban
+ * Modal para criação rápida de tarefas
+ * Com opção de vincular a um processo do kanban
  */
 
 import { useState, useEffect } from "react"
@@ -13,21 +13,19 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Calendar } from "lucide-react"
+import { Loader2, Calendar, Flag, User, Link2 } from "lucide-react"
 import { PrazoClassification } from "@/src/utils/prazoUtils"
 
-interface Projeto {
+interface Usuario {
   id: number
   nome: string
-  descricao: string | null
-  _count: {
-    atividades: number
-  }
+  email?: string
 }
 
-interface Status {
+interface Processo {
   id: number
   nome: string
+  pais?: string
 }
 
 interface QuickAddModalProps {
@@ -41,9 +39,13 @@ interface QuickAddModalProps {
 export interface QuickAddFormData {
   nome: string
   descricao: string
-  projeto_id: number
-  status_id: number
+  prioridade: string
+  responsavelId: number | null
+  processoId: number | null
   prazo_category: string
+  // Campos para compatibilidade (podem ser ignorados pelo hook)
+  projeto_id?: number
+  status_id?: number
 }
 
 export default function QuickAddModal({ 
@@ -56,22 +58,23 @@ export default function QuickAddModal({
   const [formData, setFormData] = useState<QuickAddFormData>({
     nome: '',
     descricao: '',
-    projeto_id: 0,
-    status_id: 0,
+    prioridade: 'MEDIA',
+    responsavelId: null,
+    processoId: null,
     prazo_category: classification.category
   })
   
-  const [projetos, setProjetos] = useState<Projeto[]>([])
-  const [statuses, setStatuses] = useState<Status[]>([])
-  const [loadingProjetos, setLoadingProjetos] = useState(false)
-  const [loadingStatuses, setLoadingStatuses] = useState(false)
+  const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  const [processos, setProcessos] = useState<Processo[]>([])
+  const [loadingUsuarios, setLoadingUsuarios] = useState(false)
+  const [loadingProcessos, setLoadingProcessos] = useState(false)
   const [errors, setErrors] = useState<{[key: string]: string}>({})
 
-  // Carregar projetos quando modal abrir
+  // Carregar dados quando modal abrir
   useEffect(() => {
     if (isOpen) {
-      fetchProjetos()
-      fetchStatuses()
+      fetchUsuarios()
+      fetchProcessos()
       // Auto-focus no campo nome
       setTimeout(() => {
         const nomeInput = document.getElementById('quick-add-nome')
@@ -88,55 +91,42 @@ export default function QuickAddModal({
       setFormData({
         nome: '',
         descricao: '',
-        projeto_id: 0,
-        status_id: 0,
+        prioridade: 'MEDIA',
+        responsavelId: null,
+        processoId: null,
         prazo_category: classification.category
       })
       setErrors({})
     }
   }, [isOpen, classification.category])
 
-  const fetchProjetos = async () => {
+  const fetchUsuarios = async () => {
     try {
-      setLoadingProjetos(true)
-      const response = await fetch('/api/projetos')
+      setLoadingUsuarios(true)
+      const response = await fetch('/api/usuarios')
       if (response.ok) {
         const data = await response.json()
-        setProjetos(data.projetos || [])
+        setUsuarios(data.usuarios || data || [])
       }
     } catch (error) {
-      console.error('Erro ao carregar projetos:', error)
+      console.error('Erro ao carregar usuários:', error)
     } finally {
-      setLoadingProjetos(false)
+      setLoadingUsuarios(false)
     }
   }
 
-  const fetchStatuses = async () => {
+  const fetchProcessos = async () => {
     try {
-      setLoadingStatuses(true)
-      const response = await fetch('/api/status')
+      setLoadingProcessos(true)
+      const response = await fetch('/api/processos')
       if (response.ok) {
         const data = await response.json()
-        // A API retorna { status: [...] }, então precisamos acessar data.status
-        const statusArray = data.status || []
-        setStatuses(statusArray)
-        
-        // Definir status padrão automaticamente
-        if (statusArray.length > 0 && !formData.status_id) {
-          const defaultStatus = statusArray.find((status: Status) => 
-            status.nome.toLowerCase().includes('fazer') ||
-            status.nome.toLowerCase().includes('pendente') ||
-            status.nome.toLowerCase().includes('novo')
-          )
-          
-          const statusToUse = defaultStatus || statusArray[0]
-          setFormData(prev => ({ ...prev, status_id: statusToUse.id }))
-        }
+        setProcessos(data.processos || data || [])
       }
     } catch (error) {
-      console.error('Erro ao carregar status:', error)
+      console.error('Erro ao carregar processos:', error)
     } finally {
-      setLoadingStatuses(false)
+      setLoadingProcessos(false)
     }
   }
 
@@ -144,15 +134,7 @@ export default function QuickAddModal({
     const newErrors: {[key: string]: string} = {}
     
     if (!formData.nome.trim()) {
-      newErrors.nome = 'Nome da atividade é obrigatório'
-    }
-    
-    if (!formData.projeto_id || formData.projeto_id <= 0) {
-      newErrors.projeto_id = 'Selecione um projeto'
-    }
-    
-    if (!formData.status_id || formData.status_id <= 0) {
-      newErrors.status_id = 'Selecione um status'
+      newErrors.nome = 'Nome da tarefa é obrigatório'
     }
     
     setErrors(newErrors)
@@ -170,7 +152,7 @@ export default function QuickAddModal({
       await onSubmit(formData)
       onClose()
     } catch (error) {
-      console.error('Erro ao criar atividade:', error)
+      console.error('Erro ao criar tarefa:', error)
     }
   }
 
@@ -184,9 +166,9 @@ export default function QuickAddModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]" onKeyDown={handleKeyDown}>
         <DialogHeader>
-          <DialogTitle>Adicionar Tarefa Rápida</DialogTitle>
+          <DialogTitle>Nova Tarefa</DialogTitle>
           <DialogDescription>
-            Crie uma nova atividade rapidamente com o prazo já definido.
+            Crie uma nova tarefa. Ela começará como pendente automaticamente.
           </DialogDescription>
         </DialogHeader>
 
@@ -195,7 +177,7 @@ export default function QuickAddModal({
           <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
             <Calendar className="h-4 w-4" />
             <span className="text-sm font-medium">Prazo:</span>
-            <Badge variant={classification.color as any} className="text-xs">
+            <Badge variant="outline" className="text-xs">
               {classification.label}
             </Badge>
             <span className="text-xs text-muted-foreground ml-auto">
@@ -206,13 +188,13 @@ export default function QuickAddModal({
           {/* Nome */}
           <div className="space-y-2">
             <Label htmlFor="quick-add-nome">
-              Nome da Atividade <span className="text-red-500">*</span>
+              Nome da Tarefa <span className="text-red-500">*</span>
             </Label>
             <Input
               id="quick-add-nome"
               value={formData.nome}
               onChange={(e) => setFormData(prev => ({ ...prev, nome: e.target.value }))}
-              placeholder="Digite o nome da atividade..."
+              placeholder="Digite o nome da tarefa..."
               className={errors.nome ? 'border-red-500' : ''}
               disabled={isLoading}
             />
@@ -221,65 +203,115 @@ export default function QuickAddModal({
             )}
           </div>
 
-          {/* Projeto */}
+          {/* Processo vinculado */}
           <div className="space-y-2">
-            <Label htmlFor="quick-add-projeto">
-              Projeto <span className="text-red-500">*</span>
+            <Label htmlFor="quick-add-processo">
+              <Link2 className="h-4 w-4 inline mr-1" />
+              Vincular a Processo (opcional)
             </Label>
             <Select
-              value={formData.projeto_id > 0 ? formData.projeto_id.toString() : ""}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, projeto_id: parseInt(value) }))}
-              disabled={isLoading || loadingProjetos}
+              value={formData.processoId?.toString() || "none"}
+              onValueChange={(value) => setFormData(prev => ({ 
+                ...prev, 
+                processoId: value === "none" ? null : parseInt(value) 
+              }))}
+              disabled={isLoading || loadingProcessos}
             >
-              <SelectTrigger className={errors.projeto_id ? 'border-red-500' : ''}>
-                <SelectValue placeholder="Selecione um projeto" />
-                {loadingProjetos && <Loader2 className="h-4 w-4 animate-spin ml-2" />}
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um processo" />
+                {loadingProcessos && <Loader2 className="h-4 w-4 animate-spin ml-2" />}
               </SelectTrigger>
               <SelectContent>
-                {projetos.map((projeto) => (
-                  <SelectItem key={projeto.id} value={projeto.id.toString()}>
-                    <div className="flex items-center justify-between w-full">
-                      <span>{projeto.nome}</span>
-                      <Badge variant="outline" className="ml-2 text-xs">
-                        {projeto._count?.atividades || 0} atividades
-                      </Badge>
-                    </div>
+                <SelectItem value="none">Sem vínculo (tarefa independente)</SelectItem>
+                {processos.map((processo) => (
+                  <SelectItem key={processo.id} value={processo.id.toString()}>
+                    <span className="flex items-center gap-2">
+                      {processo.nome}
+                      {processo.pais && (
+                        <Badge variant="outline" className="text-xs">
+                          {processo.pais}
+                        </Badge>
+                      )}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {errors.projeto_id && (
-              <p className="text-sm text-red-500">{errors.projeto_id}</p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              Vincule a tarefa a um card do kanban para melhor organização
+            </p>
           </div>
 
-          {/* Status */}
+          {/* Prioridade */}
           <div className="space-y-2">
-            <Label htmlFor="quick-add-status">
-              Status <span className="text-red-500">*</span>
+            <Label htmlFor="quick-add-prioridade">
+              <Flag className="h-4 w-4 inline mr-1" />
+              Prioridade
             </Label>
             <Select
-              value={formData.status_id > 0 ? formData.status_id.toString() : ""}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, status_id: parseInt(value) }))}
-              disabled={isLoading || loadingStatuses}
+              value={formData.prioridade}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, prioridade: value }))}
+              disabled={isLoading}
             >
-              <SelectTrigger className={errors.status_id ? 'border-red-500' : ''}>
-                <SelectValue placeholder="Selecione um status" />
-                {loadingStatuses && <Loader2 className="h-4 w-4 animate-spin ml-2" />}
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a prioridade" />
               </SelectTrigger>
               <SelectContent>
-                {statuses.map((status) => (
-                  <SelectItem key={status.id} value={status.id.toString()}>
-                    <div className="flex items-center justify-between w-full">
-                      <span>{status.nome}</span>
-                    </div>
+                <SelectItem value="BAIXA">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    Baixa
+                  </span>
+                </SelectItem>
+                <SelectItem value="MEDIA">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                    Média
+                  </span>
+                </SelectItem>
+                <SelectItem value="ALTA">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                    Alta
+                  </span>
+                </SelectItem>
+                <SelectItem value="URGENTE">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                    Urgente
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Responsável */}
+          <div className="space-y-2">
+            <Label htmlFor="quick-add-responsavel">
+              <User className="h-4 w-4 inline mr-1" />
+              Responsável (opcional)
+            </Label>
+            <Select
+              value={formData.responsavelId?.toString() || "none"}
+              onValueChange={(value) => setFormData(prev => ({ 
+                ...prev, 
+                responsavelId: value === "none" ? null : parseInt(value) 
+              }))}
+              disabled={isLoading || loadingUsuarios}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um responsável" />
+                {loadingUsuarios && <Loader2 className="h-4 w-4 animate-spin ml-2" />}
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sem responsável</SelectItem>
+                {usuarios.map((usuario) => (
+                  <SelectItem key={usuario.id} value={usuario.id.toString()}>
+                    {usuario.nome}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {errors.status_id && (
-              <p className="text-sm text-red-500">{errors.status_id}</p>
-            )}
           </div>
 
           {/* Descrição */}
@@ -289,10 +321,20 @@ export default function QuickAddModal({
               id="quick-add-descricao"
               value={formData.descricao}
               onChange={(e) => setFormData(prev => ({ ...prev, descricao: e.target.value }))}
-              placeholder="Descreva brevemente a atividade..."
+              placeholder="Descreva brevemente a tarefa..."
               rows={3}
               disabled={isLoading}
             />
+          </div>
+
+          {/* Status info */}
+          <div className="flex items-center gap-2 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+            <Badge className="bg-yellow-100 text-yellow-700 border-yellow-300">
+              Pendente
+            </Badge>
+            <span className="text-xs text-yellow-700">
+              A tarefa será criada como pendente
+            </span>
           </div>
 
           {/* Actions */}
@@ -307,10 +349,10 @@ export default function QuickAddModal({
             </Button>
             <Button
               type="submit"
-              disabled={isLoading || !formData.nome.trim() || !formData.projeto_id || !formData.status_id}
+              disabled={isLoading || !formData.nome.trim()}
             >
               {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Criar Atividade
+              Criar Tarefa
             </Button>
           </div>
 

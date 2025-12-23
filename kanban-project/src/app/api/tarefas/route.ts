@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { PrioridadeTarefa } from "@prisma/client"
+import { PrioridadeTarefa, Pais } from "@prisma/client"
 
 // GET - Buscar tarefas (com filtros opcionais)
 export async function GET(request: Request) {
@@ -10,6 +10,9 @@ export async function GET(request: Request) {
     const responsavelId = searchParams.get("responsavelId")
     const concluida = searchParams.get("concluida")
     const prioridade = searchParams.get("prioridade") as PrioridadeTarefa | null
+    const pais = searchParams.get("pais") as Pais | null
+    const statusId = searchParams.get("statusId")
+    const apenasRaiz = searchParams.get("apenasRaiz")
 
     const where: any = {}
 
@@ -21,12 +24,24 @@ export async function GET(request: Request) {
       where.responsavelId = parseInt(responsavelId)
     }
 
-    if (concluida !== null) {
+    if (concluida !== null && concluida !== undefined && concluida !== "") {
       where.concluida = concluida === "true"
     }
 
     if (prioridade && Object.values(PrioridadeTarefa).includes(prioridade)) {
       where.prioridade = prioridade
+    }
+
+    if (pais && Object.values(Pais).includes(pais)) {
+      where.pais = pais
+    }
+
+    if (statusId) {
+      where.statusId = parseInt(statusId)
+    }
+
+    if (apenasRaiz === "true") {
+      where.tarefaPaiId = null
     }
 
     const tarefas = await prisma.tarefa.findMany({
@@ -45,12 +60,55 @@ export async function GET(request: Request) {
             nome: true,
             email: true
           }
+        },
+        status: {
+          select: {
+            id: true,
+            nome: true
+          }
+        },
+        subtarefas: {
+          include: {
+            responsavel: {
+              select: {
+                id: true,
+                nome: true,
+                email: true
+              }
+            },
+            subtarefas: {
+              include: {
+                responsavel: {
+                  select: {
+                    id: true,
+                    nome: true,
+                    email: true
+                  }
+                }
+              },
+              orderBy: [
+                { ordem: "asc" },
+                { createdAt: "asc" }
+              ]
+            }
+          },
+          orderBy: [
+            { ordem: "asc" },
+            { createdAt: "asc" }
+          ]
+        },
+        tarefaPai: {
+          select: {
+            id: true,
+            titulo: true
+          }
         }
       },
       orderBy: [
-        { concluida: "asc" },      // Não concluídas primeiro
-        { prioridade: "desc" },     // Maior prioridade primeiro
-        { dataPrazo: "asc" },       // Prazo mais próximo primeiro
+        { concluida: "asc" },
+        { prioridade: "desc" },
+        { dataPrazo: "asc" },
+        { ordem: "asc" },
         { createdAt: "desc" }
       ]
     })
@@ -65,7 +123,7 @@ export async function GET(request: Request) {
   }
 }
 
-// POST - Criar nova tarefa
+// POST - Criar nova tarefa ou subtarefa
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -75,7 +133,11 @@ export async function POST(request: Request) {
       processoId, 
       responsavelId,
       prioridade,
-      dataPrazo
+      dataPrazo,
+      statusId,
+      pais,
+      tarefaPaiId,
+      ordem
     } = body
 
     if (!titulo) {
@@ -85,26 +147,32 @@ export async function POST(request: Request) {
       )
     }
 
-    if (!processoId) {
-      return NextResponse.json(
-        { error: "Processo é obrigatório" },
-        { status: 400 }
-      )
+    if (tarefaPaiId) {
+      const tarefaPai = await prisma.tarefa.findUnique({
+        where: { id: tarefaPaiId }
+      })
+
+      if (!tarefaPai) {
+        return NextResponse.json(
+          { error: "Tarefa pai não encontrada" },
+          { status: 404 }
+        )
+      }
     }
 
-    // Verificar se o processo existe
-    const processo = await prisma.processo.findUnique({
-      where: { id: processoId }
-    })
+    if (processoId) {
+      const processo = await prisma.processo.findUnique({
+        where: { id: processoId }
+      })
 
-    if (!processo) {
-      return NextResponse.json(
-        { error: "Processo não encontrado" },
-        { status: 404 }
-      )
+      if (!processo) {
+        return NextResponse.json(
+          { error: "Processo não encontrado" },
+          { status: 404 }
+        )
+      }
     }
 
-    // Verificar se o responsável existe (se fornecido)
     if (responsavelId) {
       const responsavel = await prisma.usuario.findUnique({
         where: { id: responsavelId }
@@ -118,19 +186,49 @@ export async function POST(request: Request) {
       }
     }
 
-    // Validar prioridade
+    if (statusId) {
+      const status = await prisma.status.findUnique({
+        where: { id: statusId }
+      })
+
+      if (!status) {
+        return NextResponse.json(
+          { error: "Status não encontrado" },
+          { status: 404 }
+        )
+      }
+    }
+
     const prioridadeValida = prioridade && Object.values(PrioridadeTarefa).includes(prioridade)
       ? prioridade
       : PrioridadeTarefa.MEDIA
+
+    const paisValido = pais && Object.values(Pais).includes(pais) ? pais : null
+
+    // Calcular ordem se não fornecida
+    let ordemFinal = ordem
+    if (ordemFinal === undefined || ordemFinal === null) {
+      const ultimaTarefa = await prisma.tarefa.findFirst({
+        where: tarefaPaiId 
+          ? { tarefaPaiId } 
+          : { tarefaPaiId: null, processoId: processoId || undefined },
+        orderBy: { ordem: "desc" }
+      })
+      ordemFinal = (ultimaTarefa?.ordem ?? -1) + 1
+    }
 
     const tarefa = await prisma.tarefa.create({
       data: {
         titulo,
         descricao: descricao || null,
-        processoId,
+        processoId: processoId || null,
         responsavelId: responsavelId || null,
         prioridade: prioridadeValida,
-        dataPrazo: dataPrazo ? new Date(dataPrazo) : null
+        dataPrazo: dataPrazo ? new Date(dataPrazo) : null,
+        statusId: statusId || null,
+        pais: paisValido,
+        tarefaPaiId: tarefaPaiId || null,
+        ordem: ordemFinal
       },
       include: {
         processo: {
@@ -145,6 +243,19 @@ export async function POST(request: Request) {
             id: true,
             nome: true,
             email: true
+          }
+        },
+        status: {
+          select: {
+            id: true,
+            nome: true
+          }
+        },
+        subtarefas: true,
+        tarefaPai: {
+          select: {
+            id: true,
+            titulo: true
           }
         }
       }

@@ -36,26 +36,27 @@ export default function StatusCard({
   const { label, color, description } = classification
   const activityCount = activities.length
 
-  const getHeaderColor = () => {
+  // Cores para toda a caixa (card inteiro)
+  const getCardColor = () => {
     const colorMap = {
-      'destructive': 'bg-red-500/10 border-red-500/30',
-      'orange': 'bg-orange-500/10 border-orange-500/30',
-      'yellow': 'bg-yellow-500/10 border-yellow-500/30',
-      'blue': 'bg-blue-500/10 border-blue-500/30',
-      'green': 'bg-green-500/10 border-green-500/30',
-      'secondary': 'bg-white/5 border-white/10'
+      'destructive': 'bg-red-500/20 border-red-500/30',
+      'orange': 'bg-orange-500/20 border-orange-500/30',
+      'yellow': 'bg-yellow-500/20 border-yellow-500/30',
+      'blue': 'bg-blue-500/20 border-blue-500/30',
+      'green': 'bg-green-500/20 border-green-500/30',
+      'secondary': 'bg-white/10 border-white/20'
     }
     return colorMap[color as keyof typeof colorMap] || colorMap.secondary
   }
 
   const getBadgeColor = () => {
     const colorMap = {
-      'destructive': 'bg-red-500/20 text-red-300 border-red-500/30',
-      'orange': 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-      'yellow': 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-      'blue': 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-      'green': 'bg-green-500/20 text-green-300 border-green-500/30',
-      'secondary': 'bg-white/10 text-white/70 border-white/20'
+      'destructive': 'bg-red-500/30 text-red-200 border-red-500/40',
+      'orange': 'bg-orange-500/30 text-orange-200 border-orange-500/40',
+      'yellow': 'bg-yellow-500/30 text-yellow-200 border-yellow-500/40',
+      'blue': 'bg-blue-500/30 text-blue-200 border-blue-500/40',
+      'green': 'bg-green-500/30 text-green-200 border-green-500/40',
+      'secondary': 'bg-white/20 text-white/80 border-white/30'
     }
     return colorMap[color as keyof typeof colorMap] || colorMap.secondary
   }
@@ -64,10 +65,11 @@ export default function StatusCard({
     <div className="flex flex-col h-full min-w-[300px] max-w-[350px]">
       <Card className={`
         flex flex-col h-full transition-all duration-200
-        bg-white/5 backdrop-blur-xl border border-white/10
-        ${isDropTarget ? 'ring-2 ring-white/30 shadow-lg bg-white/10' : ''}
+        backdrop-blur-xl border
+        ${getCardColor()}
+        ${isDropTarget ? 'ring-2 ring-white/40 shadow-lg' : ''}
       `}>
-        <CardHeader className={`${getHeaderColor()} pb-3 rounded-t-lg border-b border-white/10`}>
+        <CardHeader className="pb-3 border-b border-white/10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <CardTitle className="text-sm font-semibold text-white">
@@ -111,25 +113,23 @@ export default function StatusCard({
             </div>
           </div>
           {description && (
-            <p className="text-xs text-white/60 mt-1">
+            <p className="text-xs text-white/70 mt-1">
               {description}
             </p>
           )}
-          
           {/* Quick Add Button */}
           {quickAddButton && (
             <div className="mt-3 flex justify-center">
               {quickAddButton}
             </div>
           )}
-          
         </CardHeader>
         <CardContent className="flex-1 p-3 overflow-y-auto">
           <div className="space-y-2">
             {children}
             {activityCount === 0 && (
               <div className="text-center py-8">
-                <p className="text-sm text-white/50">Nenhuma atividade</p>
+                <p className="text-sm text-white/60">Nenhuma atividade</p>
               </div>
             )}
           </div>

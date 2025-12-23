@@ -16,21 +16,24 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Filter, X } from "lucide-react"
 
-interface Projeto {
+interface Processo {
   id: number
   nome: string
 }
 
-interface Status {
+interface Usuario {
   id: number
   nome: string
 }
 
 interface FilterOptions {
-  projeto?: string
+  processo?: string
   status?: string
   responsavel?: string
   nomeAtividade?: string
+  prioridade?: string
+  dataInicio?: string
+  dataFim?: string
 }
 
 interface ActivityFiltersProps {
@@ -38,42 +41,56 @@ interface ActivityFiltersProps {
   activeFilters: FilterOptions
 }
 
+// Status de tarefas (baseado no campo concluida)
+const STATUS_TAREFAS = [
+  { id: 'pendente', nome: 'Pendente' },
+  { id: 'concluida', nome: 'Concluída' }
+]
+
+// Prioridades disponíveis
+const PRIORIDADES = [
+  { id: 'BAIXA', nome: 'Baixa' },
+  { id: 'MEDIA', nome: 'Média' },
+  { id: 'ALTA', nome: 'Alta' },
+  { id: 'URGENTE', nome: 'Urgente' }
+]
+
 export default function ActivityFilters({ onFiltersChange, activeFilters }: ActivityFiltersProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [projetos, setProjetos] = useState<Projeto[]>([])
-  const [statusList, setStatusList] = useState<Status[]>([])
+  const [processos, setProcessos] = useState<Processo[]>([])
+  const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [localFilters, setLocalFilters] = useState<FilterOptions>(activeFilters)
 
   useEffect(() => {
-    fetchProjetos()
-    fetchStatus()
+    fetchProcessos()
+    fetchUsuarios()
   }, [])
 
   useEffect(() => {
     setLocalFilters(activeFilters)
   }, [activeFilters])
 
-  const fetchProjetos = async () => {
+  const fetchProcessos = async () => {
     try {
-      const response = await fetch('/api/projetos')
+      const response = await fetch('/api/processos')
       if (response.ok) {
         const data = await response.json()
-        setProjetos(data.projetos || [])
+        setProcessos(data.processos || data || [])
       }
     } catch (error) {
-      console.error('Erro ao carregar projetos:', error)
+      console.error('Erro ao carregar processos:', error)
     }
   }
 
-  const fetchStatus = async () => {
+  const fetchUsuarios = async () => {
     try {
-      const response = await fetch('/api/status')
+      const response = await fetch('/api/usuarios')
       if (response.ok) {
         const data = await response.json()
-        setStatusList(data.status || [])
+        setUsuarios(data.usuarios || data || [])
       }
     } catch (error) {
-      console.error('Erro ao carregar status:', error)
+      console.error('Erro ao carregar usuários:', error)
     }
   }
 
@@ -106,6 +123,14 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
     return Object.values(activeFilters).filter(value => value && value !== '').length
   }
 
+  const getStatusLabel = (statusId: string) => {
+    return STATUS_TAREFAS.find(s => s.id === statusId)?.nome || statusId
+  }
+
+  const getPrioridadeLabel = (prioridadeId: string) => {
+    return PRIORIDADES.find(p => p.id === prioridadeId)?.nome || prioridadeId
+  }
+
   const activeFilterCount = getActiveFilterCount()
 
   return (
@@ -113,12 +138,12 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
       {/* Filtros ativos */}
       <div className="flex items-center gap-1 flex-wrap">
         {activeFilters.nomeAtividade && (
-          <Badge variant="secondary" className="text-xs">
+          <Badge variant="secondary" className="text-xs bg-white/10 text-white border-white/20">
             Nome: {activeFilters.nomeAtividade}
             <Button
               variant="ghost"
               size="sm"
-              className="h-3 w-3 p-0 ml-1 hover:bg-destructive hover:text-destructive-foreground"
+              className="h-3 w-3 p-0 ml-1 hover:bg-red-500/20"
               onClick={() => removeFilter('nomeAtividade')}
             >
               <X className="h-2 w-2" />
@@ -126,14 +151,14 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
           </Badge>
         )}
         
-        {activeFilters.projeto && (
-          <Badge variant="secondary" className="text-xs">
-            Projeto: {projetos.find(p => p.id.toString() === activeFilters.projeto)?.nome || activeFilters.projeto}
+        {activeFilters.processo && (
+          <Badge variant="secondary" className="text-xs bg-white/10 text-white border-white/20">
+            Processo: {processos.find(p => p.id.toString() === activeFilters.processo)?.nome || activeFilters.processo}
             <Button
               variant="ghost"
               size="sm"
-              className="h-3 w-3 p-0 ml-1 hover:bg-destructive hover:text-destructive-foreground"
-              onClick={() => removeFilter('projeto')}
+              className="h-3 w-3 p-0 ml-1 hover:bg-red-500/20"
+              onClick={() => removeFilter('processo')}
             >
               <X className="h-2 w-2" />
             </Button>
@@ -141,12 +166,16 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
         )}
 
         {activeFilters.status && (
-          <Badge variant="secondary" className="text-xs">
-            Status: {statusList.find(s => s.id.toString() === activeFilters.status)?.nome || activeFilters.status}
+          <Badge variant="secondary" className={`text-xs ${
+            activeFilters.status === 'pendente' 
+              ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' 
+              : 'bg-green-500/20 text-green-300 border-green-500/30'
+          }`}>
+            Status: {getStatusLabel(activeFilters.status)}
             <Button
               variant="ghost"
               size="sm"
-              className="h-3 w-3 p-0 ml-1 hover:bg-destructive hover:text-destructive-foreground"
+              className="h-3 w-3 p-0 ml-1 hover:bg-red-500/20"
               onClick={() => removeFilter('status')}
             >
               <X className="h-2 w-2" />
@@ -154,13 +183,27 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
           </Badge>
         )}
 
-        {activeFilters.responsavel && (
-          <Badge variant="secondary" className="text-xs">
-            Responsável: {activeFilters.responsavel}
+        {activeFilters.prioridade && (
+          <Badge variant="secondary" className="text-xs bg-white/10 text-white border-white/20">
+            Prioridade: {getPrioridadeLabel(activeFilters.prioridade)}
             <Button
               variant="ghost"
               size="sm"
-              className="h-3 w-3 p-0 ml-1 hover:bg-destructive hover:text-destructive-foreground"
+              className="h-3 w-3 p-0 ml-1 hover:bg-red-500/20"
+              onClick={() => removeFilter('prioridade')}
+            >
+              <X className="h-2 w-2" />
+            </Button>
+          </Badge>
+        )}
+
+        {activeFilters.responsavel && (
+          <Badge variant="secondary" className="text-xs bg-white/10 text-white border-white/20">
+            Responsável: {usuarios.find(u => u.id.toString() === activeFilters.responsavel)?.nome || activeFilters.responsavel}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-3 w-3 p-0 ml-1 hover:bg-red-500/20"
               onClick={() => removeFilter('responsavel')}
             >
               <X className="h-2 w-2" />
@@ -172,9 +215,9 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
       {/* Botão de filtros */}
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger asChild>
-          <Button variant="outline" size="sm" className="relative">
+          <Button variant="outline" size="sm" className="relative bg-transparent border-white/30 text-white hover:bg-white/10">
             <Filter className="h-4 w-4 mr-2" />
-            Filtros
+            Filtro
             {activeFilterCount > 0 && (
               <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 text-xs">
                 {activeFilterCount}
@@ -182,41 +225,42 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
             )}
           </Button>
         </SheetTrigger>
-        <SheetContent>
+        <SheetContent className="bg-[#1a1a2e] border-white/10 text-white">
           <SheetHeader>
-            <SheetTitle>Filtrar Atividades</SheetTitle>
-            <SheetDescription>
-              Configure os filtros para encontrar atividades específicas
+            <SheetTitle className="text-white">Filtrar Tarefas</SheetTitle>
+            <SheetDescription className="text-white/60">
+              Configure os filtros para encontrar tarefas específicas
             </SheetDescription>
           </SheetHeader>
 
           <div className="space-y-4 mt-6">
-            {/* Nome da atividade */}
+            {/* Nome da tarefa */}
             <div className="space-y-2">
-              <Label htmlFor="nomeAtividade">Nome da Atividade</Label>
+              <Label htmlFor="nomeAtividade" className="text-white">Nome da Tarefa</Label>
               <Input
                 id="nomeAtividade"
-                placeholder="Digite o nome da atividade"
+                placeholder="Digite o nome da tarefa"
                 value={localFilters.nomeAtividade || ''}
                 onChange={(e) => handleFilterChange('nomeAtividade', e.target.value)}
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
               />
             </div>
 
-            {/* Projeto */}
+            {/* Processo vinculado */}
             <div className="space-y-2">
-              <Label htmlFor="projeto">Projeto</Label>
+              <Label htmlFor="processo" className="text-white">Processo</Label>
               <Select
-                value={localFilters.projeto || ''}
-                onValueChange={(value) => handleFilterChange('projeto', value)}
+                value={localFilters.processo || 'all'}
+                onValueChange={(value) => handleFilterChange('processo', value === 'all' ? '' : value)}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um projeto" />
+                <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                  <SelectValue placeholder="Todos os processos" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Todos os projetos</SelectItem>
-                  {projetos.map((projeto) => (
-                    <SelectItem key={projeto.id} value={projeto.id.toString()}>
-                      {projeto.nome}
+                <SelectContent className="bg-[#1a1a2e] border-white/20">
+                  <SelectItem value="all" className="text-white hover:bg-white/10">Todos os processos</SelectItem>
+                  {processos.map((processo) => (
+                    <SelectItem key={processo.id} value={processo.id.toString()} className="text-white hover:bg-white/10">
+                      {processo.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -225,19 +269,53 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
 
             {/* Status */}
             <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
+              <Label htmlFor="status" className="text-white">Status</Label>
               <Select
-                value={localFilters.status || ''}
-                onValueChange={(value) => handleFilterChange('status', value)}
+                value={localFilters.status || 'all'}
+                onValueChange={(value) => handleFilterChange('status', value === 'all' ? '' : value)}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um status" />
+                <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                  <SelectValue placeholder="Todos os Status" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Todos os status</SelectItem>
-                  {statusList.map((status) => (
-                    <SelectItem key={status.id} value={status.id.toString()}>
-                      {status.nome}
+                <SelectContent className="bg-[#1a1a2e] border-white/20">
+                  <SelectItem value="all" className="text-white hover:bg-white/10">Todos os Status</SelectItem>
+                  {STATUS_TAREFAS.map((status) => (
+                    <SelectItem key={status.id} value={status.id} className="text-white hover:bg-white/10">
+                      <span className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${
+                          status.id === 'pendente' ? 'bg-yellow-400' : 'bg-green-400'
+                        }`}></span>
+                        {status.nome}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Prioridade */}
+            <div className="space-y-2">
+              <Label htmlFor="prioridade" className="text-white">Prioridade</Label>
+              <Select
+                value={localFilters.prioridade || 'all'}
+                onValueChange={(value) => handleFilterChange('prioridade', value === 'all' ? '' : value)}
+              >
+                <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                  <SelectValue placeholder="Todas as prioridades" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a2e] border-white/20">
+                  <SelectItem value="all" className="text-white hover:bg-white/10">Todas as prioridades</SelectItem>
+                  {PRIORIDADES.map((prioridade) => (
+                    <SelectItem key={prioridade.id} value={prioridade.id} className="text-white hover:bg-white/10">
+                      <span className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${
+                          prioridade.id === 'URGENTE' ? 'bg-red-500' :
+                          prioridade.id === 'ALTA' ? 'bg-orange-500' :
+                          prioridade.id === 'MEDIA' ? 'bg-yellow-500' :
+                          'bg-green-500'
+                        }`}></span>
+                        {prioridade.nome}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -246,22 +324,63 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
 
             {/* Responsável */}
             <div className="space-y-2">
-              <Label htmlFor="responsavel">Responsável</Label>
+              <Label htmlFor="responsavel" className="text-white">Responsável</Label>
+              <Select
+                value={localFilters.responsavel || 'all'}
+                onValueChange={(value) => handleFilterChange('responsavel', value === 'all' ? '' : value)}
+              >
+                <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                  <SelectValue placeholder="Todos os Responsáveis" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a2e] border-white/20">
+                  <SelectItem value="all" className="text-white hover:bg-white/10">Todos os Responsáveis</SelectItem>
+                  {usuarios.map((usuario) => (
+                    <SelectItem key={usuario.id} value={usuario.id.toString()} className="text-white hover:bg-white/10">
+                      {usuario.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Data Início */}
+            <div className="space-y-2">
+              <Label htmlFor="dataInicio" className="text-white">Data Início</Label>
               <Input
-                id="responsavel"
-                placeholder="Nome do responsável"
-                value={localFilters.responsavel || ''}
-                onChange={(e) => handleFilterChange('responsavel', e.target.value)}
+                id="dataInicio"
+                type="date"
+                value={localFilters.dataInicio || ''}
+                onChange={(e) => handleFilterChange('dataInicio', e.target.value)}
+                className="bg-white/10 border-white/20 text-white [color-scheme:dark]"
+              />
+            </div>
+
+            {/* Data Fim */}
+            <div className="space-y-2">
+              <Label htmlFor="dataFim" className="text-white">Data Fim</Label>
+              <Input
+                id="dataFim"
+                type="date"
+                value={localFilters.dataFim || ''}
+                onChange={(e) => handleFilterChange('dataFim', e.target.value)}
+                className="bg-white/10 border-white/20 text-white [color-scheme:dark]"
               />
             </div>
 
             {/* Botões */}
             <div className="flex gap-2 pt-4">
-              <Button onClick={applyFilters} className="flex-1">
-                Aplicar Filtros
+              <Button 
+                variant="outline" 
+                onClick={clearFilters}
+                className="flex-1 bg-transparent border-white/30 text-white hover:bg-white/10"
+              >
+                Limpar Filtros
               </Button>
-              <Button variant="outline" onClick={clearFilters}>
-                Limpar
+              <Button 
+                onClick={applyFilters} 
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Aplicar Filtros
               </Button>
             </div>
           </div>
@@ -270,7 +389,12 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
 
       {/* Botão para limpar todos os filtros */}
       {activeFilterCount > 0 && (
-        <Button variant="ghost" size="sm" onClick={clearFilters}>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={clearFilters}
+          className="text-white/60 hover:text-white hover:bg-white/10"
+        >
           Limpar filtros
         </Button>
       )}

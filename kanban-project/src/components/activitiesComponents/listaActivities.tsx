@@ -42,7 +42,12 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
 
   // Garantir que atividades é sempre um array
   const atividades = Array.isArray(activities) ? activities : []
-  const statusList = Array.isArray(statuses) ? statuses : []
+  
+  // Status para tarefas (Pendente/Concluída)
+  const statusTarefas = [
+    { id: -2, nome: 'Pendente' },
+    { id: -1, nome: 'Concluída' }
+  ]
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Sem prazo'
@@ -165,28 +170,21 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
 
     setIsActionLoading(true)
     try {
+      // Para tarefas, atualizar o campo concluida
+      const concluida = selectedStatus === '-1' // -1 = Concluída
+      
       const updatePromises = selectedItems.map(id => 
         fetch(`/api/tarefas/${id}`, {
-          method: 'PATCH',
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ statusId: parseInt(selectedStatus) })
+          body: JSON.stringify({ concluida })
         })
       )
       
       await Promise.all(updatePromises)
       
-      const newStatus = statusList.find((s: Status) => s.id?.toString() === selectedStatus)
-      if (newStatus) {
-        mutate(
-          atividades.map((atividade: Atividade) => 
-            selectedItems.includes(atividade.id)
-              ? { ...atividade, status: newStatus }
-              : atividade
-          ),
-          { revalidate: false }
-        )
-        setTimeout(() => mutate(), 100)
-      }
+      // Revalidar dados
+      setTimeout(() => mutate(), 100)
       
       setSelectedItems([])
       setSelectedAction('')
@@ -217,10 +215,26 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
     setIsDetailsModalOpen(false)
   }
 
+  // Função para obter cor do status
+  const getStatusBadgeClass = (statusNome: string | undefined) => {
+    const nome = statusNome?.toLowerCase() || ''
+    
+    if (nome === 'concluída' || nome === 'concluida' || nome === 'concluído' || nome === 'concluido') {
+      return "bg-green-500/20 text-green-300 hover:bg-green-500/30 border-green-500/30"
+    }
+    if (nome === 'pendente') {
+      return "bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 border-yellow-500/30"
+    }
+    if (nome === 'em andamento') {
+      return "bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border-blue-500/30"
+    }
+    return "bg-gray-500/20 text-gray-300 border-gray-500/30"
+  }
+
   // Loading state
   if (isLoading) {
     return (
-      <div className="rounded-2xl">
+      <div className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
         <div className="px-4 py-3 border-b border-white/10">
           <div className="grid grid-cols-12 gap-4 items-center">
             <div className="col-span-1 h-4 bg-white/10 rounded animate-pulse"></div>
@@ -260,7 +274,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   // Error state - mostrar mensagem amigável ao invés de erro técnico
   if (error) {
     return (
-      <div className="rounded-2xl">
+      <div className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
         <div className="p-6">
           <div className="flex flex-col items-center justify-center h-32 text-center">
             <div className="w-16 h-16 mb-4 rounded-full bg-white/10 flex items-center justify-center">
@@ -277,10 +291,10 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   }
 
   return (
-    <div className="rounded-2xl">
+    <div className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
       {/* Table Header */}
       <div className="px-4 py-3 border-b border-white/10">
-        <div className="grid grid-cols-12 gap-4 items-center text-sm font-medium text-white">
+        <div className="grid grid-cols-12 gap-4 items-center text-sm font-medium text-white/80">
           <div className="col-span-1">
             <input
               type="checkbox"
@@ -312,13 +326,13 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
             <p className="text-sm text-white/50">Crie uma nova atividade clicando no botão acima</p>
           </div>
         ) : (
-          atividades.filter((atividade: Atividade) => atividade && atividade.nome).map((atividade: Atividade) => (
+          atividades.map((atividade: Atividade) => (
             <div
               key={atividade.id}
               className="px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer"
               onClick={() => handleAtividadeClick(atividade)}
             >
-              <div className="grid grid-cols-12 gap-4 items-center text-white">
+              <div className="grid grid-cols-12 gap-4 items-center text-white/80">
                 <div className="col-span-1">
                   <input
                     type="checkbox"
@@ -331,43 +345,29 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 
                 <div className="col-span-3">
                   <div className="space-y-1">
-                    <div className="font-medium text-sm">{atividade.nome}</div>
-                    <div className="text-xs text-white/60">
+                    <div className="font-medium text-sm text-white">{atividade.nome || 'Sem título'}</div>
+                    <div className="text-xs text-white/50">
                       {atividade.descricao || 'Sem descrição'}
                     </div>
                   </div>
                 </div>
                 
                 <div className="col-span-2">
-                  <div className="text-sm text-white/80">
+                  <div className="text-sm text-white/70">
                     {formatDateOnly(atividade.data_criacao)}
                   </div>
                 </div>
                 
                 <div className="col-span-2">
-                  <div className="text-sm text-white/80">
+                  <div className="text-sm text-white/70">
                     {formatDate(atividade.data_termino)}
                   </div>
                 </div>
                 
                 <div className="col-span-1">
-                  {atividade.status ? (
-                    <Badge 
-                      className={
-                        atividade.status.nome?.toLowerCase() === 'concluído' || atividade.status.nome?.toLowerCase() === 'concluido'
-                          ? "bg-green-500/20 text-green-300 hover:bg-green-500/30 border-green-500/30"
-                          : atividade.status.nome?.toLowerCase() === 'em andamento'
-                          ? "bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 border-yellow-500/30"
-                          : "bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border-blue-500/30"
-                      }
-                    >
-                      {atividade.status.nome}
-                    </Badge>
-                  ) : (
-                    <Badge className="bg-gray-500/20 text-gray-300 border-gray-500/30">
-                      Sem status
-                    </Badge>
-                  )}
+                  <Badge className={getStatusBadgeClass(atividade.status?.nome)}>
+                    {atividade.status?.nome || 'Sem status'}
+                  </Badge>
                 </div>
                 
                 <div className="col-span-1">
@@ -384,15 +384,15 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                   <div className="flex items-center">
                     <Avatar className="h-6 w-6 border border-white/20">
                       <AvatarFallback className="text-xs bg-white/10 text-white">
-                        {atividade.usuarios?.[0]?.usuario?.nome?.slice(0, 2).toUpperCase() || 'NA'}
+                        {atividade.responsavel?.nome?.slice(0, 2).toUpperCase() || 'NA'}
                       </AvatarFallback>
                     </Avatar>
                   </div>
                 </div>
                 
                 <div className="col-span-1">
-                  <div className="text-sm font-medium text-white/80">
-                    {PAIS_LABELS[atividade.pais] || atividade.pais}
+                  <div className="text-sm font-medium text-white/70">
+                    {PAIS_LABELS[atividade.pais] || atividade.pais || '-'}
                   </div>
                 </div>
               </div>
@@ -425,8 +425,8 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
-                      {statusList.map((status: Status) => (
-                        <SelectItem key={status.id} value={status.id?.toString() || ''}>
+                      {statusTarefas.map((status) => (
+                        <SelectItem key={status.id} value={status.id.toString()}>
                           {status.nome}
                         </SelectItem>
                       ))}
@@ -439,7 +439,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                   size="sm" 
                   onClick={applyAction}
                   disabled={isActionLoading || (!selectedAction || (selectedAction === 'status' && !selectedStatus))}
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/10"
                 >
                   {isActionLoading ? 'Aplicando...' : 'Aplicar'}
                 </Button>

@@ -101,7 +101,7 @@ export default function ActivityCard({ activity, onClick, isDragging = false }: 
         {/* País */}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Flag className="h-3 w-3" />
-          <span className="truncate">{PAIS_LABELS[activity.pais]}</span>
+          <span className="truncate">{PAIS_LABELS[activity.pais] || activity.pais}</span>
         </div>
 
         {/* Prazo */}
@@ -131,8 +131,15 @@ export default function ActivityCard({ activity, onClick, isDragging = false }: 
 
         {/* Status */}
         <div className="flex items-center justify-between">
-          <Badge variant="outline" className="text-xs">
-            {activity.status.nome}
+          <Badge 
+            variant="outline" 
+            className={`text-xs ${
+              activity.status?.nome?.toLowerCase() === 'concluída' || activity.concluida
+                ? 'bg-green-100 text-green-700 border-green-300'
+                : 'bg-yellow-100 text-yellow-700 border-yellow-300'
+            }`}
+          >
+            {activity.status?.nome || (activity.concluida ? 'Concluída' : 'Pendente')}
           </Badge>
           
           {/* Responsáveis */}
@@ -143,7 +150,7 @@ export default function ActivityCard({ activity, onClick, isDragging = false }: 
                 {activity.usuarios.slice(0, 3).map((userAtv, index) => (
                   <Avatar key={index} className="h-5 w-5 border border-background">
                     <AvatarFallback className="text-xs">
-                      {getInitials(userAtv.usuario.nome)}
+                      {getInitials(userAtv.usuario?.nome || 'NA')}
                     </AvatarFallback>
                   </Avatar>
                 ))}

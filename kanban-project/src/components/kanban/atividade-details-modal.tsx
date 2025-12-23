@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { MapTooltip } from "../ui/map-tooltip"
 import { ArvoreGenealogicaView } from "../arvore"
+import { ProcessoTarefas } from "./ProcessoTarefas"
 import { 
   X, 
   Phone, 
@@ -44,7 +45,6 @@ interface ProcessoDetailsModalProps {
   statusList?: Status[]
   contratantes?: Contratante[]
   requerentes?: Requerente[]
-  // NOVO: Props para abrir em aba específica (via navegação da pesquisa)
   initialTab?: string
   initialPessoaId?: number
   initialSidebarTab?: string
@@ -58,13 +58,11 @@ export function ProcessoDetailsModal({
   statusList = [],
   contratantes: contratantesProp = [],
   requerentes: requerentesProp = [],
-  // NOVO: Props para navegação
   initialTab,
   initialPessoaId,
   initialSidebarTab
 }: ProcessoDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<"geral" | "faturas" | "historico" | "arvore">("geral")
-  const [novaTarefa, setNovaTarefa] = useState("")
   const [etapas, setEtapas] = useState<Status[]>([])
   const [statusIdAtual, setStatusIdAtual] = useState(processo?.statusId)
   const [mudouEtapa, setMudouEtapa] = useState(false)
@@ -88,20 +86,17 @@ export function ProcessoDetailsModal({
   // Árvore genealógica
   const [arvoreIdLocal, setArvoreIdLocal] = useState<number | null>(processo?.arvoreId || null)
   
-  // NOVO: Estado para pessoa selecionada na árvore
+  // Estado para pessoa selecionada na árvore
   const [pessoaIdParaFocar, setPessoaIdParaFocar] = useState<number | undefined>(undefined)
   const [sidebarTabParaFocar, setSidebarTabParaFocar] = useState<string | undefined>(undefined)
   
   const contratanteRef = useRef<HTMLDivElement>(null)
   const requerenteRef = useRef<HTMLDivElement>(null)
   
-  // Flag para controlar se já processou os params iniciais
   const [initialParamsProcessed, setInitialParamsProcessed] = useState(false)
 
-  // NOVO: Efeito para definir aba inicial quando o modal abre
   useEffect(() => {
     if (isOpen && initialTab && !initialParamsProcessed) {
-      // Mapear o valor do parâmetro para o tipo correto
       if (initialTab === "arvore") {
         setActiveTab("arvore")
       } else if (initialTab === "geral") {
@@ -112,12 +107,10 @@ export function ProcessoDetailsModal({
         setActiveTab("historico")
       }
       
-      // Definir pessoa para focar
       if (initialPessoaId) {
         setPessoaIdParaFocar(initialPessoaId)
       }
       
-      // Definir aba da sidebar para focar
       if (initialSidebarTab) {
         setSidebarTabParaFocar(initialSidebarTab)
       }
@@ -126,7 +119,6 @@ export function ProcessoDetailsModal({
     }
   }, [isOpen, initialTab, initialPessoaId, initialSidebarTab, initialParamsProcessed])
 
-  // Reset quando o modal fecha
   useEffect(() => {
     if (!isOpen) {
       setInitialParamsProcessed(false)
@@ -135,7 +127,6 @@ export function ProcessoDetailsModal({
     }
   }, [isOpen])
 
-  // Atualizar quando o processo mudar
   useEffect(() => {
     setStatusIdAtual(processo?.statusId)
     setNomeEditado(processo?.nome || "")
@@ -144,7 +135,6 @@ export function ProcessoDetailsModal({
     setArvoreIdLocal(processo?.arvoreId || null)
   }, [processo])
 
-  // Buscar contatos se não foram passados como prop
   useEffect(() => {
     if (isOpen && contratantesProp.length === 0) {
       fetch('/api/contratantes')
@@ -160,7 +150,6 @@ export function ProcessoDetailsModal({
     }
   }, [isOpen, contratantesProp.length, requerentesProp.length])
 
-  // Fechar dropdowns ao clicar fora
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (contratanteRef.current && !contratanteRef.current.contains(e.target as Node)) {
@@ -179,11 +168,10 @@ export function ProcessoDetailsModal({
       onSave?.()
     }
     setIsEditing(false)
-    setActiveTab("geral") // Reset para aba padrão ao fechar
+    setActiveTab("geral")
     onClose()
   }
 
-  // Buscar etapas do país quando o modal abre
   useEffect(() => {
     if (isOpen && processo?.pais) {
       if (statusList.length > 0) {
@@ -201,7 +189,6 @@ export function ProcessoDetailsModal({
     }
   }, [isOpen, processo?.pais, statusList])
 
-  // Fechar com ESC
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') handleClose()
@@ -216,7 +203,6 @@ export function ProcessoDetailsModal({
     }
   }, [isOpen, handleClose])
 
-  // Salvar edições
   const handleSaveEdit = async () => {
     if (!processo) return
     
@@ -243,7 +229,6 @@ export function ProcessoDetailsModal({
     }
   }
 
-  // Cancelar edição
   const handleCancelEdit = () => {
     setNomeEditado(processo?.nome || "")
     setContratantesSelecionados(processo?.contratantes || [])
@@ -251,7 +236,6 @@ export function ProcessoDetailsModal({
     setIsEditing(false)
   }
 
-  // Excluir processo
   const handleDelete = async () => {
     if (!processo) return
     
@@ -278,7 +262,6 @@ export function ProcessoDetailsModal({
     }
   }
 
-  // Filtrar contratantes pela busca (excluindo já selecionados)
   const contratantesFiltrados = contratantes.filter(c => 
     !contratantesSelecionados.find(sel => sel.id === c.id) &&
     (c.nome.toLowerCase().includes(buscaContratante.toLowerCase()) ||
@@ -286,7 +269,6 @@ export function ProcessoDetailsModal({
     c.telefone?.includes(buscaContratante))
   )
 
-  // Filtrar requerentes pela busca (excluindo já selecionados)
   const requerentesFiltrados = requerentes.filter(r => 
     !requerentesSelecionados.find(sel => sel.id === r.id) &&
     (r.nome.toLowerCase().includes(buscaRequerente.toLowerCase()) ||
@@ -294,26 +276,22 @@ export function ProcessoDetailsModal({
     r.telefone?.includes(buscaRequerente))
   )
 
-  // Adicionar contratante
   const addContratante = (cont: Contratante) => {
     setContratantesSelecionados([...contratantesSelecionados, cont])
     setBuscaContratante("")
     setShowContratanteDropdown(false)
   }
 
-  // Remover contratante
   const removeContratante = (id: number) => {
     setContratantesSelecionados(contratantesSelecionados.filter(c => c.id !== id))
   }
 
-  // Adicionar requerente
   const addRequerente = (req: Requerente) => {
     setRequerentesSelecionados([...requerentesSelecionados, req])
     setBuscaRequerente("")
     setShowRequerenteDropdown(false)
   }
 
-  // Remover requerente
   const removeRequerente = (id: number) => {
     setRequerentesSelecionados(requerentesSelecionados.filter(r => r.id !== id))
   }
@@ -336,7 +314,6 @@ export function ProcessoDetailsModal({
 
   const dataCriacao = processo.createdAt
   const dataFormatada = dataCriacao ? new Date(dataCriacao).toLocaleDateString('pt-BR') : ""
-  const tarefas = processo.tarefas || []
 
   const modalContent = (
     <>
@@ -789,122 +766,11 @@ export function ProcessoDetailsModal({
                 )}
               </div>
 
-              {/* ========== COLUNA DIREITA - TAREFAS ========== */}
-              <div className="overflow-y-auto flex flex-col">
-                <div className="flex items-center justify-between border-b bg-white px-4 py-3 sticky top-0 flex-shrink-0">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-blue-600" />
-                    <h3 className="font-semibold text-gray-900">Tarefas</h3>
-                    {tarefas.length > 0 && (
-                      <span className="px-2 py-0.5 bg-blue-100 text-blue-600 text-xs font-medium rounded-full">
-                        {tarefas.length}
-                      </span>
-                    )}
-                  </div>
-                  <button className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
-                    <Plus className="h-4 w-4" />
-                    Nova
-                  </button>
-                </div>
-
-                <div className="p-4 border-b flex-shrink-0">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="Coisas a fazer"
-                      value={novaTarefa}
-                      onChange={(e) => setNovaTarefa(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button variant="ghost" size="sm" className="text-gray-500">
-                      ações
-                      <ChevronDown className="h-4 w-4 ml-1" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="p-4 border-b bg-blue-50 flex-shrink-0">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Plus className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">Adicionar uma nova tarefa</p>
-                      <p className="text-sm text-gray-500">
-                        Planeje sua próxima ação no processo para nunca esquecer o cliente
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b flex-shrink-0">
-                  <button className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    {new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}
-                  </button>
-                  <button className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
-                    <Filter className="h-4 w-4" />
-                    FILTRO
-                  </button>
-                </div>
-
-                <div className="flex-1 p-4 space-y-3 overflow-y-auto">
-                  {tarefas.length > 0 ? (
-                    tarefas.map((tarefa) => (
-                      <div 
-                        key={tarefa.id}
-                        className="flex items-start gap-3 p-3 bg-white rounded-lg border hover:shadow-sm transition-shadow"
-                      >
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${tarefa.concluida ? 'bg-green-100' : 'bg-blue-100'}`}>
-                          {tarefa.concluida ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <Clock className="h-4 w-4 text-blue-600" />
-                          )}
-                        </div>
-                        
-                        <div className="flex-1">
-                          <p className={`font-medium ${tarefa.concluida ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
-                            {tarefa.titulo}
-                          </p>
-                          {tarefa.dataPrazo && (
-                            <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                              <Calendar className="h-3 w-3" />
-                              Prazo: {new Date(tarefa.dataPrazo).toLocaleDateString('pt-BR')}
-                            </p>
-                          )}
-                          {tarefa.responsavel && (
-                            <p className="text-sm text-gray-500 mt-1">
-                              Responsável: {tarefa.responsavel.nome}
-                            </p>
-                          )}
-                        </div>
-
-                        {!tarefa.concluida && (
-                          <span className="px-2 py-1 bg-green-500 text-white text-xs rounded-full flex-shrink-0">
-                            Pendente
-                          </span>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <MessageSquare className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                      <p>Nenhuma tarefa ainda</p>
-                      <p className="text-sm">Adicione tarefas para acompanhar o progresso</p>
-                    </div>
-                  )}
-
-                  <div className="flex items-start gap-3 p-3 text-sm text-gray-500">
-                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs">i</span>
-                    </div>
-                    <div>
-                      <p>Processo criado {dataFormatada && <span className="text-gray-400">{dataFormatada}</span>}</p>
-                      <p className="font-medium text-gray-700">{processo.nome}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              {/* ========== COLUNA DIREITA - TAREFAS (COMPONENTE) ========== */}
+              <ProcessoTarefas 
+                processoId={processo.id} 
+                onUpdate={onSave}
+              />
             </div>
           )}
 
@@ -916,7 +782,6 @@ export function ProcessoDetailsModal({
                 setArvoreIdLocal(novoArvoreId)
                 onSave?.()
               }}
-              // NOVO: Passar pessoa para focar na árvore (vinda da pesquisa)
               pessoaIdParaFocar={pessoaIdParaFocar}
               sidebarTabParaFocar={sidebarTabParaFocar}
             />
