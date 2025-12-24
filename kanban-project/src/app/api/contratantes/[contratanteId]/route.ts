@@ -1,3 +1,5 @@
+// SUBSTITUIR: src/app/api/contratantes/[contratanteId]/route.ts
+
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
@@ -22,10 +24,15 @@ export async function GET(
       include: {
         processos: {
           include: {
-            status: true,
+            // ✅ CORRIGIDO: Navegar até processo para acessar status
+            processo: {
+              include: {
+                status: true
+              }
+            }
           }
-        },
-      },
+        }
+      }
     })
 
     if (!contratante) {
@@ -35,7 +42,13 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ contratante })
+    // Formatar resposta para facilitar uso no frontend
+    const contratanteFormatado = {
+      ...contratante,
+      processos: contratante.processos.map(pc => pc.processo)
+    }
+
+    return NextResponse.json({ contratante: contratanteFormatado })
   } catch (error) {
     console.error("Erro ao buscar contratante:", error)
     return NextResponse.json(
@@ -63,48 +76,65 @@ export async function PUT(
 
     const body = await request.json()
 
-    // Verificar se existe
-    const existente = await prisma.contratante.findUnique({
-      where: { id },
+    // Verificar se o contratante existe
+    const contratanteExistente = await prisma.contratante.findUnique({
+      where: { id }
     })
 
-    if (!existente) {
+    if (!contratanteExistente) {
       return NextResponse.json(
         { error: "Contratante não encontrado" },
         { status: 404 }
       )
     }
 
-    // Montar objeto de dados para update
+    // Montar objeto de atualização
     const updateData: Record<string, unknown> = {}
 
-    if (body.tipo !== undefined) updateData.tipo = body.tipo || null
-    if (body.nome !== undefined) updateData.nome = body.nome?.trim() || null
-    if (body.cpf !== undefined) updateData.cpf = body.cpf || null
-    if (body.rg !== undefined) updateData.rg = body.rg || null
+    if (body.nome !== undefined) updateData.nome = body.nome
+    if (body.cpf !== undefined) updateData.cpf = body.cpf
+    if (body.rg !== undefined) updateData.rg = body.rg
     if (body.dataNascimento !== undefined) {
       updateData.dataNascimento = body.dataNascimento ? new Date(body.dataNascimento) : null
     }
-    if (body.sexo !== undefined) updateData.sexo = body.sexo || null
-    if (body.estadoCivil !== undefined) updateData.estadoCivil = body.estadoCivil || null
-    if (body.nacionalidade !== undefined) updateData.nacionalidade = body.nacionalidade || null
-    if (body.telefone !== undefined) updateData.telefone = body.telefone || null
-    if (body.email !== undefined) updateData.email = body.email || null
-    if (body.endereco !== undefined) updateData.endereco = body.endereco || null
-    if (body.numero !== undefined) updateData.numero = body.numero || null
-    if (body.complemento !== undefined) updateData.complemento = body.complemento || null
-    if (body.bairro !== undefined) updateData.bairro = body.bairro || null
-    if (body.cidade !== undefined) updateData.cidade = body.cidade || null
-    if (body.estado !== undefined) updateData.estado = body.estado || null
-    if (body.cep !== undefined) updateData.cep = body.cep || null
-    if (body.observacoes !== undefined) updateData.observacoes = body.observacoes || null
+    if (body.sexo !== undefined) updateData.sexo = body.sexo
+    if (body.estadoCivil !== undefined) updateData.estadoCivil = body.estadoCivil
+    if (body.nacionalidade !== undefined) updateData.nacionalidade = body.nacionalidade
+    if (body.telefone !== undefined) updateData.telefone = body.telefone
+    if (body.email !== undefined) updateData.email = body.email
+    if (body.endereco !== undefined) updateData.endereco = body.endereco
+    if (body.numero !== undefined) updateData.numero = body.numero
+    if (body.complemento !== undefined) updateData.complemento = body.complemento
+    if (body.bairro !== undefined) updateData.bairro = body.bairro
+    if (body.cidade !== undefined) updateData.cidade = body.cidade
+    if (body.estado !== undefined) updateData.estado = body.estado
+    if (body.cep !== undefined) updateData.cep = body.cep
+    if (body.observacoes !== undefined) updateData.observacoes = body.observacoes
+    if (body.fotoUrl !== undefined) updateData.fotoUrl = body.fotoUrl
 
     const contratante = await prisma.contratante.update({
       where: { id },
       data: updateData,
+      include: {
+        processos: {
+          include: {
+            processo: {
+              include: {
+                status: true
+              }
+            }
+          }
+        }
+      }
     })
 
-    return NextResponse.json({ contratante })
+    // Formatar resposta
+    const contratanteFormatado = {
+      ...contratante,
+      processos: contratante.processos.map(pc => pc.processo)
+    }
+
+    return NextResponse.json({ contratante: contratanteFormatado })
   } catch (error) {
     console.error("Erro ao atualizar contratante:", error)
     return NextResponse.json(
@@ -130,33 +160,24 @@ export async function DELETE(
       )
     }
 
-    // Verificar se existe e se está em uso
-    const contratante = await prisma.contratante.findUnique({
-      where: { id },
-      include: {
-        _count: { select: { processos: true } }
-      },
+    // Verificar se o contratante existe
+    const contratanteExistente = await prisma.contratante.findUnique({
+      where: { id }
     })
 
-    if (!contratante) {
+    if (!contratanteExistente) {
       return NextResponse.json(
         { error: "Contratante não encontrado" },
         { status: 404 }
       )
     }
 
-    if (contratante._count.processos > 0) {
-      return NextResponse.json(
-        { error: `Este contratante está vinculado a ${contratante._count.processos} processo(s). Desvincule primeiro.` },
-        { status: 400 }
-      )
-    }
-
+    // Excluir (os relacionamentos em ProcessoContratante serão excluídos automaticamente pelo cascade)
     await prisma.contratante.delete({
-      where: { id },
+      where: { id }
     })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ message: "Contratante excluído com sucesso" })
   } catch (error) {
     console.error("Erro ao excluir contratante:", error)
     return NextResponse.json(
