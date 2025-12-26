@@ -40,6 +40,35 @@ enum Consulado {
   OUTROS
 }
 
+enum Tribunal {
+  ANCONA
+  BARI
+  BOLOGNA
+  BRESCIA
+  CAGLIARI
+  CALTANISSETTA
+  CAMPOBASSO
+  CATANIA
+  CATANZARO
+  FIRENZE
+  GENOVA
+  L_AQUILA
+  LECCE
+  MESSINA
+  MILANO
+  NAPOLI
+  PALERMO
+  PERUGIA
+  POTENZA
+  REGGIO_CALABRIA
+  ROMA
+  SALERNO
+  TORINO
+  TRENTO
+  TRIESTE
+  VENEZIA
+}
+
 // ✅ NOVO: Tipos de documento para cidadania
 enum TipoDocumento {
   // Certidões
@@ -103,10 +132,10 @@ enum StatusDocumento {
 // ========================================
 model Usuario {
   id    Int    @id @default(autoincrement())
-  nome  String @db.VarChar(50)
-  email String @unique @db.VarChar(30)
+  nome  String @db.VarChar(100)
+  email String @unique @db.VarChar(100)
   senha String @db.VarChar(255)
-  tipo  String @db.VarChar(15)
+  tipo  String @db.VarChar(20)
 
   // Tarefas atribuídas ao usuário
   tarefas Tarefa[]
@@ -368,7 +397,8 @@ model Processo {
   
   // ✅ NOVO: Protocolos (apenas para Espanha)
   protocolos   Protocolo[]
-
+  informacaoItalia InformacaoItalia?
+  
   @@index([pais])
   @@index([statusId])
 }
@@ -552,6 +582,52 @@ model Protocolo {
   @@index([processoId])
   @@index([contratanteId])
   @@index([requerenteId])
+}
+
+model InformacaoItalia {
+  id              Int       @id @default(autoincrement())
+  
+  // Vínculo com processo (1 processo = 1 informação)
+  processoId      Int       @unique
+  processo        Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  
+  // Dados do tribunal
+  tribunal        Tribunal
+  
+  // Datas
+  dataProtocolo     DateTime?
+  dataDistribuicao  DateTime?
+  
+  // Número do processo
+  numeroRuoloGenerale String?   @db.VarChar(100)
+  
+  // Observações
+  observacoes     String?   @db.Text
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Anexos
+  anexos          AnexoInformacaoItalia[]
+
+  @@index([processoId])
+}
+
+model AnexoInformacaoItalia {
+  id                  Int      @id @default(autoincrement())
+  nome                String   @db.VarChar(200)
+  tipo                String?  @db.VarChar(50)
+  nomeArquivo         String   @db.VarChar(300)
+  urlArquivo          String   @db.Text
+  tamanho             Int?
+  mimeType            String?  @db.VarChar(100)
+  
+  informacaoItaliaId  Int
+  informacaoItalia    InformacaoItalia @relation(fields: [informacaoItaliaId], references: [id], onDelete: Cascade)
+  
+  createdAt           DateTime @default(now())
+
+  @@index([informacaoItaliaId])
 }
 
 // ========================================

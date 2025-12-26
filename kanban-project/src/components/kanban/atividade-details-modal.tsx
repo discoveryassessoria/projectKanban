@@ -10,6 +10,7 @@ import { MapTooltip } from "../ui/map-tooltip"
 import { ArvoreGenealogicaView } from "../arvore"
 import { ProcessoTarefas } from "./ProcessoTarefas"
 import { ProcessoProtocolos } from "./ProcessoProtocolos"
+import { ProcessoInformacoes } from "./ProcessoInformacoes"
 import { 
   X, 
   Phone, 
@@ -63,8 +64,8 @@ export function ProcessoDetailsModal({
   initialPessoaId,
   initialSidebarTab
 }: ProcessoDetailsModalProps) {
-  // ✅ ATUALIZADO: Adicionado "protocolos" como possível aba
-  const [activeTab, setActiveTab] = useState<"geral" | "faturas" | "historico" | "arvore" | "protocolos">("geral")
+  // ✅ ATUALIZADO: Adicionado "informacoes" como possível aba
+  const [activeTab, setActiveTab] = useState<"geral" | "faturas" | "historico" | "arvore" | "protocolos" | "informacoes">("geral")
   const [etapas, setEtapas] = useState<Status[]>([])
   const [statusIdAtual, setStatusIdAtual] = useState(processo?.statusId)
   const [mudouEtapa, setMudouEtapa] = useState(false)
@@ -97,8 +98,9 @@ export function ProcessoDetailsModal({
   
   const [initialParamsProcessed, setInitialParamsProcessed] = useState(false)
 
-  // ✅ NOVO: Verificar se o processo é da Espanha
+  // ✅ Verificar se o processo é da Espanha ou Itália
   const isEspanha = processo?.pais === "ESPANHA"
+  const isItalia = processo?.pais === "ITALIA"
 
   useEffect(() => {
     if (isOpen && initialTab && !initialParamsProcessed) {
@@ -112,6 +114,8 @@ export function ProcessoDetailsModal({
         setActiveTab("historico")
       } else if (initialTab === "protocolos" && isEspanha) {
         setActiveTab("protocolos")
+      } else if (initialTab === "informacoes" && isItalia) {
+        setActiveTab("informacoes")
       }
       
       if (initialPessoaId) {
@@ -124,7 +128,7 @@ export function ProcessoDetailsModal({
       
       setInitialParamsProcessed(true)
     }
-  }, [isOpen, initialTab, initialPessoaId, initialSidebarTab, initialParamsProcessed, isEspanha])
+  }, [isOpen, initialTab, initialPessoaId, initialSidebarTab, initialParamsProcessed, isEspanha, isItalia])
 
   useEffect(() => {
     if (!isOpen) {
@@ -322,10 +326,12 @@ export function ProcessoDetailsModal({
   const dataCriacao = processo.createdAt
   const dataFormatada = dataCriacao ? new Date(dataCriacao).toLocaleDateString('pt-BR') : ""
 
-  // ✅ NOVO: Definir abas dinamicamente baseado no país
+  // ✅ Definir abas dinamicamente baseado no país
   const tabs = [
     { id: "geral", label: "Geral" },
     { id: "arvore", label: "Árvore Genealógica" },
+    // Aba Informações só aparece para ITÁLIA
+    ...(isItalia ? [{ id: "informacoes", label: "Informações" }] : []),
     // Aba Protocolos só aparece para ESPANHA
     ...(isEspanha ? [{ id: "protocolos", label: "Protocolos" }] : []),
     { id: "faturas", label: "Faturas" },
@@ -425,7 +431,7 @@ export function ProcessoDetailsModal({
           )}
         </div>
 
-        {/* ✅ ATUALIZADO: Abas principais - agora dinâmicas */}
+        {/* Abas principais - dinâmicas */}
         <div className="flex border-b bg-white px-6 flex-shrink-0">
           {tabs.map((tab) => (
             <button
@@ -796,6 +802,14 @@ export function ProcessoDetailsModal({
               }}
               pessoaIdParaFocar={pessoaIdParaFocar}
               sidebarTabParaFocar={sidebarTabParaFocar}
+            />
+          )}
+
+          {/* ✅ Aba Informações (apenas para Itália) */}
+          {activeTab === "informacoes" && isItalia && (
+            <ProcessoInformacoes
+              processoId={processo.id}
+              onUpdate={onSave}
             />
           )}
 

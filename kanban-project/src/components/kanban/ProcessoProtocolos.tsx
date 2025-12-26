@@ -112,8 +112,8 @@ export function ProcessoProtocolos({
     if (userData) {
       try {
         const user = JSON.parse(userData)
-        // Administrador e Gestor podem editar, Usuário não
-        const tiposComPermissao = ["Administrador", "Gestor"]
+        // admin e gestor podem editar, usuario não
+        const tiposComPermissao = ["admin", "Administrador", "gestor", "Gestor"]
         setPodeEditar(tiposComPermissao.includes(user.tipo))
       } catch {
         setPodeEditar(false)

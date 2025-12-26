@@ -184,8 +184,8 @@ export default function SettingsPage() {
 
   const getTipoIcon = (tipo?: string) => {
     switch (tipo) {
-      case 'admin': return <Shield className="h-5 w-5 text-amber-400" />
-      default: return <BadgeCheck className="h-5 w-5 text-blue-400" />
+      case 'admin': return <Shield className="h-5 w-5 text-white/50" />
+      default: return <BadgeCheck className="h-5 w-5 text-white/50" />
     }
   }
 

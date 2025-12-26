@@ -15,11 +15,11 @@ function getAuthToken(): string | null {
 }
 
 // Função auxiliar para fazer requisições autenticadas
-async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<any | null> {
+async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<any> {
   const token = getAuthToken()
   
   if (!token) {
-    return null
+    throw new Error("Você precisa estar autenticado")
   }
 
   const headers = {
@@ -28,24 +28,19 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<an
     ...options.headers,
   }
 
-  try {
-    const response = await fetch(url, { ...options, headers })
+  const response = await fetch(url, { ...options, headers })
+  const data = await response.json().catch(() => ({}))
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Sessão expirada. Faça login novamente.")
+    }
     
-    if (!response.ok) {
-      if (response.status === 401 || response.status === 403) {
-        return null
-      }
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `Erro na requisição: ${response.status}`)
-    }
-
-    return await response.json()
-  } catch (error: any) {
-    if (error.message && !error.message.includes('autenticado')) {
-      throw error
-    }
-    return null
+    // Mostrar erro real da API (ex: "Você não pode editar outro administrador")
+    throw new Error(data.error || `Erro na requisição: ${response.status}`)
   }
+
+  return data
 }
 
 // Buscar todos os usuários
@@ -54,32 +49,39 @@ export async function getUsers(search?: string): Promise<User[]> {
     ? `/api/usuarios?search=${encodeURIComponent(search)}&all=true`
     : '/api/usuarios?all=true'
   
-  const data = await fetchWithAuth(url)
-  
-  if (data === null) {
+  try {
+    const data = await fetchWithAuth(url)
+    return data.usuarios || []
+  } catch (error) {
+    console.error("Erro ao buscar usuários:", error)
     return []
   }
-  
-  return data.usuarios || []
 }
 
-// Criar novo usuário - rota pública, não precisa de autenticação
+// Criar novo usuário - PRECISA de autenticação de admin
 export async function createUser(userData: User): Promise<User> {
+  const token = getAuthToken()
+  
+  if (!token) {
+    throw new Error("Você precisa estar autenticado para criar usuários")
+  }
+
   try {
     const response = await fetch('/api/auth/register', {
       method: 'POST',
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
       },
       body: JSON.stringify(userData),
     })
-    
+
     const data = await response.json()
-    
+
     if (!response.ok) {
       throw new Error(data.error || data.message || "Erro ao criar usuário")
     }
-    
+
     return data.user || data.usuario
   } catch (error: any) {
     console.error("Erro ao criar usuário:", error)
@@ -93,23 +95,15 @@ export async function updateUser(userId: number, userData: Partial<User>): Promi
     method: 'PUT',
     body: JSON.stringify(userData),
   })
-  
-  if (data === null) {
-    throw new Error("Sessão expirada. Faça login novamente.")
-  }
-  
+
   return data.usuario
 }
 
 // Deletar usuário
 export async function deleteUser(userId: number): Promise<boolean> {
-  const result = await fetchWithAuth(`/api/usuarios/${userId}`, {
+  await fetchWithAuth(`/api/usuarios/${userId}`, {
     method: 'DELETE',
   })
-  
-  if (result === null) {
-    throw new Error("Sessão expirada. Faça login novamente.")
-  }
-  
+
   return true
 }

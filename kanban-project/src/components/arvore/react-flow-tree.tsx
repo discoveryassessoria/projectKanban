@@ -1,14 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import ReactFlow, {
   Node,
   Edge,
   Background,
-  Controls,
   MiniMap,
+  Panel,
   useNodesState,
   useEdgesState,
+  useReactFlow,
+  ReactFlowProvider,
   Handle,
   Position,
   NodeProps,
@@ -120,12 +122,8 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
     onPersonClick?.(pessoa)
   }
 
-  // Ring para pessoa principal ou cônjuge
-  const ringClass = isMain
-    ? 'ring-2 ring-green-500 ring-offset-2'
-    : isSpouse
-      ? 'ring-2 ring-purple-400 ring-offset-1'
-      : ''
+  // Sem destaque especial para nenhum card
+  const ringClass = ''
 
   if (mode === 'paisagem') {
     return (
@@ -313,24 +311,39 @@ const nodeTypes = {
 const getLayoutedElements = (
   nodes: Node[],
   edges: Edge[],
-  mode: ViewMode
+  mode: ViewMode,
+  pessoas?: PessoaArvore[]
 ) => {
   const dagreGraph = new dagre.graphlib.Graph()
   dagreGraph.setDefaultEdgeLabel(() => ({}))
 
   const isHorizontal = mode === 'paisagem'
+  const nodeSize = NODE_SIZES[mode]
   
+  // Configuração do Dagre com mais espaço
   dagreGraph.setGraph({
     rankdir: isHorizontal ? 'LR' : 'BT',
-    nodesep: isHorizontal ? 50 : 30,
-    ranksep: isHorizontal ? 80 : 60,
-    marginx: 40,
-    marginy: 40,
-    align: 'UL', // Alinhar para cima/esquerda para manter ordem consistente
+    nodesep: isHorizontal ? 80 : 60,  // Espaço entre nós no mesmo rank
+    ranksep: isHorizontal ? 120 : 100, // Espaço entre ranks (gerações)
+    marginx: 50,
+    marginy: 50,
   })
 
-  const nodeSize = NODE_SIZES[mode]
+  // Identificar casais (pessoas que compartilham filhos)
+  const casais = new Map<string, { pessoa1Id: number; pessoa2Id: number }>()
+  
+  if (pessoas) {
+    pessoas.forEach(pessoa => {
+      if (pessoa.paiId && pessoa.maeId) {
+        const pairKey = `${Math.min(pessoa.paiId, pessoa.maeId)}-${Math.max(pessoa.paiId, pessoa.maeId)}`
+        if (!casais.has(pairKey)) {
+          casais.set(pairKey, { pessoa1Id: pessoa.paiId, pessoa2Id: pessoa.maeId })
+        }
+      }
+    })
+  }
 
+  // Adicionar todos os nós ao Dagre
   nodes.forEach((node) => {
     dagreGraph.setNode(node.id, {
       width: node.width || nodeSize.width,
@@ -338,26 +351,330 @@ const getLayoutedElements = (
     })
   })
 
+  // Adicionar todas as edges ao Dagre
   edges.forEach((edge) => {
     dagreGraph.setEdge(edge.source, edge.target)
   })
 
+  // Executar layout inicial do Dagre
   dagre.layout(dagreGraph)
 
+  // Criar array de nós com posições iniciais
   const layoutedNodes = nodes.map((node) => {
     const nodeWithPosition = dagreGraph.node(node.id)
-    const size = NODE_SIZES[mode]
-
     return {
       ...node,
       position: {
-        x: nodeWithPosition.x - size.width / 2,
-        y: nodeWithPosition.y - size.height / 2,
+        x: nodeWithPosition.x - nodeSize.width / 2,
+        y: nodeWithPosition.y - nodeSize.height / 2,
       },
     }
   })
 
+  // ========================================
+  // PÓS-PROCESSAMENTO: Ajustar casais
+  // ========================================
+  if (pessoas && casais.size > 0) {
+    // Ordenar casais por "profundidade" na árvore (pais primeiro, depois filhos)
+    // Isso garante que ajustamos de cima para baixo
+    const casaisOrdenados = Array.from(casais.values()).sort((a, b) => {
+      const nodeA1 = layoutedNodes.find(n => n.id === `person-${a.pessoa1Id}`)
+      const nodeB1 = layoutedNodes.find(n => n.id === `person-${b.pessoa1Id}`)
+      if (!nodeA1 || !nodeB1) return 0
+      
+      if (isHorizontal) {
+        return nodeA1.position.x - nodeB1.position.x
+      } else {
+        return nodeB1.position.y - nodeA1.position.y // BT: Y maior = mais acima
+      }
+    })
+
+    // Ajustar cada casal para ficar lado a lado no mesmo nível
+    casaisOrdenados.forEach(({ pessoa1Id, pessoa2Id }) => {
+      const node1 = layoutedNodes.find(n => n.id === `person-${pessoa1Id}`)
+      const node2 = layoutedNodes.find(n => n.id === `person-${pessoa2Id}`)
+      
+      if (!node1 || !node2) return
+
+      if (isHorizontal) {
+        // Modo paisagem: mesmo X (coluna), Y adjacentes
+        const avgX = (node1.position.x + node2.position.x) / 2
+        const spacing = nodeSize.height + 15
+        
+        node1.position.x = avgX
+        node2.position.x = avgX
+        
+        // Garantir que estão um acima do outro
+        const avgY = (node1.position.y + node2.position.y) / 2
+        node1.position.y = avgY - spacing / 2
+        node2.position.y = avgY + spacing / 2
+      } else {
+        // Modo retrato: mesmo Y (linha), X adjacentes
+        const avgY = (node1.position.y + node2.position.y) / 2
+        const spacing = nodeSize.width + 20
+        
+        node1.position.y = avgY
+        node2.position.y = avgY
+        
+        // Garantir que estão lado a lado horizontalmente
+        // Manter a ordem relativa original (quem estava à esquerda continua à esquerda)
+        const avgX = (node1.position.x + node2.position.x) / 2
+        if (node1.position.x <= node2.position.x) {
+          node1.position.x = avgX - spacing / 2
+          node2.position.x = avgX + spacing / 2
+        } else {
+          node1.position.x = avgX + spacing / 2
+          node2.position.x = avgX - spacing / 2
+        }
+      }
+    })
+
+    // ========================================
+    // SEGUNDA PASSADA: Resolver sobreposições
+    // ========================================
+    // Agrupar nós por nível (rank/geração) com tolerância maior
+    const nodesByLevel = new Map<number, Node[]>()
+    const levelTolerance = isHorizontal ? nodeSize.width / 2 : nodeSize.height / 2
+    
+    layoutedNodes.forEach(node => {
+      const position = isHorizontal ? node.position.x : node.position.y
+      
+      // Encontrar um nível existente próximo ou criar um novo
+      let foundLevel: number | null = null
+      nodesByLevel.forEach((_, level) => {
+        if (Math.abs(position - level) < levelTolerance) {
+          foundLevel = level
+        }
+      })
+      
+      const level = foundLevel !== null ? foundLevel : position
+      
+      if (!nodesByLevel.has(level)) {
+        nodesByLevel.set(level, [])
+      }
+      nodesByLevel.get(level)!.push(node)
+    })
+
+    // Para cada nível, verificar e resolver sobreposições
+    nodesByLevel.forEach((nodesInLevel) => {
+      if (nodesInLevel.length <= 1) return
+
+      // Ordenar nós por posição
+      if (isHorizontal) {
+        nodesInLevel.sort((a, b) => a.position.y - b.position.y)
+      } else {
+        nodesInLevel.sort((a, b) => a.position.x - b.position.x)
+      }
+
+      // Verificar e corrigir sobreposições - múltiplas passadas para garantir
+      const minSpacing = isHorizontal ? nodeSize.height + 20 : nodeSize.width + 30
+      
+      for (let pass = 0; pass < 3; pass++) {
+        for (let i = 1; i < nodesInLevel.length; i++) {
+          const prevNode = nodesInLevel[i - 1]
+          const currNode = nodesInLevel[i]
+          
+          if (isHorizontal) {
+            const prevBottom = prevNode.position.y + nodeSize.height
+            const currTop = currNode.position.y
+            const overlap = prevBottom + minSpacing - nodeSize.height - currTop
+            
+            if (overlap > 0) {
+              // Mover o nó atual e todos os descendentes
+              const pessoaId = parseInt(currNode.id.replace('person-', ''))
+              if (!isNaN(pessoaId)) {
+                moverPessoaEDescendentes(layoutedNodes, pessoaId, overlap, pessoas, casais, isHorizontal)
+              } else {
+                currNode.position.y += overlap
+              }
+            }
+          } else {
+            const prevRight = prevNode.position.x + nodeSize.width
+            const currLeft = currNode.position.x
+            const overlap = prevRight + minSpacing - nodeSize.width - currLeft
+            
+            if (overlap > 0) {
+              // Mover o nó atual e todos os descendentes
+              const pessoaId = parseInt(currNode.id.replace('person-', ''))
+              if (!isNaN(pessoaId)) {
+                moverPessoaEDescendentes(layoutedNodes, pessoaId, overlap, pessoas, casais, isHorizontal)
+              } else {
+                currNode.position.x += overlap
+              }
+            }
+          }
+        }
+        
+        // Re-ordenar após ajustes
+        if (isHorizontal) {
+          nodesInLevel.sort((a, b) => a.position.y - b.position.y)
+        } else {
+          nodesInLevel.sort((a, b) => a.position.x - b.position.x)
+        }
+      }
+    })
+
+    // ========================================
+    // TERCEIRA PASSADA: Centralizar filhos sob os pais
+    // ========================================
+    casaisOrdenados.forEach(({ pessoa1Id, pessoa2Id }) => {
+      const nodePai = layoutedNodes.find(n => n.id === `person-${pessoa1Id}`)
+      const nodeMae = layoutedNodes.find(n => n.id === `person-${pessoa2Id}`)
+      
+      if (!nodePai || !nodeMae) return
+
+      // Encontrar filhos deste casal
+      const filhos = pessoas.filter(p => 
+        (p.paiId === pessoa1Id && p.maeId === pessoa2Id) ||
+        (p.paiId === pessoa2Id && p.maeId === pessoa1Id)
+      )
+
+      if (filhos.length === 0) return
+
+      // Encontrar nós dos filhos
+      const nodosFilhos = filhos
+        .map(f => layoutedNodes.find(n => n.id === `person-${f.id}`))
+        .filter(Boolean) as Node[]
+
+      if (nodosFilhos.length === 0) return
+
+      // Calcular centro dos pais
+      const centroPaisX = (nodePai.position.x + nodeMae.position.x + nodeSize.width) / 2
+      const centroPaisY = (nodePai.position.y + nodeMae.position.y + nodeSize.height) / 2
+
+      // Calcular centro atual dos filhos
+      const minFilhoX = Math.min(...nodosFilhos.map(n => n.position.x))
+      const maxFilhoX = Math.max(...nodosFilhos.map(n => n.position.x + nodeSize.width))
+      const centroFilhosX = (minFilhoX + maxFilhoX) / 2
+
+      // Ajustar filhos para ficarem centralizados sob os pais (apenas no modo retrato)
+      if (!isHorizontal) {
+        const deltaX = centroPaisX - centroFilhosX
+        
+        // Mover todos os filhos e seus descendentes
+        nodosFilhos.forEach(nodoFilho => {
+          // Encontrar ID da pessoa
+          const pessoaId = parseInt(nodoFilho.id.replace('person-', ''))
+          moverPessoaEDescendentes(layoutedNodes, pessoaId, deltaX, pessoas, casais, isHorizontal)
+        })
+      }
+    })
+
+    // ========================================
+    // QUARTA PASSADA: Verificação final de sobreposições
+    // ========================================
+    // Verificar TODOS os pares de nós e resolver qualquer sobreposição restante
+    const minSpacingFinal = isHorizontal ? nodeSize.height + 20 : nodeSize.width + 30
+    
+    for (let pass = 0; pass < 5; pass++) {
+      let hasOverlap = false
+      
+      for (let i = 0; i < layoutedNodes.length; i++) {
+        for (let j = i + 1; j < layoutedNodes.length; j++) {
+          const nodeA = layoutedNodes[i]
+          const nodeB = layoutedNodes[j]
+          
+          // Verificar se estão no mesmo nível (mesma geração)
+          const sameLevel = isHorizontal
+            ? Math.abs(nodeA.position.x - nodeB.position.x) < nodeSize.width / 2
+            : Math.abs(nodeA.position.y - nodeB.position.y) < nodeSize.height / 2
+          
+          if (!sameLevel) continue
+          
+          // Verificar sobreposição
+          if (isHorizontal) {
+            const aTop = nodeA.position.y
+            const aBottom = nodeA.position.y + nodeSize.height
+            const bTop = nodeB.position.y
+            const bBottom = nodeB.position.y + nodeSize.height
+            
+            const overlap = Math.min(aBottom, bBottom) - Math.max(aTop, bTop) + minSpacingFinal - nodeSize.height
+            
+            if (overlap > 0) {
+              hasOverlap = true
+              // Mover o que está mais abaixo para baixo
+              if (nodeA.position.y < nodeB.position.y) {
+                nodeB.position.y += overlap
+              } else {
+                nodeA.position.y += overlap
+              }
+            }
+          } else {
+            const aLeft = nodeA.position.x
+            const aRight = nodeA.position.x + nodeSize.width
+            const bLeft = nodeB.position.x
+            const bRight = nodeB.position.x + nodeSize.width
+            
+            const overlap = Math.min(aRight, bRight) - Math.max(aLeft, bLeft) + minSpacingFinal - nodeSize.width
+            
+            if (overlap > 0) {
+              hasOverlap = true
+              // Mover o que está mais à direita para a direita
+              if (nodeA.position.x < nodeB.position.x) {
+                nodeB.position.x += overlap
+              } else {
+                nodeA.position.x += overlap
+              }
+            }
+          }
+        }
+      }
+      
+      if (!hasOverlap) break
+    }
+  }
+
   return { nodes: layoutedNodes, edges }
+}
+
+// Função auxiliar para mover uma pessoa e todos os seus descendentes
+function moverPessoaEDescendentes(
+  nodes: Node[], 
+  pessoaId: number, 
+  delta: number, 
+  pessoas: PessoaArvore[],
+  casais: Map<string, { pessoa1Id: number; pessoa2Id: number }>,
+  isHorizontal: boolean
+) {
+  const nodesToMove = new Set<string>()
+  const visited = new Set<number>()
+  
+  const collectNodes = (pId: number) => {
+    if (visited.has(pId)) return
+    visited.add(pId)
+    
+    nodesToMove.add(`person-${pId}`)
+    
+    // Adicionar cônjuge(s)
+    casais.forEach((casal) => {
+      if (casal.pessoa1Id === pId && !visited.has(casal.pessoa2Id)) {
+        nodesToMove.add(`person-${casal.pessoa2Id}`)
+      }
+      if (casal.pessoa2Id === pId && !visited.has(casal.pessoa1Id)) {
+        nodesToMove.add(`person-${casal.pessoa1Id}`)
+      }
+    })
+    
+    // Adicionar filhos recursivamente
+    pessoas.forEach(p => {
+      if ((p.paiId === pId || p.maeId === pId) && !visited.has(p.id)) {
+        collectNodes(p.id)
+      }
+    })
+  }
+  
+  collectNodes(pessoaId)
+  
+  // Mover todos os nós coletados
+  nodes.forEach(node => {
+    if (nodesToMove.has(node.id)) {
+      if (isHorizontal) {
+        node.position.y += delta
+      } else {
+        node.position.x += delta
+      }
+    }
+  })
 }
 
 // ========================================
@@ -424,22 +741,35 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
     return pessoas.find(p => p.id === pessoa.maeId) || null
   }
 
-  // Helper para adicionar pessoa e seus ancestrais
-  const addPersonWithAncestors = (
-    pessoa: PessoaArvore,
-    isMain: boolean = false,
-    isSpouse: boolean = false,
-    depth: number = 0,
-    maxDepth: number = 3
-  ) => {
-    if (processedIds.has(pessoa.id) || depth > maxDepth) return
-    processedIds.add(pessoa.id)
+  // Função para encontrar TODOS os filhos de uma pessoa
+  const findFilhos = (pessoa: PessoaArvore): PessoaArvore[] => {
+    return pessoas.filter(p => p.paiId === pessoa.id || p.maeId === pessoa.id)
+  }
 
+  // Função para encontrar irmãos de uma pessoa
+  const findIrmaos = (pessoa: PessoaArvore): PessoaArvore[] => {
     const pai = findPai(pessoa)
     const mae = findMae(pessoa)
-    const pessoaUnioes = findUnioes(pessoa)
+    
+    if (!pai && !mae) return []
+    
+    return pessoas.filter(p => {
+      if (p.id === pessoa.id) return false
+      const mesmoPai = pai && p.paiId === pai.id
+      const mesmaMae = mae && p.maeId === mae.id
+      return mesmoPai || mesmaMae
+    })
+  }
 
-    // Adicionar nó da pessoa (simplificado)
+  // Função para adicionar um nó de pessoa (sem duplicar)
+  const addPersonNode = (
+    pessoa: PessoaArvore,
+    isMain: boolean = false,
+    isSpouse: boolean = false
+  ) => {
+    if (processedIds.has(pessoa.id)) return false
+    processedIds.add(pessoa.id)
+
     nodes.push({
       id: `person-${pessoa.id}`,
       type: 'person',
@@ -449,25 +779,58 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
         isMain,
         isSpouse,
         mode,
-        unioes: pessoaUnioes,
+        unioes: findUnioes(pessoa),
         onPersonClick,
       },
     })
+    return true
+  }
 
-    // Adicionar pai
+  // Função para adicionar edge (sem duplicar)
+  const addEdge = (
+    sourceId: string,
+    targetId: string,
+    edgeId: string,
+    color: string,
+    dashed: boolean = false
+  ) => {
+    if (edges.find(e => e.id === edgeId)) return
+    edges.push({
+      id: edgeId,
+      source: sourceId,
+      target: targetId,
+      type: 'smoothstep',
+      style: { 
+        stroke: color, 
+        strokeWidth: 2,
+        ...(dashed ? { strokeDasharray: '5,5' } : {})
+      },
+    })
+  }
+
+  // ========================================
+  // ✅ CORRIGIDO: Função recursiva com controle de depth
+  // Placeholders só aparecem na depth 0 (pessoa principal)
+  // ========================================
+  const addPersonWithAncestorsAndSiblings = (
+    pessoa: PessoaArvore,
+    isMain: boolean = false,
+    isSpouse: boolean = false,
+    depth: number = 0  // ✅ NOVO: controle de profundidade
+  ) => {
+    // Adicionar a pessoa
+    const added = addPersonNode(pessoa, isMain, isSpouse)
+    if (!added) return // Já foi processada
+
+    const pai = findPai(pessoa)
+    const mae = findMae(pessoa)
+
+    // Adicionar pai e seus ancestrais
     if (pai) {
-      addPersonWithAncestors(pai, false, false, depth + 1, maxDepth)
-      // Cor baseada no sexo da pessoa (pai), não no tipo de relação
-      const paiColor = getGenderColors(pai.sexo).border
-      edges.push({
-        id: `edge-pai-${pessoa.id}`,
-        source: `person-${pessoa.id}`,
-        target: `person-${pai.id}`,
-        type: 'smoothstep',
-        style: { stroke: paiColor, strokeWidth: 2 },
-      })
-    } else if (depth < maxDepth) {
-      // Placeholder para adicionar pai - linha neutra
+      addPersonWithAncestorsAndSiblings(pai, false, false, depth + 1)
+      addEdge(`person-${pessoa.id}`, `person-${pai.id}`, `edge-pai-${pessoa.id}`, colors.neutral)
+    } else if (depth === 0) {
+      // ✅ CORRIGIDO: Placeholder APENAS na primeira camada (depth === 0)
       const addPaiId = `add-pai-${pessoa.id}`
       if (!nodes.find(n => n.id === addPaiId)) {
         nodes.push({
@@ -476,30 +839,16 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
           position: { x: 0, y: 0 },
           data: { type: 'pai' as const, mode, onClick: () => onAddPai?.(pessoa.id) },
         })
-        edges.push({
-          id: `edge-add-pai-${pessoa.id}`,
-          source: `person-${pessoa.id}`,
-          target: addPaiId,
-          type: 'smoothstep',
-          style: { stroke: colors.neutral, strokeWidth: 2, strokeDasharray: '5,5' },
-        })
+        addEdge(`person-${pessoa.id}`, addPaiId, `edge-add-pai-${pessoa.id}`, colors.neutral, true)
       }
     }
 
-    // Adicionar mãe
+    // Adicionar mãe e seus ancestrais
     if (mae) {
-      addPersonWithAncestors(mae, false, false, depth + 1, maxDepth)
-      // Cor baseada no sexo da pessoa (mãe), não no tipo de relação
-      const maeColor = getGenderColors(mae.sexo).border
-      edges.push({
-        id: `edge-mae-${pessoa.id}`,
-        source: `person-${pessoa.id}`,
-        target: `person-${mae.id}`,
-        type: 'smoothstep',
-        style: { stroke: maeColor, strokeWidth: 2 },
-      })
-    } else if (depth < maxDepth) {
-      // Placeholder para adicionar mãe - linha neutra
+      addPersonWithAncestorsAndSiblings(mae, false, false, depth + 1)
+      addEdge(`person-${pessoa.id}`, `person-${mae.id}`, `edge-mae-${pessoa.id}`, colors.neutral)
+    } else if (depth === 0) {
+      // ✅ CORRIGIDO: Placeholder APENAS na primeira camada (depth === 0)
       const addMaeId = `add-mae-${pessoa.id}`
       if (!nodes.find(n => n.id === addMaeId)) {
         nodes.push({
@@ -508,195 +857,136 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
           position: { x: 0, y: 0 },
           data: { type: 'mae' as const, mode, onClick: () => onAddMae?.(pessoa.id) },
         })
-        edges.push({
-          id: `edge-add-mae-${pessoa.id}`,
-          source: `person-${pessoa.id}`,
-          target: addMaeId,
-          type: 'smoothstep',
-          style: { stroke: colors.neutral, strokeWidth: 2, strokeDasharray: '5,5' },
-        })
+        addEdge(`person-${pessoa.id}`, addMaeId, `edge-add-mae-${pessoa.id}`, colors.neutral, true)
       }
     }
-  }
 
-  // Adicionar pessoa principal com ancestrais
-  addPersonWithAncestors(pessoaPrincipal, true, false, 0)
-
-  // Adicionar TODOS os cônjuges e suas famílias
-  const conjuges = findConjuges(pessoaPrincipal)
-  conjuges.forEach(conjuge => {
-    addPersonWithAncestors(conjuge, false, true, 0)
-
-    // Conectar pessoa principal ao cônjuge - linha roxa para união
-    edges.push({
-      id: `edge-casamento-${pessoaPrincipal.id}-${conjuge.id}`,
-      source: `person-${pessoaPrincipal.id}`,
-      target: `person-${conjuge.id}`,
-      type: 'smoothstep',
-      style: { stroke: '#9333ea', strokeWidth: 2 },
-    })
-  })
-
-  // Função recursiva para adicionar filhos e descendentes
-  const addDescendants = (pessoa: PessoaArvore, depth: number = 0, maxDepth: number = 3) => {
-    if (depth > maxDepth) return
-    
-    // Encontrar filhos desta pessoa
-    const filhos = pessoas.filter(p => 
-      (p.paiId === pessoa.id || p.maeId === pessoa.id) && !processedIds.has(p.id)
-    )
-    
-    filhos.forEach(filho => {
-      if (processedIds.has(filho.id)) return
-      processedIds.add(filho.id)
-      
-      // Adicionar nó do filho
-      nodes.push({
-        id: `person-${filho.id}`,
-        type: 'person',
-        position: { x: 0, y: 0 },
-        data: {
-          pessoa: filho,
-          isMain: false,
-          isSpouse: false,
-          mode,
-          unioes: findUnioes(filho),
-          onPersonClick,
-        },
-      })
-      
-      // Conectar filho ao pai - cor baseada no sexo do filho
-      const filhoColor = getGenderColors(filho.sexo).border
-      edges.push({
-        id: `edge-filho-${filho.id}-${pessoa.id}`,
-        source: `person-${filho.id}`,
-        target: `person-${pessoa.id}`,
-        type: 'smoothstep',
-        style: { stroke: filhoColor, strokeWidth: 2 },
-      })
-      
-      // Adicionar cônjuge do filho
-      const conjugesFilho = findConjuges(filho)
-      conjugesFilho.forEach(conjugeFilho => {
-        if (!processedIds.has(conjugeFilho.id)) {
-          processedIds.add(conjugeFilho.id)
-          nodes.push({
-            id: `person-${conjugeFilho.id}`,
-            type: 'person',
-            position: { x: 0, y: 0 },
-            data: {
-              pessoa: conjugeFilho,
-              isMain: false,
-              isSpouse: true,
-              mode,
-              unioes: findUnioes(conjugeFilho),
-              onPersonClick,
-            },
-          })
-          edges.push({
-            id: `edge-casamento-${filho.id}-${conjugeFilho.id}`,
-            source: `person-${filho.id}`,
-            target: `person-${conjugeFilho.id}`,
-            type: 'smoothstep',
-            style: { stroke: '#9333ea', strokeWidth: 2 },
-          })
-        }
-      })
-      
-      // Recursivamente adicionar descendentes do filho
-      addDescendants(filho, depth + 1, maxDepth)
-    })
-  }
-
-  // Adicionar filhos da pessoa principal e descendentes
-  addDescendants(pessoaPrincipal, 0, 3)
-
-  // Adicionar irmãos da pessoa principal (outros filhos dos mesmos pais)
-  const paiPrincipal = findPai(pessoaPrincipal)
-  const maePrincipal = findMae(pessoaPrincipal)
-  
-  if (paiPrincipal || maePrincipal) {
-    const irmaos = pessoas.filter(p => {
-      if (p.id === pessoaPrincipal.id) return false
-      if (processedIds.has(p.id)) return false
-      
-      // É irmão se tem o mesmo pai OU a mesma mãe
-      const mesmoPai = paiPrincipal && p.paiId === paiPrincipal.id
-      const mesmaMae = maePrincipal && p.maeId === maePrincipal.id
-      
-      return mesmoPai || mesmaMae
-    })
-    
+    // Adicionar irmãos desta pessoa (filhos dos mesmos pais)
+    const irmaos = findIrmaos(pessoa)
     irmaos.forEach(irmao => {
       if (processedIds.has(irmao.id)) return
-      processedIds.add(irmao.id)
       
-      // Adicionar nó do irmão
-      nodes.push({
-        id: `person-${irmao.id}`,
-        type: 'person',
-        position: { x: 0, y: 0 },
-        data: {
-          pessoa: irmao,
-          isMain: false,
-          isSpouse: false,
-          mode,
-          unioes: findUnioes(irmao),
-          onPersonClick,
-        },
-      })
+      addPersonNode(irmao, false, false)
       
-      // Conectar irmão ao pai ou mãe - cor baseada no sexo do irmão
-      const irmaoColor = getGenderColors(irmao.sexo).border
-      
-      if (paiPrincipal && irmao.paiId === paiPrincipal.id) {
-        edges.push({
-          id: `edge-irmao-pai-${irmao.id}`,
-          source: `person-${irmao.id}`,
-          target: `person-${paiPrincipal.id}`,
-          type: 'smoothstep',
-          style: { stroke: irmaoColor, strokeWidth: 2 },
-        })
-      } else if (maePrincipal && irmao.maeId === maePrincipal.id) {
-        edges.push({
-          id: `edge-irmao-mae-${irmao.id}`,
-          source: `person-${irmao.id}`,
-          target: `person-${maePrincipal.id}`,
-          type: 'smoothstep',
-          style: { stroke: irmaoColor, strokeWidth: 2 },
-        })
+      // Conectar irmão a AMBOS os pais
+      if (pai && irmao.paiId === pai.id) {
+        addEdge(`person-${irmao.id}`, `person-${pai.id}`, `edge-irmao-pai-${irmao.id}`, colors.neutral)
       }
-      
-      // Adicionar cônjuges do irmão
+      if (mae && irmao.maeId === mae.id) {
+        addEdge(`person-${irmao.id}`, `person-${mae.id}`, `edge-irmao-mae-${irmao.id}`, colors.neutral)
+      }
+
+      // Adicionar cônjuges do irmão (sem linha de casamento - relação implícita pelos filhos)
       const conjugesIrmao = findConjuges(irmao)
       conjugesIrmao.forEach(conjugeIrmao => {
-        if (!processedIds.has(conjugeIrmao.id)) {
-          processedIds.add(conjugeIrmao.id)
-          nodes.push({
-            id: `person-${conjugeIrmao.id}`,
-            type: 'person',
-            position: { x: 0, y: 0 },
-            data: {
-              pessoa: conjugeIrmao,
-              isMain: false,
-              isSpouse: true,
-              mode,
-              unioes: findUnioes(conjugeIrmao),
-              onPersonClick,
-            },
-          })
-          edges.push({
-            id: `edge-casamento-irmao-${irmao.id}-${conjugeIrmao.id}`,
-            source: `person-${irmao.id}`,
-            target: `person-${conjugeIrmao.id}`,
-            type: 'smoothstep',
-            style: { stroke: '#9333ea', strokeWidth: 2 },
-          })
+        if (addPersonNode(conjugeIrmao, false, false)) {
+          // Adicionar ancestrais do cônjuge do irmão (sem placeholders)
+          addPersonWithAncestorsAndSiblings(conjugeIrmao, false, false, depth + 1)
         }
       })
+
+      // Adicionar filhos do irmão (sobrinhos)
+      addAllDescendants(irmao)
+    })
+  }
+
+  // Função para adicionar TODOS os descendentes de uma pessoa
+  const addAllDescendants = (pessoa: PessoaArvore) => {
+    const filhos = findFilhos(pessoa)
+    
+    filhos.forEach(filho => {
+      if (processedIds.has(filho.id)) {
+        // Filho já existe, mas precisamos garantir conexão com este pai/mãe
+        addEdge(`person-${filho.id}`, `person-${pessoa.id}`, `edge-filho-${filho.id}-${pessoa.id}`, colors.neutral)
+        return
+      }
       
-      // Adicionar descendentes do irmão (sobrinhos)
-      addDescendants(irmao, 1, 3)
+      addPersonNode(filho, false, false)
+      
+      // Conectar filho a AMBOS os pais se existirem
+      const pai = findPai(filho)
+      const mae = findMae(filho)
+      
+      if (pai && processedIds.has(pai.id)) {
+        addEdge(`person-${filho.id}`, `person-${pai.id}`, `edge-filho-${filho.id}-pai-${pai.id}`, colors.neutral)
+      }
+      if (mae && processedIds.has(mae.id)) {
+        addEdge(`person-${filho.id}`, `person-${mae.id}`, `edge-filho-${filho.id}-mae-${mae.id}`, colors.neutral)
+      }
+      
+      // Se nenhum dos pais foi conectado ainda, conectar ao pai/mãe atual
+      if ((!pai || !processedIds.has(pai.id)) && (!mae || !processedIds.has(mae.id))) {
+        addEdge(`person-${filho.id}`, `person-${pessoa.id}`, `edge-filho-${filho.id}-${pessoa.id}`, colors.neutral)
+      }
+
+      // Adicionar cônjuges do filho (sem linha de casamento - relação implícita pelos filhos)
+      const conjugesFilho = findConjuges(filho)
+      conjugesFilho.forEach(conjugeFilho => {
+        if (addPersonNode(conjugeFilho, false, false)) {
+          // Adicionar ancestrais do cônjuge (sem placeholders, depth > 0)
+          addPersonWithAncestorsAndSiblings(conjugeFilho, false, false, 1)
+        }
+      })
+
+      // Recursivamente adicionar descendentes
+      addAllDescendants(filho)
+    })
+  }
+
+  // ========================================
+  // CONSTRUÇÃO DA ÁRVORE
+  // ========================================
+
+  // 1. Adicionar pessoa principal com todos os ancestrais e irmãos de ancestrais
+  //    depth = 0 para mostrar placeholders apenas aqui
+  addPersonWithAncestorsAndSiblings(pessoaPrincipal, true, false, 0)
+
+  // 2. Adicionar TODOS os cônjuges da pessoa principal e suas famílias
+  //    Sem linha de casamento - relação implícita pelos filhos em comum
+  const conjuges = findConjuges(pessoaPrincipal)
+  conjuges.forEach(conjuge => {
+    // Cônjuge usa depth = 1 para NÃO mostrar placeholders
+    addPersonWithAncestorsAndSiblings(conjuge, false, false, 1)
+  })
+
+  // 3. Adicionar descendentes da pessoa principal
+  addAllDescendants(pessoaPrincipal)
+
+  // 4. Garantir que TODOS os filhos de TODAS as pessoas na árvore estão incluídos
+  // Fazer uma segunda passada para pegar qualquer pessoa que tenha pais já processados
+  let changed = true
+  let iterations = 0
+  const maxIterations = 100 // Prevenir loop infinito
+  
+  while (changed && iterations < maxIterations) {
+    changed = false
+    iterations++
+    
+    pessoas.forEach(pessoa => {
+      if (processedIds.has(pessoa.id)) return
+      
+      // Se o pai OU a mãe desta pessoa já está na árvore, adicionar esta pessoa também
+      const paiNaArvore = pessoa.paiId && processedIds.has(pessoa.paiId)
+      const maeNaArvore = pessoa.maeId && processedIds.has(pessoa.maeId)
+      
+      if (paiNaArvore || maeNaArvore) {
+        addPersonNode(pessoa, false, false)
+        changed = true
+        
+        // Conectar a AMBOS os pais se existirem na árvore
+        if (paiNaArvore && pessoa.paiId) {
+          addEdge(`person-${pessoa.id}`, `person-${pessoa.paiId}`, `edge-filho-${pessoa.id}-pai`, colors.neutral)
+        }
+        if (maeNaArvore && pessoa.maeId) {
+          addEdge(`person-${pessoa.id}`, `person-${pessoa.maeId}`, `edge-filho-${pessoa.id}-mae`, colors.neutral)
+        }
+        
+        // Adicionar cônjuges desta pessoa (sem linha de casamento)
+        const conjugesPessoa = findConjuges(pessoa)
+        conjugesPessoa.forEach(conjuge => {
+          addPersonNode(conjuge, false, false)
+        })
+      }
     })
   }
 
@@ -718,7 +1008,8 @@ interface ReactFlowTreeProps {
   onAddConjuge?: (pessoaId: number) => void
 }
 
-export function ReactFlowTree({
+// Componente interno que usa useReactFlow
+function ReactFlowTreeInner({
   pessoas,
   unioes,
   pessoaPrincipal,
@@ -731,26 +1022,56 @@ export function ReactFlowTree({
 }: ReactFlowTreeProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [isLocked, setIsLocked] = useState(false)
+  
+  // Hooks do React Flow
+  const { zoomIn, zoomOut, fitView } = useReactFlow()
 
-  // Recalcular nós e arestas quando os dados mudam
+  // Refs para callbacks - evita re-renders quando callbacks mudam
+  const onPersonClickRef = useRef(onPersonClick)
+  const onAddPaiRef = useRef(onAddPai)
+  const onAddMaeRef = useRef(onAddMae)
+  const onAddFilhoRef = useRef(onAddFilho)
+  const onAddConjugeRef = useRef(onAddConjuge)
+
+  // Atualizar refs quando callbacks mudam
   useEffect(() => {
+    onPersonClickRef.current = onPersonClick
+    onAddPaiRef.current = onAddPai
+    onAddMaeRef.current = onAddMae
+    onAddFilhoRef.current = onAddFilho
+    onAddConjugeRef.current = onAddConjuge
+  }, [onPersonClick, onAddPai, onAddMae, onAddFilho, onAddConjuge])
+
+  // Função para calcular o layout da árvore
+  const calculateLayout = useCallback(() => {
     const { nodes: rawNodes, edges: rawEdges } = buildTreeNodesAndEdges({
       pessoas,
       unioes,
       pessoaPrincipal,
       mode,
-      onPersonClick,
-      onAddPai,
-      onAddMae,
-      onAddFilho,
-      onAddConjuge,
+      onPersonClick: (pessoa) => onPersonClickRef.current?.(pessoa),
+      onAddPai: (id) => onAddPaiRef.current?.(id),
+      onAddMae: (id) => onAddMaeRef.current?.(id),
+      onAddFilho: (id) => onAddFilhoRef.current?.(id),
+      onAddConjuge: (id) => onAddConjugeRef.current?.(id),
     })
 
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rawNodes, rawEdges, mode)
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rawNodes, rawEdges, mode, pessoas)
 
     setNodes(layoutedNodes)
     setEdges(layoutedEdges)
-  }, [pessoas, unioes, pessoaPrincipal, mode, onPersonClick, onAddPai, onAddMae, onAddFilho, onAddConjuge])
+  }, [pessoas, unioes, pessoaPrincipal, mode])
+
+  // Recalcular nós e arestas APENAS quando os dados mudam (não quando callbacks mudam)
+  useEffect(() => {
+    calculateLayout()
+  }, [calculateLayout])
+
+  // Função para resetar o layout (exposta para uso externo se necessário)
+  const handleResetLayout = useCallback(() => {
+    calculateLayout()
+  }, [calculateLayout])
 
   return (
     <ReactFlow
@@ -766,17 +1087,93 @@ export function ReactFlowTree({
       maxZoom={2}
       attributionPosition="bottom-left"
       proOptions={{ hideAttribution: true }}
+      nodesDraggable={!isLocked}
+      nodesConnectable={false}
+      elementsSelectable={!isLocked}
     >
       <Background color="#e0e0e0" gap={20} />
-      <Controls />
+      
+      {/* Controles Customizados */}
+      <Panel position="bottom-left">
+        <div className="flex flex-col bg-white border border-gray-200 rounded shadow-sm">
+          {/* Zoom In */}
+          <button
+            onClick={() => zoomIn()}
+            className="p-2 hover:bg-gray-100 border-b border-gray-200"
+            title="Aumentar zoom"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+          
+          {/* Zoom Out */}
+          <button
+            onClick={() => zoomOut()}
+            className="p-2 hover:bg-gray-100 border-b border-gray-200"
+            title="Diminuir zoom"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+          
+          {/* Fit View */}
+          <button
+            onClick={() => fitView({ padding: 0.2 })}
+            className="p-2 hover:bg-gray-100 border-b border-gray-200"
+            title="Ajustar visualização"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+              <path d="M21 8V5a2 2 0 0 0-2-2h-3"></path>
+              <path d="M3 16v3a2 2 0 0 0 2 2h3"></path>
+              <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
+            </svg>
+          </button>
+          
+          {/* Lock/Unlock */}
+          <button
+            onClick={() => setIsLocked(!isLocked)}
+            className="p-2 hover:bg-gray-100 border-b border-gray-200"
+            title={isLocked ? "Desbloquear movimentação" : "Bloquear movimentação"}
+          >
+            {isLocked ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+              </svg>
+            )}
+          </button>
+          
+          {/* Reset Layout */}
+          <button
+            onClick={handleResetLayout}
+            className="p-2 hover:bg-gray-100"
+            title="Resetar layout da árvore"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+              <path d="M21 3v5h-5"></path>
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+              <path d="M3 21v-5h5"></path>
+            </svg>
+          </button>
+        </div>
+      </Panel>
+      
       <MiniMap
         nodeStrokeWidth={3}
         nodeColor={(node) => {
           if (node.type === 'addPerson') return '#ddd'
           const data = node.data as PersonNodeData
           if (data?.pessoa) {
-            if (data.isMain) return colors.green
-            if (data.isSpouse) return '#9333ea'
             return getGenderColors(data.pessoa.sexo).border
           }
           return '#888'
@@ -784,5 +1181,14 @@ export function ReactFlowTree({
         maskColor="rgba(255, 255, 255, 0.8)"
       />
     </ReactFlow>
+  )
+}
+
+// Componente exportado com Provider
+export function ReactFlowTree(props: ReactFlowTreeProps) {
+  return (
+    <ReactFlowProvider>
+      <ReactFlowTreeInner {...props} />
+    </ReactFlowProvider>
   )
 }
