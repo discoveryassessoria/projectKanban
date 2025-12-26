@@ -1,6 +1,8 @@
+// src/services/activityService.ts
+
 interface UpdateActivityData {
   statusId?: number
-  data_termino?: string | null
+  dataPrazo?: string | null  // ✅ Campo correto é dataPrazo
 }
 
 interface UpdateActivityResponse {
@@ -23,8 +25,9 @@ export class ActivityService {
     data: UpdateActivityData
   ): Promise<UpdateActivityResponse> {
     try {
-      const response = await fetch(`/api/activities/${id}`, {
-        method: 'PATCH',
+      // ✅ CORRIGIDO: Endpoint /api/tarefas e método PUT
+      const response = await fetch(`/api/tarefas/${id}`, {
+        method: 'PUT',  // ✅ A API só suporta PUT, não PATCH
         headers: {
           'Content-Type': 'application/json',
         },
@@ -52,7 +55,8 @@ export class ActivityService {
     id: number, 
     newDeadline: string | null
   ): Promise<UpdateActivityResponse> {
-    return this.updateActivity(id, { data_termino: newDeadline })
+    // ✅ CORRIGIDO: Campo correto é dataPrazo
+    return this.updateActivity(id, { dataPrazo: newDeadline })
   }
 
   /**
@@ -70,7 +74,7 @@ export class ActivityService {
    */
   static async getActivities(): Promise<any[]> {
     try {
-      const response = await fetch('/api/activities')
+      const response = await fetch('/api/tarefas')
       
       if (!response.ok) {
         throw new Error('Erro ao carregar atividades')

@@ -2,6 +2,7 @@
 // Contratante e Requerente com campos expandidos
 // ✅ ATUALIZAÇÃO: Campos de cidadania + modelo Documento
 // ✅ ATUALIZAÇÃO: Subtarefas com auto-relacionamento
+// ✅ ATUALIZAÇÃO: Protocolo para processos da Espanha
 
 generator client {
   provider = "prisma-client-js"
@@ -27,6 +28,16 @@ enum PrioridadeTarefa {
   MEDIA
   ALTA
   URGENTE
+}
+
+// ✅ NOVO: Consulados da Espanha no Brasil
+enum Consulado {
+  SAO_PAULO
+  PORTO_ALEGRE
+  RIO_DE_JANEIRO
+  SALVADOR
+  BRASILIA
+  OUTROS
 }
 
 // ✅ NOVO: Tipos de documento para cidadania
@@ -354,6 +365,9 @@ model Processo {
   requerentes  ProcessoRequerente[]
   tarefas      Tarefa[]
   anexos       AnexoProcesso[]
+  
+  // ✅ NOVO: Protocolos (apenas para Espanha)
+  protocolos   Protocolo[]
 
   @@index([pais])
   @@index([statusId])
@@ -463,6 +477,9 @@ model Contratante {
 
   processos       ProcessoContratante[]
   anexos          AnexoContratante[]
+  
+  // ✅ NOVO: Protocolos vinculados
+  protocolos      Protocolo[]
 }
 
 // ========================================
@@ -495,6 +512,46 @@ model Requerente {
 
   processos       ProcessoRequerente[]
   anexos          AnexoRequerente[]
+  
+  // ✅ NOVO: Protocolos vinculados
+  protocolos      Protocolo[]
+}
+
+// ========================================
+// ✅ NOVO: PROTOCOLO - APENAS PARA ESPANHA
+// ========================================
+model Protocolo {
+  id              Int       @id @default(autoincrement())
+  
+  // Vínculo com processo
+  processoId      Int
+  processo        Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  
+  // Pessoa vinculada (pode ser contratante OU requerente)
+  contratanteId   Int?
+  contratante     Contratante? @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
+  
+  requerenteId    Int?
+  requerente      Requerente? @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+  
+  // Dados do protocolo
+  consulado       Consulado
+  consuladoOutro  String?   @db.VarChar(200) // Se consulado = OUTROS
+  
+  dataProtocolo   DateTime?
+  numeroProtocolo String?   @db.VarChar(100)
+  
+  observacoes     String?   @db.Text
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // ✅ NOVO: Anexos do protocolo
+  anexos          AnexoProtocolo[]
+
+  @@index([processoId])
+  @@index([contratanteId])
+  @@index([requerenteId])
 }
 
 // ========================================
@@ -549,6 +606,26 @@ model AnexoRequerente {
   createdAt     DateTime @default(now())
 
   @@index([requerenteId])
+}
+
+// ========================================
+// ANEXO DE PROTOCOLO
+// ========================================
+model AnexoProtocolo {
+  id            Int      @id @default(autoincrement())
+  nome          String   @db.VarChar(200)
+  tipo          String?  @db.VarChar(50)
+  nomeArquivo   String   @db.VarChar(300)
+  urlArquivo    String   @db.Text
+  tamanho       Int?
+  mimeType      String?  @db.VarChar(100)
+  
+  protocoloId   Int
+  protocolo     Protocolo @relation(fields: [protocoloId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime @default(now())
+
+  @@index([protocoloId])
 }
 
 // ========================================

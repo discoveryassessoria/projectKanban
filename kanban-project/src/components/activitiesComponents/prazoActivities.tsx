@@ -231,6 +231,15 @@ export default function PrazoActivities() {
     setIsDragging(false)
   }
 
+  // ✅ CORRIGIDO: Helper para formatar data com hora do meio-dia (evita problema de timezone)
+  const formatDateForAPI = (date: Date): string => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    // Usar meio-dia (12:00) para evitar problemas de fuso horário
+    return `${year}-${month}-${day}T12:00:00`
+  }
+
   // Função para calcular nova data baseada na categoria
   const calculateNewDateForCategory = (category: PrazoCategory): string | null => {
     const now = new Date()
@@ -239,25 +248,25 @@ export default function PrazoActivities() {
       case 'vencido':
         const yesterday = new Date(now)
         yesterday.setDate(now.getDate() - 1)
-        return yesterday.toISOString()
+        return formatDateForAPI(yesterday)
         
       case 'hoje':
-        return now.toISOString()
+        return formatDateForAPI(now)
         
       case 'proximos-3-dias':
         const in2Days = new Date(now)
         in2Days.setDate(now.getDate() + 2)
-        return in2Days.toISOString()
+        return formatDateForAPI(in2Days)
         
       case 'proxima-semana':
         const in5Days = new Date(now)
         in5Days.setDate(now.getDate() + 5)
-        return in5Days.toISOString()
+        return formatDateForAPI(in5Days)
         
       case 'futuro':
         const in15Days = new Date(now)
         in15Days.setDate(now.getDate() + 15)
-        return in15Days.toISOString()
+        return formatDateForAPI(in15Days)
         
       case 'sem-prazo':
         return null

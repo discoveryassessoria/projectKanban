@@ -1,5 +1,4 @@
-// ESTE ARQUIVO VAI EM: src/components/kanban/atividade-details-modal.tsx
-// SUBSTITUA O ARQUIVO EXISTENTE
+// src/components/kanban/atividade-details-modal.tsx
 
 "use client"
 
@@ -10,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { MapTooltip } from "../ui/map-tooltip"
 import { ArvoreGenealogicaView } from "../arvore"
 import { ProcessoTarefas } from "./ProcessoTarefas"
+import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { 
   X, 
   Phone, 
@@ -25,7 +25,8 @@ import {
   GitBranch,
   User,
   MapPin,
-  Trash2
+  Trash2,
+  FileText
 } from "lucide-react"
 import { 
   Pais, 
@@ -62,7 +63,8 @@ export function ProcessoDetailsModal({
   initialPessoaId,
   initialSidebarTab
 }: ProcessoDetailsModalProps) {
-  const [activeTab, setActiveTab] = useState<"geral" | "faturas" | "historico" | "arvore">("geral")
+  // ✅ ATUALIZADO: Adicionado "protocolos" como possível aba
+  const [activeTab, setActiveTab] = useState<"geral" | "faturas" | "historico" | "arvore" | "protocolos">("geral")
   const [etapas, setEtapas] = useState<Status[]>([])
   const [statusIdAtual, setStatusIdAtual] = useState(processo?.statusId)
   const [mudouEtapa, setMudouEtapa] = useState(false)
@@ -95,6 +97,9 @@ export function ProcessoDetailsModal({
   
   const [initialParamsProcessed, setInitialParamsProcessed] = useState(false)
 
+  // ✅ NOVO: Verificar se o processo é da Espanha
+  const isEspanha = processo?.pais === "ESPANHA"
+
   useEffect(() => {
     if (isOpen && initialTab && !initialParamsProcessed) {
       if (initialTab === "arvore") {
@@ -105,6 +110,8 @@ export function ProcessoDetailsModal({
         setActiveTab("faturas")
       } else if (initialTab === "historico") {
         setActiveTab("historico")
+      } else if (initialTab === "protocolos" && isEspanha) {
+        setActiveTab("protocolos")
       }
       
       if (initialPessoaId) {
@@ -117,7 +124,7 @@ export function ProcessoDetailsModal({
       
       setInitialParamsProcessed(true)
     }
-  }, [isOpen, initialTab, initialPessoaId, initialSidebarTab, initialParamsProcessed])
+  }, [isOpen, initialTab, initialPessoaId, initialSidebarTab, initialParamsProcessed, isEspanha])
 
   useEffect(() => {
     if (!isOpen) {
@@ -315,6 +322,16 @@ export function ProcessoDetailsModal({
   const dataCriacao = processo.createdAt
   const dataFormatada = dataCriacao ? new Date(dataCriacao).toLocaleDateString('pt-BR') : ""
 
+  // ✅ NOVO: Definir abas dinamicamente baseado no país
+  const tabs = [
+    { id: "geral", label: "Geral" },
+    { id: "arvore", label: "Árvore Genealógica" },
+    // Aba Protocolos só aparece para ESPANHA
+    ...(isEspanha ? [{ id: "protocolos", label: "Protocolos" }] : []),
+    { id: "faturas", label: "Faturas" },
+    { id: "historico", label: "Histórico" },
+  ]
+
   const modalContent = (
     <>
       <div className="fixed inset-0 bg-black/50 z-[9998]" onClick={handleClose} />
@@ -408,14 +425,9 @@ export function ProcessoDetailsModal({
           )}
         </div>
 
-        {/* Abas principais */}
+        {/* ✅ ATUALIZADO: Abas principais - agora dinâmicas */}
         <div className="flex border-b bg-white px-6 flex-shrink-0">
-          {[
-            { id: "geral", label: "Geral" },
-            { id: "arvore", label: "Árvore Genealógica" },
-            { id: "faturas", label: "Faturas" },
-            { id: "historico", label: "Histórico" },
-          ].map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
@@ -784,6 +796,16 @@ export function ProcessoDetailsModal({
               }}
               pessoaIdParaFocar={pessoaIdParaFocar}
               sidebarTabParaFocar={sidebarTabParaFocar}
+            />
+          )}
+
+          {/* ✅ Aba Protocolos (apenas para Espanha) */}
+          {activeTab === "protocolos" && isEspanha && (
+            <ProcessoProtocolos
+              processoId={processo.id}
+              contratantes={contratantesSelecionados}
+              requerentes={requerentesSelecionados}
+              onUpdate={onSave}
             />
           )}
 
