@@ -43,7 +43,7 @@ export function ProcessosLista({
   const filteredProcessos = processos.filter(p => 
     p.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.descricao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.contratante?.nome.toLowerCase().includes(searchTerm.toLowerCase())
+    p.contratantes?.some(c => c.nome?.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   // Paginação
@@ -130,6 +130,7 @@ export function ProcessosLista({
               const tarefasCount = processo._count?.tarefas ?? processo.tarefas?.length ?? 0
               const tarefasConcluidas = processo.tarefas?.filter(t => t.concluida)?.length ?? 0
               const requerentesCount = processo.requerentes?.length ?? 0
+              const primeiroContratante = processo.contratantes?.[0]
 
               return (
                 <tr 
@@ -162,9 +163,9 @@ export function ProcessosLista({
                     </div>
                   </td>
                   <td className="py-3 px-4">
-                    {processo.contratante ? (
+                    {primeiroContratante ? (
                       <span className="text-indigo-400 hover:underline cursor-pointer">
-                        {processo.contratante.nome}
+                        {primeiroContratante.nome}
                       </span>
                     ) : (
                       <span className="text-white/40">-</span>
