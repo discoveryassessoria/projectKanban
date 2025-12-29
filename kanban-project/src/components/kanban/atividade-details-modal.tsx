@@ -11,6 +11,8 @@ import { ArvoreGenealogicaView } from "../arvore"
 import { ProcessoTarefas } from "./ProcessoTarefas"
 import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoInformacoes } from "./ProcessoInformacoes"
+import { ProcessoHistorico } from "./ProcessoHistorico"
+import { ProcessoFaturas } from "./ProcessoFaturas"
 import { 
   X, 
   Phone, 
@@ -824,21 +826,17 @@ export function ProcessoDetailsModal({
           )}
 
           {activeTab === "faturas" && (
-            <div className="h-full flex items-center justify-center text-gray-500">
-              <div className="text-center">
-                <h3 className="text-lg font-medium text-gray-700">Faturas</h3>
-                <p className="text-sm mt-2">Gerencie as faturas deste processo</p>
-              </div>
-            </div>
+            <ProcessoFaturas
+            processoId={processo.id}
+            onUpdate={onSave}
+            />
           )}
 
           {activeTab === "historico" && (
-            <div className="h-full flex items-center justify-center text-gray-500">
-              <div className="text-center">
-                <h3 className="text-lg font-medium text-gray-700">Histórico</h3>
-                <p className="text-sm mt-2">Veja o histórico de alterações</p>
-              </div>
-            </div>
+            <ProcessoHistorico
+            processoId={processo.id}
+            onUpdate={onSave}
+            />
           )}
         </div>
       </div>

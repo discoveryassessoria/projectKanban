@@ -373,6 +373,7 @@ model Processo {
   nome         String    @db.VarChar(100)
   descricao    String?   @db.VarChar(500)
   observacoes  String?   @db.Text
+  faturas Fatura[]
   
   pais         Pais
   
@@ -723,4 +724,66 @@ model LogAuditoria {
   @@index([entidade])
   @@index([usuarioId])
   @@index([criadoEm])
+}
+
+// ========================================
+// ADICIONAR AO FINAL DO schema.prisma
+// ========================================
+
+// ========================================
+// FATURA - COBRANÇA POR PROCESSO
+// ========================================
+enum StatusFatura {
+  PENDENTE
+  PAGO
+  VENCIDO
+  CANCELADO
+  PARCIAL
+}
+
+enum FormaPagamento {
+  PIX
+  CARTAO_CREDITO
+  CARTAO_DEBITO
+  BOLETO
+  TRANSFERENCIA
+  DINHEIRO
+  CHEQUE
+  OUTRO
+}
+
+model Fatura {
+  id              Int           @id @default(autoincrement())
+  
+  // Vínculo com processo
+  processoId      Int
+  processo        Processo      @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  
+  // Dados da fatura
+  descricao       String        @db.VarChar(200)
+  valor           Decimal       @db.Decimal(10, 2)
+  status          StatusFatura  @default(PENDENTE)
+  
+  // Datas
+  dataEmissao     DateTime      @default(now())
+  dataVencimento  DateTime?
+  dataPagamento   DateTime?
+  
+  // Pagamento
+  formaPagamento  FormaPagamento?
+  valorPago       Decimal?      @db.Decimal(10, 2)
+  
+  // Comprovante
+  comprovanteUrl  String?       @db.Text
+  comprovanteNome String?       @db.VarChar(200)
+  
+  // Observações
+  observacoes     String?       @db.Text
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([processoId])
+  @@index([status])
+  @@index([dataVencimento])
 }
