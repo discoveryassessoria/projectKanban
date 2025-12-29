@@ -1,6 +1,9 @@
+// src/app/api/processos/route.ts
+
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Pais } from "@prisma/client"
+import { logProcesso } from "@/lib/auditoria"
 
 // GET - Buscar processos (filtrado por país opcionalmente)
 export async function GET(request: Request) {
@@ -68,10 +71,10 @@ export async function POST(request: Request) {
       observacoes,
       statusId, 
       pais, 
-      contratanteIds, // Array de IDs de contratantes
+      contratanteIds,
       arvoreId,
       previsaoTermino,
-      requerenteIds // Array de IDs de requerentes
+      requerenteIds
     } = body
 
     if (!nome) {
@@ -154,6 +157,9 @@ export async function POST(request: Request) {
         }))
       })
     }
+
+    // ✅ REGISTRAR LOG
+    await logProcesso.criar(processo.nome, processo.id)
 
     // Buscar processo completo com relacionamentos
     const processoCompleto = await prisma.processo.findUnique({

@@ -1,8 +1,8 @@
-// ESTE ARQUIVO VAI EM: src/app/api/processos/[processoId]/route.ts
-// SUBSTITUA O ARQUIVO EXISTENTE
+// src/app/api/processos/[processoId]/route.ts
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { logProcesso } from "@/lib/auditoria"
 
 // GET - Buscar processo por ID
 export async function GET(
@@ -93,16 +93,17 @@ export async function PUT(
       descricao, 
       observacoes,
       statusId, 
-      contratanteIds, // Array de IDs de contratantes
+      contratanteIds,
       arvoreId,
       previsaoTermino,
       dataConclusao,
-      requerenteIds // Array de IDs de requerentes
+      requerenteIds
     } = body
 
-    // Verificar se o processo existe
+    // Verificar se o processo existe e pegar status atual
     const processoExistente = await prisma.processo.findUnique({
-      where: { id }
+      where: { id },
+      include: { status: true }
     })
 
     if (!processoExistente) {
@@ -113,19 +114,20 @@ export async function PUT(
     }
 
     // Se statusId foi fornecido, verificar se pertence ao mesmo país
-    if (statusId) {
-      const status = await prisma.status.findUnique({
+    let statusNovo = null
+    if (statusId && statusId !== processoExistente.statusId) {
+      statusNovo = await prisma.status.findUnique({
         where: { id: statusId }
       })
 
-      if (!status) {
+      if (!statusNovo) {
         return NextResponse.json(
           { error: "Status não encontrado" },
           { status: 404 }
         )
       }
 
-      if (status.pais !== processoExistente.pais) {
+      if (statusNovo.pais !== processoExistente.pais) {
         return NextResponse.json(
           { error: "Status não pertence a este país" },
           { status: 400 }
@@ -135,12 +137,10 @@ export async function PUT(
 
     // Atualizar contratantes se fornecidos
     if (contratanteIds !== undefined) {
-      // Remover todos os contratantes atuais
       await prisma.processoContratante.deleteMany({
         where: { processoId: id }
       })
 
-      // Adicionar os novos
       if (contratanteIds.length > 0) {
         await prisma.processoContratante.createMany({
           data: contratanteIds.map((contratanteId: number) => ({
@@ -153,12 +153,10 @@ export async function PUT(
 
     // Atualizar requerentes se fornecidos
     if (requerenteIds !== undefined) {
-      // Remover todos os requerentes atuais
       await prisma.processoRequerente.deleteMany({
         where: { processoId: id }
       })
 
-      // Adicionar os novos
       if (requerenteIds.length > 0) {
         await prisma.processoRequerente.createMany({
           data: requerenteIds.map((requerenteId: number) => ({
@@ -169,7 +167,7 @@ export async function PUT(
       }
     }
 
-    // Atualizar o processo (campos básicos)
+    // Atualizar o processo
     await prisma.processo.update({
       where: { id },
       data: {
@@ -187,7 +185,21 @@ export async function PUT(
       }
     })
 
-    // Buscar processo atualizado com todos os relacionamentos
+    // ✅ REGISTRAR LOG
+    if (statusNovo && processoExistente.status) {
+      // Se mudou de status, registrar como "moveu"
+      await logProcesso.mover(
+        processoExistente.nome,
+        id,
+        processoExistente.status.nome,
+        statusNovo.nome
+      )
+    } else {
+      // Se só editou dados, registrar como "editou"
+      await logProcesso.editar(processoExistente.nome, id)
+    }
+
+    // Buscar processo atualizado
     const processoAtualizado = await prisma.processo.findUnique({
       where: { id },
       include: {
@@ -228,7 +240,7 @@ export async function PUT(
   }
 }
 
-// DELETE - Excluir processo E LIMPAR ÁRVORE ÓRFÃ
+// DELETE - Excluir processo
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ processoId: string }> }
@@ -244,10 +256,10 @@ export async function DELETE(
       )
     }
 
-    // 1. Buscar o processo para pegar o arvoreId ANTES de deletar
+    // Buscar o processo para pegar nome e arvoreId ANTES de deletar
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { arvoreId: true }
+      select: { nome: true, arvoreId: true }
     })
 
     if (!processo) {
@@ -258,29 +270,28 @@ export async function DELETE(
     }
 
     const arvoreId = processo.arvoreId
+    const nomeProcesso = processo.nome
 
-    // 2. Excluir o processo (cascade vai deletar tarefas, requerentes, contratantes e anexos)
+    // Excluir o processo
     await prisma.processo.delete({
       where: { id }
     })
 
-    // 3. Se tinha uma árvore vinculada, verificar se ficou órfã
+    // ✅ REGISTRAR LOG
+    await logProcesso.excluir(nomeProcesso, id)
+
+    // Se tinha uma árvore vinculada, verificar se ficou órfã
     let arvoreRemovida = false
     if (arvoreId) {
-      // Verificar se algum outro processo usa essa árvore
       const outrosProcessos = await prisma.processo.count({
         where: { arvoreId }
       })
 
-      // Se nenhum outro processo usa, deletar a árvore
-      // (cascade do Prisma vai deletar pessoas, uniões, documentos)
       if (outrosProcessos === 0) {
         await prisma.arvore.delete({
           where: { id: arvoreId }
         })
-        
         arvoreRemovida = true
-        console.log(`✅ Árvore órfã ${arvoreId} foi deletada automaticamente`)
       }
     }
 

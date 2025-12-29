@@ -1,7 +1,8 @@
-// SUBSTITUIR: src/app/api/contratantes/[contratanteId]/route.ts
+// src/app/api/contratantes/[contratanteId]/route.ts
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { logContratante } from "@/lib/auditoria"
 
 // GET - Buscar contratante por ID
 export async function GET(
@@ -24,7 +25,6 @@ export async function GET(
       include: {
         processos: {
           include: {
-            // ✅ CORRIGIDO: Navegar até processo para acessar status
             processo: {
               include: {
                 status: true
@@ -42,7 +42,6 @@ export async function GET(
       )
     }
 
-    // Formatar resposta para facilitar uso no frontend
     const contratanteFormatado = {
       ...contratante,
       processos: contratante.processos.map(pc => pc.processo)
@@ -76,7 +75,6 @@ export async function PUT(
 
     const body = await request.json()
 
-    // Verificar se o contratante existe
     const contratanteExistente = await prisma.contratante.findUnique({
       where: { id }
     })
@@ -88,7 +86,6 @@ export async function PUT(
       )
     }
 
-    // Montar objeto de atualização
     const updateData: Record<string, unknown> = {}
 
     if (body.nome !== undefined) updateData.nome = body.nome
@@ -128,7 +125,9 @@ export async function PUT(
       }
     })
 
-    // Formatar resposta
+    // ✅ REGISTRAR LOG
+    await logContratante.editar(contratante.nome, contratante.id)
+
     const contratanteFormatado = {
       ...contratante,
       processos: contratante.processos.map(pc => pc.processo)
@@ -160,7 +159,6 @@ export async function DELETE(
       )
     }
 
-    // Verificar se o contratante existe
     const contratanteExistente = await prisma.contratante.findUnique({
       where: { id }
     })
@@ -172,10 +170,14 @@ export async function DELETE(
       )
     }
 
-    // Excluir (os relacionamentos em ProcessoContratante serão excluídos automaticamente pelo cascade)
+    const nomeContratante = contratanteExistente.nome
+
     await prisma.contratante.delete({
       where: { id }
     })
+
+    // ✅ REGISTRAR LOG
+    await logContratante.excluir(nomeContratante, id)
 
     return NextResponse.json({ message: "Contratante excluído com sucesso" })
   } catch (error) {

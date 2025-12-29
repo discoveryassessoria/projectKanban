@@ -1,5 +1,8 @@
+// src/app/api/contratantes/route.ts
+
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { logContratante } from "@/lib/auditoria"
 
 // GET - Buscar todos os contratantes
 export async function GET(request: Request) {
@@ -50,12 +53,10 @@ export async function POST(request: Request) {
       )
     }
 
-    // Montar objeto de dados para create
     const createData: Record<string, unknown> = {
       nome: body.nome.trim(),
     }
 
-    // Campos que existem no modelo Contratante
     if (body.cpf) createData.cpf = body.cpf
     if (body.rg) createData.rg = body.rg
     if (body.dataNascimento) createData.dataNascimento = new Date(body.dataNascimento)
@@ -76,6 +77,9 @@ export async function POST(request: Request) {
     const contratante = await prisma.contratante.create({
       data: createData as any,
     })
+
+    // ✅ REGISTRAR LOG
+    await logContratante.criar(contratante.nome, contratante.id)
 
     return NextResponse.json({ contratante }, { status: 201 })
   } catch (error) {

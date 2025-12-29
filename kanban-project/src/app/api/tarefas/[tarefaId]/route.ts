@@ -1,6 +1,9 @@
+// src/app/api/tarefas/[tarefaId]/route.ts
+
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { PrioridadeTarefa } from "@prisma/client"
+import { logTarefa } from "@/lib/auditoria"
 
 async function verificarEConcluirTarefaPai(tarefaPaiId: number) {
   const tarefaPai = await prisma.tarefa.findUnique({
@@ -231,6 +234,9 @@ export async function PUT(
     if (pais !== undefined) dataAtualizacao.pais = pais
     if (ordem !== undefined) dataAtualizacao.ordem = ordem
 
+    // Variável para controlar tipo de log
+    let tipoLog: "editar" | "concluir" | "reabrir" = "editar"
+
     if (concluida !== undefined) {
       if (concluida && !tarefaExistente.concluida) {
         if (tarefaExistente.subtarefas.length > 0) {
@@ -244,10 +250,12 @@ export async function PUT(
         }
         dataAtualizacao.concluida = true
         dataAtualizacao.dataConclusao = new Date()
+        tipoLog = "concluir"
       } 
       else if (!concluida && tarefaExistente.concluida) {
         dataAtualizacao.concluida = false
         dataAtualizacao.dataConclusao = null
+        tipoLog = "reabrir"
       }
     }
 
@@ -297,6 +305,15 @@ export async function PUT(
         }
       }
     })
+
+    // ✅ REGISTRAR LOG
+    if (tipoLog === "concluir") {
+      await logTarefa.concluir(tarefa.titulo, tarefa.id)
+    } else if (tipoLog === "reabrir") {
+      await logTarefa.reabrir(tarefa.titulo, tarefa.id)
+    } else {
+      await logTarefa.editar(tarefa.titulo, tarefa.id)
+    }
 
     if (concluida && tarefaExistente.tarefaPaiId) {
       await verificarEConcluirTarefaPai(tarefaExistente.tarefaPaiId)
@@ -348,10 +365,14 @@ export async function DELETE(
     }
 
     const tarefaPaiId = tarefa.tarefaPaiId
+    const tituloTarefa = tarefa.titulo
 
     await prisma.tarefa.delete({
       where: { id }
     })
+
+    // ✅ REGISTRAR LOG
+    await logTarefa.excluir(tituloTarefa, id)
 
     if (tarefaPaiId) {
       await verificarEConcluirTarefaPai(tarefaPaiId)

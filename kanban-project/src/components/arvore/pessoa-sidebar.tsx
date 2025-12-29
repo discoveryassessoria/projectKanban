@@ -1,4 +1,4 @@
-// ESTE ARQUIVO VAI EM: src/components/arvore/pessoa-sidebar.tsx
+// src/components/arvore/pessoa-sidebar.tsx
 
 "use client"
 
@@ -40,7 +40,9 @@ interface PessoaSidebarProps {
   onAddConjuge?: (pessoaId: number) => void
   onAddDocumento?: (pessoaId: number) => void
   onEditDocumento?: (documento: DocumentoArvore) => void
-  // NOVO: Prop para abrir em aba específica (ex: "documentos" vindo da pesquisa)
+  // NOVO: Callback para selecionar outra pessoa (navegar na sidebar + centralizar árvore)
+  onSelectPerson?: (pessoa: PessoaArvore) => void
+  // Prop para abrir em aba específica (ex: "documentos" vindo da pesquisa)
   initialTab?: string
 }
 
@@ -318,6 +320,38 @@ function DocumentoCard({ documento, onClick }: { documento: DocumentoArvore, onC
 }
 
 // ========================================
+// NOVO: Card de familiar clicável
+// ========================================
+function FamiliarCard({ 
+  familiar, 
+  relacao, 
+  extra,
+  onClick 
+}: { 
+  familiar: PessoaArvore
+  relacao: string
+  extra?: React.ReactNode
+  onClick?: () => void 
+}) {
+  return (
+    <div 
+      className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg hover:bg-teal-50 hover:ring-1 hover:ring-teal-200 transition-all cursor-pointer group"
+      onClick={onClick}
+    >
+      <PersonAvatar pessoa={familiar} size={40} />
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-slate-900 text-sm group-hover:text-teal-700 transition-colors">
+          {familiar.nome} {familiar.sobrenome}
+        </p>
+        <p className="text-xs text-slate-500">{relacao}</p>
+        {extra}
+      </div>
+      <ExternalLink className="w-4 h-4 text-slate-300 group-hover:text-teal-500 transition-colors" />
+    </div>
+  )
+}
+
+// ========================================
 // COMPONENTE PRINCIPAL
 // ========================================
 export function PessoaSidebar({ 
@@ -334,13 +368,14 @@ export function PessoaSidebar({
   onAddConjuge,
   onAddDocumento,
   onEditDocumento,
+  onSelectPerson,
   initialTab
 }: PessoaSidebarProps) {
   const [activeTab, setActiveTab] = useState<"info" | "familia" | "docs">("info")
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [initialTabProcessed, setInitialTabProcessed] = useState(false)
   
-  // NOVO: Efeito para definir aba inicial quando a sidebar abre (vindo da pesquisa)
+  // Efeito para definir aba inicial quando a sidebar abre (vindo da pesquisa)
   useEffect(() => {
     if (pessoa && initialTab && !initialTabProcessed) {
       if (initialTab === "documentos" || initialTab === "docs") {
@@ -375,6 +410,13 @@ export function PessoaSidebar({
       setConfirmDelete(false)
     } else {
       setConfirmDelete(true)
+    }
+  }
+
+  // Handler para selecionar um familiar
+  const handleSelectFamiliar = (familiar: PessoaArvore) => {
+    if (onSelectPerson) {
+      onSelectPerson(familiar)
     }
   }
 
@@ -602,26 +644,18 @@ export function PessoaSidebar({
               {(pessoa.pai || pessoa.mae) ? (
                 <div className="space-y-2">
                   {pessoa.pai && (
-                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer">
-                      <PersonAvatar pessoa={pessoa.pai} size={40} />
-                      <div>
-                        <p className="font-medium text-slate-900 text-sm">
-                          {pessoa.pai.nome} {pessoa.pai.sobrenome}
-                        </p>
-                        <p className="text-xs text-slate-500">Pai</p>
-                      </div>
-                    </div>
+                    <FamiliarCard 
+                      familiar={pessoa.pai}
+                      relacao="Pai"
+                      onClick={() => handleSelectFamiliar(pessoa.pai!)}
+                    />
                   )}
                   {pessoa.mae && (
-                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer">
-                      <PersonAvatar pessoa={pessoa.mae} size={40} />
-                      <div>
-                        <p className="font-medium text-slate-900 text-sm">
-                          {pessoa.mae.nome} {pessoa.mae.sobrenome}
-                        </p>
-                        <p className="text-xs text-slate-500">Mãe</p>
-                      </div>
-                    </div>
+                    <FamiliarCard 
+                      familiar={pessoa.mae}
+                      relacao="Mãe"
+                      onClick={() => handleSelectFamiliar(pessoa.mae!)}
+                    />
                   )}
                   {/* Botão para adicionar pai se não tem */}
                   {!pessoa.pai && (
@@ -668,7 +702,7 @@ export function PessoaSidebar({
             <div>
               <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Cônjuge</h4>
               <div className="space-y-2">
-                {conjuges.map((conjuge, index) => {
+                {conjuges.map((conjuge) => {
                   // Encontrar o casamento correspondente
                   const casamento = casamentos.find(c => 
                     (c.pessoa1Id === pessoa.id && c.pessoa2Id === conjuge.id) ||
@@ -676,11 +710,15 @@ export function PessoaSidebar({
                   )
                   
                   return (
-                    <div key={conjuge.id} className="p-3 bg-slate-50 rounded-lg">
+                    <div 
+                      key={conjuge.id} 
+                      className="p-3 bg-slate-50 rounded-lg hover:bg-teal-50 hover:ring-1 hover:ring-teal-200 transition-all cursor-pointer group"
+                      onClick={() => handleSelectFamiliar(conjuge)}
+                    >
                       <div className="flex items-center gap-3">
                         <PersonAvatar pessoa={conjuge} size={40} />
-                        <div>
-                          <p className="font-medium text-slate-900 text-sm">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-slate-900 text-sm group-hover:text-teal-700 transition-colors">
                             {conjuge.nome} {conjuge.sobrenome}
                           </p>
                           {casamento?.data_inicio && (
@@ -689,6 +727,7 @@ export function PessoaSidebar({
                             </p>
                           )}
                         </div>
+                        <ExternalLink className="w-4 h-4 text-slate-300 group-hover:text-teal-500 transition-colors" />
                       </div>
                       {casamento && (casamento.local || casamento.cartorio) && (
                         <div className="mt-2 pt-2 border-t border-slate-200 text-xs text-slate-500">
@@ -725,15 +764,12 @@ export function PessoaSidebar({
                 return (
                   <div className="space-y-2">
                     {filhos.map(filho => (
-                      <div key={filho.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer">
-                        <PersonAvatar pessoa={filho} size={40} />
-                        <div>
-                          <p className="font-medium text-slate-900 text-sm">
-                            {filho.nome} {filho.sobrenome}
-                          </p>
-                          <p className="text-xs text-slate-500">Filho(a)</p>
-                        </div>
-                      </div>
+                      <FamiliarCard 
+                        key={filho.id}
+                        familiar={filho}
+                        relacao="Filho(a)"
+                        onClick={() => handleSelectFamiliar(filho)}
+                      />
                     ))}
                     <button 
                       onClick={() => onAddFilho?.(pessoa.id)}

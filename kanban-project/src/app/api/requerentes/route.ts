@@ -1,5 +1,8 @@
+// src/app/api/requerentes/route.ts
+
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { logRequerente } from "@/lib/auditoria"
 
 // GET - Buscar todos os requerentes
 export async function GET(request: Request) {
@@ -74,6 +77,9 @@ export async function POST(request: Request) {
     const requerente = await prisma.requerente.create({
       data: createData as any,
     })
+
+    // ✅ REGISTRAR LOG
+    await logRequerente.criar(requerente.nome, requerente.id)
 
     return NextResponse.json({ requerente }, { status: 201 })
   } catch (error) {

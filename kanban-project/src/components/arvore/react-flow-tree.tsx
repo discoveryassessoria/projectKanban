@@ -1,6 +1,8 @@
+// src/components/arvore/react-flow-tree.tsx
+
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from "react"
 import ReactFlow, {
   Node,
   Edge,
@@ -994,6 +996,13 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
 }
 
 // ========================================
+// TIPOS EXPORTADOS PARA REF
+// ========================================
+export interface ReactFlowTreeRef {
+  centerOnPerson: (pessoaId: number) => void
+}
+
+// ========================================
 // COMPONENTE PRINCIPAL: ReactFlowTree
 // ========================================
 interface ReactFlowTreeProps {
@@ -1009,7 +1018,7 @@ interface ReactFlowTreeProps {
 }
 
 // Componente interno que usa useReactFlow
-function ReactFlowTreeInner({
+const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
   pessoas,
   unioes,
   pessoaPrincipal,
@@ -1019,13 +1028,13 @@ function ReactFlowTreeInner({
   onAddMae,
   onAddFilho,
   onAddConjuge,
-}: ReactFlowTreeProps) {
+}, ref) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
   const [isLocked, setIsLocked] = useState(false)
   
   // Hooks do React Flow
-  const { zoomIn, zoomOut, fitView } = useReactFlow()
+  const { zoomIn, zoomOut, fitView, setCenter, getNodes } = useReactFlow()
 
   // Refs para callbacks - evita re-renders quando callbacks mudam
   const onPersonClickRef = useRef(onPersonClick)
@@ -1072,6 +1081,27 @@ function ReactFlowTreeInner({
   const handleResetLayout = useCallback(() => {
     calculateLayout()
   }, [calculateLayout])
+
+  // ========================================
+  // EXPOR FUNÇÃO centerOnPerson VIA REF
+  // ========================================
+  useImperativeHandle(ref, () => ({
+    centerOnPerson: (pessoaId: number) => {
+      // Pegar todos os nós atuais
+      const currentNodes = getNodes()
+      const targetNode = currentNodes.find(n => n.id === `person-${pessoaId}`)
+      
+      if (targetNode) {
+        const nodeSize = NODE_SIZES[mode]
+        // Centralizar no centro do nó
+        const x = targetNode.position.x + nodeSize.width / 2
+        const y = targetNode.position.y + nodeSize.height / 2
+        
+        // Animar até o centro do nó com zoom 1
+        setCenter(x, y, { zoom: 1, duration: 500 })
+      }
+    }
+  }), [getNodes, setCenter, mode])
 
   return (
     <ReactFlow
@@ -1182,13 +1212,17 @@ function ReactFlowTreeInner({
       />
     </ReactFlow>
   )
-}
+})
 
-// Componente exportado com Provider
-export function ReactFlowTree(props: ReactFlowTreeProps) {
+ReactFlowTreeInner.displayName = 'ReactFlowTreeInner'
+
+// Componente wrapper com Provider que passa a ref
+export const ReactFlowTree = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>((props, ref) => {
   return (
     <ReactFlowProvider>
-      <ReactFlowTreeInner {...props} />
+      <ReactFlowTreeInner {...props} ref={ref} />
     </ReactFlowProvider>
   )
-}
+})
+
+ReactFlowTree.displayName = 'ReactFlowTree'

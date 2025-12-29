@@ -1,6 +1,9 @@
+// src/app/api/tarefas/route.ts
+
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { PrioridadeTarefa, Pais } from "@prisma/client"
+import { logTarefa } from "@/lib/auditoria"
 
 // GET - Buscar tarefas (com filtros opcionais)
 export async function GET(request: Request) {
@@ -147,6 +150,23 @@ export async function POST(request: Request) {
       )
     }
 
+    // Buscar nome do processo se fornecido
+    let processoNome: string | undefined
+    if (processoId) {
+      const processo = await prisma.processo.findUnique({
+        where: { id: processoId },
+        select: { nome: true }
+      })
+
+      if (!processo) {
+        return NextResponse.json(
+          { error: "Processo não encontrado" },
+          { status: 404 }
+        )
+      }
+      processoNome = processo.nome
+    }
+
     if (tarefaPaiId) {
       const tarefaPai = await prisma.tarefa.findUnique({
         where: { id: tarefaPaiId }
@@ -155,19 +175,6 @@ export async function POST(request: Request) {
       if (!tarefaPai) {
         return NextResponse.json(
           { error: "Tarefa pai não encontrada" },
-          { status: 404 }
-        )
-      }
-    }
-
-    if (processoId) {
-      const processo = await prisma.processo.findUnique({
-        where: { id: processoId }
-      })
-
-      if (!processo) {
-        return NextResponse.json(
-          { error: "Processo não encontrado" },
           { status: 404 }
         )
       }
@@ -260,6 +267,9 @@ export async function POST(request: Request) {
         }
       }
     })
+
+    // ✅ REGISTRAR LOG
+    await logTarefa.criar(tarefa.titulo, tarefa.id, processoNome)
 
     return NextResponse.json({ tarefa }, { status: 201 })
   } catch (error) {

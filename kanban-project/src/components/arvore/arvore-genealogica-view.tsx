@@ -1,4 +1,4 @@
-// ESTE ARQUIVO VAI EM: src/components/arvore/arvore-genealogica-view.tsx
+// src/components/arvore/arvore-genealogica-view.tsx
 
 "use client"
 
@@ -8,7 +8,7 @@ import dagre from "dagre"
 import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
 import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
-import { ReactFlowTree } from "./react-flow-tree"
+import { ReactFlowTree, ReactFlowTreeRef } from "./react-flow-tree"
 import { TreeOnboarding } from "./tree-onboarding"
 import { DocumentoModal } from "./documento-modal"
 import {
@@ -59,6 +59,11 @@ export function ArvoreGenealogicaView({
   const [isExporting, setIsExporting] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const treeContainerRef = useRef<HTMLDivElement>(null)
+  
+  // ========================================
+  // REF PARA O REACT FLOW TREE (para centralizar)
+  // ========================================
+  const reactFlowTreeRef = useRef<ReactFlowTreeRef>(null)
 
   const [showAddPersonModal, setShowAddPersonModal] = useState(false)
   const [addPersonType, setAddPersonType] = useState<'pai' | 'mae' | 'filho' | 'pessoa' | 'conjuge' | null>(null)
@@ -384,6 +389,27 @@ export function ArvoreGenealogicaView({
     setFullDetailsPerson(pessoa)
   }
 
+  // ========================================
+  // NOVO: Handler para navegar entre familiares na sidebar
+  // ========================================
+  const handleSelectPersonFromSidebar = useCallback((pessoa: PessoaArvore) => {
+    // Buscar a pessoa completa do array (com todos os relacionamentos)
+    const pessoaCompleta = pessoas.find(p => p.id === pessoa.id)
+    
+    if (pessoaCompleta) {
+      // Atualizar pessoa selecionada na sidebar
+      setSelectedPerson(pessoaCompleta)
+      
+      // Resetar tab inicial para mostrar aba "familia" já que estamos navegando por relacionamentos
+      setSidebarTabInicial("familia")
+      
+      // Centralizar a árvore nessa pessoa
+      setTimeout(() => {
+        reactFlowTreeRef.current?.centerOnPerson(pessoa.id)
+      }, 50)
+    }
+  }, [pessoas])
+
   const findConjuge = (pessoa: PessoaArvore): PessoaArvore | null => {
     const uniao = unioes.find(u => u.pessoa1Id === pessoa.id || u.pessoa2Id === pessoa.id)
     if (!uniao) return null
@@ -607,6 +633,7 @@ export function ArvoreGenealogicaView({
 
         {pessoas.length > 0 && pessoaPrincipal && (
           <ReactFlowTree
+            ref={reactFlowTreeRef}
             pessoas={pessoas}
             unioes={unioes}
             pessoaPrincipal={pessoaPrincipal}
@@ -640,6 +667,7 @@ export function ArvoreGenealogicaView({
         onAddConjuge={handleAddConjugeById}
         onAddDocumento={handleAddDocumento}
         onEditDocumento={handleEditDocumento}
+        onSelectPerson={handleSelectPersonFromSidebar}
         initialTab={sidebarTabInicial}
       />
 

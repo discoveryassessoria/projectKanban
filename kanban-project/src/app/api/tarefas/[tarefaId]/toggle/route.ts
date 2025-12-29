@@ -1,5 +1,8 @@
+// src/app/api/tarefas/[tarefaId]/toggle/route.ts
+
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { logTarefa } from "@/lib/auditoria"
 
 async function verificarEConcluirTarefaPai(tarefaPaiId: number) {
   const tarefaPai = await prisma.tarefa.findUnique({
@@ -127,6 +130,13 @@ export async function POST(
         }
       }
     })
+
+    // ✅ REGISTRAR LOG
+    if (novaConcluida) {
+      await logTarefa.concluir(tarefa.titulo, tarefa.id)
+    } else {
+      await logTarefa.reabrir(tarefa.titulo, tarefa.id)
+    }
 
     if (novaConcluida && tarefaAtual.tarefaPaiId) {
       await verificarEConcluirTarefaPai(tarefaAtual.tarefaPaiId)
