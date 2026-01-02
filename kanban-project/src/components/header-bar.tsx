@@ -49,33 +49,28 @@ export function HeaderBar({
     processos: any[]
     arvores: any[]
   }>({ projetos: [], processos: [], arvores: [] })
-  
+
   const router = useRouter()
 
   useEffect(() => {
     const updateDateTime = () => {
       const now = new Date()
-      
       const time = now.toLocaleTimeString("pt-BR", {
         hour: "2-digit",
         minute: "2-digit",
       })
-      
       const date = now.toLocaleDateString("pt-BR", {
         weekday: "long",
         day: "numeric",
         month: "long",
       })
-      
       const capitalizedDate = date.charAt(0).toUpperCase() + date.slice(1)
-      
       setCurrentTime(time)
       setCurrentDate(capitalizedDate)
     }
 
     updateDateTime()
     const interval = setInterval(updateDateTime, 1000)
-
     return () => clearInterval(interval)
   }, [])
 
@@ -91,7 +86,7 @@ export function HeaderBar({
   // Função de pesquisa
   const handleSearch = (query: string) => {
     setSearchQuery(query)
-    
+
     if (query.trim() === "") {
       setShowSearchResults(false)
       setSearchResults({ projetos: [], processos: [], arvores: [] })
@@ -105,10 +100,11 @@ export function HeaderBar({
       p.descricao?.toLowerCase().includes(queryLower)
     )
 
+    // ✅ CORRIGIDO: contratante → contratantes (plural, array)
     const processosFiltrados = processos.filter(p => 
       p.nome.toLowerCase().includes(queryLower) ||
       p.descricao?.toLowerCase().includes(queryLower) ||
-      p.contratante?.nome.toLowerCase().includes(queryLower)
+      p.contratantes?.some(c => c.nome?.toLowerCase().includes(queryLower))
     )
 
     const arvoresFiltradas = arvores.filter(a => 
@@ -121,6 +117,7 @@ export function HeaderBar({
       processos: processosFiltrados.slice(0, 3),
       arvores: arvoresFiltradas.slice(0, 3)
     })
+
     setShowSearchResults(true)
   }
 
@@ -237,8 +234,9 @@ export function HeaderBar({
                             <FolderOpen className="h-4 w-4 text-amber-500 flex-shrink-0" />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm text-gray-800 truncate">{processo.nome}</p>
+                              {/* ✅ CORRIGIDO: contratantes[0].nome */}
                               <p className="text-[10px] text-gray-400 truncate">
-                                {processo.contratante?.nome || "Sem contratante"}
+                                {processo.contratantes?.[0]?.nome || "Sem contratante"}
                               </p>
                             </div>
                           </button>
