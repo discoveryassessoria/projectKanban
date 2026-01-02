@@ -9,26 +9,41 @@ import type { ProcessoWithStatus } from "@/src/types/kanban"
 interface KanbanCardProps {
   processo: ProcessoWithStatus
   onClick?: () => void
+  isDragging?: boolean // Prop para quando está no DragOverlay
 }
 
-export function KanbanCard({ processo, onClick }: KanbanCardProps) {
+export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: KanbanCardProps) {
   const { 
     id, 
     nome, 
     descricao, 
-    contratante,
+    contratantes = [], // Array de contratantes
     requerentes = [],
     tarefas = [],
     _count
   } = processo
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
+  // Pegar o primeiro contratante para exibir dados de contato
+  const contratante = contratantes[0] || null
+
+  const { 
+    attributes, 
+    listeners, 
+    setNodeRef, 
+    transform, 
+    transition, 
+    isDragging: isDraggingSortable 
+  } = useSortable({ 
     id: id,
     data: {
       type: "Card",
       processo: processo,
+      statusId: processo.statusId,
     },
   })
+
+  // Usar prop isDragging se fornecida (DragOverlay), senão usar do useSortable
+  const isDragging = isDraggingProp ?? isDraggingSortable
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -81,7 +96,7 @@ export function KanbanCard({ processo, onClick }: KanbanCardProps) {
         className={`
           mb-3 bg-white rounded-lg shadow-sm border border-gray-200
           hover:shadow-md transition-all cursor-grab active:cursor-grabbing
-          ${isDragging ? "shadow-xl ring-2 ring-blue-400/50 rotate-2" : ""}
+          ${isDragging ? "shadow-xl ring-2 ring-blue-400/50" : ""}
         `}
         onClick={handleCardClick}
       >

@@ -4,17 +4,21 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import {
   DndContext,
   type DragEndEvent,
   type DragStartEvent,
   DragOverlay,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
+  pointerWithin,
   rectIntersection,
+  type DragOverEvent,
 } from "@dnd-kit/core"
+import { snapCenterToCursor } from "@dnd-kit/modifiers"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react"
@@ -37,28 +41,36 @@ interface KanbanBoardProps {
   contratantes?: Contratante[]
   requerentes?: Requerente[]
   onRefresh: () => void
-  // NOVO: Props para abrir modal automaticamente via URL
   initialProcessoId?: number | null
   initialTab?: string | null
   initialPessoaId?: number | null
   initialSidebarTab?: string | null
-  onModalOpened?: () => void // Callback para limpar URL params depois de abrir
+  onModalOpened?: () => void
 }
 
 export function KanbanBoard({ 
   pais,
-  processos,
+  processos: processosFromProps,
   statusList,
   contratantes = [],
   requerentes = [],
   onRefresh,
-  // NOVO: Props para navegação via URL
   initialProcessoId = null,
   initialTab = null,
   initialPessoaId = null,
   initialSidebarTab = null,
   onModalOpened,
 }: KanbanBoardProps) {
+  // ========================================
+  // ESTADO LOCAL PARA ATUALIZAÇÃO OTIMISTA
+  // ========================================
+  const [localProcessos, setLocalProcessos] = useState<ProcessoWithStatus[]>(processosFromProps)
+  
+  // Sincronizar quando props mudam (ex: após refresh real)
+  useEffect(() => {
+    setLocalProcessos(processosFromProps)
+  }, [processosFromProps])
+
   const [newStatusName, setNewStatusName] = useState("")
   const [isAddingStatus, setIsAddingStatus] = useState(false)
   const [activeProcesso, setActiveProcesso] = useState<ProcessoWithStatus | null>(null)
@@ -75,24 +87,35 @@ export function KanbanBoard({
   const hoverIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   
-  // Quantas colunas cabem na tela (padrão conservador: 4)
   const [visibleColumns, setVisibleColumns] = useState(4)
-
-  // Flag para controlar se já processamos os params iniciais
   const [initialParamsProcessed, setInitialParamsProcessed] = useState(false)
 
   const paisConfig = PAISES_CONFIG[pais]
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 3 },
-    }),
-  )
+  // ========================================
+  // SENSORES OTIMIZADOS
+  // ========================================
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: {
+      // Precisa mover 8px antes de ativar o drag (evita cliques acidentais)
+      distance: 8,
+    },
+  })
+  
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: {
+      // Para touch: delay de 150ms OU mover 5px
+      delay: 150,
+      tolerance: 5,
+    },
+  })
 
-  // NOVO: Efeito para abrir modal automaticamente quando recebe initialProcessoId
+  const sensors = useSensors(pointerSensor, touchSensor)
+
+  // Efeito para abrir modal automaticamente
   useEffect(() => {
-    if (initialProcessoId && processos.length > 0 && !initialParamsProcessed) {
-      const processo = processos.find(p => p.id === initialProcessoId)
+    if (initialProcessoId && localProcessos.length > 0 && !initialParamsProcessed) {
+      const processo = localProcessos.find(p => p.id === initialProcessoId)
       if (processo) {
         setSelectedProcesso(processo)
         setModalInitialTab(initialTab || undefined)
@@ -101,24 +124,24 @@ export function KanbanBoard({
         setIsDetailsModalOpen(true)
         setInitialParamsProcessed(true)
         
-        // Notificar que o modal foi aberto (para limpar URL params)
         if (onModalOpened) {
           onModalOpened()
         }
       }
     }
-  }, [initialProcessoId, initialTab, initialPessoaId, initialSidebarTab, processos, initialParamsProcessed, onModalOpened])
+  }, [initialProcessoId, initialTab, initialPessoaId, initialSidebarTab, localProcessos, initialParamsProcessed, onModalOpened])
 
-  // Ordenar status
-  const sortedStatusList = [...statusList].sort((a, b) => {
-    const aIsConcluido = a.nome.toLowerCase() === "concluído"
-    const bIsConcluido = b.nome.toLowerCase() === "concluído"
-    if (aIsConcluido) return 1
-    if (bIsConcluido) return -1
-    return (a.ordem ?? 0) - (b.ordem ?? 0)
-  })
+  // Ordenar status (memoizado para performance)
+  const sortedStatusList = useMemo(() => {
+    return [...statusList].sort((a, b) => {
+      const aIsConcluido = a.nome.toLowerCase() === "concluído"
+      const bIsConcluido = b.nome.toLowerCase() === "concluído"
+      if (aIsConcluido) return 1
+      if (bIsConcluido) return -1
+      return (a.ordem ?? 0) - (b.ordem ?? 0)
+    })
+  }, [statusList])
 
-  // Total de colunas (status + botão adicionar)
   const totalColumns = sortedStatusList.length + 1
 
   // Calcula quantas colunas cabem na tela
@@ -234,7 +257,7 @@ export function KanbanBoard({
 
   const handleProcessoClick = (processo: ProcessoWithStatus) => {
     setSelectedProcesso(processo)
-    setModalInitialTab(undefined) // Reset quando clica manualmente
+    setModalInitialTab(undefined)
     setModalInitialPessoaId(undefined)
     setModalInitialSidebarTab(undefined)
     setIsDetailsModalOpen(true)
@@ -251,25 +274,32 @@ export function KanbanBoard({
     setModalInitialSidebarTab(undefined)
   }
 
+  // ========================================
+  // DRAG HANDLERS OTIMIZADOS
+  // ========================================
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
     const activeId = typeof active.id === 'string' ? parseInt(active.id) : active.id as number
-    const processo = processos.find((p) => p.id === activeId)
+    const processo = localProcessos.find((p) => p.id === activeId)
     setActiveProcesso(processo || null)
   }
 
-  const onDragEnd = async (event: DragEndEvent) => {
-    setActiveProcesso(null)
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
+    
+    // Limpa o overlay imediatamente
+    setActiveProcesso(null)
+    
     if (!over) return
 
     const activeId = typeof active.id === 'string' ? parseInt(active.id) : active.id as number
     const overId = typeof over.id === 'string' ? parseInt(over.id) : over.id as number
 
-    const activeProcesso = processos.find((p) => p.id === activeId)
-    if (!activeProcesso) return
+    const processo = localProcessos.find((p) => p.id === activeId)
+    if (!processo) return
 
-    let targetStatusId: number
+    // Determinar o status de destino
+    let targetStatusId: number | null = null
 
     if (over.data.current?.statusId) {
       targetStatusId = over.data.current.statusId
@@ -278,31 +308,47 @@ export function KanbanBoard({
       if (isColumnDrop) {
         targetStatusId = overId
       } else {
-        const overProcesso = processos.find((p) => p.id === overId)
+        const overProcesso = localProcessos.find((p) => p.id === overId)
         if (overProcesso) {
           targetStatusId = overProcesso.statusId
-        } else {
-          return
         }
       }
-    } else {
-      return
     }
 
-    if (activeProcesso.statusId !== targetStatusId) {
-      try {
-        const response = await fetch(`/api/processos/${activeId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ statusId: targetStatusId }),
-        })
+    if (!targetStatusId || processo.statusId === targetStatusId) return
 
-        if (!response.ok) throw new Error("Erro ao mover processo")
-        onRefresh()
-      } catch (error) {
-        console.error("Error updating processo status:", error)
-        alert("Erro ao mover o processo. Tente novamente.")
+    // ========================================
+    // ATUALIZAÇÃO OTIMISTA - Move imediatamente na UI
+    // ========================================
+    const previousProcessos = [...localProcessos]
+    
+    setLocalProcessos(prev => 
+      prev.map(p => 
+        p.id === activeId 
+          ? { ...p, statusId: targetStatusId! }
+          : p
+      )
+    )
+
+    // Chamada à API em background
+    try {
+      const response = await fetch(`/api/processos/${activeId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ statusId: targetStatusId }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Erro ao mover processo")
       }
+      
+      // Não precisa chamar onRefresh() - já atualizamos localmente
+      // Só chama se precisar sincronizar outros dados
+    } catch (error) {
+      console.error("Error updating processo status:", error)
+      // ROLLBACK - volta ao estado anterior se der erro
+      setLocalProcessos(previousProcessos)
+      alert("Erro ao mover o processo. Tente novamente.")
     }
   }
 
@@ -310,7 +356,7 @@ export function KanbanBoard({
     const concluidoStatus = statusList.find((s) => s.nome.toLowerCase() === "transcrição")
     if (!concluidoStatus) return
 
-    const completedProcessos = processos.filter((p) => p.statusId === concluidoStatus.id)
+    const completedProcessos = localProcessos.filter((p) => p.statusId === concluidoStatus.id)
 
     if (completedProcessos.length === 0) {
       alert("Não há processos concluídos para limpar.")
@@ -334,9 +380,18 @@ export function KanbanBoard({
     }
   }
 
-  // Colunas visíveis (slice do array)
+  // Colunas visíveis
   const visibleStatusList = sortedStatusList.slice(startIndex, startIndex + visibleColumns)
   const showAddButton = startIndex + visibleColumns >= sortedStatusList.length
+
+  // Memoizar processos por status para evitar recálculos
+  const processosByStatus = useMemo(() => {
+    const map = new Map<number, ProcessoWithStatus[]>()
+    for (const status of statusList) {
+      map.set(status.id, localProcessos.filter(p => p.statusId === status.id))
+    }
+    return map
+  }, [localProcessos, statusList])
 
   return (
     <>
@@ -364,8 +419,8 @@ export function KanbanBoard({
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
-        onDragEnd={onDragEnd}
-        collisionDetection={rectIntersection}
+        onDragEnd={handleDragEnd}
+        collisionDetection={pointerWithin}
       >
         {/* Container com setas de navegação */}
         <div ref={containerRef} className="relative flex items-stretch">
@@ -390,7 +445,7 @@ export function KanbanBoard({
             <ChevronLeft className={`h-6 w-6 transition-all ${canGoLeft ? 'text-white' : 'text-white/10'} ${isHoveringLeft ? 'scale-125' : ''}`} />
           </div>
 
-          {/* Área das colunas - usando Grid para controle preciso */}
+          {/* Área das colunas */}
           <div className="flex-1 min-w-0 overflow-hidden">
             <div 
               className="grid pb-4 min-h-[450px] gap-2"
@@ -402,12 +457,11 @@ export function KanbanBoard({
                 <div 
                   key={status.id} 
                   className="min-w-0"
-                  style={{ animation: 'fadeSlide 0.3s ease-out' }}
                 >
                   <KanbanColumn
                     id={status.id}
                     title={status.nome}
-                    processos={processos.filter((p) => p.statusId === status.id)}
+                    processos={processosByStatus.get(status.id) || []}
                     headerColor={paisConfig.cor}
                     isFirst={startIndex + index === 0}
                     isLast={startIndex + index === sortedStatusList.length - 1}
@@ -421,10 +475,7 @@ export function KanbanBoard({
 
               {/* Botão Adicionar Coluna */}
               {showAddButton && (
-                <div 
-                  className="min-w-0"
-                  style={{ animation: 'fadeSlide 0.3s ease-out' }}
-                >
+                <div className="min-w-0">
                   {isAddingStatus ? (
                     <div className="p-3 rounded-lg bg-white/10 border border-white/20 backdrop-blur-xl h-full">
                       <form onSubmit={handleAddNewStatus}>
@@ -487,28 +538,20 @@ export function KanbanBoard({
           </div>
         </div>
 
-        <DragOverlay>
+        <DragOverlay 
+          modifiers={[snapCenterToCursor]}
+          dropAnimation={{
+            duration: 200,
+            easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+          }}
+        >
           {activeProcesso ? (
-            <div className="rotate-3 scale-105">
-              <KanbanCard processo={activeProcesso} />
+            <div style={{ transform: 'rotate(3deg) scale(1.05)', opacity: 0.9 }}>
+              <KanbanCard processo={activeProcesso} isDragging />
             </div>
           ) : null}
         </DragOverlay>
       </DndContext>
-
-      {/* CSS para animação */}
-      <style jsx global>{`
-        @keyframes fadeSlide {
-          from {
-            opacity: 0.5;
-            transform: translateX(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-      `}</style>
 
       <ProcessoDetailsModal
         processo={selectedProcesso}

@@ -1,5 +1,4 @@
 // ESTE ARQUIVO VAI EM: prisma/seed.ts
-
 import { PrismaClient, Pais } from '@prisma/client'
 import { hash } from 'bcrypt'
 
@@ -23,28 +22,28 @@ const paises: Pais[] = [Pais.ALEMANHA, Pais.ESPANHA, Pais.ITALIA, Pais.PORTUGAL]
 async function main() {
   console.log('🌱 Iniciando seed do banco de dados...')
 
-  // ===== CRIAR USUÁRIO ADMIN =====
-  const adminExistente = await prisma.usuario.findUnique({
-    where: { email: 'admin@teste.com' }
+  // ===== CRIAR OU ATUALIZAR USUÁRIO ADMIN =====
+  const senhaHash = await hash('12345678', 10)
+  
+  const admin = await prisma.usuario.upsert({
+    where: { email: 'admin@teste.com' },
+    update: {
+      senha: senhaHash,  // Atualiza a senha se já existir
+      nome: 'Administrador',
+      tipo: 'admin'
+    },
+    create: {
+      nome: 'Administrador',
+      email: 'admin@teste.com',
+      senha: senhaHash,
+      tipo: 'admin'
+    }
   })
-
-  if (adminExistente) {
-    console.log('⚠️  Usuário admin já existe no banco de dados')
-  } else {
-    const senhaHash = await hash('12345678', 10)
-    const admin = await prisma.usuario.create({
-      data: {
-        nome: 'Administrador',
-        email: 'admin@teste.com',
-        senha: senhaHash,
-        tipo: 'admin'
-      }
-    })
-    console.log('✅ Usuário admin criado com sucesso!')
-    console.log('📧 Email: admin@teste.com')
-    console.log('🔑 Senha: 12345678')
-    console.log(`👤 ID: ${admin.id}`)
-  }
+  
+  console.log('✅ Usuário admin criado/atualizado!')
+  console.log('📧 Email: admin@teste.com')
+  console.log('🔑 Senha: 12345678')
+  console.log(`👤 ID: ${admin.id}`)
 
   // ===== CRIAR ETAPAS DE KANBAN =====
   console.log('\n📋 Criando etapas do Kanban...')
@@ -75,6 +74,7 @@ async function main() {
           ordem: i,
         },
       })
+
       console.log(`   ✅ "${nome}"`)
     }
   }
