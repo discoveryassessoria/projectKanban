@@ -1,6 +1,31 @@
+// src/app/api/documentos/route.ts
+// ✅ ATUALIZADO: Adiciona automação de criar tarefa quando documento é criado como SOLICITADO
+
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { TipoDocumento, StatusDocumento } from "@prisma/client"
+
+// Helper para obter label do tipo de documento
+function getTipoDocumentoLabel(tipo: string): string {
+  const labels: Record<string, string> = {
+    CERTIDAO_NASCIMENTO: "Certidão de Nascimento",
+    CERTIDAO_NASCIMENTO_INTEIRO_TEOR: "Certidão de Nascimento (Inteiro Teor)",
+    CERTIDAO_CASAMENTO: "Certidão de Casamento",
+    CERTIDAO_CASAMENTO_INTEIRO_TEOR: "Certidão de Casamento (Inteiro Teor)",
+    CERTIDAO_OBITO: "Certidão de Óbito",
+    CERTIDAO_OBITO_INTEIRO_TEOR: "Certidão de Óbito (Inteiro Teor)",
+    CERTIDAO_BATISMO: "Certidão de Batismo",
+    CNN: "Certidão Negativa de Naturalização",
+    RG: "RG",
+    CPF: "CPF",
+    CNH: "CNH",
+    PASSAPORTE_BRASILEIRO: "Passaporte Brasileiro",
+    PASSAPORTE_ESTRANGEIRO: "Passaporte Estrangeiro",
+    TRADUCAO_JURAMENTADA: "Tradução Juramentada",
+    APOSTILA_HAIA: "Apostila de Haia",
+  }
+  return labels[tipo] || tipo
+}
 
 // GET - Listar documentos (com filtros)
 export async function GET(request: NextRequest) {
@@ -61,7 +86,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Criar novo documento
+// POST - Criar novo documento (COM AUTOMAÇÃO)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -123,9 +148,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verificar se a pessoa existe
+    // ✅ ATUALIZADO: Buscar pessoa COM árvore e processos para automação
     const pessoa = await prisma.pessoa.findUnique({
-      where: { id: parseInt(pessoaId) }
+      where: { id: parseInt(pessoaId) },
+      include: {
+        arvore: {
+          include: {
+            processos: {
+              select: { id: true },
+              take: 1
+            }
+          }
+        }
+      }
     })
 
     if (!pessoa) {
@@ -182,6 +217,28 @@ export async function POST(request: NextRequest) {
         }
       }
     })
+
+    // ✅ NOVO: Automação - Criar tarefa se documento foi criado como SOLICITADO
+    const statusFinal = (status as StatusDocumento) || 'PENDENTE'
+    
+    if (statusFinal === "SOLICITADO") {
+      const processoId = pessoa.arvore?.processos[0]?.id
+
+      if (processoId) {
+        const tipoLabel = getTipoDocumentoLabel(tipo)
+        const nomePessoa = `${pessoa.nome} ${pessoa.sobrenome || ""}`.trim()
+
+        await prisma.tarefa.create({
+          data: {
+            titulo: `Solicitar ${tipoLabel} - ${nomePessoa}`,
+            descricao: `Solicitar ${tipoLabel} de ${nomePessoa}`,
+            processoId,
+            prioridade: "MEDIA",
+            concluida: false
+          }
+        })
+      }
+    }
 
     return NextResponse.json(documento, { status: 201 })
   } catch (error) {

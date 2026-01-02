@@ -1,6 +1,31 @@
+// src/app/api/documentos/[id]/route.ts
+// ✅ ATUALIZADO: Adiciona automação de criar tarefa quando status muda para SOLICITADO
+
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma, TipoDocumento, StatusDocumento } from "@prisma/client"
+
+// Helper para obter label do tipo de documento
+function getTipoDocumentoLabel(tipo: string): string {
+  const labels: Record<string, string> = {
+    CERTIDAO_NASCIMENTO: "Certidão de Nascimento",
+    CERTIDAO_NASCIMENTO_INTEIRO_TEOR: "Certidão de Nascimento (Inteiro Teor)",
+    CERTIDAO_CASAMENTO: "Certidão de Casamento",
+    CERTIDAO_CASAMENTO_INTEIRO_TEOR: "Certidão de Casamento (Inteiro Teor)",
+    CERTIDAO_OBITO: "Certidão de Óbito",
+    CERTIDAO_OBITO_INTEIRO_TEOR: "Certidão de Óbito (Inteiro Teor)",
+    CERTIDAO_BATISMO: "Certidão de Batismo",
+    CNN: "Certidão Negativa de Naturalização",
+    RG: "RG",
+    CPF: "CPF",
+    CNH: "CNH",
+    PASSAPORTE_BRASILEIRO: "Passaporte Brasileiro",
+    PASSAPORTE_ESTRANGEIRO: "Passaporte Estrangeiro",
+    TRADUCAO_JURAMENTADA: "Tradução Juramentada",
+    APOSTILA_HAIA: "Apostila de Haia",
+  }
+  return labels[tipo] || tipo
+}
 
 // GET - Buscar documento por ID
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -51,6 +76,33 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const body = await request.json()
+
+    // ✅ NOVO: Buscar documento atual ANTES de atualizar (para comparar status)
+    const documentoAtual = await prisma.documento.findUnique({
+      where: { id },
+      include: {
+        pessoa: {
+          select: {
+            id: true,
+            nome: true,
+            sobrenome: true,
+            arvore: {
+              select: {
+                id: true,
+                processos: {
+                  select: { id: true },
+                  take: 1
+                }
+              }
+            }
+          }
+        }
+      }
+    })
+
+    if (!documentoAtual) {
+      return NextResponse.json({ error: "Documento não encontrado" }, { status: 404 })
+    }
 
     const dataToUpdate: Prisma.DocumentoUpdateInput = {}
 
@@ -121,6 +173,28 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         }
       }
     })
+
+    // ✅ NOVO: Automação - Criar tarefa quando status muda para SOLICITADO
+    const statusMudouParaSolicitado = body.status === "SOLICITADO" && documentoAtual.status !== "SOLICITADO"
+
+    if (statusMudouParaSolicitado) {
+      const processoId = documentoAtual.pessoa.arvore?.processos[0]?.id
+
+      if (processoId) {
+        const tipoLabel = getTipoDocumentoLabel(documentoAtual.tipo)
+        const nomePessoa = `${documentoAtual.pessoa.nome} ${documentoAtual.pessoa.sobrenome || ""}`.trim()
+
+        await prisma.tarefa.create({
+          data: {
+            titulo: `Solicitar ${tipoLabel} - ${nomePessoa}`,
+            descricao: `Solicitar ${tipoLabel} de ${nomePessoa}`,
+            processoId,
+            prioridade: "MEDIA",
+            concluida: false
+          }
+        })
+      }
+    }
 
     return NextResponse.json(documentoAtualizado)
   } catch (error) {
@@ -193,6 +267,31 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       )
     }
 
+    // ✅ NOVO: Buscar status anterior para automação
+    const documentoAtual = await prisma.documento.findUnique({
+      where: { id },
+      include: {
+        pessoa: {
+          select: {
+            nome: true,
+            sobrenome: true,
+            arvore: {
+              select: {
+                processos: {
+                  select: { id: true },
+                  take: 1
+                }
+              }
+            }
+          }
+        }
+      }
+    })
+
+    if (!documentoAtual) {
+      return NextResponse.json({ error: "Documento não encontrado" }, { status: 404 })
+    }
+
     const documentoAtualizado = await prisma.documento.update({
       where: { id },
       data: { status: body.status },
@@ -206,6 +305,28 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         }
       }
     })
+
+    // ✅ NOVO: Automação - Criar tarefa quando status muda para SOLICITADO
+    const statusMudouParaSolicitado = body.status === "SOLICITADO" && documentoAtual.status !== "SOLICITADO"
+
+    if (statusMudouParaSolicitado) {
+      const processoId = documentoAtual.pessoa.arvore?.processos[0]?.id
+
+      if (processoId) {
+        const tipoLabel = getTipoDocumentoLabel(documentoAtual.tipo)
+        const nomePessoa = `${documentoAtual.pessoa.nome} ${documentoAtual.pessoa.sobrenome || ""}`.trim()
+
+        await prisma.tarefa.create({
+          data: {
+            titulo: `Solicitar ${tipoLabel} - ${nomePessoa}`,
+            descricao: `Solicitar ${tipoLabel} de ${nomePessoa}`,
+            processoId,
+            prioridade: "MEDIA",
+            concluida: false
+          }
+        })
+      }
+    }
 
     return NextResponse.json(documentoAtualizado)
   } catch (error) {
