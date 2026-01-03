@@ -24,6 +24,7 @@ import {
   ChevronDown,
   ChevronUp
 } from "lucide-react"
+import { TabelaCustos } from "./TabelaCustos"
 
 interface Fatura {
   id: number
@@ -96,6 +97,10 @@ export function ProcessoFaturas({ processoId, onUpdate }: ProcessoFaturasProps) 
   const [faturas, setFaturas] = useState<Fatura[]>([])
   const [totais, setTotais] = useState<Totais>({ total: 0, pago: 0, pendente: 0, vencido: 0 })
   const [loading, setLoading] = useState(true)
+  
+  // Controle de seções
+  const [showCustos, setShowCustos] = useState(true)
+  const [showFaturas, setShowFaturas] = useState(true)
   
   // Modais
   const [showNovaFatura, setShowNovaFatura] = useState(false)
@@ -244,215 +249,271 @@ export function ProcessoFaturas({ processoId, onUpdate }: ProcessoFaturasProps) 
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      {/* Header com totalizadores */}
-      <div className="bg-white border-b px-6 py-4">
-        <div className="flex items-center justify-between mb-4">
+    <div className="h-full flex flex-col bg-gray-50 overflow-y-auto">
+      {/* ===== SEÇÃO: TABELA DE CUSTOS ===== */}
+      <div className="bg-white border-b">
+        {/* Header da seção Custos */}
+        <div
+        onClick={() => setShowCustos(!showCustos)}
+        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer"
+        >
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-lg">
-              <Receipt className="h-5 w-5 text-emerald-600" />
+            <div className="p-2 bg-amber-100 rounded-lg">
+              <DollarSign className="h-5 w-5 text-amber-600" />
             </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Faturas</h3>
-              <p className="text-sm text-gray-500">{faturas.length} fatura(s)</p>
+            <div className="text-left">
+              <h3 className="font-semibold text-gray-900">Custos por Pessoa</h3>
+              <p className="text-sm text-gray-500">Planilha de custos detalhada</p>
             </div>
           </div>
-          
-          <Button 
-            onClick={() => setShowNovaFatura(true)}
-            className="bg-emerald-600 hover:bg-emerald-700"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Fatura
-          </Button>
+          {showCustos ? (
+            <ChevronUp className="h-5 w-5 text-gray-400" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-gray-400" />
+          )}
         </div>
-
-        {/* Totalizadores */}
-        <div className="grid grid-cols-4 gap-4">
-          <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs text-gray-500 uppercase font-medium">Total</p>
-            <p className="text-lg font-bold text-gray-900">{formatarMoeda(totais.total)}</p>
+        
+        {/* Conteúdo da Tabela de Custos */}
+        {showCustos && (
+          <div className="px-6 pb-6">
+            <TabelaCustos processoId={processoId} />
           </div>
-          <div className="bg-green-50 rounded-lg p-3">
-            <p className="text-xs text-green-600 uppercase font-medium">Recebido</p>
-            <p className="text-lg font-bold text-green-700">{formatarMoeda(totais.pago)}</p>
-          </div>
-          <div className="bg-yellow-50 rounded-lg p-3">
-            <p className="text-xs text-yellow-600 uppercase font-medium">Pendente</p>
-            <p className="text-lg font-bold text-yellow-700">{formatarMoeda(totais.pendente)}</p>
-          </div>
-          <div className="bg-red-50 rounded-lg p-3">
-            <p className="text-xs text-red-600 uppercase font-medium">Vencido</p>
-            <p className="text-lg font-bold text-red-700">{formatarMoeda(totais.vencido)}</p>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Lista de faturas */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center h-64">
-            <div className="animate-spin h-8 w-8 border-2 border-gray-200 border-t-emerald-500 rounded-full mb-3" />
-            <p className="text-gray-500 text-sm">Carregando faturas...</p>
-          </div>
-        ) : faturas.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <div className="p-4 bg-gray-100 rounded-full mb-4">
-              <Receipt className="h-10 w-10 text-gray-300" />
+      {/* Divisor visual */}
+      <div className="h-2 bg-gray-100" />
+
+      {/* ===== SEÇÃO: FATURAS ===== */}
+      <div className="flex-1 flex flex-col">
+        {/* Header da seção Faturas */}
+        <div className="bg-white border-b">
+          <div
+          onClick={() => setShowFaturas(!showFaturas)}
+          className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <Receipt className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold text-gray-900">Faturas</h3>
+                <p className="text-sm text-gray-500">{faturas.length} fatura(s)</p>
+              </div>
             </div>
-            <h4 className="text-gray-700 font-medium mb-1">Nenhuma fatura</h4>
-            <p className="text-gray-500 text-sm max-w-xs mb-4">
-              Clique em "Nova Fatura" para adicionar
-            </p>
+            <div className="flex items-center gap-3">
+              <Button 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowNovaFatura(true)
+                }}
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Nova Fatura
+              </Button>
+              {showFaturas ? (
+                <ChevronUp className="h-5 w-5 text-gray-400" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-gray-400" />
+              )}
+            </div>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {faturas.map((fatura) => {
-              const config = STATUS_CONFIG[fatura.status]
-              const StatusIcon = config.icon
-              const isExpanded = expandedFatura === fatura.id
 
-              return (
-                <div
-                  key={fatura.id}
-                  className="bg-white rounded-xl border shadow-sm overflow-hidden"
-                >
-                  {/* Linha principal */}
-                  <div 
-                    className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                    onClick={() => setExpandedFatura(isExpanded ? null : fatura.id)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4 flex-1">
-                        {/* Ícone de status */}
-                        <div className={`p-2 rounded-lg ${config.color}`}>
-                          <StatusIcon className="h-4 w-4" />
-                        </div>
+          {/* Totalizadores */}
+          {showFaturas && (
+            <div className="px-6 pb-4">
+              <div className="grid grid-cols-4 gap-4">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 uppercase font-medium">Total</p>
+                  <p className="text-lg font-bold text-gray-900">{formatarMoeda(totais.total)}</p>
+                </div>
+                <div className="bg-green-50 rounded-lg p-3">
+                  <p className="text-xs text-green-600 uppercase font-medium">Recebido</p>
+                  <p className="text-lg font-bold text-green-700">{formatarMoeda(totais.pago)}</p>
+                </div>
+                <div className="bg-yellow-50 rounded-lg p-3">
+                  <p className="text-xs text-yellow-600 uppercase font-medium">Pendente</p>
+                  <p className="text-lg font-bold text-yellow-700">{formatarMoeda(totais.pendente)}</p>
+                </div>
+                <div className="bg-red-50 rounded-lg p-3">
+                  <p className="text-xs text-red-600 uppercase font-medium">Vencido</p>
+                  <p className="text-lg font-bold text-red-700">{formatarMoeda(totais.vencido)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
-                        {/* Info principal */}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 truncate">
-                            {fatura.descricao}
-                          </p>
-                          <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {formatarData(fatura.dataEmissao)}
-                            </span>
-                            {fatura.dataVencimento && (
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                Venc: {formatarData(fatura.dataVencimento)}
+        {/* Lista de faturas */}
+        {showFaturas && (
+          <div className="flex-1 p-6">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center h-64">
+                <div className="animate-spin h-8 w-8 border-2 border-gray-200 border-t-emerald-500 rounded-full mb-3" />
+                <p className="text-gray-500 text-sm">Carregando faturas...</p>
+              </div>
+            ) : faturas.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-center">
+                <div className="p-4 bg-gray-100 rounded-full mb-4">
+                  <Receipt className="h-10 w-10 text-gray-300" />
+                </div>
+                <h4 className="text-gray-700 font-medium mb-1">Nenhuma fatura</h4>
+                <p className="text-gray-500 text-sm max-w-xs mb-4">
+                  Clique em "Nova Fatura" para adicionar
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {faturas.map((fatura) => {
+                  const config = STATUS_CONFIG[fatura.status]
+                  const StatusIcon = config.icon
+                  const isExpanded = expandedFatura === fatura.id
+
+                  return (
+                    <div
+                      key={fatura.id}
+                      className="bg-white rounded-xl border shadow-sm overflow-hidden"
+                    >
+                      {/* Linha principal */}
+                      <div 
+                        className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => setExpandedFatura(isExpanded ? null : fatura.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4 flex-1">
+                            {/* Ícone de status */}
+                            <div className={`p-2 rounded-lg ${config.color}`}>
+                              <StatusIcon className="h-4 w-4" />
+                            </div>
+
+                            {/* Info principal */}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-900 truncate">
+                                {fatura.descricao}
+                              </p>
+                              <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {formatarData(fatura.dataEmissao)}
+                                </span>
+                                {fatura.dataVencimento && (
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    Venc: {formatarData(fatura.dataVencimento)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Valor */}
+                            <div className="text-right">
+                              <p className="font-bold text-gray-900 text-lg">
+                                {formatarMoeda(fatura.valor)}
+                              </p>
+                              <span className={`
+                                inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border
+                                ${config.color}
+                              `}>
+                                {config.label}
                               </span>
+                            </div>
+
+                            {/* Expandir */}
+                            <button className="text-gray-400 hover:text-gray-600 ml-2">
+                              {isExpanded ? (
+                                <ChevronUp className="h-5 w-5" />
+                              ) : (
+                                <ChevronDown className="h-5 w-5" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Detalhes expandidos */}
+                      {isExpanded && (
+                        <div className="border-t bg-gray-50 p-4">
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            {fatura.dataPagamento && (
+                              <div>
+                                <p className="text-xs text-gray-500 uppercase">Data Pagamento</p>
+                                <p className="text-sm font-medium">{formatarData(fatura.dataPagamento)}</p>
+                              </div>
+                            )}
+                            {fatura.formaPagamento && (
+                              <div>
+                                <p className="text-xs text-gray-500 uppercase">Forma Pagamento</p>
+                                <p className="text-sm font-medium">
+                                  {FORMAS_PAGAMENTO.find(f => f.value === fatura.formaPagamento)?.label || fatura.formaPagamento}
+                                </p>
+                              </div>
+                            )}
+                            {fatura.valorPago && (
+                              <div>
+                                <p className="text-xs text-gray-500 uppercase">Valor Pago</p>
+                                <p className="text-sm font-medium text-green-600">{formatarMoeda(fatura.valorPago)}</p>
+                              </div>
+                            )}
+                            {fatura.observacoes && (
+                              <div className="col-span-2">
+                                <p className="text-xs text-gray-500 uppercase">Observações</p>
+                                <p className="text-sm">{fatura.observacoes}</p>
+                              </div>
                             )}
                           </div>
-                        </div>
 
-                        {/* Valor */}
-                        <div className="text-right">
-                          <p className="font-bold text-gray-900 text-lg">
-                            {formatarMoeda(fatura.valor)}
-                          </p>
-                          <span className={`
-                            inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border
-                            ${config.color}
-                          `}>
-                            {config.label}
-                          </span>
-                        </div>
-
-                        {/* Expandir */}
-                        <button className="text-gray-400 hover:text-gray-600 ml-2">
-                          {isExpanded ? (
-                            <ChevronUp className="h-5 w-5" />
-                          ) : (
-                            <ChevronDown className="h-5 w-5" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Detalhes expandidos */}
-                  {isExpanded && (
-                    <div className="border-t bg-gray-50 p-4">
-                      <div className="grid grid-cols-2 gap-4 mb-4">
-                        {fatura.dataPagamento && (
-                          <div>
-                            <p className="text-xs text-gray-500 uppercase">Data Pagamento</p>
-                            <p className="text-sm font-medium">{formatarData(fatura.dataPagamento)}</p>
-                          </div>
-                        )}
-                        {fatura.formaPagamento && (
-                          <div>
-                            <p className="text-xs text-gray-500 uppercase">Forma Pagamento</p>
-                            <p className="text-sm font-medium">
-                              {FORMAS_PAGAMENTO.find(f => f.value === fatura.formaPagamento)?.label || fatura.formaPagamento}
-                            </p>
-                          </div>
-                        )}
-                        {fatura.valorPago && (
-                          <div>
-                            <p className="text-xs text-gray-500 uppercase">Valor Pago</p>
-                            <p className="text-sm font-medium text-green-600">{formatarMoeda(fatura.valorPago)}</p>
-                          </div>
-                        )}
-                        {fatura.observacoes && (
-                          <div className="col-span-2">
-                            <p className="text-xs text-gray-500 uppercase">Observações</p>
-                            <p className="text-sm">{fatura.observacoes}</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Ações */}
-                      <div className="flex items-center gap-2 pt-3 border-t">
-                        {fatura.status === 'PENDENTE' || fatura.status === 'VENCIDO' ? (
-                          <>
+                          {/* Ações */}
+                          <div className="flex items-center gap-2 pt-3 border-t">
+                            {fatura.status === 'PENDENTE' || fatura.status === 'VENCIDO' ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setPagarValor(String(fatura.valor))
+                                    setPagarData(new Date().toISOString().split('T')[0])
+                                    setShowPagar(fatura)
+                                  }}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  <Check className="h-4 w-4 mr-1" />
+                                  Marcar como Pago
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleCancelar(fatura)
+                                  }}
+                                  className="text-gray-600"
+                                >
+                                  <Ban className="h-4 w-4 mr-1" />
+                                  Cancelar
+                                </Button>
+                              </>
+                            ) : null}
                             <Button
                               size="sm"
+                              variant="ghost"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                setPagarValor(String(fatura.valor))
-                                setPagarData(new Date().toISOString().split('T')[0])
-                                setShowPagar(fatura)
+                                handleExcluir(fatura)
                               }}
-                              className="bg-green-600 hover:bg-green-700"
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50 ml-auto"
                             >
-                              <Check className="h-4 w-4 mr-1" />
-                              Marcar como Pago
+                              <Trash2 className="h-4 w-4" />
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleCancelar(fatura)
-                              }}
-                              className="text-gray-600"
-                            >
-                              <Ban className="h-4 w-4 mr-1" />
-                              Cancelar
-                            </Button>
-                          </>
-                        ) : null}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleExcluir(fatura)
-                          }}
-                          className="text-red-500 hover:text-red-600 hover:bg-red-50 ml-auto"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              )
-            })}
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

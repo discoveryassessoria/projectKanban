@@ -3,6 +3,7 @@
 // ✅ ATUALIZAÇÃO: Campos de cidadania + modelo Documento
 // ✅ ATUALIZAÇÃO: Subtarefas com auto-relacionamento
 // ✅ ATUALIZAÇÃO: Protocolo para processos da Espanha
+// ✅ ATUALIZAÇÃO: TipoServico e CustoPessoa para tabela de custos
 
 generator client {
   provider = "prisma-client-js"
@@ -218,6 +219,9 @@ model Pessoa {
   // ✅ NOVO: Relacionamento com documentos
   documentos Documento[]
   
+  // ✅ NOVO: Custos vinculados à pessoa
+  custos CustoPessoa[]
+  
   // ✅ NOVO: Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -399,6 +403,10 @@ model Processo {
   // ✅ NOVO: Protocolos (apenas para Espanha)
   protocolos   Protocolo[]
   informacaoItalia InformacaoItalia?
+  
+  // ✅ NOVO: Tipos de serviço e custos por pessoa
+  tiposServico TipoServico[]
+  custosPessoa CustoPessoa[]
   
   @@index([pais])
   @@index([statusId])
@@ -727,10 +735,6 @@ model LogAuditoria {
 }
 
 // ========================================
-// ADICIONAR AO FINAL DO schema.prisma
-// ========================================
-
-// ========================================
 // FATURA - COBRANÇA POR PROCESSO
 // ========================================
 enum StatusFatura {
@@ -786,4 +790,56 @@ model Fatura {
   @@index([processoId])
   @@index([status])
   @@index([dataVencimento])
+}
+
+// ========================================
+// TIPO DE SERVIÇO - COLUNAS DE CUSTO POR PROCESSO
+// ========================================
+model TipoServico {
+  id          Int       @id @default(autoincrement())
+  
+  // Vínculo com processo
+  processoId  Int
+  processo    Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  
+  // Dados do tipo de serviço
+  nome        String    @db.VarChar(100)  // Ex: "Certidão Inteiro Teor", "Tradução", etc.
+  ordem       Int       @default(0)        // Ordem de exibição na tabela
+  
+  createdAt   DateTime  @default(now())
+  
+  // Custos vinculados
+  custos      CustoPessoa[]
+
+  @@index([processoId])
+}
+
+// ========================================
+// CUSTO POR PESSOA - VALORES DA PLANILHA
+// ========================================
+model CustoPessoa {
+  id              Int       @id @default(autoincrement())
+  
+  // Vínculos
+  processoId      Int
+  processo        Processo      @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  
+  pessoaId        Int
+  pessoa          Pessoa        @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  
+  tipoServicoId   Int
+  tipoServico     TipoServico   @relation(fields: [tipoServicoId], references: [id], onDelete: Cascade)
+  
+  // Valor
+  valor           Decimal       @db.Decimal(10, 2) @default(0)
+  observacao      String?       @db.VarChar(200)
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Constraint único: uma pessoa só pode ter um valor por tipo de serviço no processo
+  @@unique([processoId, pessoaId, tipoServicoId])
+  @@index([processoId])
+  @@index([pessoaId])
+  @@index([tipoServicoId])
 }
