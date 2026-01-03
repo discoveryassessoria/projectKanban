@@ -250,7 +250,8 @@ function FilterModal({
   onFiltersChange 
 }: FilterModalProps) {
   const { paises } = usePaises()
-  const { statuses } = useStatuses()
+  // ✅ CORRIGIDO: Passa o país selecionado para filtrar os status
+  const { statuses } = useStatuses(filters.pais)
   const { users } = useUsers()
 
   const handleApplyFilters = () => {
@@ -268,7 +269,12 @@ function FilterModal({
   }
 
   const updateFilter = (key: keyof Filters, value: string) => {
-    onFiltersChange({ ...filters, [key]: value })
+    // ✅ CORRIGIDO: Quando mudar o país, resetar o status
+    if (key === 'pais') {
+      onFiltersChange({ ...filters, pais: value, status: 'all' })
+    } else {
+      onFiltersChange({ ...filters, [key]: value })
+    }
   }
 
   return (
@@ -463,10 +469,16 @@ function CreateActivityModal() {
   })
 
   const { paises } = usePaises()
-  const { statuses } = useStatuses()
+  // ✅ CORRIGIDO: Passa o país selecionado para filtrar os status
+  const { statuses } = useStatuses(formData.pais)
 
   const updateFormData = (key: keyof ActivityFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [key]: value }))
+    // ✅ CORRIGIDO: Quando mudar o país, resetar o status
+    if (key === 'pais') {
+      setFormData(prev => ({ ...prev, pais: value, status_id: '' }))
+    } else {
+      setFormData(prev => ({ ...prev, [key]: value }))
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -484,7 +496,8 @@ function CreateActivityModal() {
           titulo: formData.nome,
           descricao: formData.descricao,
           dataPrazo: formData.data_termino || null,
-          pais: formData.pais || 'PORTUGAL'
+          pais: formData.pais || 'PORTUGAL',
+          statusId: formData.status_id ? parseInt(formData.status_id) : null
         })
       })
 
@@ -567,6 +580,28 @@ function CreateActivityModal() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* ✅ NOVO: Select de Status (só aparece quando país selecionado) */}
+          {formData.pais && statuses.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-gray-700">Status (opcional)</Label>
+              <Select 
+                value={formData.status_id} 
+                onValueChange={(value) => updateFormData('status_id', value)}
+              >
+                <SelectTrigger className="bg-white border-gray-300 text-gray-900">
+                  <SelectValue placeholder="Selecione um status" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200 text-gray-900">
+                  {statuses.map((status: Status) => (
+                    <SelectItem key={status.id} value={String(status.id)}>
+                      {status.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
             Criar Atividade

@@ -1,5 +1,4 @@
-// ESTE ARQUIVO VAI EM: src/components/kanban-board-novo.tsx
-// SUBSTITUA O ARQUIVO EXISTENTE
+// ESTE ARQUIVO VAI EM: src/components/kanban-board.tsx
 
 "use client"
 
@@ -9,14 +8,13 @@ import {
   DndContext,
   type DragEndEvent,
   type DragStartEvent,
+  type DragMoveEvent,
   DragOverlay,
   PointerSensor,
   TouchSensor,
   useSensor,
   useSensors,
   pointerWithin,
-  rectIntersection,
-  type DragOverEvent,
 } from "@dnd-kit/core"
 import { snapCenterToCursor } from "@dnd-kit/modifiers"
 import { Button } from "@/components/ui/button"
@@ -61,12 +59,8 @@ export function KanbanBoard({
   initialSidebarTab = null,
   onModalOpened,
 }: KanbanBoardProps) {
-  // ========================================
-  // ESTADO LOCAL PARA ATUALIZAÇÃO OTIMISTA
-  // ========================================
   const [localProcessos, setLocalProcessos] = useState<ProcessoWithStatus[]>(processosFromProps)
   
-  // Sincronizar quando props mudam (ex: após refresh real)
   useEffect(() => {
     setLocalProcessos(processosFromProps)
   }, [processosFromProps])
@@ -80,34 +74,24 @@ export function KanbanBoard({
   const [modalInitialPessoaId, setModalInitialPessoaId] = useState<number | undefined>(undefined)
   const [modalInitialSidebarTab, setModalInitialSidebarTab] = useState<string | undefined>(undefined)
   
-  // Estado para navegação por setas
+  // Estado para navegação por índice (modelo original)
   const [startIndex, setStartIndex] = useState(0)
-  const [isHoveringLeft, setIsHoveringLeft] = useState(false)
-  const [isHoveringRight, setIsHoveringRight] = useState(false)
-  const hoverIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const autoScrollRef = useRef<NodeJS.Timeout | null>(null)
   
-  const [visibleColumns, setVisibleColumns] = useState(4)
+  const [visibleColumns, setVisibleColumns] = useState(5)
   const [initialParamsProcessed, setInitialParamsProcessed] = useState(false)
 
   const paisConfig = PAISES_CONFIG[pais]
 
-  // ========================================
-  // SENSORES OTIMIZADOS
-  // ========================================
+  // Sensores
   const pointerSensor = useSensor(PointerSensor, {
-    activationConstraint: {
-      // Precisa mover 8px antes de ativar o drag (evita cliques acidentais)
-      distance: 8,
-    },
+    activationConstraint: { distance: 8 },
   })
   
   const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: {
-      // Para touch: delay de 150ms OU mover 5px
-      delay: 150,
-      tolerance: 5,
-    },
+    activationConstraint: { delay: 150, tolerance: 5 },
   })
 
   const sensors = useSensors(pointerSensor, touchSensor)
@@ -123,15 +107,12 @@ export function KanbanBoard({
         setModalInitialSidebarTab(initialSidebarTab || undefined)
         setIsDetailsModalOpen(true)
         setInitialParamsProcessed(true)
-        
-        if (onModalOpened) {
-          onModalOpened()
-        }
+        onModalOpened?.()
       }
     }
   }, [initialProcessoId, initialTab, initialPessoaId, initialSidebarTab, localProcessos, initialParamsProcessed, onModalOpened])
 
-  // Ordenar status (memoizado para performance)
+  // Ordenar status
   const sortedStatusList = useMemo(() => {
     return [...statusList].sort((a, b) => {
       const aIsConcluido = a.nome.toLowerCase() === "concluído"
@@ -149,9 +130,9 @@ export function KanbanBoard({
     const updateVisibleColumns = () => {
       if (containerRef.current) {
         const containerWidth = containerRef.current.offsetWidth
-        const availableWidth = containerWidth - 80
-        const cols = Math.floor(availableWidth / 220)
-        setVisibleColumns(Math.max(3, Math.min(5, cols)))
+        const availableWidth = containerWidth - 100
+        const cols = Math.floor(availableWidth / 180)
+        setVisibleColumns(Math.max(4, Math.min(6, cols)))
       }
     }
 
@@ -161,55 +142,45 @@ export function KanbanBoard({
   }, [])
 
   // Navegação
+  const maxIndex = Math.max(0, totalColumns - visibleColumns)
   const canGoLeft = startIndex > 0
-  const canGoRight = startIndex + visibleColumns < totalColumns
+  const canGoRight = startIndex < maxIndex
 
-  const handlePrev = useCallback(() => {
-    setStartIndex(prev => Math.max(0, prev - 1))
-  }, [])
-
-  const handleNext = useCallback(() => {
-    setStartIndex(prev => Math.min(Math.max(0, totalColumns - visibleColumns), prev + 1))
-  }, [totalColumns, visibleColumns])
-
-  // Hover navigation
-  const startHoverNavigation = useCallback((direction: 'left' | 'right') => {
-    if (hoverIntervalRef.current) {
-      clearInterval(hoverIntervalRef.current)
+  // Auto-scroll contínuo
+  const startAutoScroll = useCallback((direction: 'left' | 'right') => {
+    if (autoScrollRef.current) return
+    
+    // Executa imediatamente
+    if (direction === 'left' && startIndex > 0) {
+      setStartIndex(prev => Math.max(0, prev - 1))
+    } else if (direction === 'right' && startIndex < maxIndex) {
+      setStartIndex(prev => Math.min(maxIndex, prev + 1))
     }
+    
+    // Continua em intervalo
+    autoScrollRef.current = setInterval(() => {
+      setStartIndex(prev => {
+        if (direction === 'left') {
+          return Math.max(0, prev - 1)
+        } else {
+          return Math.min(maxIndex, prev + 1)
+        }
+      })
+    }, 350)
+  }, [maxIndex, startIndex])
 
-    if (direction === 'left') {
-      handlePrev()
-    } else {
-      handleNext()
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollRef.current) {
+      clearInterval(autoScrollRef.current)
+      autoScrollRef.current = null
     }
-
-    hoverIntervalRef.current = setInterval(() => {
-      if (direction === 'left') {
-        setStartIndex(prev => Math.max(0, prev - 1))
-      } else {
-        setStartIndex(prev => Math.min(Math.max(0, totalColumns - visibleColumns), prev + 1))
-      }
-    }, 500)
-  }, [totalColumns, visibleColumns, handlePrev, handleNext])
-
-  const stopHoverNavigation = useCallback(() => {
-    if (hoverIntervalRef.current) {
-      clearInterval(hoverIntervalRef.current)
-      hoverIntervalRef.current = null
-    }
-    setIsHoveringLeft(false)
-    setIsHoveringRight(false)
   }, [])
 
   useEffect(() => {
-    return () => {
-      if (hoverIntervalRef.current) {
-        clearInterval(hoverIntervalRef.current)
-      }
-    }
-  }, [])
+    return () => stopAutoScroll()
+  }, [stopAutoScroll])
 
+  // Handlers
   const handleAddNewStatus = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newStatusName.trim()) return
@@ -240,11 +211,7 @@ export function KanbanBoard({
       const response = await fetch("/api/processos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          nome, 
-          statusId, 
-          pais
-        }),
+        body: JSON.stringify({ nome, statusId, pais }),
       })
 
       if (!response.ok) throw new Error("Falha ao criar novo processo")
@@ -263,9 +230,7 @@ export function KanbanBoard({
     setIsDetailsModalOpen(true)
   }
 
-  const handleProcessoSave = () => {
-    onRefresh()
-  }
+  const handleProcessoSave = () => onRefresh()
 
   const handleModalClose = () => {
     setIsDetailsModalOpen(false)
@@ -274,21 +239,41 @@ export function KanbanBoard({
     setModalInitialSidebarTab(undefined)
   }
 
-  // ========================================
-  // DRAG HANDLERS OTIMIZADOS
-  // ========================================
+  // Drag handlers
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
     const activeId = typeof active.id === 'string' ? parseInt(active.id) : active.id as number
     const processo = localProcessos.find((p) => p.id === activeId)
     setActiveProcesso(processo || null)
+    setIsDragging(true)
+  }
+
+  const handleDragMove = (event: DragMoveEvent) => {
+    if (!containerRef.current || !isDragging) return
+    
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const { activatorEvent } = event
+    
+    if (activatorEvent && 'clientX' in activatorEvent) {
+      const mouseX = (activatorEvent as MouseEvent).clientX
+      const edgeThreshold = 80
+      
+      if (mouseX > containerRect.right - edgeThreshold && canGoRight) {
+        if (!autoScrollRef.current) startAutoScroll('right')
+      } else if (mouseX < containerRect.left + edgeThreshold && canGoLeft) {
+        if (!autoScrollRef.current) startAutoScroll('left')
+      } else {
+        stopAutoScroll()
+      }
+    }
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
     
-    // Limpa o overlay imediatamente
     setActiveProcesso(null)
+    setIsDragging(false)
+    stopAutoScroll()
     
     if (!over) return
 
@@ -298,7 +283,6 @@ export function KanbanBoard({
     const processo = localProcessos.find((p) => p.id === activeId)
     if (!processo) return
 
-    // Determinar o status de destino
     let targetStatusId: number | null = null
 
     if (over.data.current?.statusId) {
@@ -317,20 +301,12 @@ export function KanbanBoard({
 
     if (!targetStatusId || processo.statusId === targetStatusId) return
 
-    // ========================================
-    // ATUALIZAÇÃO OTIMISTA - Move imediatamente na UI
-    // ========================================
     const previousProcessos = [...localProcessos]
     
     setLocalProcessos(prev => 
-      prev.map(p => 
-        p.id === activeId 
-          ? { ...p, statusId: targetStatusId! }
-          : p
-      )
+      prev.map(p => p.id === activeId ? { ...p, statusId: targetStatusId! } : p)
     )
 
-    // Chamada à API em background
     try {
       const response = await fetch(`/api/processos/${activeId}`, {
         method: "PUT",
@@ -338,15 +314,9 @@ export function KanbanBoard({
         body: JSON.stringify({ statusId: targetStatusId }),
       })
 
-      if (!response.ok) {
-        throw new Error("Erro ao mover processo")
-      }
-      
-      // Não precisa chamar onRefresh() - já atualizamos localmente
-      // Só chama se precisar sincronizar outros dados
+      if (!response.ok) throw new Error("Erro ao mover processo")
     } catch (error) {
       console.error("Error updating processo status:", error)
-      // ROLLBACK - volta ao estado anterior se der erro
       setLocalProcessos(previousProcessos)
       alert("Erro ao mover o processo. Tente novamente.")
     }
@@ -380,11 +350,11 @@ export function KanbanBoard({
     }
   }
 
-  // Colunas visíveis
+  // Colunas visíveis (SLICE - modelo original que funciona)
   const visibleStatusList = sortedStatusList.slice(startIndex, startIndex + visibleColumns)
   const showAddButton = startIndex + visibleColumns >= sortedStatusList.length
 
-  // Memoizar processos por status para evitar recálculos
+  // Memoizar processos por status
   const processosByStatus = useMemo(() => {
     const map = new Map<number, ProcessoWithStatus[]>()
     for (const status of statusList) {
@@ -419,52 +389,42 @@ export function KanbanBoard({
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
         collisionDetection={pointerWithin}
       >
-        {/* Container com setas de navegação */}
-        <div ref={containerRef} className="relative flex items-stretch">
-          {/* Seta Esquerda */}
-          <div
-            onMouseEnter={() => {
-              if (canGoLeft) {
-                setIsHoveringLeft(true)
-                startHoverNavigation('left')
-              }
-            }}
-            onMouseLeave={stopHoverNavigation}
+        <div ref={containerRef} className="relative flex items-center gap-2">
+          {/* Seta Esquerda - Circular */}
+          <button
+            onMouseEnter={() => canGoLeft && startAutoScroll('left')}
+            onMouseLeave={stopAutoScroll}
+            disabled={!canGoLeft}
             className={`
-              flex-shrink-0 w-10 flex items-center justify-center
-              transition-all duration-200 rounded-l-lg
+              flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center
+              transition-all duration-200
               ${canGoLeft 
-                ? 'cursor-pointer bg-white/5 hover:bg-white/20' 
-                : 'cursor-default bg-transparent'}
-              ${isHoveringLeft ? 'bg-white/20' : ''}
+                ? 'bg-white/10 hover:bg-white/20 text-white cursor-pointer' 
+                : 'bg-transparent text-white/20 cursor-default'}
             `}
           >
-            <ChevronLeft className={`h-6 w-6 transition-all ${canGoLeft ? 'text-white' : 'text-white/10'} ${isHoveringLeft ? 'scale-125' : ''}`} />
-          </div>
+            <ChevronLeft className="h-5 w-5" />
+          </button>
 
-          {/* Área das colunas */}
-          <div className="flex-1 min-w-0 overflow-hidden">
-            <div 
-              className="grid pb-4 min-h-[450px] gap-2"
-              style={{
-                gridTemplateColumns: `repeat(${visibleStatusList.length + (showAddButton ? 1 : 0)}, 1fr)`
-              }}
-            >
+          {/* Container das colunas - MODELO ORIGINAL */}
+          <div className="flex-1 overflow-hidden rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm">
+            <div className="flex min-h-[500px]">
               {visibleStatusList.map((status, index) => (
                 <div 
-                  key={status.id} 
-                  className="min-w-0"
+                  key={status.id}
+                  className="flex-1 min-w-0"
                 >
                   <KanbanColumn
                     id={status.id}
                     title={status.nome}
                     processos={processosByStatus.get(status.id) || []}
                     headerColor={paisConfig.cor}
-                    isFirst={startIndex + index === 0}
-                    isLast={startIndex + index === sortedStatusList.length - 1}
+                    isFirst={index === 0}
+                    isLast={index === visibleStatusList.length - 1 && !showAddButton}
                     onProcessoAdd={handleAddNewProcesso}
                     onProcessoClick={handleProcessoClick}
                     onStatusUpdate={onRefresh}
@@ -475,16 +435,16 @@ export function KanbanBoard({
 
               {/* Botão Adicionar Coluna */}
               {showAddButton && (
-                <div className="min-w-0">
+                <div className="flex-1 min-w-0 p-2">
                   {isAddingStatus ? (
-                    <div className="p-3 rounded-lg bg-white/10 border border-white/20 backdrop-blur-xl h-full">
+                    <div className="p-3 rounded-lg bg-white/5 border border-white/10 h-full">
                       <form onSubmit={handleAddNewStatus}>
                         <Input
                           autoFocus
                           placeholder="Nome da nova coluna..."
                           value={newStatusName}
                           onChange={(e) => setNewStatusName(e.target.value)}
-                          className="mb-2 bg-white/10 border-white/20 text-white placeholder:text-white/60 backdrop-blur-sm"
+                          className="mb-2 bg-white/10 border-white/20 text-white placeholder:text-white/50 text-sm h-8"
                         />
                         <div className="flex justify-end gap-2">
                           <Button
@@ -492,11 +452,11 @@ export function KanbanBoard({
                             variant="ghost"
                             size="sm"
                             onClick={() => setIsAddingStatus(false)}
-                            className="hover:bg-white/10 text-white/80"
+                            className="h-7 px-2 hover:bg-white/10 text-white/70 text-xs"
                           >
                             Cancelar
                           </Button>
-                          <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                          <Button type="submit" size="sm" className="h-7 px-2 bg-blue-600 hover:bg-blue-700 text-xs">
                             Adicionar
                           </Button>
                         </div>
@@ -505,10 +465,10 @@ export function KanbanBoard({
                   ) : (
                     <Button
                       variant="ghost"
-                      className="w-full h-full min-h-[100px] border-2 border-dashed border-white/30 hover:border-white/50 hover:bg-white/5 text-white/70 hover:text-white backdrop-blur-sm"
+                      className="w-full h-full min-h-[80px] border border-dashed border-white/20 hover:border-white/40 hover:bg-white/5 text-white/50 hover:text-white/80 text-sm"
                       onClick={() => setIsAddingStatus(true)}
                     >
-                      <Plus className="mr-2 h-4 w-4" /> Adicionar coluna
+                      <Plus className="mr-1.5 h-4 w-4" /> Nova coluna
                     </Button>
                   )}
                 </div>
@@ -516,26 +476,21 @@ export function KanbanBoard({
             </div>
           </div>
 
-          {/* Seta Direita */}
-          <div
-            onMouseEnter={() => {
-              if (canGoRight) {
-                setIsHoveringRight(true)
-                startHoverNavigation('right')
-              }
-            }}
-            onMouseLeave={stopHoverNavigation}
+          {/* Seta Direita - Circular */}
+          <button
+            onMouseEnter={() => canGoRight && startAutoScroll('right')}
+            onMouseLeave={stopAutoScroll}
+            disabled={!canGoRight}
             className={`
-              flex-shrink-0 w-10 flex items-center justify-center
-              transition-all duration-200 rounded-r-lg
+              flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center
+              transition-all duration-200
               ${canGoRight 
-                ? 'cursor-pointer bg-white/5 hover:bg-white/20' 
-                : 'cursor-default bg-transparent'}
-              ${isHoveringRight ? 'bg-white/20' : ''}
+                ? 'bg-white/10 hover:bg-white/20 text-white cursor-pointer' 
+                : 'bg-transparent text-white/20 cursor-default'}
             `}
           >
-            <ChevronRight className={`h-6 w-6 transition-all ${canGoRight ? 'text-white' : 'text-white/10'} ${isHoveringRight ? 'scale-125' : ''}`} />
-          </div>
+            <ChevronRight className="h-5 w-5" />
+          </button>
         </div>
 
         <DragOverlay 
@@ -546,7 +501,7 @@ export function KanbanBoard({
           }}
         >
           {activeProcesso ? (
-            <div style={{ transform: 'rotate(3deg) scale(1.05)', opacity: 0.9 }}>
+            <div style={{ transform: 'rotate(2deg) scale(1.02)', opacity: 0.95 }}>
               <KanbanCard processo={activeProcesso} isDragging />
             </div>
           ) : null}

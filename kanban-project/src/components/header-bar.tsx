@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Search, Bell, LogOut, BarChart3, FolderOpen, TreeDeciduous } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -28,6 +28,15 @@ interface HeaderBarProps {
   onLogout?: () => void
 }
 
+interface TarefaNotificacao {
+  id: number
+  titulo: string
+  dataPrazo: string | null
+  concluida: boolean
+  createdAt: string
+  processoNome: string
+}
+
 export function HeaderBar({ 
   title, 
   subtitle, 
@@ -50,7 +59,87 @@ export function HeaderBar({
     arvores: any[]
   }>({ projetos: [], processos: [], arvores: [] })
 
+  // Estado para notificações buscadas diretamente
+  const [notificacoes, setNotificacoes] = useState<{
+    vencidas: TarefaNotificacao[]
+    hoje: TarefaNotificacao[]
+    proximos3Dias: TarefaNotificacao[]
+    novas: TarefaNotificacao[]
+  }>({ vencidas: [], hoje: [], proximos3Dias: [], novas: [] })
+  const [totalNotificacoes, setTotalNotificacoes] = useState(0)
+
   const router = useRouter()
+
+  // Buscar notificações diretamente da API
+  const fetchNotificacoes = useCallback(async () => {
+    try {
+      // Buscar todas as tarefas (endpoint correto)
+      const response = await fetch('/api/tarefas')
+      if (!response.ok) return
+
+      const data = await response.json()
+      const tarefas = data.tarefas || []
+      if (!Array.isArray(tarefas)) return
+
+      const hoje = new Date()
+      hoje.setHours(0, 0, 0, 0)
+
+      const vencidas: TarefaNotificacao[] = []
+      const hojeList: TarefaNotificacao[] = []
+      const proximos3Dias: TarefaNotificacao[] = []
+      const novas: TarefaNotificacao[] = []
+
+      const umDiaAtras = new Date()
+      umDiaAtras.setDate(umDiaAtras.getDate() - 1)
+
+      const em3Dias = new Date(hoje)
+      em3Dias.setDate(hoje.getDate() + 3)
+
+      tarefas.forEach((t: any) => {
+        const tarefa: TarefaNotificacao = {
+          id: t.id,
+          titulo: t.titulo || 'Sem título',
+          dataPrazo: t.dataPrazo || null,
+          concluida: t.concluida || false,
+          createdAt: t.createdAt,
+          processoNome: t.processo?.nome || 'Sem processo'
+        }
+
+        // Ignorar tarefas concluídas para vencidas/hoje/próximos
+        if (!tarefa.concluida && tarefa.dataPrazo) {
+          const prazo = new Date(tarefa.dataPrazo)
+          prazo.setHours(0, 0, 0, 0)
+
+          if (prazo < hoje) {
+            vencidas.push(tarefa)
+          } else if (prazo.getTime() === hoje.getTime()) {
+            hojeList.push(tarefa)
+          } else if (prazo > hoje && prazo <= em3Dias) {
+            proximos3Dias.push(tarefa)
+          }
+        }
+
+        // Tarefas novas (criadas nas últimas 24h e não concluídas)
+        if (tarefa.createdAt && !tarefa.concluida) {
+          const criacao = new Date(tarefa.createdAt)
+          if (criacao >= umDiaAtras) {
+            novas.push(tarefa)
+          }
+        }
+      })
+
+      setNotificacoes({
+        vencidas,
+        hoje: hojeList,
+        proximos3Dias,
+        novas
+      })
+
+      setTotalNotificacoes(vencidas.length + hojeList.length + proximos3Dias.length + novas.length)
+    } catch (error) {
+      console.error('Erro ao buscar notificações:', error)
+    }
+  }, [])
 
   useEffect(() => {
     const updateDateTime = () => {
@@ -73,6 +162,13 @@ export function HeaderBar({
     const interval = setInterval(updateDateTime, 1000)
     return () => clearInterval(interval)
   }, [])
+
+  // Buscar notificações ao montar e a cada 30 segundos
+  useEffect(() => {
+    fetchNotificacoes()
+    const interval = setInterval(fetchNotificacoes, 30000)
+    return () => clearInterval(interval)
+  }, [fetchNotificacoes])
 
   const getInitials = (name: string) => {
     return name
@@ -100,7 +196,6 @@ export function HeaderBar({
       p.descricao?.toLowerCase().includes(queryLower)
     )
 
-    // ✅ CORRIGIDO: contratante → contratantes (plural, array)
     const processosFiltrados = processos.filter(p => 
       p.nome.toLowerCase().includes(queryLower) ||
       p.descricao?.toLowerCase().includes(queryLower) ||
@@ -122,50 +217,6 @@ export function HeaderBar({
   }
 
   const totalResults = searchResults.projetos.length + searchResults.processos.length + searchResults.arvores.length
-
-  // Notificações baseadas em tarefas dos processos
-  const hoje = new Date()
-  hoje.setHours(0, 0, 0, 0)
-
-  // Coletar todas as tarefas de todos os processos
-  const todasTarefas = processos.flatMap(p => 
-    (p.tarefas || []).map(t => ({
-      ...t,
-      processoNome: p.nome
-    }))
-  )
-
-  const notificacoes = {
-    vencidas: todasTarefas.filter(t => {
-      if (!t.dataPrazo || t.concluida) return false
-      const prazo = new Date(t.dataPrazo)
-      prazo.setHours(0, 0, 0, 0)
-      return prazo < hoje
-    }),
-    hoje: todasTarefas.filter(t => {
-      if (!t.dataPrazo || t.concluida) return false
-      const prazo = new Date(t.dataPrazo)
-      prazo.setHours(0, 0, 0, 0)
-      return prazo.getTime() === hoje.getTime()
-    }),
-    proximos3Dias: todasTarefas.filter(t => {
-      if (!t.dataPrazo || t.concluida) return false
-      const prazo = new Date(t.dataPrazo)
-      prazo.setHours(0, 0, 0, 0)
-      const em3Dias = new Date(hoje)
-      em3Dias.setDate(hoje.getDate() + 3)
-      return prazo > hoje && prazo <= em3Dias
-    }),
-    novas: todasTarefas.filter(t => {
-      if (!t.createdAt) return false
-      const criacao = new Date(t.createdAt)
-      const umDiaAtras = new Date()
-      umDiaAtras.setDate(umDiaAtras.getDate() - 1)
-      return criacao >= umDiaAtras && !t.concluida
-    })
-  }
-
-  const totalNotificacoes = notificacoes.vencidas.length + notificacoes.hoje.length + notificacoes.proximos3Dias.length + notificacoes.novas.length
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-black/40 backdrop-blur-md shadow-lg">
@@ -234,7 +285,6 @@ export function HeaderBar({
                             <FolderOpen className="h-4 w-4 text-amber-500 flex-shrink-0" />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm text-gray-800 truncate">{processo.nome}</p>
-                              {/* ✅ CORRIGIDO: contratantes[0].nome */}
                               <p className="text-[10px] text-gray-400 truncate">
                                 {processo.contratantes?.[0]?.nome || "Sem contratante"}
                               </p>
@@ -361,6 +411,25 @@ export function HeaderBar({
                             <p className="text-[10px] text-orange-600 font-medium">
                               Vence em {new Date(tarefa.dataPrazo!).toLocaleDateString('pt-BR')}
                             </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {notificacoes.novas.length > 0 && (
+                      <div>
+                        <div className="px-3 py-2 bg-blue-50 text-[10px] uppercase tracking-wide text-blue-600 font-medium flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+                          Novas tarefas ({notificacoes.novas.length})
+                        </div>
+                        {notificacoes.novas.slice(0, 3).map(tarefa => (
+                          <div
+                            key={`nova-${tarefa.id}`}
+                            className="px-3 py-2 border-l-4 border-blue-500 hover:bg-gray-50"
+                          >
+                            <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
+                            <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
+                            <p className="text-[10px] text-blue-600 font-medium">Nova tarefa</p>
                           </div>
                         ))}
                       </div>

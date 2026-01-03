@@ -122,35 +122,42 @@ export function KanbanColumn({
     <>
       <div
         ref={setNodeRef}
-        className={`flex flex-col min-h-[450px] bg-white/5 backdrop-blur-xl rounded-lg border transition-all ${
-          isOver ? "border-blue-400/50 ring-2 ring-blue-400/30 shadow-lg" : "border-white/10"
-        }`}
+        className={`
+          flex flex-col min-h-[450px] flex-1 min-w-[200px]
+          ${!isLast ? 'border-r-2 border-dashed border-white/20' : ''}
+          ${isOver ? 'bg-blue-500/10' : 'bg-transparent'}
+          transition-colors duration-200
+        `}
       >
-        <div className="p-3 border-b border-white/10 rounded-t-lg bg-gradient-to-r from-indigo-500/80 to-indigo-600/80 backdrop-blur-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h3 className="font-bold text-sm text-white">{title}</h3>
-              <span className="px-2 py-0.5 text-xs font-medium bg-white/20 text-white rounded-full backdrop-blur-sm">
-                {processos.length}
+        {/* Header compacto estilo Bitrix */}
+        <div 
+          className="px-2 py-2 border-b border-white/10"
+          style={{ backgroundColor: `${headerColor}40` }}
+        >
+          <div className="flex items-center justify-between gap-1">
+            <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+              <h3 className="font-medium text-xs text-white whitespace-nowrap overflow-hidden text-ellipsis">{title}</h3>
+              <span className="text-xs text-white/70 flex-shrink-0">
+                ({processos.length})
               </span>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5 flex-shrink-0">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsAdding(true)}
-                className="h-7 px-2 hover:bg-white/20 text-white"
+                className="h-5 w-5 p-0 hover:bg-white/20 text-white/50 hover:text-white"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-3 w-3" />
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 px-2 hover:bg-white/20 text-white"
+                    className="h-5 w-5 p-0 hover:bg-white/20 text-white/50 hover:text-white"
                   >
-                    <MoreVertical className="h-4 w-4" />
+                    <MoreVertical className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="bg-gray-900/95 backdrop-blur-xl border-white/20 text-white">
@@ -178,7 +185,8 @@ export function KanbanColumn({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 min-h-[200px] scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+        {/* Área de cards */}
+        <div className="flex-1 overflow-y-auto p-2 min-h-[200px] scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
           <SortableContext items={processosIds} strategy={verticalListSortingStrategy}>
             {processos.map((processo) => (
               <KanbanCard 
@@ -190,13 +198,13 @@ export function KanbanColumn({
           </SortableContext>
 
           {isAdding && (
-            <form onSubmit={handleAddSubmit} className="mt-2">
+            <form onSubmit={handleAddSubmit} className="mt-2 p-2 bg-white/5 rounded-lg">
               <Input
                 autoFocus
                 placeholder="Nome do processo..."
                 value={newProcessoName}
                 onChange={(e) => setNewProcessoName(e.target.value)}
-                className="mb-2 bg-white/10 border-white/20 text-white placeholder:text-white/60 backdrop-blur-sm"
+                className="mb-2 bg-white/10 border-white/20 text-white placeholder:text-white/60 backdrop-blur-sm text-sm h-8"
               />
               <div className="flex justify-end gap-2">
                 <Button
@@ -204,11 +212,11 @@ export function KanbanColumn({
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsAdding(false)}
-                  className="hover:bg-white/10 text-white"
+                  className="h-7 px-2 hover:bg-white/10 text-white text-xs"
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                <Button type="submit" size="sm" className="h-7 px-2 bg-indigo-600 hover:bg-indigo-700 text-xs">
                   Adicionar
                 </Button>
               </div>

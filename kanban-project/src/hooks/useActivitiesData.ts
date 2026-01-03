@@ -15,6 +15,7 @@ export interface Usuario {
 export interface Status {
   id?: number
   nome: string
+  pais?: string
 }
 
 export interface UserAtv {
@@ -211,18 +212,44 @@ export function usePaises() {
 
 /**
  * Hook para buscar status
+ * @param pais - País opcional para filtrar status (se não passar, busca todos)
  */
-export function useStatuses() {
+export function useStatuses(pais?: string) {
+  // Construir URL com filtro de país se fornecido
+  const url = pais && pais !== 'all' 
+    ? `/api/status?pais=${pais}` 
+    : '/api/status'
+  
   const { data, error, isLoading, mutate: revalidate } = useSWR<{ status: Status[] } | Status[]>(
-    '/api/status',
+    url,
     fetcher,
     swrConfig
   )
   
   // Normalizar resposta
-  const statuses = Array.isArray(data) 
+  let statuses = Array.isArray(data) 
     ? data 
     : (data as any)?.status || []
+  
+  // Remover duplicatas por nome (caso a API não filtre corretamente)
+  if (pais && pais !== 'all') {
+    // Se temos um país específico, já deve vir filtrado da API
+    // Mas por segurança, removemos duplicatas
+    const seen = new Set<string>()
+    statuses = statuses.filter((s: Status) => {
+      if (seen.has(s.nome)) return false
+      seen.add(s.nome)
+      return true
+    })
+  } else {
+    // Se não tem país, retorna lista única de nomes (sem duplicatas)
+    const seen = new Set<string>()
+    statuses = statuses.filter((s: Status) => {
+      if (seen.has(s.nome)) return false
+      seen.add(s.nome)
+      return true
+    })
+  }
   
   return {
     statuses,
@@ -308,7 +335,7 @@ export function invalidateActivities() {
 
 // Invalidar cache de status
 export function invalidateStatuses() {
-  mutate('/api/status')
+  mutate((key) => typeof key === 'string' && key.startsWith('/api/status'))
 }
 
 // Invalidar cache de usuários

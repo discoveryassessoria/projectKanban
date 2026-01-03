@@ -81,10 +81,15 @@ export function ProcessoTarefas({ processoId, onUpdate }: ProcessoTarefasProps) 
     }
   }
 
-  // Buscar usuários
+  // Buscar usuários (com token de autenticação)
   const fetchUsuarios = async () => {
     try {
-      const response = await fetch("/api/usuarios")
+      const token = localStorage.getItem('authToken')
+      const response = await fetch("/api/usuarios", {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       const data = await response.json()
       if (data.usuarios) {
         setUsuarios(data.usuarios)
