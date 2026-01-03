@@ -4,7 +4,7 @@ import { hash } from "bcrypt"
 import { UserType } from "@/src/utils/userTypes"
 
 // Função auxiliar para verificar se o usuário é admin
-function verifyAdmin(request: NextRequest): { isAdmin: boolean; userId?: number } {
+function verifyAdmin(request: NextRequest): { isAdmin: boolean; userId?: number; tipo?: string } {
   try {
     const authHeader = request.headers.get("authorization")
     const token = authHeader?.replace("Bearer ", "")
@@ -23,6 +23,7 @@ function verifyAdmin(request: NextRequest): { isAdmin: boolean; userId?: number 
     return {
       isAdmin: decoded.tipo === "admin",
       userId: decoded.userId,
+      tipo: decoded.tipo,
     }
   } catch (error) {
     return { isAdmin: false }
@@ -111,11 +112,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 // DELETE - Deletar usuário
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { isAdmin, userId: requesterId } = verifyAdmin(request)
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Acesso negado. Apenas administradores podem deletar usuários." }, { status: 403 })
-    }
+    const { isAdmin, userId: requesterId, tipo: requesterTipo } = verifyAdmin(request)
 
     const { id: idParam } = await params
     const userId = parseInt(idParam)
@@ -132,14 +129,33 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
     }
 
-    // Impedir que admin delete outro admin
-    if (usuarioExistente.tipo === "admin") {
-      return NextResponse.json({ error: "Você não pode deletar um administrador" }, { status: 403 })
+    // Verificar se é a própria conta ou se é admin deletando outro
+    const isDeletandoPropriaConta = usuarioExistente.id === requesterId
+
+    // Se não é admin e não está deletando a própria conta
+    if (!isAdmin && !isDeletandoPropriaConta) {
+      return NextResponse.json({ error: "Acesso negado. Você só pode deletar sua própria conta." }, { status: 403 })
     }
 
-    // Impedir que admin delete a si mesmo
-    if (usuarioExistente.id === requesterId) {
-      return NextResponse.json({ error: "Você não pode deletar sua própria conta" }, { status: 403 })
+    // Admin tentando deletar OUTRO admin (não permitido)
+    if (isAdmin && usuarioExistente.tipo === "admin" && !isDeletandoPropriaConta) {
+      return NextResponse.json({ error: "Você não pode deletar outro administrador" }, { status: 403 })
+    }
+
+    // Se é um admin deletando a própria conta, verificar se existe outro admin
+    if (usuarioExistente.tipo === "admin" && isDeletandoPropriaConta) {
+      const outrosAdmins = await prisma.usuario.count({
+        where: {
+          tipo: "admin",
+          id: { not: userId }
+        }
+      })
+
+      if (outrosAdmins === 0) {
+        return NextResponse.json({ 
+          error: "Você é o único administrador do sistema. Promova outro usuário a administrador antes de excluir sua conta." 
+        }, { status: 403 })
+      }
     }
 
     // Deletar usuário

@@ -398,21 +398,23 @@ export default function SettingsPage() {
               <Trash2 className="h-5 w-5" />
               Excluir Conta Permanentemente
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              <p>
-                Tem certeza que deseja excluir sua conta? Esta ação é <strong>irreversível</strong> e todos os seus dados serão perdidos.
-              </p>
-              <div className="space-y-2">
-                <Label htmlFor="confirm" className="text-gray-700">
-                  Digite <strong>EXCLUIR</strong> para confirmar:
-                </Label>
-                <Input
-                  id="confirm"
-                  value={deleteConfirmation}
-                  onChange={(e) => setDeleteConfirmation(e.target.value.toUpperCase())}
-                  placeholder="EXCLUIR"
-                  className="bg-white border-gray-300"
-                />
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-muted-foreground">
+                <span className="block">
+                  Tem certeza que deseja excluir sua conta? Esta ação é <strong>irreversível</strong> e todos os seus dados serão perdidos.
+                </span>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm" className="text-gray-700">
+                    Digite <strong>EXCLUIR</strong> para confirmar:
+                  </Label>
+                  <Input
+                    id="confirm"
+                    value={deleteConfirmation}
+                    onChange={(e) => setDeleteConfirmation(e.target.value.toUpperCase())}
+                    placeholder="EXCLUIR"
+                    className="bg-white border-gray-300"
+                  />
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
