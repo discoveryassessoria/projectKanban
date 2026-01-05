@@ -1,16 +1,25 @@
+// SUBSTITUI: src/components/app-sidebar.tsx
+
 "use client"
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  KanbanIcon,
   Home,
   Settings,
-  Inbox,
-  Calendar,
+  CheckSquare,
   Search,
   Shield,
   Menu,
+  DollarSign,
+  Receipt,
+  CreditCard,
+  TrendingUp,
+  Users,
+  FileText,
+  Kanban,
+  TreeDeciduous,
+  Bot,
 } from "lucide-react"
 import {
   Sidebar,
@@ -29,29 +38,68 @@ import { useIsAdmin } from "@/src/hooks/use-is-admin"
 
 const menuItems = [
   {
-    title: "Painel Principal",
+    title: "Página Inicial",
     url: "/dashboard",
     icon: Home,
   },
   {
-    title: "Kanban",
+    title: "Processos",
     url: "/kanban",
-    icon: Inbox,
+    icon: Kanban,
   },
   {
-    title: "Atividades e Projetos",
+    title: "Tarefas e Projetos",
     url: "/activities",
-    icon: Calendar,
+    icon: CheckSquare,
   },
   {
     title: "Árvore Genealógica",
     url: "/genealogy",
-    icon: Search,
+    icon: TreeDeciduous,
+  },
+  {
+    title: "Automação",
+    url: "/automation",
+    icon: Bot,
   },
   {
     title: "Configurações",
     url: "/settings",
     icon: Settings,
+  },
+]
+
+// Novo grupo: Finanças
+const financeItems = [
+  {
+    title: "Dashboard",
+    url: "/financas",
+    icon: TrendingUp,
+  },
+  {
+    title: "Contas a Receber",
+    url: "/financas/contas-receber",
+    icon: Receipt,
+  },
+  {
+    title: "Contas a Pagar",
+    url: "/financas/contas-pagar",
+    icon: CreditCard,
+  },
+  {
+    title: "Fluxo de Caixa",
+    url: "/financas/fluxo-caixa",
+    icon: DollarSign,
+  },
+  {
+    title: "Fornecedores",
+    url: "/financas/fornecedores",
+    icon: Users,
+  },
+  {
+    title: "Relatórios",
+    url: "/financas/relatorios",
+    icon: FileText,
   },
 ]
 
@@ -69,6 +117,9 @@ export function AppSidebar() {
   const { isAdmin } = useIsAdmin()
   const { state } = useSidebar()
   const isCollapsed = state === "collapsed"
+
+  // Verifica se está em alguma rota de finanças
+  const isFinanceActive = pathname.startsWith("/financas")
 
   return (
     <Sidebar
@@ -92,6 +143,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="px-2 py-3 space-y-4">
+        {/* Navegação Principal */}
         <SidebarGroup>
           {!isCollapsed && (
             <SidebarGroupLabel className="text-[11px] uppercase tracking-wide text-white/60 px-2">
@@ -125,6 +177,41 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Finanças */}
+        <SidebarGroup>
+          {!isCollapsed && (
+            <SidebarGroupLabel className="text-[11px] uppercase tracking-wide text-white/60 px-2">
+              Finanças
+            </SidebarGroupLabel>
+          )}
+          <SidebarGroupContent>
+            <SidebarMenu className="space-y-1">
+              {financeItems.map((item) => {
+                const isActive = pathname === item.url
+
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      tooltip={item.title}
+                      className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition
+                      hover:bg-white/10 hover:text-white
+                      ${isActive ? "bg-white/12 text-white shadow-inner border border-white/10" : "text-white/75"}`}
+                    >
+                      <Link href={item.url}>
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        {!isCollapsed && <span className="whitespace-nowrap overflow-hidden">{item.title}</span>}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Administração */}
         {isAdmin && (
           <SidebarGroup>
             {!isCollapsed && (

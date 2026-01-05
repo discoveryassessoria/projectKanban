@@ -843,3 +843,283 @@ model CustoPessoa {
   @@index([pessoaId])
   @@index([tipoServicoId])
 }
+
+// ========================================
+// ADICIONAR AO FINAL DO schema.prisma
+// MÓDULO FINANCEIRO COMPLETO
+// ========================================
+
+// ========================================
+// ENUMS FINANCEIROS
+// ========================================
+
+enum TipoTransacao {
+  ENTRADA
+  SAIDA
+}
+
+enum StatusContaPagar {
+  PENDENTE
+  PAGO
+  VENCIDO
+  CANCELADO
+  AGENDADO
+}
+
+enum RecorrenciaTipo {
+  UNICA
+  SEMANAL
+  MENSAL
+  TRIMESTRAL
+  SEMESTRAL
+  ANUAL
+}
+
+// ========================================
+// CATEGORIA FINANCEIRA
+// ========================================
+model CategoriaFinanceira {
+  id          Int       @id @default(autoincrement())
+  nome        String    @db.VarChar(100)
+  tipo        TipoTransacao  // ENTRADA ou SAIDA
+  cor         String?   @db.VarChar(7)  // Hex color para gráficos
+  icone       String?   @db.VarChar(50)
+  descricao   String?   @db.VarChar(200)
+  
+  // Categoria pai (para subcategorias)
+  categoriaPaiId Int?
+  categoriaPai   CategoriaFinanceira?  @relation("Subcategorias", fields: [categoriaPaiId], references: [id], onDelete: SetNull)
+  subcategorias  CategoriaFinanceira[] @relation("Subcategorias")
+  
+  ativo       Boolean   @default(true)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relacionamentos
+  contasPagar ContaPagar[]
+  transacoes  Transacao[]
+
+  @@index([tipo])
+}
+
+// ========================================
+// CONTA BANCÁRIA
+// ========================================
+model ContaBancaria {
+  id              Int       @id @default(autoincrement())
+  nome            String    @db.VarChar(100)  // Ex: "Conta Principal", "Caixa"
+  banco           String?   @db.VarChar(100)
+  agencia         String?   @db.VarChar(20)
+  conta           String?   @db.VarChar(30)
+  tipoConta       String?   @db.VarChar(30)   // Corrente, Poupança, Caixa
+  
+  // Chaves Pix
+  chavePix        String?   @db.VarChar(100)
+  tipoChavePix    String?   @db.VarChar(20)   // CPF, CNPJ, Email, Telefone, Aleatoria
+  
+  saldoInicial    Decimal   @db.Decimal(12, 2) @default(0)
+  saldoAtual      Decimal   @db.Decimal(12, 2) @default(0)
+  
+  cor             String?   @db.VarChar(7)    // Para identificação visual
+  ativo           Boolean   @default(true)
+  principal       Boolean   @default(false)   // Conta principal
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relacionamentos
+  transacoes      Transacao[]
+  contasPagar     ContaPagar[]
+
+  @@index([ativo])
+}
+
+// ========================================
+// FORNECEDOR
+// ========================================
+model Fornecedor {
+  id              Int       @id @default(autoincrement())
+  
+  // Dados básicos
+  nome            String    @db.VarChar(150)
+  nomeFantasia    String?   @db.VarChar(150)
+  tipo            String    @db.VarChar(20)   // PF ou PJ
+  
+  // Documentos
+  cpfCnpj         String?   @db.VarChar(20)
+  inscricaoEstadual String? @db.VarChar(20)
+  inscricaoMunicipal String? @db.VarChar(20)
+  
+  // Contato
+  telefone        String?   @db.VarChar(20)
+  celular         String?   @db.VarChar(20)
+  email           String?   @db.VarChar(100)
+  website         String?   @db.VarChar(200)
+  
+  // Endereço
+  cep             String?   @db.VarChar(10)
+  endereco        String?   @db.VarChar(200)
+  numero          String?   @db.VarChar(20)
+  complemento     String?   @db.VarChar(100)
+  bairro          String?   @db.VarChar(100)
+  cidade          String?   @db.VarChar(100)
+  estado          String?   @db.VarChar(2)
+  
+  // Dados bancários do fornecedor (para pagamentos)
+  banco           String?   @db.VarChar(100)
+  agencia         String?   @db.VarChar(20)
+  conta           String?   @db.VarChar(30)
+  tipoConta       String?   @db.VarChar(20)
+  chavePix        String?   @db.VarChar(100)
+  tipoChavePix    String?   @db.VarChar(20)
+  
+  observacoes     String?   @db.Text
+  ativo           Boolean   @default(true)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relacionamentos
+  contasPagar     ContaPagar[]
+
+  @@index([nome])
+  @@index([cpfCnpj])
+  @@index([ativo])
+}
+
+// ========================================
+// CONTA A PAGAR
+// ========================================
+model ContaPagar {
+  id              Int             @id @default(autoincrement())
+  
+  // Descrição
+  descricao       String          @db.VarChar(200)
+  observacoes     String?         @db.Text
+  
+  // Fornecedor (opcional - pode ser despesa sem fornecedor)
+  fornecedorId    Int?
+  fornecedor      Fornecedor?     @relation(fields: [fornecedorId], references: [id], onDelete: SetNull)
+  
+  // Categoria
+  categoriaId     Int?
+  categoria       CategoriaFinanceira? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  
+  // Valores
+  valor           Decimal         @db.Decimal(12, 2)
+  valorPago       Decimal?        @db.Decimal(12, 2)
+  desconto        Decimal?        @db.Decimal(12, 2) @default(0)
+  juros           Decimal?        @db.Decimal(12, 2) @default(0)
+  multa           Decimal?        @db.Decimal(12, 2) @default(0)
+  
+  // Datas
+  dataEmissao     DateTime        @default(now())
+  dataVencimento  DateTime
+  dataPagamento   DateTime?
+  dataCompetencia DateTime?       // Mês de competência contábil
+  
+  // Status
+  status          StatusContaPagar @default(PENDENTE)
+  
+  // Pagamento
+  formaPagamento  FormaPagamento?
+  contaBancariaId Int?
+  contaBancaria   ContaBancaria?  @relation(fields: [contaBancariaId], references: [id], onDelete: SetNull)
+  
+  // Documento fiscal
+  numeroDocumento String?         @db.VarChar(50)
+  tipoDocumento   String?         @db.VarChar(50)  // NF, Boleto, Recibo, etc
+  
+  // Comprovante
+  comprovanteUrl  String?         @db.Text
+  comprovanteNome String?         @db.VarChar(200)
+  
+  // Recorrência
+  recorrencia     RecorrenciaTipo @default(UNICA)
+  contaPaiId      Int?            // Se for parcela de uma conta parcelada
+  numeroParcela   Int?
+  totalParcelas   Int?
+  
+  // Vínculo com processo (opcional)
+  processoId      Int?
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  // Transação gerada quando pago
+  transacoes      Transacao[]
+
+  @@index([fornecedorId])
+  @@index([categoriaId])
+  @@index([status])
+  @@index([dataVencimento])
+  @@index([processoId])
+}
+
+// ========================================
+// TRANSAÇÃO (FLUXO DE CAIXA)
+// ========================================
+model Transacao {
+  id              Int             @id @default(autoincrement())
+  
+  // Tipo e descrição
+  tipo            TipoTransacao
+  descricao       String          @db.VarChar(200)
+  observacoes     String?         @db.Text
+  
+  // Valores
+  valor           Decimal         @db.Decimal(12, 2)
+  
+  // Data
+  data            DateTime        @default(now())
+  dataCompetencia DateTime?       // Mês de competência
+  
+  // Conta bancária
+  contaBancariaId Int
+  contaBancaria   ContaBancaria   @relation(fields: [contaBancariaId], references: [id], onDelete: Restrict)
+  
+  // Categoria
+  categoriaId     Int?
+  categoria       CategoriaFinanceira? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  
+  // Origem da transação (qual entidade gerou)
+  // Pode ser uma fatura paga (entrada) ou conta paga (saída)
+  faturaId        Int?
+  contaPagarId    Int?
+  contaPagar      ContaPagar?     @relation(fields: [contaPagarId], references: [id], onDelete: SetNull)
+  
+  // Vínculo com processo
+  processoId      Int?
+  
+  // Conciliação bancária
+  conciliado      Boolean         @default(false)
+  dataConciliacao DateTime?
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([tipo])
+  @@index([contaBancariaId])
+  @@index([categoriaId])
+  @@index([data])
+  @@index([faturaId])
+  @@index([contaPagarId])
+  @@index([processoId])
+}
+
+// ========================================
+// CENTRO DE CUSTO (OPCIONAL - PARA ANÁLISE)
+// ========================================
+model CentroCusto {
+  id          Int       @id @default(autoincrement())
+  nome        String    @db.VarChar(100)
+  descricao   String?   @db.VarChar(200)
+  cor         String?   @db.VarChar(7)
+  ativo       Boolean   @default(true)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([ativo])
+}
