@@ -1,15 +1,15 @@
 // CRIAR EM: src/app/api/contas-pagar/[id]/route.ts
-
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
 // GET - Buscar conta por ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id)
+    const { id: idParam } = await params
+    const id = parseInt(idParam)
 
     const conta = await prisma.contaPagar.findUnique({
       where: { id },
@@ -45,10 +45,11 @@ export async function GET(
 // PUT - Atualizar conta
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id)
+    const { id: idParam } = await params
+    const id = parseInt(idParam)
     const body = await request.json()
 
     const conta = await prisma.contaPagar.update({
@@ -83,10 +84,11 @@ export async function PUT(
 // DELETE - Excluir conta
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id)
+    const { id: idParam } = await params
+    const id = parseInt(idParam)
 
     await prisma.contaPagar.delete({
       where: { id },

@@ -1,15 +1,15 @@
 // CRIAR EM: src/app/api/fornecedores/[id]/route.ts
-
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
 // GET - Buscar fornecedor por ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id)
+    const { id: idParam } = await params
+    const id = parseInt(idParam)
 
     const fornecedor = await prisma.fornecedor.findUnique({
       where: { id },
@@ -41,10 +41,11 @@ export async function GET(
 // PUT - Atualizar fornecedor
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id)
+    const { id: idParam } = await params
+    const id = parseInt(idParam)
     const body = await request.json()
 
     const fornecedor = await prisma.fornecedor.update({
@@ -91,10 +92,11 @@ export async function PUT(
 // DELETE - Excluir fornecedor
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id)
+    const { id: idParam } = await params
+    const id = parseInt(idParam)
 
     // Verificar se há contas vinculadas
     const contasVinculadas = await prisma.contaPagar.count({
