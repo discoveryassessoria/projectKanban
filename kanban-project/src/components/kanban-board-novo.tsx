@@ -354,11 +354,16 @@ export function KanbanBoard({
   const visibleStatusList = sortedStatusList.slice(startIndex, startIndex + visibleColumns)
   const showAddButton = startIndex + visibleColumns >= sortedStatusList.length
 
-  // Memoizar processos por status
+  // Memoizar processos por status - ordenados alfabeticamente (A-Z)
   const processosByStatus = useMemo(() => {
     const map = new Map<number, ProcessoWithStatus[]>()
     for (const status of statusList) {
-      map.set(status.id, localProcessos.filter(p => p.statusId === status.id))
+      map.set(
+        status.id, 
+        localProcessos
+          .filter(p => p.statusId === status.id)
+          .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+      )
     }
     return map
   }, [localProcessos, statusList])
