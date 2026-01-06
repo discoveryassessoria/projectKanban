@@ -26,6 +26,7 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
   // Pegar o primeiro contratante para exibir dados de contato
   const contratante = contratantes[0] || null
 
+  // ✅ CORREÇÃO: Usar ID com prefixo "card-" para evitar conflito com IDs de colunas
   const { 
     attributes, 
     listeners, 
@@ -34,7 +35,7 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
     transition, 
     isDragging: isDraggingSortable 
   } = useSortable({ 
-    id: id,
+    id: `card-${id}`,
     data: {
       type: "Card",
       processo: processo,

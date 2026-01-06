@@ -52,8 +52,9 @@ export function KanbanColumn({
   onStatusUpdate,
   pais,
 }: KanbanColumnProps) {
+  // ✅ CORREÇÃO: Usar ID com prefixo "column-" para evitar conflito com IDs de cards
   const { setNodeRef, isOver } = useDroppable({ 
-    id: id,
+    id: `column-${id}`,
     data: {
       type: "Column",
       statusId: id,
@@ -67,7 +68,8 @@ export function KanbanColumn({
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
-  const processosIds = useMemo(() => processos.map((p) => p.id), [processos])
+  // ✅ CORREÇÃO: IDs dos processos com prefixo para o SortableContext
+  const processosIds = useMemo(() => processos.map((p) => `card-${p.id}`), [processos])
   
   const isConcluido = title.toLowerCase() === "concluído"
 
@@ -123,7 +125,7 @@ export function KanbanColumn({
       <div
         ref={setNodeRef}
         className={`
-          flex flex-col min-h-[450px] flex-1 min-w-[200px]
+          flex flex-col h-full w-full
           ${!isLast ? 'border-r-2 border-dashed border-white/20' : ''}
           ${isOver ? 'bg-blue-500/10' : 'bg-transparent'}
           transition-colors duration-200
@@ -185,8 +187,8 @@ export function KanbanColumn({
           </div>
         </div>
 
-        {/* Área de cards */}
-        <div className="flex-1 overflow-y-auto p-2 min-h-[200px] scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+        {/* Área de cards com scroll interno */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
           <SortableContext items={processosIds} strategy={verticalListSortingStrategy}>
             {processos.map((processo) => (
               <KanbanCard 

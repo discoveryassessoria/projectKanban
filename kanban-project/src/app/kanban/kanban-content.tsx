@@ -1,5 +1,4 @@
 // ESTE ARQUIVO VAI EM: src/app/processos/kanban-content.tsx
-// SUBSTITUA O ARQUIVO EXISTENTE
 
 "use client"
 
@@ -246,7 +245,8 @@ export function KanbanContent() {
       <div className="min-h-screen relative">
         <div className="absolute inset-0 bg-black/40 pointer-events-none" />
         
-        <main className="relative px-6 py-6 max-w-full">
+        {/* ✅ CORREÇÃO: overflow-x-hidden no main */}
+        <main className="relative px-6 py-6 overflow-hidden">
           {/* TABS PRINCIPAIS */}
           <div className="bg-white/5 border border-white/15 rounded-2xl p-4 backdrop-blur-xl shadow-lg mb-4">
             <div className="flex items-center justify-between flex-wrap gap-4">
@@ -336,8 +336,8 @@ export function KanbanContent() {
             </div>
           </div>
 
-          {/* CONTEÚDO */}
-          <div className="bg-white/5 border border-white/15 rounded-2xl p-4 backdrop-blur-xl shadow-lg w-full overflow-hidden">
+          {/* CONTEÚDO - overflow-hidden para conter o kanban */}
+          <div className="bg-white/5 border border-white/15 rounded-2xl p-4 backdrop-blur-xl shadow-lg overflow-hidden" style={{ maxWidth: '100%' }}>
             {/* Processos - Kanban */}
             {tabPrincipal === "processos" && subTab === "kanban" && (
               <KanbanBoard 

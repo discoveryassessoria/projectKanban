@@ -3,12 +3,11 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import {
   DndContext,
   type DragEndEvent,
   type DragStartEvent,
-  type DragMoveEvent,
   DragOverlay,
   PointerSensor,
   TouchSensor,
@@ -19,7 +18,7 @@ import {
 import { snapCenterToCursor } from "@dnd-kit/modifiers"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react"
+import { Plus, Trash2 } from "lucide-react"
 import { KanbanColumn } from "./kanban/kanban-column"
 import { KanbanCard } from "./kanban/kanban-card"
 import { ProcessoDetailsModal } from "./kanban/atividade-details-modal"
@@ -44,6 +43,24 @@ interface KanbanBoardProps {
   initialPessoaId?: number | null
   initialSidebarTab?: string | null
   onModalOpened?: () => void
+}
+
+// ✅ Helper para extrair ID numérico de IDs prefixados
+const extractId = (id: string | number): number => {
+  if (typeof id === 'number') return id
+  // Remove prefixos "card-" ou "column-"
+  const match = id.match(/\d+$/)
+  return match ? parseInt(match[0]) : 0
+}
+
+// ✅ Helper para verificar se é um card
+const isCardId = (id: string | number): boolean => {
+  return typeof id === 'string' && id.startsWith('card-')
+}
+
+// ✅ Helper para verificar se é uma coluna
+const isColumnId = (id: string | number): boolean => {
+  return typeof id === 'string' && id.startsWith('column-')
 }
 
 export function KanbanBoard({ 
@@ -74,13 +91,8 @@ export function KanbanBoard({
   const [modalInitialPessoaId, setModalInitialPessoaId] = useState<number | undefined>(undefined)
   const [modalInitialSidebarTab, setModalInitialSidebarTab] = useState<string | undefined>(undefined)
   
-  // Estado para navegação por índice (modelo original)
-  const [startIndex, setStartIndex] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-  const autoScrollRef = useRef<NodeJS.Timeout | null>(null)
-  
-  const [visibleColumns, setVisibleColumns] = useState(5)
   const [initialParamsProcessed, setInitialParamsProcessed] = useState(false)
 
   const paisConfig = PAISES_CONFIG[pais]
@@ -122,63 +134,6 @@ export function KanbanBoard({
       return (a.ordem ?? 0) - (b.ordem ?? 0)
     })
   }, [statusList])
-
-  const totalColumns = sortedStatusList.length + 1
-
-  // Calcula quantas colunas cabem na tela
-  useEffect(() => {
-    const updateVisibleColumns = () => {
-      if (containerRef.current) {
-        const containerWidth = containerRef.current.offsetWidth
-        const availableWidth = containerWidth - 100
-        const cols = Math.floor(availableWidth / 180)
-        setVisibleColumns(Math.max(4, Math.min(6, cols)))
-      }
-    }
-
-    setTimeout(updateVisibleColumns, 100)
-    window.addEventListener('resize', updateVisibleColumns)
-    return () => window.removeEventListener('resize', updateVisibleColumns)
-  }, [])
-
-  // Navegação
-  const maxIndex = Math.max(0, totalColumns - visibleColumns)
-  const canGoLeft = startIndex > 0
-  const canGoRight = startIndex < maxIndex
-
-  // Auto-scroll contínuo
-  const startAutoScroll = useCallback((direction: 'left' | 'right') => {
-    if (autoScrollRef.current) return
-    
-    // Executa imediatamente
-    if (direction === 'left' && startIndex > 0) {
-      setStartIndex(prev => Math.max(0, prev - 1))
-    } else if (direction === 'right' && startIndex < maxIndex) {
-      setStartIndex(prev => Math.min(maxIndex, prev + 1))
-    }
-    
-    // Continua em intervalo
-    autoScrollRef.current = setInterval(() => {
-      setStartIndex(prev => {
-        if (direction === 'left') {
-          return Math.max(0, prev - 1)
-        } else {
-          return Math.min(maxIndex, prev + 1)
-        }
-      })
-    }, 350)
-  }, [maxIndex, startIndex])
-
-  const stopAutoScroll = useCallback(() => {
-    if (autoScrollRef.current) {
-      clearInterval(autoScrollRef.current)
-      autoScrollRef.current = null
-    }
-  }, [])
-
-  useEffect(() => {
-    return () => stopAutoScroll()
-  }, [stopAutoScroll])
 
   // Handlers
   const handleAddNewStatus = async (e: React.FormEvent) => {
@@ -239,70 +194,61 @@ export function KanbanBoard({
     setModalInitialSidebarTab(undefined)
   }
 
-  // Drag handlers
+  // ✅ CORREÇÃO: Drag handlers atualizados para IDs prefixados
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
-    const activeId = typeof active.id === 'string' ? parseInt(active.id) : active.id as number
+    // Extrair ID numérico do processo
+    const activeId = extractId(active.id)
     const processo = localProcessos.find((p) => p.id === activeId)
     setActiveProcesso(processo || null)
     setIsDragging(true)
   }
 
-  const handleDragMove = (event: DragMoveEvent) => {
-    if (!containerRef.current || !isDragging) return
-    
-    const containerRect = containerRef.current.getBoundingClientRect()
-    const { activatorEvent } = event
-    
-    if (activatorEvent && 'clientX' in activatorEvent) {
-      const mouseX = (activatorEvent as MouseEvent).clientX
-      const edgeThreshold = 80
-      
-      if (mouseX > containerRect.right - edgeThreshold && canGoRight) {
-        if (!autoScrollRef.current) startAutoScroll('right')
-      } else if (mouseX < containerRect.left + edgeThreshold && canGoLeft) {
-        if (!autoScrollRef.current) startAutoScroll('left')
-      } else {
-        stopAutoScroll()
-      }
-    }
+  // Drag handlers não precisam mais de auto-scroll com scroll nativo
+  const handleDragMove = () => {
+    // Scroll nativo do browser vai funcionar automaticamente
   }
 
+  // ✅ CORREÇÃO: handleDragEnd atualizado para IDs prefixados
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
     
     setActiveProcesso(null)
     setIsDragging(false)
-    stopAutoScroll()
     
     if (!over) return
 
-    const activeId = typeof active.id === 'string' ? parseInt(active.id) : active.id as number
-    const overId = typeof over.id === 'string' ? parseInt(over.id) : over.id as number
-
+    // Extrair ID numérico do card arrastado
+    const activeId = extractId(active.id)
+    
     const processo = localProcessos.find((p) => p.id === activeId)
     if (!processo) return
 
     let targetStatusId: number | null = null
 
+    // Primeiro, tentar pegar do data (mais confiável)
     if (over.data.current?.statusId) {
       targetStatusId = over.data.current.statusId
-    } else if (!isNaN(overId)) {
-      const isColumnDrop = statusList.some(status => status.id === overId)
-      if (isColumnDrop) {
-        targetStatusId = overId
-      } else {
-        const overProcesso = localProcessos.find((p) => p.id === overId)
-        if (overProcesso) {
-          targetStatusId = overProcesso.statusId
-        }
+    } 
+    // Se soltou sobre uma coluna
+    else if (isColumnId(over.id)) {
+      targetStatusId = extractId(over.id)
+    }
+    // Se soltou sobre outro card
+    else if (isCardId(over.id)) {
+      const overProcessoId = extractId(over.id)
+      const overProcesso = localProcessos.find((p) => p.id === overProcessoId)
+      if (overProcesso) {
+        targetStatusId = overProcesso.statusId
       }
     }
 
+    // Se não conseguiu determinar o status ou é o mesmo, não faz nada
     if (!targetStatusId || processo.statusId === targetStatusId) return
 
     const previousProcessos = [...localProcessos]
     
+    // Atualização otimista
     setLocalProcessos(prev => 
       prev.map(p => p.id === activeId ? { ...p, statusId: targetStatusId! } : p)
     )
@@ -350,20 +296,14 @@ export function KanbanBoard({
     }
   }
 
-  // Colunas visíveis (SLICE - modelo original que funciona)
-  const visibleStatusList = sortedStatusList.slice(startIndex, startIndex + visibleColumns)
-  const showAddButton = startIndex + visibleColumns >= sortedStatusList.length
+  // Todas as colunas (sem paginação)
+  const showAddButton = true
 
-  // Memoizar processos por status - ordenados alfabeticamente (A-Z)
+  // ✅ Memoizar processos por status - ordenados alfabeticamente (A-Z)
   const processosByStatus = useMemo(() => {
     const map = new Map<number, ProcessoWithStatus[]>()
     for (const status of statusList) {
-      map.set(
-        status.id, 
-        localProcessos
-          .filter(p => p.statusId === status.id)
-          .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-      )
+      map.set(status.id, localProcessos.filter(p => p.statusId === status.id).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
     }
     return map
   }, [localProcessos, statusList])
@@ -398,30 +338,21 @@ export function KanbanBoard({
         onDragEnd={handleDragEnd}
         collisionDetection={pointerWithin}
       >
-        <div ref={containerRef} className="relative flex items-center gap-2">
-          {/* Seta Esquerda - Circular */}
-          <button
-            onMouseEnter={() => canGoLeft && startAutoScroll('left')}
-            onMouseLeave={stopAutoScroll}
-            disabled={!canGoLeft}
-            className={`
-              flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center
-              transition-all duration-200
-              ${canGoLeft 
-                ? 'bg-white/10 hover:bg-white/20 text-white cursor-pointer' 
-                : 'bg-transparent text-white/20 cursor-default'}
-            `}
+        <div ref={containerRef} className="relative w-full max-w-full">
+          {/* Container das colunas com scroll horizontal */}
+          <div 
+            className="rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm pb-3 scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-white/10"
+            style={{ 
+              overflowX: 'auto', 
+              overflowY: 'hidden',
+              maxWidth: '100%'
+            }}
           >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-
-          {/* Container das colunas - MODELO ORIGINAL */}
-          <div className="flex-1 overflow-hidden rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm">
-            <div className="flex min-h-[500px]">
-              {visibleStatusList.map((status, index) => (
+            <div className="flex h-[calc(100vh-280px)] min-h-[500px]" style={{ width: 'max-content' }}>
+              {sortedStatusList.map((status, index) => (
                 <div 
                   key={status.id}
-                  className="flex-1 min-w-0"
+                  className="flex-shrink-0 w-[220px] h-full"
                 >
                   <KanbanColumn
                     id={status.id}
@@ -429,7 +360,7 @@ export function KanbanBoard({
                     processos={processosByStatus.get(status.id) || []}
                     headerColor={paisConfig.cor}
                     isFirst={index === 0}
-                    isLast={index === visibleStatusList.length - 1 && !showAddButton}
+                    isLast={index === sortedStatusList.length - 1 && !showAddButton}
                     onProcessoAdd={handleAddNewProcesso}
                     onProcessoClick={handleProcessoClick}
                     onStatusUpdate={onRefresh}
@@ -439,63 +370,45 @@ export function KanbanBoard({
               ))}
 
               {/* Botão Adicionar Coluna */}
-              {showAddButton && (
-                <div className="flex-1 min-w-0 p-2">
-                  {isAddingStatus ? (
-                    <div className="p-3 rounded-lg bg-white/5 border border-white/10 h-full">
-                      <form onSubmit={handleAddNewStatus}>
-                        <Input
-                          autoFocus
-                          placeholder="Nome da nova coluna..."
-                          value={newStatusName}
-                          onChange={(e) => setNewStatusName(e.target.value)}
-                          className="mb-2 bg-white/10 border-white/20 text-white placeholder:text-white/50 text-sm h-8"
-                        />
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setIsAddingStatus(false)}
-                            className="h-7 px-2 hover:bg-white/10 text-white/70 text-xs"
-                          >
-                            Cancelar
-                          </Button>
-                          <Button type="submit" size="sm" className="h-7 px-2 bg-blue-600 hover:bg-blue-700 text-xs">
-                            Adicionar
-                          </Button>
-                        </div>
-                      </form>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      className="w-full h-full min-h-[80px] border border-dashed border-white/20 hover:border-white/40 hover:bg-white/5 text-white/50 hover:text-white/80 text-sm"
-                      onClick={() => setIsAddingStatus(true)}
-                    >
-                      <Plus className="mr-1.5 h-4 w-4" /> Nova coluna
-                    </Button>
-                  )}
-                </div>
-              )}
+              <div className="flex-shrink-0 w-[220px] p-2 h-full">
+                {isAddingStatus ? (
+                  <div className="p-3 rounded-lg bg-white/5 border border-white/10 h-full">
+                    <form onSubmit={handleAddNewStatus}>
+                      <Input
+                        autoFocus
+                        placeholder="Nome da nova coluna..."
+                        value={newStatusName}
+                        onChange={(e) => setNewStatusName(e.target.value)}
+                        className="mb-2 bg-white/10 border-white/20 text-white placeholder:text-white/50 text-sm h-8"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsAddingStatus(false)}
+                          className="h-7 px-2 hover:bg-white/10 text-white/70 text-xs"
+                        >
+                          Cancelar
+                        </Button>
+                        <Button type="submit" size="sm" className="h-7 px-2 bg-blue-600 hover:bg-blue-700 text-xs">
+                          Adicionar
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    className="w-full h-full min-h-[80px] border border-dashed border-white/20 hover:border-white/40 hover:bg-white/5 text-white/50 hover:text-white/80 text-sm"
+                    onClick={() => setIsAddingStatus(true)}
+                  >
+                    <Plus className="mr-1.5 h-4 w-4" /> Nova coluna
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
-
-          {/* Seta Direita - Circular */}
-          <button
-            onMouseEnter={() => canGoRight && startAutoScroll('right')}
-            onMouseLeave={stopAutoScroll}
-            disabled={!canGoRight}
-            className={`
-              flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center
-              transition-all duration-200
-              ${canGoRight 
-                ? 'bg-white/10 hover:bg-white/20 text-white cursor-pointer' 
-                : 'bg-transparent text-white/20 cursor-default'}
-            `}
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
         </div>
 
         <DragOverlay 
