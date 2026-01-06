@@ -1,5 +1,4 @@
 // src/app/api/contratantes/route.ts
-
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { logContratante } from "@/lib/auditoria"
@@ -59,12 +58,15 @@ export async function POST(request: Request) {
 
     if (body.cpf) createData.cpf = body.cpf
     if (body.rg) createData.rg = body.rg
+    if (body.passaporte) createData.passaporte = body.passaporte  // ✅ NOVO
+    if (body.crnm) createData.crnm = body.crnm                    // ✅ NOVO
     if (body.dataNascimento) createData.dataNascimento = new Date(body.dataNascimento)
     if (body.sexo) createData.sexo = body.sexo
     if (body.estadoCivil) createData.estadoCivil = body.estadoCivil
     if (body.nacionalidade) createData.nacionalidade = body.nacionalidade
     if (body.telefone) createData.telefone = body.telefone
     if (body.email) createData.email = body.email
+    if (body.pais) createData.pais = body.pais                    // ✅ NOVO (se não tiver)
     if (body.endereco) createData.endereco = body.endereco
     if (body.numero) createData.numero = body.numero
     if (body.complemento) createData.complemento = body.complemento

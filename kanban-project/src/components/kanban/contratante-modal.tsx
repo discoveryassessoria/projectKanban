@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Building2, User, MapPin, Phone, CreditCard } from "lucide-react"
-import { applyCPFMask, applyRGMask, applyTelefoneMask, removeMask } from "@/src/utils/masks"
+import { applyCPFMask, applyRGMask, applyTelefoneMask, removeMask, removeTelefoneMask } from "@/src/utils/masks"
 
 interface Contratante {
   id: number
@@ -68,7 +68,7 @@ export function ContratanteModal({
         cpf: formData.cpf ? removeMask(formData.cpf) : null,
         rg: formData.rg ? removeMask(formData.rg) : null,
         endereco: formData.endereco.trim() || null,
-        telefone: formData.telefone ? removeMask(formData.telefone) : null,
+        telefone: formData.telefone ? removeTelefoneMask(formData.telefone) : null,
       })
       onClose()
     }
@@ -188,9 +188,9 @@ export function ContratanteModal({
               id="telefone"
               value={isViewMode ? applyTelefoneMask(formData.telefone) : formData.telefone}
               onChange={handleTelefoneChange}
-              placeholder="(00) 00000-0000"
+              placeholder="(00) 00000-0000 ou +XX..."
               readOnly={isViewMode}
-              maxLength={15}
+              maxLength={20}
             />
           </div>
 

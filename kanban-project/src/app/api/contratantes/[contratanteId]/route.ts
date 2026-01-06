@@ -91,6 +91,8 @@ export async function PUT(
     if (body.nome !== undefined) updateData.nome = body.nome
     if (body.cpf !== undefined) updateData.cpf = body.cpf
     if (body.rg !== undefined) updateData.rg = body.rg
+    if (body.passaporte !== undefined) updateData.passaporte = body.passaporte  // ✅ NOVO
+    if (body.crnm !== undefined) updateData.crnm = body.crnm                    // ✅ NOVO
     if (body.dataNascimento !== undefined) {
       updateData.dataNascimento = body.dataNascimento ? new Date(body.dataNascimento) : null
     }
@@ -99,6 +101,7 @@ export async function PUT(
     if (body.nacionalidade !== undefined) updateData.nacionalidade = body.nacionalidade
     if (body.telefone !== undefined) updateData.telefone = body.telefone
     if (body.email !== undefined) updateData.email = body.email
+    if (body.pais !== undefined) updateData.pais = body.pais                    // ✅ NOVO (se não tiver)
     if (body.endereco !== undefined) updateData.endereco = body.endereco
     if (body.numero !== undefined) updateData.numero = body.numero
     if (body.complemento !== undefined) updateData.complemento = body.complemento

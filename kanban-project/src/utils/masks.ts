@@ -4,12 +4,10 @@ export const formatCPF = (value: string): string => {
   const cleaned = value.replace(/\D/g, '')
   const match = cleaned.match(/^(\d{0,3})(\d{0,3})(\d{0,3})(\d{0,2})$/)
   if (!match) return value
-  
   let formatted = match[1]
   if (match[2]) formatted += '.' + match[2]
   if (match[3]) formatted += '.' + match[3]
   if (match[4]) formatted += '-' + match[4]
-  
   return formatted
 }
 
@@ -17,29 +15,41 @@ export const formatRG = (value: string): string => {
   const cleaned = value.replace(/\D/g, '')
   const match = cleaned.match(/^(\d{0,2})(\d{0,3})(\d{0,3})(\d{0,1})$/)
   if (!match) return value
-  
   let formatted = match[1]
   if (match[2]) formatted += '.' + match[2]
   if (match[3]) formatted += '.' + match[3]
   if (match[4]) formatted += '-' + match[4]
-  
   return formatted
 }
 
 export const formatTelefone = (value: string): string => {
+  // Se começa com +, é internacional - formato livre
+  if (value.startsWith('+')) {
+    // Permite +, números, espaços e hífens para formato internacional
+    return value.replace(/[^\d+\s\-]/g, '').slice(0, 20)
+  }
+  
+  // Formato brasileiro padrão
   const cleaned = value.replace(/\D/g, '')
   const match = cleaned.match(/^(\d{0,2})(\d{0,5})(\d{0,4})$/)
   if (!match) return value
-  
   let formatted = ''
   if (match[1]) formatted = '(' + match[1]
   if (match[2]) formatted += ') ' + match[2]
   if (match[3]) formatted += '-' + match[3]
-  
   return formatted
 }
 
 export const removeMask = (value: string): string => {
+  return value.replace(/\D/g, '')
+}
+
+// Remove máscara de telefone preservando o + para internacionais
+export const removeTelefoneMask = (value: string): string => {
+  if (value.startsWith('+')) {
+    // Preserva o + e remove apenas espaços e hífens
+    return value.replace(/[^\d+]/g, '')
+  }
   return value.replace(/\D/g, '')
 }
 
@@ -55,5 +65,9 @@ export const applyRGMask = (value: string): string => {
 
 export const applyTelefoneMask = (value: string): string => {
   if (!value) return ''
+  // Se começa com +, é internacional - não remove o +
+  if (value.startsWith('+')) {
+    return formatTelefone(value)
+  }
   return formatTelefone(removeMask(value))
 }

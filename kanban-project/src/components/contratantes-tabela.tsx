@@ -39,12 +39,15 @@ interface Contratante {
   nome: string
   cpf?: string | null
   rg?: string | null
+  passaporte?: string | null
+  crnm?: string | null
   dataNascimento?: string | null
   sexo?: string | null
   estadoCivil?: string | null
   nacionalidade?: string | null
   telefone?: string | null
   email?: string | null
+  pais?: string | null
   endereco?: string | null
   numero?: string | null
   complemento?: string | null
@@ -78,12 +81,16 @@ const initialFormData = {
   nome: "",
   cpf: "",
   rg: "",
+  passaporte: "",
+  crnm: "",
   dataNascimento: "",
   sexo: "",
   estadoCivil: "",
   nacionalidade: "",
   telefone: "",
   email: "",
+  pais: "Brasil",
+  paisOutro: "",
   endereco: "",
   numero: "",
   complemento: "",
@@ -100,7 +107,23 @@ const TIPO_OPTIONS = [
 ]
 const SEXO_OPTIONS = ["Masculino", "Feminino", "Outro"]
 const ESTADO_CIVIL_OPTIONS = ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável", "Separado(a)"]
-const NACIONALIDADE_OPTIONS = ["Brasileiro(a)", "Português(a)", "Italiano(a)", "Espanhol(a)", "Alemão(ã)", "Outro"]
+const NACIONALIDADE_OPTIONS = ["Brasileiro(a)", "Português(a)", "Italiano(a)", "Espanhol(a)", "Alemão(ã)", "Americano(a)", "Outro"]
+
+// Lista de países com código para API de CEP
+const PAISES_OPTIONS = [
+  { nome: "Brasil", codigo: "br" },
+  { nome: "Estados Unidos", codigo: "us" },
+  { nome: "Portugal", codigo: "pt" },
+  { nome: "Espanha", codigo: "es" },
+  { nome: "Itália", codigo: "it" },
+  { nome: "Alemanha", codigo: "de" },
+  { nome: "França", codigo: "fr" },
+  { nome: "Reino Unido", codigo: "gb" },
+  { nome: "Argentina", codigo: "ar" },
+  { nome: "Canadá", codigo: "ca" },
+  { nome: "Japão", codigo: "jp" },
+  { nome: "Outro", codigo: null },
+]
 
 // Componente do Modal separado para usar Portal
 function ContratanteModal({
@@ -136,6 +159,33 @@ function ContratanteModal({
   const [uploadProgress, setUploadProgress] = useState(0)
   const [carregandoAnexos, setCarregandoAnexos] = useState(false)
 
+  // Verificar se é Brasil para aplicar máscaras específicas
+  const isBrasil = formData.pais === "Brasil"
+  
+  // Pegar código do país para API
+  const getCodigoPais = (nomePais: string): string | null => {
+    const pais = PAISES_OPTIONS.find(p => p.nome === nomePais)
+    return pais?.codigo || null
+  }
+
+  // Pegar placeholder de exemplo do CEP baseado no país
+  const getCEPPlaceholder = (nomePais: string): string => {
+    const exemplos: Record<string, string> = {
+      "Brasil": "00000-000",
+      "Estados Unidos": "00000",
+      "Portugal": "0000-000",
+      "Espanha": "00000",
+      "Itália": "00000",
+      "Alemanha": "00000",
+      "França": "00000",
+      "Reino Unido": "AA0A 0AA",
+      "Argentina": "A0000AAA",
+      "Canadá": "A0A 0A0",
+      "Japão": "000-0000",
+    }
+    return exemplos[nomePais] || "Código postal"
+  }
+
   // Carregar anexos existentes quando abrir para editar/visualizar
   useEffect(() => {
     if (isOpen && editingId) {
@@ -166,7 +216,6 @@ function ContratanteModal({
     },
     onClientUploadComplete: async (res) => {
       if (res && editingId) {
-        // Salvar cada arquivo no banco de dados
         for (const file of res) {
           try {
             const response = await fetch("/api/anexos", {
@@ -195,7 +244,6 @@ function ContratanteModal({
         setArquivos([])
         setUploadProgress(0)
       } else if (res && !editingId) {
-        // Se ainda não salvou o cliente, guarda temporariamente
         const novosAnexos = res.map(file => ({
           id: Date.now() + Math.random(),
           nome: file.name,
@@ -264,7 +312,6 @@ function ContratanteModal({
     setMounted(true)
   }, [])
 
-  // Limpar arquivos quando fechar o modal
   useEffect(() => {
     if (!isOpen) {
       setArquivos([])
@@ -284,30 +331,157 @@ function ContratanteModal({
       .replace(/(-\d{2})\d+?$/, "$1")
   }
 
-  // Formatar telefone
-  const formatTelefone = (value: string) => {
-    return value
-      .replace(/\D/g, "")
-      .replace(/(\d{2})(\d)/, "($1) $2")
-      .replace(/(\d{5})(\d)/, "$1-$2")
-      .replace(/(-\d{4})\d+?$/, "$1")
+  // Formatar Passaporte (apenas maiúsculas, sem caracteres especiais)
+  const formatPassaporte = (value: string) => {
+    return value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15)
   }
 
-  // Formatar CEP
-  const formatCEP = (value: string) => {
+  // Formatar CRNM (apenas maiúsculas, sem caracteres especiais)
+  const formatCRNM = (value: string) => {
+    return value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15)
+  }
+
+  // Formatar telefone
+  const formatTelefone = (value: string) => {
+    let cleaned = value.replace(/[^\d+]/g, '')
+    
+    if (cleaned && !cleaned.startsWith('+')) {
+      cleaned = '+55' + cleaned
+    }
+    
+    if (cleaned === '+') return '+'
+    
+    const digits = cleaned.slice(1)
+    if (!digits) return '+'
+    
+    // Brasil +55
+    if (digits.startsWith('55')) {
+      const number = digits.slice(2)
+      if (number.length === 0) return '+55'
+      if (number.length <= 2) return `+55 (${number}`
+      const ddd = number.slice(0, 2)
+      const rest = number.slice(2)
+      if (rest.length === 0) return `+55 (${ddd})`
+      if (rest.length <= 5) return `+55 (${ddd}) ${rest}`
+      if (rest.length <= 9) {
+        if (rest.length === 9) {
+          return `+55 (${ddd}) ${rest.slice(0, 5)}-${rest.slice(5)}`
+        } else if (rest.length === 8) {
+          return `+55 (${ddd}) ${rest.slice(0, 4)}-${rest.slice(4)}`
+        }
+        return `+55 (${ddd}) ${rest}`
+      }
+      const maxRest = rest.slice(0, 9)
+      return `+55 (${ddd}) ${maxRest.slice(0, 5)}-${maxRest.slice(5)}`
+    }
+    
+    // EUA/Canadá +1
+    if (digits.startsWith('1')) {
+      const number = digits.slice(1)
+      if (number.length === 0) return '+1'
+      if (number.length <= 3) return `+1 (${number}`
+      const areaCode = number.slice(0, 3)
+      const rest = number.slice(3)
+      if (rest.length === 0) return `+1 (${areaCode})`
+      if (rest.length <= 3) return `+1 (${areaCode}) ${rest}`
+      if (rest.length <= 7) {
+        return `+1 (${areaCode}) ${rest.slice(0, 3)}-${rest.slice(3)}`
+      }
+      const maxRest = rest.slice(0, 7)
+      return `+1 (${areaCode}) ${maxRest.slice(0, 3)}-${maxRest.slice(3)}`
+    }
+    
+    // Portugal +351
+    if (digits.startsWith('351')) {
+      const number = digits.slice(3)
+      if (number.length === 0) return '+351'
+      if (number.length <= 3) return `+351 ${number}`
+      if (number.length <= 6) return `+351 ${number.slice(0, 3)} ${number.slice(3)}`
+      if (number.length <= 9) return `+351 ${number.slice(0, 3)} ${number.slice(3, 6)} ${number.slice(6)}`
+      const maxNum = number.slice(0, 9)
+      return `+351 ${maxNum.slice(0, 3)} ${maxNum.slice(3, 6)} ${maxNum.slice(6)}`
+    }
+    
+    // Espanha +34
+    if (digits.startsWith('34')) {
+      const number = digits.slice(2)
+      if (number.length === 0) return '+34'
+      if (number.length <= 3) return `+34 ${number}`
+      if (number.length <= 6) return `+34 ${number.slice(0, 3)} ${number.slice(3)}`
+      if (number.length <= 9) return `+34 ${number.slice(0, 3)} ${number.slice(3, 6)} ${number.slice(6)}`
+      const maxNum = number.slice(0, 9)
+      return `+34 ${maxNum.slice(0, 3)} ${maxNum.slice(3, 6)} ${maxNum.slice(6)}`
+    }
+    
+    // Itália +39
+    if (digits.startsWith('39')) {
+      const number = digits.slice(2)
+      if (number.length === 0) return '+39'
+      if (number.length <= 3) return `+39 ${number}`
+      if (number.length <= 6) return `+39 ${number.slice(0, 3)} ${number.slice(3)}`
+      if (number.length <= 10) return `+39 ${number.slice(0, 3)} ${number.slice(3, 6)} ${number.slice(6)}`
+      const maxNum = number.slice(0, 10)
+      return `+39 ${maxNum.slice(0, 3)} ${maxNum.slice(3, 6)} ${maxNum.slice(6)}`
+    }
+    
+    // Alemanha +49
+    if (digits.startsWith('49')) {
+      const number = digits.slice(2)
+      if (number.length === 0) return '+49'
+      if (number.length <= 4) return `+49 ${number}`
+      if (number.length <= 11) return `+49 ${number.slice(0, 4)} ${number.slice(4)}`
+      const maxNum = number.slice(0, 11)
+      return `+49 ${maxNum.slice(0, 4)} ${maxNum.slice(4)}`
+    }
+    
+    // França +33
+    if (digits.startsWith('33')) {
+      const number = digits.slice(2)
+      if (number.length === 0) return '+33'
+      if (number.length <= 1) return `+33 ${number}`
+      if (number.length <= 3) return `+33 ${number.slice(0, 1)} ${number.slice(1)}`
+      if (number.length <= 5) return `+33 ${number.slice(0, 1)} ${number.slice(1, 3)} ${number.slice(3)}`
+      if (number.length <= 7) return `+33 ${number.slice(0, 1)} ${number.slice(1, 3)} ${number.slice(3, 5)} ${number.slice(5)}`
+      if (number.length <= 9) return `+33 ${number.slice(0, 1)} ${number.slice(1, 3)} ${number.slice(3, 5)} ${number.slice(5, 7)} ${number.slice(7)}`
+      const maxNum = number.slice(0, 9)
+      return `+33 ${maxNum.slice(0, 1)} ${maxNum.slice(1, 3)} ${maxNum.slice(3, 5)} ${maxNum.slice(5, 7)} ${maxNum.slice(7)}`
+    }
+    
+    // Argentina +54
+    if (digits.startsWith('54')) {
+      const number = digits.slice(2)
+      if (number.length === 0) return '+54'
+      if (number.length <= 2) return `+54 ${number}`
+      if (number.length <= 6) return `+54 ${number.slice(0, 2)} ${number.slice(2)}`
+      if (number.length <= 10) return `+54 ${number.slice(0, 2)} ${number.slice(2, 6)} ${number.slice(6)}`
+      const maxNum = number.slice(0, 10)
+      return `+54 ${maxNum.slice(0, 2)} ${maxNum.slice(2, 6)} ${maxNum.slice(6)}`
+    }
+    
+    // Para qualquer outro DDI - formatação genérica
+    // Agrupa em blocos de 3-4 dígitos após o DDI
+    if (digits.length <= 3) return `+${digits}`
+    if (digits.length <= 6) return `+${digits.slice(0, 3)} ${digits.slice(3)}`
+    if (digits.length <= 9) return `+${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`
+    if (digits.length <= 12) return `+${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 9)} ${digits.slice(9)}`
+    
+    // Limita a 15 dígitos (padrão E.164)
+    const maxDigits = digits.slice(0, 15)
+    return `+${maxDigits.slice(0, 3)} ${maxDigits.slice(3, 6)} ${maxDigits.slice(6, 9)} ${maxDigits.slice(9, 12)} ${maxDigits.slice(12)}`
+  }
+
+  // Formatar CEP brasileiro
+  const formatCEPBrasil = (value: string) => {
     return value
       .replace(/\D/g, "")
       .replace(/(\d{5})(\d)/, "$1-$2")
       .replace(/(-\d{3})\d+?$/, "$1")
   }
 
-  // Buscar CEP na API ViaCEP
-  const buscarCEP = async (cep: string) => {
+  // Buscar CEP - Brasil (ViaCEP)
+  const buscarCEPBrasil = async (cep: string) => {
     const cepLimpo = cep.replace(/\D/g, "")
-    
-    if (cepLimpo.length !== 8) return
-    
-    setBuscandoCep(true)
+    if (cepLimpo.length !== 8) return false
     
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`)
@@ -316,30 +490,194 @@ function ContratanteModal({
       if (!data.erro) {
         setFormData({
           ...formData,
-          cep: formatCEP(cepLimpo),
+          cep: formatCEPBrasil(cepLimpo),
           endereco: data.logradouro || "",
           bairro: data.bairro || "",
           cidade: data.localidade || "",
           estado: data.uf || "",
           complemento: data.complemento || formData.complemento,
         })
+        return true
       }
     } catch (error) {
-      console.error("Erro ao buscar CEP:", error)
+      console.error("Erro ao buscar CEP Brasil:", error)
+    }
+    return false
+  }
+
+  // Buscar CEP - Internacional (Zippopotam.us)
+  const buscarCEPInternacional = async (cep: string, codigoPais: string) => {
+    const cepOriginal = cep.trim()
+    
+    // Diferentes formatos para tentar
+    const formatos: string[] = []
+    
+    // Formato limpo (sem espaços e hífens)
+    const cepLimpo = cepOriginal.replace(/[\s-]/g, "").toUpperCase()
+    
+    // Adicionar formato original primeiro (pode ter hífen que a API precisa)
+    if (cepOriginal !== cepLimpo) {
+      formatos.push(cepOriginal.toUpperCase())
+    }
+    formatos.push(cepLimpo)
+    
+    // Para Portugal, tentar também só os primeiros 4 dígitos
+    if (codigoPais === "pt") {
+      const sohNumeros = cepLimpo.replace(/\D/g, "")
+      if (sohNumeros.length >= 4) {
+        formatos.push(sohNumeros.slice(0, 4))
+      }
+    }
+    
+    // Para Reino Unido, tentar só a primeira parte (outcode)
+    if (codigoPais === "gb") {
+      const match = cepLimpo.match(/^([A-Z]{1,2}\d{1,2}[A-Z]?)/)
+      if (match) {
+        formatos.push(match[1])
+      }
+      if (cepLimpo.length >= 3) {
+        formatos.push(cepLimpo.slice(0, 3))
+        formatos.push(cepLimpo.slice(0, 4))
+      }
+    }
+    
+    // Para Canadá, tentar só os primeiros 3 caracteres (FSA)
+    if (codigoPais === "ca") {
+      if (cepLimpo.length >= 3) {
+        formatos.push(cepLimpo.slice(0, 3))
+      }
+    }
+    
+    // Para Japão, tentar só os primeiros 3 dígitos
+    if (codigoPais === "jp") {
+      const sohNumeros = cepLimpo.replace(/\D/g, "")
+      if (sohNumeros.length >= 3) {
+        formatos.push(sohNumeros.slice(0, 3))
+      }
+    }
+    
+    // Para Argentina, tentar com prefixo de letra
+    if (codigoPais === "ar") {
+      if (!cepLimpo.startsWith("C") && !cepLimpo.startsWith("B")) {
+        formatos.push("C" + cepLimpo)
+        formatos.push("B" + cepLimpo)
+      }
+    }
+    
+    // Tentar cada formato
+    for (const formato of formatos) {
+      if (formato.length < 2) continue
+      
+      try {
+        const response = await fetch(`https://api.zippopotam.us/${codigoPais}/${formato}`)
+        
+        if (response.ok) {
+          const data = await response.json()
+          
+          if (data.places && data.places.length > 0) {
+            const place = data.places[0]
+            const estado = place["state"] || place["state abbreviation"] || ""
+            
+            setFormData({
+              ...formData,
+              cep: cepOriginal,
+              cidade: place["place name"] || "",
+              estado: estado,
+              endereco: "",
+              bairro: "",
+              numero: "",
+              complemento: "",
+            })
+            return true
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao buscar CEP internacional:", error)
+      }
+    }
+    
+    // Se não encontrou em nenhum formato, limpar cidade e estado
+    setFormData({
+      ...formData,
+      cep: cepOriginal,
+      cidade: "",
+      estado: "",
+      endereco: "",
+      bairro: "",
+      numero: "",
+      complemento: "",
+    })
+    
+    return false
+  }
+
+  // Buscar CEP - Função principal
+  const buscarCEP = async (cep: string) => {
+    const codigoPais = getCodigoPais(formData.pais)
+    
+    if (!codigoPais) return // País "Outro" não tem busca
+    
+    setBuscandoCep(true)
+    
+    try {
+      if (formData.pais === "Brasil") {
+        await buscarCEPBrasil(cep)
+      } else {
+        await buscarCEPInternacional(cep, codigoPais)
+      }
     } finally {
       setBuscandoCep(false)
     }
   }
 
-  // Handler do CEP com busca automática
+  // Handler do CEP
   const handleCEPChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatCEP(e.target.value)
-    setFormData({ ...formData, cep: formatted })
+    const value = e.target.value
     
-    // Buscar quando completar 9 caracteres (00000-000)
-    if (formatted.length === 9) {
-      buscarCEP(formatted)
+    if (isBrasil) {
+      const formatted = formatCEPBrasil(value)
+      setFormData({ ...formData, cep: formatted })
+      
+      // Buscar quando completar 9 caracteres (00000-000)
+      if (formatted.length === 9) {
+        buscarCEP(formatted)
+      }
+    } else {
+      // Para outros países, aceita qualquer formato
+      const formatted = value.toUpperCase().slice(0, 15)
+      setFormData({ ...formData, cep: formatted })
     }
+  }
+
+  // Buscar CEP ao pressionar Enter ou perder foco (para países internacionais)
+  const handleCEPBlur = () => {
+    if (!isBrasil && formData.cep && formData.cep.length >= 3) {
+      buscarCEP(formData.cep)
+    }
+  }
+
+  const handleCEPKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !isBrasil && formData.cep && formData.cep.length >= 3) {
+      e.preventDefault()
+      buscarCEP(formData.cep)
+    }
+  }
+
+  // Handler de mudança de país
+  const handlePaisChange = (novoPais: string) => {
+    setFormData({ 
+      ...formData, 
+      pais: novoPais, 
+      paisOutro: novoPais === "Outro" ? formData.paisOutro : "",
+      // Limpar campos de endereço ao trocar de país
+      cep: "",
+      endereco: "",
+      numero: "",
+      complemento: "",
+      bairro: "",
+      cidade: "",
+      estado: "",
+    })
   }
 
   if (!isOpen || !mounted) return null
@@ -348,13 +686,11 @@ function ContratanteModal({
       className="fixed inset-0 z-[9999] flex items-center justify-center"
       style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
     >
-      {/* Overlay */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
       
-      {/* Modal */}
       <div 
         className="relative bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
         style={{
@@ -451,7 +787,6 @@ function ContratanteModal({
                   </h3>
                   
                   <div className="space-y-4">
-                    {/* Tipo e Nome */}
                     <div className="grid grid-cols-4 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -461,7 +796,7 @@ function ContratanteModal({
                           value={formData.tipo}
                           onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
                           disabled={isViewMode || !!editingId}
-                          className={`w-full h-10 px-3 rounded-md border text-gray-900 disabled:bg-gray-100 ${
+                          className={`w-full h-10 px-3 rounded-lg border text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 ${
                             formData.tipo === 'requerente' 
                               ? 'bg-purple-50 border-purple-300' 
                               : 'bg-white border-gray-300'
@@ -492,7 +827,6 @@ function ContratanteModal({
                       </div>
                     </div>
 
-                    {/* CPF e RG */}
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">CPF</label>
@@ -516,6 +850,31 @@ function ContratanteModal({
                         />
                       </div>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Passaporte</label>
+                        <Input
+                          value={formData.passaporte}
+                          onChange={(e) => setFormData({ ...formData, passaporte: formatPassaporte(e.target.value) })}
+                          placeholder="Número do passaporte"
+                          maxLength={15}
+                          disabled={isViewMode}
+                          className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">CRNM</label>
+                        <Input
+                          value={formData.crnm}
+                          onChange={(e) => setFormData({ ...formData, crnm: formatCRNM(e.target.value) })}
+                          placeholder="Número do CRNM"
+                          maxLength={15}
+                          disabled={isViewMode}
+                          className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -527,7 +886,6 @@ function ContratanteModal({
                   </h3>
                   
                   <div className="space-y-4">
-                    {/* Data Nascimento e Sexo */}
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -547,7 +905,7 @@ function ContratanteModal({
                           value={formData.sexo}
                           onChange={(e) => setFormData({ ...formData, sexo: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-10 px-3 rounded-md bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100"
+                          className="w-full h-10 px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                         >
                           <option value="">Selecione</option>
                           {SEXO_OPTIONS.map(opt => (
@@ -557,7 +915,6 @@ function ContratanteModal({
                       </div>
                     </div>
 
-                    {/* Estado Civil e Nacionalidade */}
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -568,7 +925,7 @@ function ContratanteModal({
                           value={formData.estadoCivil}
                           onChange={(e) => setFormData({ ...formData, estadoCivil: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-10 px-3 rounded-md bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100"
+                          className="w-full h-10 px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                         >
                           <option value="">Selecione</option>
                           {ESTADO_CIVIL_OPTIONS.map(opt => (
@@ -585,7 +942,7 @@ function ContratanteModal({
                           value={formData.nacionalidade}
                           onChange={(e) => setFormData({ ...formData, nacionalidade: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-10 px-3 rounded-md bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100"
+                          className="w-full h-10 px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                         >
                           <option value="">Selecione</option>
                           {NACIONALIDADE_OPTIONS.map(opt => (
@@ -610,8 +967,8 @@ function ContratanteModal({
                       <Input
                         value={formData.telefone}
                         onChange={(e) => setFormData({ ...formData, telefone: formatTelefone(e.target.value) })}
-                        placeholder="(00) 00000-0000"
-                        maxLength={15}
+                        placeholder="+55 (11) 99999-9999"
+                        maxLength={25}
                         disabled={isViewMode}
                         className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
                       />
@@ -641,26 +998,103 @@ function ContratanteModal({
                 </h3>
                 
                 <div className="space-y-4">
-                  {/* CEP com busca automática */}
-                  <div className="w-1/3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
-                    <div className="relative">
-                      <Input
-                        value={formData.cep}
-                        onChange={handleCEPChange}
-                        placeholder="00000-000"
-                        maxLength={9}
-                        disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 pr-10"
-                      />
-                      {buscandoCep && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                  {/* País e CEP */}
+                  {formData.pais === "Outro" ? (
+                    <>
+                      {/* Quando é "Outro" - dropdown sozinho */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <Globe className="h-4 w-4 inline mr-1 text-gray-400" />
+                            País
+                          </label>
+                          <select
+                            value={formData.pais}
+                            onChange={(e) => handlePaisChange(e.target.value)}
+                            disabled={isViewMode}
+                            className="w-full h-10 px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                          >
+                            {PAISES_OPTIONS.map(pais => (
+                              <option key={pais.nome} value={pais.nome}>{pais.nome}</option>
+                            ))}
+                          </select>
                         </div>
-                      )}
+                      </div>
+                      {/* Nome do País e Código Postal na mesma linha */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Nome do País
+                          </label>
+                          <Input
+                            value={formData.paisOutro || ""}
+                            onChange={(e) => setFormData({ ...formData, paisOutro: e.target.value })}
+                            placeholder="Digite o nome do país"
+                            disabled={isViewMode}
+                            className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Código Postal
+                          </label>
+                          <Input
+                            value={formData.cep}
+                            onChange={(e) => setFormData({ ...formData, cep: e.target.value.toUpperCase().slice(0, 15) })}
+                            placeholder="Código postal"
+                            maxLength={15}
+                            disabled={isViewMode}
+                            className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">Preencha manualmente</p>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <Globe className="h-4 w-4 inline mr-1 text-gray-400" />
+                          País
+                        </label>
+                        <select
+                          value={formData.pais}
+                          onChange={(e) => handlePaisChange(e.target.value)}
+                          disabled={isViewMode}
+                          className="w-full h-10 px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                        >
+                          {PAISES_OPTIONS.map(pais => (
+                            <option key={pais.nome} value={pais.nome}>{pais.nome}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {isBrasil ? "CEP" : "Código Postal"}
+                        </label>
+                        <div className="relative">
+                          <Input
+                            value={formData.cep}
+                            onChange={handleCEPChange}
+                            onBlur={handleCEPBlur}
+                            onKeyDown={handleCEPKeyDown}
+                            placeholder={getCEPPlaceholder(formData.pais)}
+                            maxLength={isBrasil ? 9 : 15}
+                            disabled={isViewMode}
+                            className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 pr-10"
+                          />
+                          {buscandoCep && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                              <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {`Digite o ${isBrasil ? "CEP" : "código postal"} para preencher automaticamente`}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Digite o CEP para preencher automaticamente</p>
-                  </div>
+                  )}
 
                   {/* Endereço e Número */}
                   <div className="grid grid-cols-4 gap-4">
@@ -699,7 +1133,9 @@ function ContratanteModal({
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Bairro
+                      </label>
                       <Input
                         value={formData.bairro}
                         onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
@@ -723,18 +1159,16 @@ function ContratanteModal({
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                      <select
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Estado
+                      </label>
+                      <Input
                         value={formData.estado}
                         onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                        placeholder="UF"
                         disabled={isViewMode}
-                        className="w-full h-10 px-3 rounded-md bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100"
-                      >
-                        <option value="">UF</option>
-                        {["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"].map(uf => (
-                          <option key={uf} value={uf}>{uf}</option>
-                        ))}
-                      </select>
+                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                      />
                     </div>
                   </div>
                 </div>
@@ -744,7 +1178,6 @@ function ContratanteModal({
             {/* Tab Observações */}
             {activeTab === "observacoes" && (
               <div className="space-y-6">
-                {/* Observações */}
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <FileText className="h-4 w-4 text-indigo-600" />
@@ -756,11 +1189,10 @@ function ContratanteModal({
                     placeholder="Anotações, informações importantes..."
                     rows={6}
                     disabled={isViewMode}
-                    className="w-full px-3 py-2 rounded-md bg-white border border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 resize-none"
+                    className="w-full px-3 py-2 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                   />
                 </div>
 
-                {/* Anexos */}
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <FileText className="h-4 w-4 text-indigo-600" />
@@ -768,7 +1200,6 @@ function ContratanteModal({
                     {carregandoAnexos && <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />}
                   </h3>
 
-                  {/* Aviso para salvar primeiro */}
                   {!editingId && (
                     <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                       <p className="text-sm text-amber-700">
@@ -777,7 +1208,6 @@ function ContratanteModal({
                     </div>
                   )}
                   
-                  {/* Anexos já enviados - Grid com Preview */}
                   {anexosExistentes.length > 0 && (
                     <div className="mb-4">
                       <p className="text-sm text-gray-600 font-medium mb-3">Arquivos enviados:</p>
@@ -796,7 +1226,6 @@ function ContratanteModal({
                               key={anexo.id || index} 
                               className="group relative bg-gray-50 rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
                             >
-                              {/* Thumbnail/Preview */}
                               <a 
                                 href={anexo.urlArquivo} 
                                 target="_blank" 
@@ -834,13 +1263,11 @@ function ContratanteModal({
                                   </div>
                                 )}
                                 
-                                {/* Overlay no hover */}
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                                   <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
                               </a>
                               
-                              {/* Nome do arquivo */}
                               <div className="p-2 border-t border-gray-200">
                                 <p className="text-xs text-gray-700 truncate" title={fileName}>
                                   {fileName}
@@ -850,7 +1277,6 @@ function ContratanteModal({
                                 )}
                               </div>
                               
-                              {/* Botão de remover */}
                               {!isViewMode && (
                                 <button
                                   type="button"
@@ -870,7 +1296,6 @@ function ContratanteModal({
                     </div>
                   )}
 
-                  {/* Arquivos selecionados para upload */}
                   {arquivos.length > 0 && editingId && (
                     <div className="mb-4 space-y-2">
                       <p className="text-sm text-gray-600 font-medium">Arquivos selecionados:</p>
@@ -893,7 +1318,6 @@ function ContratanteModal({
                         </div>
                       ))}
                       
-                      {/* Botão de Upload */}
                       <button
                         type="button"
                         onClick={handleUpload}
@@ -912,7 +1336,6 @@ function ContratanteModal({
                     </div>
                   )}
 
-                  {/* Área de drop/seleção */}
                   {!isViewMode && editingId && (
                     <label className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors block">
                       <input
@@ -928,7 +1351,6 @@ function ContratanteModal({
                     </label>
                   )}
 
-                  {/* Mensagem quando não há anexos no modo visualização */}
                   {isViewMode && anexosExistentes.length === 0 && !carregandoAnexos && (
                     <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
                       <FileText className="h-10 w-10 mx-auto mb-3 text-gray-300" />
@@ -944,9 +1366,9 @@ function ContratanteModal({
     </div>
   )
 
-  // Usar createPortal para renderizar no body
   return createPortal(modalContent, document.body)
 }
+
 export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabelaProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
@@ -959,7 +1381,6 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
 
   const itemsPerPage = 10
 
-  // Filtrar contratantes
   const filteredContratantes = contratantes.filter(c => {
     const searchLower = searchTerm.toLowerCase()
     return (
@@ -970,12 +1391,10 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
     )
   })
 
-  // Paginação
   const totalPages = Math.ceil(filteredContratantes.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const paginatedContratantes = filteredContratantes.slice(startIndex, startIndex + itemsPerPage)
 
-  // Abrir modal para novo
   const handleNew = () => {
     setFormData(initialFormData)
     setEditingId(null)
@@ -984,14 +1403,18 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
     setIsModalOpen(true)
   }
 
-  // Abrir modal para editar
   const handleEdit = (contratante: Contratante) => {
     const tipo = contratante.tipo || "contratante"
+    const paisSalvo = contratante.pais || "Brasil"
+    const paisNaLista = PAISES_OPTIONS.some(p => p.nome === paisSalvo)
+    
     setFormData({
       tipo,
       nome: contratante.nome || "",
       cpf: contratante.cpf || "",
       rg: contratante.rg || "",
+      passaporte: contratante.passaporte || "",
+      crnm: contratante.crnm || "",
       dataNascimento: contratante.dataNascimento 
         ? new Date(contratante.dataNascimento).toISOString().split("T")[0] 
         : "",
@@ -1000,6 +1423,8 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
       nacionalidade: contratante.nacionalidade || "",
       telefone: contratante.telefone || "",
       email: contratante.email || "",
+      pais: paisNaLista ? paisSalvo : "Outro",
+      paisOutro: paisNaLista ? "" : paisSalvo,
       endereco: contratante.endereco || "",
       numero: contratante.numero || "",
       complemento: contratante.complemento || "",
@@ -1015,14 +1440,18 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
     setIsModalOpen(true)
   }
 
-  // Abrir modal para visualizar
   const handleView = (contratante: Contratante) => {
     const tipo = contratante.tipo || "contratante"
+    const paisSalvo = contratante.pais || "Brasil"
+    const paisNaLista = PAISES_OPTIONS.some(p => p.nome === paisSalvo)
+    
     setFormData({
       tipo,
       nome: contratante.nome || "",
       cpf: contratante.cpf || "",
       rg: contratante.rg || "",
+      passaporte: contratante.passaporte || "",
+      crnm: contratante.crnm || "",
       dataNascimento: contratante.dataNascimento 
         ? new Date(contratante.dataNascimento).toISOString().split("T")[0] 
         : "",
@@ -1031,6 +1460,8 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
       nacionalidade: contratante.nacionalidade || "",
       telefone: contratante.telefone || "",
       email: contratante.email || "",
+      pais: paisNaLista ? paisSalvo : "Outro",
+      paisOutro: paisNaLista ? "" : paisSalvo,
       endereco: contratante.endereco || "",
       numero: contratante.numero || "",
       complemento: contratante.complemento || "",
@@ -1046,7 +1477,6 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
     setIsModalOpen(true)
   }
 
-  // Salvar
   const handleSave = async () => {
     if (!formData.nome.trim()) {
       alert("Nome é obrigatório")
@@ -1065,7 +1495,13 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
       
       const method = editingId ? "PUT" : "POST"
 
-      const { tipo, ...dataToSend } = formData
+      const { tipo, paisOutro, ...restData } = formData
+      
+      // Se o país é "Outro", usa o valor digitado em paisOutro
+      const dataToSend = {
+        ...restData,
+        pais: formData.pais === "Outro" ? (paisOutro || "Outro") : formData.pais,
+      }
 
       const response = await fetch(url, {
         method,
@@ -1089,7 +1525,6 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
     }
   }
 
-  // Excluir
   const handleDelete = async (id: number, tipo?: string | null) => {
     if (!confirm("Tem certeza que deseja excluir este cliente?")) return
 
@@ -1110,14 +1545,12 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
     }
   }
 
-  // Formatar data
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("pt-BR")
   }
 
   return (
     <>
-      {/* Header da tabela */}
       <div className="flex items-center justify-between mb-4">
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
@@ -1141,7 +1574,6 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
         </Button>
       </div>
 
-      {/* Tabela */}
       <div className="rounded-lg border border-white/20 overflow-hidden">
         <table className="w-full">
           <thead className="bg-white/10">
@@ -1261,7 +1693,6 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
         </table>
       </div>
 
-      {/* Paginação */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
           <p className="text-sm text-white/50">
@@ -1293,7 +1724,6 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
         </div>
       )}
 
-      {/* Modal usando Portal */}
       <ContratanteModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
