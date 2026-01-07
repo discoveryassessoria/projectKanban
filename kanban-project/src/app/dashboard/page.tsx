@@ -265,7 +265,7 @@ export default function DashboardPage() {
               </Button>
               <Button 
                 className="bg-sky-600 hover:bg-sky-700 text-white text-xs h-9 px-4"
-                onClick={() => router.push('/tarefas')}
+                onClick={() => router.push('/activities')}
               >
                 + Nova Tarefa
               </Button>

@@ -372,14 +372,14 @@ export function KanbanBoard({
               {/* Botão Adicionar Coluna */}
               <div className="flex-shrink-0 w-[260px] p-2 h-full">
                 {isAddingStatus ? (
-                  <div className="p-3 rounded-lg bg-white/5 border border-white/10 h-full">
+                  <div className="p-3 rounded-lg bg-white border border-gray-200 shadow-sm h-full">
                     <form onSubmit={handleAddNewStatus}>
                       <Input
                         autoFocus
                         placeholder="Nome da nova coluna..."
                         value={newStatusName}
                         onChange={(e) => setNewStatusName(e.target.value)}
-                        className="mb-2 bg-white/10 border-white/20 text-white placeholder:text-white/50 text-sm h-8"
+                        className="mb-2 bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 text-sm h-8"
                       />
                       <div className="flex justify-end gap-2">
                         <Button
@@ -387,11 +387,11 @@ export function KanbanBoard({
                           variant="ghost"
                           size="sm"
                           onClick={() => setIsAddingStatus(false)}
-                          className="h-7 px-2 hover:bg-white/10 text-white/70 text-xs"
+                          className="h-7 px-2 hover:bg-gray-100 text-gray-600 text-xs"
                         >
                           Cancelar
                         </Button>
-                        <Button type="submit" size="sm" className="h-7 px-2 bg-blue-600 hover:bg-blue-700 text-xs">
+                        <Button type="submit" size="sm" className="h-7 px-2 bg-blue-600 hover:bg-blue-700 text-white text-xs">
                           Adicionar
                         </Button>
                       </div>

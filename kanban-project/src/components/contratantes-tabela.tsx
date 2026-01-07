@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useUploadThing } from "@/src/lib/uploadthing"
 import { PDFThumbnail } from "./pdf-thumbnail"
+import { DatePickerField } from "@/components/ui/date-picker-field"
 
 interface Contratante {
   id: number
@@ -873,12 +874,11 @@ export function ContratanteModal({
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Data de Nascimento
                         </label>
-                        <Input
-                          type="date"
+                        <DatePickerField
                           value={formData.dataNascimento}
-                          onChange={(e) => setFormData({ ...formData, dataNascimento: e.target.value })}
+                          onChange={(value) => setFormData({ ...formData, dataNascimento: value })}
                           disabled={isViewMode}
-                          className="bg-white border-gray-300 text-gray-900 disabled:bg-gray-100"
+                          placeholder="dd/mm/aaaa"
                         />
                       </div>
                       <div>

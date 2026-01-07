@@ -172,22 +172,22 @@ export function KanbanColumn({
                     <MoreVertical className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-gray-900/95 backdrop-blur-xl border-white/20 text-white">
+                <DropdownMenuContent align="end" className="bg-white border-gray-200 text-gray-900 shadow-lg">
                   <DropdownMenuItem
                     onClick={() => {
                       setEditedStatusName(title)
                       setEditError(null)
                       setIsEditDialogOpen(true)
                     }}
-                    className="text-white hover:bg-white/10 cursor-pointer"
+                    className="text-gray-700 hover:bg-gray-100 cursor-pointer"
                   >
                     <Edit2 className="h-4 w-4 mr-2" />
                     Editar nome
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuSeparator className="bg-gray-200" />
                   <DropdownMenuItem
                     onClick={() => setIsDeleteDialogOpen(true)}
-                    className="text-red-400 hover:bg-white/10 hover:text-red-300 cursor-pointer"
+                    className="text-red-600 hover:bg-red-50 hover:text-red-700 cursor-pointer"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Excluir status
@@ -211,13 +211,13 @@ export function KanbanColumn({
           </SortableContext>
 
           {isAdding && (
-            <form onSubmit={handleAddSubmit} className="mt-2 p-2 bg-white/5 rounded-lg">
+            <form onSubmit={handleAddSubmit} className="mt-2 p-2 bg-white rounded-lg border border-gray-200 shadow-sm">
               <Input
                 autoFocus
                 placeholder="Nome do processo..."
                 value={newProcessoName}
                 onChange={(e) => setNewProcessoName(e.target.value)}
-                className="mb-2 bg-white/10 border-white/20 text-white placeholder:text-white/60 backdrop-blur-sm text-sm h-8"
+                className="mb-2 bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 text-sm h-8"
               />
               <div className="flex justify-end gap-2">
                 <Button
@@ -225,11 +225,11 @@ export function KanbanColumn({
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsAdding(false)}
-                  className="h-7 px-2 hover:bg-white/10 text-white text-xs"
+                  className="h-7 px-2 hover:bg-gray-100 text-gray-600 text-xs"
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" size="sm" className="h-7 px-2 bg-indigo-600 hover:bg-indigo-700 text-xs">
+                <Button type="submit" size="sm" className="h-7 px-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs">
                   Adicionar
                 </Button>
               </div>
@@ -239,14 +239,14 @@ export function KanbanColumn({
       </div>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="bg-gray-900/95 backdrop-blur-xl border-white/20 text-white">
+        <DialogContent className="bg-white border-gray-200 text-gray-900 shadow-xl">
           <DialogHeader>
-            <DialogTitle>Editar Status</DialogTitle>
-            <DialogDescription className="text-white/70">Altere o nome do status</DialogDescription>
+            <DialogTitle className="text-gray-900">Editar Status</DialogTitle>
+            <DialogDescription className="text-gray-500">Altere o nome do status</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="status-name">Nome do Status</Label>
+              <Label htmlFor="status-name" className="text-gray-700">Nome do Status</Label>
               <Input
                 id="status-name"
                 value={editedStatusName}
@@ -254,18 +254,18 @@ export function KanbanColumn({
                   setEditedStatusName(e.target.value)
                   setEditError(null)
                 }}
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/60 backdrop-blur-sm"
+                className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500"
               />
               {editError && (
-                <p className="text-sm text-red-400">{editError}</p>
+                <p className="text-sm text-red-500">{editError}</p>
               )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)} className="hover:bg-white/10 text-white">
+            <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)} className="hover:bg-gray-100 text-gray-700">
               Cancelar
             </Button>
-            <Button onClick={handleEditStatus} className="bg-indigo-600 hover:bg-indigo-700">
+            <Button onClick={handleEditStatus} className="bg-indigo-600 hover:bg-indigo-700 text-white">
               Salvar
             </Button>
           </DialogFooter>
@@ -273,23 +273,23 @@ export function KanbanColumn({
       </Dialog>
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="bg-gray-900/95 backdrop-blur-xl border-white/20 text-white">
+        <DialogContent className="bg-white border-gray-200 text-gray-900 shadow-xl">
           <DialogHeader>
-            <DialogTitle>Excluir Status</DialogTitle>
-            <DialogDescription className="text-white/70">
+            <DialogTitle className="text-gray-900">Excluir Status</DialogTitle>
+            <DialogDescription className="text-gray-500">
               Tem certeza que deseja excluir o status "{title}"? Esta ação não pode ser desfeita.
               {processos.length > 0 && (
-                <span className="block mt-2 text-red-400">
+                <span className="block mt-2 text-red-500">
                   Atenção: Este status possui {processos.length} processo(s). Eles também serão excluídos.
                 </span>
               )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="hover:bg-white/10 text-white">
+            <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="hover:bg-gray-100 text-gray-700">
               Cancelar
             </Button>
-            <Button onClick={handleDeleteStatus} className="bg-red-600 hover:bg-red-700">
+            <Button onClick={handleDeleteStatus} className="bg-red-600 hover:bg-red-700 text-white">
               Excluir
             </Button>
           </DialogFooter>
