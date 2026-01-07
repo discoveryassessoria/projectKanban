@@ -76,7 +76,8 @@ interface ContratantesTabelaProps {
   onRefresh: () => void
 }
 
-const initialFormData = {
+// ✅ EXPORTADO para uso em outros componentes
+export const initialFormData = {
   tipo: "contratante",
   nome: "",
   cpf: "",
@@ -125,8 +126,8 @@ const PAISES_OPTIONS = [
   { nome: "Outro", codigo: null },
 ]
 
-// Componente do Modal separado para usar Portal
-function ContratanteModal({
+// ✅ EXPORTADO - Componente do Modal separado para usar Portal
+export function ContratanteModal({
   isOpen,
   onClose,
   isViewMode,
@@ -459,7 +460,6 @@ function ContratanteModal({
     }
     
     // Para qualquer outro DDI - formatação genérica
-    // Agrupa em blocos de 3-4 dígitos após o DDI
     if (digits.length <= 3) return `+${digits}`
     if (digits.length <= 6) return `+${digits.slice(0, 3)} ${digits.slice(3)}`
     if (digits.length <= 9) return `+${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`
@@ -508,20 +508,14 @@ function ContratanteModal({
   // Buscar CEP - Internacional (Zippopotam.us)
   const buscarCEPInternacional = async (cep: string, codigoPais: string) => {
     const cepOriginal = cep.trim()
-    
-    // Diferentes formatos para tentar
     const formatos: string[] = []
-    
-    // Formato limpo (sem espaços e hífens)
     const cepLimpo = cepOriginal.replace(/[\s-]/g, "").toUpperCase()
     
-    // Adicionar formato original primeiro (pode ter hífen que a API precisa)
     if (cepOriginal !== cepLimpo) {
       formatos.push(cepOriginal.toUpperCase())
     }
     formatos.push(cepLimpo)
     
-    // Para Portugal, tentar também só os primeiros 4 dígitos
     if (codigoPais === "pt") {
       const sohNumeros = cepLimpo.replace(/\D/g, "")
       if (sohNumeros.length >= 4) {
@@ -529,7 +523,6 @@ function ContratanteModal({
       }
     }
     
-    // Para Reino Unido, tentar só a primeira parte (outcode)
     if (codigoPais === "gb") {
       const match = cepLimpo.match(/^([A-Z]{1,2}\d{1,2}[A-Z]?)/)
       if (match) {
@@ -541,14 +534,12 @@ function ContratanteModal({
       }
     }
     
-    // Para Canadá, tentar só os primeiros 3 caracteres (FSA)
     if (codigoPais === "ca") {
       if (cepLimpo.length >= 3) {
         formatos.push(cepLimpo.slice(0, 3))
       }
     }
     
-    // Para Japão, tentar só os primeiros 3 dígitos
     if (codigoPais === "jp") {
       const sohNumeros = cepLimpo.replace(/\D/g, "")
       if (sohNumeros.length >= 3) {
@@ -556,7 +547,6 @@ function ContratanteModal({
       }
     }
     
-    // Para Argentina, tentar com prefixo de letra
     if (codigoPais === "ar") {
       if (!cepLimpo.startsWith("C") && !cepLimpo.startsWith("B")) {
         formatos.push("C" + cepLimpo)
@@ -564,7 +554,6 @@ function ContratanteModal({
       }
     }
     
-    // Tentar cada formato
     for (const formato of formatos) {
       if (formato.length < 2) continue
       
@@ -596,7 +585,6 @@ function ContratanteModal({
       }
     }
     
-    // Se não encontrou em nenhum formato, limpar cidade e estado
     setFormData({
       ...formData,
       cep: cepOriginal,
@@ -611,11 +599,10 @@ function ContratanteModal({
     return false
   }
 
-  // Buscar CEP - Função principal
   const buscarCEP = async (cep: string) => {
     const codigoPais = getCodigoPais(formData.pais)
     
-    if (!codigoPais) return // País "Outro" não tem busca
+    if (!codigoPais) return
     
     setBuscandoCep(true)
     
@@ -630,7 +617,6 @@ function ContratanteModal({
     }
   }
 
-  // Handler do CEP
   const handleCEPChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     
@@ -638,18 +624,15 @@ function ContratanteModal({
       const formatted = formatCEPBrasil(value)
       setFormData({ ...formData, cep: formatted })
       
-      // Buscar quando completar 9 caracteres (00000-000)
       if (formatted.length === 9) {
         buscarCEP(formatted)
       }
     } else {
-      // Para outros países, aceita qualquer formato
       const formatted = value.toUpperCase().slice(0, 15)
       setFormData({ ...formData, cep: formatted })
     }
   }
 
-  // Buscar CEP ao pressionar Enter ou perder foco (para países internacionais)
   const handleCEPBlur = () => {
     if (!isBrasil && formData.cep && formData.cep.length >= 3) {
       buscarCEP(formData.cep)
@@ -663,13 +646,11 @@ function ContratanteModal({
     }
   }
 
-  // Handler de mudança de país
   const handlePaisChange = (novoPais: string) => {
     setFormData({ 
       ...formData, 
       pais: novoPais, 
       paisOutro: novoPais === "Outro" ? formData.paisOutro : "",
-      // Limpar campos de endereço ao trocar de país
       cep: "",
       endereco: "",
       numero: "",
@@ -681,6 +662,7 @@ function ContratanteModal({
   }
 
   if (!isOpen || !mounted) return null
+  
   const modalContent = (
     <div 
       className="fixed inset-0 z-[9999] flex items-center justify-center"
@@ -998,10 +980,8 @@ function ContratanteModal({
                 </h3>
                 
                 <div className="space-y-4">
-                  {/* País e CEP */}
                   {formData.pais === "Outro" ? (
                     <>
-                      {/* Quando é "Outro" - dropdown sozinho */}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1020,7 +1000,6 @@ function ContratanteModal({
                           </select>
                         </div>
                       </div>
-                      {/* Nome do País e Código Postal na mesma linha */}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1096,7 +1075,6 @@ function ContratanteModal({
                     </div>
                   )}
 
-                  {/* Endereço e Número */}
                   <div className="grid grid-cols-4 gap-4">
                     <div className="col-span-3">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
@@ -1120,7 +1098,6 @@ function ContratanteModal({
                     </div>
                   </div>
 
-                  {/* Complemento e Bairro */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Complemento</label>
@@ -1146,7 +1123,6 @@ function ContratanteModal({
                     </div>
                   </div>
 
-                  {/* Cidade e Estado */}
                   <div className="grid grid-cols-3 gap-4">
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
@@ -1497,7 +1473,6 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
 
       const { tipo, paisOutro, ...restData } = formData
       
-      // Se o país é "Outro", usa o valor digitado em paisOutro
       const dataToSend = {
         ...restData,
         pais: formData.pais === "Outro" ? (paisOutro || "Outro") : formData.pais,

@@ -13,6 +13,8 @@ import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoInformacoes } from "./ProcessoInformacoes"
 import { ProcessoHistorico } from "./ProcessoHistorico"
 import { ProcessoFaturas } from "./ProcessoFaturas"
+// ✅ IMPORTAR o modal e o initialFormData
+import { ContratanteModal, initialFormData } from "../contratantes-tabela"
 import { 
   X, 
   Phone, 
@@ -40,6 +42,22 @@ import {
   type Contratante,
   type Requerente
 } from "@/src/types/kanban"
+
+// Lista de países (necessária para o modal)
+const PAISES_OPTIONS = [
+  { nome: "Brasil", codigo: "br" },
+  { nome: "Estados Unidos", codigo: "us" },
+  { nome: "Portugal", codigo: "pt" },
+  { nome: "Espanha", codigo: "es" },
+  { nome: "Itália", codigo: "it" },
+  { nome: "Alemanha", codigo: "de" },
+  { nome: "França", codigo: "fr" },
+  { nome: "Reino Unido", codigo: "gb" },
+  { nome: "Argentina", codigo: "ar" },
+  { nome: "Canadá", codigo: "ca" },
+  { nome: "Japão", codigo: "jp" },
+  { nome: "Outro", codigo: null },
+]
 
 interface ProcessoDetailsModalProps {
   processo: ProcessoWithStatus | Processo | null
@@ -95,6 +113,13 @@ export function ProcessoDetailsModal({
   const [pessoaIdParaFocar, setPessoaIdParaFocar] = useState<number | undefined>(undefined)
   const [sidebarTabParaFocar, setSidebarTabParaFocar] = useState<string | undefined>(undefined)
   
+  // ✅ NOVO: Estados para o modal de detalhes do cliente
+  const [clienteModalOpen, setClienteModalOpen] = useState(false)
+  const [clienteFormData, setClienteFormData] = useState(initialFormData)
+  const [clienteEditingId, setClienteEditingId] = useState<number | null>(null)
+  const [clienteTipo, setClienteTipo] = useState<string>("contratante")
+  const [clienteIsViewMode, setClienteIsViewMode] = useState(true)
+  
   const contratanteRef = useRef<HTMLDivElement>(null)
   const requerenteRef = useRef<HTMLDivElement>(null)
   
@@ -103,6 +128,92 @@ export function ProcessoDetailsModal({
   // ✅ Verificar se o processo é da Espanha ou Itália
   const isEspanha = processo?.pais === "ESPANHA"
   const isItalia = processo?.pais === "ITALIA"
+
+  // ✅ NOVO: Função para abrir o modal de detalhes do cliente
+  const abrirDetalhesCliente = (cliente: Contratante | Requerente, tipo: "contratante" | "requerente") => {
+    const clienteAny = cliente as any
+    const paisSalvo = clienteAny.pais || "Brasil"
+    const paisNaLista = PAISES_OPTIONS.some(p => p.nome === paisSalvo)
+    
+    setClienteFormData({
+      tipo,
+      nome: cliente.nome || "",
+      cpf: cliente.cpf || "",
+      rg: cliente.rg || "",
+      passaporte: clienteAny.passaporte || "",
+      crnm: clienteAny.crnm || "",
+      dataNascimento: cliente.dataNascimento 
+        ? new Date(cliente.dataNascimento).toISOString().split("T")[0] 
+        : "",
+      sexo: cliente.sexo || "",
+      estadoCivil: cliente.estadoCivil || "",
+      nacionalidade: cliente.nacionalidade || "",
+      telefone: cliente.telefone || "",
+      email: cliente.email || "",
+      pais: paisNaLista ? paisSalvo : "Outro",
+      paisOutro: paisNaLista ? "" : paisSalvo,
+      endereco: cliente.endereco || "",
+      numero: cliente.numero || "",
+      complemento: cliente.complemento || "",
+      bairro: cliente.bairro || "",
+      cidade: cliente.cidade || "",
+      estado: cliente.estado || "",
+      cep: cliente.cep || "",
+      observacoes: cliente.observacoes || "",
+    })
+    setClienteEditingId(cliente.id)
+    setClienteTipo(tipo)
+    setClienteIsViewMode(true)
+    setClienteModalOpen(true)
+  }
+
+  // ✅ NOVO: Função para salvar alterações do cliente
+  const handleSaveCliente = async () => {
+    if (!clienteFormData.nome.trim()) {
+      alert("Nome é obrigatório")
+      return
+    }
+
+    try {
+      const baseUrl = clienteTipo === "requerente" ? "/api/requerentes" : "/api/contratantes"
+      const url = `${baseUrl}/${clienteEditingId}`
+      
+      const { tipo, paisOutro, ...restData } = clienteFormData
+      
+      const dataToSend = {
+        ...restData,
+        pais: clienteFormData.pais === "Outro" ? (paisOutro || "Outro") : clienteFormData.pais,
+      }
+
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dataToSend),
+      })
+
+      if (response.ok) {
+        setClienteModalOpen(false)
+        // Atualizar a lista local
+        if (clienteTipo === "contratante") {
+          const atualizado = contratantesSelecionados.map(c => 
+            c.id === clienteEditingId ? { ...c, ...dataToSend } : c
+          )
+          setContratantesSelecionados(atualizado as Contratante[])
+        } else {
+          const atualizado = requerentesSelecionados.map(r => 
+            r.id === clienteEditingId ? { ...r, ...dataToSend } : r
+          )
+          setRequerentesSelecionados(atualizado as Requerente[])
+        }
+        onSave?.()
+      } else {
+        const data = await response.json()
+        throw new Error(data.error || "Erro ao salvar")
+      }
+    } catch (error: any) {
+      alert(error.message || "Erro ao salvar cliente")
+    }
+  }
 
   useEffect(() => {
     if (isOpen && initialTab && !initialParamsProcessed) {
@@ -493,13 +604,17 @@ export function ProcessoDetailsModal({
                       <p className="text-gray-900 font-medium">{paisConfig.label}</p>
                     </div>
 
-                    {/* Contratantes */}
+                    {/* Contratantes - ✅ AGORA CLICÁVEIS */}
                     <div className="mb-6">
                       <label className="text-xs text-gray-500 uppercase mb-2 block">Contratantes</label>
                       {contratantesSelecionados.length > 0 ? (
                         <div className="space-y-3">
                           {contratantesSelecionados.map((cont) => (
-                            <div key={cont.id} className="p-4 bg-gray-50 rounded-lg">
+                            <div 
+                              key={cont.id} 
+                              onClick={() => abrirDetalhesCliente(cont, "contratante")}
+                              className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                            >
                               <p className="text-gray-900 font-semibold">{cont.nome}</p>
                               
                               {cont.telefone && (
@@ -517,27 +632,32 @@ export function ProcessoDetailsModal({
                               )}
                               
                               {cont.endereco && (
-                                <MapTooltip
-                                  endereco={cont.endereco}
-                                  numero={cont.numero}
-                                  bairro={cont.bairro}
-                                  cidade={cont.cidade}
-                                  estado={cont.estado}
-                                  cep={cont.cep}
+                                <div 
+                                  className="flex items-start gap-2 text-sm text-gray-600 mt-2"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
-                                  <div className="flex items-start gap-2 text-sm text-gray-600 mt-2 cursor-pointer hover:text-blue-600">
-                                    <MapPin className="h-4 w-4 mt-0.5" />
-                                    <div className="underline decoration-dotted underline-offset-2">
-                                      <p>{cont.endereco}{cont.numero && `, ${cont.numero}`}</p>
-                                      {cont.bairro && <p>{cont.bairro}</p>}
-                                      <p>{cont.cidade && cont.cidade}{cont.estado && ` - ${cont.estado}`}</p>
-                                      {cont.cep && <p>CEP: {cont.cep}</p>}
+                                  <MapTooltip
+                                    endereco={cont.endereco}
+                                    numero={cont.numero}
+                                    bairro={cont.bairro}
+                                    cidade={cont.cidade}
+                                    estado={cont.estado}
+                                    cep={cont.cep}
+                                  >
+                                    <div className="flex items-start gap-2 cursor-pointer hover:text-blue-600">
+                                      <MapPin className="h-4 w-4 mt-0.5" />
+                                      <div className="underline decoration-dotted underline-offset-2">
+                                        <p>{cont.endereco}{cont.numero && `, ${cont.numero}`}</p>
+                                        {cont.bairro && <p>{cont.bairro}</p>}
+                                        <p>{cont.cidade && cont.cidade}{cont.estado && ` - ${cont.estado}`}</p>
+                                        {cont.cep && <p>CEP: {cont.cep}</p>}
+                                      </div>
                                     </div>
-                                  </div>
-                                </MapTooltip>
+                                  </MapTooltip>
+                                </div>
                               )}
 
-                              <div className="flex gap-2 mt-3">
+                              <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
                                 <Button variant="outline" size="sm" className="text-gray-600">
                                   <Phone className="h-4 w-4" />
                                 </Button>
@@ -556,13 +676,17 @@ export function ProcessoDetailsModal({
                       )}
                     </div>
 
-                    {/* Requerentes */}
+                    {/* Requerentes - ✅ AGORA CLICÁVEIS */}
                     <div className="mb-6">
                       <label className="text-xs text-gray-500 uppercase mb-2 block">Requerentes</label>
                       {requerentesSelecionados.length > 0 ? (
                         <div className="space-y-3">
                           {requerentesSelecionados.map((req) => (
-                            <div key={req.id} className="p-3 bg-blue-50 rounded-lg">
+                            <div 
+                              key={req.id} 
+                              onClick={() => abrirDetalhesCliente(req, "requerente")}
+                              className="p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
+                            >
                               <p className="text-gray-900 font-medium">{req.nome}</p>
                               {req.telefone && (
                                 <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
@@ -577,24 +701,29 @@ export function ProcessoDetailsModal({
                                 </div>
                               )}
                               {req.endereco && (
-                                <MapTooltip
-                                  endereco={req.endereco}
-                                  numero={req.numero}
-                                  bairro={req.bairro}
-                                  cidade={req.cidade}
-                                  estado={req.estado}
-                                  cep={req.cep}
+                                <div 
+                                  className="flex items-start gap-2 text-sm text-gray-600 mt-2"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
-                                  <div className="flex items-start gap-2 text-sm text-gray-600 mt-2 cursor-pointer hover:text-blue-600">
-                                    <MapPin className="h-3 w-3 mt-0.5" />
-                                    <div className="underline decoration-dotted underline-offset-2">
-                                      <p>{req.endereco}{req.numero && `, ${req.numero}`}</p>
-                                      {req.bairro && <p>{req.bairro}</p>}
-                                      <p>{req.cidade && req.cidade}{req.estado && ` - ${req.estado}`}</p>
-                                      {req.cep && <p>CEP: {req.cep}</p>}
+                                  <MapTooltip
+                                    endereco={req.endereco}
+                                    numero={req.numero}
+                                    bairro={req.bairro}
+                                    cidade={req.cidade}
+                                    estado={req.estado}
+                                    cep={req.cep}
+                                  >
+                                    <div className="flex items-start gap-2 cursor-pointer hover:text-blue-600">
+                                      <MapPin className="h-3 w-3 mt-0.5" />
+                                      <div className="underline decoration-dotted underline-offset-2">
+                                        <p>{req.endereco}{req.numero && `, ${req.numero}`}</p>
+                                        {req.bairro && <p>{req.bairro}</p>}
+                                        <p>{req.cidade && req.cidade}{req.estado && ` - ${req.estado}`}</p>
+                                        {req.cep && <p>CEP: {req.cep}</p>}
+                                      </div>
                                     </div>
-                                  </div>
-                                </MapTooltip>
+                                  </MapTooltip>
+                                </div>
                               )}
                             </div>
                           ))}
@@ -840,6 +969,24 @@ export function ProcessoDetailsModal({
           )}
         </div>
       </div>
+
+      {/* ✅ NOVO: Modal de detalhes do cliente */}
+      <ContratanteModal
+        isOpen={clienteModalOpen}
+        onClose={() => {
+          setClienteModalOpen(false)
+          setClienteFormData(initialFormData)
+          setClienteEditingId(null)
+        }}
+        isViewMode={clienteIsViewMode}
+        setIsViewMode={setClienteIsViewMode}
+        editingId={clienteEditingId}
+        editingTipo={clienteTipo}
+        formData={clienteFormData}
+        setFormData={setClienteFormData}
+        onSave={handleSaveCliente}
+        isLoading={false}
+      />
     </>
   )
 
