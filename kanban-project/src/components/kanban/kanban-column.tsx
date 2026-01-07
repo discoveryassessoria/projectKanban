@@ -65,6 +65,7 @@ export function KanbanColumn({
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editedStatusName, setEditedStatusName] = useState(title)
+  const [editError, setEditError] = useState<string | null>(null)
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
@@ -82,22 +83,31 @@ export function KanbanColumn({
   }
 
   const handleEditStatus = async () => {
-    if (!editedStatusName.trim()) return
+    const trimmedName = editedStatusName.trim()
+    if (!trimmedName) {
+      setEditError("O nome não pode estar vazio")
+      return
+    }
+
+    setEditError(null)
 
     try {
       const response = await fetch(`/api/status/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome: editedStatusName }),
+        body: JSON.stringify({ nome: trimmedName }),
       })
 
-      if (!response.ok) throw new Error("Falha ao atualizar status")
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || `Erro ${response.status}: ${response.statusText}`)
+      }
 
       setIsEditDialogOpen(false)
       onStatusUpdate?.()
-    } catch (error) {
-      console.error(error)
-      alert("Não foi possível atualizar o status.")
+    } catch (error: any) {
+      console.error("Erro ao atualizar status:", error)
+      setEditError(error.message || "Não foi possível atualizar o status.")
     }
   }
 
@@ -131,14 +141,14 @@ export function KanbanColumn({
           transition-colors duration-200
         `}
       >
-        {/* Header compacto estilo Bitrix */}
+        {/* Header compacto estilo Bitrix - altura fixa */}
         <div 
-          className="px-2 py-2 border-b border-white/10"
+          className="px-2 py-2 border-b border-white/10 h-10 flex items-center"
           style={{ backgroundColor: `${headerColor}40` }}
         >
-          <div className="flex items-center justify-between gap-1">
-            <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-              <h3 className="font-medium text-xs text-white whitespace-nowrap overflow-hidden text-ellipsis">{title}</h3>
+          <div className="flex items-center justify-between gap-1 w-full">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h3 className="font-medium text-xs text-white">{title}</h3>
               <span className="text-xs text-white/70 flex-shrink-0">
                 ({processos.length})
               </span>
@@ -166,6 +176,7 @@ export function KanbanColumn({
                   <DropdownMenuItem
                     onClick={() => {
                       setEditedStatusName(title)
+                      setEditError(null)
                       setIsEditDialogOpen(true)
                     }}
                     className="text-white hover:bg-white/10 cursor-pointer"
@@ -239,9 +250,15 @@ export function KanbanColumn({
               <Input
                 id="status-name"
                 value={editedStatusName}
-                onChange={(e) => setEditedStatusName(e.target.value)}
+                onChange={(e) => {
+                  setEditedStatusName(e.target.value)
+                  setEditError(null)
+                }}
                 className="bg-white/10 border-white/20 text-white placeholder:text-white/60 backdrop-blur-sm"
               />
+              {editError && (
+                <p className="text-sm text-red-400">{editError}</p>
+              )}
             </div>
           </div>
           <DialogFooter>

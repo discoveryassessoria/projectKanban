@@ -352,7 +352,7 @@ export function KanbanBoard({
               {sortedStatusList.map((status, index) => (
                 <div 
                   key={status.id}
-                  className="flex-shrink-0 w-[220px] h-full"
+                  className="flex-shrink-0 w-[260px] h-full"
                 >
                   <KanbanColumn
                     id={status.id}
@@ -370,7 +370,7 @@ export function KanbanBoard({
               ))}
 
               {/* Botão Adicionar Coluna */}
-              <div className="flex-shrink-0 w-[220px] p-2 h-full">
+              <div className="flex-shrink-0 w-[260px] p-2 h-full">
                 {isAddingStatus ? (
                   <div className="p-3 rounded-lg bg-white/5 border border-white/10 h-full">
                     <form onSubmit={handleAddNewStatus}>

@@ -48,8 +48,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 })
     }
 
-    if (nome.length > 20) {
-      return NextResponse.json({ error: 'Nome deve ter no máximo 20 caracteres' }, { status: 400 })
+    if (nome.length > 50) {
+      return NextResponse.json({ error: 'Nome deve ter no máximo 50 caracteres' }, { status: 400 })
     }
 
     const existingStatus = await prisma.status.findUnique({
