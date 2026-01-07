@@ -13,7 +13,6 @@ const TIPO_DOCUMENTO_OPTIONS = [
   { value: 'CNN', label: 'Certidão Negativa de Naturalização (CNN)' },
   { value: 'RG', label: 'RG' },
   { value: 'CPF', label: 'CPF' },
-  { value: 'PASSAPORTE', label: 'Passaporte' },
   { value: 'OUTRO', label: 'Outro' },
 ]
 
@@ -195,7 +194,7 @@ export function DocumentoModal({
   const [saving, setSaving] = useState(false)
   
   // Campos do formulário
-  const [tipo, setTipo] = useState(documento?.tipo || 'CERTIDAO_NASCIMENTO')
+  const [tipo, setTipo] = useState(documento?.tipo || 'CERTIDAO_NASCIMENTO_INTEIRO_TEOR')
   const [status, setStatus] = useState(documento?.status || 'PENDENTE')
   const [descricao, setDescricao] = useState(documento?.descricao || '')
   const [cartorio, setCartorio] = useState(documento?.cartorio || '')

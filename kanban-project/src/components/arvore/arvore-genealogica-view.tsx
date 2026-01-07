@@ -96,6 +96,18 @@ export function ArvoreGenealogicaView({
     }
   }, [pessoaIdParaFocar, sidebarTabParaFocar, pessoas, pessoaFocada])
 
+  // ========================================
+  // ATUALIZAR SIDEBAR QUANDO PESSOAS MUDAR
+  // ========================================
+  useEffect(() => {
+    if (selectedPerson) {
+      const pessoaAtualizada = pessoas.find(p => p.id === selectedPerson.id)
+      if (pessoaAtualizada && pessoaAtualizada !== selectedPerson) {
+        setSelectedPerson(pessoaAtualizada)
+      }
+    }
+  }, [pessoas])
+
 // ========================================
   // FUNÇÃO DE EXPORTAR PDF - CAPTURA DE TELA
   // ========================================
@@ -224,6 +236,24 @@ export function ArvoreGenealogicaView({
     setDocumentoPessoaNome(pessoa ? `${pessoa.nome} ${pessoa.sobrenome || ''}`.trim() : '')
     setEditingDocumento(documento)
     setShowDocumentoModal(true)
+  }
+
+  const handleDeleteDocumento = async (documento: DocumentoArvore) => {
+    try {
+      const response = await fetch(`/api/documentos/${documento.id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        await fetchArvore()
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Erro ao excluir documento')
+      }
+    } catch (error) {
+      console.error('Erro ao excluir documento:', error)
+      alert('Erro ao excluir documento')
+    }
   }
 
   const handleEditPerson = (pessoa: PessoaArvore) => {
@@ -667,6 +697,7 @@ export function ArvoreGenealogicaView({
         onAddConjuge={handleAddConjugeById}
         onAddDocumento={handleAddDocumento}
         onEditDocumento={handleEditDocumento}
+        onDeleteDocumento={handleDeleteDocumento}
         onSelectPerson={handleSelectPersonFromSidebar}
         initialTab={sidebarTabInicial}
       />

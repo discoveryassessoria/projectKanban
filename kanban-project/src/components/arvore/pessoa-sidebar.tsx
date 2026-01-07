@@ -40,6 +40,7 @@ interface PessoaSidebarProps {
   onAddConjuge?: (pessoaId: number) => void
   onAddDocumento?: (pessoaId: number) => void
   onEditDocumento?: (documento: DocumentoArvore) => void
+  onDeleteDocumento?: (documento: DocumentoArvore) => void
   // NOVO: Callback para selecionar outra pessoa (navegar na sidebar + centralizar árvore)
   onSelectPerson?: (pessoa: PessoaArvore) => void
   // Prop para abrir em aba específica (ex: "documentos" vindo da pesquisa)
@@ -108,10 +109,9 @@ const TIPO_DOCUMENTO_LABELS: Record<string, string> = {
   CERTIDAO_CASAMENTO_INTEIRO_TEOR: 'Certidão de Casamento (Inteiro Teor)',
   CERTIDAO_OBITO_INTEIRO_TEOR: 'Certidão de Óbito (Inteiro Teor)',
   CERTIDAO_BATISMO: 'Certidão de Batismo',
-  CNN: 'Certidão Negativa de Naturalização',
+  CNN: 'Certidão Negativa de Naturalização (CNN)',
   RG: 'RG',
   CPF: 'CPF',
-  PASSAPORTE: 'Passaporte',
   OUTRO: 'Outro'
 }
 
@@ -220,9 +220,30 @@ function CollapsibleSection({
   )
 }
 
-function DocumentoCard({ documento, onClick }: { documento: DocumentoArvore, onClick?: () => void }) {
+function DocumentoCard({ 
+  documento, 
+  onClick,
+  onDelete 
+}: { 
+  documento: DocumentoArvore
+  onClick?: () => void
+  onDelete?: () => void
+}) {
   const statusConfig = STATUS_CONFIG[documento.status] || STATUS_CONFIG.PENDENTE
   const StatusIcon = statusConfig.icon
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (confirmDelete) {
+      onDelete?.()
+      setConfirmDelete(false)
+    } else {
+      setConfirmDelete(true)
+      // Reset após 3 segundos
+      setTimeout(() => setConfirmDelete(false), 3000)
+    }
+  }
   
   return (
     <div 
@@ -249,14 +270,29 @@ function DocumentoCard({ documento, onClick }: { documento: DocumentoArvore, onC
             </p>
           )}
         </div>
-        <div 
-          className="px-2 py-1 rounded-md flex items-center gap-1 flex-shrink-0"
-          style={{ backgroundColor: statusConfig.bg }}
-        >
-          <StatusIcon className="w-3 h-3" style={{ color: statusConfig.color }} />
-          <span className="text-[10px] font-medium" style={{ color: statusConfig.color }}>
-            {statusConfig.label}
-          </span>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <div 
+            className="px-2 py-1 rounded-md flex items-center gap-1"
+            style={{ backgroundColor: statusConfig.bg }}
+          >
+            <StatusIcon className="w-3 h-3" style={{ color: statusConfig.color }} />
+            <span className="text-[10px] font-medium" style={{ color: statusConfig.color }}>
+              {statusConfig.label}
+            </span>
+          </div>
+          {onDelete && (
+            <button
+              onClick={handleDelete}
+              className={`p-1.5 rounded-md transition-colors ${
+                confirmDelete 
+                  ? 'bg-red-500 text-white hover:bg-red-600' 
+                  : 'hover:bg-red-50 text-slate-400 hover:text-red-500'
+              }`}
+              title={confirmDelete ? 'Clique para confirmar' : 'Excluir documento'}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
       
@@ -368,6 +404,7 @@ export function PessoaSidebar({
   onAddConjuge,
   onAddDocumento,
   onEditDocumento,
+  onDeleteDocumento,
   onSelectPerson,
   initialTab
 }: PessoaSidebarProps) {
@@ -795,6 +832,7 @@ export function PessoaSidebar({
                     key={doc.id} 
                     documento={doc} 
                     onClick={() => onEditDocumento?.(doc)}
+                    onDelete={() => onDeleteDocumento?.(doc)}
                   />
                 ))}
               </div>

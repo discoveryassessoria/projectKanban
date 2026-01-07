@@ -32,7 +32,8 @@ const colors = {
   neutral: '#6B7280',
   neutralBg: '#F3F4F6',
   green: '#87B940',
-  line: '#9CA3AF'
+  line: '#9CA3AF',
+  marriage: '#9333EA' // Roxo para linha de casamento
 }
 
 type ViewMode = 'paisagem' | 'retrato'
@@ -149,6 +150,19 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
           position={Position.Left}
           className="!bg-gray-400 !w-2 !h-2 !border-2 !border-white"
         />
+        {/* Handles para linha de casamento (invisíveis) */}
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          id="marriage-out"
+          className="!opacity-0 !w-1 !h-1"
+        />
+        <Handle
+          type="target"
+          position={Position.Top}
+          id="marriage-in"
+          className="!opacity-0 !w-1 !h-1"
+        />
 
         <div className="p-2 h-full flex flex-col justify-center">
           <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-1">
@@ -206,6 +220,19 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
         type="target"
         position={Position.Bottom}
         className="!bg-gray-400 !w-2 !h-2 !border-2 !border-white"
+      />
+      {/* Handles para linha de casamento (invisíveis) */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="marriage-out"
+        className="!opacity-0 !w-1 !h-1"
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="marriage-in"
+        className="!opacity-0 !w-1 !h-1"
       />
 
       <div className="p-2 h-full flex flex-col items-center justify-center text-center">
@@ -314,7 +341,8 @@ const getLayoutedElements = (
   nodes: Node[],
   edges: Edge[],
   mode: ViewMode,
-  pessoas?: PessoaArvore[]
+  pessoas?: PessoaArvore[],
+  unioes?: UniaoArvore[]  // Receber uniões para incluir casais sem filhos
 ) => {
   const dagreGraph = new dagre.graphlib.Graph()
   dagreGraph.setDefaultEdgeLabel(() => ({}))
@@ -331,9 +359,23 @@ const getLayoutedElements = (
     marginy: 50,
   })
 
-  // Identificar casais (pessoas que compartilham filhos)
+  // Identificar casais (pessoas que compartilham filhos OU têm união registrada)
   const casais = new Map<string, { pessoa1Id: number; pessoa2Id: number }>()
   
+  // Primeiro adicionar casais das uniões (inclui casais sem filhos)
+  if (unioes) {
+    unioes.forEach(uniao => {
+      // Verificar se ambos os IDs existem
+      if (uniao.pessoa1Id == null || uniao.pessoa2Id == null) return
+      
+      const pairKey = `${Math.min(uniao.pessoa1Id, uniao.pessoa2Id)}-${Math.max(uniao.pessoa1Id, uniao.pessoa2Id)}`
+      if (!casais.has(pairKey)) {
+        casais.set(pairKey, { pessoa1Id: uniao.pessoa1Id, pessoa2Id: uniao.pessoa2Id })
+      }
+    })
+  }
+  
+  // Depois adicionar casais que compartilham filhos (pode sobrepor, Map evita duplicatas)
   if (pessoas) {
     pessoas.forEach(pessoa => {
       if (pessoa.paiId && pessoa.maeId) {
@@ -353,9 +395,11 @@ const getLayoutedElements = (
     })
   })
 
-  // Adicionar todas as edges ao Dagre
+  // Adicionar todas as edges ao Dagre (exceto edges de casamento visuais)
   edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target)
+    if (!edge.id.startsWith('edge-marriage-')) {
+      dagreGraph.setEdge(edge.source, edge.target)
+    }
   })
 
   // Executar layout inicial do Dagre
@@ -377,6 +421,52 @@ const getLayoutedElements = (
   // PÓS-PROCESSAMENTO: Ajustar casais
   // ========================================
   if (pessoas && casais.size > 0) {
+    // ========================================
+    // PASSADA ZERO: Posicionar cônjuge ao lado do parceiro
+    // ========================================
+    // Cônjuges sem filhos podem estar em posições erradas porque não têm edges no Dagre
+    // Precisamos movê-los para o lado do parceiro
+    casais.forEach(({ pessoa1Id, pessoa2Id }) => {
+      const node1 = layoutedNodes.find(n => n.id === `person-${pessoa1Id}`)
+      const node2 = layoutedNodes.find(n => n.id === `person-${pessoa2Id}`)
+      
+      if (!node1 || !node2) return
+      
+      // Verificar se este casal tem filhos (se tiver, já estão conectados pelo Dagre)
+      const temFilhos = pessoas.some(p => 
+        (p.paiId === pessoa1Id && p.maeId === pessoa2Id) ||
+        (p.paiId === pessoa2Id && p.maeId === pessoa1Id)
+      )
+      
+      if (isHorizontal) {
+        // Modo paisagem: igualar X e posicionar Y adjacentes
+        // Para casais sem filhos, mover cônjuge para junto do parceiro
+        if (!temFilhos) {
+          // Mover node2 para junto de node1
+          node2.position.x = node1.position.x
+          node2.position.y = node1.position.y + nodeSize.height + 15
+        } else {
+          // Casais com filhos: apenas garantir mesmo X
+          const avgX = (node1.position.x + node2.position.x) / 2
+          node1.position.x = avgX
+          node2.position.x = avgX
+        }
+      } else {
+        // Modo retrato: igualar Y e posicionar X adjacentes
+        // Para casais sem filhos, mover cônjuge para junto do parceiro
+        if (!temFilhos) {
+          // Mover node2 para junto de node1 (ao lado direito)
+          node2.position.y = node1.position.y
+          node2.position.x = node1.position.x + nodeSize.width + 20
+        } else {
+          // Casais com filhos: apenas garantir mesmo Y
+          const avgY = (node1.position.y + node2.position.y) / 2
+          node1.position.y = avgY
+          node2.position.y = avgY
+        }
+      }
+    })
+    
     // Ordenar casais por "profundidade" na árvore (pais primeiro, depois filhos)
     // Isso garante que ajustamos de cima para baixo
     const casaisOrdenados = Array.from(casais.values()).sort((a, b) => {
@@ -563,12 +653,36 @@ const getLayoutedElements = (
     })
 
     // ========================================
-    // QUARTA PASSADA: Verificação final de sobreposições
+    // QUARTA PASSADA: Verificação GLOBAL de sobreposições
     // ========================================
-    // Verificar TODOS os pares de nós e resolver qualquer sobreposição restante
-    const minSpacingFinal = isHorizontal ? nodeSize.height + 20 : nodeSize.width + 30
+    // Verificar TODOS os pares de nós e resolver sobreposições
+    // IMPORTANTE: Mover casais como unidade para não separá-los
     
-    for (let pass = 0; pass < 5; pass++) {
+    // Função auxiliar para mover um nó E seu cônjuge (se houver)
+    const moverComConjuge = (node: Node, deltaX: number, deltaY: number) => {
+      node.position.x += deltaX
+      node.position.y += deltaY
+      
+      // Verificar se tem cônjuge e mover junto
+      const pessoaId = parseInt(node.id.replace('person-', ''))
+      if (!isNaN(pessoaId)) {
+        casais.forEach((casal) => {
+          let conjugeId: number | null = null
+          if (casal.pessoa1Id === pessoaId) conjugeId = casal.pessoa2Id
+          if (casal.pessoa2Id === pessoaId) conjugeId = casal.pessoa1Id
+          
+          if (conjugeId !== null) {
+            const conjugeNode = layoutedNodes.find(n => n.id === `person-${conjugeId}`)
+            if (conjugeNode) {
+              conjugeNode.position.x += deltaX
+              conjugeNode.position.y += deltaY
+            }
+          }
+        })
+      }
+    }
+    
+    for (let pass = 0; pass < 10; pass++) {
       let hasOverlap = false
       
       for (let i = 0; i < layoutedNodes.length; i++) {
@@ -576,46 +690,61 @@ const getLayoutedElements = (
           const nodeA = layoutedNodes[i]
           const nodeB = layoutedNodes[j]
           
-          // Verificar se estão no mesmo nível (mesma geração)
-          const sameLevel = isHorizontal
-            ? Math.abs(nodeA.position.x - nodeB.position.x) < nodeSize.width / 2
-            : Math.abs(nodeA.position.y - nodeB.position.y) < nodeSize.height / 2
+          // Pular se são um casal (não devem se afastar)
+          const idA = parseInt(nodeA.id.replace('person-', ''))
+          const idB = parseInt(nodeB.id.replace('person-', ''))
+          if (!isNaN(idA) && !isNaN(idB)) {
+            const pairKey = `${Math.min(idA, idB)}-${Math.max(idA, idB)}`
+            if (casais.has(pairKey)) continue // São casal, pular
+          }
           
-          if (!sameLevel) continue
+          // Calcular limites de cada nó
+          const aLeft = nodeA.position.x
+          const aRight = nodeA.position.x + nodeSize.width
+          const aTop = nodeA.position.y
+          const aBottom = nodeA.position.y + nodeSize.height
           
-          // Verificar sobreposição
-          if (isHorizontal) {
-            const aTop = nodeA.position.y
-            const aBottom = nodeA.position.y + nodeSize.height
-            const bTop = nodeB.position.y
-            const bBottom = nodeB.position.y + nodeSize.height
+          const bLeft = nodeB.position.x
+          const bRight = nodeB.position.x + nodeSize.width
+          const bTop = nodeB.position.y
+          const bBottom = nodeB.position.y + nodeSize.height
+          
+          // Verificar se há sobreposição em AMBOS os eixos (caixas colidindo)
+          const overlapX = Math.min(aRight, bRight) - Math.max(aLeft, bLeft)
+          const overlapY = Math.min(aBottom, bBottom) - Math.max(aTop, bTop)
+          
+          // Se há sobreposição em ambos os eixos, os cards estão colidindo
+          if (overlapX > 0 && overlapY > 0) {
+            hasOverlap = true
             
-            const overlap = Math.min(aBottom, bBottom) - Math.max(aTop, bTop) + minSpacingFinal - nodeSize.height
+            // Verificar se estão aproximadamente no mesmo nível (mesma geração)
+            const sameLevelY = Math.abs(nodeA.position.y - nodeB.position.y) < nodeSize.height
             
-            if (overlap > 0) {
-              hasOverlap = true
-              // Mover o que está mais abaixo para baixo
+            if (isHorizontal) {
+              // Modo paisagem: mover em Y
+              const moveAmount = overlapY + 20
               if (nodeA.position.y < nodeB.position.y) {
-                nodeB.position.y += overlap
+                moverComConjuge(nodeB, 0, moveAmount)
               } else {
-                nodeA.position.y += overlap
+                moverComConjuge(nodeA, 0, moveAmount)
               }
-            }
-          } else {
-            const aLeft = nodeA.position.x
-            const aRight = nodeA.position.x + nodeSize.width
-            const bLeft = nodeB.position.x
-            const bRight = nodeB.position.x + nodeSize.width
-            
-            const overlap = Math.min(aRight, bRight) - Math.max(aLeft, bLeft) + minSpacingFinal - nodeSize.width
-            
-            if (overlap > 0) {
-              hasOverlap = true
-              // Mover o que está mais à direita para a direita
-              if (nodeA.position.x < nodeB.position.x) {
-                nodeB.position.x += overlap
+            } else {
+              // Modo retrato: preferir mover em X se no mesmo nível
+              if (sameLevelY) {
+                const moveAmount = overlapX + 20
+                if (nodeA.position.x < nodeB.position.x) {
+                  moverComConjuge(nodeB, moveAmount, 0)
+                } else {
+                  moverComConjuge(nodeA, moveAmount, 0)
+                }
               } else {
-                nodeA.position.x += overlap
+                // Níveis diferentes: mover em Y
+                const moveAmount = overlapY + 20
+                if (nodeA.position.y < nodeB.position.y) {
+                  moverComConjuge(nodeB, 0, moveAmount)
+                } else {
+                  moverComConjuge(nodeA, 0, moveAmount)
+                }
               }
             }
           }
@@ -624,6 +753,50 @@ const getLayoutedElements = (
       
       if (!hasOverlap) break
     }
+    
+    // ========================================
+    // QUINTA PASSADA: Garantir casais lado a lado novamente
+    // ========================================
+    // Após resolver sobreposições, reajustar casais que possam ter sido desalinhados
+    casaisOrdenados.forEach(({ pessoa1Id, pessoa2Id }) => {
+      const node1 = layoutedNodes.find(n => n.id === `person-${pessoa1Id}`)
+      const node2 = layoutedNodes.find(n => n.id === `person-${pessoa2Id}`)
+      
+      if (!node1 || !node2) return
+
+      if (isHorizontal) {
+        // Modo paisagem: mesmo X, Y adjacentes
+        const avgX = (node1.position.x + node2.position.x) / 2
+        node1.position.x = avgX
+        node2.position.x = avgX
+        
+        // Garantir espaçamento vertical correto
+        const spacing = nodeSize.height + 15
+        const avgY = (node1.position.y + node2.position.y) / 2
+        if (Math.abs(node1.position.y - node2.position.y) < spacing * 0.8) {
+          node1.position.y = avgY - spacing / 2
+          node2.position.y = avgY + spacing / 2
+        }
+      } else {
+        // Modo retrato: mesmo Y, X adjacentes
+        const avgY = (node1.position.y + node2.position.y) / 2
+        node1.position.y = avgY
+        node2.position.y = avgY
+        
+        // Garantir espaçamento horizontal correto
+        const spacing = nodeSize.width + 20
+        const avgX = (node1.position.x + node2.position.x) / 2
+        if (Math.abs(node1.position.x - node2.position.x) < spacing * 0.8) {
+          if (node1.position.x <= node2.position.x) {
+            node1.position.x = avgX - spacing / 2
+            node2.position.x = avgX + spacing / 2
+          } else {
+            node1.position.x = avgX + spacing / 2
+            node2.position.x = avgX - spacing / 2
+          }
+        }
+      }
+    })
   }
 
   return { nodes: layoutedNodes, edges }
@@ -704,6 +877,7 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
   const nodes: Node[] = []
   const edges: Edge[] = []
   const processedIds = new Set<number>()
+  const processedMarriageEdges = new Set<string>() // Controlar edges de casamento
 
   // Retorna TODAS as uniões de uma pessoa
   const findUnioes = (pessoa: PessoaArvore): UniaoArvore[] => {
@@ -720,6 +894,7 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
     const unioesP = findUnioes(pessoa)
     return unioesP
       .map(u => {
+        if (u.pessoa1Id == null || u.pessoa2Id == null) return null
         const conjugeId = u.pessoa1Id === pessoa.id ? u.pessoa2Id : u.pessoa1Id
         return pessoas.find(p => p.id === conjugeId)
       })
@@ -728,7 +903,7 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
 
   const findConjuge = (pessoa: PessoaArvore): PessoaArvore | null => {
     const uniao = findUniao(pessoa)
-    if (!uniao) return null
+    if (!uniao || uniao.pessoa1Id == null || uniao.pessoa2Id == null) return null
     const conjugeId = uniao.pessoa1Id === pessoa.id ? uniao.pessoa2Id : uniao.pessoa1Id
     return pessoas.find(p => p.id === conjugeId) || null
   }
@@ -760,6 +935,37 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
       const mesmoPai = pai && p.paiId === pai.id
       const mesmaMae = mae && p.maeId === mae.id
       return mesmoPai || mesmaMae
+    })
+  }
+
+  // Verificar se um casal tem filhos em comum
+  const casalTemFilhos = (pessoa1Id: number, pessoa2Id: number): boolean => {
+    return pessoas.some(p => 
+      (p.paiId === pessoa1Id && p.maeId === pessoa2Id) ||
+      (p.paiId === pessoa2Id && p.maeId === pessoa1Id)
+    )
+  }
+
+  // Adicionar edge de casamento APENAS para casais SEM filhos
+  const addMarriageEdge = (pessoa1Id: number, pessoa2Id: number) => {
+    // Só adicionar se NÃO tiverem filhos em comum
+    if (casalTemFilhos(pessoa1Id, pessoa2Id)) return
+    
+    const edgeKey = `${Math.min(pessoa1Id, pessoa2Id)}-${Math.max(pessoa1Id, pessoa2Id)}`
+    if (processedMarriageEdges.has(edgeKey)) return
+    processedMarriageEdges.add(edgeKey)
+    
+    edges.push({
+      id: `edge-marriage-${edgeKey}`,
+      source: `person-${pessoa1Id}`,
+      target: `person-${pessoa2Id}`,
+      sourceHandle: 'marriage-out',
+      targetHandle: 'marriage-in',
+      type: 'smoothstep',
+      style: { 
+        stroke: colors.neutral, 
+        strokeWidth: 2,
+      },
     })
   }
 
@@ -811,14 +1017,14 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
   }
 
   // ========================================
-  // ✅ CORRIGIDO: Função recursiva com controle de depth
+  // CORRIGIDO: Função recursiva com controle de depth
   // Placeholders só aparecem na depth 0 (pessoa principal)
   // ========================================
   const addPersonWithAncestorsAndSiblings = (
     pessoa: PessoaArvore,
     isMain: boolean = false,
     isSpouse: boolean = false,
-    depth: number = 0  // ✅ NOVO: controle de profundidade
+    depth: number = 0  // controle de profundidade
   ) => {
     // Adicionar a pessoa
     const added = addPersonNode(pessoa, isMain, isSpouse)
@@ -832,7 +1038,7 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
       addPersonWithAncestorsAndSiblings(pai, false, false, depth + 1)
       addEdge(`person-${pessoa.id}`, `person-${pai.id}`, `edge-pai-${pessoa.id}`, colors.neutral)
     } else if (depth === 0) {
-      // ✅ CORRIGIDO: Placeholder APENAS na primeira camada (depth === 0)
+      // CORRIGIDO: Placeholder APENAS na primeira camada (depth === 0)
       const addPaiId = `add-pai-${pessoa.id}`
       if (!nodes.find(n => n.id === addPaiId)) {
         nodes.push({
@@ -850,7 +1056,7 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
       addPersonWithAncestorsAndSiblings(mae, false, false, depth + 1)
       addEdge(`person-${pessoa.id}`, `person-${mae.id}`, `edge-mae-${pessoa.id}`, colors.neutral)
     } else if (depth === 0) {
-      // ✅ CORRIGIDO: Placeholder APENAS na primeira camada (depth === 0)
+      // CORRIGIDO: Placeholder APENAS na primeira camada (depth === 0)
       const addMaeId = `add-mae-${pessoa.id}`
       if (!nodes.find(n => n.id === addMaeId)) {
         nodes.push({
@@ -878,13 +1084,15 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
         addEdge(`person-${irmao.id}`, `person-${mae.id}`, `edge-irmao-mae-${irmao.id}`, colors.neutral)
       }
 
-      // Adicionar cônjuges do irmão (sem linha de casamento - relação implícita pelos filhos)
+      // Adicionar cônjuges do irmão
       const conjugesIrmao = findConjuges(irmao)
       conjugesIrmao.forEach(conjugeIrmao => {
         if (addPersonNode(conjugeIrmao, false, false)) {
           // Adicionar ancestrais do cônjuge do irmão (sem placeholders)
           addPersonWithAncestorsAndSiblings(conjugeIrmao, false, false, depth + 1)
         }
+        // Adicionar linha de casamento se não tiverem filhos
+        addMarriageEdge(irmao.id, conjugeIrmao.id)
       })
 
       // Adicionar filhos do irmão (sobrinhos)
@@ -921,13 +1129,15 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
         addEdge(`person-${filho.id}`, `person-${pessoa.id}`, `edge-filho-${filho.id}-${pessoa.id}`, colors.neutral)
       }
 
-      // Adicionar cônjuges do filho (sem linha de casamento - relação implícita pelos filhos)
+      // Adicionar cônjuges do filho
       const conjugesFilho = findConjuges(filho)
       conjugesFilho.forEach(conjugeFilho => {
         if (addPersonNode(conjugeFilho, false, false)) {
           // Adicionar ancestrais do cônjuge (sem placeholders, depth > 0)
           addPersonWithAncestorsAndSiblings(conjugeFilho, false, false, 1)
         }
+        // Adicionar linha de casamento se não tiverem filhos
+        addMarriageEdge(filho.id, conjugeFilho.id)
       })
 
       // Recursivamente adicionar descendentes
@@ -944,11 +1154,12 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
   addPersonWithAncestorsAndSiblings(pessoaPrincipal, true, false, 0)
 
   // 2. Adicionar TODOS os cônjuges da pessoa principal e suas famílias
-  //    Sem linha de casamento - relação implícita pelos filhos em comum
   const conjuges = findConjuges(pessoaPrincipal)
   conjuges.forEach(conjuge => {
     // Cônjuge usa depth = 1 para NÃO mostrar placeholders
     addPersonWithAncestorsAndSiblings(conjuge, false, false, 1)
+    // Adicionar linha de casamento se não tiverem filhos
+    addMarriageEdge(pessoaPrincipal.id, conjuge.id)
   })
 
   // 3. Adicionar descendentes da pessoa principal
@@ -983,10 +1194,12 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
           addEdge(`person-${pessoa.id}`, `person-${pessoa.maeId}`, `edge-filho-${pessoa.id}-mae`, colors.neutral)
         }
         
-        // Adicionar cônjuges desta pessoa (sem linha de casamento)
+        // Adicionar cônjuges desta pessoa
         const conjugesPessoa = findConjuges(pessoa)
         conjugesPessoa.forEach(conjuge => {
           addPersonNode(conjuge, false, false)
+          // Adicionar linha de casamento se não tiverem filhos
+          addMarriageEdge(pessoa.id, conjuge.id)
         })
       }
     })
@@ -1066,7 +1279,8 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
       onAddConjuge: (id) => onAddConjugeRef.current?.(id),
     })
 
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rawNodes, rawEdges, mode, pessoas)
+    // CORRIGIDO: Passar uniões para o layout
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rawNodes, rawEdges, mode, pessoas, unioes)
 
     setNodes(layoutedNodes)
     setEdges(layoutedEdges)
