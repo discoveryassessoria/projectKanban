@@ -1957,26 +1957,26 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-gray-900 border-white/20">
+                      <DropdownMenuContent align="end" className="bg-white border-gray-200">
                         <DropdownMenuItem 
                           onClick={() => handleView(contratante)}
-                          className="text-white/80 hover:text-white hover:bg-white/10 cursor-pointer"
+                          className="text-gray-700 hover:bg-gray-100 cursor-pointer"
                         >
                           <Eye className="h-4 w-4 mr-2" />
                           Visualizar
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           onClick={() => handleEdit(contratante)}
-                          className="text-white/80 hover:text-white hover:bg-white/10 cursor-pointer"
+                          className="text-gray-700 hover:bg-gray-100 cursor-pointer"
                         >
                           <Edit className="h-4 w-4 mr-2" />
                           Editar
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           onClick={() => handleDelete(contratante.id, contratante.tipo)}
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10 cursor-pointer"
+                          className="text-red-500 focus:text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-red-500/10 cursor-pointer"
                         >
-                          <Trash2 className="h-4 w-4 mr-2" />
+                          <Trash2 className="h-4 w-4 mr-2 text-red-500" />
                           Excluir
                         </DropdownMenuItem>
                       </DropdownMenuContent>

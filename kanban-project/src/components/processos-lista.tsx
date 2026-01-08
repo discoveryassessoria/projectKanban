@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Pencil,
   Trash2,
-  Eye,
   Users,
   CheckSquare
 } from "lucide-react"
@@ -20,6 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ProcessoDetailsModal } from "./kanban/atividade-details-modal"
 import type { ProcessoWithStatus, Status, Contratante } from "@/src/types/kanban"
 
 interface ProcessosListaProps {
@@ -38,6 +38,22 @@ export function ProcessosLista({
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+
+  // Estados para o modal de edição
+  const [selectedProcesso, setSelectedProcesso] = useState<ProcessoWithStatus | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // Função para abrir modal de edição
+  const handleEdit = (processo: ProcessoWithStatus) => {
+    setSelectedProcesso(processo)
+    setIsModalOpen(true)
+  }
+
+  // Função para fechar modal
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setSelectedProcesso(null)
+  }
 
   // Filtrar processos
   const filteredProcessos = processos.filter(p => 
@@ -135,7 +151,8 @@ export function ProcessosLista({
               return (
                 <tr 
                   key={processo.id} 
-                  className="border-b border-white/10 hover:bg-white/5 transition-colors"
+                  className="border-b border-white/10 hover:bg-white/5 transition-colors cursor-pointer"
+                  onClick={() => handleEdit(processo)}
                 >
                   <td className="py-3 px-4">
                     <div>
@@ -197,7 +214,7 @@ export function ProcessosLista({
                       : '-'
                     }
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -209,24 +226,19 @@ export function ProcessosLista({
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-gray-900 border-white/20">
+                        <DropdownMenuContent align="end" className="bg-white border-gray-200">
                           <DropdownMenuItem 
-                            className="text-white hover:bg-white/10 cursor-pointer"
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            Ver detalhes
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-white hover:bg-white/10 cursor-pointer"
+                            onClick={() => handleEdit(processo)}
+                            className="text-gray-700 hover:bg-gray-100 cursor-pointer"
                           >
                             <Pencil className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => handleDelete(processo.id)}
-                            className="text-red-400 hover:bg-red-500/20 cursor-pointer"
+                            className="text-red-500 focus:text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-red-500/10 cursor-pointer"
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
+                            <Trash2 className="h-4 w-4 mr-2 text-red-500" />
                             Excluir
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -280,6 +292,15 @@ export function ProcessosLista({
           </div>
         </div>
       )}
+
+      {/* Modal de Edição */}
+      <ProcessoDetailsModal
+        processo={selectedProcesso}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onSave={onRefresh}
+        statusList={statusList}
+      />
     </div>
   )
 }

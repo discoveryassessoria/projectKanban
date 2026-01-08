@@ -1,4 +1,4 @@
-// ESTE ARQUIVO VAI EM: src/components/kanban-board.tsx
+// ESTE ARQUIVO VAI EM: src/components/kanban-board-novo.tsx
 
 "use client"
 
@@ -18,7 +18,7 @@ import {
 import { snapCenterToCursor } from "@dnd-kit/modifiers"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Trash2 } from "lucide-react"
+import { Plus } from "lucide-react"
 import { KanbanColumn } from "./kanban/kanban-column"
 import { KanbanCard } from "./kanban/kanban-card"
 import { ProcessoDetailsModal } from "./kanban/atividade-details-modal"
@@ -268,34 +268,6 @@ export function KanbanBoard({
     }
   }
 
-  const handleClearCompleted = async () => {
-    const concluidoStatus = statusList.find((s) => s.nome.toLowerCase() === "transcrição")
-    if (!concluidoStatus) return
-
-    const completedProcessos = localProcessos.filter((p) => p.statusId === concluidoStatus.id)
-
-    if (completedProcessos.length === 0) {
-      alert("Não há processos concluídos para limpar.")
-      return
-    }
-
-    if (!confirm(`Tem certeza que deseja deletar ${completedProcessos.length} processo(s) concluído(s)?`)) {
-      return
-    }
-
-    try {
-      await Promise.all(
-        completedProcessos.map((processo) =>
-          fetch(`/api/processos/${processo.id}`, { method: "DELETE" }),
-        ),
-      )
-      onRefresh()
-    } catch (error) {
-      console.error("Erro ao limpar processos concluídos:", error)
-      alert("Não foi possível limpar os processos concluídos.")
-    }
-  }
-
   // Todas as colunas (sem paginação)
   const showAddButton = true
 
@@ -320,15 +292,6 @@ export function KanbanBoard({
             Arraste e solte os processos entre as colunas
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleClearCompleted}
-          className="border-red-400/40 text-red-300 bg-red-500/10 hover:bg-red-500/20 backdrop-blur-sm"
-        >
-          <Trash2 className="mr-2 h-4 w-4" />
-          Limpar Concluídas
-        </Button>
       </div>
 
       <DndContext
