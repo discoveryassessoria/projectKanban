@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import { HeaderBar } from "@/src/components/header-bar"
 import { HistoryIcon } from "@/src/components/icons/history-icon"
+import { BandeiraPais } from "@/src/components/ui/bandeira-pais"
 import { Pais, PAISES_CONFIG, type ProcessoWithStatus } from "@/src/types/kanban"
 
 interface Usuario {
@@ -370,7 +371,7 @@ export default function DashboardPage() {
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">{config.bandeira}</span>
+                        <BandeiraPais pais={pais} size="lg" />
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-white text-sm">{config.label}</h4>
                           <p className="text-xs text-white/50 mt-0.5">
@@ -437,7 +438,6 @@ export default function DashboardPage() {
 
                           <div className="space-y-2">
                             {processosStatus.slice(0, 3).map(processo => {
-                              const paisConfig = PAISES_CONFIG[processo.pais]
                               return (
                                 <div 
                                   key={processo.id} 
@@ -445,9 +445,9 @@ export default function DashboardPage() {
                                   onClick={() => router.push('/kanban')}
                                 >
                                   <p className="text-sm font-medium text-white truncate">{processo.nome}</p>
-                                  <p className="text-xs text-white/40 mt-1 truncate flex items-center gap-1">
-                                    <span>{paisConfig?.bandeira}</span>
-                                    {paisConfig?.label || processo.pais}
+                                  <p className="text-xs text-white/40 mt-1 truncate flex items-center gap-1.5">
+                                    <BandeiraPais pais={processo.pais} size="sm" />
+                                    {PAISES_CONFIG[processo.pais]?.label || processo.pais}
                                   </p>
                                 </div>
                               )
@@ -574,7 +574,6 @@ export default function DashboardPage() {
                     {proximosPrazos.map((tarefa) => {
                       const prazo = new Date(tarefa.dataPrazo!)
                       const diffDias = Math.ceil((prazo.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
-                      const paisConfig = PAISES_CONFIG[tarefa.pais]
 
                       let corBorda = "border-white/20"
                       let corTexto = "text-white/70"
@@ -602,8 +601,8 @@ export default function DashboardPage() {
                             )}
                           </div>
                           <p className="text-sm font-medium text-white truncate">{tarefa.titulo}</p>
-                          <p className="text-xs text-white/50 truncate mt-1 flex items-center gap-1">
-                            <span>{paisConfig?.bandeira}</span>
+                          <p className="text-xs text-white/50 truncate mt-1 flex items-center gap-1.5">
+                            <BandeiraPais pais={tarefa.pais} size="sm" />
                             {tarefa.processoNome}
                           </p>
                         </div>
