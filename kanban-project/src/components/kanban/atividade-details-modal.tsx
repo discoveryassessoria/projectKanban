@@ -604,12 +604,12 @@ export function ProcessoDetailsModal({
                       <p className="text-gray-900 font-medium">{paisConfig.label}</p>
                     </div>
 
-                    {/* Contratantes - ✅ AGORA CLICÁVEIS */}
+                    {/* Contratantes - ✅ ORDENADOS ALFABETICAMENTE */}
                     <div className="mb-6">
                       <label className="text-xs text-gray-500 uppercase mb-2 block">Contratantes</label>
                       {contratantesSelecionados.length > 0 ? (
                         <div className="space-y-3">
-                          {contratantesSelecionados.map((cont) => (
+                          {[...contratantesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((cont) => (
                             <div 
                               key={cont.id} 
                               onClick={() => abrirDetalhesCliente(cont, "contratante")}
@@ -676,12 +676,12 @@ export function ProcessoDetailsModal({
                       )}
                     </div>
 
-                    {/* Requerentes - ✅ AGORA CLICÁVEIS */}
+                    {/* Requerentes - ✅ ORDENADOS ALFABETICAMENTE */}
                     <div className="mb-6">
                       <label className="text-xs text-gray-500 uppercase mb-2 block">Requerentes</label>
                       {requerentesSelecionados.length > 0 ? (
                         <div className="space-y-3">
-                          {requerentesSelecionados.map((req) => (
+                          {[...requerentesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((req) => (
                             <div 
                               key={req.id} 
                               onClick={() => abrirDetalhesCliente(req, "requerente")}
@@ -760,13 +760,13 @@ export function ProcessoDetailsModal({
                       </select>
                     </div>
 
-                    {/* Contratantes (busca múltipla) */}
+                    {/* Contratantes (busca múltipla) - ✅ ORDENADOS ALFABETICAMENTE */}
                     <div className="mb-6" ref={contratanteRef}>
                       <label className="text-xs text-gray-500 uppercase mb-1 block">Contratantes</label>
                       
                       {contratantesSelecionados.length > 0 && (
                         <div className="space-y-2 mb-3">
-                          {contratantesSelecionados.map((cont) => (
+                          {[...contratantesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((cont) => (
                             <div key={cont.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
                               <div className="flex items-center gap-2">
                                 <User className="h-4 w-4 text-gray-600" />
@@ -831,13 +831,13 @@ export function ProcessoDetailsModal({
                       </div>
                     </div>
 
-                    {/* Requerentes (busca múltipla) */}
+                    {/* Requerentes (busca múltipla) - ✅ ORDENADOS ALFABETICAMENTE */}
                     <div className="mb-6" ref={requerenteRef}>
                       <label className="text-xs text-gray-500 uppercase mb-1 block">Requerentes</label>
                       
                       {requerentesSelecionados.length > 0 && (
                         <div className="space-y-2 mb-3">
-                          {requerentesSelecionados.map((req) => (
+                          {[...requerentesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((req) => (
                             <div key={req.id} className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
                               <div className="flex items-center gap-2">
                                 <User className="h-4 w-4 text-blue-600" />
