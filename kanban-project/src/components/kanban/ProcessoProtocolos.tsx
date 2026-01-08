@@ -5,6 +5,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { DatePickerField } from "@/components/ui/date-picker-field"
 import { useUploadThing } from "@/src/lib/uploadthing"
 import {
   Plus,
@@ -496,10 +497,9 @@ export function ProcessoProtocolos({
                   <Calendar className="h-4 w-4 inline mr-1" />
                   Data do Protocolo
                 </label>
-                <Input
-                  type="date"
+                <DatePickerField
                   value={form.dataProtocolo}
-                  onChange={(e) => setForm({ ...form, dataProtocolo: e.target.value })}
+                  onChange={(value) => setForm({ ...form, dataProtocolo: value })}
                 />
               </div>
 

@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { DatePickerField } from "@/components/ui/date-picker-field"
 import {
   Select,
   SelectContent,
@@ -87,11 +88,10 @@ export function CamposPersonalizadosEditor({
       
       case 'data':
         return (
-          <Input
-            {...commonProps}
-            type="date"
+          <DatePickerField
             value={campo.valor?.toString() || ''}
-            onChange={(e) => handleUpdateCampo(campo.id, { valor: e.target.value || null })}
+            onChange={(value) => handleUpdateCampo(campo.id, { valor: value || null })}
+            disabled={disabled}
           />
         )
       

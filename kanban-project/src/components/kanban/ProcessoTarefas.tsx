@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { DatePickerField } from "@/components/ui/date-picker-field"
 import {
   Plus,
   Calendar,
@@ -570,10 +571,9 @@ export function ProcessoTarefas({ processoId, onUpdate }: ProcessoTarefasProps) 
                   <Calendar className="h-4 w-4 inline mr-1" />
                   Prazo
                 </label>
-                <Input
-                  type="date"
+                <DatePickerField
                   value={editForm.dataPrazo}
-                  onChange={(e) => setEditForm({ ...editForm, dataPrazo: e.target.value })}
+                  onChange={(value) => setEditForm({ ...editForm, dataPrazo: value })}
                 />
               </div>
 

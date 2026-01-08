@@ -17,6 +17,7 @@ import CalendarioActivities from "@/src/components/activitiesComponents/calendar
 import { HeaderBar } from "@/src/components/header-bar"
 import { usePaises, useStatuses, useUsers, useActivities, invalidateActivities } from "@/src/hooks/useActivitiesData"
 import type { Atividade, Status } from "@/src/hooks/useActivitiesData"
+import { DatePickerField } from "@/components/ui/date-picker-field"
 
 // Mapeamento de países para exibição
 const PAIS_LABELS: Record<string, string> = {
@@ -287,20 +288,16 @@ function FilterModal({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-gray-700">Data Início</Label>
-              <Input
-                type="date"
+              <DatePickerField
                 value={filters.dataInicio}
-                onChange={(e) => updateFilter('dataInicio', e.target.value)}
-                className="bg-white border-gray-300 text-gray-900"
+                onChange={(value) => updateFilter('dataInicio', value)}
               />
             </div>
             <div className="space-y-2">
               <Label className="text-gray-700">Data Fim</Label>
-              <Input
-                type="date"
+              <DatePickerField
                 value={filters.dataFim}
-                onChange={(e) => updateFilter('dataFim', e.target.value)}
-                className="bg-white border-gray-300 text-gray-900"
+                onChange={(value) => updateFilter('dataFim', value)}
               />
             </div>
           </div>
@@ -554,11 +551,9 @@ function CreateActivityModal() {
 
           <div className="space-y-2">
             <Label className="text-gray-700">Data de Término</Label>
-            <Input
-              type="date"
+            <DatePickerField
               value={formData.data_termino}
-              onChange={(e) => updateFormData('data_termino', e.target.value)}
-              className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500 [&::-webkit-calendar-picker-indicator]:opacity-50"
+              onChange={(value) => updateFormData('data_termino', value)}
             />
           </div>
 

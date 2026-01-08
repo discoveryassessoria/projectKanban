@@ -11,6 +11,7 @@ import { PessoaDetailsPage } from "./pessoa-details-page"
 import { ReactFlowTree, ReactFlowTreeRef } from "./react-flow-tree"
 import { TreeOnboarding } from "./tree-onboarding"
 import { DocumentoModal } from "./documento-modal"
+import { DatePickerField } from "@/components/ui/date-picker-field"
 import {
   Plus,
   User,
@@ -971,11 +972,9 @@ function AddPersonModal({
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
-              <input
-                type="date"
+              <DatePickerField
                 value={dataNasc}
-                onChange={(e) => setDataNasc(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                onChange={(value) => setDataNasc(value)}
               />
             </div>
             <div>
@@ -1059,11 +1058,9 @@ function AddPersonModal({
                 )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Data do Casamento</label>
-                  <input
-                    type="date"
+                  <DatePickerField
                     value={dataCasamento}
-                    onChange={(e) => setDataCasamento(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    onChange={(value) => setDataCasamento(value)}
                   />
                 </div>
                 <div>
@@ -1086,11 +1083,9 @@ function AddPersonModal({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Data de Falecimento</label>
-                  <input
-                    type="date"
+                  <DatePickerField
                     value={dataObito}
-                    onChange={(e) => setDataObito(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    onChange={(value) => setDataObito(value)}
                   />
                 </div>
                 <div>
@@ -1291,11 +1286,9 @@ function EditPersonModal({
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
-              <input
-                type="date"
+              <DatePickerField
                 value={dataNasc}
-                onChange={(e) => setDataNasc(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                onChange={(value) => setDataNasc(value)}
               />
             </div>
             <div>
@@ -1373,11 +1366,9 @@ function EditPersonModal({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Data do Casamento</label>
-                  <input
-                    type="date"
+                  <DatePickerField
                     value={dataCasamento}
-                    onChange={(e) => setDataCasamento(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    onChange={(value) => setDataCasamento(value)}
                   />
                 </div>
                 <div>
@@ -1400,11 +1391,9 @@ function EditPersonModal({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Data de Falecimento</label>
-                  <input
-                    type="date"
+                  <DatePickerField
                     value={dataObito}
-                    onChange={(e) => setDataObito(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    onChange={(value) => setDataObito(value)}
                   />
                 </div>
                 <div>

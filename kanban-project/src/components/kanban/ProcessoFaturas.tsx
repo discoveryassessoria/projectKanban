@@ -25,6 +25,7 @@ import {
   ChevronUp
 } from "lucide-react"
 import { TabelaCustos } from "./TabelaCustos"
+import { DatePickerField } from "@/components/ui/date-picker-field"
 
 interface Fatura {
   id: number
@@ -565,10 +566,9 @@ export function ProcessoFaturas({ processoId, onUpdate }: ProcessoFaturasProps) 
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Data de Vencimento
                 </label>
-                <Input
-                  type="date"
+                <DatePickerField
                   value={novaVencimento}
-                  onChange={(e) => setNovaVencimento(e.target.value)}
+                  onChange={setNovaVencimento}
                 />
               </div>
               
@@ -663,10 +663,9 @@ export function ProcessoFaturas({ processoId, onUpdate }: ProcessoFaturasProps) 
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Data do Pagamento
                   </label>
-                  <Input
-                    type="date"
+                  <DatePickerField
                     value={pagarData}
-                    onChange={(e) => setPagarData(e.target.value)}
+                    onChange={setPagarData}
                   />
                 </div>
               </div>

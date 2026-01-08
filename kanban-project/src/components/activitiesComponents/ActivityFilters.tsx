@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Filter, X } from "lucide-react"
+import { DatePickerField } from "@/components/ui/date-picker-field"
 
 interface Processo {
   id: number
@@ -346,24 +347,18 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
             {/* Data Início */}
             <div className="space-y-2">
               <Label htmlFor="dataInicio" className="text-white">Data Início</Label>
-              <Input
-                id="dataInicio"
-                type="date"
+              <DatePickerField
                 value={localFilters.dataInicio || ''}
-                onChange={(e) => handleFilterChange('dataInicio', e.target.value)}
-                className="bg-white/10 border-white/20 text-white [color-scheme:dark]"
+                onChange={(value) => handleFilterChange('dataInicio', value)}
               />
             </div>
 
             {/* Data Fim */}
             <div className="space-y-2">
               <Label htmlFor="dataFim" className="text-white">Data Fim</Label>
-              <Input
-                id="dataFim"
-                type="date"
+              <DatePickerField
                 value={localFilters.dataFim || ''}
-                onChange={(e) => handleFilterChange('dataFim', e.target.value)}
-                className="bg-white/10 border-white/20 text-white [color-scheme:dark]"
+                onChange={(value) => handleFilterChange('dataFim', value)}
               />
             </div>
 

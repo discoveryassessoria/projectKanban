@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react"
 import { X, FileText, Upload, File, Trash2, Eye, Loader2 } from "lucide-react"
 import { useUploadThing } from "@/src/lib/uploadthing"
+import { DatePickerField } from "@/components/ui/date-picker-field"
 
 // Tipos de documento
 const TIPO_DOCUMENTO_OPTIONS = [
@@ -425,11 +426,9 @@ export function DocumentoModal({
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Data de Emissão
               </label>
-              <input
-                type="date"
+              <DatePickerField
                 value={dataEmissao}
-                onChange={(e) => setDataEmissao(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                onChange={(value) => setDataEmissao(value)}
               />
             </div>
 
@@ -474,11 +473,9 @@ export function DocumentoModal({
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Data da Tradução
                     </label>
-                    <input
-                      type="date"
+                    <DatePickerField
                       value={dataTraducao}
-                      onChange={(e) => setDataTraducao(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+                      onChange={(value) => setDataTraducao(value)}
                     />
                   </div>
 
@@ -525,11 +522,9 @@ export function DocumentoModal({
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Data do Apostilamento
                     </label>
-                    <input
-                      type="date"
+                    <DatePickerField
                       value={dataApostilamento}
-                      onChange={(e) => setDataApostilamento(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      onChange={(value) => setDataApostilamento(value)}
                     />
                   </div>
 

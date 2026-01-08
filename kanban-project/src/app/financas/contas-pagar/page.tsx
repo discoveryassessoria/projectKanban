@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { DatePickerField } from "@/components/ui/date-picker-field"
 
 interface ContaPagar {
   id: number
@@ -242,13 +243,9 @@ export default function ContasPagarPage() {
                 
                 <div className="space-y-2">
                   <Label htmlFor="dataVencimento">Vencimento *</Label>
-                  <Input
-                    id="dataVencimento"
-                    type="date"
+                  <DatePickerField
                     value={formData.dataVencimento}
-                    onChange={(e) => setFormData(prev => ({ ...prev, dataVencimento: e.target.value }))}
-                    className="bg-white/10 border-white/20 text-white"
-                    required
+                    onChange={(value) => setFormData(prev => ({ ...prev, dataVencimento: value }))}
                   />
                 </div>
               </div>

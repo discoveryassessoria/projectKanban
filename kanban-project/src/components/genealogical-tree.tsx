@@ -47,6 +47,7 @@ import type { Pessoa, Arvore, TreeNode } from "@/src/types/genealogy"
 import { PersonFormDialog, type PersonFormData, type ExistingPersonFormData } from "@/src/components/person-form-dialog"
 import Swal from "sweetalert2"
 import withReactContent from "sweetalert2-react-content"
+import { DatePickerField } from "@/components/ui/date-picker-field"
 
 const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
   const { pessoa, onAddChild, onAddParent, onAddSpouse, onEdit, onDelete, relationshipType } = data
@@ -1053,11 +1054,9 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
                   </div>
                   <div>
                     <Label htmlFor="data_nasc">Data de Nascimento</Label>
-                    <Input
-                      id="data_nasc"
-                      type="date"
+                    <DatePickerField
                       value={newSpouseData.data_nasc}
-                      onChange={(e) => setNewSpouseData(prev => ({...prev, data_nasc: e.target.value}))}
+                      onChange={(value) => setNewSpouseData(prev => ({...prev, data_nasc: value}))}
                     />
                   </div>
                 </div>
