@@ -5,13 +5,38 @@ import { prisma } from "@/lib/prisma"
 import { Pais } from "@prisma/client"
 import { logProcesso } from "@/lib/auditoria"
 
-// GET - Buscar processos (filtrado por país opcionalmente)
+// GET - Buscar processos (filtrado por país, requerente ou contratante)
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const pais = searchParams.get("pais") as Pais | null
+    const requerenteId = searchParams.get("requerenteId")
+    const contratanteId = searchParams.get("contratanteId")
 
-    const where = pais ? { pais } : {}
+    // Construir filtro dinâmico
+    const where: any = {}
+    
+    if (pais) {
+      where.pais = pais
+    }
+
+    // ✅ Filtro por requerente
+    if (requerenteId) {
+      where.requerentes = {
+        some: {
+          requerenteId: parseInt(requerenteId)
+        }
+      }
+    }
+
+    // ✅ Filtro por contratante
+    if (contratanteId) {
+      where.contratantes = {
+        some: {
+          contratanteId: parseInt(contratanteId)
+        }
+      }
+    }
 
     const processos = await prisma.processo.findMany({
       where,

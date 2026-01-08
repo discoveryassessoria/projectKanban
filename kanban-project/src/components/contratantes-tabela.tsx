@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { createPortal } from "react-dom"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { 
@@ -22,7 +23,8 @@ import {
   Eye,
   Globe,
   Heart,
-  Loader2
+  Loader2,
+  AlertTriangle
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -75,6 +77,237 @@ interface Anexo {
 interface ContratantesTabelaProps {
   contratantes: Contratante[]
   onRefresh: () => void
+  // ✅ NOVO: Callback para abrir processo no Kanban
+  onOpenProcesso?: (processoId: number, pais: string) => void
+}
+
+// ✅ Interface para processos vinculados
+interface ProcessoVinculado {
+  id: number
+  numero: string
+  pais: string
+  status: string
+  etapaAtual?: string | null
+}
+
+// ✅ Componente de Tooltip para mostrar processos vinculados
+function ProcessosTooltip({ 
+  clienteId, 
+  clienteTipo, 
+  count,
+  onOpenProcesso
+}: { 
+  clienteId: number
+  clienteTipo: string
+  count: number
+  onOpenProcesso?: (processoId: number, pais: string) => void
+}) {
+  const router = useRouter()
+  const [isHovering, setIsHovering] = useState(false)
+  const [isTooltipHovering, setIsTooltipHovering] = useState(false)
+  const [processos, setProcessos] = useState<ProcessoVinculado[]>([])
+  const [loading, setLoading] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0, showAbove: false })
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Controlar visibilidade combinando hover do trigger e do tooltip
+  const isVisible = isHovering || isTooltipHovering
+
+  const fetchProcessos = async () => {
+    if (loaded || loading || count === 0) return
+    
+    setLoading(true)
+    try {
+      const param = clienteTipo === 'requerente' ? 'requerenteId' : 'contratanteId'
+      const response = await fetch(`/api/processos?${param}=${clienteId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setProcessos(data.processos?.map((p: any) => ({
+          id: p.id,
+          numero: p.numero || p.nome || `#${p.id}`,
+          pais: p.pais || 'N/A',
+          status: p.status?.nome || 'Em andamento',
+          etapaAtual: p.etapaAtual
+        })) || [])
+        setLoaded(true)
+      }
+    } catch (error) {
+      console.error("Erro ao buscar processos:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleMouseEnter = () => {
+    // Cancelar qualquer timeout de esconder
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current)
+    }
+    
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect()
+      
+      // Verificar se há espaço acima (precisa de pelo menos 150px)
+      const showAbove = rect.top > 180
+      
+      // Centralizar tooltip em relação ao número
+      // Tooltip tem 288px de largura (w-72), então metade = 144px
+      const tooltipWidth = 288
+      const centerX = rect.left + (rect.width / 2) - (tooltipWidth / 2)
+      
+      // Garantir que não saia da tela
+      const adjustedLeft = Math.max(10, Math.min(centerX, window.innerWidth - tooltipWidth - 10))
+      
+      setTooltipPosition({
+        top: showAbove 
+          ? rect.top - 8
+          : rect.bottom + 8,
+        left: adjustedLeft,
+        showAbove
+      })
+    }
+    timeoutRef.current = setTimeout(() => {
+      setIsHovering(true)
+      fetchProcessos()
+    }, 100)
+  }
+
+  const handleMouseLeave = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+    // Delay para permitir mover o mouse para o tooltip
+    hideTimeoutRef.current = setTimeout(() => {
+      setIsHovering(false)
+    }, 100)
+  }
+
+  const handleTooltipMouseEnter = () => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current)
+    }
+    setIsTooltipHovering(true)
+  }
+
+  const handleTooltipMouseLeave = () => {
+    setIsTooltipHovering(false)
+  }
+
+  const handleClickProcesso = (processo: ProcessoVinculado, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsHovering(false)
+    setIsTooltipHovering(false)
+    
+    if (onOpenProcesso) {
+      // Usar callback para abrir na mesma página
+      onOpenProcesso(processo.id, processo.pais)
+    } else {
+      // Fallback: navegar para o Kanban
+      const paisNormalizado = processo.pais?.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      router.push(`/kanban?processoId=${processo.id}&pais=${paisNormalizado}`)
+    }
+  }
+
+  const getBandeira = (pais: string) => {
+    const paisNormalizado = pais?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    
+    const bandeiras: Record<string, string> = {
+      'italia': '🇮🇹',
+      'portugal': '🇵🇹',
+      'espanha': '🇪🇸',
+      'alemanha': '🇩🇪',
+    }
+    return bandeiras[paisNormalizado] || '🌍'
+  }
+
+  if (count === 0) {
+    return (
+      <span className="px-2 py-1 bg-white/10 rounded text-xs text-white/40">
+        0
+      </span>
+    )
+  }
+
+  const tooltipContent = isVisible && mounted ? createPortal(
+    <div 
+      className="fixed z-[9999] w-72 bg-white border border-gray-200 rounded-lg shadow-2xl p-3 animate-in fade-in-0 zoom-in-95 duration-200"
+      style={tooltipPosition.showAbove ? {
+        bottom: window.innerHeight - tooltipPosition.top,
+        left: tooltipPosition.left,
+      } : {
+        top: tooltipPosition.top,
+        left: tooltipPosition.left,
+      }}
+      onMouseEnter={handleTooltipMouseEnter}
+      onMouseLeave={handleTooltipMouseLeave}
+    >
+      <div className="text-xs font-medium text-gray-500 mb-2">
+        Processos vinculados ({count})
+      </div>
+      
+      {loading ? (
+        <div className="flex items-center justify-center py-3">
+          <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
+          <span className="ml-2 text-xs text-gray-500">Carregando...</span>
+        </div>
+      ) : (
+        <div className="space-y-1.5 max-h-48 overflow-y-auto">
+          {processos.map((processo) => (
+            <div
+              key={processo.id}
+              onClick={(e) => handleClickProcesso(processo, e)}
+              className="flex items-center justify-between p-2 bg-gray-50 hover:bg-gray-100 rounded-md cursor-pointer transition-colors group"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-base">{getBandeira(processo.pais)}</span>
+                <div>
+                  <div className="text-xs font-medium text-gray-800">
+                    {processo.numero}
+                  </div>
+                  <div className="text-[10px] text-gray-500">
+                    {processo.etapaAtual || processo.status}
+                  </div>
+                </div>
+              </div>
+              <Eye className="h-3 w-3 text-gray-400 group-hover:text-gray-600 transition-colors" />
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {!loading && processos.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-gray-200 text-center">
+          <span className="text-[10px] text-gray-400">
+            Clique para abrir no Kanban
+          </span>
+        </div>
+      )}
+    </div>,
+    document.body
+  ) : null
+
+  return (
+    <div 
+      ref={containerRef}
+      className="relative inline-block"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <span className="px-2 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 rounded text-xs text-indigo-300 cursor-pointer transition-colors">
+        {count}
+      </span>
+      {tooltipContent}
+    </div>
+  )
 }
 
 // ✅ EXPORTADO para uso em outros componentes
@@ -139,6 +372,9 @@ export function ContratanteModal({
   setFormData,
   onSave,
   isLoading,
+  // ✅ NOVO: Props para erros
+  errors = {},
+  setErrors,
 }: {
   isOpen: boolean
   onClose: () => void
@@ -150,6 +386,9 @@ export function ContratanteModal({
   setFormData: (data: typeof initialFormData) => void
   onSave: () => void
   isLoading: boolean
+  // ✅ NOVO: Tipagem dos erros
+  errors?: { nome?: string; cpf?: string; geral?: string }
+  setErrors?: (errors: { nome?: string; cpf?: string; geral?: string }) => void
 }) {
   const [activeTab, setActiveTab] = useState<"dados" | "endereco" | "observacoes">("dados")
   const [mounted, setMounted] = useState(false)
@@ -662,6 +901,21 @@ export function ContratanteModal({
     })
   }
 
+  // ✅ NOVO: Limpar erro quando usuário digita
+  const handleNomeChange = (value: string) => {
+    setFormData({ ...formData, nome: value })
+    if (errors.nome && setErrors) {
+      setErrors({ ...errors, nome: undefined })
+    }
+  }
+
+  const handleCPFChange = (value: string) => {
+    setFormData({ ...formData, cpf: formatCPF(value) })
+    if (errors.cpf && setErrors) {
+      setErrors({ ...errors, cpf: undefined })
+    }
+  }
+
   if (!isOpen || !mounted) return null
   
   const modalContent = (
@@ -730,6 +984,14 @@ export function ContratanteModal({
             </button>
           </div>
         </div>
+
+        {/* ✅ NOVO: Erro geral no topo */}
+        {errors.geral && (
+          <div className="mx-8 mt-4 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+            <span>{errors.geral}</span>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 px-8 bg-white shrink-0">
@@ -802,25 +1064,45 @@ export function ContratanteModal({
                         </label>
                         <Input
                           value={formData.nome}
-                          onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                          onChange={(e) => handleNomeChange(e.target.value)}
                           placeholder="Nome completo"
                           disabled={isViewMode}
-                          className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                          className={`bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 ${
+                            errors.nome ? 'border-red-500 focus-visible:ring-red-500' : ''
+                          }`}
                         />
+                        {/* ✅ NOVO: Mensagem de erro para Nome */}
+                        {errors.nome && (
+                          <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            {errors.nome}
+                          </p>
+                        )}
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">CPF</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          CPF <span className="text-red-500">*</span>
+                        </label>
                         <Input
                           value={formData.cpf}
-                          onChange={(e) => setFormData({ ...formData, cpf: formatCPF(e.target.value) })}
+                          onChange={(e) => handleCPFChange(e.target.value)}
                           placeholder="000.000.000-00"
                           maxLength={14}
                           disabled={isViewMode}
-                          className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                          className={`bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 ${
+                            errors.cpf ? 'border-red-500 focus-visible:ring-red-500' : ''
+                          }`}
                         />
+                        {/* ✅ NOVO: Mensagem de erro para CPF */}
+                        {errors.cpf && (
+                          <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            {errors.cpf}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">RG</label>
@@ -1345,7 +1627,7 @@ export function ContratanteModal({
   return createPortal(modalContent, document.body)
 }
 
-export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabelaProps) {
+export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: ContratantesTabelaProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -1354,6 +1636,8 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
   const [editingTipo, setEditingTipo] = useState<string>("contratante")
   const [formData, setFormData] = useState(initialFormData)
   const [isLoading, setIsLoading] = useState(false)
+  // ✅ NOVO: Estado para erros
+  const [errors, setErrors] = useState<{ nome?: string; cpf?: string; geral?: string }>({})
 
   const itemsPerPage = 10
 
@@ -1376,6 +1660,7 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
     setEditingId(null)
     setEditingTipo("contratante")
     setIsViewMode(false)
+    setErrors({}) // ✅ Limpar erros
     setIsModalOpen(true)
   }
 
@@ -1413,6 +1698,7 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
     setEditingId(contratante.id)
     setEditingTipo(tipo)
     setIsViewMode(false)
+    setErrors({}) // ✅ Limpar erros
     setIsModalOpen(true)
   }
 
@@ -1450,12 +1736,30 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
     setEditingId(contratante.id)
     setEditingTipo(tipo)
     setIsViewMode(true)
+    setErrors({}) // ✅ Limpar erros
     setIsModalOpen(true)
   }
 
   const handleSave = async () => {
+    // ✅ NOVO: Limpar erros anteriores
+    setErrors({})
+
+    // ✅ NOVO: Validação local - Nome obrigatório
     if (!formData.nome.trim()) {
-      alert("Nome é obrigatório")
+      setErrors({ nome: "Nome é obrigatório" })
+      return
+    }
+
+    // ✅ NOVO: Validação local - CPF obrigatório
+    const cpfLimpo = formData.cpf.replace(/\D/g, "")
+    if (!cpfLimpo) {
+      setErrors({ cpf: "CPF é obrigatório" })
+      return
+    }
+
+    // ✅ NOVO: Validação local - CPF deve ter 11 dígitos
+    if (cpfLimpo.length !== 11) {
+      setErrors({ cpf: "CPF deve ter 11 dígitos" })
       return
     }
 
@@ -1484,17 +1788,31 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
         body: JSON.stringify(dataToSend),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const data = await response.json()
+        // ✅ NOVO: Tratar erros de duplicidade da API
+        if (response.status === 409) {
+          // Erro de conflito (duplicidade)
+          if (data.campo === 'nome') {
+            setErrors({ nome: data.error })
+          } else if (data.campo === 'cpf') {
+            setErrors({ cpf: data.error })
+          } else {
+            setErrors({ geral: data.error })
+          }
+          return
+        }
         throw new Error(data.error || "Erro ao salvar")
       }
 
       setIsModalOpen(false)
       setFormData(initialFormData)
       setEditingId(null)
+      setErrors({})
       onRefresh()
     } catch (error: any) {
-      alert(error.message || "Erro ao salvar cliente")
+      setErrors({ geral: error.message || "Erro ao salvar cliente" })
     } finally {
       setIsLoading(false)
     }
@@ -1622,9 +1940,12 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="px-2 py-1 bg-white/10 rounded text-xs text-white/70">
-                      {contratante._count?.processos || 0}
-                    </span>
+                    <ProcessosTooltip 
+                      clienteId={contratante.id}
+                      clienteTipo={contratante.tipo || 'contratante'}
+                      count={contratante._count?.processos || 0}
+                      onOpenProcesso={onOpenProcesso}
+                    />
                   </td>
                   <td className="px-4 py-3 text-white/50 text-sm">
                     {formatDate(contratante.createdAt)}
@@ -1675,11 +1996,11 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
           </p>
           <div className="flex items-center gap-2">
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="border-white/20 text-white/70 hover:bg-white/10 disabled:opacity-50"
+              className="bg-transparent text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -1687,11 +2008,11 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
               {currentPage} / {totalPages}
             </span>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="border-white/20 text-white/70 hover:bg-white/10 disabled:opacity-50"
+              className="bg-transparent text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -1710,6 +2031,8 @@ export function ContratantesTabela({ contratantes, onRefresh }: ContratantesTabe
         setFormData={setFormData}
         onSave={handleSave}
         isLoading={isLoading}
+        errors={errors}
+        setErrors={setErrors}
       />
     </>
   )

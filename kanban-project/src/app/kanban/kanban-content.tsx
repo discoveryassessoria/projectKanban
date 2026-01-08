@@ -10,6 +10,7 @@ import { ProcessosLista } from "@/src/components/processos-lista"
 import { ContratantesTabela } from "@/src/components/contratantes-tabela"
 import { PaisTabs } from "@/src/components/ui/pais-selector"
 import { HeaderBar } from "@/src/components/header-bar"
+import { ProcessoDetailsModal } from "@/src/components/kanban/atividade-details-modal"
 import { 
   Pais, 
   type ProcessoWithStatus, 
@@ -55,6 +56,11 @@ export function KanbanContent() {
   const [initialTab, setInitialTab] = useState<string | null>(null)
   const [initialPessoaId, setInitialPessoaId] = useState<number | null>(null)
   const [initialSidebarTab, setInitialSidebarTab] = useState<string | null>(null)
+
+  // ✅ NOVO: Estados para modal de processo na aba Clientes
+  const [clientesProcessoModal, setClientesProcessoModal] = useState<ProcessoWithStatus | null>(null)
+  const [isClientesProcessoModalOpen, setIsClientesProcessoModalOpen] = useState(false)
+  const [clientesStatusList, setClientesStatusList] = useState<Status[]>([])
 
   // Ler parâmetros da URL para abertura automática do modal
   useEffect(() => {
@@ -110,6 +116,34 @@ export function KanbanContent() {
     setInitialTab(null)
     setInitialPessoaId(null)
     setInitialSidebarTab(null)
+  }, [])
+
+  // ✅ NOVO: Callback para abrir processo a partir da aba Clientes (abre modal sem mudar de aba)
+  const handleOpenProcessoFromClientes = useCallback(async (processoId: number, pais: string) => {
+    try {
+      const paisNormalizado = pais?.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      
+      // Buscar processo E status em paralelo para ser mais rápido
+      const [processoResponse, statusResponse] = await Promise.all([
+        fetch(`/api/processos/${processoId}`),
+        fetch(`/api/status?pais=${paisNormalizado}`)
+      ])
+      
+      if (!processoResponse.ok) throw new Error("Erro ao buscar processo")
+      
+      const [processoData, statusData] = await Promise.all([
+        processoResponse.json(),
+        statusResponse.ok ? statusResponse.json() : { status: [] }
+      ])
+      
+      // Abrir o modal com o processo
+      setClientesStatusList(statusData.status || [])
+      setClientesProcessoModal(processoData.processo)
+      setIsClientesProcessoModalOpen(true)
+    } catch (error) {
+      console.error("Erro ao abrir processo:", error)
+      alert("Não foi possível abrir o processo.")
+    }
   }, [])
 
   // Buscar status por país
@@ -377,11 +411,27 @@ export function KanbanContent() {
                   buscarContratantes()
                   buscarRequerentes()
                 }}
+                onOpenProcesso={handleOpenProcessoFromClientes}
               />
             )}
           </div>
         </main>
       </div>
+
+      {/* ✅ Modal de Processo para aba Clientes */}
+      <ProcessoDetailsModal
+        processo={clientesProcessoModal}
+        isOpen={isClientesProcessoModalOpen}
+        onClose={() => {
+          setIsClientesProcessoModalOpen(false)
+          setClientesProcessoModal(null)
+        }}
+        onSave={() => {
+          buscarContratantes()
+          buscarRequerentes()
+        }}
+        statusList={clientesStatusList}
+      />
     </div>
   )
 }
