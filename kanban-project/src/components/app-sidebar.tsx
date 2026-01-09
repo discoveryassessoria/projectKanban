@@ -8,8 +8,6 @@ import {
   Home,
   Settings,
   CheckSquare,
-  Search,
-  Shield,
   Menu,
   DollarSign,
   Receipt,
@@ -19,7 +17,7 @@ import {
   FileText,
   Kanban,
   TreeDeciduous,
-  Bot,
+  Shield,
 } from "lucide-react"
 import {
   Sidebar,
@@ -56,11 +54,6 @@ const menuItems = [
     title: "Árvore Genealógica",
     url: "/genealogy",
     icon: TreeDeciduous,
-  },
-  {
-    title: "Automação",
-    url: "/automation",
-    icon: Bot,
   },
   {
     title: "Configurações",

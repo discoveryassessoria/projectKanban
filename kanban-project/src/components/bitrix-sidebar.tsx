@@ -11,7 +11,6 @@ import { HouseIcon } from "@/src/components/icons/house-icon"
 import { GridIcon } from "@/src/components/icons/grid-icon"
 import { CheckIcon } from "@/src/components/icons/check-icon"
 import { TreeIcon } from "@/src/components/icons/tree-icon"
-import { ZapIcon } from "@/src/components/icons/zap-icon"
 import { SettingsIcon } from "@/src/components/icons/settings-icon"
 import { ShieldIcon } from "@/src/components/icons/shield-icon"
 import { useSidebarContext } from "@/src/contexts/sidebar-context"
@@ -44,13 +43,6 @@ const menuItems = [
     icon: TreeIcon,
     textOffset: "",
     iconOffset: "",
-  },
-  {
-    title: "Automação",
-    url: "/automation",
-    icon: ZapIcon,
-    textOffset: "translate-y-[0.1px]",
-    iconOffset: "translate-y-[0.3px]",
   },
   {
     title: "Configurações",
@@ -107,7 +99,7 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
   }
 
   // Função para renderizar o ícone corretamente
-  const renderIcon = (Icon: typeof HouseIcon | typeof GridIcon | typeof CheckIcon | typeof TreeIcon | typeof ZapIcon | typeof SettingsIcon | typeof ShieldIcon, isActive: boolean, iconOffset: string = "") => {
+  const renderIcon = (Icon: typeof HouseIcon | typeof GridIcon | typeof CheckIcon | typeof TreeIcon | typeof SettingsIcon | typeof ShieldIcon, isActive: boolean, iconOffset: string = "") => {
     // Todos os ícones são customizados agora, passa a prop filled
     return <Icon className={`h-5 w-5 flex-shrink-0 text-white ${iconOffset}`} filled={isActive} />
   }
