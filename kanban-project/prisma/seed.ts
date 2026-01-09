@@ -1,21 +1,64 @@
 // ESTE ARQUIVO VAI EM: prisma/seed.ts
+// Versão atualizada com etapas específicas por país
+
 import { PrismaClient, Pais } from '@prisma/client'
 import { hash } from 'bcrypt'
 
 const prisma = new PrismaClient()
 
-// Etapas padrão para todos os países
-const etapasPadrao = [
-  'Busca Documental',
-  'Emissão de Documentos',
-  'Análise Documental',
-  'Retificação',
-  'Tradução Juramentada',
-  'Apostilamento',
-  'Aguardando Protocolo',
-  'Protocolado',
-  'Transcrição',
-]
+// Etapas específicas por país
+const etapasPorPais: Record<Pais, string[]> = {
+  ITALIA: [
+    'Genealogia',
+    'Busca Documental',
+    'Emissão de Documentos',
+    'Análise Documental',
+    'Retificação',
+    'Tradução Juramentada',
+    'Apostilamento',
+    'Aguardando Protocolo',
+    'Protocolado',
+    'Transcrição',
+    'Finalizado',
+  ],
+  ESPANHA: [
+    'Genealogia',
+    'Busca Documental',
+    'Emissão de Documentos',
+    'Análise Documental',
+    'Retificação',
+    'Apostilamento',
+    'Aguardando Protocolo',
+    'Protocolado',
+    'Fase 2',
+    'Análise Consular',
+    'Finalizado',
+  ],
+  ALEMANHA: [
+    'Genealogia',
+    'Busca Documental',
+    'Emissão de Documentos',
+    'Análise Documental',
+    'Retificação',
+    'Tradução Juramentada',
+    'Aguardando Protocolo',
+    'Protocolado',
+    'Análise Consular',
+    'Finalizado',
+  ],
+  PORTUGAL: [
+    'Genealogia',
+    'Busca Documental',
+    'Emissão de Documentos',
+    'Análise Documental',
+    'Retificação',
+    'Apostilamento',
+    'Aguardando Protocolo',
+    'Protocolado',
+    'Análise Conservatória',
+    'Finalizado',
+  ],
+}
 
 const paises: Pais[] = [Pais.ALEMANHA, Pais.ESPANHA, Pais.ITALIA, Pais.PORTUGAL]
 
@@ -24,11 +67,11 @@ async function main() {
 
   // ===== CRIAR OU ATUALIZAR USUÁRIO ADMIN =====
   const senhaHash = await hash('12345678', 10)
-  
+
   const admin = await prisma.usuario.upsert({
     where: { email: 'admin@teste.com' },
     update: {
-      senha: senhaHash,  // Atualiza a senha se já existir
+      senha: senhaHash, // Atualiza a senha se já existir
       nome: 'Administrador',
       tipo: 'admin'
     },
@@ -39,55 +82,123 @@ async function main() {
       tipo: 'admin'
     }
   })
-  
-  console.log('✅ Usuário admin criado/atualizado!')
-  console.log('📧 Email: admin@teste.com')
-  console.log('🔑 Senha: 12345678')
-  console.log(`👤 ID: ${admin.id}`)
 
-  // ===== CRIAR ETAPAS DE KANBAN =====
-  console.log('\n📋 Criando etapas do Kanban...')
+  console.log(`✅ Usuário admin criado/atualizado: ${admin.email}`)
+
+  // ===== CRIAR ETAPAS POR PAÍS =====
+  console.log('\n📋 Criando etapas por país...')
 
   for (const pais of paises) {
-    console.log(`\n🌍 ${pais}:`)
+    const etapas = etapasPorPais[pais]
+    console.log(`\n   ${pais}:`)
 
-    for (let i = 0; i < etapasPadrao.length; i++) {
-      const nome = etapasPadrao[i]
+    for (let i = 0; i < etapas.length; i++) {
+      const nomeEtapa = etapas[i]
 
-      // Verificar se já existe
-      const existente = await prisma.status.findFirst({
+      await prisma.status.upsert({
         where: {
-          nome,
-          pais,
+          nome_pais: {
+            nome: nomeEtapa,
+            pais: pais,
+          },
         },
-      })
-
-      if (existente) {
-        console.log(`   ⏭️  "${nome}" já existe`)
-        continue
-      }
-
-      await prisma.status.create({
-        data: {
-          nome,
-          pais,
+        update: {
+          ordem: i,
+        },
+        create: {
+          nome: nomeEtapa,
+          pais: pais,
           ordem: i,
         },
       })
 
-      console.log(`   ✅ "${nome}"`)
+      console.log(`      ${i + 1}. ${nomeEtapa}`)
     }
   }
 
-  console.log('\n✨ Seed concluído com sucesso!')
+  // ===== CRIAR CATEGORIAS FINANCEIRAS PADRÃO =====
+  console.log('\n💰 Criando categorias financeiras...')
+
+  const categoriasEntrada = [
+    { nome: 'Honorários', cor: '#22c55e', icone: 'banknotes' },
+    { nome: 'Reembolsos', cor: '#3b82f6', icone: 'arrow-uturn-left' },
+    { nome: 'Outros Recebimentos', cor: '#8b5cf6', icone: 'plus-circle' },
+  ]
+
+  const categoriasSaida = [
+    { nome: 'Certidões', cor: '#ef4444', icone: 'document-text' },
+    { nome: 'Traduções', cor: '#f97316', icone: 'language' },
+    { nome: 'Apostilamentos', cor: '#eab308', icone: 'stamp' },
+    { nome: 'Taxas Consulares', cor: '#14b8a6', icone: 'building-library' },
+    { nome: 'Despesas Operacionais', cor: '#6366f1', icone: 'cog' },
+    { nome: 'Impostos', cor: '#ec4899', icone: 'receipt-percent' },
+    { nome: 'Outras Despesas', cor: '#78716c', icone: 'minus-circle' },
+  ]
+
+  for (const cat of categoriasEntrada) {
+    await prisma.categoriaFinanceira.upsert({
+      where: { id: -1 }, // Força criar se não existir por nome
+      update: {},
+      create: {
+        nome: cat.nome,
+        tipo: 'ENTRADA',
+        cor: cat.cor,
+        icone: cat.icone,
+      },
+    }).catch(async () => {
+      // Se já existe, ignora
+      const existe = await prisma.categoriaFinanceira.findFirst({
+        where: { nome: cat.nome, tipo: 'ENTRADA' }
+      })
+      if (!existe) {
+        await prisma.categoriaFinanceira.create({
+          data: {
+            nome: cat.nome,
+            tipo: 'ENTRADA',
+            cor: cat.cor,
+            icone: cat.icone,
+          }
+        })
+      }
+    })
+  }
+
+  for (const cat of categoriasSaida) {
+    const existe = await prisma.categoriaFinanceira.findFirst({
+      where: { nome: cat.nome, tipo: 'SAIDA' }
+    })
+    if (!existe) {
+      await prisma.categoriaFinanceira.create({
+        data: {
+          nome: cat.nome,
+          tipo: 'SAIDA',
+          cor: cat.cor,
+          icone: cat.icone,
+        }
+      })
+    }
+  }
+
+  console.log('   ✅ Categorias financeiras criadas')
+
+  // ===== RESUMO FINAL =====
+  console.log('\n\n📊 RESUMO:')
+  
+  const totalStatus = await prisma.status.count()
+  const totalCategorias = await prisma.categoriaFinanceira.count()
+  
+  console.log(`   - ${totalStatus} etapas criadas`)
+  console.log(`   - ${totalCategorias} categorias financeiras`)
+  console.log(`   - 1 usuário admin`)
+
+  console.log('\n✅ Seed concluído com sucesso!')
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect()
-  })
-  .catch(async (e) => {
-    console.error('❌ Erro ao executar seed:', e)
-    await prisma.$disconnect()
+  .catch((e) => {
+    console.error('❌ Erro no seed:', e)
     process.exit(1)
+  })
+  .finally(async () => {
+    await prisma.$disconnect()
   })
