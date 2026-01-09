@@ -916,8 +916,10 @@ export function ProcessoDetailsModal({
               </div>
 
               {/* ========== COLUNA DIREITA - TAREFAS (COMPONENTE) ========== */}
+              {/* ✅ CORRIGIDO: Adicionado prop pais */}
               <ProcessoTarefas 
-                processoId={processo.id} 
+                processoId={processo.id}
+                pais={paisConfig.label}
                 onUpdate={onSave}
               />
             </div>

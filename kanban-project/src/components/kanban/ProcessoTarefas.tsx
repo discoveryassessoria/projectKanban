@@ -16,9 +16,10 @@ import {
   X,
   ChevronRight,
   ChevronDown,
-  GripVertical
+  GripVertical,
+  ListTodo
 } from "lucide-react"
-import { TAREFAS_PRE_DEFINIDAS, type TarefaPreDefinida } from "../../lib/tarefas-config"
+import { getTarefasPorPais, type TarefaPreDefinida } from "../../lib/tarefas-config"
 
 // ==========================================
 // TIPOS
@@ -45,6 +46,7 @@ interface Tarefa {
 
 interface ProcessoTarefasProps {
   processoId: number
+  pais: string // Nova prop para filtrar tarefas por país
   onUpdate?: () => void
 }
 
@@ -60,9 +62,9 @@ interface CirculoProgressoProps {
 
 function CirculoProgresso({ 
   porcentagem, 
-  tamanho = 48, 
+  tamanho = 44, 
   corFundo = "#e5e7eb",
-  corProgresso = "#2563eb"
+  corProgresso = "#3b82f6"
 }: CirculoProgressoProps) {
   const raio = (tamanho - 6) / 2
   const circunferencia = 2 * Math.PI * raio
@@ -72,7 +74,7 @@ function CirculoProgresso({
   if (porcentagem >= 100) {
     return (
       <div 
-        className="flex items-center justify-center rounded-full bg-green-500"
+        className="flex items-center justify-center rounded-full bg-emerald-500 shadow-sm shadow-emerald-200"
         style={{ width: tamanho, height: tamanho }}
       >
         <svg 
@@ -119,10 +121,28 @@ function CirculoProgresso({
         />
       </svg>
       {/* Porcentagem no centro */}
-      <span className="absolute text-xs font-semibold text-gray-700">
+      <span className="absolute text-[11px] font-bold text-gray-600">
         {Math.round(porcentagem)}%
       </span>
     </div>
+  )
+}
+
+// ==========================================
+// COMPONENTE: Badge de Prioridade
+// ==========================================
+function BadgePrioridade({ prioridade }: { prioridade: string }) {
+  const config = {
+    URGENTE: { bg: "bg-red-50", text: "text-red-600", border: "border-red-200", label: "Urgente" },
+    ALTA: { bg: "bg-orange-50", text: "text-orange-600", border: "border-orange-200", label: "Alta" },
+    MEDIA: { bg: "bg-amber-50", text: "text-amber-600", border: "border-amber-200", label: "Média" },
+    BAIXA: { bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-200", label: "Baixa" },
+  }[prioridade] || { bg: "bg-gray-50", text: "text-gray-600", border: "border-gray-200", label: prioridade }
+
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border ${config.bg} ${config.text} ${config.border}`}>
+      {config.label}
+    </span>
   )
 }
 
@@ -141,40 +161,54 @@ function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
   const concluidas = subtarefas.filter(s => s.concluida).length
   const porcentagem = temSubtarefas ? (concluidas / subtarefas.length) * 100 : (tarefa.concluida ? 100 : 0)
 
-  const getPrioridadeCor = (prioridade: string) => {
-    switch (prioridade) {
-      case "URGENTE": return "bg-red-500"
-      case "ALTA": return "bg-orange-500"
-      case "MEDIA": return "bg-yellow-500"
-      case "BAIXA": return "bg-green-500"
-      default: return "bg-gray-400"
-    }
-  }
+  // Verificar se está atrasada
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+  const prazo = tarefa.dataPrazo ? new Date(tarefa.dataPrazo) : null
+  const atrasada = prazo && prazo < hoje && !tarefa.concluida
 
   return (
     <div
       onClick={onClick}
       className={`
-        group relative flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer
-        transition-all duration-200 ease-out
+        group relative flex items-center gap-4 p-4 rounded-xl cursor-pointer
+        transition-all duration-200 ease-out border
         ${tarefa.concluida 
-          ? 'bg-gray-50 border-gray-200 opacity-75' 
-          : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-100'
+          ? 'bg-gray-50/80 border-gray-200/60 opacity-70' 
+          : atrasada
+            ? 'bg-white border-red-200 hover:border-red-300 hover:shadow-md hover:shadow-red-100/50'
+            : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-md hover:shadow-blue-100/50'
         }
       `}
     >
-      {/* Círculo de progresso - apenas visual */}
-      <div className="flex-shrink-0">
+      {/* Indicador lateral de prioridade */}
+      {!tarefa.concluida && (
+        <div className={`absolute left-0 top-3 bottom-3 w-1 rounded-r-full transition-all
+          ${tarefa.prioridade === 'URGENTE' ? 'bg-red-500' : ''}
+          ${tarefa.prioridade === 'ALTA' ? 'bg-orange-500' : ''}
+          ${tarefa.prioridade === 'MEDIA' ? 'bg-amber-400' : ''}
+          ${tarefa.prioridade === 'BAIXA' ? 'bg-emerald-400' : ''}
+        `} />
+      )}
+
+      {/* Círculo de progresso */}
+      <div className="flex-shrink-0 ml-1">
         {temSubtarefas ? (
-          <CirculoProgresso 
-            porcentagem={porcentagem}
-          />
+          <CirculoProgresso porcentagem={porcentagem} />
         ) : (
-          <div className="w-12 h-12 rounded-full border-2 border-gray-300 flex items-center justify-center">
+          <div className={`
+            w-11 h-11 rounded-full border-2 flex items-center justify-center transition-all
+            ${tarefa.concluida 
+              ? 'bg-emerald-500 border-emerald-500' 
+              : 'border-gray-300 group-hover:border-blue-400'
+            }
+          `}>
             {tarefa.concluida ? (
-              <CheckCircle2 className="w-8 h-8 text-green-500" />
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
             ) : (
-              <Circle className="w-8 h-8 text-gray-300" />
+              <Circle className="w-5 h-5 text-gray-300 group-hover:text-blue-400 transition-colors" />
             )}
           </div>
         )}
@@ -182,48 +216,56 @@ function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
 
       {/* Conteúdo */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <h4 className={`font-semibold text-base ${tarefa.concluida ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+        <div className="flex items-center gap-2 mb-1.5">
+          <h4 className={`font-semibold text-[15px] leading-tight ${tarefa.concluida ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
             {tarefa.titulo}
           </h4>
-          <span 
-            className={`w-2.5 h-2.5 rounded-full ${getPrioridadeCor(tarefa.prioridade)}`} 
-            title={tarefa.prioridade}
-          />
         </div>
 
         {/* Info adicional */}
-        <div className="flex items-center gap-4 text-sm text-gray-500">
+        <div className="flex items-center flex-wrap gap-2 text-xs">
+          {!tarefa.concluida && <BadgePrioridade prioridade={tarefa.prioridade} />}
+          
           {temSubtarefas && (
-            <span className="font-medium">
-              {concluidas} de {subtarefas.length} {subtarefas.length === 1 ? 'subtarefa' : 'subtarefas'}
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 font-medium border border-blue-100">
+              <ListTodo className="w-3 h-3" />
+              {concluidas}/{subtarefas.length}
             </span>
           )}
+          
           {tarefa.dataPrazo && (
-            <span className="flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5" />
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium border
+              ${atrasada 
+                ? 'bg-red-50 text-red-600 border-red-200' 
+                : 'bg-gray-50 text-gray-600 border-gray-200'
+              }
+            `}>
+              <Calendar className="w-3 h-3" />
               {new Date(tarefa.dataPrazo).toLocaleDateString('pt-BR')}
             </span>
           )}
+          
           {tarefa.responsavel && (
-            <span className="flex items-center gap-1">
-              <User className="w-3.5 h-3.5" />
-              {tarefa.responsavel.nome}
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 font-medium border border-gray-200">
+              <User className="w-3 h-3" />
+              {tarefa.responsavel.nome.split(' ')[0]}
             </span>
           )}
         </div>
       </div>
 
-      {/* Seta e ações */}
-      <div className="flex items-center gap-2">
+      {/* Ações */}
+      <div className="flex items-center gap-1">
         <button
           onClick={onDelete}
-          className="p-2 text-gray-400 hover:text-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
           title="Excluir"
         >
           <Trash2 className="w-4 h-4" />
         </button>
-        <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
+        <div className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 group-hover:text-blue-500 group-hover:bg-blue-50 transition-all">
+          <ChevronRight className="w-5 h-5" />
+        </div>
       </div>
     </div>
   )
@@ -257,8 +299,14 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
     responsavelId: subtarefa.responsavelId?.toString() || ""
   })
 
+  // ✅ Verificar se é uma subtarefa temporária (ID negativo)
+  const isTemporaria = subtarefa.id < 0
+
   // Buscar sub-subtarefas quando expandir
   const fetchSubSubtarefas = async () => {
+    // Não busca se for temporária
+    if (isTemporaria) return
+    
     try {
       const response = await fetch(`/api/tarefas/${subtarefa.id}`)
       const data = await response.json()
@@ -272,7 +320,7 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
 
   // Criar sub-subtarefa
   const handleCriarSubSub = async () => {
-    if (!novaSubSub.trim()) return
+    if (!novaSubSub.trim() || isTemporaria) return
     setCriandoSubSub(true)
     try {
       const response = await fetch(`/api/tarefas/${subtarefa.id}/subtarefas`, {
@@ -294,6 +342,7 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
 
   // Salvar edição
   const handleSalvar = async () => {
+    if (isTemporaria) return
     setSalvando(true)
     try {
       const response = await fetch(`/api/tarefas/${subtarefa.id}`, {
@@ -320,6 +369,9 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
 
   // Toggle sub-subtarefa
   const handleToggleSubSub = async (id: number) => {
+    // ✅ Não permite toggle em IDs temporários (negativos)
+    if (id < 0) return
+    
     try {
       const response = await fetch(`/api/tarefas/${id}/toggle`, { method: "POST" })
       if (response.ok) {
@@ -333,6 +385,7 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
 
   // Excluir sub-subtarefa
   const handleDeleteSubSub = async (id: number) => {
+    if (id < 0) return // Não exclui temporárias
     if (!confirm("Excluir esta subtarefa?")) return
     try {
       const response = await fetch(`/api/tarefas/${id}`, { method: "DELETE" })
@@ -346,7 +399,7 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
   }
 
   const handleExpandir = () => {
-    if (!expandido) {
+    if (!expandido && !isTemporaria) {
       fetchSubSubtarefas()
     }
     setExpandido(!expandido)
@@ -360,26 +413,23 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
       {/* Item principal */}
       <div
         className={`
-          group flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all
+          group flex items-center gap-3 px-4 py-3 rounded-xl border transition-all
           ${subtarefa.concluida 
             ? 'bg-gray-50 border-gray-200' 
             : 'bg-white border-gray-200 hover:border-blue-300'
           }
-          ${processando.has(subtarefa.id) ? 'opacity-70' : ''}
+          ${processando.has(subtarefa.id) || isTemporaria ? 'opacity-70' : ''}
           ${expandido ? 'border-blue-400 shadow-sm' : ''}
         `}
       >
-        {/* Checkbox circular - clicável para concluir */}
-        <button
-          onClick={() => onToggle(subtarefa.id)}
-          disabled={processando.has(subtarefa.id)}
+        {/* Checkbox circular - apenas visual (não clicável) */}
+        <div
           className={`
             w-7 h-7 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all
             ${subtarefa.concluida 
               ? 'bg-blue-600 border-blue-600' 
-              : 'border-gray-300 hover:border-blue-500'
+              : 'border-gray-300'
             }
-            ${processando.has(subtarefa.id) ? 'cursor-wait' : 'cursor-pointer'}
           `}
         >
           {subtarefa.concluida && (
@@ -387,14 +437,19 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
             </svg>
           )}
-        </button>
+        </div>
 
         {/* Título e info */}
         <div className="flex-1 min-w-0">
           <span className={`text-sm ${subtarefa.concluida ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
             {subtarefa.titulo}
           </span>
-          {temSubSubtarefas && (
+          {isTemporaria && (
+            <span className="ml-2 text-xs text-gray-400 italic">
+              (salvando...)
+            </span>
+          )}
+          {temSubSubtarefas && !isTemporaria && (
             <span className="ml-2 text-xs text-gray-400">
               ({concluidasSubSub}/{subSubtarefas.length})
             </span>
@@ -402,34 +457,38 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
         </div>
 
         {/* Botão excluir */}
-        <button
-          onClick={() => {
-            if (confirm("Excluir esta subtarefa?")) {
-              onDelete(subtarefa.id)
-            }
-          }}
-          className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        {!isTemporaria && (
+          <button
+            onClick={() => {
+              if (confirm("Excluir esta subtarefa?")) {
+                onDelete(subtarefa.id)
+              }
+            }}
+            className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
 
         {/* Seta - expande/colapsa */}
-        <button
-          onClick={handleExpandir}
-          className={`
-            p-1.5 rounded-lg transition-all
-            text-gray-400 hover:text-blue-500 hover:bg-blue-50
-          `}
-        >
-          <ChevronDown className={`w-5 h-5 transition-transform ${expandido ? 'rotate-180' : ''}`} />
-        </button>
+        {!isTemporaria && (
+          <button
+            onClick={handleExpandir}
+            className={`
+              p-1.5 rounded-lg transition-all
+              text-gray-400 hover:text-blue-500 hover:bg-blue-50
+            `}
+          >
+            <ChevronDown className={`w-5 h-5 transition-transform ${expandido ? 'rotate-180' : ''}`} />
+          </button>
+        )}
       </div>
 
       {/* Área expandida */}
-      {expandido && (
-        <div className="mt-2 ml-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
-          {/* Detalhes / Edição */}
-          <div className="bg-gray-50 rounded-lg p-3 space-y-3">
+      {expandido && !isTemporaria && (
+        <div className="mt-2 ml-4 animate-in slide-in-from-top-2 duration-200">
+          {/* Caixa de detalhes + subtarefas */}
+          <div className="bg-gray-50 rounded-lg p-3 space-y-4">
             {editando ? (
               <>
                 <Input
@@ -494,93 +553,119 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
                 </div>
               </>
             ) : (
-              <div className="space-y-2">
-                {subtarefa.descricao ? (
-                  <p className="text-sm text-gray-600">{subtarefa.descricao}</p>
-                ) : (
-                  <p className="text-xs text-gray-400 italic">Sem descrição</p>
-                )}
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="px-2 py-0.5 rounded-full bg-white border text-gray-600">
-                    {subtarefa.prioridade === "URGENTE" && "🔴 Urgente"}
-                    {subtarefa.prioridade === "ALTA" && "🟠 Alta"}
-                    {subtarefa.prioridade === "MEDIA" && "🟡 Média"}
-                    {subtarefa.prioridade === "BAIXA" && "🟢 Baixa"}
-                  </span>
-                  {subtarefa.dataPrazo && (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border text-gray-600">
-                      <Calendar className="w-3 h-3" />
-                      {new Date(subtarefa.dataPrazo).toLocaleDateString('pt-BR')}
-                    </span>
+              <>
+                {/* Detalhes */}
+                <div className="space-y-2">
+                  {subtarefa.descricao ? (
+                    <p className="text-sm text-gray-600">{subtarefa.descricao}</p>
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">Sem descrição</p>
                   )}
-                  {subtarefa.responsavel && (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border text-gray-600">
-                      <User className="w-3 h-3" />
-                      {subtarefa.responsavel.nome}
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="px-2 py-0.5 rounded-full bg-white border text-gray-600">
+                      {subtarefa.prioridade === "URGENTE" && "🔴 Urgente"}
+                      {subtarefa.prioridade === "ALTA" && "🟠 Alta"}
+                      {subtarefa.prioridade === "MEDIA" && "🟡 Média"}
+                      {subtarefa.prioridade === "BAIXA" && "🟢 Baixa"}
                     </span>
-                  )}
-                  <button
-                    onClick={() => setEditando(true)}
-                    className="text-blue-600 hover:text-blue-700 hover:underline ml-auto"
-                  >
-                    Editar
-                  </button>
+                    {subtarefa.dataPrazo && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border text-gray-600">
+                        <Calendar className="w-3 h-3" />
+                        {new Date(subtarefa.dataPrazo).toLocaleDateString('pt-BR')}
+                      </span>
+                    )}
+                    {subtarefa.responsavel && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border text-gray-600">
+                        <User className="w-3 h-3" />
+                        {subtarefa.responsavel.nome}
+                      </span>
+                    )}
+                  </div>
+                  {/* Botões de ação */}
+                  <div className="flex items-center gap-2 pt-2 border-t border-gray-200 mt-2">
+                    <button
+                      onClick={() => onToggle(subtarefa.id)}
+                      disabled={processando.has(subtarefa.id)}
+                      className={`
+                        flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-colors
+                        ${subtarefa.concluida 
+                          ? 'bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200' 
+                          : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'
+                        }
+                        disabled:opacity-50
+                      `}
+                    >
+                      {processando.has(subtarefa.id) ? (
+                        <Loader2 className="w-3 h-3 animate-spin mx-auto" />
+                      ) : subtarefa.concluida ? (
+                        "↩ Reabrir"
+                      ) : (
+                        "✓ Marcar como concluída"
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setEditando(true)}
+                      className="py-1.5 px-3 rounded-lg text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200 transition-colors"
+                    >
+                      Editar
+                    </button>
+                  </div>
                 </div>
-              </div>
+
+                {/* Subtarefas - dentro da mesma caixa */}
+                {nivel < 2 && (
+                  <div className="pt-3 border-t border-gray-200">
+                    <h4 className="text-xs font-medium text-gray-500 mb-2">Subtarefas</h4>
+                    
+                    {subSubtarefas.length > 0 ? (
+                      <div className="space-y-2 mb-3">
+                        {subSubtarefas.map((subSub) => (
+                          <SubtarefaItem
+                            key={subSub.id}
+                            subtarefa={subSub}
+                            nivel={nivel + 1}
+                            onToggle={handleToggleSubSub}
+                            onDelete={handleDeleteSubSub}
+                            onUpdate={onUpdate}
+                            processando={new Set()}
+                            usuarios={usuarios}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 mb-2">Nenhuma subtarefa</p>
+                    )}
+
+                    {/* Input nova sub-subtarefa */}
+                    <div className="flex items-center gap-2">
+                      <Input
+                        placeholder="Adicionar subtarefa..."
+                        value={novaSubSub}
+                        onChange={(e) => setNovaSubSub(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !criandoSubSub) handleCriarSubSub()
+                        }}
+                        disabled={criandoSubSub}
+                        className="flex-1 h-8 text-sm bg-white"
+                      />
+                      <Button
+                        onClick={handleCriarSubSub}
+                        disabled={criandoSubSub || !novaSubSub.trim()}
+                        size="sm"
+                        className="h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700"
+                      >
+                        {criandoSubSub ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Plus className="w-3 h-3" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
-
-          {/* Sub-subtarefas */}
-          {nivel < 2 && ( // Limita a 3 níveis
-            <div className="space-y-2">
-              <h4 className="text-xs font-medium text-gray-500 px-1">Subtarefas</h4>
-              
-              {subSubtarefas.length > 0 ? (
-                <div className="space-y-2">
-                  {subSubtarefas.map((subSub) => (
-                    <SubtarefaItem
-                      key={subSub.id}
-                      subtarefa={subSub}
-                      nivel={nivel + 1}
-                      onToggle={handleToggleSubSub}
-                      onDelete={handleDeleteSubSub}
-                      onUpdate={onUpdate}
-                      processando={new Set()}
-                      usuarios={usuarios}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-gray-400 px-1">Nenhuma subtarefa</p>
-              )}
-
-              {/* Input nova sub-subtarefa */}
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="Adicionar subtarefa..."
-                  value={novaSubSub}
-                  onChange={(e) => setNovaSubSub(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !criandoSubSub) handleCriarSubSub()
-                  }}
-                  disabled={criandoSubSub}
-                  className="flex-1 h-8 text-sm"
-                />
-                <Button
-                  onClick={handleCriarSubSub}
-                  disabled={criandoSubSub || !novaSubSub.trim()}
-                  size="sm"
-                  className="h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700"
-                >
-                  {criandoSubSub ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Plus className="w-3 h-3" />
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -634,7 +719,8 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
     if (!novaSubtarefa.trim()) return
 
     const tituloNovo = novaSubtarefa.trim()
-    const tempId = Date.now() // ID temporário
+    // ✅ CORRIGIDO: ID temporário NEGATIVO para distinguir de IDs reais
+    const tempId = -Date.now()
     
     // Optimistic update - adiciona imediatamente
     const novaSubtarefaTemp: Tarefa = {
@@ -657,7 +743,16 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
         body: JSON.stringify({ titulo: tituloNovo })
       })
 
-      if (!response.ok) {
+      if (response.ok) {
+        // ✅ Atualiza com o ID real do servidor
+        const data = await response.json()
+        if (data.subtarefa) {
+          setSubtarefasLocal(prev => 
+            prev.map(s => s.id === tempId ? data.subtarefa : s)
+          )
+        }
+        onUpdate()
+      } else {
         // Reverte se falhou
         setSubtarefasLocal(prev => prev.filter(s => s.id !== tempId))
         onSubtarefaRemove?.(tempId)
@@ -676,6 +771,12 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
 
   // Toggle subtarefa com optimistic update (protegido contra cliques rápidos)
   const handleToggleSubtarefa = async (subtarefaId: number) => {
+    // ✅ CORRIGIDO: Não permite toggle em IDs temporários (negativos)
+    if (subtarefaId < 0) {
+      console.log("Subtarefa ainda sendo salva, aguarde...")
+      return
+    }
+    
     // Se já está processando esta subtarefa, ignora
     if (processando.has(subtarefaId)) return
     
@@ -739,6 +840,9 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
 
   // Excluir subtarefa com optimistic update
   const handleExcluirSubtarefa = async (subtarefaId: number) => {
+    // ✅ Não exclui subtarefas temporárias
+    if (subtarefaId < 0) return
+    
     // Guarda estado anterior para reverter se necessário
     const subtarefaRemovida = subtarefasLocal.find(s => s.id === subtarefaId)
     
@@ -1038,7 +1142,7 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
 // ==========================================
 // COMPONENTE PRINCIPAL: ProcessoTarefas
 // ==========================================
-export function ProcessoTarefas({ processoId, onUpdate }: ProcessoTarefasProps) {
+export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasProps) {
   const [tarefas, setTarefas] = useState<Tarefa[]>([])
   const [loading, setLoading] = useState(true)
   const [novaTarefa, setNovaTarefa] = useState("")
@@ -1050,6 +1154,9 @@ export function ProcessoTarefas({ processoId, onUpdate }: ProcessoTarefasProps) 
   const [mostrarSeletor, setMostrarSeletor] = useState(false)
   const [mostrarInputCustom, setMostrarInputCustom] = useState(false)
   const seletorRef = useRef<HTMLDivElement>(null)
+  
+  // Obter tarefas pré-definidas do país
+  const tarefasPreDefinidas = getTarefasPorPais(pais)
   
   // Ref para rastrear o ID do modal aberto (evita bugs de re-abertura)
   const modalAbertoIdRef = useRef<number | null>(null)
@@ -1196,18 +1303,23 @@ export function ProcessoTarefas({ processoId, onUpdate }: ProcessoTarefasProps) 
       {/* Header */}
       <div className="flex items-center justify-between border-b bg-white px-4 py-3 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-5 w-5 text-blue-600" />
-          <h3 className="font-semibold text-gray-900">Tarefas</h3>
-          {tarefas.length > 0 && (
-            <span className="px-2 py-0.5 bg-blue-100 text-blue-600 text-xs font-medium rounded-full">
-              {tarefasPendentes.length} pendente{tarefasPendentes.length !== 1 ? 's' : ''}
-            </span>
-          )}
+          <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+            <CheckCircle2 className="h-4 w-4 text-blue-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900 text-sm">Tarefas</h3>
+            {tarefas.length > 0 && (
+              <p className="text-xs text-gray-500">
+                {tarefasPendentes.length} pendente{tarefasPendentes.length !== 1 ? 's' : ''}
+                {tarefasConcluidas.length > 0 && ` · ${tarefasConcluidas.length} concluída${tarefasConcluidas.length !== 1 ? 's' : ''}`}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Seletor de nova tarefa */}
-      <div className="p-4 border-b flex-shrink-0" ref={seletorRef}>
+      <div className="p-4 border-b flex-shrink-0 bg-gray-50/50" ref={seletorRef}>
         <div className="relative">
           {/* Botão principal / Input customizado */}
           {mostrarInputCustom ? (
@@ -1224,7 +1336,7 @@ export function ProcessoTarefas({ processoId, onUpdate }: ProcessoTarefasProps) 
                   }
                 }}
                 disabled={criando}
-                className="flex-1"
+                className="flex-1 bg-white"
                 autoFocus
               />
               <Button
@@ -1254,30 +1366,44 @@ export function ProcessoTarefas({ processoId, onUpdate }: ProcessoTarefasProps) 
             <button
               onClick={() => setMostrarSeletor(!mostrarSeletor)}
               disabled={criando}
-              className="w-full flex items-center justify-between px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-left hover:border-blue-400 transition-colors disabled:opacity-50"
+              className="w-full flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl text-left hover:border-blue-300 hover:shadow-sm transition-all disabled:opacity-50 group"
             >
-              <span className="text-gray-500">Adicionar nova tarefa...</span>
+              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                <Plus className="h-4 w-4 text-blue-600" />
+              </div>
+              <span className="flex-1 text-gray-500 text-sm">Adicionar nova tarefa...</span>
               <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${mostrarSeletor ? 'rotate-180' : ''}`} />
             </button>
           )}
 
           {/* Dropdown de opções */}
           {mostrarSeletor && !mostrarInputCustom && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-              {TAREFAS_PRE_DEFINIDAS.map((tarefa) => (
-                <button
-                  key={tarefa.id}
-                  onClick={() => handleSelecionarTarefaPreDefinida(tarefa)}
-                  disabled={criando}
-                  className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  <CheckCircle2 className="h-4 w-4 text-gray-300" />
-                  {tarefa.nome}
-                </button>
-              ))}
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-72 overflow-y-auto">
+              {tarefasPreDefinidas.length > 0 ? (
+                <>
+                  <div className="px-4 py-2 border-b border-gray-100">
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Tarefas de {pais}</p>
+                  </div>
+                  {tarefasPreDefinidas.map((tarefa) => (
+                    <button
+                      key={tarefa.id}
+                      onClick={() => handleSelecionarTarefaPreDefinida(tarefa)}
+                      disabled={criando}
+                      className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors disabled:opacity-50 flex items-center gap-3"
+                    >
+                      <Circle className="h-4 w-4 text-gray-300" />
+                      {tarefa.nome}
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <div className="px-4 py-3 text-sm text-gray-500">
+                  Nenhuma tarefa pré-definida para {pais}
+                </div>
+              )}
               
               {/* Separador */}
-              <div className="border-t border-gray-100 my-1" />
+              <div className="border-t border-gray-100" />
               
               {/* Opção "Outro" */}
               <button
@@ -1285,7 +1411,7 @@ export function ProcessoTarefas({ processoId, onUpdate }: ProcessoTarefasProps) 
                   setMostrarSeletor(false)
                   setMostrarInputCustom(true)
                 }}
-                className="w-full px-4 py-2.5 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-2 font-medium"
+                className="w-full px-4 py-3 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-3 font-medium"
               >
                 <Plus className="h-4 w-4" />
                 Outro (digitar nome)
@@ -1298,14 +1424,16 @@ export function ProcessoTarefas({ processoId, onUpdate }: ProcessoTarefasProps) 
       {/* Lista de tarefas - com scroll */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         {loading ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
           </div>
         ) : tarefas.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-            <p className="font-medium">Nenhuma tarefa ainda</p>
-            <p className="text-sm">Adicione tarefas para acompanhar o progresso</p>
+          <div className="text-center py-12">
+            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="h-8 w-8 text-gray-300" />
+            </div>
+            <p className="font-medium text-gray-600">Nenhuma tarefa ainda</p>
+            <p className="text-sm text-gray-400 mt-1">Adicione tarefas para acompanhar o progresso</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -1321,9 +1449,11 @@ export function ProcessoTarefas({ processoId, onUpdate }: ProcessoTarefasProps) 
 
             {/* Separador */}
             {tarefasConcluidas.length > 0 && tarefasPendentes.length > 0 && (
-              <div className="flex items-center gap-2 py-2">
+              <div className="flex items-center gap-3 py-3">
                 <div className="flex-1 h-px bg-gray-200" />
-                <span className="text-xs text-gray-400">Concluídas ({tarefasConcluidas.length})</span>
+                <span className="text-xs font-medium text-gray-400 bg-gray-50 px-3 py-1 rounded-full">
+                  Concluídas ({tarefasConcluidas.length})
+                </span>
                 <div className="flex-1 h-px bg-gray-200" />
               </div>
             )}

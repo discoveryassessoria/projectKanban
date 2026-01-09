@@ -173,6 +173,103 @@ function StatusBadge({ deceased }: { deceased: boolean }) {
   )
 }
 
+// ✅ NOVO: Indicadores de documentos
+interface DocumentoIndicadorProps {
+  tipo: 'NASCIMENTO' | 'CASAMENTO' | 'OBITO'
+  temDocumento: boolean
+  temArquivo: boolean
+}
+
+function DocumentoIndicador({ tipo, temDocumento, temArquivo }: DocumentoIndicadorProps) {
+  const config = {
+    NASCIMENTO: { label: 'Nascimento', abbrev: 'N' },
+    CASAMENTO: { label: 'Casamento', abbrev: 'C' },
+    OBITO: { label: 'Óbito', abbrev: 'O' }
+  }
+  
+  const { label, abbrev } = config[tipo]
+  
+  // Verde = tem arquivo, Amarelo = tem doc mas sem arquivo, Vermelho = não tem doc
+  let bgColor = '#EF4444' // vermelho
+  let statusText = 'Pendente'
+  
+  if (temArquivo) {
+    bgColor = '#22C55E' // verde
+    statusText = 'Anexado'
+  } else if (temDocumento) {
+    bgColor = '#F59E0B' // amarelo
+    statusText = 'Sem arquivo'
+  }
+  
+  return (
+    <div className="group/tooltip relative">
+      <div
+        className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold cursor-help transition-transform hover:scale-110 shadow-sm"
+        style={{ backgroundColor: bgColor }}
+      >
+        {abbrev}
+      </div>
+      {/* Tooltip */}
+      <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-[100] pointer-events-none shadow-lg">
+        {label}: {statusText}
+        <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900" />
+      </div>
+    </div>
+  )
+}
+
+interface DocumentosIndicadoresProps {
+  pessoa: PessoaArvore
+  temConjuge: boolean
+}
+
+function DocumentosIndicadores({ pessoa, temConjuge }: DocumentosIndicadoresProps) {
+  const documentos = pessoa.documentos || []
+  const falecido = isDeceased(pessoa)
+  
+  // Função para verificar documento por tipo
+  const verificarDocumento = (tipo: string) => {
+    const doc = documentos.find(d => d.tipo?.toUpperCase() === tipo)
+    return {
+      temDocumento: !!doc,
+      temArquivo: !!(doc?.arquivo_url)
+    }
+  }
+  
+  const nascimento = verificarDocumento('NASCIMENTO')
+  const casamento = verificarDocumento('CASAMENTO')
+  const obito = verificarDocumento('OBITO')
+  
+  return (
+    <div className="absolute left-0 top-0 bottom-0 flex flex-col items-center justify-center gap-1.5 px-1.5 z-10" style={{ transform: 'translateX(-50%)' }}>
+      {/* Nascimento - sempre aparece */}
+      <DocumentoIndicador 
+        tipo="NASCIMENTO" 
+        temDocumento={nascimento.temDocumento}
+        temArquivo={nascimento.temArquivo}
+      />
+      
+      {/* Casamento - só aparece se tem cônjuge */}
+      {temConjuge && (
+        <DocumentoIndicador 
+          tipo="CASAMENTO" 
+          temDocumento={casamento.temDocumento}
+          temArquivo={casamento.temArquivo}
+        />
+      )}
+      
+      {/* Óbito - só aparece se falecido */}
+      {falecido && (
+        <DocumentoIndicador 
+          tipo="OBITO" 
+          temDocumento={obito.temDocumento}
+          temArquivo={obito.temArquivo}
+        />
+      )}
+    </div>
+  )
+}
+
 // ✅ NOVO: Badge de país de nascimento
 function CountryBadge({ pais }: { pais?: string | null }) {
   if (!pais) return null
@@ -216,17 +313,24 @@ export function PessoaCard({
   const conjugeGenderColors = conjuge ? getGenderColors(conjuge.sexo) : null
   const pid = pessoa.pid || generatePID(pessoa.id)
   const conjugePid = conjuge ? (conjuge.pid || generatePID(conjuge.id)) : null
+  
+  // Verifica se tem cônjuge para exibir indicador de casamento
+  const temConjuge = !!(conjuge || (pessoa.unioesComoPessoa1 && pessoa.unioesComoPessoa1.length > 0) || (pessoa.unioesComoPessoa2 && pessoa.unioesComoPessoa2.length > 0))
 
   return (
     <div
-      className={`relative bg-white rounded-xl shadow-lg overflow-hidden transition-all hover:shadow-xl ${isMain ? 'ring-2 ring-offset-2' : ''}`}
+      className={`relative bg-white rounded-xl shadow-lg overflow-visible transition-all hover:shadow-xl ${isMain ? 'ring-2 ring-offset-2' : ''}`}
       style={{
         minWidth: '260px',
         maxWidth: '320px',
         borderLeft: `4px solid ${genderColors.border}`,
-        ...(isMain && { ringColor: colors.green })
+        ...(isMain && { ringColor: colors.green }),
+        marginLeft: '12px' // Espaço para os indicadores
       }}
     >
+      {/* ✅ NOVO: Indicadores de documentos na lateral */}
+      <DocumentosIndicadores pessoa={pessoa} temConjuge={temConjuge} />
+      
       {/* Pessoa principal */}
       <div
         className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"

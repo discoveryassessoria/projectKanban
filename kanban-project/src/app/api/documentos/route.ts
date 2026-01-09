@@ -1,5 +1,5 @@
 // src/app/api/documentos/route.ts
-// ✅ ATUALIZADO: Adiciona automação de criar tarefa quando documento é criado como SOLICITADO
+// ✅ ATUALIZADO: Adiciona automação de criar tarefa quando documento é criado como SOLICITAR
 
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // ✅ ATUALIZADO: Buscar pessoa COM árvore e processos para automação
+    // Buscar pessoa COM árvore e processos para automação
     const pessoa = await prisma.pessoa.findUnique({
       where: { id: parseInt(pessoaId) },
       include: {
@@ -218,21 +218,34 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // ✅ NOVO: Automação - Criar tarefa se documento foi criado como SOLICITADO
+    // ✅ ATUALIZADO: Automação - Criar tarefa se documento foi criado como SOLICITAR
     const statusFinal = (status as StatusDocumento) || 'PENDENTE'
     
-    if (statusFinal === "SOLICITADO") {
+    if (statusFinal === "SOLICITAR") {
       const processoId = pessoa.arvore?.processos[0]?.id
 
       if (processoId) {
         const tipoLabel = getTipoDocumentoLabel(tipo)
         const nomePessoa = `${pessoa.nome} ${pessoa.sobrenome || ""}`.trim()
 
+        // Buscar tarefa pai "Emissão da Pasta Documental"
+        const tarefaPai = await prisma.tarefa.findFirst({
+          where: {
+            processoId,
+            tarefaPaiId: null,
+            titulo: {
+              contains: 'Emissão',
+              mode: 'insensitive'
+            }
+          }
+        })
+
         await prisma.tarefa.create({
           data: {
             titulo: `Solicitar ${tipoLabel} - ${nomePessoa}`,
             descricao: `Solicitar ${tipoLabel} de ${nomePessoa}`,
             processoId,
+            tarefaPaiId: tarefaPai?.id || null,
             prioridade: "MEDIA",
             concluida: false
           }

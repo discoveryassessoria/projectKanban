@@ -768,6 +768,7 @@ export function ArvoreGenealogicaView({
           pessoaId={documentoPessoaId}
           pessoaNome={documentoPessoaNome}
           documento={editingDocumento}
+          processoId={processoId}
           onClose={() => {
             setShowDocumentoModal(false)
             setDocumentoPessoaId(null)

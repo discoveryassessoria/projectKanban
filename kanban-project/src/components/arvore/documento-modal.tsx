@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback } from "react"
 import { X, FileText, Upload, File, Trash2, Eye, Loader2 } from "lucide-react"
 import { useUploadThing } from "@/src/lib/uploadthing"
 import { DatePickerField } from "@/components/ui/date-picker-field"
@@ -17,8 +17,11 @@ const TIPO_DOCUMENTO_OPTIONS = [
   { value: 'OUTRO', label: 'Outro' },
 ]
 
+// ✅ ATUALIZADO: Novos status
 const STATUS_OPTIONS = [
   { value: 'PENDENTE', label: 'Pendente' },
+  { value: 'EM_BUSCA', label: 'Em busca' },
+  { value: 'SOLICITAR', label: 'Solicitar' },
   { value: 'SOLICITADO', label: 'Solicitado' },
   { value: 'RECEBIDO', label: 'Recebido' },
 ]
@@ -37,6 +40,7 @@ interface DocumentoModalProps {
   documento?: DocumentoArvore | null  // Se passar, é edição
   onClose: () => void
   onSuccess: () => void
+  processoId?: number
 }
 
 // Componente de Upload reutilizável
@@ -189,7 +193,8 @@ export function DocumentoModal({
   pessoaNome,
   documento,
   onClose,
-  onSuccess
+  onSuccess,
+  processoId
 }: DocumentoModalProps) {
   const isEditing = !!documento
   const [saving, setSaving] = useState(false)
@@ -270,6 +275,7 @@ export function DocumentoModal({
       })
 
       if (response.ok) {
+        // A API já cria a tarefa automaticamente quando status = SOLICITAR
         onSuccess()
       } else {
         const error = await response.json()

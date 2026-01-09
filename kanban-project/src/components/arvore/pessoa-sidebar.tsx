@@ -116,14 +116,16 @@ const TIPO_DOCUMENTO_LABELS: Record<string, string> = {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  PENDENTE: { label: 'Pendente', color: '#92400E', bg: '#FEF3C7', icon: Clock },
-  SOLICITADO: { label: 'Solicitado', color: '#1E40AF', bg: '#DBEAFE', icon: Clock },
-  RECEBIDO: { label: 'Recebido', color: '#065F46', bg: '#D1FAE5', icon: CheckCircle2 },
-  EM_TRADUCAO: { label: 'Em Tradução', color: '#3730A3', bg: '#E0E7FF', icon: Clock },
-  TRADUZIDO: { label: 'Traduzido', color: '#155E75', bg: '#CFFAFE', icon: CheckCircle2 },
-  APOSTILADO: { label: 'Apostilado', color: '#6B21A8', bg: '#F3E8FF', icon: CheckCircle2 },
-  ENTREGUE: { label: 'Entregue', color: '#166534', bg: '#DCFCE7', icon: CheckCircle2 },
-  INVALIDO: { label: 'Inválido', color: '#991B1B', bg: '#FEE2E2', icon: AlertCircle },
+  PENDENTE: { label: 'Pendente', color: '#92400E', bg: '#FEF3C7', icon: Clock },           // 🟡 Amarelo
+  EM_BUSCA: { label: 'Em Busca', color: '#1D4ED8', bg: '#DBEAFE', icon: Clock },           // 🔵 Azul
+  SOLICITAR: { label: 'Solicitar', color: '#DC2626', bg: '#FEE2E2', icon: AlertCircle },   // 🔴 Vermelho (urgente!)
+  SOLICITADO: { label: 'Solicitado', color: '#EA580C', bg: '#FFEDD5', icon: Clock },       // 🟠 Laranja
+  RECEBIDO: { label: 'Recebido', color: '#059669', bg: '#D1FAE5', icon: CheckCircle2 },    // 🟢 Verde
+  EM_TRADUCAO: { label: 'Em Tradução', color: '#7C3AED', bg: '#EDE9FE', icon: Clock },     // 🟣 Roxo
+  TRADUZIDO: { label: 'Traduzido', color: '#0891B2', bg: '#CFFAFE', icon: CheckCircle2 },  // 🔵 Ciano
+  APOSTILADO: { label: 'Apostilado', color: '#059669', bg: '#D1FAE5', icon: CheckCircle2 },// 🟢 Verde
+  ENTREGUE: { label: 'Entregue', color: '#166534', bg: '#DCFCE7', icon: CheckCircle2 },    // 🟢 Verde escuro
+  INVALIDO: { label: 'Inválido', color: '#991B1B', bg: '#FEE2E2', icon: AlertCircle },     // 🔴 Vermelho
 }
 
 // ========================================
