@@ -19,7 +19,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         filhosComoPai: true,
         filhosComoMae: true,
         arvore: true,
-        // ✅ NOVO: Incluir documentos
         documentos: {
           orderBy: { createdAt: 'desc' }
         },
@@ -81,7 +80,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.x !== undefined) dataToUpdate.x = body.x
     if (body.y !== undefined) dataToUpdate.y = body.y
     
-    // ✅ NOVOS CAMPOS
+    // Campos expandidos
     if (body.estado_nasc !== undefined) dataToUpdate.estado_nasc = body.estado_nasc
     if (body.pais_nasc !== undefined) dataToUpdate.pais_nasc = body.pais_nasc
     if (body.vivo !== undefined) dataToUpdate.vivo = body.vivo
@@ -102,7 +101,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.pais_destino !== undefined) dataToUpdate.pais_destino = body.pais_destino
     if (body.navio !== undefined) dataToUpdate.navio = body.navio
     
-    // ✅ NOVO: Requerente e Linhagem
+    // Requerente e Linhagem
     if (body.requerente !== undefined) dataToUpdate.requerente = body.requerente
     if (body.numeroLinhagem !== undefined) dataToUpdate.numeroLinhagem = body.numeroLinhagem ? parseInt(body.numeroLinhagem) : null
 
@@ -154,15 +153,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: "Pessoa não encontrada" }, { status: 404 })
     }
 
-    // Verificar se tem filhos (não pode deletar se tiver)
-    const totalFilhos = pessoa.filhosComoPai.length + pessoa.filhosComoMae.length
-    if (totalFilhos > 0) {
-      return NextResponse.json(
-        { error: "Não é possível excluir uma pessoa que possui filhos" },
-        { status: 400 }
-      )
-    }
-
     // Executar deleção dentro de uma transação
     await prisma.$transaction(async (tx) => {
       // 1. Deletar documentos da pessoa
@@ -185,7 +175,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         })
       }
 
-      // 3. Remover referências de pai/mãe em outros registros
+      // 3. Remover referências de pai/mãe nos filhos
       await tx.pessoa.updateMany({
         where: { paiId: id },
         data: { paiId: null },
@@ -196,7 +186,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         data: { maeId: null },
       })
 
-      // 4. Finalmente, deletar a pessoa
+      // 4. Deletar a pessoa
       await tx.pessoa.delete({
         where: { id },
       })
