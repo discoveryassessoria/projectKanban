@@ -43,7 +43,7 @@ interface DocumentoModalProps {
   processoId?: number
 }
 
-// Componente de Upload reutilizável
+// ✅ ATUALIZADO: Componente de Upload com barra de progresso
 function FileUploadZone({
   onFileUploaded,
   label,
@@ -54,27 +54,36 @@ function FileUploadZone({
   colorScheme?: "teal" | "cyan" | "purple"
 }) {
   const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [dragActive, setDragActive] = useState(false)
 
   const { startUpload } = useUploadThing("anexoUploader", {
     onClientUploadComplete: (res) => {
       if (res && res[0]) {
+        // ✅ ATUALIZADO: Usar ufsUrl (nova API) com fallback para url
+        const fileUrl = (res[0] as any).ufsUrl || res[0].url
         onFileUploaded({
-          url: res[0].url,
+          url: fileUrl,
           name: res[0].name
         })
       }
       setIsUploading(false)
+      setUploadProgress(0)
     },
     onUploadError: (error) => {
       alert(`Erro no upload: ${error.message}`)
       setIsUploading(false)
+      setUploadProgress(0)
+    },
+    onUploadProgress: (progress) => {
+      setUploadProgress(progress)
     },
   })
 
   const handleFiles = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return
     setIsUploading(true)
+    setUploadProgress(0)
     startUpload(Array.from(files))
   }, [startUpload])
 
@@ -100,19 +109,25 @@ function FileUploadZone({
       border: dragActive ? "border-teal-400" : "border-gray-300",
       bg: dragActive ? "bg-teal-50" : "bg-gray-50",
       text: "text-teal-600",
-      icon: "text-teal-500"
+      icon: "text-teal-500",
+      progressBg: "bg-teal-100",
+      progressBar: "bg-teal-500"
     },
     cyan: {
       border: dragActive ? "border-cyan-400" : "border-gray-300",
       bg: dragActive ? "bg-cyan-50" : "bg-gray-50",
       text: "text-cyan-600",
-      icon: "text-cyan-500"
+      icon: "text-cyan-500",
+      progressBg: "bg-cyan-100",
+      progressBar: "bg-cyan-500"
     },
     purple: {
       border: dragActive ? "border-purple-400" : "border-gray-300",
       bg: dragActive ? "bg-purple-50" : "bg-gray-50",
       text: "text-purple-600",
-      icon: "text-purple-500"
+      icon: "text-purple-500",
+      progressBg: "bg-purple-100",
+      progressBar: "bg-purple-500"
     }
   }
 
@@ -127,9 +142,23 @@ function FileUploadZone({
       className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${scheme.border} ${scheme.bg}`}
     >
       {isUploading ? (
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-3">
           <Loader2 className={`w-8 h-8 animate-spin ${scheme.icon}`} />
-          <span className="text-sm text-gray-600">Enviando...</span>
+          <div className="w-full max-w-xs">
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-gray-600">Enviando...</span>
+              <span className={scheme.text}>{uploadProgress}%</span>
+            </div>
+            <div className={`h-2 rounded-full ${scheme.progressBg}`}>
+              <div 
+                className={`h-2 rounded-full transition-all duration-300 ${scheme.progressBar}`}
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          </div>
+          <span className="text-xs text-gray-500">
+            Aguarde, arquivos grandes podem demorar...
+          </span>
         </div>
       ) : (
         <label className="cursor-pointer flex flex-col items-center gap-2">

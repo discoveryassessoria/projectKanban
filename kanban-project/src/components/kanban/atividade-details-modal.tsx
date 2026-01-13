@@ -959,6 +959,7 @@ export function ProcessoDetailsModal({
           {activeTab === "faturas" && (
             <ProcessoFaturas
             processoId={processo.id}
+            nomeFamilia={processo.nome}
             onUpdate={onSave}
             />
           )}

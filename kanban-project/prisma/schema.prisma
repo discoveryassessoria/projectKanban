@@ -7,6 +7,7 @@
 // ✅ ATUALIZAÇÃO: Campo país e estado expandido para endereços internacionais
 // ✅ ATUALIZAÇÃO: Campos passaporte e crnm em Contratante e Requerente
 // ✅ ATUALIZAÇÃO: Campos requerente e numeroLinhagem em Pessoa
+// ✅ ATUALIZAÇÃO: CustoPessoa com tipoRegistro para custos por documento
 
 generator client {
   provider = "prisma-client-js"
@@ -229,6 +230,9 @@ model Pessoa {
   
   // ✅ NOVO: Custos vinculados à pessoa
   custos CustoPessoa[]
+  
+  // ✅ NOVO: Ordem de exibição na tabela de custos (dentro do mesmo numeroLinhagem)
+  ordemCusto    Int?      @default(0)
   
   // ✅ NOVO: Timestamps
   createdAt DateTime @default(now())
@@ -833,7 +837,8 @@ model TipoServico {
 }
 
 // ========================================
-// CUSTO POR PESSOA - VALORES DA PLANILHA
+// CUSTO POR PESSOA/DOCUMENTO - VALORES DA PLANILHA
+// ✅ ATUALIZADO: Agora suporta custos por documento (tipoRegistro)
 // ========================================
 model CustoPessoa {
   id              Int       @id @default(autoincrement())
@@ -848,6 +853,10 @@ model CustoPessoa {
   tipoServicoId   Int
   tipoServico     TipoServico   @relation(fields: [tipoServicoId], references: [id], onDelete: Cascade)
   
+  // ✅ NOVO: Tipo de registro (Nascimento, Casamento, Óbito)
+  // Permite custos diferentes para cada documento da mesma pessoa
+  tipoRegistro    String?       @db.VarChar(20)
+  
   // Valor
   valor           Decimal       @db.Decimal(10, 2) @default(0)
   observacao      String?       @db.VarChar(200)
@@ -855,15 +864,14 @@ model CustoPessoa {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  // Constraint único: uma pessoa só pode ter um valor por tipo de serviço no processo
-  @@unique([processoId, pessoaId, tipoServicoId])
+  // Constraint único: uma pessoa só pode ter um valor por tipo de serviço E tipo de registro no processo
+  @@unique([processoId, pessoaId, tipoServicoId, tipoRegistro])
   @@index([processoId])
   @@index([pessoaId])
   @@index([tipoServicoId])
 }
 
 // ========================================
-// ADICIONAR AO FINAL DO schema.prisma
 // MÓDULO FINANCEIRO COMPLETO
 // ========================================
 

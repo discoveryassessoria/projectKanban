@@ -13,8 +13,10 @@ export const ourFileRouter = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { maxFileSize: "64MB", maxFileCount: 10 },
   })
     .onUploadComplete(async ({ file }) => {
-      console.log("Upload completo:", file.url)
-      return { url: file.url }
+      // ✅ ATUALIZADO: Usar ufsUrl (nova API) com fallback para url (antiga)
+      const fileUrl = (file as any).ufsUrl || file.url
+      console.log("Upload completo:", fileUrl)
+      return { url: fileUrl }
     }),
 } satisfies FileRouter
 

@@ -52,6 +52,7 @@ interface Totais {
 
 interface ProcessoFaturasProps {
   processoId: number
+  nomeFamilia?: string
   onUpdate?: () => void
 }
 
@@ -94,7 +95,7 @@ const FORMAS_PAGAMENTO = [
   { value: 'OUTRO', label: 'Outro' },
 ]
 
-export function ProcessoFaturas({ processoId, onUpdate }: ProcessoFaturasProps) {
+export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoFaturasProps) {
   const [faturas, setFaturas] = useState<Fatura[]>([])
   const [totais, setTotais] = useState<Totais>({ total: 0, pago: 0, pendente: 0, vencido: 0 })
   const [loading, setLoading] = useState(true)
@@ -277,7 +278,7 @@ export function ProcessoFaturas({ processoId, onUpdate }: ProcessoFaturasProps) 
         {/* Conteúdo da Tabela de Custos */}
         {showCustos && (
           <div className="px-6 pb-6">
-            <TabelaCustos processoId={processoId} />
+            <TabelaCustos processoId={processoId} nomeFamilia={nomeFamilia} />
           </div>
         )}
       </div>
