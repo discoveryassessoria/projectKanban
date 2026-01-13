@@ -7,6 +7,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import type { ProcessoWithStatus } from "@/src/types/kanban"
 
+// ✅ NOVO: Mapeamento de bandeiras por país
+const BANDEIRAS_PAIS: Record<string, string> = {
+  ALEMANHA: "🇩🇪",
+  ESPANHA: "🇪🇸",
+  ITALIA: "🇮🇹",
+  PORTUGAL: "🇵🇹",
+}
+
 interface HeaderBarProps {
   title: string
   subtitle: string
@@ -54,10 +62,8 @@ export function HeaderBar({
   const [showSearchResults, setShowSearchResults] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [searchResults, setSearchResults] = useState<{
-    projetos: any[]
-    processos: any[]
-    arvores: any[]
-  }>({ projetos: [], processos: [], arvores: [] })
+    processos: ProcessoWithStatus[]
+  }>({ processos: [] })
 
   // Estado para notificações buscadas diretamente
   const [notificacoes, setNotificacoes] = useState<{
@@ -179,44 +185,44 @@ export function HeaderBar({
       .slice(0, 2)
   }
 
-  // Função de pesquisa
+  // ✅ ATUALIZADO: Função de pesquisa - só procura processos
   const handleSearch = (query: string) => {
     setSearchQuery(query)
 
     if (query.trim() === "") {
       setShowSearchResults(false)
-      setSearchResults({ projetos: [], processos: [], arvores: [] })
+      setSearchResults({ processos: [] })
       return
     }
 
     const queryLower = query.toLowerCase()
 
-    const projetosFiltrados = projetos.filter(p => 
-      p.nome.toLowerCase().includes(queryLower) ||
-      p.descricao?.toLowerCase().includes(queryLower)
-    )
-
+    // Buscar apenas em processos
     const processosFiltrados = processos.filter(p => 
       p.nome.toLowerCase().includes(queryLower) ||
       p.descricao?.toLowerCase().includes(queryLower) ||
       p.contratantes?.some(c => c.nome?.toLowerCase().includes(queryLower))
     )
 
-    const arvoresFiltradas = arvores.filter(a => 
-      a.nome.toLowerCase().includes(queryLower) ||
-      a.descricao?.toLowerCase().includes(queryLower)
-    )
-
     setSearchResults({
-      projetos: projetosFiltrados.slice(0, 3),
-      processos: processosFiltrados.slice(0, 3),
-      arvores: arvoresFiltradas.slice(0, 3)
+      processos: processosFiltrados.slice(0, 5) // Mostrar até 5 resultados
     })
 
     setShowSearchResults(true)
   }
 
-  const totalResults = searchResults.projetos.length + searchResults.processos.length + searchResults.arvores.length
+  // ✅ NOVO: Função para navegar para o processo
+  const handleProcessoClick = (processo: ProcessoWithStatus) => {
+    // Navegar para a página de processos com os parâmetros corretos
+    const url = `/kanban?pais=${processo.pais}&processoId=${processo.id}`
+    router.push(url)
+    
+    // Limpar a busca
+    setShowSearchResults(false)
+    setSearchQuery("")
+  }
+
+  const totalResults = searchResults.processos.length
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-black/40 backdrop-blur-md shadow-lg">
@@ -248,7 +254,7 @@ export function HeaderBar({
               <Search className="h-4 w-4 text-white/70" />
               <input
                 className="bg-transparent text-xs outline-none placeholder:text-white/60 w-40 text-white"
-                placeholder="Pesquisar no sistema..."
+                placeholder="Pesquisar processos..."
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 onFocus={() => searchQuery && setShowSearchResults(true)}
@@ -262,62 +268,36 @@ export function HeaderBar({
                 {totalResults === 0 ? (
                   <div className="px-4 py-6 text-center text-gray-400">
                     <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm text-gray-600">Nenhum resultado encontrado</p>
+                    <p className="text-sm text-gray-600">Nenhum processo encontrado</p>
                     <p className="text-xs mt-1 text-gray-400">Tente buscar por outro termo</p>
                   </div>
                 ) : (
                   <div className="max-h-80 overflow-y-auto">
-                    {searchResults.processos.length > 0 && (
-                      <div>
-                        <div className="px-3 py-2 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500 font-medium">
-                          Processos
+                    <div className="px-3 py-2 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500 font-medium">
+                      Processos
+                    </div>
+                    {searchResults.processos.map(processo => (
+                      <button
+                        key={`processo-${processo.id}`}
+                        className="w-full px-3 py-2 flex items-center gap-3 hover:bg-gray-100 transition text-left"
+                        onClick={() => handleProcessoClick(processo)}
+                      >
+                        {/* ✅ Bandeira do país */}
+                        <span className="text-lg flex-shrink-0">
+                          {BANDEIRAS_PAIS[processo.pais] || "🏳️"}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-800 truncate font-medium">{processo.nome}</p>
+                          <p className="text-[10px] text-gray-400 truncate">
+                            {processo.contratantes?.[0]?.nome || "Sem contratante"}
+                          </p>
                         </div>
-                        {searchResults.processos.map(processo => (
-                          <button
-                            key={`processo-${processo.id}`}
-                            className="w-full px-3 py-2 flex items-center gap-3 hover:bg-gray-100 transition text-left"
-                            onClick={() => {
-                              router.push('/kanban')
-                              setShowSearchResults(false)
-                              setSearchQuery("")
-                            }}
-                          >
-                            <FolderOpen className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-gray-800 truncate">{processo.nome}</p>
-                              <p className="text-[10px] text-gray-400 truncate">
-                                {processo.contratantes?.[0]?.nome || "Sem contratante"}
-                              </p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {searchResults.arvores.length > 0 && (
-                      <div>
-                        <div className="px-3 py-2 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500 font-medium">
-                          Árvores Genealógicas
-                        </div>
-                        {searchResults.arvores.map(arvore => (
-                          <button
-                            key={`arvore-${arvore.id}`}
-                            className="w-full px-3 py-2 flex items-center gap-3 hover:bg-gray-100 transition text-left"
-                            onClick={() => {
-                              router.push('/genealogy')
-                              setShowSearchResults(false)
-                              setSearchQuery("")
-                            }}
-                          >
-                            <TreeDeciduous className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-gray-800 truncate">{arvore.nome}</p>
-                              <p className="text-[10px] text-gray-400 truncate">{arvore.pessoas?.length || 0} pessoas</p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                        {/* ✅ Indicador visual de clique */}
+                        <span className="text-[10px] text-blue-500 flex-shrink-0">
+                          Clique para abrir →
+                        </span>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>

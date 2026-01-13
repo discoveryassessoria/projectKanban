@@ -101,6 +101,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.porto_chegada !== undefined) dataToUpdate.porto_chegada = body.porto_chegada
     if (body.pais_destino !== undefined) dataToUpdate.pais_destino = body.pais_destino
     if (body.navio !== undefined) dataToUpdate.navio = body.navio
+    
+    // ✅ NOVO: Requerente e Linhagem
+    if (body.requerente !== undefined) dataToUpdate.requerente = body.requerente
+    if (body.numeroLinhagem !== undefined) dataToUpdate.numeroLinhagem = body.numeroLinhagem ? parseInt(body.numeroLinhagem) : null
 
     const pessoaAtualizada = await prisma.pessoa.update({
       where: { id },

@@ -40,6 +40,9 @@ export interface PessoaArvore {
   navio?: string | null
   // Notas
   comentario?: string | null
+  // ✅ NOVO: Requerente e Linhagem
+  requerente?: string | null       // "nao" | "maior" | "menor"
+  numeroLinhagem?: number | null   // Posição na linhagem (1, 2, 3...)
   // Posição no canvas
   x?: number | null
   y?: number | null

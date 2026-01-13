@@ -6,6 +6,7 @@
 // ✅ ATUALIZAÇÃO: TipoServico e CustoPessoa para tabela de custos
 // ✅ ATUALIZAÇÃO: Campo país e estado expandido para endereços internacionais
 // ✅ ATUALIZAÇÃO: Campos passaporte e crnm em Contratante e Requerente
+// ✅ ATUALIZAÇÃO: Campos requerente e numeroLinhagem em Pessoa
 
 generator client {
   provider = "prisma-client-js"
@@ -196,6 +197,10 @@ model Pessoa {
   
   // Notas
   comentario  String?   @db.Text
+  
+  // ✅ NOVO: Requerente e Linhagem
+  requerente      String?   @default("nao")  // "nao" | "maior" | "menor"
+  numeroLinhagem  Int?                        // Posição na linhagem (1, 2, 3...)
   
   // Posição no canvas (React Flow)
   x Int?

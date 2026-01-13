@@ -28,7 +28,8 @@ const MESES = [
 
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
 
-function parseDate(dateStr: string): Date | null {
+// ✅ CORREÇÃO: Aceitar anos desde 1500
+function parseDate(dateStr: string, minYear: number = 1500, maxYear: number = 2100): Date | null {
   if (dateStr.length !== 10) return null
   
   const parts = dateStr.split("/")
@@ -41,7 +42,7 @@ function parseDate(dateStr: string): Date | null {
   if (isNaN(day) || isNaN(month) || isNaN(year)) return null
   if (day < 1 || day > 31) return null
   if (month < 0 || month > 11) return null
-  if (year < 1900 || year > 2100) return null
+  if (year < minYear || year > maxYear) return null
   
   const date = new Date(year, month, day)
   
@@ -65,7 +66,7 @@ export function DatePickerField({
   placeholder = "dd/mm/aaaa",
   className,
   disabled = false,
-  fromYear = 1900,
+  fromYear = 1500,  // ✅ CORREÇÃO: Padrão agora é 1500
   toYear = new Date().getFullYear(),
 }: DatePickerFieldProps) {
   const [open, setOpen] = React.useState(false)
@@ -90,15 +91,14 @@ export function DatePickerField({
     }
   }, [dateValue])
 
+  // ✅ CORREÇÃO: Gerar todos os anos disponíveis para permitir navegação completa
   const years = React.useMemo(() => {
     const arr = []
-    const minYear = Math.max(fromYear, viewYear - 5)
-    const maxYear = Math.min(toYear, viewYear + 5)
-    for (let y = maxYear; y >= minYear; y--) {
+    for (let y = toYear; y >= fromYear; y--) {
       arr.push(y)
     }
     return arr
-  }, [fromYear, toYear, viewYear])
+  }, [fromYear, toYear])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value.replace(/\D/g, "")
@@ -120,13 +120,18 @@ export function DatePickerField({
     }
     
     if (val.length === 10) {
-      const parsed = parseDate(val)
+      const parsed = parseDate(val, fromYear, toYear)
       if (parsed) {
         const isoDate = format(parsed, "yyyy-MM-dd")
         onChange?.(isoDate)
         setViewMonth(parsed.getMonth())
         setViewYear(parsed.getFullYear())
       }
+    }
+    
+    // ✅ CORREÇÃO: Permitir limpar a data quando o campo estiver vazio
+    if (val.length === 0) {
+      onChange?.("")
     }
     
     if (val.length >= 7) {
@@ -147,8 +152,14 @@ export function DatePickerField({
   }
 
   const handleInputBlur = () => {
+    // ✅ CORREÇÃO: Permitir limpar a data quando o campo estiver vazio
+    if (inputValue.length === 0) {
+      onChange?.("")
+      return
+    }
+    
     if (inputValue.length === 10) {
-      const parsed = parseDate(inputValue)
+      const parsed = parseDate(inputValue, fromYear, toYear)
       if (parsed) {
         const isoDate = format(parsed, "yyyy-MM-dd")
         onChange?.(isoDate)
@@ -157,6 +168,7 @@ export function DatePickerField({
           setInputValue(format(dateValue, "dd/MM/yyyy"))
         } else {
           setInputValue("")
+          onChange?.("")
         }
       }
     } else if (inputValue.length > 0 && inputValue.length < 10) {
@@ -164,6 +176,7 @@ export function DatePickerField({
         setInputValue(format(dateValue, "dd/MM/yyyy"))
       } else {
         setInputValue("")
+        onChange?.("")
       }
     }
   }
@@ -338,7 +351,7 @@ export function DatePickerField({
             <select
               value={viewYear}
               onChange={handleYearChange}
-              className="py-1.5 text-sm bg-transparent border-0 text-gray-700 font-normal focus:outline-none focus:ring-0 cursor-pointer hover:bg-gray-50 rounded text-center w-16"
+              className="py-1.5 text-sm bg-transparent border-0 text-gray-700 font-normal focus:outline-none focus:ring-0 cursor-pointer hover:bg-gray-50 rounded text-center w-20"
               style={{ textAlignLast: 'center' }}
             >
               {years.map(year => (

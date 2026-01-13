@@ -87,6 +87,10 @@ export async function POST(request: NextRequest) {
       porto_chegada,
       pais_destino,
       navio,
+      
+      // ✅ NOVO: Requerente e Linhagem
+      requerente,
+      numeroLinhagem,
     } = body
 
     if (!nome) {
@@ -144,6 +148,10 @@ export async function POST(request: NextRequest) {
         porto_chegada: porto_chegada || null,
         pais_destino: pais_destino || null,
         navio: navio || null,
+        
+        // ✅ NOVO: Requerente e Linhagem
+        requerente: requerente || 'nao',
+        numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null,
       },
       include: {
         pai: true,

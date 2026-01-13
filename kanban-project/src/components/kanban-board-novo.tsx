@@ -95,6 +95,13 @@ export function KanbanBoard({
   const containerRef = useRef<HTMLDivElement>(null)
   const [initialParamsProcessed, setInitialParamsProcessed] = useState(false)
 
+  // ✅ CORREÇÃO: Resetar initialParamsProcessed quando um novo processoId chega
+  useEffect(() => {
+    if (initialProcessoId !== null) {
+      setInitialParamsProcessed(false)
+    }
+  }, [initialProcessoId])
+
   const paisConfig = PAISES_CONFIG[pais]
 
   // Sensores

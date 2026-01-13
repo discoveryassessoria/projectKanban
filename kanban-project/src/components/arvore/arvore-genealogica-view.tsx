@@ -61,9 +61,6 @@ export function ArvoreGenealogicaView({
   const containerRef = useRef<HTMLDivElement>(null)
   const treeContainerRef = useRef<HTMLDivElement>(null)
   
-  // ========================================
-  // REF PARA O REACT FLOW TREE (para centralizar)
-  // ========================================
   const reactFlowTreeRef = useRef<ReactFlowTreeRef>(null)
 
   const [showAddPersonModal, setShowAddPersonModal] = useState(false)
@@ -97,9 +94,6 @@ export function ArvoreGenealogicaView({
     }
   }, [pessoaIdParaFocar, sidebarTabParaFocar, pessoas, pessoaFocada])
 
-  // ========================================
-  // ATUALIZAR SIDEBAR QUANDO PESSOAS MUDAR
-  // ========================================
   useEffect(() => {
     if (selectedPerson) {
       const pessoaAtualizada = pessoas.find(p => p.id === selectedPerson.id)
@@ -109,19 +103,14 @@ export function ArvoreGenealogicaView({
     }
   }, [pessoas])
 
-// ========================================
-  // FUNÇÃO DE EXPORTAR PDF - CAPTURA DE TELA
-  // ========================================
   const handleExportPDF = useCallback(async () => {
     if (pessoas.length === 0 || !pessoaPrincipal || !treeContainerRef.current) return
 
     setIsExporting(true)
 
     try {
-      // Importar html-to-image dinamicamente
       const { toPng } = await import('html-to-image')
 
-      // Encontrar elementos do ReactFlow
       const reactFlowContainer = treeContainerRef.current.querySelector('.react-flow') as HTMLElement
       
       if (!reactFlowContainer) {
@@ -130,7 +119,6 @@ export function ArvoreGenealogicaView({
         return
       }
 
-      // Esconder controles, minimap e painéis temporariamente
       const elementsToHide = reactFlowContainer.querySelectorAll(
         '.react-flow__panel, .react-flow__minimap, .react-flow__controls, .react-flow__background'
       )
@@ -138,22 +126,18 @@ export function ArvoreGenealogicaView({
         (el as HTMLElement).style.setProperty('display', 'none', 'important')
       })
 
-      // Aguardar um frame para garantir que as mudanças foram aplicadas
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      // Capturar o container do ReactFlow
       const imgData = await toPng(reactFlowContainer, {
         backgroundColor: '#f9fafb',
         pixelRatio: 2,
         skipFonts: true,
       })
 
-      // Restaurar elementos escondidos
       elementsToHide.forEach((el) => {
         (el as HTMLElement).style.removeProperty('display')
       })
 
-      // Criar imagem para obter dimensões
       const img = new Image()
       await new Promise((resolve, reject) => {
         img.onload = resolve
@@ -164,12 +148,10 @@ export function ArvoreGenealogicaView({
       const imgWidth = img.width
       const imgHeight = img.height
 
-      // Converter para mm (96 DPI, scale 2)
       const pxToMm = 0.264583 / 2
       const imgWidthMM = imgWidth * pxToMm
       const imgHeightMM = imgHeight * pxToMm
 
-      // Configurar PDF
       const marginX = 8
       const marginTop = 18
       const marginBottom = 10
@@ -186,32 +168,27 @@ export function ArvoreGenealogicaView({
       const actualPageWidth = pdf.internal.pageSize.getWidth()
       const actualPageHeight = pdf.internal.pageSize.getHeight()
 
-      // Cabeçalho
       pdf.setFontSize(14)
       pdf.setFont('helvetica', 'bold')
       pdf.setTextColor(30, 30, 30)
       const titulo = `Arvore Genealogica - ${pessoaPrincipal.nome} ${pessoaPrincipal.sobrenome || ''}`
       pdf.text(titulo, actualPageWidth / 2, 10, { align: 'center' })
 
-      // Subtítulo com data
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'normal')
       pdf.setTextColor(120, 120, 120)
       const dataAtual = new Date().toLocaleDateString('pt-BR')
       pdf.text(`Gerado em: ${dataAtual}`, actualPageWidth / 2, 15, { align: 'center' })
 
-      // Adicionar imagem centralizada
       const imgX = (actualPageWidth - imgWidthMM) / 2
       const imgY = marginTop
 
       pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidthMM, imgHeightMM)
 
-      // Rodapé
       pdf.setFontSize(7)
       pdf.setTextColor(150, 150, 150)
       pdf.text(`${pessoas.length} pessoas`, actualPageWidth / 2, actualPageHeight - 5, { align: 'center' })
 
-      // Salvar arquivo
       const nomeArquivo = `arvore-${pessoaPrincipal.nome.toLowerCase().replace(/\s+/g, '-')}-${dataAtual.replace(/\//g, '-')}.pdf`
       pdf.save(nomeArquivo)
 
@@ -420,21 +397,13 @@ export function ArvoreGenealogicaView({
     setFullDetailsPerson(pessoa)
   }
 
-  // ========================================
-  // NOVO: Handler para navegar entre familiares na sidebar
-  // ========================================
   const handleSelectPersonFromSidebar = useCallback((pessoa: PessoaArvore) => {
-    // Buscar a pessoa completa do array (com todos os relacionamentos)
     const pessoaCompleta = pessoas.find(p => p.id === pessoa.id)
     
     if (pessoaCompleta) {
-      // Atualizar pessoa selecionada na sidebar
       setSelectedPerson(pessoaCompleta)
-      
-      // Resetar tab inicial para mostrar aba "familia" já que estamos navegando por relacionamentos
       setSidebarTabInicial("familia")
       
-      // Centralizar a árvore nessa pessoa
       setTimeout(() => {
         reactFlowTreeRef.current?.centerOnPerson(pessoa.id)
       }, 50)
@@ -789,7 +758,7 @@ export function ArvoreGenealogicaView({
 }
 
 // ========================================
-// MODAL DE ADICIONAR PESSOA
+// MODAL DE ADICIONAR PESSOA - ✅ ATUALIZADO COM REQUERENTE E LINHAGEM
 // ========================================
 function AddPersonModal({
   arvoreId,
@@ -826,6 +795,10 @@ function AddPersonModal({
   const [conjugeId, setConjugeId] = useState<number | string>('')
   const [comentario, setComentario] = useState('')
   const [saving, setSaving] = useState(false)
+  
+  // ✅ NOVOS CAMPOS
+  const [requerente, setRequerente] = useState<string>('nao')
+  const [numeroLinhagem, setNumeroLinhagem] = useState<string>('')
 
   useEffect(() => {
     if (type === 'conjuge') setIsCasado(true)
@@ -849,6 +822,8 @@ function AddPersonModal({
         data_obito: isFalecido && dataObito ? new Date(dataObito).toISOString() : null,
         local_emigracao: isFalecido && localObito ? localObito.trim() : null,
         comentario: comentario.trim() || null,
+        requerente: requerente || 'nao',  // ✅ NOVO
+        numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null,  // ✅ NOVO
         arvoreId
       }
 
@@ -1103,6 +1078,33 @@ function AddPersonModal({
             </div>
           )}
 
+          {/* ✅ NOVOS CAMPOS: Requerente e Número de Linhagem */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Requerente</label>
+              <select
+                value={requerente}
+                onChange={(e) => setRequerente(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="nao">Não</option>
+                <option value="maior">Sim - Maior de idade</option>
+                <option value="menor">Sim - Menor de idade</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nº Linhagem</label>
+              <input
+                type="number"
+                min="1"
+                value={numeroLinhagem}
+                onChange={(e) => setNumeroLinhagem(e.target.value)}
+                placeholder="Ex: 1, 2, 3..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
             <textarea
@@ -1136,7 +1138,7 @@ function AddPersonModal({
 }
 
 // ========================================
-// MODAL DE EDITAR PESSOA
+// MODAL DE EDITAR PESSOA - ✅ ATUALIZADO COM REQUERENTE E LINHAGEM
 // ========================================
 function EditPersonModal({
   pessoa,
@@ -1172,6 +1174,10 @@ function EditPersonModal({
   const [conjugeId, setConjugeId] = useState<number | string>(conjugeExistenteId || '')
   const [comentario, setComentario] = useState(pessoa.comentario || '')
   const [saving, setSaving] = useState(false)
+  
+  // ✅ NOVOS CAMPOS
+  const [requerente, setRequerente] = useState((pessoa as any).requerente || 'nao')
+  const [numeroLinhagem, setNumeroLinhagem] = useState((pessoa as any).numeroLinhagem?.toString() || '')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1193,7 +1199,9 @@ function EditPersonModal({
           vivo: !isFalecido,
           data_obito: isFalecido && dataObito ? new Date(dataObito).toISOString() : null,
           local_emigracao: isFalecido && localObito ? localObito.trim() : null,
-          comentario: comentario.trim() || null
+          comentario: comentario.trim() || null,
+          requerente: requerente || 'nao',  // ✅ NOVO
+          numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null  // ✅ NOVO
         })
       })
 
@@ -1410,6 +1418,33 @@ function EditPersonModal({
               </div>
             </div>
           )}
+
+          {/* ✅ NOVOS CAMPOS: Requerente e Número de Linhagem */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Requerente</label>
+              <select
+                value={requerente}
+                onChange={(e) => setRequerente(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="nao">Não</option>
+                <option value="maior">Sim - Maior de idade</option>
+                <option value="menor">Sim - Menor de idade</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nº Linhagem</label>
+              <input
+                type="number"
+                min="1"
+                value={numeroLinhagem}
+                onChange={(e) => setNumeroLinhagem(e.target.value)}
+                placeholder="Ex: 1, 2, 3..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
