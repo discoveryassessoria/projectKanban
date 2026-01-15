@@ -645,3 +645,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .react-datepicker-popper[data-placement^=top] .react-datepicker__triangle {
     display: none;
   }
+
+input[type="time"].time-white,
+input[type="number"].time-white {
+  color: white !important;
+  -webkit-text-fill-color: white !important;
+}

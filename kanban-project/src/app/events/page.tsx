@@ -1,6 +1,10 @@
 // app/events/page.tsx
 "use client"
 
+import { Input } from "@/components/ui/input"
+import { DatePickerField } from "@/components/ui/date-picker-field"
+import { X, Check } from "lucide-react"
+import { Edit2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { HeaderBar } from "@/src/components/header-bar"
@@ -73,6 +77,22 @@ export default function EventosPage() {
   const [mesAtual, setMesAtual] = useState(new Date())
   const [filtroTipo, setFiltroTipo] = useState<string | null>(null)
   
+const [showForm, setShowForm] = useState(false)
+const [editingId, setEditingId] = useState<number | null>(null)
+const [isSaving, setIsSaving] = useState(false)
+
+// Form state
+const [titulo, setTitulo] = useState("")
+const [descricao, setDescricao] = useState("")
+const [tipo, setTipo] = useState("OUTRO")
+const [dataInicio, setDataInicio] = useState("")
+const [horaInicio, setHoraInicio] = useState("")
+const [horaFim, setHoraFim] = useState("")  // ← adicionar
+const [dataFim, setDataFim] = useState("")
+const [diaInteiro, setDiaInteiro] = useState(false)
+const [local, setLocal] = useState("")
+const [lembreteDias, setLembreteDias] = useState("")
+
   const router = useRouter()
 
   useEffect(() => {
@@ -185,6 +205,96 @@ export default function EventosPage() {
     setMesAtual(new Date(mesAtual.getFullYear(), mesAtual.getMonth() + direcao, 1))
   }
 
+  const resetForm = () => {
+  setTitulo("")
+  setDescricao("")
+  setTipo("OUTRO")
+  setDataInicio("")
+  setHoraInicio("")
+  setDataFim("")  // ← adicionar esta linha
+  setHoraFim("")  // ← adicionar
+  setDiaInteiro(false)
+  setLocal("")
+  setLembreteDias("")
+  setEditingId(null)
+  setShowForm(false)
+}
+
+const handleSubmit = async () => {
+  if (!titulo.trim() || !dataInicio) {
+    alert("Título e data são obrigatórios")
+    return
+  }
+
+  try {
+    setIsSaving(true)
+    const dataInicioCompleta = diaInteiro
+      ? `${dataInicio}T00:00:00`
+      : `${dataInicio}T${horaInicio || "00:00"}:00`
+
+    const dataFimCompleta = dataFim
+        ? diaInteiro
+        ? `${dataFim}T23:59:59`
+        : `${dataFim}T${horaFim || "23:59"}:00`
+        : null
+
+    const payload = {
+      titulo,
+      descricao: descricao || null,
+      tipo,
+      dataInicio: dataInicioCompleta,
+      dataFim: dataFimCompleta,  // ← adicionar
+      diaInteiro,
+      local: local || null,
+      lembreteDias: lembreteDias ? parseInt(lembreteDias) : null,
+      cor: TIPOS_EVENTO.find((t) => t.value === tipo)?.cor,
+    }
+
+    const url = editingId ? `/api/eventos/${editingId}` : "/api/eventos"
+    const method = editingId ? "PUT" : "POST"
+
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+
+    if (res.ok) {
+      resetForm()
+      fetchEventos()
+    } else {
+      alert("Erro ao salvar evento")
+    }
+  } catch (error) {
+    console.error("Erro ao salvar evento:", error)
+    alert("Erro ao salvar evento")
+  } finally {
+    setIsSaving(false)
+  }
+}
+
+  const handleEdit = (evento: Evento) => {
+  const dataIni = new Date(evento.dataInicio)
+  setTitulo(evento.titulo)
+  setDescricao(evento.descricao || "")
+  setTipo(evento.tipo)
+  setDataInicio(dataIni.toISOString().split("T")[0])
+  setHoraInicio(dataIni.toTimeString().slice(0, 5))
+  if (evento.dataFim) {
+    const dataF = new Date(evento.dataFim)
+    setDataFim(dataF.toISOString().split("T")[0])
+    setHoraFim(dataF.toTimeString().slice(0, 5))
+  } else {
+    setDataFim("")
+    setHoraFim("")
+  }
+  setDiaInteiro(evento.diaInteiro)
+  setLocal(evento.local || "")
+  setLembreteDias(evento.lembreteDias?.toString() || "")
+  setEditingId(evento.id)
+  setShowForm(true)
+}
+
   const getTipoConfig = (tipoValue: string) => {
     return TIPOS_EVENTO.find((t) => t.value === tipoValue) || TIPOS_EVENTO[6]
   }
@@ -279,6 +389,13 @@ export default function EventosPage() {
                   Calendário
                 </button>
               </div>
+              <Button
+                onClick={() => setShowForm(true)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                Novo Evento
+              </Button>
             </div>
           </section>
 
@@ -331,6 +448,182 @@ export default function EventosPage() {
               </CardContent>
             </Card>
           </section>
+
+{/* Formulário de Novo Evento */}
+          {showForm && (
+            <section>
+              <Card className="bg-white/10 backdrop-blur-sm border border-white/20">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-white">
+                      {editingId ? "Editar Evento" : "Novo Evento"}
+                    </h3>
+                    <button
+                      onClick={resetForm}
+                      className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                    >
+                      <X className="h-5 w-5 text-white/60" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Título */}
+                    <div className="md:col-span-2">
+                      <label className="text-sm text-white/70 mb-1 block">Título *</label>
+                      <Input
+                        value={titulo}
+                        onChange={(e) => setTitulo(e.target.value)}
+                        placeholder="Ex: Reunião no Consulado"
+                        className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
+                      />
+                    </div>
+
+                    {/* Tipo */}
+                    <div className="md:col-span-2">
+                      <label className="text-sm text-white/70 mb-1 block">Tipo</label>
+                      <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
+                        {TIPOS_EVENTO.map((t) => {
+                          const Icon = t.icon
+                          return (
+                            <button
+                              key={t.value}
+                              onClick={() => setTipo(t.value)}
+                              className={`p-2 rounded-lg border text-sm flex flex-col items-center gap-1 transition-colors ${
+                                tipo === t.value
+                                  ? "border-white bg-white/20 text-white"
+                                  : "border-white/20 hover:border-white/40 text-white/60"
+                              }`}
+                            >
+                              <Icon className="h-4 w-4" style={{ color: t.cor }} />
+                              <span className="text-xs">{t.label}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Dia inteiro */}
+                    <div className="md:col-span-2">
+                      <label className="flex items-center gap-2 text-sm text-white/70 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={diaInteiro}
+                          onChange={(e) => setDiaInteiro(e.target.checked)}
+                          className="rounded border-white/30"
+                        />
+                        Dia inteiro
+                      </label>
+                    </div>
+
+                    {/* Data */}
+                    <div>
+                      <label className="text-sm text-white/70 mb-1 block">Data *</label>
+                      <DatePickerField
+  value={dataInicio}
+  onChange={(value) => setDataInicio(value)}
+  placeholder="dd/mm/aaaa"
+  className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
+/>
+                    </div>
+
+                    {/* Hora */}
+                    {!diaInteiro && (
+                      <div>
+                        <label className="text-sm text-white/70 mb-1 block">Hora</label>
+                        <Input
+  type="time"
+  value={horaInicio}
+  onChange={(e) => setHoraInicio(e.target.value)}
+  className="bg-white/10 border-white/20 [color-scheme:dark] time-white"
+/>
+                      </div>
+                    )}
+
+{/* Data Fim e Hora Fim */}
+{!diaInteiro && (
+  <>
+    <div>
+      <label className="text-sm text-white/70 mb-1 block">Data Fim (opcional)</label>
+      <DatePickerField
+  value={dataFim}
+  onChange={(value) => setDataFim(value)}
+  placeholder="dd/mm/aaaa"
+  className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
+/>
+    </div>
+    {dataFim && (
+      <div>
+        <label className="text-sm text-white/70 mb-1 block">Hora Fim</label>
+        <Input
+  type="time"
+  value={horaFim}
+  onChange={(e) => setHoraFim(e.target.value)}
+  className="bg-white/10 border-white/20 [color-scheme:dark] time-white"
+/>
+      </div>
+    )}
+  </>
+)}
+
+                    {/* Local */}
+                    <div>
+                      <label className="text-sm text-white/70 mb-1 block">Local</label>
+                      <Input
+                        value={local}
+                        onChange={(e) => setLocal(e.target.value)}
+                        placeholder="Ex: Consulado de São Paulo"
+                        className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
+                      />
+                    </div>
+
+                    {/* Lembrete */}
+                    <div>
+                      <label className="text-sm text-white/70 mb-1 block">Lembrete (dias antes)</label>
+                      <Input
+  type="number"
+  value={lembreteDias}
+  onChange={(e) => setLembreteDias(e.target.value)}
+  placeholder="Ex: 3"
+  min="0"
+  className="bg-white/10 border-white/20 text-white placeholder:text-white/40 [color-scheme:dark]"
+/>
+                    </div>
+
+                    {/* Descrição */}
+                    <div className="md:col-span-2">
+                      <label className="text-sm text-white/70 mb-1 block">Descrição</label>
+                      <textarea
+                        value={descricao}
+                        onChange={(e) => setDescricao(e.target.value)}
+                        placeholder="Detalhes do evento..."
+                        rows={3}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Botões */}
+                  <div className="flex gap-2 mt-6">
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={isSaving}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      <Check className="h-4 w-4 mr-1.5" />
+                      {isSaving ? "Salvando..." : editingId ? "Salvar" : "Criar Evento"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={resetForm}
+                      className="text-white/70 hover:text-white hover:bg-white/10"
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </section>
+          )}
 
           {/* Filtros */}
           <section className="flex items-center gap-2 flex-wrap">
@@ -414,12 +707,16 @@ export default function EventosPage() {
                               key={evento.id}
                               className={`p-4 rounded-xl border transition-colors cursor-pointer ${
                                 isPassado
-                                  ? "bg-white/5 border-white/10 opacity-60"
+                                  ? "bg-white/5 border-white/10"
                                   : isEventoHoje
                                   ? "bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20"
                                   : "bg-white/5 border-white/10 hover:bg-white/10"
                               }`}
-                              onClick={() => router.push(`/kanban?processoId=${evento.processo.id}&tab=eventos&pais=${evento.processo.pais}`)}
+                              onClick={() => {
+  if (evento.processo) {
+    router.push(`/kanban?processoId=${evento.processo.id}&tab=eventos&pais=${evento.processo.pais}`)
+  }
+}}
                             >
                               <div className="flex items-start gap-4">
                                 <div
@@ -458,9 +755,18 @@ export default function EventosPage() {
                                     </div>
 
                                     <div className="flex items-center gap-2 flex-shrink-0">
-                                      <BandeiraPais pais={evento.processo.pais as any} size="sm" />
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleEdit(evento)
+                                            }}
+                                        className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                        >
+                                        <Edit2 className="h-4 w-4" />
+                                        </button>
+                                      {evento.processo && <BandeiraPais pais={evento.processo.pais as any} size="sm" />}
                                       <span className="text-sm text-white/60">
-                                        {evento.processo.nome}
+                                        {evento.processo?.nome || "Sem processo"}
                                       </span>
                                     </div>
                                   </div>
@@ -564,7 +870,11 @@ export default function EventosPage() {
                                     color: tipoConfig.cor,
                                   }}
                                   title={evento.titulo}
-                                  onClick={() => router.push(`/kanban?processoId=${evento.processo.id}&tab=eventos&pais=${evento.processo.pais}`)}
+                                  onClick={() => {
+  if (evento.processo) {
+    router.push(`/kanban?processoId=${evento.processo.id}&tab=eventos&pais=${evento.processo.pais}`)
+  }
+}}
                                 >
                                   {evento.titulo}
                                 </div>

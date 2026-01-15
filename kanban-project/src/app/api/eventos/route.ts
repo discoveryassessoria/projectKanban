@@ -69,37 +69,37 @@ export async function POST(request: NextRequest) {
       observacoes,
     } = body
 
-    if (!processoId || !titulo || !dataInicio) {
-      return NextResponse.json(
-        { error: "Processo, título e data de início são obrigatórios" },
+    if (!titulo || !dataInicio) {
+        return NextResponse.json(
+        { error: "Título e data de início são obrigatórios" },
         { status: 400 }
-      )
+        )
     }
 
     const evento = await prisma.evento.create({
-      data: {
-        processoId: parseInt(processoId),
-        titulo,
-        descricao,
-        tipo: tipo || "OUTRO",
-        dataInicio: new Date(dataInicio),
-        dataFim: dataFim ? new Date(dataFim) : null,
-        diaInteiro: diaInteiro || false,
-        local,
-        lembreteDias: lembreteDias ? parseInt(lembreteDias) : null,
-        cor,
-        observacoes,
+  data: {
+    ...(processoId && { processoId: parseInt(processoId) }),
+    titulo,
+    descricao,
+    tipo: tipo || "OUTRO",
+    dataInicio: new Date(dataInicio),
+    dataFim: dataFim ? new Date(dataFim) : null,
+    diaInteiro: diaInteiro || false,
+    local,
+    lembreteDias: lembreteDias ? parseInt(lembreteDias) : null,
+    cor,
+    observacoes,
+  },
+  include: processoId ? {
+    processo: {
+      select: {
+        id: true,
+        nome: true,
+        pais: true,
       },
-      include: {
-        processo: {
-          select: {
-            id: true,
-            nome: true,
-            pais: true,
-          },
-        },
-      },
-    })
+    },
+  } : undefined,
+})
 
     return NextResponse.json({ evento }, { status: 201 })
   } catch (error) {

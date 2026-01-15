@@ -1174,9 +1174,9 @@ enum TipoEvento {
 model Evento {
   id              Int           @id @default(autoincrement())
   
-  // Vínculo com processo
-  processoId      Int
-  processo        Processo      @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  // Vínculo com processo (opcional para eventos gerais)
+  processoId      Int?
+  processo        Processo?     @relation(fields: [processoId], references: [id], onDelete: Cascade)
   
   // Dados do evento
   titulo          String        @db.VarChar(200)

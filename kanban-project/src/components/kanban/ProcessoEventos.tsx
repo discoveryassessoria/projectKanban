@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { DatePickerField } from "@/components/ui/date-picker-field"
 import {
   Plus,
   Calendar,
@@ -308,11 +309,11 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                   <label className="text-sm text-gray-600 mb-1 block">
                     Data Início *
                   </label>
-                  <Input
-                    type="date"
+                  <DatePickerField
                     value={dataInicio}
-                    onChange={(e) => setDataInicio(e.target.value)}
-                  />
+                    onChange={(value) => setDataInicio(value)}
+                    placeholder="dd/mm/aaaa"
+                />
                 </div>
                 {!diaInteiro && (
                   <div>
@@ -332,11 +333,11 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                   <label className="text-sm text-gray-600 mb-1 block">
                     Data Fim (opcional)
                   </label>
-                  <Input
-                    type="date"
+                  <DatePickerField
                     value={dataFim}
-                    onChange={(e) => setDataFim(e.target.value)}
-                  />
+                    onChange={(value) => setDataFim(value)}
+                    placeholder="dd/mm/aaaa"
+                />
                 </div>
                 {dataFim && (
                   <div>
