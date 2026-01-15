@@ -14,6 +14,7 @@ import { TreeIcon } from "@/src/components/icons/tree-icon"
 import { SettingsIcon } from "@/src/components/icons/settings-icon"
 import { ShieldIcon } from "@/src/components/icons/shield-icon"
 import { useSidebarContext } from "@/src/contexts/sidebar-context"
+import { CalendarIcon } from "@/src/components/icons/calendar-icon"
 
 const menuItems = [
   {
@@ -36,6 +37,13 @@ const menuItems = [
     icon: CheckIcon,
     textOffset: "",
     iconOffset: "translate-y-[0.5px]",
+  },
+  {
+    title: "Eventos",
+    url: "/events",
+    icon: CalendarIcon,
+    textOffset: "",
+    iconOffset: "",
   },
   {
     title: "Árvore Genealógica",
@@ -99,8 +107,8 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
   }
 
   // Função para renderizar o ícone corretamente
-  const renderIcon = (Icon: typeof HouseIcon | typeof GridIcon | typeof CheckIcon | typeof TreeIcon | typeof SettingsIcon | typeof ShieldIcon, isActive: boolean, iconOffset: string = "") => {
-    // Todos os ícones são customizados agora, passa a prop filled
+  const renderIcon = (Icon: typeof HouseIcon | typeof GridIcon | typeof CheckIcon | typeof TreeIcon | typeof SettingsIcon | typeof ShieldIcon | typeof CalendarIcon, isActive: boolean, iconOffset: string = "") => {
+  // Todos os ícones são customizados agora, passa a prop filled
     return <Icon className={`h-5 w-5 flex-shrink-0 text-white ${iconOffset}`} filled={isActive} />
   }
 

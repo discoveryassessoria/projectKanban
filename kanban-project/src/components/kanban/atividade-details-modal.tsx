@@ -15,6 +15,7 @@ import { ProcessoHistorico } from "./ProcessoHistorico"
 import { ProcessoFaturas } from "./ProcessoFaturas"
 // ✅ IMPORTAR o modal e o initialFormData
 import { ContratanteModal, initialFormData } from "../contratantes-tabela"
+import { ProcessoEventos } from "./ProcessoEventos"
 import { 
   X, 
   Phone, 
@@ -85,7 +86,7 @@ export function ProcessoDetailsModal({
   initialSidebarTab
 }: ProcessoDetailsModalProps) {
   // ✅ ATUALIZADO: Adicionado "informacoes" como possível aba
-  const [activeTab, setActiveTab] = useState<"geral" | "faturas" | "historico" | "arvore" | "protocolos" | "informacoes">("geral")
+  const [activeTab, setActiveTab] = useState<"geral" | "faturas" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos">("geral")
   const [etapas, setEtapas] = useState<Status[]>([])
   const [statusIdAtual, setStatusIdAtual] = useState(processo?.statusId)
   const [mudouEtapa, setMudouEtapa] = useState(false)
@@ -229,6 +230,8 @@ export function ProcessoDetailsModal({
         setActiveTab("protocolos")
       } else if (initialTab === "informacoes" && isItalia) {
         setActiveTab("informacoes")
+      } else if (initialTab === "eventos") {
+        setActiveTab("eventos")
       }
       
       if (initialPessoaId) {
@@ -448,6 +451,7 @@ export function ProcessoDetailsModal({
     // Aba Protocolos só aparece para ESPANHA
     ...(isEspanha ? [{ id: "protocolos", label: "Protocolos" }] : []),
     { id: "faturas", label: "Faturas" },
+    { id: "eventos", label: "Eventos" },  // ✅ NOVO
     { id: "historico", label: "Histórico" },
   ]
 
@@ -492,10 +496,6 @@ export function ProcessoDetailsModal({
               onClick={handleDelete}
             >
               <Trash2 className="h-5 w-5" />
-            </Button>
-            <Button className="bg-red-500 hover:bg-red-600 text-white">
-              Orçamento
-              <ChevronDown className="h-4 w-4 ml-2" />
             </Button>
           </div>
         </div>
@@ -960,6 +960,13 @@ export function ProcessoDetailsModal({
             <ProcessoFaturas
             processoId={processo.id}
             nomeFamilia={processo.nome}
+            onUpdate={onSave}
+            />
+          )}
+
+          {activeTab === "eventos" && (
+            <ProcessoEventos
+            processoId={processo.id}
             onUpdate={onSave}
             />
           )}

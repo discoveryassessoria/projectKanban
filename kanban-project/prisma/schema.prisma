@@ -292,6 +292,8 @@ model Arvore {
   commentPosX Float? @default(0)
   commentPosY Float? @default(0)
 
+  posicoesNodes Json?
+
   pessoaPrincipalId Int?    @unique
   pessoaPrincipal   Pessoa? @relation("ArvorePrincipal", fields: [pessoaPrincipalId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
@@ -420,6 +422,9 @@ model Processo {
   tiposServico TipoServico[]
   custosPessoa CustoPessoa[]
   
+  // ✅ NOVO: Eventos do processo
+  eventos      Evento[]
+
   @@index([pais])
   @@index([statusId])
 }
@@ -1148,4 +1153,57 @@ model CentroCusto {
   updatedAt   DateTime  @updatedAt
 
   @@index([ativo])
+}
+
+// ========================================
+// ENUM TIPO EVENTO
+// ========================================
+enum TipoEvento {
+  CONSULADO
+  CARTORIO
+  REUNIAO
+  PRAZO
+  AUDIENCIA
+  ENTREGA_DOCUMENTO
+  OUTRO
+}
+
+// ========================================
+// EVENTO - COMPROMISSOS DO PROCESSO
+// ========================================
+model Evento {
+  id              Int           @id @default(autoincrement())
+  
+  // Vínculo com processo
+  processoId      Int
+  processo        Processo      @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  
+  // Dados do evento
+  titulo          String        @db.VarChar(200)
+  descricao       String?       @db.Text
+  tipo            TipoEvento    @default(OUTRO)
+  
+  // Data e hora
+  dataInicio      DateTime
+  dataFim         DateTime?
+  diaInteiro      Boolean       @default(false)
+  
+  // Local
+  local           String?       @db.VarChar(200)
+  
+  // Lembrete (dias antes)
+  lembreteDias    Int?
+  
+  // Cor para o calendário (hex)
+  cor             String?       @db.VarChar(7)
+  
+  // Observações
+  observacoes     String?       @db.Text
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([processoId])
+  @@index([dataInicio])
+  @@index([tipo])
 }

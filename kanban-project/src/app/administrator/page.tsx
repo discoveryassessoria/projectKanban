@@ -436,7 +436,10 @@ export default function AdministratorPage() {
                           <td className="py-3 px-4 text-white">{usuario.nome}</td>
                           <td className="py-3 px-4 text-white/70">{usuario.email}</td>
                           <td className="py-3 px-4">
-                            <Badge variant={getBadgeVariant(usuario.tipo)} className="gap-1">
+                            <Badge 
+                              variant={getBadgeVariant(usuario.tipo)} 
+                              className={`gap-1 ${usuario.tipo !== UserType.ADMIN && usuario.tipo !== UserType.GESTOR ? 'bg-white text-gray-800 border-gray-300' : ''}`}
+                            >
                               {getBadgeIcon(usuario.tipo)}
                               {userTypeLabels[usuario.tipo as UserType]}
                             </Badge>
