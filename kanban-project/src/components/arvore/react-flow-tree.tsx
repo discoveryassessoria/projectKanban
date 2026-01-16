@@ -190,6 +190,15 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
   // Verificar se pessoa é falecida (vivo === false)
   const isFalecido = pessoa.vivo === false
 
+  // Verificar se é requerente
+  const requerente = (pessoa as any).requerente
+  const isRequerente = requerente === 'maior' || requerente === 'menor'
+  const requerenteLabel = requerente === 'maior' 
+    ? 'Requerente maior de idade' 
+    : requerente === 'menor' 
+      ? 'Requerente menor de idade' 
+      : null
+
   // Verificar se tem cônjuge
   const temConjuge = unioes.length > 0
 
@@ -276,6 +285,16 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
           <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-1">
             {nomeCompleto}
           </h3>
+          {/* Badge de Requerente */}
+            {isRequerente && (
+              <span className={`inline-flex items-center mt-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold w-fit ${
+                requerente === 'maior' 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-amber-100 text-amber-800'
+                  }`}>
+                {requerenteLabel}
+              </span>
+            )}
           <div className="mt-1 text-[10px] text-gray-500 space-y-0.5">
             {/* Linha 1: Nascimento e Casamentos */}
             {(dataNasc || datasCasamento.length > 0) && (
@@ -375,10 +394,20 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
         <h3 className="font-semibold text-gray-900 text-[11px] leading-tight line-clamp-2">
           {nomeCompleto}
         </h3>
-        <div className="mt-1 text-[9px] text-gray-500 space-y-0.5">
+        {/* Badge de Requerente */}
+          {isRequerente && (
+            <span className={`inline-flex items-center mt-0.5 px-1 py-0.5 rounded text-[7px] font-semibold ${
+              requerente === 'maior' 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-amber-100 text-amber-800'
+                }`}>
+              {requerenteLabel}
+            </span>
+          )}
+        <div className="mt-0.5 text-[9px] text-gray-500 space-y-0">
           {/* Linha 1: Nascimento e Casamentos */}
           {(dataNasc || datasCasamento.length > 0) && (
-            <div className="flex items-center justify-center gap-2 flex-wrap">
+            <div className="flex items-center justify-center gap-1 flex-wrap">
               {dataNasc && (
                 <span className="inline-flex items-center gap-0.5">
                   <span>★</span>
