@@ -15,6 +15,7 @@ import { SettingsIcon } from "@/src/components/icons/settings-icon"
 import { ShieldIcon } from "@/src/components/icons/shield-icon"
 import { useSidebarContext } from "@/src/contexts/sidebar-context"
 import { CalendarIcon } from "@/src/components/icons/calendar-icon"
+import { BlogIcon } from "@src/components/icons/blog-icon"
 
 const menuItems = [
   {
@@ -51,6 +52,13 @@ const menuItems = [
     icon: TreeIcon,
     textOffset: "",
     iconOffset: "",
+  },
+  {
+  title: "Blog",
+  url: "/blog",
+  icon: BlogIcon,
+  textOffset: "",
+  iconOffset: "",
   },
   {
     title: "Configurações",

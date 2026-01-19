@@ -8,6 +8,7 @@
 // ✅ ATUALIZAÇÃO: Campos passaporte e crnm em Contratante e Requerente
 // ✅ ATUALIZAÇÃO: Campos requerente e numeroLinhagem em Pessoa
 // ✅ ATUALIZAÇÃO: CustoPessoa com tipoRegistro para custos por documento
+// ✅ ATUALIZAÇÃO: BlogPost para posts da landing page
 
 generator client {
   provider = "prisma-client-js"
@@ -131,6 +132,28 @@ enum StatusDocumento {
   ENTREGUE
   INVALIDO
   NAO_ENCONTRADO
+}
+
+// ========================================
+// ENUM TIPO EVENTO
+// ========================================
+enum TipoEvento {
+  CONSULADO
+  CARTORIO
+  REUNIAO
+  PRAZO
+  AUDIENCIA
+  ENTREGA_DOCUMENTO
+  OUTRO
+}
+
+// ========================================
+// ✅ NOVO: STATUS DO POST DO BLOG
+// ========================================
+enum StatusPost {
+  RASCUNHO
+  PUBLICADO
+  ARQUIVADO
 }
 
 // ========================================
@@ -1156,19 +1179,6 @@ model CentroCusto {
 }
 
 // ========================================
-// ENUM TIPO EVENTO
-// ========================================
-enum TipoEvento {
-  CONSULADO
-  CARTORIO
-  REUNIAO
-  PRAZO
-  AUDIENCIA
-  ENTREGA_DOCUMENTO
-  OUTRO
-}
-
-// ========================================
 // EVENTO - COMPROMISSOS DO PROCESSO
 // ========================================
 model Evento {
@@ -1206,4 +1216,44 @@ model Evento {
   @@index([processoId])
   @@index([dataInicio])
   @@index([tipo])
+}
+
+// ========================================
+// ✅ NOVO: BLOG - POSTS PARA LANDING PAGE
+// ========================================
+model BlogPost {
+  id              Int           @id @default(autoincrement())
+  
+  // Conteúdo
+  titulo          String        @db.VarChar(200)
+  slug            String        @unique @db.VarChar(220)
+  resumo          String        @db.VarChar(500)
+  conteudo        String?       @db.Text
+  
+  // Imagem de capa
+  imagemUrl       String?       @db.Text
+  imagemAlt       String?       @db.VarChar(200)
+  
+  // Categorização
+  categoria       String        @db.VarChar(100)
+  
+  // Meta
+  tempoLeitura    Int           @default(5)
+  status          StatusPost    @default(RASCUNHO)
+  destaque        Boolean       @default(false)
+  
+  // Datas
+  dataPublicacao  DateTime?
+  
+  // SEO
+  metaTitle       String?       @db.VarChar(70)
+  metaDescription String?       @db.VarChar(160)
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([status])
+  @@index([dataPublicacao])
+  @@index([categoria])
+  @@index([destaque])
 }
