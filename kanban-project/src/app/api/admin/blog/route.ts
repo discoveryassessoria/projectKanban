@@ -1,17 +1,17 @@
 // ========================================
 // CRIAR ARQUIVO: app/api/admin/blog/route.ts
 // ========================================
-// API ADMIN - Requer autenticação (adicionar middleware se necessário)
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// GET - Listar todos os posts (admin)
+// GET - Listar todos os posts
 export async function GET() {
   try {
     const posts = await prisma.blogPost.findMany({
       orderBy: { createdAt: 'desc' }
     })
+    
     return NextResponse.json(posts)
   } catch (error) {
     console.error('Erro ao buscar posts:', error)
@@ -24,10 +24,18 @@ export async function POST(request: Request) {
   try {
     const data = await request.json()
     
+    // Gerar slug a partir do título se não for fornecido
+    const slug = data.slug || data.titulo
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+    
     const post = await prisma.blogPost.create({
       data: {
         titulo: data.titulo,
-        slug: data.slug,
+        slug: slug,
         resumo: data.resumo,
         conteudo: data.conteudo || null,
         imagemUrl: data.imagemUrl || null,
@@ -46,7 +54,6 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('Erro ao criar post:', error)
     
-    // Erro de slug duplicado
     if (error.code === 'P2002') {
       return NextResponse.json(
         { error: 'Já existe um post com esse slug' },

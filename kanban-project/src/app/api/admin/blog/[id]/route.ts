@@ -8,11 +8,13 @@ import { prisma } from '@/lib/prisma'
 // GET - Buscar post por ID
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
+    
     const post = await prisma.blogPost.findUnique({
-      where: { id: parseInt(params.id) }
+      where: { id: parseInt(id) }
     })
     
     if (!post) {
@@ -28,13 +30,14 @@ export async function GET(
 // PUT - Atualizar post
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const data = await request.json()
     
     const post = await prisma.blogPost.update({
-      where: { id: parseInt(params.id) },
+      where: { id: parseInt(id) },
       data: {
         titulo: data.titulo,
         slug: data.slug,
@@ -70,11 +73,13 @@ export async function PUT(
 // DELETE - Excluir post
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
+    
     await prisma.blogPost.delete({
-      where: { id: parseInt(params.id) }
+      where: { id: parseInt(id) }
     })
     
     return NextResponse.json({ message: 'Post excluído com sucesso' })

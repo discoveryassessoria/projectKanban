@@ -1,0 +1,1 @@
+export { BlogIcon } from './blog-icon'

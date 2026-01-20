@@ -1,10 +1,11 @@
-// ========================================
-// CRIAR ARQUIVO: app/(dashboard)/blog/page.tsx
-// ========================================
-
-'use client'
+"use client"
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { HeaderBar } from "@/src/components/header-bar"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { 
   Plus, 
   Pencil, 
@@ -14,10 +15,22 @@ import {
   Star,
   StarOff,
   Search,
+  Calendar,
   Clock,
-  ExternalLink,
-  Image as ImageIcon
+  X,
+  Check,
+  FileText,
+  Filter,
+  Image as ImageIcon,
+  Tag
 } from 'lucide-react'
+
+interface Usuario {
+  id: number
+  nome: string
+  email: string
+  tipo: string
+}
 
 interface BlogPost {
   id: number
@@ -29,152 +42,126 @@ interface BlogPost {
   imagemAlt?: string
   categoria: string
   tempoLeitura: number
-  status: 'RASCUNHO' | 'PUBLICADO' | 'ARQUIVADO'
+  status: string
   destaque: boolean
   dataPublicacao?: string
   createdAt: string
 }
 
-const CATEGORIAS = [
+const categorias = [
   'Cidadania Italiana',
   'Cidadania Portuguesa', 
   'Cidadania Espanhola',
-  'Cidadania Alemã',
-  'Visto Americano',
-  'Visto Canadense',
-  'Dicas e Orientações',
+  'Documentação',
+  'Dicas de Viagem',
   'Notícias',
+  'Geral'
 ]
 
 export default function BlogAdminPage() {
+  const router = useRouter()
+  const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [posts, setPosts] = useState<BlogPost[]>([])
   const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
-  const [editingPost, setEditingPost] = useState<BlogPost | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterCategoria, setFilterCategoria] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [filtroStatus, setFiltroStatus] = useState<string>('todos')
+  const [busca, setBusca] = useState('')
   
-  // Form state
-  const [form, setForm] = useState({
+  // Modal/Form states
+  const [showForm, setShowForm] = useState(false)
+  const [editingPost, setEditingPost] = useState<BlogPost | null>(null)
+  const [formData, setFormData] = useState({
     titulo: '',
-    slug: '',
     resumo: '',
     conteudo: '',
     imagemUrl: '',
     imagemAlt: '',
-    categoria: 'Cidadania Italiana',
+    categoria: 'Geral',
     tempoLeitura: 5,
-    status: 'RASCUNHO' as const,
+    status: 'RASCUNHO',
     destaque: false,
-    dataPublicacao: '',
+    dataPublicacao: ''
   })
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    fetchPosts()
-  }, [])
+    const token = localStorage.getItem("authToken")
+    const userData = localStorage.getItem("user")
+
+    if (!token || !userData) {
+      router.push('/login')
+      return
+    }
+
+    try {
+      const user = JSON.parse(userData)
+      setUsuario(user)
+      fetchPosts()
+    } catch (error) {
+      console.error("Erro ao carregar dados do usuário:", error)
+      router.push('/login')
+    }
+  }, [router])
 
   const fetchPosts = async () => {
     try {
-      const res = await fetch('/api/admin/blog')
-      const data = await res.json()
-      setPosts(data)
+      const response = await fetch('/api/admin/blog')
+      const data = await response.json()
+      setPosts(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Erro ao buscar posts:', error)
+      setPosts([])
     } finally {
       setLoading(false)
     }
   }
 
-  const generateSlug = (titulo: string) => {
-    return titulo
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '')
-  }
-
-  const handleTituloChange = (titulo: string) => {
-    setForm({
-      ...form,
-      titulo,
-      slug: editingPost ? form.slug : generateSlug(titulo)
-    })
-  }
-
-  const openNewPost = () => {
-    setEditingPost(null)
-    setForm({
-      titulo: '',
-      slug: '',
-      resumo: '',
-      conteudo: '',
-      imagemUrl: '',
-      imagemAlt: '',
-      categoria: 'Cidadania Italiana',
-      tempoLeitura: 5,
-      status: 'RASCUNHO',
-      destaque: false,
-      dataPublicacao: '',
-    })
-    setShowModal(true)
-  }
-
-  const openEditPost = (post: BlogPost) => {
-    setEditingPost(post)
-    setForm({
-      titulo: post.titulo,
-      slug: post.slug,
-      resumo: post.resumo,
-      conteudo: post.conteudo || '',
-      imagemUrl: post.imagemUrl || '',
-      imagemAlt: post.imagemAlt || '',
-      categoria: post.categoria,
-      tempoLeitura: post.tempoLeitura,
-      status: post.status,
-      destaque: post.destaque,
-      dataPublicacao: post.dataPublicacao ? post.dataPublicacao.split('T')[0] : '',
-    })
-    setShowModal(true)
+  const handleLogout = () => {
+    localStorage.removeItem("authToken")
+    localStorage.removeItem("user")
+    router.push("/login")
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    
+
     try {
       const url = editingPost 
         ? `/api/admin/blog/${editingPost.id}`
         : '/api/admin/blog'
       
-      const method = editingPost ? 'PUT' : 'POST'
-      
-      const res = await fetch(url, {
-        method,
+      const response = await fetch(url, {
+        method: editingPost ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          dataPublicacao: form.dataPublicacao ? new Date(form.dataPublicacao).toISOString() : null
-        })
+        body: JSON.stringify(formData)
       })
-      
-      if (res.ok) {
-        fetchPosts()
-        setShowModal(false)
-      } else {
-        const error = await res.json()
-        alert(error.error || 'Erro ao salvar post')
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Erro ao salvar')
       }
-    } catch (error) {
-      console.error('Erro ao salvar post:', error)
-      alert('Erro ao salvar post')
+
+      await fetchPosts()
+      resetForm()
+    } catch (error: any) {
+      alert(error.message || 'Erro ao salvar post')
     } finally {
       setSaving(false)
     }
   }
 
-  const toggleStatus = async (post: BlogPost) => {
+  const handleDelete = async (id: number) => {
+    if (!confirm('Tem certeza que deseja excluir este post?')) return
+
+    try {
+      await fetch(`/api/admin/blog/${id}`, { method: 'DELETE' })
+      await fetchPosts()
+    } catch (error) {
+      alert('Erro ao excluir post')
+    }
+  }
+
+  const togglePublish = async (post: BlogPost) => {
     const newStatus = post.status === 'PUBLICADO' ? 'RASCUNHO' : 'PUBLICADO'
     
     try {
@@ -184,14 +171,12 @@ export default function BlogAdminPage() {
         body: JSON.stringify({ 
           ...post, 
           status: newStatus,
-          dataPublicacao: newStatus === 'PUBLICADO' && !post.dataPublicacao 
-            ? new Date().toISOString() 
-            : post.dataPublicacao
+          dataPublicacao: newStatus === 'PUBLICADO' ? new Date().toISOString() : post.dataPublicacao
         })
       })
-      fetchPosts()
+      await fetchPosts()
     } catch (error) {
-      console.error('Erro ao atualizar post:', error)
+      alert('Erro ao alterar status')
     }
   }
 
@@ -202,400 +187,462 @@ export default function BlogAdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...post, destaque: !post.destaque })
       })
-      fetchPosts()
+      await fetchPosts()
     } catch (error) {
-      console.error('Erro ao atualizar post:', error)
+      alert('Erro ao alterar destaque')
     }
   }
 
-  const deletePost = async (id: number) => {
-    if (!confirm('Tem certeza que deseja excluir este post?')) return
-    
-    try {
-      await fetch(`/api/admin/blog/${id}`, { method: 'DELETE' })
-      fetchPosts()
-    } catch (error) {
-      console.error('Erro ao excluir post:', error)
-    }
+  const editPost = (post: BlogPost) => {
+    setEditingPost(post)
+    setFormData({
+      titulo: post.titulo,
+      resumo: post.resumo,
+      conteudo: post.conteudo || '',
+      imagemUrl: post.imagemUrl || '',
+      imagemAlt: post.imagemAlt || '',
+      categoria: post.categoria,
+      tempoLeitura: post.tempoLeitura,
+      status: post.status,
+      destaque: post.destaque,
+      dataPublicacao: post.dataPublicacao ? post.dataPublicacao.split('T')[0] : ''
+    })
+    setShowForm(true)
   }
 
-  const filteredPosts = posts.filter(post => {
-    const matchSearch = post.titulo.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchCategoria = !filterCategoria || post.categoria === filterCategoria
-    return matchSearch && matchCategoria
+  const resetForm = () => {
+    setShowForm(false)
+    setEditingPost(null)
+    setFormData({
+      titulo: '',
+      resumo: '',
+      conteudo: '',
+      imagemUrl: '',
+      imagemAlt: '',
+      categoria: 'Geral',
+      tempoLeitura: 5,
+      status: 'RASCUNHO',
+      destaque: false,
+      dataPublicacao: ''
+    })
+  }
+
+  // Filtros
+  const filteredPosts = (posts || []).filter(post => {
+    const matchStatus = filtroStatus === 'todos' || post.status === filtroStatus
+    const matchBusca = post.titulo.toLowerCase().includes(busca.toLowerCase()) ||
+                       post.resumo.toLowerCase().includes(busca.toLowerCase())
+    return matchStatus && matchBusca
   })
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('pt-BR')
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PUBLICADO': return 'bg-green-100 text-green-800'
-      case 'RASCUNHO': return 'bg-gray-100 text-gray-800'
-      case 'ARQUIVADO': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'PUBLICADO': return 'Publicado'
-      case 'RASCUNHO': return 'Rascunho'
-      case 'ARQUIVADO': return 'Arquivado'
-      default: return status
-    }
-  }
+  // Métricas
+  const totalPosts = posts.length
+  const publicados = posts.filter(p => p.status === 'PUBLICADO').length
+  const rascunhos = posts.filter(p => p.status === 'RASCUNHO').length
+  const destaques = posts.filter(p => p.destaque).length
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+      <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
+        <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
+        <div className="min-h-screen bg-black/40 backdrop-blur-sm flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin h-12 w-12 border-4 border-white border-t-transparent rounded-full mx-auto mb-4" />
+            <p className="text-white/70">Carregando posts...</p>
+          </div>
+        </div>
       </div>
     )
   }
 
+  if (!usuario) return null
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Blog</h1>
-          <p className="text-gray-600">Gerencie os posts do site</p>
-        </div>
-        <button
-          onClick={openNewPost}
-          className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-        >
-          <Plus className="w-5 h-5" />
-          Novo Post
-        </button>
-      </div>
+    <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
+      {/* Background com imagem */}
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
 
-      {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar posts..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-          />
-        </div>
-        <select
-          value={filterCategoria}
-          onChange={(e) => setFilterCategoria(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-        >
-          <option value="">Todas as categorias</option>
-          {CATEGORIAS.map(cat => (
-            <option key={cat} value={cat}>{cat}</option>
-          ))}
-        </select>
-      </div>
+      {/* HeaderBar igual às outras páginas */}
+      <HeaderBar
+        title="Blog"
+        subtitle="Gerencie os posts do blog da landing page"
+        userName={usuario.nome}
+        userRole={usuario.tipo === 'admin' ? 'Administrador' : usuario.tipo}
+        userEmail={usuario.email}
+        onLogout={handleLogout}
+      />
 
-      {/* Lista de Posts */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Post</th>
-                <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Categoria</th>
-                <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Status</th>
-                <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Data</th>
-                <th className="text-right px-6 py-3 text-sm font-medium text-gray-500">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredPosts.map(post => (
-                <tr key={post.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      {post.imagemUrl ? (
-                        <img 
-                          src={post.imagemUrl} 
-                          alt={post.imagemAlt || post.titulo}
-                          className="w-12 h-12 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center">
-                          <ImageIcon className="w-6 h-6 text-gray-400" />
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className="font-medium text-gray-900 truncate max-w-xs">{post.titulo}</p>
-                        <p className="text-sm text-gray-500 flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {post.tempoLeitura} min de leitura
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                      {post.categoria}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(post.status)}`}>
-                        {getStatusLabel(post.status)}
-                      </span>
-                      {post.destaque && (
-                        <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {post.dataPublicacao ? formatDate(post.dataPublicacao) : '-'}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => toggleDestaque(post)}
-                        className={`p-2 rounded-lg transition-colors ${
-                          post.destaque 
-                            ? 'text-amber-500 hover:bg-amber-50' 
-                            : 'text-gray-400 hover:bg-gray-100'
-                        }`}
-                        title={post.destaque ? 'Remover destaque' : 'Destacar'}
-                      >
-                        {post.destaque ? <Star className="w-5 h-5 fill-current" /> : <StarOff className="w-5 h-5" />}
-                      </button>
-                      <button
-                        onClick={() => toggleStatus(post)}
-                        className={`p-2 rounded-lg transition-colors ${
-                          post.status === 'PUBLICADO'
-                            ? 'text-green-500 hover:bg-green-50' 
-                            : 'text-gray-400 hover:bg-gray-100'
-                        }`}
-                        title={post.status === 'PUBLICADO' ? 'Despublicar' : 'Publicar'}
-                      >
-                        {post.status === 'PUBLICADO' ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-                      </button>
-                      <button
-                        onClick={() => openEditPost(post)}
-                        className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Editar"
-                      >
-                        <Pencil className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => deletePost(post.id)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Conteúdo */}
+      <div className="min-h-screen relative">
+        <div className="absolute inset-0 bg-black/40 pointer-events-none" />
         
-        {filteredPosts.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
-            <p className="mb-2">Nenhum post encontrado</p>
-            <button
-              onClick={openNewPost}
-              className="text-amber-500 hover:text-amber-600 font-medium"
-            >
-              Criar primeiro post
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white p-6 border-b border-gray-200 z-10">
-              <h2 className="text-xl font-bold text-gray-900">
-                {editingPost ? 'Editar Post' : 'Novo Post'}
+        <main className="relative px-6 py-6 space-y-6">
+          {/* Título e Botão */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-semibold flex items-center gap-3">
+                <FileText className="w-8 h-8 text-amber-400" />
+                Blog
               </h2>
+              <p className="text-sm text-white/70 mt-1">Gerencie os posts do blog da landing page</p>
             </div>
-            
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {/* Título */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Título *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={form.titulo}
-                  onChange={(e) => handleTituloChange(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  placeholder="Ex: Novas regras para cidadania italiana em 2026"
-                />
-              </div>
+            <Button 
+              onClick={() => setShowForm(true)}
+              className="bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Post
+            </Button>
+          </div>
 
-              {/* Slug */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Slug (URL)
-                </label>
-                <input
-                  type="text"
-                  value={form.slug}
-                  onChange={(e) => setForm({ ...form, slug: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-gray-50"
-                  placeholder="novas-regras-cidadania-italiana-2026"
-                />
-                <p className="text-xs text-gray-500 mt-1">URL amigável gerada automaticamente</p>
-              </div>
+          {/* Cards de Métricas */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: 'Total de Posts', value: totalPosts, cor: 'bg-blue-500' },
+              { label: 'Publicados', value: publicados, cor: 'bg-green-500' },
+              { label: 'Rascunhos', value: rascunhos, cor: 'bg-yellow-500' },
+              { label: 'Em Destaque', value: destaques, cor: 'bg-purple-500' },
+            ].map((metric, idx) => (
+              <Card key={idx} className="bg-white/10 backdrop-blur-sm border border-white/20 text-white">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-white/60 font-medium">{metric.label}</p>
+                      <p className="text-3xl font-bold mt-2">{metric.value}</p>
+                    </div>
+                    <div className={`p-2.5 rounded-xl ${metric.cor}`}>
+                      <FileText className="h-5 w-5 text-white" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
 
-              {/* Resumo */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Resumo * <span className="font-normal text-gray-500">(aparece no card)</span>
-                </label>
-                <textarea
-                  required
-                  rows={3}
-                  maxLength={500}
-                  value={form.resumo}
-                  onChange={(e) => setForm({ ...form, resumo: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
-                  placeholder="Breve descrição do post que aparecerá no card..."
-                />
-                <p className="text-xs text-gray-500 mt-1">{form.resumo.length}/500 caracteres</p>
-              </div>
-
-              {/* Imagem */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  URL da Imagem
-                </label>
-                <input
-                  type="url"
-                  value={form.imagemUrl}
-                  onChange={(e) => setForm({ ...form, imagemUrl: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  placeholder="https://images.unsplash.com/..."
-                />
-                <p className="text-xs text-gray-500 mt-1">Use imagens do Unsplash ou Pexels (gratuitas)</p>
-                {form.imagemUrl && (
-                  <div className="mt-2">
-                    <img 
-                      src={form.imagemUrl} 
-                      alt="Preview" 
-                      className="w-full h-40 object-cover rounded-lg"
-                      onError={(e) => (e.currentTarget.style.display = 'none')}
+          {/* Filtros */}
+          <Card className="bg-white/10 backdrop-blur-sm border border-white/20">
+            <CardContent className="p-4">
+              <div className="flex flex-wrap gap-4 items-center">
+                <div className="flex-1 min-w-[200px]">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
+                    <Input
+                      placeholder="Buscar posts..."
+                      value={busca}
+                      onChange={(e) => setBusca(e.target.value)}
+                      className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
                     />
                   </div>
-                )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={filtroStatus === 'todos' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setFiltroStatus('todos')}
+                    className={filtroStatus === 'todos' ? 'bg-amber-500 text-black' : 'border-white/30 text-white/70 bg-transparent hover:bg-white/10'}
+                  >
+                    Todos
+                  </Button>
+                  <Button
+                    variant={filtroStatus === 'PUBLICADO' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setFiltroStatus('PUBLICADO')}
+                    className={filtroStatus === 'PUBLICADO' ? 'bg-green-500 text-white' : 'border-white/30 text-white/70 bg-transparent hover:bg-white/10'}
+                  >
+                    Publicados
+                  </Button>
+                  <Button
+                    variant={filtroStatus === 'RASCUNHO' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setFiltroStatus('RASCUNHO')}
+                    className={filtroStatus === 'RASCUNHO' ? 'bg-yellow-500 text-black' : 'border-white/30 text-white/70 bg-transparent hover:bg-white/10'}
+                  >
+                    Rascunhos
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Lista de Posts */}
+          {filteredPosts.length === 0 ? (
+            <Card className="bg-white/10 backdrop-blur-sm border border-white/20">
+              <CardContent className="p-12 text-center">
+                <FileText className="w-16 h-16 text-white/30 mx-auto mb-4" />
+                <p className="text-white/70 text-lg">Nenhum post encontrado</p>
+                <p className="text-white/50 text-sm mt-1">Clique em "Novo Post" para criar seu primeiro post</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredPosts.map((post) => (
+                <Card key={post.id} className="bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/15 transition-colors">
+                  <CardContent className="p-4">
+                    <div className="flex gap-4">
+                      {/* Imagem */}
+                      <div className="w-32 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-white/10">
+                        {post.imagemUrl ? (
+                          <img 
+                            src={post.imagemUrl} 
+                            alt={post.imagemAlt || post.titulo}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <ImageIcon className="w-8 h-8 text-white/30" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Conteúdo */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <h3 className="text-white font-semibold text-lg truncate">{post.titulo}</h3>
+                            <p className="text-white/60 text-sm line-clamp-2 mt-1">{post.resumo}</p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {/* Status Badge */}
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              post.status === 'PUBLICADO' 
+                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                : post.status === 'ARQUIVADO'
+                                ? 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                                : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                            }`}>
+                              {post.status}
+                            </span>
+                            {post.destaque && (
+                              <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Meta info */}
+                        <div className="flex items-center gap-4 mt-3 text-xs text-white/50">
+                          <span className="flex items-center gap-1">
+                            <Tag className="w-3 h-3" />
+                            {post.categoria}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {post.tempoLeitura} min de leitura
+                          </span>
+                          {post.dataPublicacao && (
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(post.dataPublicacao).toLocaleDateString('pt-BR')}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Ações */}
+                        <div className="flex items-center gap-2 mt-3">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => togglePublish(post)}
+                            className="text-white/60 hover:text-white hover:bg-white/10"
+                          >
+                            {post.status === 'PUBLICADO' ? (
+                              <><EyeOff className="w-4 h-4 mr-1" /> Despublicar</>
+                            ) : (
+                              <><Eye className="w-4 h-4 mr-1" /> Publicar</>
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleDestaque(post)}
+                            className="text-white/60 hover:text-amber-400 hover:bg-white/10"
+                          >
+                            {post.destaque ? (
+                              <><StarOff className="w-4 h-4 mr-1" /> Remover Destaque</>
+                            ) : (
+                              <><Star className="w-4 h-4 mr-1" /> Destacar</>
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => editPost(post)}
+                            className="text-white/60 hover:text-blue-400 hover:bg-white/10"
+                          >
+                            <Pencil className="w-4 h-4 mr-1" /> Editar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(post.id)}
+                            className="text-white/60 hover:text-red-400 hover:bg-white/10"
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" /> Excluir
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* Modal de Formulário */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={resetForm} />
+          <Card className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-gray-900 border-white/20">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-white">
+                  {editingPost ? 'Editar Post' : 'Novo Post'}
+                </h2>
+                <Button variant="ghost" size="sm" onClick={resetForm} className="text-white/60 hover:text-white">
+                  <X className="w-5 h-5" />
+                </Button>
               </div>
 
-              {/* Categoria e Tempo */}
-              <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Categoria *
-                  </label>
-                  <select
+                  <label className="text-sm text-white/70 mb-1 block">Título *</label>
+                  <Input
+                    value={formData.titulo}
+                    onChange={(e) => setFormData({...formData, titulo: e.target.value})}
+                    placeholder="Digite o título do post"
+                    className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                     required
-                    value={form.categoria}
-                    onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  >
-                    {CATEGORIAS.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tempo de Leitura (min)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="60"
-                    value={form.tempoLeitura}
-                    onChange={(e) => setForm({ ...form, tempoLeitura: parseInt(e.target.value) || 5 })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   />
                 </div>
-              </div>
 
-              {/* Data e Status */}
-              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Data de Publicação
-                  </label>
-                  <input
-                    type="date"
-                    value={form.dataPublicacao}
-                    onChange={(e) => setForm({ ...form, dataPublicacao: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  <label className="text-sm text-white/70 mb-1 block">Resumo *</label>
+                  <textarea
+                    value={formData.resumo}
+                    onChange={(e) => setFormData({...formData, resumo: e.target.value})}
+                    placeholder="Digite um resumo do post (aparece no card)"
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder:text-white/50 resize-none h-20"
+                    required
                   />
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Status
-                  </label>
-                  <select
-                    value={form.status}
-                    onChange={(e) => setForm({ ...form, status: e.target.value as any })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  >
-                    <option value="RASCUNHO">Rascunho</option>
-                    <option value="PUBLICADO">Publicado</option>
-                    <option value="ARQUIVADO">Arquivado</option>
-                  </select>
+                  <label className="text-sm text-white/70 mb-1 block">Conteúdo</label>
+                  <textarea
+                    value={formData.conteudo}
+                    onChange={(e) => setFormData({...formData, conteudo: e.target.value})}
+                    placeholder="Conteúdo completo do post (opcional)"
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder:text-white/50 resize-none h-32"
+                  />
                 </div>
-              </div>
 
-              {/* Destaque */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="destaque"
-                  checked={form.destaque}
-                  onChange={(e) => setForm({ ...form, destaque: e.target.checked })}
-                  className="w-4 h-4 text-amber-500 border-gray-300 rounded focus:ring-amber-500"
-                />
-                <label htmlFor="destaque" className="text-sm text-gray-700 cursor-pointer">
-                  Destacar este post (aparece primeiro na lista)
-                </label>
-              </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-white/70 mb-1 block">URL da Imagem</label>
+                    <Input
+                      value={formData.imagemUrl}
+                      onChange={(e) => setFormData({...formData, imagemUrl: e.target.value})}
+                      placeholder="https://..."
+                      className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-white/70 mb-1 block">Alt da Imagem</label>
+                    <Input
+                      value={formData.imagemAlt}
+                      onChange={(e) => setFormData({...formData, imagemAlt: e.target.value})}
+                      placeholder="Descrição da imagem"
+                      className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                    />
+                  </div>
+                </div>
 
-              {/* Botões */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                  disabled={saving}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white rounded-lg transition-colors flex items-center gap-2"
-                >
-                  {saving ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    editingPost ? 'Salvar' : 'Criar Post'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-white/70 mb-1 block">Categoria *</label>
+                    <select
+                      value={formData.categoria}
+                      onChange={(e) => setFormData({...formData, categoria: e.target.value})}
+                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white"
+                      required
+                    >
+                      {categorias.map(cat => (
+                        <option key={cat} value={cat} className="bg-gray-900">{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm text-white/70 mb-1 block">Tempo de Leitura (min)</label>
+                    <Input
+                      type="number"
+                      value={formData.tempoLeitura}
+                      onChange={(e) => setFormData({...formData, tempoLeitura: parseInt(e.target.value) || 5})}
+                      min={1}
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-white/70 mb-1 block">Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({...formData, status: e.target.value})}
+                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white"
+                    >
+                      <option value="RASCUNHO" className="bg-gray-900">Rascunho</option>
+                      <option value="PUBLICADO" className="bg-gray-900">Publicado</option>
+                      <option value="ARQUIVADO" className="bg-gray-900">Arquivado</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm text-white/70 mb-1 block">Data de Publicação</label>
+                    <Input
+                      type="date"
+                      value={formData.dataPublicacao}
+                      onChange={(e) => setFormData({...formData, dataPublicacao: e.target.value})}
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="destaque"
+                    checked={formData.destaque}
+                    onChange={(e) => setFormData({...formData, destaque: e.target.checked})}
+                    className="rounded border-white/30"
+                  />
+                  <label htmlFor="destaque" className="text-sm text-white/70">
+                    Marcar como destaque (aparece primeiro)
+                  </label>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={resetForm}
+                    className="flex-1 border-white/30 text-white/70 bg-transparent hover:bg-white/10"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={saving}
+                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+                  >
+                    {saving ? 'Salvando...' : (
+                      <><Check className="w-4 h-4 mr-2" /> {editingPost ? 'Atualizar' : 'Criar Post'}</>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
