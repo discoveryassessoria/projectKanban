@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Search, Bell, LogOut, BarChart3, FolderOpen, TreeDeciduous } from "lucide-react"
+import { Search, Bell, LogOut } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import type { ProcessoWithStatus } from "@/src/types/kanban"
+import { parseLocalDate, formatDateBR, getToday, isToday, isPast, isWithinDays } from "@/src/lib/date-utils"
 
-// ✅ NOVO: Mapeamento de bandeiras por país
+// Mapeamento de bandeiras por país
 const BANDEIRAS_PAIS: Record<string, string> = {
   ALEMANHA: "🇩🇪",
   ESPANHA: "🇪🇸",
@@ -36,7 +37,6 @@ interface HeaderBarProps {
   onLogout?: () => void
 }
 
-// ✅ ATUALIZADO: Adicionado processoId, pais e responsavel
 interface TarefaNotificacao {
   id: number
   titulo: string
@@ -70,7 +70,6 @@ export function HeaderBar({
     processos: ProcessoWithStatus[]
   }>({ processos: [] })
 
-  // Estado para notificações buscadas diretamente
   const [notificacoes, setNotificacoes] = useState<{
     vencidas: TarefaNotificacao[]
     hoje: TarefaNotificacao[]
@@ -84,16 +83,12 @@ export function HeaderBar({
   // Buscar notificações diretamente da API
   const fetchNotificacoes = useCallback(async () => {
     try {
-      // Buscar todas as tarefas (endpoint correto)
       const response = await fetch('/api/tarefas')
       if (!response.ok) return
 
       const data = await response.json()
       const tarefas = data.tarefas || []
       if (!Array.isArray(tarefas)) return
-
-      const hoje = new Date()
-      hoje.setHours(0, 0, 0, 0)
 
       const vencidas: TarefaNotificacao[] = []
       const hojeList: TarefaNotificacao[] = []
@@ -103,11 +98,7 @@ export function HeaderBar({
       const umDiaAtras = new Date()
       umDiaAtras.setDate(umDiaAtras.getDate() - 1)
 
-      const em3Dias = new Date(hoje)
-      em3Dias.setDate(hoje.getDate() + 3)
-
       tarefas.forEach((t: any) => {
-        // ✅ ATUALIZADO: Incluindo processoId, pais e responsável
         const tarefa: TarefaNotificacao = {
           id: t.id,
           titulo: t.titulo || 'Sem título',
@@ -121,25 +112,21 @@ export function HeaderBar({
           responsavelEmail: t.responsavel?.email || null
         }
 
-        // ✅ NOVO: Filtrar por responsável
-        // Só mostra se: não tem responsável OU responsável é o usuário logado
+        // Filtrar por responsável
         const semResponsavel = !tarefa.responsavelId
         const souResponsavel = userEmail && tarefa.responsavelEmail === userEmail
         
         if (!semResponsavel && !souResponsavel) {
-          return // Pula esta tarefa - tem responsável e não sou eu
+          return
         }
 
-        // Ignorar tarefas concluídas para vencidas/hoje/próximos
+        // ✅ CORRIGIDO: Usar funções de comparação de data corretas
         if (!tarefa.concluida && tarefa.dataPrazo) {
-          const prazo = new Date(tarefa.dataPrazo)
-          prazo.setHours(0, 0, 0, 0)
-
-          if (prazo < hoje) {
+          if (isPast(tarefa.dataPrazo)) {
             vencidas.push(tarefa)
-          } else if (prazo.getTime() === hoje.getTime()) {
+          } else if (isToday(tarefa.dataPrazo)) {
             hojeList.push(tarefa)
-          } else if (prazo > hoje && prazo <= em3Dias) {
+          } else if (isWithinDays(tarefa.dataPrazo, 3)) {
             proximos3Dias.push(tarefa)
           }
         }
@@ -188,7 +175,6 @@ export function HeaderBar({
     return () => clearInterval(interval)
   }, [])
 
-  // Buscar notificações ao montar e a cada 30 segundos
   useEffect(() => {
     fetchNotificacoes()
     const interval = setInterval(fetchNotificacoes, 30000)
@@ -204,7 +190,6 @@ export function HeaderBar({
       .slice(0, 2)
   }
 
-  // ✅ ATUALIZADO: Função de pesquisa - só procura processos
   const handleSearch = (query: string) => {
     setSearchQuery(query)
 
@@ -216,7 +201,6 @@ export function HeaderBar({
 
     const queryLower = query.toLowerCase()
 
-    // Buscar apenas em processos
     const processosFiltrados = processos.filter(p => 
       p.nome.toLowerCase().includes(queryLower) ||
       p.descricao?.toLowerCase().includes(queryLower) ||
@@ -224,35 +208,26 @@ export function HeaderBar({
     )
 
     setSearchResults({
-      processos: processosFiltrados.slice(0, 5) // Mostrar até 5 resultados
+      processos: processosFiltrados.slice(0, 5)
     })
 
     setShowSearchResults(true)
   }
 
-  // ✅ NOVO: Função para navegar para o processo
   const handleProcessoClick = (processo: ProcessoWithStatus) => {
-    // Navegar para a página de processos com os parâmetros corretos
     const url = `/kanban?pais=${processo.pais}&processoId=${processo.id}`
     router.push(url)
-    
-    // Limpar a busca
     setShowSearchResults(false)
     setSearchQuery("")
   }
 
-  // ✅ NOVO: Função para navegar ao clicar na tarefa da notificação
   const handleTarefaClick = (tarefa: TarefaNotificacao) => {
-    // Se a tarefa tem processo, abre o Kanban na aba de tarefas
     if (tarefa.processoId) {
       const pais = tarefa.pais || 'PORTUGAL'
       router.push(`/kanban?pais=${pais}&processoId=${tarefa.processoId}&tab=tarefas`)
     } else {
-      // Tarefa sem processo - vai para a página de tarefas
       router.push('/activities')
     }
-    
-    // Fechar dropdown
     setShowNotifications(false)
   }
 
@@ -316,7 +291,6 @@ export function HeaderBar({
                         className="w-full px-3 py-2 flex items-center gap-3 hover:bg-gray-100 transition text-left"
                         onClick={() => handleProcessoClick(processo)}
                       >
-                        {/* ✅ Bandeira do país */}
                         <span className="text-lg flex-shrink-0">
                           {BANDEIRAS_PAIS[processo.pais] || "🏳️"}
                         </span>
@@ -326,7 +300,6 @@ export function HeaderBar({
                             {processo.contratantes?.[0]?.nome || "Sem contratante"}
                           </p>
                         </div>
-                        {/* ✅ Indicador visual de clique */}
                         <span className="text-[10px] text-blue-500 flex-shrink-0">
                           Clique para abrir →
                         </span>
@@ -383,7 +356,7 @@ export function HeaderBar({
                             <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
                             <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
                             <p className="text-[10px] text-red-500 font-medium">
-                              Venceu em {new Date(tarefa.dataPrazo!).toLocaleDateString('pt-BR')}
+                              Venceu em {formatDateBR(tarefa.dataPrazo)}
                             </p>
                           </button>
                         ))}
@@ -425,7 +398,7 @@ export function HeaderBar({
                             <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
                             <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
                             <p className="text-[10px] text-orange-600 font-medium">
-                              Vence em {new Date(tarefa.dataPrazo!).toLocaleDateString('pt-BR')}
+                              Vence em {formatDateBR(tarefa.dataPrazo)}
                             </p>
                           </button>
                         ))}

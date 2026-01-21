@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { PrioridadeTarefa, Pais } from "@prisma/client"
 import { logTarefa } from "@/lib/auditoria"
+import { toUTCNoon } from "@/src/lib/date-utils"  // ✅ NOVO IMPORT
 
 // GET - Buscar tarefas (com filtros opcionais)
 export async function GET(request: Request) {
@@ -231,7 +232,7 @@ export async function POST(request: Request) {
         processoId: processoId || null,
         responsavelId: responsavelId || null,
         prioridade: prioridadeValida,
-        dataPrazo: dataPrazo ? new Date(dataPrazo) : null,
+        dataPrazo: toUTCNoon(dataPrazo),  // ✅ CORRIGIDO - Usa toUTCNoon
         statusId: statusId || null,
         pais: paisValido,
         tarefaPaiId: tarefaPaiId || null,

@@ -20,6 +20,8 @@ import {
   ListTodo
 } from "lucide-react"
 import { getTarefasPorPais, type TarefaPreDefinida } from "../../lib/tarefas-config"
+// ✅ NOVO: Import das funções de data
+import { isPast, formatDateBR } from "@/src/lib/date-utils"
 
 // ==========================================
 // TIPOS
@@ -161,11 +163,8 @@ function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
   const concluidas = subtarefas.filter(s => s.concluida).length
   const porcentagem = temSubtarefas ? (concluidas / subtarefas.length) * 100 : (tarefa.concluida ? 100 : 0)
 
-  // Verificar se está atrasada
-  const hoje = new Date()
-  hoje.setHours(0, 0, 0, 0)
-  const prazo = tarefa.dataPrazo ? new Date(tarefa.dataPrazo) : null
-  const atrasada = prazo && prazo < hoje && !tarefa.concluida
+  // ✅ CORRIGIDO: Usar isPast do date-utils
+  const atrasada = tarefa.dataPrazo && isPast(tarefa.dataPrazo) && !tarefa.concluida
 
   return (
     <div
@@ -241,7 +240,8 @@ function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
               }
             `}>
               <Calendar className="w-3 h-3" />
-              {new Date(tarefa.dataPrazo).toLocaleDateString('pt-BR')}
+              {/* ✅ CORRIGIDO: Usar formatDateBR */}
+              {formatDateBR(tarefa.dataPrazo)}
             </span>
           )}
           
@@ -571,7 +571,8 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
                     {subtarefa.dataPrazo && (
                       <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border text-gray-600">
                         <Calendar className="w-3 h-3" />
-                        {new Date(subtarefa.dataPrazo).toLocaleDateString('pt-BR')}
+                        {/* ✅ CORRIGIDO: Usar formatDateBR */}
+                        {formatDateBR(subtarefa.dataPrazo)}
                       </span>
                     )}
                     {subtarefa.responsavel && (
