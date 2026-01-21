@@ -465,17 +465,8 @@ function CreateActivityModal() {
     status_id: ''
   })
 
-  const { paises } = usePaises()
-  // ✅ CORRIGIDO: Passa o país selecionado para filtrar os status
-  const { statuses } = useStatuses(formData.pais)
-
   const updateFormData = (key: keyof ActivityFormData, value: string) => {
-    // ✅ CORRIGIDO: Quando mudar o país, resetar o status
-    if (key === 'pais') {
-      setFormData(prev => ({ ...prev, pais: value, status_id: '' }))
-    } else {
-      setFormData(prev => ({ ...prev, [key]: value }))
-    }
+    setFormData(prev => ({ ...prev, [key]: value }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -493,8 +484,9 @@ function CreateActivityModal() {
           titulo: formData.nome,
           descricao: formData.descricao,
           dataPrazo: formData.data_termino || null,
-          pais: formData.pais || 'PORTUGAL',
-          statusId: formData.status_id ? parseInt(formData.status_id) : null
+          // ✅ Tarefas criadas por esta página sempre ficam sem país
+          pais: null,
+          statusId: null
         })
       })
 
@@ -556,47 +548,6 @@ function CreateActivityModal() {
               onChange={(value) => updateFormData('data_termino', value)}
             />
           </div>
-
-          <div className="space-y-2">
-            <Label className="text-gray-700">País</Label>
-            <Select 
-              value={formData.pais} 
-              onValueChange={(value) => updateFormData('pais', value)}
-            >
-              <SelectTrigger className="bg-white border-gray-300 text-gray-900">
-                <SelectValue placeholder="Selecione um país" />
-              </SelectTrigger>
-              <SelectContent className="bg-white border-gray-200 text-gray-900">
-                {paises.map((pais) => (
-                  <SelectItem key={pais} value={pais}>
-                    {PAIS_LABELS[pais] || pais}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* ✅ NOVO: Select de Status (só aparece quando país selecionado) */}
-          {formData.pais && statuses.length > 0 && (
-            <div className="space-y-2">
-              <Label className="text-gray-700">Status (opcional)</Label>
-              <Select 
-                value={formData.status_id} 
-                onValueChange={(value) => updateFormData('status_id', value)}
-              >
-                <SelectTrigger className="bg-white border-gray-300 text-gray-900">
-                  <SelectValue placeholder="Selecione um status" />
-                </SelectTrigger>
-                <SelectContent className="bg-white border-gray-200 text-gray-900">
-                  {statuses.map((status: Status) => (
-                    <SelectItem key={status.id} value={String(status.id)}>
-                      {status.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
             Criar Atividade

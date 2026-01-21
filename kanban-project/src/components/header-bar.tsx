@@ -36,13 +36,18 @@ interface HeaderBarProps {
   onLogout?: () => void
 }
 
+// ✅ ATUALIZADO: Adicionado processoId, pais e responsavel
 interface TarefaNotificacao {
   id: number
   titulo: string
   dataPrazo: string | null
   concluida: boolean
   createdAt: string
+  processoId: number | null
   processoNome: string
+  pais: string | null
+  responsavelId: number | null
+  responsavelEmail: string | null
 }
 
 export function HeaderBar({ 
@@ -102,13 +107,27 @@ export function HeaderBar({
       em3Dias.setDate(hoje.getDate() + 3)
 
       tarefas.forEach((t: any) => {
+        // ✅ ATUALIZADO: Incluindo processoId, pais e responsável
         const tarefa: TarefaNotificacao = {
           id: t.id,
           titulo: t.titulo || 'Sem título',
           dataPrazo: t.dataPrazo || null,
           concluida: t.concluida || false,
           createdAt: t.createdAt,
-          processoNome: t.processo?.nome || 'Sem processo'
+          processoId: t.processoId || t.processo?.id || null,
+          processoNome: t.processo?.nome || 'Sem processo',
+          pais: t.pais || t.processo?.pais || null,
+          responsavelId: t.responsavelId || t.responsavel?.id || null,
+          responsavelEmail: t.responsavel?.email || null
+        }
+
+        // ✅ NOVO: Filtrar por responsável
+        // Só mostra se: não tem responsável OU responsável é o usuário logado
+        const semResponsavel = !tarefa.responsavelId
+        const souResponsavel = userEmail && tarefa.responsavelEmail === userEmail
+        
+        if (!semResponsavel && !souResponsavel) {
+          return // Pula esta tarefa - tem responsável e não sou eu
         }
 
         // Ignorar tarefas concluídas para vencidas/hoje/próximos
@@ -145,7 +164,7 @@ export function HeaderBar({
     } catch (error) {
       console.error('Erro ao buscar notificações:', error)
     }
-  }, [])
+  }, [userEmail])
 
   useEffect(() => {
     const updateDateTime = () => {
@@ -220,6 +239,21 @@ export function HeaderBar({
     // Limpar a busca
     setShowSearchResults(false)
     setSearchQuery("")
+  }
+
+  // ✅ NOVO: Função para navegar ao clicar na tarefa da notificação
+  const handleTarefaClick = (tarefa: TarefaNotificacao) => {
+    // Se a tarefa tem processo, abre o Kanban na aba de tarefas
+    if (tarefa.processoId) {
+      const pais = tarefa.pais || 'PORTUGAL'
+      router.push(`/kanban?pais=${pais}&processoId=${tarefa.processoId}&tab=tarefas`)
+    } else {
+      // Tarefa sem processo - vai para a página de tarefas
+      router.push('/activities')
+    }
+    
+    // Fechar dropdown
+    setShowNotifications(false)
   }
 
   const totalResults = searchResults.processos.length
@@ -309,7 +343,6 @@ export function HeaderBar({
             <button 
               className="relative inline-flex items-center justify-center rounded-full p-2 border border-white/30 hover:bg-white/10 transition"
               onClick={() => setShowNotifications(!showNotifications)}
-              onBlur={() => setTimeout(() => setShowNotifications(false), 200)}
             >
               <Bell className="h-4 w-4 text-white" />
               {totalNotificacoes > 0 && (
@@ -334,83 +367,87 @@ export function HeaderBar({
                     <p className="text-xs text-gray-400 mt-1">Você está em dia!</p>
                   </div>
                 ) : (
-                  <div className="max-h-80 overflow-y-auto">
+                  <div className="max-h-[400px] overflow-y-auto">
                     {notificacoes.vencidas.length > 0 && (
                       <div>
-                        <div className="px-3 py-2 bg-red-50 text-[10px] uppercase tracking-wide text-red-600 font-medium flex items-center gap-1">
+                        <div className="px-3 py-2 bg-red-50 text-[10px] uppercase tracking-wide text-red-600 font-medium flex items-center gap-1 sticky top-0">
                           <span className="h-2 w-2 rounded-full bg-red-500"></span>
                           Tarefas Vencidas ({notificacoes.vencidas.length})
                         </div>
-                        {notificacoes.vencidas.slice(0, 3).map(tarefa => (
-                          <div
+                        {notificacoes.vencidas.map(tarefa => (
+                          <button
                             key={`vencida-${tarefa.id}`}
-                            className="px-3 py-2 border-l-4 border-red-500 hover:bg-gray-50"
+                            className="w-full text-left px-3 py-2 border-l-4 border-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                            onClick={() => handleTarefaClick(tarefa)}
                           >
                             <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
                             <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
                             <p className="text-[10px] text-red-500 font-medium">
                               Venceu em {new Date(tarefa.dataPrazo!).toLocaleDateString('pt-BR')}
                             </p>
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
 
                     {notificacoes.hoje.length > 0 && (
                       <div>
-                        <div className="px-3 py-2 bg-amber-50 text-[10px] uppercase tracking-wide text-amber-600 font-medium flex items-center gap-1">
+                        <div className="px-3 py-2 bg-amber-50 text-[10px] uppercase tracking-wide text-amber-600 font-medium flex items-center gap-1 sticky top-0">
                           <span className="h-2 w-2 rounded-full bg-amber-500"></span>
                           Vencem hoje ({notificacoes.hoje.length})
                         </div>
-                        {notificacoes.hoje.slice(0, 3).map(tarefa => (
-                          <div
+                        {notificacoes.hoje.map(tarefa => (
+                          <button
                             key={`hoje-${tarefa.id}`}
-                            className="px-3 py-2 border-l-4 border-amber-500 hover:bg-gray-50"
+                            className="w-full text-left px-3 py-2 border-l-4 border-amber-500 hover:bg-amber-50 transition-colors cursor-pointer"
+                            onClick={() => handleTarefaClick(tarefa)}
                           >
                             <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
                             <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
                             <p className="text-[10px] text-amber-600 font-medium">Vence hoje!</p>
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
 
                     {notificacoes.proximos3Dias.length > 0 && (
                       <div>
-                        <div className="px-3 py-2 bg-orange-50 text-[10px] uppercase tracking-wide text-orange-600 font-medium flex items-center gap-1">
+                        <div className="px-3 py-2 bg-orange-50 text-[10px] uppercase tracking-wide text-orange-600 font-medium flex items-center gap-1 sticky top-0">
                           <span className="h-2 w-2 rounded-full bg-orange-500"></span>
                           Próximos 3 dias ({notificacoes.proximos3Dias.length})
                         </div>
-                        {notificacoes.proximos3Dias.slice(0, 3).map(tarefa => (
-                          <div
+                        {notificacoes.proximos3Dias.map(tarefa => (
+                          <button
                             key={`proximos-${tarefa.id}`}
-                            className="px-3 py-2 border-l-4 border-orange-500 hover:bg-gray-50"
+                            className="w-full text-left px-3 py-2 border-l-4 border-orange-500 hover:bg-orange-50 transition-colors cursor-pointer"
+                            onClick={() => handleTarefaClick(tarefa)}
                           >
                             <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
                             <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
                             <p className="text-[10px] text-orange-600 font-medium">
                               Vence em {new Date(tarefa.dataPrazo!).toLocaleDateString('pt-BR')}
                             </p>
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
 
                     {notificacoes.novas.length > 0 && (
                       <div>
-                        <div className="px-3 py-2 bg-blue-50 text-[10px] uppercase tracking-wide text-blue-600 font-medium flex items-center gap-1">
+                        <div className="px-3 py-2 bg-blue-50 text-[10px] uppercase tracking-wide text-blue-600 font-medium flex items-center gap-1 sticky top-0">
                           <span className="h-2 w-2 rounded-full bg-blue-500"></span>
                           Novas tarefas ({notificacoes.novas.length})
                         </div>
-                        {notificacoes.novas.slice(0, 3).map(tarefa => (
-                          <div
+                        {notificacoes.novas.map(tarefa => (
+                          <button
                             key={`nova-${tarefa.id}`}
-                            className="px-3 py-2 border-l-4 border-blue-500 hover:bg-gray-50"
+                            className="w-full text-left px-3 py-2 border-l-4 border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer"
+                            onClick={() => handleTarefaClick(tarefa)}
                           >
                             <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
                             <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
                             <p className="text-[10px] text-blue-600 font-medium">Nova tarefa</p>
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}

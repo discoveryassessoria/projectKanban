@@ -1,14 +1,14 @@
 ﻿"use client"
 
 import { useEffect, useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useActivities, useStatuses, useContratantes, useRequerentes, invalidateActivities } from "@/src/hooks/useActivitiesData"
 import type { Atividade, Status, Usuario } from "@/src/hooks/useActivitiesData"
-import { ProcessoDetailsModal } from "@/src/components/kanban/atividade-details-modal"
-import type { Contratante, Requerente } from "@/src/types/kanban"
+import { TarefaDetailsModal } from "@/src/components/activitiesComponents/tarefa-details-modal"
 
 // Mapeamento de países para exibição
 const PAIS_LABELS: Record<string, string> = {
@@ -27,6 +27,8 @@ interface ListaActivitiesProps {
 }
 
 export default function ListaActivities({ filters }: ListaActivitiesProps) {
+  const router = useRouter()
+  
   // Usar hooks de cache para buscar dados
   const { activities = [], isLoading, error, mutate } = useActivities(filters)
   const { statuses = [] } = useStatuses()
@@ -206,8 +208,15 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   }
 
   const handleAtividadeClick = (atividade: Atividade) => {
-    setSelectedAtividade(atividade)
-    setIsDetailsModalOpen(true)
+    // Se tem processo vinculado → vai pro Kanban
+    if (atividade.processo?.id) {
+      const pais = atividade.processo.pais || atividade.pais || 'PORTUGAL'
+      router.push(`/kanban?processoId=${atividade.processo.id}&tab=tarefas&pais=${pais}`)
+    } else {
+      // Tarefa independente → abre o modal
+      setSelectedAtividade(atividade)
+      setIsDetailsModalOpen(true)
+    }
   }
 
   const handleAtividadeSave = () => {
@@ -463,8 +472,9 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
         </div>
       </div>
 
-      <ProcessoDetailsModal
-        processo={selectedAtividade as any}
+      {/* ✅ NOVO: Modal específico para tarefas */}
+      <TarefaDetailsModal
+        tarefa={selectedAtividade as any}
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
         onSave={handleAtividadeSave}
