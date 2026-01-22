@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
-// POST - Marcar fatura como paga
+// POST - Registrar pagamento (cria um novo registro de pagamento)
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ processoId: string; faturaId: string }> }
@@ -26,7 +26,8 @@ export async function POST(
       valorPago,
       dataPagamento,
       comprovanteUrl,
-      comprovanteNome 
+      comprovanteNome,
+      observacao
     } = body
 
     // Verificar se fatura existe
@@ -34,6 +35,9 @@ export async function POST(
       where: { 
         id: fId,
         processoId: pId 
+      },
+      include: {
+        pagamentos: true
       }
     })
 
@@ -44,37 +48,72 @@ export async function POST(
       )
     }
 
-    // Verificar se já foi paga
+    // Verificar se já foi paga totalmente
     if (faturaExistente.status === 'PAGO') {
       return NextResponse.json(
-        { error: "Fatura já está paga" },
+        { error: "Fatura já está totalmente paga" },
         { status: 400 }
       )
     }
 
-    // Verificar se está cancelada
-    if (faturaExistente.status === 'CANCELADO') {
+    // Calcular valores
+    const valorFatura = Number(faturaExistente.valor)
+    const valorJaPago = faturaExistente.pagamentos.reduce((acc, p) => acc + Number(p.valor), 0)
+    const valorRestante = valorFatura - valorJaPago
+    
+    // Valor do pagamento (se não informado, usa o restante)
+    const valorPagamentoAtual = valorPago ? parseFloat(valorPago) : valorRestante
+    
+    // Validar que não está pagando mais do que deve
+    if (valorPagamentoAtual > valorRestante + 0.01) {
       return NextResponse.json(
-        { error: "Não é possível pagar uma fatura cancelada" },
+        { error: `Valor do pagamento (${valorPagamentoAtual}) excede o valor restante (${valorRestante})` },
         { status: 400 }
       )
     }
 
-    const fatura = await prisma.fatura.update({
-      where: { id: fId },
+    // Criar o pagamento
+    const pagamento = await prisma.pagamentoFatura.create({
       data: {
-        status: 'PAGO',
+        faturaId: fId,
+        valor: valorPagamentoAtual,
+        data: dataPagamento ? new Date(dataPagamento) : new Date(),
         formaPagamento: formaPagamento || null,
-        valorPago: valorPago ? parseFloat(valorPago) : Number(faturaExistente.valor),
-        dataPagamento: dataPagamento ? new Date(dataPagamento) : new Date(),
         comprovanteUrl: comprovanteUrl || null,
-        comprovanteNome: comprovanteNome || null
+        comprovanteNome: comprovanteNome || null,
+        observacao: observacao || null
       }
     })
 
-    return NextResponse.json({ fatura })
+    // Calcular novo total pago
+    const novoTotalPago = valorJaPago + valorPagamentoAtual
+    const novoRestante = valorFatura - novoTotalPago
+
+    // Determinar novo status
+    let novoStatus: 'PAGO' | 'PARCIAL'
+    if (novoTotalPago >= valorFatura - 0.01) {
+      novoStatus = 'PAGO'
+    } else {
+      novoStatus = 'PARCIAL'
+    }
+
+    // Atualizar status da fatura
+    await prisma.fatura.update({
+      where: { id: fId },
+      data: { status: novoStatus }
+    })
+
+    return NextResponse.json({ 
+      pagamento,
+      novoStatus,
+      totalPago: novoTotalPago,
+      valorRestante: novoRestante,
+      message: novoStatus === 'PAGO' 
+        ? 'Fatura paga totalmente' 
+        : `Pagamento registrado. Restam ${novoRestante.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+    })
   } catch (error) {
-    console.error('Erro ao marcar fatura como paga:', error)
+    console.error('Erro ao registrar pagamento:', error)
     return NextResponse.json(
       { error: "Erro ao processar pagamento" },
       { status: 500 }

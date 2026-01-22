@@ -9,38 +9,43 @@ import {
   Plus,
   DollarSign,
   Calendar,
-  CreditCard,
   Check,
   X,
   AlertCircle,
   Clock,
   Trash2,
-  Edit,
   Receipt,
-  TrendingUp,
   TrendingDown,
-  Ban,
-  FileText,
   ChevronDown,
   ChevronUp
 } from "lucide-react"
 import { TabelaCustos } from "./TabelaCustos"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 
+interface Pagamento {
+  id: number
+  valor: number | string
+  data: string
+  formaPagamento: string | null
+  comprovanteUrl: string | null
+  comprovanteNome: string | null
+  observacao: string | null
+}
+
 interface Fatura {
   id: number
   processoId: number
   descricao: string
   valor: number | string
-  status: 'PENDENTE' | 'PAGO' | 'VENCIDO' | 'CANCELADO' | 'PARCIAL'
+  status: 'PENDENTE' | 'PAGO' | 'VENCIDO' | 'PARCIAL'
   dataEmissao: string
   dataVencimento: string | null
-  dataPagamento: string | null
-  formaPagamento: string | null
-  valorPago: number | string | null
-  comprovanteUrl: string | null
-  comprovanteNome: string | null
   observacoes: string | null
+  // Calculados
+  valorPago: number
+  valorRestante: number
+  // Histórico de pagamentos
+  pagamentos: Pagamento[]
 }
 
 interface Totais {
@@ -72,11 +77,6 @@ const STATUS_CONFIG = {
     color: 'bg-red-100 text-red-700 border-red-200',
     icon: AlertCircle 
   },
-  CANCELADO: { 
-    label: 'Cancelado', 
-    color: 'bg-gray-100 text-gray-500 border-gray-200',
-    icon: Ban 
-  },
   PARCIAL: { 
     label: 'Parcial', 
     color: 'bg-orange-100 text-orange-700 border-orange-200',
@@ -107,7 +107,6 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
   // Modais
   const [showNovaFatura, setShowNovaFatura] = useState(false)
   const [showPagar, setShowPagar] = useState<Fatura | null>(null)
-  const [showEditar, setShowEditar] = useState<Fatura | null>(null)
   const [expandedFatura, setExpandedFatura] = useState<number | null>(null)
   
   // Form nova fatura
@@ -121,6 +120,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
   const [pagarForma, setPagarForma] = useState('')
   const [pagarValor, setPagarValor] = useState('')
   const [pagarData, setPagarData] = useState('')
+  const [pagarObservacao, setPagarObservacao] = useState('')
 
   useEffect(() => {
     carregarFaturas()
@@ -185,7 +185,8 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
         body: JSON.stringify({
           formaPagamento: pagarForma || null,
           valorPago: pagarValor || null,
-          dataPagamento: pagarData || null
+          dataPagamento: pagarData || null,
+          observacao: pagarObservacao || null
         })
       })
 
@@ -194,6 +195,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
         setPagarForma('')
         setPagarValor('')
         setPagarData('')
+        setPagarObservacao('')
         carregarFaturas()
         onUpdate?.()
       }
@@ -201,25 +203,6 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
       console.error('Erro ao pagar fatura:', error)
     } finally {
       setSalvando(false)
-    }
-  }
-
-  const handleCancelar = async (fatura: Fatura) => {
-    if (!confirm('Tem certeza que deseja cancelar esta fatura?')) return
-
-    try {
-      const response = await fetch(`/api/processos/${processoId}/faturas/${fatura.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'CANCELADO' })
-      })
-
-      if (response.ok) {
-        carregarFaturas()
-        onUpdate?.()
-      }
-    } catch (error) {
-      console.error('Erro ao cancelar fatura:', error)
     }
   }
 
@@ -254,10 +237,9 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
     <div className="h-full flex flex-col bg-gray-50 overflow-y-auto">
       {/* ===== SEÇÃO: TABELA DE CUSTOS ===== */}
       <div className="bg-white border-b">
-        {/* Header da seção Custos */}
         <div
-        onClick={() => setShowCustos(!showCustos)}
-        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer"
+          onClick={() => setShowCustos(!showCustos)}
+          className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <div className="p-2 bg-amber-100 rounded-lg">
@@ -275,7 +257,6 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
           )}
         </div>
         
-        {/* Conteúdo da Tabela de Custos */}
         {showCustos && (
           <div className="px-6 pb-6">
             <TabelaCustos processoId={processoId} nomeFamilia={nomeFamilia} />
@@ -288,11 +269,10 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
 
       {/* ===== SEÇÃO: FATURAS ===== */}
       <div className="flex-1 flex flex-col">
-        {/* Header da seção Faturas */}
         <div className="bg-white border-b">
           <div
-          onClick={() => setShowFaturas(!showFaturas)}
-          className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer"
+            onClick={() => setShowFaturas(!showFaturas)}
+            className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-3">
               <div className="p-2 bg-emerald-100 rounded-lg">
@@ -385,12 +365,10 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4 flex-1">
-                            {/* Ícone de status */}
                             <div className={`p-2 rounded-lg ${config.color}`}>
                               <StatusIcon className="h-4 w-4" />
                             </div>
 
-                            {/* Info principal */}
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-gray-900 truncate">
                                 {fatura.descricao}
@@ -409,7 +387,6 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                               </div>
                             </div>
 
-                            {/* Valor */}
                             <div className="text-right">
                               <p className="font-bold text-gray-900 text-lg">
                                 {formatarMoeda(fatura.valor)}
@@ -422,7 +399,6 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                               </span>
                             </div>
 
-                            {/* Expandir */}
                             <button className="text-gray-400 hover:text-gray-600 ml-2">
                               {isExpanded ? (
                                 <ChevronUp className="h-5 w-5" />
@@ -437,66 +413,67 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                       {/* Detalhes expandidos */}
                       {isExpanded && (
                         <div className="border-t bg-gray-50 p-4">
-                          <div className="grid grid-cols-2 gap-4 mb-4">
-                            {fatura.dataPagamento && (
-                              <div>
-                                <p className="text-xs text-gray-500 uppercase">Data Pagamento</p>
-                                <p className="text-sm font-medium">{formatarData(fatura.dataPagamento)}</p>
-                              </div>
-                            )}
-                            {fatura.formaPagamento && (
-                              <div>
-                                <p className="text-xs text-gray-500 uppercase">Forma Pagamento</p>
-                                <p className="text-sm font-medium">
-                                  {FORMAS_PAGAMENTO.find(f => f.value === fatura.formaPagamento)?.label || fatura.formaPagamento}
-                                </p>
-                              </div>
-                            )}
-                            {fatura.valorPago && (
-                              <div>
-                                <p className="text-xs text-gray-500 uppercase">Valor Pago</p>
-                                <p className="text-sm font-medium text-green-600">{formatarMoeda(fatura.valorPago)}</p>
-                              </div>
-                            )}
-                            {fatura.observacoes && (
-                              <div className="col-span-2">
-                                <p className="text-xs text-gray-500 uppercase">Observações</p>
-                                <p className="text-sm">{fatura.observacoes}</p>
-                              </div>
-                            )}
+                          {/* Resumo financeiro */}
+                          <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-white rounded-lg border">
+                            <div>
+                              <p className="text-xs text-gray-500 uppercase">Valor Total</p>
+                              <p className="text-sm font-bold text-gray-900">{formatarMoeda(fatura.valor)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500 uppercase">Pago</p>
+                              <p className="text-sm font-bold text-green-600">{formatarMoeda(fatura.valorPago)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500 uppercase">Restante</p>
+                              <p className="text-sm font-bold text-orange-600">{formatarMoeda(fatura.valorRestante)}</p>
+                            </div>
                           </div>
+
+                          {/* Histórico de pagamentos */}
+                          {fatura.pagamentos && fatura.pagamentos.length > 0 && (
+                            <div className="mb-4">
+                              <p className="text-xs text-gray-500 uppercase mb-2">Histórico de Pagamentos</p>
+                              <div className="space-y-2">
+                                {fatura.pagamentos.map((pag, idx) => (
+                                  <div key={pag.id} className="flex items-center justify-between p-2 bg-white rounded border text-sm">
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-gray-400">#{idx + 1}</span>
+                                      <span className="font-medium text-green-600">{formatarMoeda(pag.valor)}</span>
+                                      <span className="text-gray-500">{formatarData(pag.data)}</span>
+                                    </div>
+                                    <span className="text-gray-500">
+                                      {FORMAS_PAGAMENTO.find(f => f.value === pag.formaPagamento)?.label || pag.formaPagamento || '-'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {fatura.observacoes && (
+                            <div className="mb-4">
+                              <p className="text-xs text-gray-500 uppercase">Observações</p>
+                              <p className="text-sm">{fatura.observacoes}</p>
+                            </div>
+                          )}
 
                           {/* Ações */}
                           <div className="flex items-center gap-2 pt-3 border-t">
-                            {fatura.status === 'PENDENTE' || fatura.status === 'VENCIDO' ? (
-                              <>
-                                <Button
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setPagarValor(String(fatura.valor))
-                                    setPagarData(new Date().toISOString().split('T')[0])
-                                    setShowPagar(fatura)
-                                  }}
-                                  className="bg-green-600 hover:bg-green-700"
-                                >
-                                  <Check className="h-4 w-4 mr-1" />
-                                  Marcar como Pago
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleCancelar(fatura)
-                                  }}
-                                  className="text-gray-600"
-                                >
-                                  <Ban className="h-4 w-4 mr-1" />
-                                  Cancelar
-                                </Button>
-                              </>
-                            ) : null}
+                            {fatura.status !== 'PAGO' && (
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setPagarValor(String(fatura.valorRestante))
+                                  setPagarData(new Date().toISOString().split('T')[0])
+                                  setShowPagar(fatura)
+                                }}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                <Check className="h-4 w-4 mr-1" />
+                                {fatura.status === 'PARCIAL' ? 'Registrar Pagamento' : 'Marcar como Pago'}
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="ghost"
@@ -624,7 +601,20 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
               <div className="bg-gray-50 rounded-lg p-3 mb-4">
                 <p className="text-sm text-gray-500">Fatura</p>
                 <p className="font-medium">{showPagar.descricao}</p>
-                <p className="text-lg font-bold text-emerald-600">{formatarMoeda(showPagar.valor)}</p>
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  <div>
+                    <p className="text-xs text-gray-500">Total</p>
+                    <p className="font-bold text-gray-900">{formatarMoeda(showPagar.valor)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Pago</p>
+                    <p className="font-bold text-green-600">{formatarMoeda(showPagar.valorPago)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Restante</p>
+                    <p className="font-bold text-orange-600">{formatarMoeda(showPagar.valorRestante)}</p>
+                  </div>
+                </div>
               </div>
               
               <div className="space-y-4">
@@ -646,7 +636,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Valor Pago
+                    Valor do Pagamento
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
@@ -658,6 +648,9 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                       className="pl-10"
                     />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Informe o valor total para quitar ou um valor menor para pagamento parcial
+                  </p>
                 </div>
                 
                 <div>
@@ -667,6 +660,17 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                   <DatePickerField
                     value={pagarData}
                     onChange={setPagarData}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Observação (opcional)
+                  </label>
+                  <Input
+                    value={pagarObservacao}
+                    onChange={(e) => setPagarObservacao(e.target.value)}
+                    placeholder="Ex: Pix de fulano, referente a..."
                   />
                 </div>
               </div>

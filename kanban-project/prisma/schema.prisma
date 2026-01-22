@@ -29,6 +29,15 @@ enum Pais {
   ITALIA
 }
 
+enum StatusTarefa {
+  NAO_INICIADA
+  EM_ANDAMENTO
+  AGUARDANDO_CLIENTE
+  AGUARDANDO_TERCEIRO
+  CONCLUIDO_RECEBIDO
+  CONCLUIDO_NAO_POSSUI
+}
+
 enum PrioridadeTarefa {
   BAIXA
   MEDIA
@@ -171,6 +180,9 @@ model Usuario {
   
   // Logs de auditoria
   logs LogAuditoria[]
+
+  // ✅ NOVO: Histórico de ações em tarefas
+  historicoTarefas TarefaHistorico[]
 }
 
 // ========================================
@@ -476,32 +488,46 @@ model Tarefa {
   processoId  Int?
   processo    Processo?  @relation(fields: [processoId], references: [id], onDelete: Cascade)
   
-  // ✅ NOVO: Vínculo com status
+  // ✅ Vínculo com status do Kanban
   statusId    Int?
   status      Status?   @relation(fields: [statusId], references: [id], onDelete: SetNull)
   
-  // ✅ NOVO: País da tarefa (para tarefas independentes)
+  // ✅ País da tarefa (para tarefas independentes)
   pais        Pais?
   
   responsavelId Int?
   responsavel   Usuario? @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
   
-  concluida   Boolean   @default(false)
-  prioridade  PrioridadeTarefa @default(MEDIA)
+  // ✅ ATUALIZADO: Status de fluxo da tarefa (substitui 'concluida')
+  statusTarefa    StatusTarefa  @default(NAO_INICIADA)
+  concluida       Boolean       @default(false)  // Mantido para compatibilidade
+  prioridade      PrioridadeTarefa @default(MEDIA)
   
-  dataPrazo   DateTime?
-  dataConclusao DateTime?
+  // Datas
+  dataPrazo       DateTime?
+  dataConclusao   DateTime?
+  dataInicio      DateTime?     // Quando a tarefa foi iniciada
   
-  // ✅ NOVO: Auto-relacionamento para subtarefas
-  // Uma tarefa pode ter uma tarefa pai (ser subtarefa)
+  // ✅ NOVO: Sistema de cobrança
+  quantidadeCobrancas   Int       @default(0)    // Quantas vezes foi cobrado
+  ultimaCobranca        DateTime?               // Data da última cobrança
+  prazoCobranca         Int?      @default(5)   // Dias para próxima cobrança
+  
+  // ✅ NOVO: Observações e anotações
+  observacoes     String?   @db.Text
+  motivoConclusao String?   @db.VarChar(50)  // "recebido", "nao_possui", etc
+  
+  // Auto-relacionamento para subtarefas
   tarefaPaiId Int?
-  tarefaPai   Tarefa?  @relation("Subtarefas", fields: [tarefaPaiId], references: [id], onDelete: Cascade)
-  
-  // Uma tarefa pode ter várias subtarefas
+  tarefaPai     Tarefa?   @relation("Subtarefas", fields: [tarefaPaiId], references: [id], onDelete: Cascade)
   subtarefas  Tarefa[] @relation("Subtarefas")
   
-  // ✅ NOVO: Ordem da tarefa/subtarefa para organização
-  ordem       Int      @default(0)
+  // Organização
+  ordem           Int      @default(0)
+  tipoSubtarefa   String?  @db.VarChar(20)  // NORMAL, COBRANCA
+  
+  // ✅ NOVO: Histórico de ações
+  historico       TarefaHistorico[]
   
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -509,9 +535,36 @@ model Tarefa {
   @@index([processoId])
   @@index([responsavelId])
   @@index([concluida])
+  @@index([statusTarefa])
   @@index([tarefaPaiId])
   @@index([statusId])
   @@index([pais])
+  @@index([dataPrazo])
+}
+
+model TarefaHistorico {
+  id          Int       @id @default(autoincrement())
+  
+  // Vínculo com tarefa
+  tarefaId    Int
+  tarefa      Tarefa    @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  
+  // Quem fez a ação
+  usuarioId   Int?
+  usuario     Usuario?  @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  
+  // Ação realizada
+  acao        String    @db.VarChar(50)   // CRIADA, INICIADA, COBRADA, AGUARDANDO_CLIENTE, CONCLUIDA, etc
+  descricao   String    @db.VarChar(500)  // Texto descritivo: "Taciana iniciou a tarefa"
+  
+  // Dados adicionais (JSON para flexibilidade)
+  dados       Json?     // { statusAnterior: "X", statusNovo: "Y", observacao: "..." }
+  
+  createdAt   DateTime  @default(now())
+
+  @@index([tarefaId])
+  @@index([usuarioId])
+  @@index([createdAt])
 }
 
 // ========================================
@@ -791,7 +844,6 @@ enum StatusFatura {
   PENDENTE
   PAGO
   VENCIDO
-  CANCELADO
   PARCIAL
 }
 
@@ -821,18 +873,12 @@ model Fatura {
   // Datas
   dataEmissao     DateTime      @default(now())
   dataVencimento  DateTime?
-  dataPagamento   DateTime?
-  
-  // Pagamento
-  formaPagamento  FormaPagamento?
-  valorPago       Decimal?      @db.Decimal(10, 2)
-  
-  // Comprovante
-  comprovanteUrl  String?       @db.Text
-  comprovanteNome String?       @db.VarChar(200)
   
   // Observações
   observacoes     String?       @db.Text
+  
+  // ✅ NOVO: Pagamentos vinculados (histórico completo)
+  pagamentos      PagamentoFatura[]
   
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -840,6 +886,30 @@ model Fatura {
   @@index([processoId])
   @@index([status])
   @@index([dataVencimento])
+}
+
+model PagamentoFatura {
+  id              Int            @id @default(autoincrement())
+  
+  // Vínculo com fatura
+  faturaId        Int
+  fatura          Fatura         @relation(fields: [faturaId], references: [id], onDelete: Cascade)
+  
+  // Dados do pagamento
+  valor           Decimal        @db.Decimal(10, 2)
+  data            DateTime       @default(now())
+  formaPagamento  FormaPagamento?
+  
+  // Comprovante
+  comprovanteUrl  String?        @db.Text
+  comprovanteNome String?        @db.VarChar(200)
+  
+  // Observação
+  observacao      String?        @db.Text
+  
+  createdAt       DateTime       @default(now())
+  
+  @@index([faturaId])
 }
 
 // ========================================

@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { PrioridadeTarefa, Pais } from "@prisma/client"
 import { logTarefa } from "@/lib/auditoria"
-import { toUTCNoon } from "@/src/lib/date-utils"  // ✅ NOVO IMPORT
+import { toUTCNoon } from "@/src/lib/date-utils"
 
 // GET - Buscar tarefas (com filtros opcionais)
 export async function GET(request: Request) {
@@ -88,6 +88,22 @@ export async function GET(request: Request) {
                     nome: true,
                     email: true
                   }
+                },
+                // NÍVEL 3 - Cobranças
+                subtarefas: {
+                  include: {
+                    responsavel: {
+                      select: {
+                        id: true,
+                        nome: true,
+                        email: true
+                      }
+                    }
+                  },
+                  orderBy: [
+                    { ordem: "asc" },
+                    { createdAt: "asc" }
+                  ]
                 }
               },
               orderBy: [
@@ -232,7 +248,7 @@ export async function POST(request: Request) {
         processoId: processoId || null,
         responsavelId: responsavelId || null,
         prioridade: prioridadeValida,
-        dataPrazo: toUTCNoon(dataPrazo),  // ✅ CORRIGIDO - Usa toUTCNoon
+        dataPrazo: toUTCNoon(dataPrazo),
         statusId: statusId || null,
         pais: paisValido,
         tarefaPaiId: tarefaPaiId || null,

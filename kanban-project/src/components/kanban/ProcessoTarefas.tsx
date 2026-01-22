@@ -16,11 +16,17 @@ import {
   X,
   ChevronRight,
   ChevronDown,
-  GripVertical,
-  ListTodo
+  ListTodo,
+  Play,
+  MessageSquare,
+  Clock,
+  FileX,
+  RefreshCw,
+  CalendarCheck,
+  CalendarClock,
+  FolderOpen
 } from "lucide-react"
 import { getTarefasPorPais, type TarefaPreDefinida } from "../../lib/tarefas-config"
-// ✅ NOVO: Import das funções de data
 import { isPast, formatDateBR } from "@/src/lib/date-utils"
 
 // ==========================================
@@ -40,6 +46,10 @@ interface Tarefa {
   prioridade: string
   dataPrazo?: string
   dataConclusao?: string
+  dataInicio?: string
+  observacoes?: string
+  tipoSubtarefa?: string
+  prazoCobranca?: number
   responsavel?: Responsavel
   responsavelId?: number
   subtarefas?: Tarefa[]
@@ -48,7 +58,7 @@ interface Tarefa {
 
 interface ProcessoTarefasProps {
   processoId: number
-  pais: string // Nova prop para filtrar tarefas por país
+  pais: string
   onUpdate?: () => void
 }
 
@@ -72,7 +82,6 @@ function CirculoProgresso({
   const circunferencia = 2 * Math.PI * raio
   const offset = circunferencia - (porcentagem / 100) * circunferencia
   
-  // Se 100%, mostra círculo verde com check
   if (porcentagem >= 100) {
     return (
       <div 
@@ -99,7 +108,6 @@ function CirculoProgresso({
   return (
     <div className="relative flex items-center justify-center" style={{ width: tamanho, height: tamanho }}>
       <svg width={tamanho} height={tamanho} className="transform -rotate-90">
-        {/* Círculo de fundo */}
         <circle
           cx={tamanho / 2}
           cy={tamanho / 2}
@@ -108,7 +116,6 @@ function CirculoProgresso({
           stroke={corFundo}
           strokeWidth={4}
         />
-        {/* Círculo de progresso */}
         <circle
           cx={tamanho / 2}
           cy={tamanho / 2}
@@ -122,7 +129,6 @@ function CirculoProgresso({
           className="transition-all duration-500 ease-out"
         />
       </svg>
-      {/* Porcentagem no centro */}
       <span className="absolute text-[11px] font-bold text-gray-600">
         {Math.round(porcentagem)}%
       </span>
@@ -149,7 +155,7 @@ function BadgePrioridade({ prioridade }: { prioridade: string }) {
 }
 
 // ==========================================
-// COMPONENTE: Card da Tarefa Principal
+// COMPONENTE: Card da Tarefa Principal (tela principal - NÃO MUDA)
 // ==========================================
 interface TarefaCardProps {
   tarefa: Tarefa
@@ -160,11 +166,36 @@ interface TarefaCardProps {
 function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
   const subtarefas = tarefa.subtarefas || []
   const temSubtarefas = subtarefas.length > 0
-  const concluidas = subtarefas.filter(s => s.concluida).length
-  const porcentagem = temSubtarefas ? (concluidas / subtarefas.length) * 100 : (tarefa.concluida ? 100 : 0)
-
-  // ✅ CORRIGIDO: Usar isPast do date-utils
+  
+  // Calcula progresso baseado nas tarefas dentro das atividades
+  const calcularProgresso = () => {
+    let totalTarefas = 0
+    let tarefasConcluidas = 0
+    
+    subtarefas.forEach(atividade => {
+      const tarefasDaAtividade = atividade.subtarefas || []
+      totalTarefas += tarefasDaAtividade.length
+      tarefasConcluidas += tarefasDaAtividade.filter(t => t.concluida).length
+    })
+    
+    if (totalTarefas === 0) {
+      return tarefa.concluida ? 100 : 0
+    }
+    return (tarefasConcluidas / totalTarefas) * 100
+  }
+  
+  const porcentagem = calcularProgresso()
   const atrasada = tarefa.dataPrazo && isPast(tarefa.dataPrazo) && !tarefa.concluida
+
+  // Conta total de tarefas dentro das atividades
+  const contarTarefas = () => {
+    let total = 0
+    subtarefas.forEach(atividade => {
+      total += (atividade.subtarefas || []).length
+    })
+    return total
+  }
+  const totalTarefas = contarTarefas()
 
   return (
     <div
@@ -190,16 +221,16 @@ function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
         `} />
       )}
 
-      {/* Círculo de progresso */}
+      {/* Círculo de progresso ou ícone de pasta */}
       <div className="flex-shrink-0 ml-1">
-        {temSubtarefas ? (
+        {totalTarefas > 0 ? (
           <CirculoProgresso porcentagem={porcentagem} />
         ) : (
           <div className={`
             w-11 h-11 rounded-full border-2 flex items-center justify-center transition-all
             ${tarefa.concluida 
               ? 'bg-emerald-500 border-emerald-500' 
-              : 'border-gray-300 group-hover:border-blue-400'
+              : 'border-gray-300 bg-gray-50 group-hover:border-blue-400'
             }
           `}>
             {tarefa.concluida ? (
@@ -207,7 +238,7 @@ function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             ) : (
-              <Circle className="w-5 h-5 text-gray-300 group-hover:text-blue-400 transition-colors" />
+              <FolderOpen className="w-5 h-5 text-gray-400 group-hover:text-blue-400 transition-colors" />
             )}
           </div>
         )}
@@ -225,10 +256,10 @@ function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
         <div className="flex items-center flex-wrap gap-2 text-xs">
           {!tarefa.concluida && <BadgePrioridade prioridade={tarefa.prioridade} />}
           
-          {temSubtarefas && (
+          {totalTarefas > 0 && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 font-medium border border-blue-100">
               <ListTodo className="w-3 h-3" />
-              {concluidas}/{subtarefas.length}
+              {Math.round(porcentagem)}% ({totalTarefas} tarefa{totalTarefas !== 1 ? 's' : ''})
             </span>
           )}
           
@@ -240,7 +271,6 @@ function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
               }
             `}>
               <Calendar className="w-3 h-3" />
-              {/* ✅ CORRIGIDO: Usar formatDateBR */}
               {formatDateBR(tarefa.dataPrazo)}
             </span>
           )}
@@ -272,80 +302,400 @@ function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
 }
 
 // ==========================================
-// COMPONENTE: SubtarefaItem (recursivo e expansível)
+// COMPONENTE: Modal de Ação de Cobrança (Subtarefa)
 // ==========================================
-interface SubtarefaItemProps {
+interface CobrancaModalProps {
   subtarefa: Tarefa
-  nivel: number
-  onToggle: (id: number) => void
+  onClose: () => void
+  onUpdate: () => void
+}
+
+function CobrancaModal({ subtarefa, onClose, onUpdate }: CobrancaModalProps) {
+  const [processando, setProcessando] = useState(false)
+  const [observacao, setObservacao] = useState(subtarefa.observacoes || "")
+  const [novoPrazo, setNovoPrazo] = useState("")
+  const [diasCobranca, setDiasCobranca] = useState(5)
+  const [mostrarAlterarPrazo, setMostrarAlterarPrazo] = useState(false)
+
+  const executarAcao = async (acao: string) => {
+    setProcessando(true)
+    try {
+      const response = await fetch(`/api/tarefas/${subtarefa.id}/cobranca`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          acao,
+          observacao: observacao || undefined,
+          novoPrazo: novoPrazo || undefined,
+          diasCobranca
+        })
+      })
+
+      if (response.ok) {
+        onUpdate()
+        onClose()
+      } else {
+        const data = await response.json()
+        alert(data.error || "Erro ao executar ação")
+      }
+    } catch (error) {
+      console.error("Erro:", error)
+      alert("Erro ao executar ação")
+    } finally {
+      setProcessando(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10002] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-lg">Ação de Cobrança</h3>
+              <p className="text-amber-100 text-sm mt-0.5">{subtarefa.titulo}</p>
+            </div>
+            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Conteúdo */}
+        <div className="p-6 space-y-4">
+          {/* Datas */}
+          <div className="flex flex-wrap gap-3 text-xs">
+            {subtarefa.dataInicio && (
+              <span className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 rounded-md">
+                <CalendarCheck className="w-3 h-3" />
+                Início: {formatDateBR(subtarefa.dataInicio)}
+              </span>
+            )}
+            {subtarefa.dataPrazo && (
+              <span className={`flex items-center gap-1 px-2 py-1 rounded-md ${isPast(subtarefa.dataPrazo) && !subtarefa.concluida ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-600'}`}>
+                <CalendarClock className="w-3 h-3" />
+                Prazo: {formatDateBR(subtarefa.dataPrazo)}
+              </span>
+            )}
+          </div>
+
+          {/* Campo de observação */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              <MessageSquare className="w-4 h-4 inline mr-1" />
+              Observação
+            </label>
+            <textarea
+              value={observacao}
+              onChange={(e) => setObservacao(e.target.value)}
+              placeholder="Ex: Cliente informou que vai enviar semana que vem..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-500"
+              rows={2}
+            />
+          </div>
+
+          {/* Botões de ação */}
+          <div className="space-y-2">
+            {/* Recebido */}
+            <button
+              onClick={() => executarAcao("recebido")}
+              disabled={processando}
+              className="w-full flex items-center gap-3 px-4 py-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-emerald-700 font-medium transition-colors disabled:opacity-50"
+            >
+              <CheckCircle2 className="w-5 h-5" />
+              <div className="text-left">
+                <div>Documento Recebido</div>
+                <div className="text-xs text-emerald-600 font-normal">Finaliza a tarefa</div>
+              </div>
+            </button>
+
+            {/* Cobrado, aguardando */}
+            <button
+              onClick={() => executarAcao("cobrado")}
+              disabled={processando}
+              className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl text-blue-700 font-medium transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className="w-5 h-5" />
+              <div className="text-left flex-1">
+                <div>Cobrado, Aguardando</div>
+                <div className="text-xs text-blue-600 font-normal">Cria nova cobrança em {diasCobranca} dias</div>
+              </div>
+              <select
+                value={diasCobranca}
+                onChange={(e) => setDiasCobranca(parseInt(e.target.value))}
+                onClick={(e) => e.stopPropagation()}
+                className="px-2 py-1 text-xs border border-blue-300 rounded-lg bg-white"
+              >
+                <option value={3}>3 dias</option>
+                <option value={5}>5 dias</option>
+                <option value={7}>7 dias</option>
+                <option value={10}>10 dias</option>
+                <option value={15}>15 dias</option>
+              </select>
+            </button>
+
+            {/* Cliente não possui */}
+            <button
+              onClick={() => executarAcao("nao_possui")}
+              disabled={processando}
+              className="w-full flex items-center gap-3 px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-gray-700 font-medium transition-colors disabled:opacity-50"
+            >
+              <FileX className="w-5 h-5" />
+              <div className="text-left">
+                <div>Cliente Não Possui</div>
+                <div className="text-xs text-gray-500 font-normal">Finaliza como não aplicável</div>
+              </div>
+            </button>
+
+            {/* Alterar prazo */}
+            {!mostrarAlterarPrazo ? (
+              <button
+                onClick={() => setMostrarAlterarPrazo(true)}
+                className="w-full flex items-center gap-3 px-4 py-3 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl text-amber-700 font-medium transition-colors"
+              >
+                <Clock className="w-5 h-5" />
+                <div className="text-left">
+                  <div>Alterar Prazo</div>
+                  <div className="text-xs text-amber-600 font-normal">Definir nova data manualmente</div>
+                </div>
+              </button>
+            ) : (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
+                <label className="block text-sm font-medium text-amber-700">
+                  Nova data de cobrança:
+                </label>
+                <DatePickerField
+                  value={novoPrazo}
+                  onChange={(value) => setNovoPrazo(value)}
+                  placeholder="Selecione a data"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setMostrarAlterarPrazo(false)}
+                    className="flex-1 px-3 py-2 text-sm text-gray-600 bg-white border rounded-lg hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => executarAcao("alterar_prazo")}
+                    disabled={processando || !novoPrazo}
+                    className="flex-1 px-3 py-2 text-sm text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50"
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Loading */}
+        {processando && (
+          <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ==========================================
+// COMPONENTE: TarefaItem (Documento identidade) - COM iniciar/concluir/alterar prazo
+// ==========================================
+interface TarefaItemProps {
+  tarefa: Tarefa
   onDelete: (id: number) => void
   onUpdate: () => void
-  processando: Set<number>
   usuarios: Responsavel[]
 }
 
-function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, processando, usuarios }: SubtarefaItemProps) {
+function TarefaItem({ tarefa, onDelete, onUpdate, usuarios }: TarefaItemProps) {
   const [expandido, setExpandido] = useState(false)
   const [editando, setEditando] = useState(false)
-  const [novaSubSub, setNovaSubSub] = useState("")
-  const [criandoSubSub, setCriandoSubSub] = useState(false)
   const [salvando, setSalvando] = useState(false)
-  const [subSubtarefas, setSubSubtarefas] = useState<Tarefa[]>(subtarefa.subtarefas || [])
+  const [iniciando, setIniciando] = useState(false)
+  const [concluindo, setConcluindo] = useState(false)
+  const [prazoCobrancaConfig, setPrazoCobrancaConfig] = useState(tarefa.prazoCobranca || 5)
+  const [subtarefas, setSubtarefas] = useState<Tarefa[]>(tarefa.subtarefas || [])
+  const [mostrarAlterarPrazo, setMostrarAlterarPrazo] = useState(false)
+  const [novoPrazo, setNovoPrazo] = useState("")
+  const [mostrarCobrancaModal, setMostrarCobrancaModal] = useState(false)
+  const [subtarefaSelecionada, setSubtarefaSelecionada] = useState<Tarefa | null>(null)
+  const [mostrarOpcaoAguardando, setMostrarOpcaoAguardando] = useState(false)
+  const [diasCobrancaAguardando, setDiasCobrancaAguardando] = useState(5)
+  
   const [editForm, setEditForm] = useState({
-    titulo: subtarefa.titulo,
-    descricao: subtarefa.descricao || "",
-    prioridade: subtarefa.prioridade,
-    dataPrazo: subtarefa.dataPrazo ? subtarefa.dataPrazo.split("T")[0] : "",
-    responsavelId: subtarefa.responsavelId?.toString() || ""
+    titulo: tarefa.titulo,
+    descricao: tarefa.descricao || "",
+    prioridade: tarefa.prioridade,
+    dataPrazo: tarefa.dataPrazo ? tarefa.dataPrazo.split("T")[0] : "",
+    responsavelId: tarefa.responsavelId?.toString() || "",
+    observacoes: tarefa.observacoes || ""
   })
 
-  // ✅ Verificar se é uma subtarefa temporária (ID negativo)
-  const isTemporaria = subtarefa.id < 0
+  const isTemporaria = tarefa.id < 0
+  const isCobranca = tarefa.tipoSubtarefa === "COBRANCA"
+  const iniciada = !!tarefa.dataInicio
 
-  // Buscar sub-subtarefas quando expandir
-  const fetchSubSubtarefas = async () => {
-    // Não busca se for temporária
+  const fetchSubtarefas = async () => {
     if (isTemporaria) return
-    
     try {
-      const response = await fetch(`/api/tarefas/${subtarefa.id}`)
+      const response = await fetch(`/api/tarefas/${tarefa.id}`)
       const data = await response.json()
       if (data.tarefa?.subtarefas) {
-        setSubSubtarefas(data.tarefa.subtarefas)
+        setSubtarefas(data.tarefa.subtarefas)
       }
     } catch (error) {
-      console.error("Erro ao buscar sub-subtarefas:", error)
+      console.error("Erro ao buscar subtarefas:", error)
     }
   }
 
-  // Criar sub-subtarefa
-  const handleCriarSubSub = async () => {
-    if (!novaSubSub.trim() || isTemporaria) return
-    setCriandoSubSub(true)
+  useEffect(() => {
+  // Só atualiza se as props tiverem dados novos (baseado no ID da última subtarefa)
+  const propsIds = (tarefa.subtarefas || []).map(s => s.id).sort().join(',')
+  const localIds = subtarefas.map(s => s.id).sort().join(',')
+  
+    if (propsIds !== localIds && tarefa.subtarefas && tarefa.subtarefas.length > 0) {
+      setSubtarefas(tarefa.subtarefas)
+    }
+  }, [tarefa.subtarefas])
+
+  // Iniciar tarefa
+  const handleIniciar = async () => {
+    if (isTemporaria) return
+    setIniciando(true)
     try {
-      const response = await fetch(`/api/tarefas/${subtarefa.id}/subtarefas`, {
+      const response = await fetch(`/api/tarefas/${tarefa.id}/iniciar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ titulo: novaSubSub.trim() })
+        body: JSON.stringify({ prazoCobranca: prazoCobrancaConfig })
       })
+
       if (response.ok) {
-        setNovaSubSub("")
-        fetchSubSubtarefas()
+        fetchSubtarefas()
+        onUpdate()
+      } else {
+        const data = await response.json()
+        alert(data.error || "Erro ao iniciar tarefa")
+      }
+    } catch (error) {
+      console.error("Erro ao iniciar:", error)
+      alert("Erro ao iniciar tarefa")
+    } finally {
+      setIniciando(false)
+    }
+  }
+
+  // Marcar como concluída
+  const handleConcluir = async () => {
+    if (isTemporaria) return
+    setConcluindo(true)
+    try {
+      const response = await fetch(`/api/tarefas/${tarefa.id}/toggle`, { method: "POST" })
+      if (response.ok) {
         onUpdate()
       }
     } catch (error) {
-      console.error("Erro ao criar sub-subtarefa:", error)
+      console.error("Erro ao concluir:", error)
     } finally {
-      setCriandoSubSub(false)
+      setConcluindo(false)
     }
   }
 
-  // Salvar edição
+// Concluir com status específico (Recebido ou Não possui)
+const handleConcluirComStatus = async (status: string) => {
+  if (isTemporaria) return
+  setConcluindo(true)
+  try {
+    // Buscar cobrança pendente para agir sobre ela
+    const cobrancaPendente = subtarefas.find(s => s.tipoSubtarefa === "COBRANCA" && !s.concluida)
+    const idParaAcao = cobrancaPendente?.id || tarefa.id
+    
+    const response = await fetch(`/api/tarefas/${idParaAcao}/cobranca`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        acao: status === "recebido" ? "recebido" : "nao_possui" 
+      })
+    })
+    if (response.ok) {
+      fetchSubtarefas()
+      onUpdate()
+    } else {
+      const data = await response.json()
+      alert(data.error || "Erro ao concluir tarefa")
+    }
+  } catch (error) {
+    console.error("Erro ao concluir:", error)
+    alert("Erro ao concluir tarefa")
+  } finally {
+    setConcluindo(false)
+  }
+}
+
+// Aguardando cliente - cria nova cobrança
+const handleAguardandoCliente = async () => {
+  if (isTemporaria) return
+  setConcluindo(true)
+  try {
+    // Buscar cobrança pendente para agir sobre ela
+    const cobrancaPendente = subtarefas.find(s => s.tipoSubtarefa === "COBRANCA" && !s.concluida)
+    const idParaAcao = cobrancaPendente?.id || tarefa.id
+    
+    const response = await fetch(`/api/tarefas/${idParaAcao}/cobranca`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        acao: "cobrado",
+        observacao: "Aguardando cliente",
+        diasCobranca: diasCobrancaAguardando
+      })
+    })
+    if (response.ok) {
+      setMostrarOpcaoAguardando(false)
+      fetchSubtarefas()
+      onUpdate()
+    } else {
+      const data = await response.json()
+      alert(data.error || "Erro ao criar cobrança")
+    }
+  } catch (error) {
+    console.error("Erro:", error)
+    alert("Erro ao criar cobrança")
+  } finally {
+    setConcluindo(false)
+  }
+}
+
+  // Alterar prazo
+  const handleAlterarPrazo = async () => {
+    if (isTemporaria || !novoPrazo) return
+    setSalvando(true)
+    try {
+      const response = await fetch(`/api/tarefas/${tarefa.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataPrazo: novoPrazo })
+      })
+      if (response.ok) {
+        setMostrarAlterarPrazo(false)
+        setNovoPrazo("")
+        onUpdate()
+      }
+    } catch (error) {
+      console.error("Erro ao alterar prazo:", error)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
   const handleSalvar = async () => {
     if (isTemporaria) return
     setSalvando(true)
     try {
-      const response = await fetch(`/api/tarefas/${subtarefa.id}`, {
+      const response = await fetch(`/api/tarefas/${tarefa.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -353,7 +703,8 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
           descricao: editForm.descricao || null,
           prioridade: editForm.prioridade,
           dataPrazo: editForm.dataPrazo || null,
-          responsavelId: editForm.responsavelId ? parseInt(editForm.responsavelId) : null
+          responsavelId: editForm.responsavelId ? parseInt(editForm.responsavelId) : null,
+          observacoes: editForm.observacoes || null
         })
       })
       if (response.ok) {
@@ -367,128 +718,327 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
     }
   }
 
-  // Toggle sub-subtarefa
-  const handleToggleSubSub = async (id: number) => {
-    // ✅ Não permite toggle em IDs temporários (negativos)
-    if (id < 0) return
-    
-    try {
-      const response = await fetch(`/api/tarefas/${id}/toggle`, { method: "POST" })
-      if (response.ok) {
-        fetchSubSubtarefas()
-        onUpdate()
-      }
-    } catch (error) {
-      console.error("Erro ao alternar sub-subtarefa:", error)
-    }
-  }
-
-  // Excluir sub-subtarefa
-  const handleDeleteSubSub = async (id: number) => {
-    if (id < 0) return // Não exclui temporárias
-    if (!confirm("Excluir esta subtarefa?")) return
-    try {
-      const response = await fetch(`/api/tarefas/${id}`, { method: "DELETE" })
-      if (response.ok) {
-        setSubSubtarefas(prev => prev.filter(s => s.id !== id))
-        onUpdate()
-      }
-    } catch (error) {
-      console.error("Erro ao excluir sub-subtarefa:", error)
-    }
-  }
-
-  const handleExpandir = () => {
-    if (!expandido && !isTemporaria) {
-      fetchSubSubtarefas()
-    }
-    setExpandido(!expandido)
-  }
-
-  const concluidasSubSub = subSubtarefas.filter(s => s.concluida).length
-  const temSubSubtarefas = subSubtarefas.length > 0
-
-  return (
-    <div className={`${nivel > 0 ? 'ml-6 border-l-2 border-gray-100 pl-3' : ''}`}>
-      {/* Item principal */}
-      <div
-        className={`
-          group flex items-center gap-3 px-4 py-3 rounded-xl border transition-all
-          ${subtarefa.concluida 
-            ? 'bg-gray-50 border-gray-200' 
-            : 'bg-white border-gray-200 hover:border-blue-300'
-          }
-          ${processando.has(subtarefa.id) || isTemporaria ? 'opacity-70' : ''}
-          ${expandido ? 'border-blue-400 shadow-sm' : ''}
-        `}
-      >
-        {/* Checkbox circular - apenas visual (não clicável) */}
+  // Se for subtarefa de cobrança, renderiza diferente
+  if (isCobranca) {
+    return (
+      <>
         <div
+          onClick={() => {
+            if (!tarefa.concluida) {
+              setSubtarefaSelecionada(tarefa)
+              setMostrarCobrancaModal(true)
+            }
+          }}
           className={`
-            w-7 h-7 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all
-            ${subtarefa.concluida 
-              ? 'bg-blue-600 border-blue-600' 
-              : 'border-gray-300'
+            group flex items-center gap-3 px-3 py-2 rounded-lg border transition-all cursor-pointer
+            ${tarefa.concluida 
+              ? 'bg-gray-50 border-gray-200' 
+              : 'bg-amber-50 border-amber-200 hover:border-amber-300'
             }
           `}
         >
-          {subtarefa.concluida && (
-            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-            </svg>
+          <div className={`
+            w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center
+            ${tarefa.concluida ? 'bg-emerald-500' : 'bg-amber-400'}
+          `}>
+            {tarefa.concluida ? (
+              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <RefreshCw className="w-3 h-3 text-white" />
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <span className={`text-xs ${tarefa.concluida ? 'text-gray-400 line-through' : 'text-amber-800 font-medium'}`}>
+              {tarefa.titulo}
+            </span>
+            <div className="flex gap-2 mt-0.5">
+              {tarefa.dataInicio && (
+                <span className="text-[10px] text-gray-400">
+                  Início: {formatDateBR(tarefa.dataInicio)}
+                </span>
+              )}
+              {tarefa.dataPrazo && (
+                <span className={`text-[10px] ${isPast(tarefa.dataPrazo) && !tarefa.concluida ? 'text-red-500' : 'text-gray-400'}`}>
+                  Prazo: {formatDateBR(tarefa.dataPrazo)}
+                </span>
+              )}
+            </div>
+            {tarefa.observacoes && (
+              <p className="text-[10px] text-amber-600 mt-0.5 truncate">{tarefa.observacoes}</p>
+            )}
+          </div>
+
+          {!tarefa.concluida && (
+            <span className="text-xs text-amber-600 font-medium">Clique para ação →</span>
           )}
         </div>
 
-        {/* Título e info */}
-        <div className="flex-1 min-w-0">
-          <span className={`text-sm ${subtarefa.concluida ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
-            {subtarefa.titulo}
+        {mostrarCobrancaModal && subtarefaSelecionada && (
+          <CobrancaModal
+            subtarefa={subtarefaSelecionada}
+            onClose={() => {
+              setMostrarCobrancaModal(false)
+              setSubtarefaSelecionada(null)
+            }}
+            onUpdate={onUpdate}
+          />
+        )}
+      </>
+    )
+  }
+
+  // Tarefa normal
+  return (
+    <div className="space-y-2">
+      {/* Card da Tarefa */}
+      <div
+        className={`
+          group flex items-center gap-3 px-3 py-2 rounded-lg border transition-all
+          ${tarefa.concluida 
+            ? 'bg-gray-50 border-gray-200' 
+            : iniciada
+              ? 'bg-blue-50 border-blue-200'
+              : 'bg-white border-gray-200 hover:border-blue-300'
+          }
+          ${isTemporaria ? 'opacity-70' : ''}
+        `}
+      >
+        {/* Checkbox/Status */}
+        <div
+          onClick={() => !isTemporaria && setExpandido(!expandido)}
+          className={`
+            w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center cursor-pointer transition-all
+            ${tarefa.concluida 
+              ? 'bg-emerald-500 border-emerald-500' 
+              : iniciada
+                ? 'bg-blue-100 border-blue-400'
+                : 'border-gray-300 hover:border-blue-400'
+            }
+          `}
+        >
+          {tarefa.concluida ? (
+            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+            </svg>
+          ) : iniciada ? (
+            <Play className="w-3 h-3 text-blue-500 fill-blue-500" />
+          ) : null}
+        </div>
+
+        {/* Conteúdo */}
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpandido(!expandido)}>
+          <span className={`text-sm ${tarefa.concluida ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+            {tarefa.titulo}
           </span>
-          {isTemporaria && (
-            <span className="ml-2 text-xs text-gray-400 italic">
-              (salvando...)
-            </span>
-          )}
-          {temSubSubtarefas && !isTemporaria && (
-            <span className="ml-2 text-xs text-gray-400">
-              ({concluidasSubSub}/{subSubtarefas.length})
-            </span>
+          {isTemporaria && <span className="ml-2 text-xs text-gray-400 italic">(salvando...)</span>}
+          
+          {/* Datas */}
+          <div className="flex gap-2 mt-0.5 flex-wrap">
+            {tarefa.dataInicio && (
+              <span className="text-[10px] text-green-600">
+                <CalendarCheck className="w-3 h-3 inline mr-0.5" />
+                Início: {formatDateBR(tarefa.dataInicio)}
+              </span>
+            )}
+            {tarefa.dataPrazo && (
+              <span className={`text-[10px] ${isPast(tarefa.dataPrazo) && !tarefa.concluida ? 'text-red-500' : 'text-gray-400'}`}>
+                <CalendarClock className="w-3 h-3 inline mr-0.5" />
+                Prazo: {formatDateBR(tarefa.dataPrazo)}
+              </span>
+            )}
+          </div>
+          
+          {tarefa.observacoes && (
+            <p className="text-[10px] text-gray-500 mt-0.5 truncate">
+              <MessageSquare className="w-3 h-3 inline mr-0.5" />
+              {tarefa.observacoes}
+            </p>
           )}
         </div>
+
+        {/* Ações rápidas */}
+        {!isTemporaria && !tarefa.concluida && (
+          <div className="flex items-center gap-1">
+            {!iniciada ? (
+              // Botão Iniciar
+              <div className="flex items-center gap-1">
+                <select
+                  value={prazoCobrancaConfig}
+                  onChange={(e) => setPrazoCobrancaConfig(parseInt(e.target.value))}
+                  onClick={(e) => e.stopPropagation()}
+                  className="px-1 py-0.5 text-[10px] border border-gray-200 rounded bg-white"
+                >
+                  <option value={3}>3d</option>
+                  <option value={5}>5d</option>
+                  <option value={7}>7d</option>
+                  <option value={10}>10d</option>
+                  <option value={15}>15d</option>
+                </select>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleIniciar()
+                  }}
+                  disabled={iniciando}
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-white bg-amber-500 hover:bg-amber-600 rounded transition-colors disabled:opacity-50"
+                >
+                  {iniciando ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                  Iniciar
+                </button>
+              </div>
+            ) : (
+              // Botões para tarefa iniciada
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleConcluirComStatus("recebido")
+                  }}
+                  disabled={concluindo}
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-white bg-emerald-500 hover:bg-emerald-600 rounded transition-colors disabled:opacity-50"
+                  title="Documento recebido"
+                >
+                  {concluindo ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                  Recebido
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleConcluirComStatus("nao_possui")
+                  }}
+                  disabled={concluindo}
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded transition-colors disabled:opacity-50"
+                  title="Cliente não possui o documento"
+                >
+                  <FileX className="w-3 h-3" />
+                  Não possui
+                </button>
+                
+                {/* Aguardando com seletor de dias */}
+                {!mostrarOpcaoAguardando ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setMostrarOpcaoAguardando(true)
+                    }}
+                    disabled={concluindo}
+                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded transition-colors disabled:opacity-50"
+                    title="Aguardando cliente - criar cobrança"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Aguardando
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1 bg-blue-50 border border-blue-200 rounded px-1" onClick={(e) => e.stopPropagation()}>
+                    <select
+                      value={diasCobrancaAguardando}
+                      onChange={(e) => setDiasCobrancaAguardando(parseInt(e.target.value))}
+                      className="px-1 py-0.5 text-[10px] border-0 bg-transparent text-blue-700 focus:outline-none"
+                    >
+                      <option value={3}>3d</option>
+                      <option value={5}>5d</option>
+                      <option value={7}>7d</option>
+                      <option value={10}>10d</option>
+                      <option value={15}>15d</option>
+                    </select>
+                    <button
+                      onClick={handleAguardandoCliente}
+                      disabled={concluindo}
+                      className="px-1.5 py-0.5 text-[10px] font-medium text-white bg-blue-500 hover:bg-blue-600 rounded transition-colors disabled:opacity-50"
+                    >
+                      {concluindo ? <Loader2 className="w-3 h-3 animate-spin" /> : "OK"}
+                    </button>
+                    <button
+                      onClick={() => setMostrarOpcaoAguardando(false)}
+                      className="px-1 py-0.5 text-[10px] text-gray-500 hover:text-gray-700"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+                
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setMostrarAlterarPrazo(!mostrarAlterarPrazo)
+                    setExpandido(true)
+                  }}
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded transition-colors"
+                >
+                  <Calendar className="w-3 h-3" />
+                  Prazo
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Botão excluir */}
         {!isTemporaria && (
           <button
-            onClick={() => {
-              if (confirm("Excluir esta subtarefa?")) {
-                onDelete(subtarefa.id)
+            onClick={(e) => {
+              e.stopPropagation()
+              if (confirm("Excluir esta tarefa?")) {
+                onDelete(tarefa.id)
               }
             }}
-            className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+            className="p-1 text-gray-400 hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-all"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
         )}
 
-        {/* Seta - expande/colapsa */}
-        {!isTemporaria && (
-          <button
-            onClick={handleExpandir}
-            className={`
-              p-1.5 rounded-lg transition-all
-              text-gray-400 hover:text-blue-500 hover:bg-blue-50
-            `}
-          >
-            <ChevronDown className={`w-5 h-5 transition-transform ${expandido ? 'rotate-180' : ''}`} />
-          </button>
-        )}
+        {/* Seta expandir */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            setExpandido(!expandido)
+          }}
+          className="p-1 text-gray-400 hover:text-blue-500 rounded transition-all"
+        >
+          <ChevronDown className={`w-4 h-4 transition-transform ${expandido ? 'rotate-180' : ''}`} />
+        </button>
       </div>
 
       {/* Área expandida */}
       {expandido && !isTemporaria && (
-        <div className="mt-2 ml-4 animate-in slide-in-from-top-2 duration-200">
-          {/* Caixa de detalhes + subtarefas */}
-          <div className="bg-gray-50 rounded-lg p-3 space-y-4">
+        <div className="ml-6 animate-in slide-in-from-top-2 duration-200">
+          <div className="bg-gray-50 rounded-lg p-3 space-y-3 border border-gray-100">
+            {/* Alterar prazo */}
+            {mostrarAlterarPrazo && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-2">
+                <label className="block text-xs font-medium text-amber-700">
+                  Nova data de prazo:
+                </label>
+                <div className="flex gap-2">
+                  <DatePickerField
+                    value={novoPrazo}
+                    onChange={(value) => setNovoPrazo(value)}
+                    placeholder="Selecione a data"
+                  />
+                  <button
+                    onClick={handleAlterarPrazo}
+                    disabled={salvando || !novoPrazo}
+                    className="px-3 py-1 text-xs text-white bg-amber-500 rounded hover:bg-amber-600 disabled:opacity-50"
+                  >
+                    {salvando ? <Loader2 className="w-3 h-3 animate-spin" /> : "Salvar"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMostrarAlterarPrazo(false)
+                      setNovoPrazo("")
+                    }}
+                    className="px-3 py-1 text-xs text-gray-600 bg-white border rounded hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+
             {editando ? (
               <>
                 <Input
@@ -503,6 +1053,13 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
                   className="w-full px-3 py-2 border rounded-lg text-sm bg-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={2}
                   placeholder="Descrição opcional"
+                />
+                <textarea
+                  value={editForm.observacoes}
+                  onChange={(e) => setEditForm({ ...editForm, observacoes: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                  placeholder="Observações..."
                 />
                 <div className="flex gap-2">
                   <select
@@ -534,133 +1091,58 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
                   ))}
                 </select>
                 <div className="flex justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEditando(false)}
-                    className="h-7 text-xs"
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => setEditando(false)} className="h-7 text-xs">
                     Cancelar
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleSalvar}
-                    disabled={salvando}
-                    className="h-7 text-xs bg-blue-600 hover:bg-blue-700"
-                  >
+                  <Button size="sm" onClick={handleSalvar} disabled={salvando} className="h-7 text-xs bg-blue-600 hover:bg-blue-700">
                     {salvando ? <Loader2 className="w-3 h-3 animate-spin" /> : "Salvar"}
                   </Button>
                 </div>
               </>
             ) : (
               <>
-                {/* Detalhes */}
+                {/* Info da tarefa */}
                 <div className="space-y-2">
-                  {subtarefa.descricao ? (
-                    <p className="text-sm text-gray-600">{subtarefa.descricao}</p>
-                  ) : (
-                    <p className="text-xs text-gray-400 italic">Sem descrição</p>
+                  {tarefa.descricao && (
+                    <p className="text-xs text-gray-600">{tarefa.descricao}</p>
                   )}
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="px-2 py-0.5 rounded-full bg-white border text-gray-600">
-                      {subtarefa.prioridade === "URGENTE" && "🔴 Urgente"}
-                      {subtarefa.prioridade === "ALTA" && "🟠 Alta"}
-                      {subtarefa.prioridade === "MEDIA" && "🟡 Média"}
-                      {subtarefa.prioridade === "BAIXA" && "🟢 Baixa"}
-                    </span>
-                    {subtarefa.dataPrazo && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border text-gray-600">
-                        <Calendar className="w-3 h-3" />
-                        {/* ✅ CORRIGIDO: Usar formatDateBR */}
-                        {formatDateBR(subtarefa.dataPrazo)}
-                      </span>
-                    )}
-                    {subtarefa.responsavel && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border text-gray-600">
-                        <User className="w-3 h-3" />
-                        {subtarefa.responsavel.nome}
-                      </span>
-                    )}
-                  </div>
-                  {/* Botões de ação */}
-                  <div className="flex items-center gap-2 pt-2 border-t border-gray-200 mt-2">
-                    <button
-                      onClick={() => onToggle(subtarefa.id)}
-                      disabled={processando.has(subtarefa.id)}
-                      className={`
-                        flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-colors
-                        ${subtarefa.concluida 
-                          ? 'bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200' 
-                          : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'
-                        }
-                        disabled:opacity-50
-                      `}
-                    >
-                      {processando.has(subtarefa.id) ? (
-                        <Loader2 className="w-3 h-3 animate-spin mx-auto" />
-                      ) : subtarefa.concluida ? (
-                        "↩ Reabrir"
-                      ) : (
-                        "✓ Marcar como concluída"
-                      )}
-                    </button>
+                  
+                  {tarefa.observacoes && (
+                    <div className="p-2 bg-amber-50 rounded border border-amber-100">
+                      <p className="text-xs text-amber-700">
+                        <MessageSquare className="w-3 h-3 inline mr-1" />
+                        {tarefa.observacoes}
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => setEditando(true)}
-                      className="py-1.5 px-3 rounded-lg text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200 transition-colors"
+                      className="py-1 px-2 rounded text-[10px] font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
                     >
                       Editar
                     </button>
                   </div>
                 </div>
 
-                {/* Subtarefas - dentro da mesma caixa */}
-                {nivel < 2 && (
-                  <div className="pt-3 border-t border-gray-200">
-                    <h4 className="text-xs font-medium text-gray-500 mb-2">Subtarefas</h4>
-                    
-                    {subSubtarefas.length > 0 ? (
-                      <div className="space-y-2 mb-3">
-                        {subSubtarefas.map((subSub) => (
-                          <SubtarefaItem
-                            key={subSub.id}
-                            subtarefa={subSub}
-                            nivel={nivel + 1}
-                            onToggle={handleToggleSubSub}
-                            onDelete={handleDeleteSubSub}
-                            onUpdate={onUpdate}
-                            processando={new Set()}
-                            usuarios={usuarios}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-gray-400 mb-2">Nenhuma subtarefa</p>
-                    )}
-
-                    {/* Input nova sub-subtarefa */}
-                    <div className="flex items-center gap-2">
-                      <Input
-                        placeholder="Adicionar subtarefa..."
-                        value={novaSubSub}
-                        onChange={(e) => setNovaSubSub(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !criandoSubSub) handleCriarSubSub()
-                        }}
-                        disabled={criandoSubSub}
-                        className="flex-1 h-8 text-sm bg-white"
-                      />
-                      <Button
-                        onClick={handleCriarSubSub}
-                        disabled={criandoSubSub || !novaSubSub.trim()}
-                        size="sm"
-                        className="h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700"
-                      >
-                        {criandoSubSub ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Plus className="w-3 h-3" />
-                        )}
-                      </Button>
+                {/* Subtarefas de cobrança */}
+                {subtarefas.length > 0 && (
+                  <div className="pt-2 border-t border-gray-200">
+                    <h5 className="text-[10px] font-medium text-gray-500 mb-2">Subtarefas de cobrança:</h5>
+                    <div className="space-y-1">
+                      {subtarefas.map((sub) => (
+                        <TarefaItem
+                          key={sub.id}
+                          tarefa={sub}
+                          onDelete={() => {}}
+                          onUpdate={() => {
+                            fetchSubtarefas()
+                            onUpdate()
+                          }}
+                          usuarios={usuarios}
+                        />
+                      ))}
                     </div>
                   </div>
                 )}
@@ -674,7 +1156,346 @@ function SubtarefaItem({ subtarefa, nivel, onToggle, onDelete, onUpdate, process
 }
 
 // ==========================================
-// COMPONENTE: Modal de Subtarefas
+// COMPONENTE: AtividadeItem (Caio) - SEM marcar como concluída
+// ==========================================
+interface AtividadeItemProps {
+  atividade: Tarefa
+  onDelete: (id: number) => void
+  onUpdate: () => void
+  usuarios: Responsavel[]
+}
+
+function AtividadeItem({ atividade, onDelete, onUpdate, usuarios }: AtividadeItemProps) {
+  const [expandido, setExpandido] = useState(true)
+  const [editando, setEditando] = useState(false)
+  const [novaTarefa, setNovaTarefa] = useState("")
+  const [criandoTarefa, setCriandoTarefa] = useState(false)
+  const [salvando, setSalvando] = useState(false)
+  const [tarefas, setTarefas] = useState<Tarefa[]>(atividade.subtarefas || [])
+  const [editForm, setEditForm] = useState({
+    titulo: atividade.titulo,
+    descricao: atividade.descricao || "",
+    prioridade: atividade.prioridade,
+    dataPrazo: atividade.dataPrazo ? atividade.dataPrazo.split("T")[0] : "",
+    responsavelId: atividade.responsavelId?.toString() || "",
+    observacoes: atividade.observacoes || ""
+  })
+
+  const isTemporaria = atividade.id < 0
+
+  const fetchTarefas = async () => {
+    if (isTemporaria) return
+    try {
+      const response = await fetch(`/api/tarefas/${atividade.id}`)
+      const data = await response.json()
+      if (data.tarefa?.subtarefas) {
+        setTarefas(data.tarefa.subtarefas)
+      }
+    } catch (error) {
+      console.error("Erro ao buscar tarefas:", error)
+    }
+  }
+
+  useEffect(() => {
+    setTarefas(atividade.subtarefas || [])
+  }, [atividade.subtarefas])
+
+  const handleCriarTarefa = async () => {
+    if (!novaTarefa.trim() || isTemporaria) return
+    setCriandoTarefa(true)
+    try {
+      const response = await fetch(`/api/tarefas/${atividade.id}/subtarefas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ titulo: novaTarefa.trim() })
+      })
+      if (response.ok) {
+        setNovaTarefa("")
+        fetchTarefas()
+        onUpdate()
+      }
+    } catch (error) {
+      console.error("Erro ao criar tarefa:", error)
+    } finally {
+      setCriandoTarefa(false)
+    }
+  }
+
+  const handleDeleteTarefa = async (tarefaId: number) => {
+    try {
+      const response = await fetch(`/api/tarefas/${tarefaId}`, { method: "DELETE" })
+      if (response.ok) {
+        setTarefas(prev => prev.filter(t => t.id !== tarefaId))
+        onUpdate()
+      }
+    } catch (error) {
+      console.error("Erro ao excluir tarefa:", error)
+    }
+  }
+
+  const handleSalvar = async () => {
+    if (isTemporaria) return
+    setSalvando(true)
+    try {
+      const response = await fetch(`/api/tarefas/${atividade.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          titulo: editForm.titulo,
+          descricao: editForm.descricao || null,
+          prioridade: editForm.prioridade,
+          dataPrazo: editForm.dataPrazo || null,
+          responsavelId: editForm.responsavelId ? parseInt(editForm.responsavelId) : null,
+          observacoes: editForm.observacoes || null
+        })
+      })
+      if (response.ok) {
+        setEditando(false)
+        onUpdate()
+      }
+    } catch (error) {
+      console.error("Erro ao salvar:", error)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const concluidasTarefas = tarefas.filter(t => t.concluida).length
+  const temTarefas = tarefas.length > 0
+
+  return (
+    <div>
+      {/* Card da Atividade - SEM checkbox de concluir */}
+      <div
+        className={`
+          group flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer
+          bg-white border-gray-200 hover:border-blue-300
+          ${isTemporaria ? 'opacity-70' : ''}
+          ${expandido ? 'border-blue-400 shadow-sm' : ''}
+        `}
+        onClick={() => setExpandido(!expandido)}
+      >
+        {/* Ícone de pessoa/progresso */}
+        <div className="w-7 h-7 rounded-full border-2 border-gray-300 flex-shrink-0 flex items-center justify-center bg-gray-50">
+          {temTarefas ? (
+            <span className="text-[10px] font-bold text-gray-500">{concluidasTarefas}/{tarefas.length}</span>
+          ) : (
+            <User className="w-3.5 h-3.5 text-gray-400" />
+          )}
+        </div>
+
+        {/* Título e info */}
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-medium text-gray-900">
+            {atividade.titulo}
+          </span>
+          {isTemporaria && (
+            <span className="ml-2 text-xs text-gray-400 italic">(salvando...)</span>
+          )}
+          {atividade.dataPrazo && (
+            <span className={`ml-2 text-xs ${isPast(atividade.dataPrazo) ? 'text-red-500' : 'text-gray-400'}`}>
+              📅 {formatDateBR(atividade.dataPrazo)}
+            </span>
+          )}
+          {atividade.observacoes && (
+            <span className="ml-2 text-xs text-amber-500" title={atividade.observacoes}>💬</span>
+          )}
+        </div>
+
+        {/* Botão excluir */}
+        {!isTemporaria && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              if (confirm("Excluir esta atividade e todas as tarefas?")) {
+                onDelete(atividade.id)
+              }
+            }}
+            className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Seta expandir */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            setExpandido(!expandido)
+          }}
+          className="p-1.5 rounded-lg transition-all text-gray-400 hover:text-blue-500 hover:bg-blue-50"
+        >
+          <ChevronDown className={`w-5 h-5 transition-transform ${expandido ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
+      {/* Área expandida */}
+      {expandido && !isTemporaria && (
+        <div className="mt-2 ml-4 animate-in slide-in-from-top-2 duration-200">
+          <div className="bg-gray-50 rounded-lg p-3 space-y-4">
+            {editando ? (
+              <>
+                <Input
+                  value={editForm.titulo}
+                  onChange={(e) => setEditForm({ ...editForm, titulo: e.target.value })}
+                  className="bg-white text-sm"
+                  placeholder="Nome da atividade"
+                />
+                <textarea
+                  value={editForm.descricao}
+                  onChange={(e) => setEditForm({ ...editForm, descricao: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                  placeholder="Descrição opcional"
+                />
+                <textarea
+                  value={editForm.observacoes}
+                  onChange={(e) => setEditForm({ ...editForm, observacoes: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                  placeholder="Observações..."
+                />
+                <div className="flex gap-2">
+                  <select
+                    value={editForm.prioridade}
+                    onChange={(e) => setEditForm({ ...editForm, prioridade: e.target.value })}
+                    className="flex-1 px-2 py-1.5 border rounded-lg text-xs bg-white"
+                  >
+                    <option value="BAIXA">🟢 Baixa</option>
+                    <option value="MEDIA">🟡 Média</option>
+                    <option value="ALTA">🟠 Alta</option>
+                    <option value="URGENTE">🔴 Urgente</option>
+                  </select>
+                  <div className="flex-1">
+                    <DatePickerField
+                      value={editForm.dataPrazo || undefined}
+                      onChange={(date) => setEditForm({ ...editForm, dataPrazo: date })}
+                      placeholder="Prazo"
+                    />
+                  </div>
+                </div>
+                <select
+                  value={editForm.responsavelId}
+                  onChange={(e) => setEditForm({ ...editForm, responsavelId: e.target.value })}
+                  className="w-full px-2 py-1.5 border rounded-lg text-xs bg-white"
+                >
+                  <option value="">Sem responsável</option>
+                  {usuarios.map((u) => (
+                    <option key={u.id} value={u.id}>{u.nome}</option>
+                  ))}
+                </select>
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setEditando(false)} className="h-7 text-xs">
+                    Cancelar
+                  </Button>
+                  <Button size="sm" onClick={handleSalvar} disabled={salvando} className="h-7 text-xs bg-blue-600 hover:bg-blue-700">
+                    {salvando ? <Loader2 className="w-3 h-3 animate-spin" /> : "Salvar"}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {atividade.descricao && (
+                    <p className="text-sm text-gray-600">{atividade.descricao}</p>
+                  )}
+                  
+                  {atividade.observacoes && (
+                    <div className="p-2 bg-amber-50 rounded-lg border border-amber-100">
+                      <p className="text-xs text-amber-700">
+                        <MessageSquare className="w-3 h-3 inline mr-1" />
+                        {atividade.observacoes}
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="px-2 py-0.5 rounded-full bg-white border text-gray-600">
+                      {atividade.prioridade === "URGENTE" && "🔴 Urgente"}
+                      {atividade.prioridade === "ALTA" && "🟠 Alta"}
+                      {atividade.prioridade === "MEDIA" && "🟡 Média"}
+                      {atividade.prioridade === "BAIXA" && "🟢 Baixa"}
+                    </span>
+                    {atividade.dataPrazo && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border text-gray-600">
+                        <Calendar className="w-3 h-3" />
+                        {formatDateBR(atividade.dataPrazo)}
+                      </span>
+                    )}
+                    {atividade.responsavel && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border text-gray-600">
+                        <User className="w-3 h-3" />
+                        {atividade.responsavel.nome}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Apenas botão Editar - SEM marcar como concluída */}
+                  <div className="flex items-center gap-2 pt-2 border-t border-gray-200 mt-2">
+                    <button
+                      onClick={() => setEditando(true)}
+                      className="py-1.5 px-3 rounded-lg text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200 transition-colors"
+                    >
+                      Editar
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tarefas dentro da atividade */}
+                <div className="pt-3 border-t border-gray-200">
+                  <h4 className="text-xs font-medium text-gray-500 mb-2">Subtarefas</h4>
+                  
+                  {tarefas.length > 0 ? (
+                    <div className="space-y-2 mb-3">
+                      {tarefas.map((tarefa) => (
+                        <TarefaItem
+                          key={tarefa.id}
+                          tarefa={tarefa}
+                          onDelete={handleDeleteTarefa}
+                          onUpdate={() => {
+                            fetchTarefas()
+                            onUpdate()
+                          }}
+                          usuarios={usuarios}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 mb-2">Nenhuma tarefa</p>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Adicionar subtarefa..."
+                      value={novaTarefa}
+                      onChange={(e) => setNovaTarefa(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !criandoTarefa) handleCriarTarefa()
+                      }}
+                      disabled={criandoTarefa}
+                      className="flex-1 h-8 text-sm bg-white"
+                    />
+                    <Button
+                      onClick={handleCriarTarefa}
+                      disabled={criandoTarefa || !novaTarefa.trim()}
+                      size="sm"
+                      className="h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700"
+                    >
+                      {criandoTarefa ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ==========================================
+// COMPONENTE: Modal de Subtarefas (Atividades)
 // ==========================================
 interface SubtarefasModalProps {
   tarefa: Tarefa
@@ -687,7 +1508,7 @@ interface SubtarefasModalProps {
 }
 
 function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubtarefaAdd, onSubtarefaRemove, usuarios }: SubtarefasModalProps) {
-  const [novaSubtarefa, setNovaSubtarefa] = useState("")
+  const [novaAtividade, setNovaAtividade] = useState("")
   const [criando, setCriando] = useState(false)
   const [editandoTarefa, setEditandoTarefa] = useState(false)
   const [editForm, setEditForm] = useState({
@@ -695,36 +1516,42 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
     descricao: tarefa.descricao || "",
     prioridade: tarefa.prioridade,
     dataPrazo: tarefa.dataPrazo ? tarefa.dataPrazo.split("T")[0] : "",
-    responsavelId: tarefa.responsavelId?.toString() || ""
+    responsavelId: tarefa.responsavelId?.toString() || "",
+    observacoes: tarefa.observacoes || ""
   })
   const [salvando, setSalvando] = useState(false)
-  
-  // Estado local para optimistic updates
-  const [subtarefasLocal, setSubtarefasLocal] = useState<Tarefa[]>(tarefa.subtarefas || [])
-  
-  // Set para rastrear subtarefas em processamento (evita cliques duplos)
+  const [atividadesLocal, setAtividadesLocal] = useState<Tarefa[]>(tarefa.subtarefas || [])
   const [processando, setProcessando] = useState<Set<number>>(new Set())
   
-  // Atualizar estado local quando tarefa mudar (mas não durante processamento)
   useEffect(() => {
     if (processando.size === 0) {
-      setSubtarefasLocal(tarefa.subtarefas || [])
+      setAtividadesLocal(tarefa.subtarefas || [])
     }
   }, [tarefa.subtarefas])
 
-  const concluidas = subtarefasLocal.filter(s => s.concluida).length
-  const porcentagem = subtarefasLocal.length > 0 ? (concluidas / subtarefasLocal.length) * 100 : 0
+  // Calcula progresso baseado em todas as tarefas dentro das atividades
+  const calcularProgresso = () => {
+    let totalTarefas = 0
+    let tarefasConcluidas = 0
+    
+    atividadesLocal.forEach(atividade => {
+      const tarefas = atividade.subtarefas || []
+      totalTarefas += tarefas.length
+      tarefasConcluidas += tarefas.filter(t => t.concluida).length
+    })
+    
+    return totalTarefas > 0 ? (tarefasConcluidas / totalTarefas) * 100 : 0
+  }
+  
+  const porcentagem = calcularProgresso()
 
-  // Criar subtarefa com optimistic update
-  const handleCriarSubtarefa = async () => {
-    if (!novaSubtarefa.trim()) return
+  const handleCriarAtividade = async () => {
+    if (!novaAtividade.trim()) return
 
-    const tituloNovo = novaSubtarefa.trim()
-    // ✅ CORRIGIDO: ID temporário NEGATIVO para distinguir de IDs reais
+    const tituloNovo = novaAtividade.trim()
     const tempId = -Date.now()
     
-    // Optimistic update - adiciona imediatamente
-    const novaSubtarefaTemp: Tarefa = {
+    const novaAtividadeTemp: Tarefa = {
       id: tempId,
       titulo: tituloNovo,
       concluida: false,
@@ -732,9 +1559,9 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
       tarefaPaiId: tarefa.id
     }
     
-    setSubtarefasLocal(prev => [...prev, novaSubtarefaTemp])
-    onSubtarefaAdd?.(novaSubtarefaTemp)
-    setNovaSubtarefa("")
+    setAtividadesLocal(prev => [...prev, novaAtividadeTemp])
+    onSubtarefaAdd?.(novaAtividadeTemp)
+    setNovaAtividade("")
 
     setCriando(true)
     try {
@@ -745,135 +1572,56 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
       })
 
       if (response.ok) {
-        // ✅ Atualiza com o ID real do servidor
         const data = await response.json()
         if (data.subtarefa) {
-          setSubtarefasLocal(prev => 
+          setAtividadesLocal(prev => 
             prev.map(s => s.id === tempId ? data.subtarefa : s)
           )
         }
         onUpdate()
       } else {
-        // Reverte se falhou
-        setSubtarefasLocal(prev => prev.filter(s => s.id !== tempId))
+        setAtividadesLocal(prev => prev.filter(s => s.id !== tempId))
         onSubtarefaRemove?.(tempId)
-        setNovaSubtarefa(tituloNovo)
+        setNovaAtividade(tituloNovo)
       }
     } catch (error) {
-      // Reverte se erro
-      setSubtarefasLocal(prev => prev.filter(s => s.id !== tempId))
+      setAtividadesLocal(prev => prev.filter(s => s.id !== tempId))
       onSubtarefaRemove?.(tempId)
-      setNovaSubtarefa(tituloNovo)
-      console.error("Erro ao criar subtarefa:", error)
+      setNovaAtividade(tituloNovo)
+      console.error("Erro ao criar atividade:", error)
     } finally {
       setCriando(false)
     }
   }
 
-  // Toggle subtarefa com optimistic update (protegido contra cliques rápidos)
-  const handleToggleSubtarefa = async (subtarefaId: number) => {
-    // ✅ CORRIGIDO: Não permite toggle em IDs temporários (negativos)
-    if (subtarefaId < 0) {
-      console.log("Subtarefa ainda sendo salva, aguarde...")
-      return
-    }
+  const handleExcluirAtividade = async (atividadeId: number) => {
+    if (atividadeId < 0) return
     
-    // Se já está processando esta subtarefa, ignora
-    if (processando.has(subtarefaId)) return
+    const atividadeRemovida = atividadesLocal.find(s => s.id === atividadeId)
     
-    // Marca como processando
-    setProcessando(prev => new Set(prev).add(subtarefaId))
-    
-    // Encontra o estado atual da subtarefa
-    const subtarefa = subtarefasLocal.find(s => s.id === subtarefaId)
-    const novoEstado = !subtarefa?.concluida
-    
-    // Optimistic update - atualiza UI imediatamente
-    setSubtarefasLocal(prev => 
-      prev.map(s => 
-        s.id === subtarefaId 
-          ? { ...s, concluida: novoEstado }
-          : s
-      )
-    )
-    
-    // Atualiza lista principal também (optimistic)
-    onSubtarefaToggle?.(subtarefaId, novoEstado)
+    setAtividadesLocal(prev => prev.filter(s => s.id !== atividadeId))
+    onSubtarefaRemove?.(atividadeId)
 
     try {
-      const response = await fetch(`/api/tarefas/${subtarefaId}/toggle`, {
-        method: "POST"
-      })
-
-      if (!response.ok) {
-        // Reverte se falhou
-        setSubtarefasLocal(prev => 
-          prev.map(s => 
-            s.id === subtarefaId 
-              ? { ...s, concluida: !novoEstado }
-              : s
-          )
-        )
-        onSubtarefaToggle?.(subtarefaId, !novoEstado)
-        const data = await response.json()
-        if (data.error) alert(data.error)
-      }
-    } catch (error) {
-      // Reverte se erro
-      setSubtarefasLocal(prev => 
-        prev.map(s => 
-          s.id === subtarefaId 
-            ? { ...s, concluida: !novoEstado }
-            : s
-        )
-      )
-      onSubtarefaToggle?.(subtarefaId, !novoEstado)
-      console.error("Erro ao alternar subtarefa:", error)
-    } finally {
-      // Remove do set de processamento
-      setProcessando(prev => {
-        const novo = new Set(prev)
-        novo.delete(subtarefaId)
-        return novo
-      })
-    }
-  }
-
-  // Excluir subtarefa com optimistic update
-  const handleExcluirSubtarefa = async (subtarefaId: number) => {
-    // ✅ Não exclui subtarefas temporárias
-    if (subtarefaId < 0) return
-    
-    // Guarda estado anterior para reverter se necessário
-    const subtarefaRemovida = subtarefasLocal.find(s => s.id === subtarefaId)
-    
-    // Optimistic update - remove imediatamente
-    setSubtarefasLocal(prev => prev.filter(s => s.id !== subtarefaId))
-    onSubtarefaRemove?.(subtarefaId)
-
-    try {
-      const response = await fetch(`/api/tarefas/${subtarefaId}`, {
+      const response = await fetch(`/api/tarefas/${atividadeId}`, {
         method: "DELETE"
       })
 
       if (!response.ok) {
-        // Reverte se falhou
-        if (subtarefaRemovida) {
-          setSubtarefasLocal(prev => [...prev, subtarefaRemovida])
-          onSubtarefaAdd?.(subtarefaRemovida)
+        if (atividadeRemovida) {
+          setAtividadesLocal(prev => [...prev, atividadeRemovida])
+          onSubtarefaAdd?.(atividadeRemovida)
         }
       }
     } catch (error) {
-      // Reverte se erro
-      if (subtarefaRemovida) {
-        setSubtarefasLocal(prev => [...prev, subtarefaRemovida])
-        onSubtarefaAdd?.(subtarefaRemovida)
+      if (atividadeRemovida) {
+        setAtividadesLocal(prev => [...prev, atividadeRemovida])
+        onSubtarefaAdd?.(atividadeRemovida)
       }
-      console.error("Erro ao excluir subtarefa:", error)
+      console.error("Erro ao excluir atividade:", error)
     }
   }
 
-  // Salvar edição da tarefa principal
   const handleSalvarEdicao = async () => {
     setSalvando(true)
     try {
@@ -885,7 +1633,8 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
           descricao: editForm.descricao || null,
           prioridade: editForm.prioridade,
           dataPrazo: editForm.dataPrazo || null,
-          responsavelId: editForm.responsavelId ? parseInt(editForm.responsavelId) : null
+          responsavelId: editForm.responsavelId ? parseInt(editForm.responsavelId) : null,
+          observacoes: editForm.observacoes || null
         })
       })
 
@@ -903,24 +1652,14 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
     }
   }
 
-  const getPrioridadeLabel = (prioridade: string) => {
-    switch (prioridade) {
-      case "URGENTE": return "🔴 Urgente"
-      case "ALTA": return "🟠 Alta"
-      case "MEDIA": return "🟡 Média"
-      case "BAIXA": return "🟢 Baixa"
-      default: return prioridade
-    }
-  }
-
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10000] flex items-center justify-center p-4" onClick={onClose}>
       <div 
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header com progresso */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5 text-white">
+        {/* Header */}
+        <div className="px-6 py-5 text-white bg-gradient-to-r from-gray-700 to-gray-800">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0 pr-4">
               {editandoTarefa ? (
@@ -934,39 +1673,31 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
               ) : (
                 <h2 className="text-xl font-bold truncate">{tarefa.titulo}</h2>
               )}
-              <p className="text-blue-100 text-sm mt-1">
-                {subtarefasLocal.length > 0 
-                  ? `${concluidas} de ${subtarefasLocal.length} subtarefas concluídas`
-                  : "Nenhuma subtarefa ainda"
-                }
+              <p className="text-gray-300 text-sm mt-1">
+                {tarefa.dataInicio ? 'Tarefa iniciada' : 'Tarefa não iniciada'}
               </p>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-full transition-colors"
-            >
+            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Barra de progresso */}
-          {subtarefasLocal.length > 0 && (
-            <div className="mt-4">
-              <div className="flex items-center justify-between text-sm mb-2">
-                <span className="text-blue-100">Progresso</span>
-                <span className="font-semibold">{Math.round(porcentagem)}%</span>
-              </div>
-              <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-white rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${porcentagem}%` }}
-                />
-              </div>
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="text-gray-300">Progresso</span>
+              <span className="font-semibold">{Math.round(porcentagem)}%</span>
             </div>
-          )}
+            <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-white rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${porcentagem}%` }}
+              />
+            </div>
+          </div>
         </div>
 
-        {/* Tabs: Atividades / Detalhes */}
+        {/* Tabs */}
         <div className="flex border-b">
           <button
             onClick={() => setEditandoTarefa(false)}
@@ -993,7 +1724,6 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
         {/* Conteúdo */}
         <div className="flex-1 overflow-y-auto">
           {editandoTarefa ? (
-            /* Form de edição */
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
@@ -1001,7 +1731,21 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
                   value={editForm.descricao}
                   onChange={(e) => setEditForm({ ...editForm, descricao: e.target.value })}
                   placeholder="Descrição opcional"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <MessageSquare className="w-4 h-4 inline mr-1" />
+                  Observações
+                </label>
+                <textarea
+                  value={editForm.observacoes}
+                  onChange={(e) => setEditForm({ ...editForm, observacoes: e.target.value })}
+                  placeholder="Anotações sobre esta tarefa..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   rows={3}
                 />
               </div>
@@ -1056,14 +1800,14 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
               <div className="pt-4 flex justify-end gap-3">
                 <button
                   onClick={() => setEditandoTarefa(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleSalvarEdicao}
                   disabled={salvando || !editForm.titulo.trim()}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
                 >
                   {salvando && <Loader2 className="w-4 h-4 animate-spin" />}
                   Salvar
@@ -1071,34 +1815,29 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
               </div>
             </div>
           ) : (
-            /* Lista de subtarefas */
             <div className="p-4">
-              {/* Aviso sobre ordem */}
-              <div className="flex items-center gap-2 px-3 py-2 mb-4 bg-gray-50 rounded-lg text-xs text-gray-500">
+              {/* Dica sobre as tarefas */}
+              <div className="flex items-center gap-2 px-3 py-2 mb-4 bg-blue-50 rounded-lg text-xs text-blue-600">
                 <span>ℹ️</span>
-                <span>Clique na seta para expandir detalhes e adicionar subtarefas</span>
+                <span>Clique nas subtarefas de cobrança (laranja) para ver as opções de ação</span>
               </div>
 
-              {/* Lista */}
-              <div className="space-y-2">
-                {subtarefasLocal.map((subtarefa) => (
-                  <SubtarefaItem
-                    key={subtarefa.id}
-                    subtarefa={subtarefa}
-                    nivel={0}
-                    onToggle={handleToggleSubtarefa}
-                    onDelete={handleExcluirSubtarefa}
+              <div className="space-y-3">
+                {atividadesLocal.map((atividade) => (
+                  <AtividadeItem
+                    key={atividade.id}
+                    atividade={atividade}
+                    onDelete={handleExcluirAtividade}
                     onUpdate={onUpdate}
-                    processando={processando}
                     usuarios={usuarios}
                   />
                 ))}
 
-                {subtarefasLocal.length === 0 && (
+                {atividadesLocal.length === 0 && (
                   <div className="text-center py-8 text-gray-400">
-                    <CheckCircle2 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Nenhuma subtarefa ainda</p>
-                    <p className="text-xs mt-1">Adicione subtarefas abaixo</p>
+                    <User className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhuma atividade ainda</p>
+                    <p className="text-xs mt-1">Adicione atividades (ex: nome da pessoa)</p>
                   </div>
                 )}
               </div>
@@ -1106,31 +1845,27 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
           )}
         </div>
 
-        {/* Footer - Input de nova subtarefa */}
+        {/* Footer */}
         {!editandoTarefa && (
           <div className="border-t p-4 bg-gray-50">
             <div className="flex items-center gap-2">
               <Input
-                placeholder="Adicionar nova subtarefa..."
-                value={novaSubtarefa}
-                onChange={(e) => setNovaSubtarefa(e.target.value)}
+                placeholder="Adicionar nova atividade..."
+                value={novaAtividade}
+                onChange={(e) => setNovaAtividade(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !criando) handleCriarSubtarefa()
+                  if (e.key === "Enter" && !criando) handleCriarAtividade()
                 }}
                 disabled={criando}
                 className="flex-1 bg-white"
               />
               <Button
-                onClick={handleCriarSubtarefa}
-                disabled={criando || !novaSubtarefa.trim()}
+                onClick={handleCriarAtividade}
+                disabled={criando || !novaAtividade.trim()}
                 size="sm"
                 className="bg-blue-600 hover:bg-blue-700"
               >
-                {criando ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Plus className="w-4 h-4" />
-                )}
+                {criando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               </Button>
             </div>
           </div>
@@ -1141,7 +1876,7 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
 }
 
 // ==========================================
-// COMPONENTE PRINCIPAL: ProcessoTarefas
+// COMPONENTE PRINCIPAL: ProcessoTarefas (NÃO MUDA)
 // ==========================================
 export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasProps) {
   const [tarefas, setTarefas] = useState<Tarefa[]>([])
@@ -1150,19 +1885,13 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
   const [criando, setCriando] = useState(false)
   const [tarefaSelecionada, setTarefaSelecionada] = useState<Tarefa | null>(null)
   const [usuarios, setUsuarios] = useState<Responsavel[]>([])
-  
-  // Estados para o seletor de tarefas pré-definidas
   const [mostrarSeletor, setMostrarSeletor] = useState(false)
   const [mostrarInputCustom, setMostrarInputCustom] = useState(false)
   const seletorRef = useRef<HTMLDivElement>(null)
   
-  // Obter tarefas pré-definidas do país
   const tarefasPreDefinidas = getTarefasPorPais(pais)
-  
-  // Ref para rastrear o ID do modal aberto (evita bugs de re-abertura)
   const modalAbertoIdRef = useRef<number | null>(null)
   
-  // Fechar seletor ao clicar fora
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (seletorRef.current && !seletorRef.current.contains(event.target as Node)) {
@@ -1173,22 +1902,18 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
   
-  // Abrir modal
   const abrirModal = (tarefa: Tarefa) => {
     modalAbertoIdRef.current = tarefa.id
     setTarefaSelecionada(tarefa)
   }
   
-  // Fechar modal e sincronizar com servidor
   const fecharModal = () => {
     modalAbertoIdRef.current = null
     setTarefaSelecionada(null)
-    // Sincroniza com servidor ao fechar
     fetchTarefas(false)
     onUpdate?.()
   }
 
-  // Buscar tarefas do processo
   const fetchTarefas = async (atualizarModal = true) => {
     try {
       const response = await fetch(`/api/tarefas?processoId=${processoId}&apenasRaiz=true`)
@@ -1196,7 +1921,6 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
       if (data.tarefas) {
         setTarefas(data.tarefas)
         
-        // Só atualiza o modal se ele ainda estiver aberto com o mesmo ID
         if (atualizarModal && modalAbertoIdRef.current !== null) {
           const atualizada = data.tarefas.find((t: Tarefa) => t.id === modalAbertoIdRef.current)
           if (atualizada) {
@@ -1211,14 +1935,11 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
     }
   }
 
-  // Buscar usuários
   const fetchUsuarios = async () => {
     try {
       const token = localStorage.getItem('authToken')
       const response = await fetch("/api/usuarios", {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       })
       const data = await response.json()
       if (data.usuarios) {
@@ -1236,7 +1957,6 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
     }
   }, [processoId])
 
-  // Criar nova tarefa (pré-definida ou customizada)
   const handleCriarTarefa = async (titulo?: string) => {
     const tituloFinal = titulo || novaTarefa.trim()
     if (!tituloFinal) return
@@ -1249,10 +1969,7 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
       const response = await fetch("/api/tarefas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          titulo: tituloFinal,
-          processoId
-        })
+        body: JSON.stringify({ titulo: tituloFinal, processoId })
       })
 
       if (response.ok) {
@@ -1267,21 +1984,16 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
     }
   }
   
-  // Selecionar tarefa pré-definida
   const handleSelecionarTarefaPreDefinida = (tarefa: TarefaPreDefinida) => {
     handleCriarTarefa(tarefa.nome)
   }
 
-  // Excluir tarefa
   const handleExcluir = async (tarefaId: number, e: React.MouseEvent) => {
     e.stopPropagation()
     if (!confirm("Excluir esta tarefa e todas as subtarefas?")) return
 
     try {
-      const response = await fetch(`/api/tarefas/${tarefaId}`, {
-        method: "DELETE"
-      })
-
+      const response = await fetch(`/api/tarefas/${tarefaId}`, { method: "DELETE" })
       if (response.ok) {
         fetchTarefas()
         onUpdate?.()
@@ -1301,7 +2013,7 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Header */}
+      {/* Header - MANTÉM "Tarefas" */}
       <div className="flex items-center justify-between border-b bg-white px-4 py-3 flex-shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -1319,10 +2031,9 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
         </div>
       </div>
 
-      {/* Seletor de nova tarefa */}
+      {/* Seletor de nova tarefa - MANTÉM */}
       <div className="p-4 border-b flex-shrink-0 bg-gray-50/50" ref={seletorRef}>
         <div className="relative">
-          {/* Botão principal / Input customizado */}
           {mostrarInputCustom ? (
             <div className="flex items-center gap-2">
               <Input
@@ -1346,11 +2057,7 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
                 size="sm"
                 className="bg-blue-600 hover:bg-blue-700"
               >
-                {criando ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Plus className="h-4 w-4" />
-                )}
+                {criando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               </Button>
               <Button
                 onClick={() => {
@@ -1377,7 +2084,6 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
             </button>
           )}
 
-          {/* Dropdown de opções */}
           {mostrarSeletor && !mostrarInputCustom && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-72 overflow-y-auto">
               {tarefasPreDefinidas.length > 0 ? (
@@ -1403,10 +2109,8 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
                 </div>
               )}
               
-              {/* Separador */}
               <div className="border-t border-gray-100" />
               
-              {/* Opção "Outro" */}
               <button
                 onClick={() => {
                   setMostrarSeletor(false)
@@ -1422,7 +2126,7 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
         </div>
       </div>
 
-      {/* Lista de tarefas - com scroll */}
+      {/* Lista de tarefas - MANTÉM */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -1438,7 +2142,6 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
           </div>
         ) : (
           <div className="space-y-3">
-            {/* Tarefas pendentes */}
             {tarefasPendentes.map(tarefa => (
               <TarefaCard
                 key={tarefa.id}
@@ -1448,7 +2151,6 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
               />
             ))}
 
-            {/* Separador */}
             {tarefasConcluidas.length > 0 && tarefasPendentes.length > 0 && (
               <div className="flex items-center gap-3 py-3">
                 <div className="flex-1 h-px bg-gray-200" />
@@ -1459,7 +2161,6 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
               </div>
             )}
 
-            {/* Tarefas concluídas */}
             {tarefasConcluidas.map(tarefa => (
               <TarefaCard
                 key={tarefa.id}
@@ -1479,7 +2180,6 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
           onClose={fecharModal}
           onUpdate={handleUpdateFromModal}
           onSubtarefaToggle={(subtarefaId, concluida) => {
-            // Optimistic update na lista principal
             setTarefas(prev => prev.map(t => {
               if (t.id === tarefaSelecionada.id && t.subtarefas) {
                 return {
@@ -1493,7 +2193,6 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
             }))
           }}
           onSubtarefaAdd={(subtarefa) => {
-            // Optimistic update - adiciona subtarefa na lista principal
             setTarefas(prev => prev.map(t => {
               if (t.id === tarefaSelecionada.id) {
                 return {
@@ -1505,7 +2204,6 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
             }))
           }}
           onSubtarefaRemove={(subtarefaId) => {
-            // Optimistic update - remove subtarefa da lista principal
             setTarefas(prev => prev.map(t => {
               if (t.id === tarefaSelecionada.id && t.subtarefas) {
                 return {

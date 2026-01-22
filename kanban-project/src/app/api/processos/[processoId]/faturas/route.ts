@@ -19,23 +19,99 @@ export async function GET(
       )
     }
 
-    const faturas = await prisma.fatura.findMany({
+    const faturasDb = await prisma.fatura.findMany({
       where: { processoId: id },
-      orderBy: { createdAt: 'desc' }
+      include: {
+        pagamentos: {
+          orderBy: { data: 'asc' }
+        }
+      },
+      orderBy: { dataVencimento: 'asc' }
     })
 
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+
+    // Processar faturas: calcular valorPago e verificar vencimento
+    const faturas = await Promise.all(
+      faturasDb.map(async (f) => {
+        // Calcular valor pago como soma dos pagamentos
+        const valorPago = f.pagamentos.reduce((acc, p) => acc + Number(p.valor), 0)
+        const valorFatura = Number(f.valor)
+        
+        // Determinar status correto
+        let statusAtualizado = f.status
+        
+        if (valorPago >= valorFatura - 0.01) {
+          statusAtualizado = 'PAGO'
+        } else if (valorPago > 0) {
+          statusAtualizado = 'PARCIAL'
+        } else if (f.dataVencimento) {
+          const dataVenc = new Date(f.dataVencimento)
+          dataVenc.setHours(0, 0, 0, 0)
+          if (dataVenc < hoje) {
+            statusAtualizado = 'VENCIDO'
+          } else {
+            statusAtualizado = 'PENDENTE'
+          }
+        }
+        
+        // Atualizar no banco se mudou
+        if (statusAtualizado !== f.status) {
+          await prisma.fatura.update({
+            where: { id: f.id },
+            data: { status: statusAtualizado }
+          })
+        }
+        
+        // Retornar fatura com dados calculados
+        return {
+          ...f,
+          status: statusAtualizado,
+          valorPago,
+          valorRestante: valorFatura - valorPago
+        }
+      })
+    )
+
     // Calcular totais
+    const agora = new Date()
+    agora.setHours(0, 0, 0, 0)
+    
+    let totalGeral = 0
+    let totalPago = 0
+    let totalPendente = 0
+    let totalVencido = 0
+
+    faturas.forEach(f => {
+      const valorFatura = Number(f.valor)
+      const valorPago = Number(f.valorPago)
+
+      totalGeral += valorFatura
+      totalPago += valorPago
+
+      const restante = valorFatura - valorPago
+      
+      // Se ainda tem valor a pagar
+      if (restante > 0.01) {
+        totalPendente += restante
+        
+        // Verificar se está vencido pela DATA, não pelo status
+        if (f.dataVencimento) {
+          const dataVenc = new Date(f.dataVencimento)
+          dataVenc.setHours(0, 0, 0, 0)
+          if (dataVenc < hoje) {
+            totalVencido += restante
+          }
+        }
+      }
+    })
+
     const totais = {
-      total: faturas.reduce((acc, f) => acc + Number(f.valor), 0),
-      pago: faturas
-        .filter(f => f.status === 'PAGO')
-        .reduce((acc, f) => acc + Number(f.valorPago || f.valor), 0),
-      pendente: faturas
-        .filter(f => f.status === 'PENDENTE' || f.status === 'VENCIDO')
-        .reduce((acc, f) => acc + Number(f.valor), 0),
-      vencido: faturas
-        .filter(f => f.status === 'VENCIDO')
-        .reduce((acc, f) => acc + Number(f.valor), 0),
+      total: totalGeral,
+      pago: totalPago,
+      pendente: totalPendente,
+      vencido: totalVencido,
     }
 
     return NextResponse.json({ faturas, totais })
@@ -96,7 +172,7 @@ export async function POST(
         processoId: id,
         descricao,
         valor: parseFloat(valor),
-        dataVencimento: dataVencimento ? new Date(dataVencimento) : null,
+        dataVencimento: dataVencimento ? new Date(dataVencimento + 'T12:00:00') : null,
         observacoes: observacoes || null,
         status: 'PENDENTE'
       }

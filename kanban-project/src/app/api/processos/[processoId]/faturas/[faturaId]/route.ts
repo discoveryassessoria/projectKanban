@@ -24,6 +24,11 @@ export async function GET(
       where: { 
         id: fId,
         processoId: pId 
+      },
+      include: {
+        pagamentos: {
+          orderBy: { data: 'asc' }
+        }
       }
     })
 
@@ -34,7 +39,16 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ fatura })
+    // Calcular valor pago
+    const valorPago = fatura.pagamentos.reduce((acc, p) => acc + Number(p.valor), 0)
+
+    return NextResponse.json({ 
+      fatura: {
+        ...fatura,
+        valorPago,
+        valorRestante: Number(fatura.valor) - valorPago
+      }
+    })
   } catch (error) {
     console.error('Erro ao buscar fatura:', error)
     return NextResponse.json(
@@ -44,7 +58,7 @@ export async function GET(
   }
 }
 
-// PUT - Atualizar fatura
+// PUT - Atualizar fatura (apenas dados básicos, não pagamentos)
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ processoId: string; faturaId: string }> }
@@ -65,13 +79,7 @@ export async function PUT(
     const { 
       descricao, 
       valor, 
-      status,
       dataVencimento,
-      dataPagamento,
-      formaPagamento,
-      valorPago,
-      comprovanteUrl,
-      comprovanteNome,
       observacoes 
     } = body
 
@@ -95,13 +103,7 @@ export async function PUT(
     
     if (descricao !== undefined) dataUpdate.descricao = descricao
     if (valor !== undefined) dataUpdate.valor = parseFloat(valor)
-    if (status !== undefined) dataUpdate.status = status
     if (dataVencimento !== undefined) dataUpdate.dataVencimento = dataVencimento ? new Date(dataVencimento) : null
-    if (dataPagamento !== undefined) dataUpdate.dataPagamento = dataPagamento ? new Date(dataPagamento) : null
-    if (formaPagamento !== undefined) dataUpdate.formaPagamento = formaPagamento
-    if (valorPago !== undefined) dataUpdate.valorPago = valorPago ? parseFloat(valorPago) : null
-    if (comprovanteUrl !== undefined) dataUpdate.comprovanteUrl = comprovanteUrl
-    if (comprovanteNome !== undefined) dataUpdate.comprovanteNome = comprovanteNome
     if (observacoes !== undefined) dataUpdate.observacoes = observacoes
 
     const fatura = await prisma.fatura.update({
@@ -119,7 +121,7 @@ export async function PUT(
   }
 }
 
-// DELETE - Excluir fatura
+// DELETE - Excluir fatura (e todos os pagamentos vinculados - cascade)
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ processoId: string; faturaId: string }> }
@@ -151,6 +153,7 @@ export async function DELETE(
       )
     }
 
+    // Delete em cascade vai apagar os pagamentos também
     await prisma.fatura.delete({
       where: { id: fId }
     })
