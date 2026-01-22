@@ -184,7 +184,8 @@ export async function PUT(
       concluida,
       statusId,
       pais,
-      ordem
+      ordem,
+      observacoes
     } = body
 
     const tarefaExistente = await prisma.tarefa.findUnique({
@@ -227,6 +228,7 @@ export async function PUT(
 
     if (titulo !== undefined) dataAtualizacao.titulo = titulo
     if (descricao !== undefined) dataAtualizacao.descricao = descricao
+    if (observacoes !== undefined) dataAtualizacao.observacoes = observacoes
     if (responsavelId !== undefined) dataAtualizacao.responsavelId = responsavelId
     if (prioridade !== undefined) dataAtualizacao.prioridade = prioridade
     if (dataPrazo !== undefined) dataAtualizacao.dataPrazo = dataPrazo ? new Date(dataPrazo) : null

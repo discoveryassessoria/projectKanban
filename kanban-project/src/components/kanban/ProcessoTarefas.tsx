@@ -259,7 +259,7 @@ function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
           {totalTarefas > 0 && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 font-medium border border-blue-100">
               <ListTodo className="w-3 h-3" />
-              {Math.round(porcentagem)}% ({totalTarefas} tarefa{totalTarefas !== 1 ? 's' : ''})
+              {totalTarefas} tarefa{totalTarefas !== 1 ? 's' : ''}
             </span>
           )}
           
@@ -525,6 +525,22 @@ function TarefaItem({ tarefa, onDelete, onUpdate, usuarios }: TarefaItemProps) {
   const [subtarefaSelecionada, setSubtarefaSelecionada] = useState<Tarefa | null>(null)
   const [mostrarOpcaoAguardando, setMostrarOpcaoAguardando] = useState(false)
   const [diasCobrancaAguardando, setDiasCobrancaAguardando] = useState(5)
+  const [confirmandoRecebido, setConfirmandoRecebido] = useState(false)
+  const [confirmandoNaoPossui, setConfirmandoNaoPossui] = useState(false)
+
+useEffect(() => {
+  if (confirmandoRecebido) {
+    const timer = setTimeout(() => setConfirmandoRecebido(false), 3000)
+    return () => clearTimeout(timer)
+  }
+}, [confirmandoRecebido])
+
+useEffect(() => {
+  if (confirmandoNaoPossui) {
+    const timer = setTimeout(() => setConfirmandoNaoPossui(false), 3000)
+    return () => clearTimeout(timer)
+  }
+}, [confirmandoNaoPossui])
   
   const [editForm, setEditForm] = useState({
     titulo: tarefa.titulo,
@@ -538,6 +554,23 @@ function TarefaItem({ tarefa, onDelete, onUpdate, usuarios }: TarefaItemProps) {
   const isTemporaria = tarefa.id < 0
   const isCobranca = tarefa.tipoSubtarefa === "COBRANCA"
   const iniciada = !!tarefa.dataInicio
+
+  const calcularStatus = () => {
+    if (tarefa.concluida) {
+      return { label: "Concluída", bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-200" }
+    }
+    if (!iniciada) {
+      return { label: "Não iniciada", bg: "bg-gray-50", text: "text-gray-500", border: "border-gray-200" }
+    }
+    // Verificar se tem cobrança pendente
+    const cobrancaPendente = subtarefas.find(s => s.tipoSubtarefa === "COBRANCA" && !s.concluida)
+    if (cobrancaPendente) {
+      return { label: "Aguardando", bg: "bg-amber-50", text: "text-amber-600", border: "border-amber-200" }
+    }
+    return { label: "Em andamento", bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-200" }
+  }
+  
+  const status = calcularStatus()
 
   const fetchSubtarefas = async () => {
     if (isTemporaria) return
@@ -830,27 +863,33 @@ const handleAguardandoCliente = async () => {
 
         {/* Conteúdo */}
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpandido(!expandido)}>
-          <span className={`text-sm ${tarefa.concluida ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
-            {tarefa.titulo}
-          </span>
-          {isTemporaria && <span className="ml-2 text-xs text-gray-400 italic">(salvando...)</span>}
-          
-          {/* Datas */}
-          <div className="flex gap-2 mt-0.5 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-sm ${tarefa.concluida ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+              {tarefa.titulo}
+            </span>
+            {isTemporaria && <span className="text-xs text-gray-400 italic">(salvando...)</span>}
+            
+            {/* Datas e Status - na mesma linha */}
             {tarefa.dataInicio && (
               <span className="text-[10px] text-green-600">
                 <CalendarCheck className="w-3 h-3 inline mr-0.5" />
-                Início: {formatDateBR(tarefa.dataInicio)}
+                {formatDateBR(tarefa.dataInicio)}
               </span>
             )}
             {tarefa.dataPrazo && (
               <span className={`text-[10px] ${isPast(tarefa.dataPrazo) && !tarefa.concluida ? 'text-red-500' : 'text-gray-400'}`}>
                 <CalendarClock className="w-3 h-3 inline mr-0.5" />
-                Prazo: {formatDateBR(tarefa.dataPrazo)}
+                {formatDateBR(tarefa.dataPrazo)}
+              </span>
+            )}
+            {/* Badge de status */}
+            {!isCobranca && (
+              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${status.bg} ${status.text} ${status.border}`}>
+                {status.label}
               </span>
             )}
           </div>
-          
+
           {tarefa.observacoes && (
             <p className="text-[10px] text-gray-500 mt-0.5 truncate">
               <MessageSquare className="w-3 h-3 inline mr-0.5" />
@@ -862,117 +901,6 @@ const handleAguardandoCliente = async () => {
         {/* Ações rápidas */}
         {!isTemporaria && !tarefa.concluida && (
           <div className="flex items-center gap-1">
-            {!iniciada ? (
-              // Botão Iniciar
-              <div className="flex items-center gap-1">
-                <select
-                  value={prazoCobrancaConfig}
-                  onChange={(e) => setPrazoCobrancaConfig(parseInt(e.target.value))}
-                  onClick={(e) => e.stopPropagation()}
-                  className="px-1 py-0.5 text-[10px] border border-gray-200 rounded bg-white"
-                >
-                  <option value={3}>3d</option>
-                  <option value={5}>5d</option>
-                  <option value={7}>7d</option>
-                  <option value={10}>10d</option>
-                  <option value={15}>15d</option>
-                </select>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleIniciar()
-                  }}
-                  disabled={iniciando}
-                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-white bg-amber-500 hover:bg-amber-600 rounded transition-colors disabled:opacity-50"
-                >
-                  {iniciando ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                  Iniciar
-                </button>
-              </div>
-            ) : (
-              // Botões para tarefa iniciada
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleConcluirComStatus("recebido")
-                  }}
-                  disabled={concluindo}
-                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-white bg-emerald-500 hover:bg-emerald-600 rounded transition-colors disabled:opacity-50"
-                  title="Documento recebido"
-                >
-                  {concluindo ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-                  Recebido
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleConcluirComStatus("nao_possui")
-                  }}
-                  disabled={concluindo}
-                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded transition-colors disabled:opacity-50"
-                  title="Cliente não possui o documento"
-                >
-                  <FileX className="w-3 h-3" />
-                  Não possui
-                </button>
-                
-                {/* Aguardando com seletor de dias */}
-                {!mostrarOpcaoAguardando ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setMostrarOpcaoAguardando(true)
-                    }}
-                    disabled={concluindo}
-                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded transition-colors disabled:opacity-50"
-                    title="Aguardando cliente - criar cobrança"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    Aguardando
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-1 bg-blue-50 border border-blue-200 rounded px-1" onClick={(e) => e.stopPropagation()}>
-                    <select
-                      value={diasCobrancaAguardando}
-                      onChange={(e) => setDiasCobrancaAguardando(parseInt(e.target.value))}
-                      className="px-1 py-0.5 text-[10px] border-0 bg-transparent text-blue-700 focus:outline-none"
-                    >
-                      <option value={3}>3d</option>
-                      <option value={5}>5d</option>
-                      <option value={7}>7d</option>
-                      <option value={10}>10d</option>
-                      <option value={15}>15d</option>
-                    </select>
-                    <button
-                      onClick={handleAguardandoCliente}
-                      disabled={concluindo}
-                      className="px-1.5 py-0.5 text-[10px] font-medium text-white bg-blue-500 hover:bg-blue-600 rounded transition-colors disabled:opacity-50"
-                    >
-                      {concluindo ? <Loader2 className="w-3 h-3 animate-spin" /> : "OK"}
-                    </button>
-                    <button
-                      onClick={() => setMostrarOpcaoAguardando(false)}
-                      className="px-1 py-0.5 text-[10px] text-gray-500 hover:text-gray-700"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                )}
-                
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setMostrarAlterarPrazo(!mostrarAlterarPrazo)
-                    setExpandido(true)
-                  }}
-                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded transition-colors"
-                >
-                  <Calendar className="w-3 h-3" />
-                  Prazo
-                </button>
-              </div>
-            )}
           </div>
         )}
 
@@ -1045,14 +973,7 @@ const handleAguardandoCliente = async () => {
                   value={editForm.titulo}
                   onChange={(e) => setEditForm({ ...editForm, titulo: e.target.value })}
                   className="bg-white text-sm"
-                  placeholder="Título"
-                />
-                <textarea
-                  value={editForm.descricao}
-                  onChange={(e) => setEditForm({ ...editForm, descricao: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={2}
-                  placeholder="Descrição opcional"
+                  placeholder="Nome da subtarefa"
                 />
                 <textarea
                   value={editForm.observacoes}
@@ -1061,35 +982,6 @@ const handleAguardandoCliente = async () => {
                   rows={2}
                   placeholder="Observações..."
                 />
-                <div className="flex gap-2">
-                  <select
-                    value={editForm.prioridade}
-                    onChange={(e) => setEditForm({ ...editForm, prioridade: e.target.value })}
-                    className="flex-1 px-2 py-1.5 border rounded-lg text-xs bg-white"
-                  >
-                    <option value="BAIXA">🟢 Baixa</option>
-                    <option value="MEDIA">🟡 Média</option>
-                    <option value="ALTA">🟠 Alta</option>
-                    <option value="URGENTE">🔴 Urgente</option>
-                  </select>
-                  <div className="flex-1">
-                    <DatePickerField
-                      value={editForm.dataPrazo || undefined}
-                      onChange={(date) => setEditForm({ ...editForm, dataPrazo: date })}
-                      placeholder="Prazo"
-                    />
-                  </div>
-                </div>
-                <select
-                  value={editForm.responsavelId}
-                  onChange={(e) => setEditForm({ ...editForm, responsavelId: e.target.value })}
-                  className="w-full px-2 py-1.5 border rounded-lg text-xs bg-white"
-                >
-                  <option value="">Sem responsável</option>
-                  {usuarios.map((u) => (
-                    <option key={u.id} value={u.id}>{u.nome}</option>
-                  ))}
-                </select>
                 <div className="flex justify-end gap-2">
                   <Button variant="ghost" size="sm" onClick={() => setEditando(false)} className="h-7 text-xs">
                     Cancelar
@@ -1116,14 +1008,144 @@ const handleAguardandoCliente = async () => {
                     </div>
                   )}
                   
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setEditando(true)}
-                      className="py-1 px-2 rounded text-[10px] font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-                    >
-                      Editar
-                    </button>
-                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+  
+  {!tarefa.concluida && !iniciada && (
+    <div className="flex items-center gap-1 ml-auto">
+      <select
+        value={prazoCobrancaConfig}
+        onChange={(e) => setPrazoCobrancaConfig(parseInt(e.target.value))}
+        className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white"
+      >
+        <option value={3}>3 dias</option>
+        <option value={5}>5 dias</option>
+        <option value={7}>7 dias</option>
+        <option value={10}>10 dias</option>
+        <option value={15}>15 dias</option>
+      </select>
+      <button
+        onClick={handleIniciar}
+        disabled={iniciando}
+        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors disabled:opacity-50"
+      >
+        {iniciando ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+        Iniciar
+      </button>
+    </div>
+  )}
+</div>
+                    
+                    {!tarefa.concluida && iniciada && (
+  <div className="flex items-center gap-2 flex-wrap">
+    <button
+      onClick={() => setEditando(true)}
+      className="py-1.5 px-3 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+    >
+      Editar
+    </button>
+    
+    <div className="flex items-center gap-1 flex-wrap ml-auto">
+      {/* Recebido */}
+{!confirmandoRecebido ? (
+  <button
+    onClick={() => setConfirmandoRecebido(true)}
+    disabled={concluindo}
+    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors disabled:opacity-50"
+    title="Documento recebido"
+  >
+    <CheckCircle2 className="w-3 h-3" />
+    Recebido
+  </button>
+) : (
+  <button
+    onClick={() => {
+      handleConcluirComStatus("recebido")
+      setConfirmandoRecebido(false)
+    }}
+    disabled={concluindo}
+    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50"
+    title="Clique para confirmar"
+  >
+    {concluindo ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+    Confirmar?
+  </button>
+)}
+      {/* Não possui */}
+{!confirmandoNaoPossui ? (
+  <button
+    onClick={() => setConfirmandoNaoPossui(true)}
+    disabled={concluindo}
+    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg transition-colors disabled:opacity-50"
+    title="Cliente não possui o documento"
+  >
+    <FileX className="w-3 h-3" />
+    Não possui
+  </button>
+) : (
+  <button
+    onClick={() => {
+      handleConcluirComStatus("nao_possui")
+      setConfirmandoNaoPossui(false)
+    }}
+    disabled={concluindo}
+    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+    title="Clique para confirmar"
+  >
+    {concluindo ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileX className="w-3 h-3" />}
+    Confirmar?
+  </button>
+)}
+      
+      {!mostrarOpcaoAguardando ? (
+        <button
+          onClick={() => setMostrarOpcaoAguardando(true)}
+          disabled={concluindo}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors disabled:opacity-50"
+          title="Aguardando cliente - criar cobrança"
+        >
+          <RefreshCw className="w-3 h-3" />
+          Aguardando
+        </button>
+      ) : (
+        <div className="flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1">
+          <select
+            value={diasCobrancaAguardando}
+            onChange={(e) => setDiasCobrancaAguardando(parseInt(e.target.value))}
+            className="px-1 py-0.5 text-xs border-0 bg-transparent text-blue-700 focus:outline-none"
+          >
+            <option value={3}>3d</option>
+            <option value={5}>5d</option>
+            <option value={7}>7d</option>
+            <option value={10}>10d</option>
+            <option value={15}>15d</option>
+          </select>
+          <button
+            onClick={handleAguardandoCliente}
+            disabled={concluindo}
+            className="px-2 py-0.5 text-xs font-medium text-white bg-blue-500 hover:bg-blue-600 rounded transition-colors disabled:opacity-50"
+          >
+            {concluindo ? <Loader2 className="w-3 h-3 animate-spin" /> : "OK"}
+          </button>
+          <button
+            onClick={() => setMostrarOpcaoAguardando(false)}
+            className="px-1 py-0.5 text-xs text-gray-500 hover:text-gray-700"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+      
+      <button
+        onClick={() => setMostrarAlterarPrazo(!mostrarAlterarPrazo)}
+        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors"
+      >
+        <Calendar className="w-3 h-3" />
+        Prazo
+      </button>
+    </div>
+  </div>
+)}
+
                 </div>
 
                 {/* Subtarefas de cobrança */}
@@ -1285,22 +1307,27 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios }: AtividadeIte
         </div>
 
         {/* Título e info */}
-        <div className="flex-1 min-w-0">
-          <span className="text-sm font-medium text-gray-900">
-            {atividade.titulo}
-          </span>
-          {isTemporaria && (
-            <span className="ml-2 text-xs text-gray-400 italic">(salvando...)</span>
-          )}
-          {atividade.dataPrazo && (
-            <span className={`ml-2 text-xs ${isPast(atividade.dataPrazo) ? 'text-red-500' : 'text-gray-400'}`}>
-              📅 {formatDateBR(atividade.dataPrazo)}
-            </span>
-          )}
-          {atividade.observacoes && (
-            <span className="ml-2 text-xs text-amber-500" title={atividade.observacoes}>💬</span>
-          )}
-        </div>
+<div className="flex-1 min-w-0">
+  <div className="flex items-center flex-wrap">
+    <span className="text-sm font-medium text-gray-900">
+      {atividade.titulo}
+    </span>
+    {isTemporaria && (
+      <span className="ml-2 text-xs text-gray-400 italic">(salvando...)</span>
+    )}
+    {atividade.dataPrazo && (
+      <span className={`ml-2 text-xs ${isPast(atividade.dataPrazo) ? 'text-red-500' : 'text-gray-400'}`}>
+        📅 {formatDateBR(atividade.dataPrazo)}
+      </span>
+    )}
+  </div>
+  {atividade.observacoes && (
+  <p className="text-[10px] text-gray-500 mt-0.5 truncate">
+    <MessageSquare className="w-3 h-3 inline mr-0.5" />
+    {atividade.observacoes}
+  </p>
+)}
+</div>
 
         {/* Botão excluir */}
         {!isTemporaria && (
@@ -1340,13 +1367,6 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios }: AtividadeIte
                   onChange={(e) => setEditForm({ ...editForm, titulo: e.target.value })}
                   className="bg-white text-sm"
                   placeholder="Nome da atividade"
-                />
-                <textarea
-                  value={editForm.descricao}
-                  onChange={(e) => setEditForm({ ...editForm, descricao: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={2}
-                  placeholder="Descrição opcional"
                 />
                 <textarea
                   value={editForm.observacoes}
@@ -1396,10 +1416,6 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios }: AtividadeIte
             ) : (
               <>
                 <div className="space-y-2">
-                  {atividade.descricao && (
-                    <p className="text-sm text-gray-600">{atividade.descricao}</p>
-                  )}
-                  
                   {atividade.observacoes && (
                     <div className="p-2 bg-amber-50 rounded-lg border border-amber-100">
                       <p className="text-xs text-amber-700">
@@ -1409,6 +1425,7 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios }: AtividadeIte
                     </div>
                   )}
                   
+                  {/* Prioridade, datas e botão Editar - tudo junto */}
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="px-2 py-0.5 rounded-full bg-white border text-gray-600">
                       {atividade.prioridade === "URGENTE" && "🔴 Urgente"}
@@ -1428,20 +1445,15 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios }: AtividadeIte
                         {atividade.responsavel.nome}
                       </span>
                     )}
-                  </div>
-                  
-                  {/* Apenas botão Editar - SEM marcar como concluída */}
-                  <div className="flex items-center gap-2 pt-2 border-t border-gray-200 mt-2">
                     <button
                       onClick={() => setEditando(true)}
-                      className="py-1.5 px-3 rounded-lg text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200 transition-colors"
+                      className="py-0.5 px-2 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200 transition-colors"
                     >
                       Editar
                     </button>
                   </div>
-                </div>
 
-                {/* Tarefas dentro da atividade */}
+              {/* Tarefas dentro da atividade */}
                 <div className="pt-3 border-t border-gray-200">
                   <h4 className="text-xs font-medium text-gray-500 mb-2">Subtarefas</h4>
                   
@@ -1485,6 +1497,7 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios }: AtividadeIte
                     </Button>
                   </div>
                 </div>
+              </div>
               </>
             )}
           </div>
@@ -1816,12 +1829,6 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
             </div>
           ) : (
             <div className="p-4">
-              {/* Dica sobre as tarefas */}
-              <div className="flex items-center gap-2 px-3 py-2 mb-4 bg-blue-50 rounded-lg text-xs text-blue-600">
-                <span>ℹ️</span>
-                <span>Clique nas subtarefas de cobrança (laranja) para ver as opções de ação</span>
-              </div>
-
               <div className="space-y-3">
                 {atividadesLocal.map((atividade) => (
                   <AtividadeItem
