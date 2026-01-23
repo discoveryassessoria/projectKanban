@@ -321,6 +321,24 @@ function CobrancaModal({ subtarefa, onClose, onUpdate, isProcuracaoAdm = false, 
   const [diasCobranca, setDiasCobranca] = useState(5)
   const [mostrarAlterarPrazo, setMostrarAlterarPrazo] = useState(false)
 
+  // Salvar responsável automaticamente ao mudar
+  const handleResponsavelChange = async (novoResponsavelId: string) => {
+    setResponsavelId(novoResponsavelId)
+    
+    try {
+      await fetch(`/api/tarefas/${subtarefa.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          responsavelId: novoResponsavelId ? parseInt(novoResponsavelId) : null
+        })
+      })
+      onUpdate()
+    } catch (error) {
+      console.error("Erro ao salvar responsável:", error)
+    }
+  }
+
   const executarAcao = async (acao: string) => {
     setProcessando(true)
     try {
@@ -407,7 +425,7 @@ function CobrancaModal({ subtarefa, onClose, onUpdate, isProcuracaoAdm = false, 
             </label>
             <select
               value={responsavelId}
-              onChange={(e) => setResponsavelId(e.target.value)}
+              onChange={(e) => handleResponsavelChange(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
             >
               <option value="">Sem responsável</option>
