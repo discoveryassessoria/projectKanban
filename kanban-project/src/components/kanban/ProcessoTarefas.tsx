@@ -369,8 +369,14 @@ function CobrancaModal({ subtarefa, onClose, onUpdate, isProcuracaoAdm = false, 
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10002] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative">
+    <div 
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10002] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4 text-white">
           <div className="flex items-center justify-between">
