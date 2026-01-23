@@ -920,16 +920,17 @@ const handleConferencia = async () => {
         </div>
 
         {mostrarCobrancaModal && subtarefaSelecionada && (
-          <CobrancaModal
-            subtarefa={subtarefaSelecionada}
-            onClose={() => {
-              setMostrarCobrancaModal(false)
-              setSubtarefaSelecionada(null)
-            }}
-            onUpdate={onUpdate}
-            isProcuracaoAdm={isProcuracaoAdm}
-          />
-        )}
+  <CobrancaModal
+    subtarefa={subtarefaSelecionada}
+    onClose={() => {
+      setMostrarCobrancaModal(false)
+      setSubtarefaSelecionada(null)
+    }}
+    onUpdate={onUpdate}
+    isProcuracaoAdm={isProcuracaoAdm}
+    usuarios={usuarios}
+  />
+)}
       </>
     )
   }
@@ -1895,10 +1896,13 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
               <span className="text-gray-300">Progresso</span>
               <span className="font-semibold">{Math.round(porcentagem)}%</span>
             </div>
-            <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+            <div className="h-2 bg-white/20 rounded-full overflow-hidden relative">
               <div 
-                className="h-full bg-white rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${porcentagem}%` }}
+                className="absolute inset-y-0 left-0 bg-white rounded-full"
+                style={{ 
+                  width: `${porcentagem}%`,
+                  transition: 'width 0.3s ease-out'
+                }}
               />
             </div>
           </div>
