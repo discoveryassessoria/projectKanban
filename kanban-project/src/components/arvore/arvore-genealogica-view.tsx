@@ -800,6 +800,17 @@ function AddPersonModal({
   const [requerente, setRequerente] = useState<string>('nao')
   const [numeroLinhagem, setNumeroLinhagem] = useState<string>('')
 
+  // Classes padrão
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm h-[42px]"
+  
+  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm h-[42px] appearance-none cursor-pointer"
+  
+  const selectStyle = {
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 12px center'
+  }
+
   useEffect(() => {
     if (type === 'conjuge') setIsCasado(true)
   }, [type])
@@ -917,7 +928,7 @@ function AddPersonModal({
                 type="text"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={inputClass}
                 required
                 autoFocus
               />
@@ -928,7 +939,7 @@ function AddPersonModal({
                 type="text"
                 value={sobrenome}
                 onChange={(e) => setSobrenome(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={inputClass}
               />
             </div>
             <div>
@@ -936,7 +947,8 @@ function AddPersonModal({
               <select
                 value={sexo}
                 onChange={(e) => setSexo(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={selectClass}
+                style={selectStyle}
               >
                 <option value="">Selecione...</option>
                 <option value="Masculino">Masculino</option>
@@ -959,7 +971,7 @@ function AddPersonModal({
                 type="text"
                 value={localNasc}
                 onChange={(e) => setLocalNasc(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={inputClass}
               />
             </div>
             <div>
@@ -969,7 +981,7 @@ function AddPersonModal({
                 value={paisNasc}
                 onChange={(e) => setPaisNasc(e.target.value)}
                 placeholder="Ex: Brasil, Itália..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={inputClass}
               />
             </div>
           </div>
@@ -982,7 +994,7 @@ function AddPersonModal({
                 value={nacionalidade}
                 onChange={(e) => setNacionalidade(e.target.value)}
                 placeholder="Ex: Brasileiro..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={inputClass}
               />
             </div>
             {type !== 'conjuge' && (
@@ -1021,7 +1033,8 @@ function AddPersonModal({
                     <select
                       value={conjugeId}
                       onChange={(e) => setConjugeId(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                      className={selectClass}
+                      style={selectStyle}
                     >
                       <option value="">Selecione...</option>
                       {pessoasDisponiveis.map(p => (
@@ -1046,7 +1059,7 @@ function AddPersonModal({
                     value={localCasamento}
                     onChange={(e) => setLocalCasamento(e.target.value)}
                     placeholder="Cidade, País"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className={inputClass}
                   />
                 </div>
               </div>
@@ -1071,7 +1084,7 @@ function AddPersonModal({
                     value={localObito}
                     onChange={(e) => setLocalObito(e.target.value)}
                     placeholder="Cidade, País"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className={inputClass}
                   />
                 </div>
               </div>
@@ -1085,7 +1098,8 @@ function AddPersonModal({
               <select
                 value={requerente}
                 onChange={(e) => setRequerente(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={selectClass}
+                style={selectStyle}
               >
                 <option value="nao">Não</option>
                 <option value="maior">Sim - Maior de idade</option>
@@ -1100,7 +1114,7 @@ function AddPersonModal({
                 value={numeroLinhagem}
                 onChange={(e) => setNumeroLinhagem(e.target.value)}
                 placeholder="Ex: 1, 2, 3..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={inputClass}
               />
             </div>
           </div>
@@ -1174,10 +1188,19 @@ function EditPersonModal({
   const [conjugeId, setConjugeId] = useState<number | string>(conjugeExistenteId || '')
   const [comentario, setComentario] = useState(pessoa.comentario || '')
   const [saving, setSaving] = useState(false)
-  
-  // ✅ NOVOS CAMPOS
   const [requerente, setRequerente] = useState((pessoa as any).requerente || 'nao')
   const [numeroLinhagem, setNumeroLinhagem] = useState((pessoa as any).numeroLinhagem?.toString() || '')
+
+  // Classes padrão
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm h-[42px]"
+  
+  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm h-[42px] appearance-none cursor-pointer"
+  
+  const selectStyle = {
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 12px center'
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1200,8 +1223,8 @@ function EditPersonModal({
           data_obito: isFalecido && dataObito ? new Date(dataObito).toISOString() : null,
           local_emigracao: isFalecido && localObito ? localObito.trim() : null,
           comentario: comentario.trim() || null,
-          requerente: requerente || 'nao',  // ✅ NOVO
-          numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null  // ✅ NOVO
+          requerente: requerente || 'nao',
+          numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null
         })
       })
 
@@ -1256,15 +1279,16 @@ function EditPersonModal({
         <div className="px-6 py-4 border-b sticky top-0 bg-white">
           <h2 className="text-xl font-semibold text-gray-900">Editar Pessoa</h2>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-3">
-          <div className="grid grid-cols-3 gap-3">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Nome, Sobrenome, Sexo */}
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
               <input
                 type="text"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={inputClass}
                 required
                 autoFocus
               />
@@ -1275,7 +1299,7 @@ function EditPersonModal({
                 type="text"
                 value={sobrenome}
                 onChange={(e) => setSobrenome(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={inputClass}
               />
             </div>
             <div>
@@ -1283,7 +1307,8 @@ function EditPersonModal({
               <select
                 value={sexo}
                 onChange={(e) => setSexo(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={selectClass}
+                style={selectStyle}
               >
                 <option value="">Selecione...</option>
                 <option value="Masculino">Masculino</option>
@@ -1292,7 +1317,8 @@ function EditPersonModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          {/* Data Nasc, Cidade Nasc, País Nasc */}
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
               <DatePickerField
@@ -1306,7 +1332,7 @@ function EditPersonModal({
                 type="text"
                 value={localNasc}
                 onChange={(e) => setLocalNasc(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={inputClass}
               />
             </div>
             <div>
@@ -1315,19 +1341,20 @@ function EditPersonModal({
                 type="text"
                 value={paisNasc}
                 onChange={(e) => setPaisNasc(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={inputClass}
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 items-end">
+          {/* Nacionalidade, Casada, Falecida */}
+          <div className="grid grid-cols-3 gap-4 items-end">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
               <input
                 type="text"
                 value={nacionalidade}
                 onChange={(e) => setNacionalidade(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={inputClass}
               />
             </div>
             <div className="flex items-center h-[42px]">
@@ -1354,16 +1381,18 @@ function EditPersonModal({
             </div>
           </div>
 
+          {/* Dados do Casamento */}
           {isCasado && (
-            <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
-              <h3 className="text-sm font-medium text-purple-800 mb-2">Dados do Casamento</h3>
-              <div className="grid grid-cols-3 gap-3">
+            <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+              <h3 className="text-sm font-medium text-purple-800 mb-3">Dados do Casamento</h3>
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Cônjuge</label>
                   <select
                     value={conjugeId}
                     onChange={(e) => setConjugeId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                    className={selectClass}
+                    style={selectStyle}
                   >
                     <option value="">Selecione...</option>
                     {pessoasDisponiveis.map(p => (
@@ -1386,18 +1415,19 @@ function EditPersonModal({
                     type="text"
                     value={localCasamento}
                     onChange={(e) => setLocalCasamento(e.target.value)}
-                    placeholder="Cidade, País"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    placeholder="Cidade - Estado"
+                    className={inputClass}
                   />
                 </div>
               </div>
             </div>
           )}
 
+          {/* Dados do Falecimento */}
           {isFalecido && (
-            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Dados do Falecimento</h3>
-              <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Dados do Falecimento</h3>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Data de Falecimento</label>
                   <DatePickerField
@@ -1411,22 +1441,23 @@ function EditPersonModal({
                     type="text"
                     value={localObito}
                     onChange={(e) => setLocalObito(e.target.value)}
-                    placeholder="Cidade, País"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    placeholder="Cidade - Estado"
+                    className={inputClass}
                   />
                 </div>
               </div>
             </div>
           )}
 
-          {/* ✅ NOVOS CAMPOS: Requerente e Número de Linhagem */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Requerente e Linhagem */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Requerente</label>
               <select
                 value={requerente}
                 onChange={(e) => setRequerente(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={selectClass}
+                style={selectStyle}
               >
                 <option value="nao">Não</option>
                 <option value="maior">Sim - Maior de idade</option>
@@ -1441,21 +1472,23 @@ function EditPersonModal({
                 value={numeroLinhagem}
                 onChange={(e) => setNumeroLinhagem(e.target.value)}
                 placeholder="Ex: 1, 2, 3..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={inputClass}
               />
             </div>
           </div>
 
+          {/* Observações */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
             <textarea
               value={comentario}
               onChange={(e) => setComentario(e.target.value)}
               rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none text-sm"
             />
           </div>
 
+          {/* Botões */}
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"

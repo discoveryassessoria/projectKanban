@@ -31,6 +31,25 @@ import { getTarefasPorPais, type TarefaPreDefinida } from "../../lib/tarefas-con
 import { isPast, formatDateBR } from "@/src/lib/date-utils"
 
 // ==========================================
+// CLASSES PADRÃO PARA FORMULÁRIOS
+// ==========================================
+const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm h-[42px]"
+
+const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm h-[42px] appearance-none cursor-pointer"
+
+const selectStyle = {
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 12px center'
+} as React.CSSProperties
+
+const selectStyleSmall = {
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 4px center'
+} as React.CSSProperties
+
+// ==========================================
 // TIPOS
 // ==========================================
 interface Responsavel {
@@ -432,7 +451,8 @@ function CobrancaModal({ subtarefa, onClose, onUpdate, isProcuracaoAdm = false, 
             <select
               value={responsavelId}
               onChange={(e) => handleResponsavelChange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className={selectClass}
+              style={selectStyle}
             >
               <option value="">Sem responsável</option>
               {usuarios.map((u) => (
@@ -471,13 +491,14 @@ function CobrancaModal({ subtarefa, onClose, onUpdate, isProcuracaoAdm = false, 
                 value={diasCobranca}
                 onChange={(e) => setDiasCobranca(parseInt(e.target.value))}
                 onClick={(e) => e.stopPropagation()}
-                className="px-2 py-1 text-xs border border-blue-300 rounded-lg bg-white"
+                className="pl-3 pr-8 py-2 text-sm border border-blue-300 rounded-lg bg-white h-[38px] appearance-none cursor-pointer"
+                style={selectStyle}
               >
+                <option value={1}>1 dia</option>
                 <option value={3}>3 dias</option>
                 <option value={5}>5 dias</option>
                 <option value={7}>7 dias</option>
                 <option value={10}>10 dias</option>
-                <option value={15}>15 dias</option>
               </select>
             </button>
 
@@ -494,16 +515,17 @@ function CobrancaModal({ subtarefa, onClose, onUpdate, isProcuracaoAdm = false, 
       <div className="text-xs text-violet-600 font-normal">Cria tarefa de conferência em {diasCobranca} dias</div>
     </div>
     <select
-      value={diasCobranca}
-      onChange={(e) => setDiasCobranca(parseInt(e.target.value))}
-      onClick={(e) => e.stopPropagation()}
-      className="px-2 py-1 text-xs border border-violet-300 rounded-lg bg-white"
-    >
+    value={diasCobranca}
+    onChange={(e) => setDiasCobranca(parseInt(e.target.value))}
+    onClick={(e) => e.stopPropagation()}
+    className="pl-3 pr-8 py-2 text-sm border border-violet-300 rounded-lg bg-white h-[38px] appearance-none cursor-pointer"
+    style={selectStyle}
+  >
+      <option value={1}>1 dia</option>
       <option value={3}>3 dias</option>
       <option value={5}>5 dias</option>
       <option value={7}>7 dias</option>
       <option value={10}>10 dias</option>
-      <option value={15}>15 dias</option>
     </select>
   </button>
 ) : (
@@ -1077,25 +1099,27 @@ const handleConferencia = async () => {
                 <label className="block text-xs font-medium text-amber-700">
                   Nova data de prazo:
                 </label>
-                <div className="flex gap-2">
-                  <DatePickerField
-                    value={novoPrazo}
-                    onChange={(value) => setNovoPrazo(value)}
-                    placeholder="Selecione a data"
-                  />
+                <div className="flex gap-2 items-center">
+                  <div className="flex-1">
+                    <DatePickerField
+                      value={novoPrazo}
+                      onChange={(value) => setNovoPrazo(value)}
+                      placeholder="Selecione a data"
+                    />
+                  </div>
                   <button
                     onClick={handleAlterarPrazo}
                     disabled={salvando || !novoPrazo}
-                    className="px-3 py-1 text-xs text-white bg-amber-500 rounded hover:bg-amber-600 disabled:opacity-50"
+                    className="px-4 h-[42px] text-sm text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 font-medium"
                   >
-                    {salvando ? <Loader2 className="w-3 h-3 animate-spin" /> : "Salvar"}
+                    {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar"}
                   </button>
                   <button
                     onClick={() => {
                       setMostrarAlterarPrazo(false)
                       setNovoPrazo("")
                     }}
-                    className="px-3 py-1 text-xs text-gray-600 bg-white border rounded hover:bg-gray-50"
+                    className="px-4 h-[42px] text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
                   >
                     Cancelar
                   </button>
@@ -1159,13 +1183,14 @@ const handleConferencia = async () => {
       <select
         value={prazoCobrancaConfig}
         onChange={(e) => setPrazoCobrancaConfig(parseInt(e.target.value))}
-        className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white"
+        className="pl-2 pr-5 py-0 text-[11px] border border-gray-200 rounded-md bg-white h-[24px] appearance-none cursor-pointer"
+        style={selectStyleSmall}
       >
+        <option value={1}>1 dia</option>
         <option value={3}>3 dias</option>
         <option value={5}>5 dias</option>
         <option value={7}>7 dias</option>
         <option value={10}>10 dias</option>
-        <option value={15}>15 dias</option>
       </select>
       <button
         onClick={handleIniciar}
@@ -1236,11 +1261,11 @@ const handleConferencia = async () => {
         onChange={(e) => setDiasConferencia(parseInt(e.target.value))}
         className="px-1 py-0.5 text-xs border-0 bg-transparent text-violet-700 focus:outline-none"
       >
+        <option value={1}>1d</option>
         <option value={3}>3d</option>
         <option value={5}>5d</option>
         <option value={7}>7d</option>
         <option value={10}>10d</option>
-        <option value={15}>15d</option>
       </select>
       <button
         onClick={handleConferencia}
@@ -1302,11 +1327,11 @@ const handleConferencia = async () => {
             onChange={(e) => setDiasCobrancaAguardando(parseInt(e.target.value))}
             className="px-1 py-0.5 text-xs border-0 bg-transparent text-blue-700 focus:outline-none"
           >
+            <option value={1}>1d</option>
             <option value={3}>3d</option>
             <option value={5}>5d</option>
             <option value={7}>7d</option>
             <option value={10}>10d</option>
-            <option value={15}>15d</option>
           </select>
           <button
             onClick={handleAguardandoCliente}
@@ -1597,7 +1622,8 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios, isProcuracaoAd
                   <select
                     value={editForm.prioridade}
                     onChange={(e) => setEditForm({ ...editForm, prioridade: e.target.value })}
-                    className="flex-1 px-2 py-1.5 border rounded-lg text-xs bg-white"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white h-[42px] appearance-none cursor-pointer"
+                    style={selectStyle}
                   >
                     <option value="BAIXA">🟢 Baixa</option>
                     <option value="MEDIA">🟡 Média</option>
@@ -1615,7 +1641,8 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios, isProcuracaoAd
                 <select
                   value={editForm.responsavelId}
                   onChange={(e) => setEditForm({ ...editForm, responsavelId: e.target.value })}
-                  className="w-full px-2 py-1.5 border rounded-lg text-xs bg-white"
+                  className={selectClass}
+                  style={selectStyle}
                 >
                   <option value="">Sem responsável</option>
                   {usuarios.map((u) => (
@@ -1994,7 +2021,8 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
                   <select
                     value={editForm.prioridade}
                     onChange={(e) => setEditForm({ ...editForm, prioridade: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={selectClass}
+                    style={selectStyle}
                   >
                     <option value="BAIXA">🟢 Baixa</option>
                     <option value="MEDIA">🟡 Média</option>
@@ -2023,7 +2051,8 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
                 <select
                   value={editForm.responsavelId}
                   onChange={(e) => setEditForm({ ...editForm, responsavelId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={selectClass}
+                  style={selectStyle}
                 >
                   <option value="">Sem responsável</option>
                   {usuarios.map((u) => (

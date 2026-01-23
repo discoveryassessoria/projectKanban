@@ -266,6 +266,17 @@ export function DocumentoModal({
     documento?.arquivo_apostila_url ? { url: documento.arquivo_apostila_url, name: 'Apostila' } : null
   )
 
+  // Classes padrão
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm h-[42px]"
+  
+  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm h-[42px] appearance-none cursor-pointer"
+  
+  const selectStyle = {
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 12px center'
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -358,7 +369,8 @@ export function DocumentoModal({
                 <select
                   value={tipo}
                   onChange={(e) => setTipo(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  className={selectClass}
+                  style={selectStyle}
                   required
                 >
                   {TIPO_DOCUMENTO_OPTIONS.map(opt => (
@@ -373,7 +385,8 @@ export function DocumentoModal({
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  className={selectClass}
+                  style={selectStyle}
                   required
                 >
                   {STATUS_OPTIONS.map(opt => (
@@ -392,7 +405,7 @@ export function DocumentoModal({
                 type="text"
                 value={descricao}
                 onChange={(e) => setDescricao(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                className={inputClass}
                 placeholder="Ex: Segunda via, Inteiro teor..."
               />
             </div>
@@ -410,7 +423,7 @@ export function DocumentoModal({
                     type="text"
                     value={cartorio}
                     onChange={(e) => setCartorio(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    className={inputClass}
                     placeholder="Nome do cartório"
                   />
                 </div>
@@ -424,7 +437,7 @@ export function DocumentoModal({
                       type="text"
                       value={livro}
                       onChange={(e) => setLivro(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                      className={inputClass}
                       placeholder="Ex: B2"
                     />
                   </div>
@@ -436,7 +449,7 @@ export function DocumentoModal({
                       type="text"
                       value={folha}
                       onChange={(e) => setFolha(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                      className={inputClass}
                       placeholder="Ex: 123"
                     />
                   </div>
@@ -448,7 +461,7 @@ export function DocumentoModal({
                       type="text"
                       value={termo}
                       onChange={(e) => setTermo(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                      className={inputClass}
                       placeholder="Ex: 456"
                     />
                   </div>
@@ -594,7 +607,7 @@ export function DocumentoModal({
                 value={observacoes}
                 onChange={(e) => setObservacoes(e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm resize-none"
                 placeholder="Observações adicionais..."
               />
             </div>

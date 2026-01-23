@@ -304,7 +304,7 @@ export function DatePickerField({
           onFocus={handleInputFocus}
           placeholder={placeholder}
           disabled={disabled}
-          className={`pr-10 ${className || "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"}`}
+          className={`pr-10 h-[42px] rounded-lg text-sm ${className || "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"}`}
         />
         <PopoverTrigger asChild>
           <button
