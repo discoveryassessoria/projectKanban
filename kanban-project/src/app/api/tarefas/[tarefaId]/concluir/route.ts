@@ -33,7 +33,7 @@ export async function POST(
       motivoConclusao = "recebido"
     } else if (status === "nao_possui") {
       statusTarefa = "CONCLUIDO_NAO_POSSUI"
-      observacaoTexto = "❌ Cliente não possui o documento"
+      observacaoTexto = "Cliente não possui o documento"
       motivoConclusao = "nao_possui"
     } else {
       return NextResponse.json({ error: "Status inválido" }, { status: 400 })

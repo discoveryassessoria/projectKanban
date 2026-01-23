@@ -60,7 +60,7 @@ export async function POST(
                 concluida: true,
                 statusTarefa: "CONCLUIDO_RECEBIDO",
                 dataConclusao: new Date(),
-                observacoes: observacao || "✅ Documento recebido"
+                observacoes: observacao || "Documento recebido"
               }
             }),
             prisma.tarefa.update({
@@ -69,7 +69,7 @@ export async function POST(
                 concluida: true,
                 statusTarefa: "CONCLUIDO_RECEBIDO",
                 dataConclusao: new Date(),
-                observacoes: observacao || "✅ Documento recebido"
+                observacoes: observacao || "Documento recebido"
               }
             })
           ])
@@ -81,7 +81,7 @@ export async function POST(
               concluida: true,
               statusTarefa: "CONCLUIDO_RECEBIDO",
               dataConclusao: new Date(),
-              observacoes: observacao || "✅ Documento recebido"
+              observacoes: observacao || "Documento recebido"
             }
           })
         }
@@ -178,7 +178,7 @@ export async function POST(
                 concluida: true,
                 statusTarefa: "CONCLUIDO_NAO_POSSUI",
                 dataConclusao: new Date(),
-                observacoes: observacao || "❌ Cliente não possui o documento"
+                observacoes: observacao || "Cliente não possui o documento"
               }
             }),
             prisma.tarefa.update({
@@ -187,7 +187,7 @@ export async function POST(
                 concluida: true,
                 statusTarefa: "CONCLUIDO_NAO_POSSUI",
                 dataConclusao: new Date(),
-                observacoes: observacao || "❌ Cliente não possui o documento"
+                observacoes: observacao || "Cliente não possui o documento"
               }
             })
           ])
@@ -198,7 +198,7 @@ export async function POST(
               concluida: true,
               statusTarefa: "CONCLUIDO_NAO_POSSUI",
               dataConclusao: new Date(),
-              observacoes: observacao || "❌ Cliente não possui o documento"
+              observacoes: observacao || "Cliente não possui o documento"
             }
           })
         }
@@ -229,6 +229,82 @@ export async function POST(
           message: "Prazo alterado com sucesso"
         })
       }
+
+      case "conferencia": {
+  // Calcular data de conferência
+  const novaDataConferencia = new Date()
+  novaDataConferencia.setDate(novaDataConferencia.getDate() + diasCobranca)
+  novaDataConferencia.setHours(12, 0, 0, 0)
+
+  // Montar título: "Conferir Preparar procuração: Carol"
+  const tituloConferencia = `Conferir ${tarefaDocumento?.titulo || "Documento"}: ${atividadePessoa?.titulo || ""}`
+
+  // Pegar responsavelId do body (opcional)
+  const { responsavelId } = body
+
+  if (isCobranca) {
+    // Concluir cobrança atual e criar conferência como irmã
+    const [_, novaSubtarefa] = await prisma.$transaction([
+      prisma.tarefa.update({
+        where: { id },
+        data: {
+          concluida: true,
+          dataConclusao: new Date(),
+          observacoes: observacao || "Enviado para conferência"
+        }
+      }),
+      prisma.tarefa.create({
+        data: {
+          titulo: tituloConferencia.trim(),
+          tarefaPaiId: tarefa.tarefaPaiId!,
+          processoId: tarefa.processoId,
+          prioridade: tarefa.prioridade,
+          dataPrazo: novaDataConferencia,
+          dataInicio: new Date(),
+          tipoSubtarefa: "CONFERENCIA",
+          statusTarefa: "AGUARDANDO_TERCEIRO",
+          responsavelId: responsavelId || null,
+          ordem: (tarefa.ordem || 0) + 1
+        }
+      })
+    ])
+
+    return NextResponse.json({ 
+      message: "Conferência agendada",
+      novaSubtarefa
+    })
+  } else {
+    // Criar conferência como FILHA da tarefa
+    const [tarefaAtualizada, novaSubtarefa] = await prisma.$transaction([
+      prisma.tarefa.update({
+        where: { id },
+        data: {
+          statusTarefa: "AGUARDANDO_TERCEIRO"
+        }
+      }),
+      prisma.tarefa.create({
+        data: {
+          titulo: tituloConferencia.trim(),
+          tarefaPaiId: id,
+          processoId: tarefa.processoId,
+          prioridade: tarefa.prioridade,
+          dataPrazo: novaDataConferencia,
+          dataInicio: new Date(),
+          tipoSubtarefa: "CONFERENCIA",
+          statusTarefa: "AGUARDANDO_TERCEIRO",
+          responsavelId: responsavelId || null,
+          ordem: 0
+        }
+      })
+    ])
+
+    return NextResponse.json({ 
+      message: "Conferência criada",
+      novaSubtarefa,
+      tarefaAtualizada
+    })
+  }
+}
 
       default:
         return NextResponse.json(

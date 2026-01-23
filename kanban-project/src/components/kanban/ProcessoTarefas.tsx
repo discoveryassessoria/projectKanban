@@ -24,6 +24,7 @@ import {
   RefreshCw,
   CalendarCheck,
   CalendarClock,
+  ClipboardCheck,
   FolderOpen
 } from "lucide-react"
 import { getTarefasPorPais, type TarefaPreDefinida } from "../../lib/tarefas-config"
@@ -308,11 +309,14 @@ interface CobrancaModalProps {
   subtarefa: Tarefa
   onClose: () => void
   onUpdate: () => void
+  isProcuracaoAdm?: boolean
+  usuarios?: Responsavel[]
 }
 
-function CobrancaModal({ subtarefa, onClose, onUpdate }: CobrancaModalProps) {
+function CobrancaModal({ subtarefa, onClose, onUpdate, isProcuracaoAdm = false, usuarios = [] }: CobrancaModalProps) {
   const [processando, setProcessando] = useState(false)
   const [observacao, setObservacao] = useState(subtarefa.observacoes || "")
+  const [responsavelId, setResponsavelId] = useState<string>(subtarefa.responsavelId?.toString() || "")
   const [novoPrazo, setNovoPrazo] = useState("")
   const [diasCobranca, setDiasCobranca] = useState(5)
   const [mostrarAlterarPrazo, setMostrarAlterarPrazo] = useState(false)
@@ -395,6 +399,24 @@ function CobrancaModal({ subtarefa, onClose, onUpdate }: CobrancaModalProps) {
             />
           </div>
 
+          {/* Responsável */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              <User className="w-4 h-4 inline mr-1" />
+              Responsável
+            </label>
+            <select
+              value={responsavelId}
+              onChange={(e) => setResponsavelId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="">Sem responsável</option>
+              {usuarios.map((u) => (
+                <option key={u.id} value={u.id}>{u.nome}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Botões de ação */}
           <div className="space-y-2">
             {/* Recebido */}
@@ -435,18 +457,44 @@ function CobrancaModal({ subtarefa, onClose, onUpdate }: CobrancaModalProps) {
               </select>
             </button>
 
-            {/* Cliente não possui */}
-            <button
-              onClick={() => executarAcao("nao_possui")}
-              disabled={processando}
-              className="w-full flex items-center gap-3 px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-gray-700 font-medium transition-colors disabled:opacity-50"
-            >
-              <FileX className="w-5 h-5" />
-              <div className="text-left">
-                <div>Cliente Não Possui</div>
-                <div className="text-xs text-gray-500 font-normal">Finaliza como não aplicável</div>
-              </div>
-            </button>
+            {/* Cliente não possui / Conferência */}
+{isProcuracaoAdm ? (
+  <button
+    onClick={() => executarAcao("conferencia")}
+    disabled={processando}
+    className="w-full flex items-center gap-3 px-4 py-3 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-xl text-violet-700 font-medium transition-colors disabled:opacity-50"
+  >
+    <ClipboardCheck className="w-5 h-5" />
+    <div className="text-left flex-1">
+      <div>Conferir</div>
+      <div className="text-xs text-violet-600 font-normal">Cria tarefa de conferência em {diasCobranca} dias</div>
+    </div>
+    <select
+      value={diasCobranca}
+      onChange={(e) => setDiasCobranca(parseInt(e.target.value))}
+      onClick={(e) => e.stopPropagation()}
+      className="px-2 py-1 text-xs border border-violet-300 rounded-lg bg-white"
+    >
+      <option value={3}>3 dias</option>
+      <option value={5}>5 dias</option>
+      <option value={7}>7 dias</option>
+      <option value={10}>10 dias</option>
+      <option value={15}>15 dias</option>
+    </select>
+  </button>
+) : (
+  <button
+    onClick={() => executarAcao("nao_possui")}
+    disabled={processando}
+    className="w-full flex items-center gap-3 px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-gray-700 font-medium transition-colors disabled:opacity-50"
+  >
+    <FileX className="w-5 h-5" />
+    <div className="text-left">
+      <div>Cliente Não Possui</div>
+      <div className="text-xs text-gray-500 font-normal">Finaliza como não aplicável</div>
+    </div>
+  </button>
+)}
 
             {/* Alterar prazo */}
             {!mostrarAlterarPrazo ? (
@@ -509,9 +557,10 @@ interface TarefaItemProps {
   onDelete: (id: number) => void
   onUpdate: () => void
   usuarios: Responsavel[]
+  isProcuracaoAdm?: boolean
 }
 
-function TarefaItem({ tarefa, onDelete, onUpdate, usuarios }: TarefaItemProps) {
+function TarefaItem({ tarefa, onDelete, onUpdate, usuarios, isProcuracaoAdm = false }: TarefaItemProps) {
   const [expandido, setExpandido] = useState(false)
   const [editando, setEditando] = useState(false)
   const [salvando, setSalvando] = useState(false)
@@ -527,6 +576,8 @@ function TarefaItem({ tarefa, onDelete, onUpdate, usuarios }: TarefaItemProps) {
   const [diasCobrancaAguardando, setDiasCobrancaAguardando] = useState(5)
   const [confirmandoRecebido, setConfirmandoRecebido] = useState(false)
   const [confirmandoNaoPossui, setConfirmandoNaoPossui] = useState(false)
+  const [mostrarOpcaoConferencia, setMostrarOpcaoConferencia] = useState(false)
+  const [diasConferencia, setDiasConferencia] = useState(5)
 
 useEffect(() => {
   if (confirmandoRecebido) {
@@ -541,6 +592,13 @@ useEffect(() => {
     return () => clearTimeout(timer)
   }
 }, [confirmandoNaoPossui])
+
+useEffect(() => {
+  if (mostrarOpcaoConferencia) {
+    const timer = setTimeout(() => setMostrarOpcaoConferencia(false), 3000)
+    return () => clearTimeout(timer)
+  }
+}, [mostrarOpcaoConferencia])
   
   const [editForm, setEditForm] = useState({
     titulo: tarefa.titulo,
@@ -702,6 +760,38 @@ const handleAguardandoCliente = async () => {
   }
 }
 
+// Conferência - cria subtarefa de conferência
+const handleConferencia = async () => {
+  if (isTemporaria) return
+  setConcluindo(true)
+  try {
+    const cobrancaPendente = subtarefas.find(s => s.tipoSubtarefa === "COBRANCA" && !s.concluida)
+    const idParaAcao = cobrancaPendente?.id || tarefa.id
+    
+    const response = await fetch(`/api/tarefas/${idParaAcao}/cobranca`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        acao: "conferencia",
+        diasCobranca: diasConferencia
+      })
+    })
+    if (response.ok) {
+      setMostrarOpcaoConferencia(false)
+      fetchSubtarefas()
+      onUpdate()
+    } else {
+      const data = await response.json()
+      alert(data.error || "Erro ao criar conferência")
+    }
+  } catch (error) {
+    console.error("Erro:", error)
+    alert("Erro ao criar conferência")
+  } finally {
+    setConcluindo(false)
+  }
+}
+
   // Alterar prazo
   const handleAlterarPrazo = async () => {
     if (isTemporaria || !novoPrazo) return
@@ -751,8 +841,29 @@ const handleAguardandoCliente = async () => {
     }
   }
 
-  // Se for subtarefa de cobrança, renderiza diferente
-  if (isCobranca) {
+  // Se for subtarefa de cobrança OU conferência, renderiza no mesmo padrão
+  const isConferencia = tarefa.tipoSubtarefa === "CONFERENCIA"
+
+  if (isCobranca || isConferencia) {
+    // Definir cores baseado no tipo
+    const cores = isConferencia 
+      ? {
+          bg: tarefa.concluida ? 'bg-gray-50' : 'bg-violet-50',
+          border: tarefa.concluida ? 'border-gray-200' : 'border-violet-200',
+          hoverBorder: 'hover:border-violet-300',
+          iconBg: tarefa.concluida ? 'bg-emerald-500' : 'bg-violet-400',
+          texto: tarefa.concluida ? 'text-gray-400 line-through' : 'text-violet-800 font-medium',
+          acao: 'text-violet-600'
+        }
+      : {
+          bg: tarefa.concluida ? 'bg-gray-50' : 'bg-blue-50',
+          border: tarefa.concluida ? 'border-gray-200' : 'border-blue-200',
+          hoverBorder: 'hover:border-blue-300',
+          iconBg: tarefa.concluida ? 'bg-emerald-500' : 'bg-blue-400',
+          texto: tarefa.concluida ? 'text-gray-400 line-through' : 'text-blue-800 font-medium',
+          acao: 'text-blue-600'
+        }
+
     return (
       <>
         <div
@@ -764,27 +875,26 @@ const handleAguardandoCliente = async () => {
           }}
           className={`
             group flex items-center gap-3 px-3 py-2 rounded-lg border transition-all cursor-pointer
-            ${tarefa.concluida 
-              ? 'bg-gray-50 border-gray-200' 
-              : 'bg-amber-50 border-amber-200 hover:border-amber-300'
-            }
+            ${cores.bg} ${cores.border} ${!tarefa.concluida ? cores.hoverBorder : ''}
           `}
         >
           <div className={`
             w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center
-            ${tarefa.concluida ? 'bg-emerald-500' : 'bg-amber-400'}
+            ${cores.iconBg}
           `}>
             {tarefa.concluida ? (
               <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
               </svg>
+            ) : isConferencia ? (
+              <ClipboardCheck className="w-3 h-3 text-white" />
             ) : (
               <RefreshCw className="w-3 h-3 text-white" />
             )}
           </div>
 
           <div className="flex-1 min-w-0">
-            <span className={`text-xs ${tarefa.concluida ? 'text-gray-400 line-through' : 'text-amber-800 font-medium'}`}>
+            <span className={`text-xs ${cores.texto}`}>
               {tarefa.titulo}
             </span>
             <div className="flex gap-2 mt-0.5">
@@ -800,12 +910,12 @@ const handleAguardandoCliente = async () => {
               )}
             </div>
             {tarefa.observacoes && (
-              <p className="text-[10px] text-amber-600 mt-0.5 truncate">{tarefa.observacoes}</p>
+              <p className={`text-[10px] mt-0.5 truncate ${isConferencia ? 'text-violet-600' : 'text-blue-600'}`}>{tarefa.observacoes}</p>
             )}
           </div>
 
           {!tarefa.concluida && (
-            <span className="text-xs text-amber-600 font-medium">Clique para ação →</span>
+            <span className={`text-xs font-medium ${cores.acao}`}>Clique para ação →</span>
           )}
         </div>
 
@@ -817,6 +927,7 @@ const handleAguardandoCliente = async () => {
               setSubtarefaSelecionada(null)
             }}
             onUpdate={onUpdate}
+            isProcuracaoAdm={isProcuracaoAdm}
           />
         )}
       </>
@@ -864,7 +975,7 @@ const handleAguardandoCliente = async () => {
         {/* Conteúdo */}
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpandido(!expandido)}>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-sm ${tarefa.concluida ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+            <span className={`text-sm ${tarefa.concluida ? 'text-gray-400' : 'text-gray-900'}`}>
               {tarefa.titulo}
             </span>
             {isTemporaria && <span className="text-xs text-gray-400 italic">(salvando...)</span>}
@@ -1011,6 +1122,14 @@ const handleAguardandoCliente = async () => {
                   <div className="flex items-center gap-2 flex-wrap">
   
   {!tarefa.concluida && !iniciada && (
+  <div className="flex items-center gap-2 flex-wrap w-full">
+    <button
+      onClick={() => setEditando(true)}
+      className="py-1.5 px-3 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+    >
+      Editar
+    </button>
+    
     <div className="flex items-center gap-1 ml-auto">
       <select
         value={prazoCobrancaConfig}
@@ -1032,7 +1151,8 @@ const handleAguardandoCliente = async () => {
         Iniciar
       </button>
     </div>
-  )}
+  </div>
+)}
 </div>
                     
                     {!tarefa.concluida && iniciada && (
@@ -1070,30 +1190,74 @@ const handleAguardandoCliente = async () => {
     Confirmar?
   </button>
 )}
-      {/* Não possui */}
-{!confirmandoNaoPossui ? (
-  <button
-    onClick={() => setConfirmandoNaoPossui(true)}
-    disabled={concluindo}
-    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg transition-colors disabled:opacity-50"
-    title="Cliente não possui o documento"
-  >
-    <FileX className="w-3 h-3" />
-    Não possui
-  </button>
+
+{/* Não possui / Conferência */}
+{isProcuracaoAdm ? (
+  // Botão Conferência (estilo igual Aguardando)
+  !mostrarOpcaoConferencia ? (
+    <button
+      onClick={() => setMostrarOpcaoConferencia(true)}
+      disabled={concluindo}
+      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-violet-600 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-lg transition-colors disabled:opacity-50"
+      title="Enviar para conferência"
+    >
+      <ClipboardCheck className="w-3 h-3" />
+      Conferência
+    </button>
+  ) : (
+    <div className="flex items-center gap-1 bg-violet-50 border border-violet-200 rounded-lg px-2 py-1">
+      <select
+        value={diasConferencia}
+        onChange={(e) => setDiasConferencia(parseInt(e.target.value))}
+        className="px-1 py-0.5 text-xs border-0 bg-transparent text-violet-700 focus:outline-none"
+      >
+        <option value={3}>3d</option>
+        <option value={5}>5d</option>
+        <option value={7}>7d</option>
+        <option value={10}>10d</option>
+        <option value={15}>15d</option>
+      </select>
+      <button
+        onClick={handleConferencia}
+        disabled={concluindo}
+        className="px-2 py-0.5 text-xs font-medium text-white bg-violet-500 hover:bg-violet-600 rounded transition-colors disabled:opacity-50"
+      >
+        {concluindo ? <Loader2 className="w-3 h-3 animate-spin" /> : "OK"}
+      </button>
+      <button
+        onClick={() => setMostrarOpcaoConferencia(false)}
+        className="px-1 py-0.5 text-xs text-gray-500 hover:text-gray-700"
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  )
 ) : (
-  <button
-    onClick={() => {
-      handleConcluirComStatus("nao_possui")
-      setConfirmandoNaoPossui(false)
-    }}
-    disabled={concluindo}
-    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
-    title="Clique para confirmar"
-  >
-    {concluindo ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileX className="w-3 h-3" />}
-    Confirmar?
-  </button>
+  // Botão Não possui (mantém igual)
+  !confirmandoNaoPossui ? (
+    <button
+      onClick={() => setConfirmandoNaoPossui(true)}
+      disabled={concluindo}
+      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg transition-colors disabled:opacity-50"
+      title="Cliente não possui o documento"
+    >
+      <FileX className="w-3 h-3" />
+      Não possui
+    </button>
+  ) : (
+    <button
+      onClick={() => {
+        handleConcluirComStatus("nao_possui")
+        setConfirmandoNaoPossui(false)
+      }}
+      disabled={concluindo}
+      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+      title="Clique para confirmar"
+    >
+      {concluindo ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileX className="w-3 h-3" />}
+      Confirmar?
+    </button>
+  )
 )}
       
       {!mostrarOpcaoAguardando ? (
@@ -1145,29 +1309,56 @@ const handleAguardandoCliente = async () => {
     </div>
   </div>
 )}
+</div>
 
+{/* Subtarefas de cobrança e conferência */}
+              {subtarefas.length > 0 && (
+                <div className="pt-2 border-t border-gray-200">
+                  {/* Cobrança */}
+                  {subtarefas.filter(s => s.tipoSubtarefa !== "CONFERENCIA").length > 0 && (
+                    <>
+                      <h5 className="text-[10px] font-medium text-gray-500 mb-2">Subtarefas de cobrança:</h5>
+                      <div className="space-y-1 mb-3">
+                        {subtarefas.filter(s => s.tipoSubtarefa !== "CONFERENCIA").map((sub) => (
+                          <TarefaItem
+                            key={sub.id}
+                            tarefa={sub}
+                            onDelete={() => {}}
+                            onUpdate={() => {
+                              fetchSubtarefas()
+                              onUpdate()
+                            }}
+                            usuarios={usuarios}
+                            isProcuracaoAdm={isProcuracaoAdm}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  
+                  {/* Conferência */}
+                  {subtarefas.filter(s => s.tipoSubtarefa === "CONFERENCIA").length > 0 && (
+                    <>
+                      <h5 className="text-[10px] font-medium text-violet-500 mb-2">Conferências pendentes:</h5>
+                      <div className="space-y-1">
+                        {subtarefas.filter(s => s.tipoSubtarefa === "CONFERENCIA").map((sub) => (
+                          <TarefaItem
+                            key={sub.id}
+                            tarefa={sub}
+                            onDelete={() => {}}
+                            onUpdate={() => {
+                              fetchSubtarefas()
+                              onUpdate()
+                            }}
+                            usuarios={usuarios}
+                            isProcuracaoAdm={isProcuracaoAdm}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
-
-                {/* Subtarefas de cobrança */}
-                {subtarefas.length > 0 && (
-                  <div className="pt-2 border-t border-gray-200">
-                    <h5 className="text-[10px] font-medium text-gray-500 mb-2">Subtarefas de cobrança:</h5>
-                    <div className="space-y-1">
-                      {subtarefas.map((sub) => (
-                        <TarefaItem
-                          key={sub.id}
-                          tarefa={sub}
-                          onDelete={() => {}}
-                          onUpdate={() => {
-                            fetchSubtarefas()
-                            onUpdate()
-                          }}
-                          usuarios={usuarios}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
+              )}
               </>
             )}
           </div>
@@ -1185,9 +1376,10 @@ interface AtividadeItemProps {
   onDelete: (id: number) => void
   onUpdate: () => void
   usuarios: Responsavel[]
+  isProcuracaoAdm?: boolean
 }
 
-function AtividadeItem({ atividade, onDelete, onUpdate, usuarios }: AtividadeItemProps) {
+function AtividadeItem({ atividade, onDelete, onUpdate, usuarios, isProcuracaoAdm = false }: AtividadeItemProps) {
   const [expandido, setExpandido] = useState(true)
   const [editando, setEditando] = useState(false)
   const [novaTarefa, setNovaTarefa] = useState("")
@@ -1316,10 +1508,11 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios }: AtividadeIte
       <span className="ml-2 text-xs text-gray-400 italic">(salvando...)</span>
     )}
     {atividade.dataPrazo && (
-      <span className={`ml-2 text-xs ${isPast(atividade.dataPrazo) ? 'text-red-500' : 'text-gray-400'}`}>
-        📅 {formatDateBR(atividade.dataPrazo)}
-      </span>
-    )}
+  <span className={`ml-2 text-xs flex items-center gap-1 ${isPast(atividade.dataPrazo) ? 'text-red-500' : 'text-gray-400'}`}>
+    <Calendar className="w-3 h-3" />
+    {formatDateBR(atividade.dataPrazo)}
+  </span>
+)}
   </div>
   {atividade.observacoes && (
   <p className="text-[10px] text-gray-500 mt-0.5 truncate">
@@ -1460,17 +1653,18 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios }: AtividadeIte
                   {tarefas.length > 0 ? (
                     <div className="space-y-2 mb-3">
                       {tarefas.map((tarefa) => (
-                        <TarefaItem
-                          key={tarefa.id}
-                          tarefa={tarefa}
-                          onDelete={handleDeleteTarefa}
-                          onUpdate={() => {
-                            fetchTarefas()
-                            onUpdate()
-                          }}
-                          usuarios={usuarios}
-                        />
-                      ))}
+  <TarefaItem
+    key={tarefa.id}
+    tarefa={tarefa}
+    onDelete={handleDeleteTarefa}
+    onUpdate={() => {
+      fetchTarefas()
+      onUpdate()
+    }}
+    usuarios={usuarios}
+    isProcuracaoAdm={isProcuracaoAdm}
+  />
+))}
                     </div>
                   ) : (
                     <p className="text-xs text-gray-400 mb-2">Nenhuma tarefa</p>
@@ -1831,14 +2025,16 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
             <div className="p-4">
               <div className="space-y-3">
                 {atividadesLocal.map((atividade) => (
-                  <AtividadeItem
-                    key={atividade.id}
-                    atividade={atividade}
-                    onDelete={handleExcluirAtividade}
-                    onUpdate={onUpdate}
-                    usuarios={usuarios}
-                  />
-                ))}
+  <AtividadeItem
+    key={atividade.id}
+    atividade={atividade}
+    onDelete={handleExcluirAtividade}
+    onUpdate={onUpdate}
+    usuarios={usuarios}
+    isProcuracaoAdm={tarefa.titulo.toLowerCase().includes('procuração administrativa') || 
+                     tarefa.titulo.toLowerCase().includes('procuracao administrativa')}
+  />
+))}
 
                 {atividadesLocal.length === 0 && (
                   <div className="text-center py-8 text-gray-400">
