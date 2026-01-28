@@ -947,6 +947,7 @@ export function ProcessoDetailsModal({
               }}
               pessoaIdParaFocar={pessoaIdParaFocar}
               sidebarTabParaFocar={sidebarTabParaFocar}
+              nomeFamilia={processo.nome}
             />
           )}
 

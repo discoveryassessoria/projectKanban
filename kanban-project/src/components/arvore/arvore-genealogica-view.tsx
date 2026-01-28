@@ -27,6 +27,7 @@ interface ArvoreGenealogicaViewProps {
   onArvoreCreated?: (arvoreId: number) => void
   pessoaIdParaFocar?: number
   sidebarTabParaFocar?: string
+  nomeFamilia?: string  // ✅ NOVA PROP
 }
 
 type ViewMode = 'paisagem' | 'retrato'
@@ -43,7 +44,8 @@ export function ArvoreGenealogicaView({
   arvoreId: initialArvoreId, 
   onArvoreCreated,
   pessoaIdParaFocar,
-  sidebarTabParaFocar
+  sidebarTabParaFocar,
+  nomeFamilia  // ✅ NOVA PROP
 }: ArvoreGenealogicaViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('paisagem')
   const [pessoas, setPessoas] = useState<PessoaArvore[]>([])
@@ -103,10 +105,15 @@ export function ArvoreGenealogicaView({
     }
   }, [pessoas])
 
+  // ✅ FUNÇÃO handleExportPDF ATUALIZADA
   const handleExportPDF = useCallback(async () => {
     if (pessoas.length === 0 || !pessoaPrincipal || !treeContainerRef.current) return
 
     setIsExporting(true)
+
+    // Salvar zoom atual e resetar para 100%
+      const currentZoom = document.body.style.zoom
+      document.body.style.zoom = '100%'
 
     try {
       const { toPng } = await import('html-to-image')
@@ -119,6 +126,7 @@ export function ArvoreGenealogicaView({
         return
       }
 
+      // Esconder elementos do ReactFlow (controles, minimap, etc)
       const elementsToHide = reactFlowContainer.querySelectorAll(
         '.react-flow__panel, .react-flow__minimap, .react-flow__controls, .react-flow__background'
       )
@@ -126,7 +134,37 @@ export function ArvoreGenealogicaView({
         (el as HTMLElement).style.setProperty('display', 'none', 'important')
       })
 
+      // ✅ NOVO: Esconder indicadores de documento (círculos verdes/vermelhos)
+      const documentIndicators = reactFlowContainer.querySelectorAll('.group\\/doctip')
+      documentIndicators.forEach((el) => {
+        (el as HTMLElement).style.setProperty('display', 'none', 'important')
+      })
+
+      // ✅ Remover TODAS as sombras (removendo classes E estilos)
+      const shadowElements = reactFlowContainer.querySelectorAll('.shadow-md, .shadow-lg, .shadow-sm, .shadow, .shadow-xl');
+      shadowElements.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        htmlEl.classList.add('!shadow-none');
+        htmlEl.style.setProperty('box-shadow', 'none', 'important');
+        htmlEl.style.setProperty('filter', 'none', 'important');
+        htmlEl.style.setProperty('drop-shadow', 'none', 'important');
+        htmlEl.style.setProperty('-webkit-box-shadow', 'none', 'important');
+        // REMOVIDO: htmlEl.style.setProperty('background-color', '#ffffff', 'important');
+      });
+
       await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Forçar todos os nomes a aparecerem completos
+      const nameElements = reactFlowContainer.querySelectorAll('h3')
+      nameElements.forEach((el) => {
+        const htmlEl = el as HTMLElement
+        htmlEl.style.setProperty('overflow', 'visible', 'important')
+        htmlEl.style.setProperty('display', 'block', 'important')
+        htmlEl.style.setProperty('-webkit-line-clamp', 'unset', 'important')
+        htmlEl.style.setProperty('-webkit-box-orient', 'unset', 'important')
+        htmlEl.style.setProperty('white-space', 'normal', 'important')
+        htmlEl.style.setProperty('text-overflow', 'unset', 'important')
+      })
 
       const imgData = await toPng(reactFlowContainer, {
         backgroundColor: '#f9fafb',
@@ -134,9 +172,37 @@ export function ArvoreGenealogicaView({
         skipFonts: true,
       })
 
+      // Restaurar estilos dos nomes
+      nameElements.forEach((el) => {
+        const htmlEl = el as HTMLElement
+        htmlEl.style.removeProperty('overflow')
+        htmlEl.style.removeProperty('display')
+        htmlEl.style.removeProperty('-webkit-line-clamp')
+        htmlEl.style.removeProperty('-webkit-box-orient')
+        htmlEl.style.removeProperty('white-space')
+        htmlEl.style.removeProperty('text-overflow')
+      })
+
+      // Restaurar elementos escondidos
       elementsToHide.forEach((el) => {
         (el as HTMLElement).style.removeProperty('display')
       })
+
+      // ✅ Restaurar indicadores de documento
+      documentIndicators.forEach((el) => {
+        (el as HTMLElement).style.removeProperty('display')
+      })
+
+      // ✅ Restaurar sombras
+      shadowElements.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        htmlEl.classList.remove('!shadow-none');
+        htmlEl.style.removeProperty('box-shadow');
+        htmlEl.style.removeProperty('filter');
+        htmlEl.style.removeProperty('drop-shadow');
+        htmlEl.style.removeProperty('-webkit-box-shadow');
+        // REMOVIDO: htmlEl.style.removeProperty('background-color');
+      });
 
       const img = new Image()
       await new Promise((resolve, reject) => {
@@ -153,8 +219,8 @@ export function ArvoreGenealogicaView({
       const imgHeightMM = imgHeight * pxToMm
 
       const marginX = 8
-      const marginTop = 18
-      const marginBottom = 10
+      const marginTop = 14
+      const marginBottom = 8
 
       const pageWidth = Math.max(imgWidthMM + marginX * 2, 297)
       const pageHeight = Math.max(imgHeightMM + marginTop + marginBottom, 210)
@@ -166,39 +232,37 @@ export function ArvoreGenealogicaView({
       })
 
       const actualPageWidth = pdf.internal.pageSize.getWidth()
-      const actualPageHeight = pdf.internal.pageSize.getHeight()
 
+      // ✅ ATUALIZADO: Título em italiano com nome da família
       pdf.setFontSize(14)
       pdf.setFont('helvetica', 'bold')
       pdf.setTextColor(30, 30, 30)
-      const titulo = `Arvore Genealogica - ${pessoaPrincipal.nome} ${pessoaPrincipal.sobrenome || ''}`
+      const titulo = `Albero Genealogico - Famiglia ${nomeFamilia || pessoaPrincipal.sobrenome || pessoaPrincipal.nome}`
       pdf.text(titulo, actualPageWidth / 2, 10, { align: 'center' })
 
-      pdf.setFontSize(8)
-      pdf.setFont('helvetica', 'normal')
-      pdf.setTextColor(120, 120, 120)
-      const dataAtual = new Date().toLocaleDateString('pt-BR')
-      pdf.text(`Gerado em: ${dataAtual}`, actualPageWidth / 2, 15, { align: 'center' })
+      // ✅ REMOVIDO: Data de geração
+      // ✅ REMOVIDO: Quantidade de pessoas
 
       const imgX = (actualPageWidth - imgWidthMM) / 2
       const imgY = marginTop
 
       pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidthMM, imgHeightMM)
 
-      pdf.setFontSize(7)
-      pdf.setTextColor(150, 150, 150)
-      pdf.text(`${pessoas.length} pessoas`, actualPageWidth / 2, actualPageHeight - 5, { align: 'center' })
-
-      const nomeArquivo = `arvore-${pessoaPrincipal.nome.toLowerCase().replace(/\s+/g, '-')}-${dataAtual.replace(/\//g, '-')}.pdf`
+      // ✅ ATUALIZADO: Nome do arquivo
+      const dataAtual = new Date().toLocaleDateString('pt-BR')
+      const nomeArquivo = `arvore-${(nomeFamilia || pessoaPrincipal.nome).toLowerCase().replace(/\s+/g, '-')}-${dataAtual.replace(/\//g, '-')}.pdf`
       pdf.save(nomeArquivo)
 
     } catch (error) {
       console.error('Erro ao exportar PDF:', error)
       alert('Erro ao exportar PDF. Verifique o console para mais detalhes.')
     } finally {
+      // Restaurar zoom original
+      document.body.style.zoom = currentZoom
+      
       setIsExporting(false)
     }
-  }, [pessoas, pessoaPrincipal])
+  }, [pessoas, pessoaPrincipal, nomeFamilia])
 
   const handleAddDocumento = (pessoaId: number) => {
     const pessoa = pessoas.find(p => p.id === pessoaId)

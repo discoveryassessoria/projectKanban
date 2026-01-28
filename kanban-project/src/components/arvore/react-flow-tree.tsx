@@ -40,8 +40,8 @@ type ViewMode = 'paisagem' | 'retrato'
 
 // Tamanhos dos nós
 const NODE_SIZES = {
-  paisagem: { width: 200, height: 90 },
-  retrato: { width: 140, height: 110 }
+  paisagem: { width: 240, height: 90 },
+  retrato: { width: 160, height: 120 }
 }
 
 // ========================================
@@ -282,7 +282,16 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
         )}
 
         <div className="p-2 h-full flex flex-col justify-center">
-          <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-1">
+          <h3 
+            className="font-semibold text-gray-900 text-[11px] leading-tight"
+            style={{ 
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              wordBreak: 'break-word'
+            }}
+          >
             {nomeCompleto}
           </h3>
           {/* Badge de Requerente */}
@@ -391,7 +400,16 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
       )}
 
       <div className="p-2 h-full flex flex-col items-center justify-center text-center">
-        <h3 className="font-semibold text-gray-900 text-[11px] leading-tight line-clamp-2">
+        <h3 
+          className="font-semibold text-gray-900 text-[11px] leading-tight"
+          style={{ 
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            wordBreak: 'break-word'
+          }}
+        >
           {nomeCompleto}
         </h3>
         {/* Badge de Requerente */}
