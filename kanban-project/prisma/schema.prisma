@@ -896,6 +896,8 @@ model Fatura {
   pagamentos      PagamentoFatura[]
   
   destinatarios   FaturaDestinatario[]
+
+  parcelasBoleto  Parcela[]     @relation("ParcelasBoleto")
   
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -1356,4 +1358,32 @@ model FaturaDestinatario {
   @@unique([faturaId, requerenteId])
   @@index([faturaId])
   @@index([requerenteId])
+}
+
+// ========================================
+// PARCELA DE BOLETO
+// ========================================
+model Parcela {
+  id              Int           @id @default(autoincrement())
+  
+  // Vínculo com fatura
+  faturaId        Int
+  fatura          Fatura        @relation("ParcelasBoleto", fields: [faturaId], references: [id], onDelete: Cascade)
+  
+  // Dados da parcela
+  numero          Int           // 1, 2, 3...
+  valor           Decimal       @db.Decimal(10, 2)
+  dataVencimento  DateTime
+  
+  // Status
+  pago            Boolean       @default(false)
+  dataPagamento   DateTime?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([faturaId, numero])
+  @@index([faturaId])
+  @@index([dataVencimento])
+  @@index([pago])
 }

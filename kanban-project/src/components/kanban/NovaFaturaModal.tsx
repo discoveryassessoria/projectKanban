@@ -167,7 +167,7 @@ export function NovaFaturaModal({
         metodoPagamento,
         parcelas: isBoleto ? parcelas : 1,
         valorParcela: isBoleto && parcelas > 1 ? valorParcela : null,
-        dataVencimento: isBoleto && dataVencimento ? dataVencimento : null,
+        dataVencimento: isBoleto && dataVencimento ? `${dataVencimento}T12:00:00.000Z` : null,
         observacoes: observacoes.trim() || null,
         destinatarioIds: destinatarioIds.length > 0 ? destinatarioIds : null
       }

@@ -1,8 +1,10 @@
 // src/app/api/processos/[processoId]/faturas/route.ts
+// ATUALIZADO - Com geração automática de parcelas para boletos
 
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
 import { Decimal } from "@prisma/client/runtime/library"
+import { gerarVencimentosParcelas } from "@/src/lib/diasUteis"
 
 // ========================================
 // HELPER: Converter Decimal para number
@@ -47,6 +49,10 @@ export async function GET(
               }
             }
           }
+        },
+        // ✅ NOVO: Incluir parcelas do boleto
+        parcelasBoleto: {
+          orderBy: { numero: 'asc' }
         }
       },
       orderBy: { createdAt: 'desc' }
@@ -55,10 +61,19 @@ export async function GET(
     // Calcular totais e status
     const faturasComCalculos = faturas.map(fatura => {
       const valorTotal = toNumber(fatura.valor)
-      const valorPago = fatura.pagamentos.reduce(
+      // Valor pago via pagamentos normais
+      const valorPagoPagamentos = fatura.pagamentos.reduce(
         (sum: number, pag: { valor: Decimal | number | string | null }) => sum + toNumber(pag.valor), 
         0
       )
+
+      // Valor pago via parcelas de boleto
+      const valorPagoParcelas = fatura.parcelasBoleto
+        .filter(p => p.pago)
+        .reduce((sum, p) => sum + toNumber(p.valor), 0)
+
+      // Total pago = pagamentos + parcelas pagas
+      const valorPago = valorPagoPagamentos + valorPagoParcelas
       const valorRestante = Math.max(0, valorTotal - valorPago)
       
       // Determinar status real
@@ -67,9 +82,24 @@ export async function GET(
         statusCalculado = 'PAGO'
       } else if (valorPago > 0) {
         statusCalculado = 'PARCIAL'
-      } else if (fatura.dataVencimento && new Date(fatura.dataVencimento) < new Date()) {
-        statusCalculado = 'VENCIDO'
+      } else if (fatura.dataVencimento) {
+        // Comparar apenas as datas (sem horário)
+        const hoje = new Date()
+        hoje.setUTCHours(0, 0, 0, 0)
+        
+        const vencimento = new Date(fatura.dataVencimento)
+        vencimento.setUTCHours(0, 0, 0, 0)
+        
+        if (vencimento < hoje) {
+          statusCalculado = 'VENCIDO'
+        }
       }
+
+      // ✅ NOVO: Processar parcelas do boleto
+      const parcelasProcessadas = fatura.parcelasBoleto.map(parcela => ({
+        ...parcela,
+        valor: toNumber(parcela.valor)
+      }))
 
       return {
         ...fatura,
@@ -85,17 +115,54 @@ export async function GET(
           valor: toNumber(p.valor)
         })),
         // Flatten destinatários
-        destinatarios: fatura.destinatarios.map(d => d.requerente)
+        destinatarios: fatura.destinatarios.map(d => d.requerente),
+        // ✅ NOVO: Parcelas do boleto
+        parcelasBoleto: parcelasProcessadas
       }
     })
 
     // Totais gerais
-    const totais = faturasComCalculos.reduce((acc, f) => ({
-      total: acc.total + f.valor,
-      pago: acc.pago + f.valorPago,
-      pendente: acc.pendente + (f.status === 'PENDENTE' || f.status === 'PARCIAL' ? f.valorRestante : 0),
-      vencido: acc.vencido + (f.status === 'VENCIDO' ? f.valorRestante : 0)
-    }), { total: 0, pago: 0, pendente: 0, vencido: 0 })
+    const hoje = new Date()
+    hoje.setUTCHours(0, 0, 0, 0)
+
+    const totais = faturasComCalculos.reduce((acc, f) => {
+      const isBoleto = f.metodoPagamento === 'BOLETO'
+      const temParcelas = f.parcelasBoleto && f.parcelasBoleto.length > 0
+
+      let vencidoFatura = 0
+      let pendenteFatura = 0
+
+      if (isBoleto && temParcelas) {
+        // Para boletos, calcular por parcela
+        f.parcelasBoleto.forEach(p => {
+          if (p.pago) return // já foi contado no valorPago
+          
+          // Toda parcela não paga é pendente
+          pendenteFatura += p.valor
+          
+          // Se também está vencida, conta no vencido
+          const vencimento = new Date(p.dataVencimento)
+          vencimento.setUTCHours(0, 0, 0, 0)
+          
+          if (vencimento < hoje) {
+            vencidoFatura += p.valor
+          }
+        })
+      } else {
+        // Para não-boletos, usar lógica original
+        pendenteFatura = f.valorRestante
+        if (f.status === 'VENCIDO') {
+          vencidoFatura = f.valorRestante
+        }
+      }
+
+      return {
+        total: acc.total + f.valor,
+        pago: acc.pago + f.valorPago,
+        pendente: acc.pendente + pendenteFatura,
+        vencido: acc.vencido + vencidoFatura
+      }
+    }, { total: 0, pago: 0, pendente: 0, vencido: 0 })
 
     return NextResponse.json({ faturas: faturasComCalculos, totais })
 
@@ -150,7 +217,26 @@ export async function POST(
       )
     }
 
-    // Criar fatura
+    const valorNumerico = parseFloat(valor)
+    const quantidadeParcelas = parcelas || 1
+    const valorParcelaCalculado = valorNumerico / quantidadeParcelas
+    const isBoleto = metodoPagamento === 'BOLETO'
+
+    // ✅ NOVO: Gerar datas de vencimento das parcelas para boletos
+    let parcelasParaCriar: { numero: number; valor: number; dataVencimento: Date }[] = []
+    
+    if (isBoleto && quantidadeParcelas > 0 && dataVencimento) {
+      const dataVencimentoInicial = new Date(dataVencimento)
+      const vencimentos = gerarVencimentosParcelas(dataVencimentoInicial, quantidadeParcelas)
+      
+      parcelasParaCriar = vencimentos.map((venc, index) => ({
+        numero: index + 1,
+        valor: valorParcelaCalculado,
+        dataVencimento: venc
+      }))
+    }
+
+    // Criar fatura com parcelas
     const fatura = await prisma.fatura.create({
       data: {
         processoId: processoIdNum,
@@ -158,10 +244,10 @@ export async function POST(
         moeda,
         valorOriginal: valorOriginal ? parseFloat(valorOriginal) : null,
         cambio: cambio ? parseFloat(cambio) : null,
-        valor: parseFloat(valor),
+        valor: valorNumerico,
         metodoPagamento: metodoPagamento || null,
-        parcelas: parcelas || 1,
-        valorParcela: valorParcela ? parseFloat(valorParcela) : null,
+        parcelas: quantidadeParcelas,
+        valorParcela: valorParcelaCalculado,
         dataVencimento: dataVencimento ? new Date(dataVencimento) : null,
         observacoes: observacoes || null,
         // Criar relacionamentos com destinatários
@@ -169,6 +255,10 @@ export async function POST(
           create: destinatarioIds.map((requerenteId: number) => ({
             requerenteId
           }))
+        } : undefined,
+        // ✅ NOVO: Criar parcelas para boletos
+        parcelasBoleto: parcelasParaCriar.length > 0 ? {
+          create: parcelasParaCriar
         } : undefined
       },
       include: {
@@ -178,6 +268,9 @@ export async function POST(
               select: { id: true, nome: true }
             }
           }
+        },
+        parcelasBoleto: {
+          orderBy: { numero: 'asc' }
         }
       }
     })
