@@ -1,188 +1,193 @@
 // src/app/api/processos/[processoId]/faturas/route.ts
 
-import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { NextRequest, NextResponse } from "next/server"
+import { Decimal } from "@prisma/client/runtime/library"
 
+// ========================================
+// HELPER: Converter Decimal para number
+// ========================================
+function toNumber(value: Decimal | number | string | null | undefined): number {
+  if (value === null || value === undefined) return 0
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') return parseFloat(value) || 0
+  return parseFloat(value.toString()) || 0
+}
+
+// ========================================
 // GET - Listar faturas do processo
+// ========================================
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
     const { processoId } = await params
-    const id = parseInt(processoId)
+    const processoIdNum = parseInt(processoId)
 
-    if (isNaN(id)) {
-      return NextResponse.json(
-        { error: "ID inválido" },
-        { status: 400 }
-      )
-    }
-
-    const faturasDb = await prisma.fatura.findMany({
-      where: { processoId: id },
+    const faturas = await prisma.fatura.findMany({
+      where: { processoId: processoIdNum },
       include: {
         pagamentos: {
-          orderBy: { data: 'asc' }
+          orderBy: { data: 'desc' }
+        },
+        destinatarios: {
+          include: {
+            requerente: {
+              select: {
+                id: true,
+                nome: true,
+                cpf: true,
+                endereco: true,
+                numero: true,
+                bairro: true,
+                cidade: true,
+                estado: true,
+                cep: true
+              }
+            }
+          }
         }
       },
-      orderBy: { dataVencimento: 'asc' }
+      orderBy: { createdAt: 'desc' }
     })
 
-    const hoje = new Date()
-    hoje.setHours(0, 0, 0, 0)
-
-    // Processar faturas: calcular valorPago e verificar vencimento
-    const faturas = await Promise.all(
-      faturasDb.map(async (f) => {
-        // Calcular valor pago como soma dos pagamentos
-        const valorPago = f.pagamentos.reduce((acc, p) => acc + Number(p.valor), 0)
-        const valorFatura = Number(f.valor)
-        
-        // Determinar status correto
-        let statusAtualizado = f.status
-        
-        if (valorPago >= valorFatura - 0.01) {
-          statusAtualizado = 'PAGO'
-        } else if (valorPago > 0) {
-          statusAtualizado = 'PARCIAL'
-        } else if (f.dataVencimento) {
-          const dataVenc = new Date(f.dataVencimento)
-          dataVenc.setHours(0, 0, 0, 0)
-          if (dataVenc < hoje) {
-            statusAtualizado = 'VENCIDO'
-          } else {
-            statusAtualizado = 'PENDENTE'
-          }
-        }
-        
-        // Atualizar no banco se mudou
-        if (statusAtualizado !== f.status) {
-          await prisma.fatura.update({
-            where: { id: f.id },
-            data: { status: statusAtualizado }
-          })
-        }
-        
-        // Retornar fatura com dados calculados
-        return {
-          ...f,
-          status: statusAtualizado,
-          valorPago,
-          valorRestante: valorFatura - valorPago
-        }
-      })
-    )
-
-    // Calcular totais
-    const agora = new Date()
-    agora.setHours(0, 0, 0, 0)
-    
-    let totalGeral = 0
-    let totalPago = 0
-    let totalPendente = 0
-    let totalVencido = 0
-
-    faturas.forEach(f => {
-      const valorFatura = Number(f.valor)
-      const valorPago = Number(f.valorPago)
-
-      totalGeral += valorFatura
-      totalPago += valorPago
-
-      const restante = valorFatura - valorPago
+    // Calcular totais e status
+    const faturasComCalculos = faturas.map(fatura => {
+      const valorTotal = toNumber(fatura.valor)
+      const valorPago = fatura.pagamentos.reduce(
+        (sum: number, pag: { valor: Decimal | number | string | null }) => sum + toNumber(pag.valor), 
+        0
+      )
+      const valorRestante = Math.max(0, valorTotal - valorPago)
       
-      // Se ainda tem valor a pagar
-      if (restante > 0.01) {
-        totalPendente += restante
-        
-        // Verificar se está vencido pela DATA, não pelo status
-        if (f.dataVencimento) {
-          const dataVenc = new Date(f.dataVencimento)
-          dataVenc.setHours(0, 0, 0, 0)
-          if (dataVenc < hoje) {
-            totalVencido += restante
-          }
-        }
+      // Determinar status real
+      let statusCalculado: 'PENDENTE' | 'PAGO' | 'VENCIDO' | 'PARCIAL' = fatura.status
+      if (valorPago >= valorTotal) {
+        statusCalculado = 'PAGO'
+      } else if (valorPago > 0) {
+        statusCalculado = 'PARCIAL'
+      } else if (fatura.dataVencimento && new Date(fatura.dataVencimento) < new Date()) {
+        statusCalculado = 'VENCIDO'
+      }
+
+      return {
+        ...fatura,
+        valor: valorTotal,
+        valorOriginal: toNumber(fatura.valorOriginal),
+        cambio: toNumber(fatura.cambio),
+        valorParcela: toNumber(fatura.valorParcela),
+        valorPago,
+        valorRestante,
+        status: statusCalculado,
+        pagamentos: fatura.pagamentos.map(p => ({
+          ...p,
+          valor: toNumber(p.valor)
+        })),
+        // Flatten destinatários
+        destinatarios: fatura.destinatarios.map(d => d.requerente)
       }
     })
 
-    const totais = {
-      total: totalGeral,
-      pago: totalPago,
-      pendente: totalPendente,
-      vencido: totalVencido,
-    }
+    // Totais gerais
+    const totais = faturasComCalculos.reduce((acc, f) => ({
+      total: acc.total + f.valor,
+      pago: acc.pago + f.valorPago,
+      pendente: acc.pendente + (f.status === 'PENDENTE' || f.status === 'PARCIAL' ? f.valorRestante : 0),
+      vencido: acc.vencido + (f.status === 'VENCIDO' ? f.valorRestante : 0)
+    }), { total: 0, pago: 0, pendente: 0, vencido: 0 })
 
-    return NextResponse.json({ faturas, totais })
+    return NextResponse.json({ faturas: faturasComCalculos, totais })
+
   } catch (error) {
     console.error('Erro ao buscar faturas:', error)
     return NextResponse.json(
-      { error: "Erro ao buscar faturas" },
+      { error: 'Erro ao buscar faturas' },
       { status: 500 }
     )
   }
 }
 
+// ========================================
 // POST - Criar nova fatura
+// ========================================
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
     const { processoId } = await params
-    const id = parseInt(processoId)
-
-    if (isNaN(id)) {
-      return NextResponse.json(
-        { error: "ID inválido" },
-        { status: 400 }
-      )
-    }
-
+    const processoIdNum = parseInt(processoId)
+    
     const body = await request.json()
-    const { 
-      descricao, 
-      valor, 
+
+    const {
+      descricao,
+      moeda = 'BRL',
+      valorOriginal,
+      cambio,
+      valor,
+      metodoPagamento,
+      parcelas = 1,
+      valorParcela,
       dataVencimento,
-      observacoes 
+      observacoes,
+      destinatarioIds
     } = body
 
-    if (!descricao || !valor) {
+    // Validações
+    if (!descricao?.trim()) {
       return NextResponse.json(
-        { error: "Descrição e valor são obrigatórios" },
+        { error: 'Descrição é obrigatória' },
         { status: 400 }
       )
     }
 
-    // Verificar se processo existe
-    const processo = await prisma.processo.findUnique({
-      where: { id }
-    })
-
-    if (!processo) {
+    if (!valor || parseFloat(valor) <= 0) {
       return NextResponse.json(
-        { error: "Processo não encontrado" },
-        { status: 404 }
+        { error: 'Valor deve ser maior que zero' },
+        { status: 400 }
       )
     }
 
+    // Criar fatura
     const fatura = await prisma.fatura.create({
       data: {
-        processoId: id,
-        descricao,
+        processoId: processoIdNum,
+        descricao: descricao.trim(),
+        moeda,
+        valorOriginal: valorOriginal ? parseFloat(valorOriginal) : null,
+        cambio: cambio ? parseFloat(cambio) : null,
         valor: parseFloat(valor),
-        dataVencimento: dataVencimento ? new Date(dataVencimento + 'T12:00:00') : null,
+        metodoPagamento: metodoPagamento || null,
+        parcelas: parcelas || 1,
+        valorParcela: valorParcela ? parseFloat(valorParcela) : null,
+        dataVencimento: dataVencimento ? new Date(dataVencimento) : null,
         observacoes: observacoes || null,
-        status: 'PENDENTE'
+        // Criar relacionamentos com destinatários
+        destinatarios: destinatarioIds?.length > 0 ? {
+          create: destinatarioIds.map((requerenteId: number) => ({
+            requerenteId
+          }))
+        } : undefined
+      },
+      include: {
+        destinatarios: {
+          include: {
+            requerente: {
+              select: { id: true, nome: true }
+            }
+          }
+        }
       }
     })
 
-    return NextResponse.json({ fatura }, { status: 201 })
+    return NextResponse.json(fatura, { status: 201 })
+
   } catch (error) {
     console.error('Erro ao criar fatura:', error)
     return NextResponse.json(
-      { error: "Erro ao criar fatura" },
+      { error: 'Erro ao criar fatura' },
       { status: 500 }
     )
   }

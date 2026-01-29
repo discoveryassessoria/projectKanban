@@ -1,4 +1,5 @@
 // src/components/kanban/ProcessoFaturas.tsx
+// ATUALIZADO - Com suporte a moedas, parcelas e destinatários
 
 "use client"
 
@@ -17,14 +18,33 @@ import {
   Receipt,
   TrendingDown,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Users,
+  Coins,
+  CreditCard
 } from "lucide-react"
 import { TabelaCustos } from "./TabelaCustos"
 import { DatePickerField } from "@/components/ui/date-picker-field"
+import { NovaFaturaModal } from "./NovaFaturaModal"
+
+// ========================================
+// TYPES
+// ========================================
+interface Requerente {
+  id: number
+  nome: string
+  cpf?: string | null
+  endereco?: string | null
+  numero?: string | null
+  bairro?: string | null
+  cidade?: string | null
+  estado?: string | null
+  cep?: string | null
+}
 
 interface Pagamento {
   id: number
-  valor: number | string
+  valor: number
   data: string
   formaPagamento: string | null
   comprovanteUrl: string | null
@@ -36,16 +56,21 @@ interface Fatura {
   id: number
   processoId: number
   descricao: string
-  valor: number | string
+  moeda: 'BRL' | 'EUR' | 'USD'
+  valorOriginal: number | null
+  cambio: number | null
+  valor: number
+  metodoPagamento: string | null
+  parcelas: number
+  valorParcela: number | null
   status: 'PENDENTE' | 'PAGO' | 'VENCIDO' | 'PARCIAL'
   dataEmissao: string
   dataVencimento: string | null
   observacoes: string | null
-  // Calculados
   valorPago: number
   valorRestante: number
-  // Histórico de pagamentos
   pagamentos: Pagamento[]
+  destinatarios: Requerente[]
 }
 
 interface Totais {
@@ -61,6 +86,9 @@ interface ProcessoFaturasProps {
   onUpdate?: () => void
 }
 
+// ========================================
+// CONSTANTS
+// ========================================
 const STATUS_CONFIG = {
   PENDENTE: { 
     label: 'Pendente', 
@@ -84,20 +112,30 @@ const STATUS_CONFIG = {
   },
 }
 
-const FORMAS_PAGAMENTO = [
-  { value: 'PIX', label: 'PIX' },
-  { value: 'CARTAO_CREDITO', label: 'Cartão de Crédito' },
-  { value: 'CARTAO_DEBITO', label: 'Cartão de Débito' },
-  { value: 'BOLETO', label: 'Boleto' },
-  { value: 'TRANSFERENCIA', label: 'Transferência' },
-  { value: 'DINHEIRO', label: 'Dinheiro' },
-  { value: 'CHEQUE', label: 'Cheque' },
-  { value: 'OUTRO', label: 'Outro' },
-]
+const FORMAS_PAGAMENTO: Record<string, string> = {
+  PIX: 'PIX',
+  CARTAO_CREDITO: 'Cartão de Crédito',
+  CARTAO_DEBITO: 'Cartão de Débito',
+  BOLETO: 'Boleto',
+  TRANSFERENCIA: 'Transferência',
+  DINHEIRO: 'Dinheiro',
+  CHEQUE: 'Cheque',
+  OUTRO: 'Outro',
+}
 
+const MOEDA_SYMBOLS: Record<string, string> = {
+  BRL: 'R$',
+  EUR: '€',
+  USD: '$'
+}
+
+// ========================================
+// COMPONENT
+// ========================================
 export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoFaturasProps) {
   const [faturas, setFaturas] = useState<Fatura[]>([])
   const [totais, setTotais] = useState<Totais>({ total: 0, pago: 0, pendente: 0, vencido: 0 })
+  const [requerentes, setRequerentes] = useState<Requerente[]>([])
   const [loading, setLoading] = useState(true)
   
   // Controle de seções
@@ -109,71 +147,54 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
   const [showPagar, setShowPagar] = useState<Fatura | null>(null)
   const [expandedFatura, setExpandedFatura] = useState<number | null>(null)
   
-  // Form nova fatura
-  const [novaDescricao, setNovaDescricao] = useState('')
-  const [novaValor, setNovaValor] = useState('')
-  const [novaVencimento, setNovaVencimento] = useState('')
-  const [novaObservacao, setNovaObservacao] = useState('')
-  const [salvando, setSalvando] = useState(false)
-  
   // Form pagar
   const [pagarForma, setPagarForma] = useState('')
   const [pagarValor, setPagarValor] = useState('')
   const [pagarData, setPagarData] = useState('')
   const [pagarObservacao, setPagarObservacao] = useState('')
+  const [salvando, setSalvando] = useState(false)
 
+  // ========================================
+  // DATA LOADING
+  // ========================================
   useEffect(() => {
-    carregarFaturas()
+    carregarDados()
   }, [processoId])
 
-  const carregarFaturas = async () => {
+  const carregarDados = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/processos/${processoId}/faturas`)
-      if (response.ok) {
-        const data = await response.json()
+      
+      // Carregar faturas e requerentes em paralelo
+      const [faturasRes, processoRes] = await Promise.all([
+        fetch(`/api/processos/${processoId}/faturas`),
+        fetch(`/api/processos/${processoId}`)
+      ])
+      
+      if (faturasRes.ok) {
+        const data = await faturasRes.json()
         setFaturas(data.faturas || [])
         setTotais(data.totais || { total: 0, pago: 0, pendente: 0, vencido: 0 })
       }
+      
+      if (processoRes.ok) {
+        const data = await processoRes.json()
+        console.log('Processo carregado:', data)
+        // A API retorna { processo: {...} }, então precisa acessar data.processo
+        const reqs = data.processo?.requerentes || []
+        console.log('Requerentes extraídos:', reqs)
+        setRequerentes(reqs)
+      }
     } catch (error) {
-      console.error('Erro ao carregar faturas:', error)
+      console.error('Erro ao carregar dados:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleCriarFatura = async () => {
-    if (!novaDescricao || !novaValor) return
-
-    try {
-      setSalvando(true)
-      const response = await fetch(`/api/processos/${processoId}/faturas`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          descricao: novaDescricao,
-          valor: novaValor,
-          dataVencimento: novaVencimento || null,
-          observacoes: novaObservacao || null
-        })
-      })
-
-      if (response.ok) {
-        setShowNovaFatura(false)
-        setNovaDescricao('')
-        setNovaValor('')
-        setNovaVencimento('')
-        setNovaObservacao('')
-        carregarFaturas()
-        onUpdate?.()
-      }
-    } catch (error) {
-      console.error('Erro ao criar fatura:', error)
-    } finally {
-      setSalvando(false)
-    }
-  }
-
+  // ========================================
+  // HANDLERS
+  // ========================================
   const handlePagar = async () => {
     if (!showPagar) return
 
@@ -196,7 +217,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
         setPagarValor('')
         setPagarData('')
         setPagarObservacao('')
-        carregarFaturas()
+        carregarDados()
         onUpdate?.()
       }
     } catch (error) {
@@ -215,7 +236,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
       })
 
       if (response.ok) {
-        carregarFaturas()
+        carregarDados()
         onUpdate?.()
       }
     } catch (error) {
@@ -223,9 +244,14 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
     }
   }
 
-  const formatarMoeda = (valor: number | string) => {
-    const num = typeof valor === 'string' ? parseFloat(valor) : valor
-    return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  // ========================================
+  // FORMATTERS
+  // ========================================
+  const formatarMoeda = (valor: number, moeda: string = 'BRL') => {
+    return valor.toLocaleString('pt-BR', { 
+      style: 'currency', 
+      currency: moeda === 'BRL' ? 'BRL' : moeda 
+    })
   }
 
   const formatarData = (data: string | null) => {
@@ -233,6 +259,9 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
     return new Date(data).toLocaleDateString('pt-BR')
   }
 
+  // ========================================
+  // RENDER
+  // ========================================
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-y-auto">
       {/* ===== SEÇÃO: TABELA DE CUSTOS ===== */}
@@ -284,9 +313,10 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Button 
+              <Button
                 onClick={(e) => {
                   e.stopPropagation()
+                  console.log('Requerentes ao abrir modal:', requerentes)
                   setShowNovaFatura(true)
                 }}
                 size="sm"
@@ -352,6 +382,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                   const config = STATUS_CONFIG[fatura.status]
                   const StatusIcon = config.icon
                   const isExpanded = expandedFatura === fatura.id
+                  const temMoedaEstrangeira = fatura.moeda !== 'BRL'
 
                   return (
                     <div
@@ -373,15 +404,39 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                               <p className="font-medium text-gray-900 truncate">
                                 {fatura.descricao}
                               </p>
-                              <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                                <span className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" />
-                                  {formatarData(fatura.dataEmissao)}
-                                </span>
+                              <div className="flex items-center gap-3 mt-1 text-sm text-gray-500 flex-wrap">
+                                {/* Método de pagamento */}
+                                {fatura.metodoPagamento && (
+                                  <span className="flex items-center gap-1">
+                                    <CreditCard className="h-3 w-3" />
+                                    {FORMAS_PAGAMENTO[fatura.metodoPagamento] || fatura.metodoPagamento}
+                                  </span>
+                                )}
+                                {/* Moeda */}
+                                {temMoedaEstrangeira && (
+                                  <span className="flex items-center gap-1 text-blue-600">
+                                    <Coins className="h-3 w-3" />
+                                    {fatura.moeda}
+                                  </span>
+                                )}
+                                {/* Parcelas */}
+                                {fatura.parcelas > 1 && (
+                                  <span className="text-amber-600 font-medium">
+                                    {fatura.parcelas}x
+                                  </span>
+                                )}
+                                {/* Vencimento */}
                                 {fatura.dataVencimento && (
                                   <span className="flex items-center gap-1">
                                     <Clock className="h-3 w-3" />
                                     Venc: {formatarData(fatura.dataVencimento)}
+                                  </span>
+                                )}
+                                {/* Destinatários */}
+                                {fatura.destinatarios?.length > 0 && (
+                                  <span className="flex items-center gap-1">
+                                    <Users className="h-3 w-3" />
+                                    {fatura.destinatarios.length} pessoa(s)
                                   </span>
                                 )}
                               </div>
@@ -391,8 +446,13 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                               <p className="font-bold text-gray-900 text-lg">
                                 {formatarMoeda(fatura.valor)}
                               </p>
+                              {temMoedaEstrangeira && fatura.valorOriginal && (
+                                <p className="text-xs text-blue-600">
+                                  {MOEDA_SYMBOLS[fatura.moeda]} {fatura.valorOriginal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
+                              )}
                               <span className={`
-                                inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border
+                                inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border mt-1
                                 ${config.color}
                               `}>
                                 {config.label}
@@ -413,11 +473,36 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                       {/* Detalhes expandidos */}
                       {isExpanded && (
                         <div className="border-t bg-gray-50 p-4">
+                          {/* Destinatários */}
+                          {fatura.destinatarios?.length > 0 && (
+                            <div className="mb-4">
+                              <p className="text-xs text-gray-500 uppercase mb-2 flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                Destinatários
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {fatura.destinatarios.map(dest => (
+                                  <span 
+                                    key={dest.id}
+                                    className="px-2 py-1 bg-white border rounded-lg text-sm"
+                                  >
+                                    {dest.nome}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
                           {/* Resumo financeiro */}
-                          <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-white rounded-lg border">
+                          <div className="grid grid-cols-4 gap-4 mb-4 p-3 bg-white rounded-lg border">
                             <div>
                               <p className="text-xs text-gray-500 uppercase">Valor Total</p>
                               <p className="text-sm font-bold text-gray-900">{formatarMoeda(fatura.valor)}</p>
+                              {temMoedaEstrangeira && fatura.valorOriginal && (
+                                <p className="text-xs text-blue-600">
+                                  ({MOEDA_SYMBOLS[fatura.moeda]} {fatura.valorOriginal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} × {fatura.cambio})
+                                </p>
+                              )}
                             </div>
                             <div>
                               <p className="text-xs text-gray-500 uppercase">Pago</p>
@@ -427,6 +512,14 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                               <p className="text-xs text-gray-500 uppercase">Restante</p>
                               <p className="text-sm font-bold text-orange-600">{formatarMoeda(fatura.valorRestante)}</p>
                             </div>
+                            {fatura.parcelas > 1 && (
+                              <div>
+                                <p className="text-xs text-gray-500 uppercase">Parcelas</p>
+                                <p className="text-sm font-bold text-amber-600">
+                                  {fatura.parcelas}x de {formatarMoeda(fatura.valorParcela || fatura.valor / fatura.parcelas)}
+                                </p>
+                              </div>
+                            )}
                           </div>
 
                           {/* Histórico de pagamentos */}
@@ -442,7 +535,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                       <span className="text-gray-500">{formatarData(pag.data)}</span>
                                     </div>
                                     <span className="text-gray-500">
-                                      {FORMAS_PAGAMENTO.find(f => f.value === pag.formaPagamento)?.label || pag.formaPagamento || '-'}
+                                      {FORMAS_PAGAMENTO[pag.formaPagamento || ''] || pag.formaPagamento || '-'}
                                     </span>
                                   </div>
                                 ))}
@@ -497,90 +590,34 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
         )}
       </div>
 
-      {/* Modal Nova Fatura */}
-      {showNovaFatura && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="font-semibold text-gray-900">Nova Fatura</h3>
-              <button 
-                onClick={() => setShowNovaFatura(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            
-            <div className="p-4 space-y-4">
+      {/* Total Geral Flutuante */}
+      {totais.total > 0 && (
+        <div className="sticky bottom-4 mx-6 mb-4">
+          <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-xl p-4 shadow-lg text-white">
+            <div className="flex items-center justify-between">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descrição *
-                </label>
-                <Input
-                  value={novaDescricao}
-                  onChange={(e) => setNovaDescricao(e.target.value)}
-                  placeholder="Ex: Busca documental, Tradução..."
-                />
+                <p className="text-emerald-100 text-sm">Total Geral do Processo</p>
+                <p className="text-2xl font-bold">{formatarMoeda(totais.total)}</p>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Valor *
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={novaValor}
-                    onChange={(e) => setNovaValor(e.target.value)}
-                    className="pl-10"
-                    placeholder="0,00"
-                  />
-                </div>
+              <div className="text-right">
+                <p className="text-emerald-100 text-sm">Saldo a Receber</p>
+                <p className="text-xl font-bold">{formatarMoeda(totais.pendente + totais.vencido)}</p>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Data de Vencimento
-                </label>
-                <DatePickerField
-                  value={novaVencimento}
-                  onChange={setNovaVencimento}
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Observações
-                </label>
-                <textarea
-                  value={novaObservacao}
-                  onChange={(e) => setNovaObservacao(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-sm resize-none"
-                  rows={3}
-                  placeholder="Notas adicionais..."
-                />
-              </div>
-            </div>
-            
-            <div className="flex justify-end gap-2 p-4 border-t bg-gray-50">
-              <Button
-                variant="outline"
-                onClick={() => setShowNovaFatura(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleCriarFatura}
-                disabled={!novaDescricao || !novaValor || salvando}
-                className="bg-emerald-600 hover:bg-emerald-700"
-              >
-                {salvando ? 'Salvando...' : 'Criar Fatura'}
-              </Button>
             </div>
           </div>
         </div>
+      )}
+
+      {showNovaFatura && (
+        <NovaFaturaModal
+          processoId={processoId}
+          requerentes={requerentes}  // ← Verifica se está passando isso
+          onClose={() => setShowNovaFatura(false)}
+          onSuccess={() => {
+            carregarDados()
+            onUpdate?.()
+          }}
+        />
       )}
 
       {/* Modal Pagar */}
@@ -628,8 +665,8 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                     className="w-full px-3 py-2 border rounded-lg text-sm"
                   >
                     <option value="">Selecione...</option>
-                    {FORMAS_PAGAMENTO.map(f => (
-                      <option key={f.value} value={f.value}>{f.label}</option>
+                    {Object.entries(FORMAS_PAGAMENTO).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
                     ))}
                   </select>
                 </div>

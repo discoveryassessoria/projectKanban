@@ -165,6 +165,13 @@ enum StatusPost {
   ARQUIVADO
 }
 
+// ✅ NOVO: Enum de Moeda
+enum Moeda {
+  BRL
+  EUR
+  USD
+}
+
 // ========================================
 // USUÁRIOS
 // ========================================
@@ -654,6 +661,7 @@ model Requerente {
 
   processos       ProcessoRequerente[]
   anexos          AnexoRequerente[]
+  faturas FaturaDestinatario[]
   
   // ✅ NOVO: Protocolos vinculados
   protocolos      Protocolo[]
@@ -877,8 +885,17 @@ model Fatura {
   // Observações
   observacoes     String?       @db.Text
   
+  moeda           Moeda         @default(BRL)
+  valorOriginal   Decimal?      @db.Decimal(10, 2)
+  cambio          Decimal?      @db.Decimal(10, 4)
+  metodoPagamento FormaPagamento?
+  parcelas        Int           @default(1)
+  valorParcela    Decimal?      @db.Decimal(10, 2)
+
   // ✅ NOVO: Pagamentos vinculados (histórico completo)
   pagamentos      PagamentoFatura[]
+  
+  destinatarios   FaturaDestinatario[]
   
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -1326,4 +1343,17 @@ model BlogPost {
   @@index([dataPublicacao])
   @@index([categoria])
   @@index([destaque])
+}
+
+model FaturaDestinatario {
+  id            Int       @id @default(autoincrement())
+  faturaId      Int
+  fatura        Fatura    @relation(fields: [faturaId], references: [id], onDelete: Cascade)
+  requerenteId  Int
+  requerente    Requerente @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  
+  @@unique([faturaId, requerenteId])
+  @@index([faturaId])
+  @@index([requerenteId])
 }
