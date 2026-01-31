@@ -928,11 +928,15 @@ export function ProcessoDetailsModal({
               </div>
 
               {/* ========== COLUNA DIREITA - TAREFAS (COMPONENTE) ========== */}
-              {/* ✅ CORRIGIDO: Adicionado prop pais */}
+              {/* ✅ CORRIGIDO: Adicionado prop pessoas */}
               <ProcessoTarefas 
                 processoId={processo.id}
                 pais={paisConfig.label}
                 onUpdate={onSave}
+                pessoas={[
+                  ...requerentesSelecionados.map(r => ({ id: r.id, nome: r.nome, tipo: 'REQUERENTE' as const })),
+                  ...contratantesSelecionados.map(c => ({ id: c.id, nome: c.nome, tipo: 'CONTRATANTE' as const }))
+                ]}
               />
             </div>
           )}

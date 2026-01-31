@@ -8,49 +8,25 @@ export interface TarefaPreDefinida {
   prioridade?: "BAIXA" | "MEDIA" | "ALTA" | "URGENTE"
 }
 
-// Tarefas pré-definidas por país
+// Tarefas padrão (mesma lista para todos os países)
+const TAREFAS_PADRAO: TarefaPreDefinida[] = [
+  { id: "documentos_pessoais", nome: "Documentos pessoais" },
+  { id: "procuracao_administrativa", nome: "Procuração administrativa" },
+  { id: "emissao_pasta_documental", nome: "Emissão da pasta documental" },
+  { id: "procuracao_judicial_retificacao", nome: "Procuração judicial (Retificação)" },
+  { id: "emissao_pasta_documental_retificada", nome: "Emissão da pasta documental (Retificada)" },
+  { id: "emissao_cnn", nome: "Emissão da CNN" },
+  { id: "traducao_juramentada", nome: "Tradução juramentada" },
+  { id: "apostilamento_haia", nome: "Apostilamento de Haia" },
+  { id: "formulario_consular", nome: "Formulário consular" },
+]
+
+// Tarefas pré-definidas por país (todos usam a lista padrão)
 export const TAREFAS_POR_PAIS: Record<string, TarefaPreDefinida[]> = {
-  Italia: [
-    { id: "busca_certidao_italia", nome: "Busca de certidão na Itália" },
-    { id: "busca_certidao_brasil", nome: "Busca de certidão no Brasil" },
-    { id: "confeccao_procuracao_administrativa", nome: "Confecção procuração administrativa" },
-    { id: "emissao_pasta_documental", nome: "Emissão da pasta documental" },
-    { id: "emissao_cnn", nome: "Emissão da CNN" },
-    { id: "confeccao_procuracao_judicial_retificacao", nome: "Confecção procuração judicial (Retificação)" },
-    { id: "traducao_juramentada", nome: "Tradução juramentada" },
-    { id: "confeccao_procuracao_judicial_italia", nome: "Confecção procuração judicial Itália" },
-    { id: "apostilamento_haia", nome: "Apostilamento de Haia" },
-  ],
-  Alemanha: [
-    { id: "busca_certidao_alemanha", nome: "Busca de certidão na Alemanha" },
-    { id: "busca_certidao_brasil", nome: "Busca de certidão no Brasil" },
-    { id: "confeccao_procuracao_administrativa", nome: "Confecção procuração administrativa" },
-    { id: "emissao_pasta_documental", nome: "Emissão da pasta documental" },
-    { id: "emissao_cnn", nome: "Emissão da CNN" },
-    { id: "confeccao_procuracao_judicial_retificacao", nome: "Confecção procuração judicial (Retificação)" },
-    { id: "traducao_juramentada", nome: "Tradução juramentada" },
-    { id: "formularios_consular", nome: "Formulários consular" },
-  ],
-  Espanha: [
-    { id: "documentos_pessoais", nome: "Documentos pessoais" },
-    { id: "confeccao_procuracao_administrativa", nome: "Confecção procuração administrativa" },
-    { id: "emissao_pasta_documental", nome: "Emissão da pasta documental" },
-    { id: "confeccao_procuracao_judicial_retificacao", nome: "Confecção procuração judicial (Retificação)" },
-    { id: "emissao_pasta_documental_retificada", nome: "Emissão da pasta documental (Retificada)" },
-    { id: "emissao_cnn", nome: "Emissão da CNN" },
-    { id: "apostilamento_haia", nome: "Apostilamento de Haia" },
-    { id: "formularios_consular", nome: "Formulários consular" },
-  ],
-  Portugal: [
-    { id: "busca_certidao_portugal", nome: "Busca de certidão em Portugal" },
-    { id: "busca_certidao_brasil", nome: "Busca de certidão no Brasil" },
-    { id: "confeccao_procuracao_administrativa", nome: "Confecção procuração administrativa" },
-    { id: "emissao_pasta_documental", nome: "Emissão da pasta documental" },
-    { id: "emissao_cnn", nome: "Emissão da CNN" },
-    { id: "confeccao_procuracao_judicial_retificacao", nome: "Confecção procuração judicial (Retificação)" },
-    { id: "apostilamento_haia", nome: "Apostilamento de Haia" },
-    { id: "formularios_consular", nome: "Formulários consular" },
-  ],
+  Italia: TAREFAS_PADRAO,
+  Alemanha: TAREFAS_PADRAO,
+  Espanha: TAREFAS_PADRAO,
+  Portugal: TAREFAS_PADRAO,
 }
 
 // Função helper para obter tarefas por país

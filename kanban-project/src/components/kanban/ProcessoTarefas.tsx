@@ -25,10 +25,30 @@ import {
   CalendarCheck,
   CalendarClock,
   ClipboardCheck,
-  FolderOpen
+  FolderOpen,
+  GripVertical
 } from "lucide-react"
 import { getTarefasPorPais, type TarefaPreDefinida } from "../../lib/tarefas-config"
 import { isPast, formatDateBR } from "@/src/lib/date-utils"
+
+// ✅ NOVO: Imports do dnd-kit para drag-and-drop
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 // ==========================================
 // CLASSES PADRÃO PARA FORMULÁRIOS
@@ -74,12 +94,21 @@ interface Tarefa {
   responsavelId?: number
   subtarefas?: Tarefa[]
   tarefaPaiId?: number
+  ordem?: number
+}
+
+// ✅ NOVO: Interface para Pessoa (requerente/contratante)
+interface Pessoa {
+  id: number
+  nome: string
+  tipo: 'REQUERENTE' | 'CONTRATANTE'
 }
 
 interface ProcessoTarefasProps {
   processoId: number
   pais: string
   onUpdate?: () => void
+  pessoas?: Pessoa[]  // ✅ NOVO: Lista de requerentes e contratantes
 }
 
 // ==========================================
@@ -175,7 +204,185 @@ function BadgePrioridade({ prioridade }: { prioridade: string }) {
 }
 
 // ==========================================
-// COMPONENTE: Card da Tarefa Principal (tela principal - NÃO MUDA)
+// ✅ NOVO: COMPONENTE: Card da Tarefa Arrastável (Sortable)
+// ==========================================
+interface SortableTarefaCardProps {
+  tarefa: Tarefa
+  onClick: () => void
+  onDelete: (e: React.MouseEvent) => void
+}
+
+function SortableTarefaCard({ tarefa, onClick, onDelete }: SortableTarefaCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: tarefa.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1000 : 1,
+  }
+
+  const subtarefas = tarefa.subtarefas || []
+  const temSubtarefas = subtarefas.length > 0
+  
+  // Calcula progresso baseado nas tarefas dentro das atividades
+  const calcularProgresso = () => {
+    let totalTarefas = 0
+    let tarefasConcluidas = 0
+    
+    subtarefas.forEach(atividade => {
+      const tarefasDaAtividade = atividade.subtarefas || []
+      totalTarefas += tarefasDaAtividade.length
+      tarefasConcluidas += tarefasDaAtividade.filter(t => t.concluida).length
+    })
+    
+    if (totalTarefas === 0) {
+      return tarefa.concluida ? 100 : 0
+    }
+    return (tarefasConcluidas / totalTarefas) * 100
+  }
+  
+  const porcentagem = calcularProgresso()
+  const atrasada = tarefa.dataPrazo && isPast(tarefa.dataPrazo) && !tarefa.concluida
+
+  // Conta total de tarefas dentro das atividades
+  const contarTarefas = () => {
+    let total = 0
+    subtarefas.forEach(atividade => {
+      total += (atividade.subtarefas || []).length
+    })
+    return total
+  }
+  const totalTarefas = contarTarefas()
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`
+        group relative flex items-center gap-4 p-4 rounded-xl cursor-pointer
+        transition-all duration-200 ease-out border
+        ${tarefa.concluida 
+          ? 'bg-gray-50/80 border-gray-200/60 opacity-70' 
+          : atrasada
+            ? 'bg-white border-red-200 hover:border-red-300 hover:shadow-md hover:shadow-red-100/50'
+            : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-md hover:shadow-blue-100/50'
+        }
+        ${isDragging ? 'shadow-lg ring-2 ring-blue-400' : ''}
+      `}
+    >
+      {/* ✅ NOVO: Handle de arraste */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="flex-shrink-0 cursor-grab active:cursor-grabbing p-1 -ml-2 rounded hover:bg-gray-100 transition-colors"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical className="w-4 h-4 text-gray-400" />
+      </div>
+
+      {/* Indicador lateral de prioridade */}
+      {!tarefa.concluida && (
+        <div className={`absolute left-0 top-3 bottom-3 w-1 rounded-r-full transition-all
+          ${tarefa.prioridade === 'URGENTE' ? 'bg-red-500' : ''}
+          ${tarefa.prioridade === 'ALTA' ? 'bg-orange-500' : ''}
+          ${tarefa.prioridade === 'MEDIA' ? 'bg-amber-400' : ''}
+          ${tarefa.prioridade === 'BAIXA' ? 'bg-emerald-400' : ''}
+        `} />
+      )}
+
+      {/* Círculo de progresso ou ícone de pasta */}
+      <div className="flex-shrink-0" onClick={onClick}>
+        {totalTarefas > 0 ? (
+          <CirculoProgresso porcentagem={porcentagem} />
+        ) : (
+          <div className={`
+            w-11 h-11 rounded-full border-2 flex items-center justify-center transition-all
+            ${tarefa.concluida 
+              ? 'bg-emerald-500 border-emerald-500' 
+              : 'border-gray-300 bg-gray-50 group-hover:border-blue-400'
+            }
+          `}>
+            {tarefa.concluida ? (
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <FolderOpen className="w-5 h-5 text-gray-400 group-hover:text-blue-400 transition-colors" />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Conteúdo */}
+      <div className="flex-1 min-w-0" onClick={onClick}>
+        <div className="flex items-center gap-2 mb-1.5">
+          <h4 className={`font-semibold text-[15px] leading-tight ${tarefa.concluida ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
+            {tarefa.titulo}
+          </h4>
+        </div>
+
+        {/* Info adicional */}
+        <div className="flex items-center flex-wrap gap-2 text-xs">
+          {!tarefa.concluida && <BadgePrioridade prioridade={tarefa.prioridade} />}
+          
+          {totalTarefas > 0 && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 font-medium border border-blue-100">
+              <ListTodo className="w-3 h-3" />
+              {totalTarefas} tarefa{totalTarefas !== 1 ? 's' : ''}
+            </span>
+          )}
+          
+          {tarefa.dataPrazo && (
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium border
+              ${atrasada 
+                ? 'bg-red-50 text-red-600 border-red-200' 
+                : 'bg-gray-50 text-gray-600 border-gray-200'
+              }
+            `}>
+              <Calendar className="w-3 h-3" />
+              {formatDateBR(tarefa.dataPrazo)}
+            </span>
+          )}
+          
+          {tarefa.responsavel && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 font-medium border border-gray-200">
+              <User className="w-3 h-3" />
+              {tarefa.responsavel.nome.split(' ')[0]}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Ações */}
+      <div className="flex items-center gap-1">
+        <button
+          onClick={onDelete}
+          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+          title="Excluir"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+        <div 
+          onClick={onClick}
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 group-hover:text-blue-500 group-hover:bg-blue-50 transition-all cursor-pointer"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ==========================================
+// COMPONENTE: Card da Tarefa Principal (tela principal - ORIGINAL, sem drag)
 // ==========================================
 interface TarefaCardProps {
   tarefa: Tarefa
@@ -1764,12 +1971,16 @@ interface SubtarefasModalProps {
   onSubtarefaAdd?: (subtarefa: Tarefa) => void
   onSubtarefaRemove?: (subtarefaId: number) => void
   usuarios: Responsavel[]
+  pessoas?: Pessoa[]  // ✅ NOVO: Lista de requerentes e contratantes
 }
 
-function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubtarefaAdd, onSubtarefaRemove, usuarios }: SubtarefasModalProps) {
+function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubtarefaAdd, onSubtarefaRemove, usuarios, pessoas = [] }: SubtarefasModalProps) {
   const [novaAtividade, setNovaAtividade] = useState("")
   const [criando, setCriando] = useState(false)
   const [editandoTarefa, setEditandoTarefa] = useState(false)
+  const [mostrarSeletorPessoas, setMostrarSeletorPessoas] = useState(false)  // ✅ NOVO
+  const [mostrarInputCustom, setMostrarInputCustom] = useState(false)  // ✅ NOVO
+  const seletorPessoasRef = useRef<HTMLDivElement>(null)  // ✅ NOVO
   const [editForm, setEditForm] = useState({
     titulo: tarefa.titulo,
     descricao: tarefa.descricao || "",
@@ -1782,11 +1993,81 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
   const [atividadesLocal, setAtividadesLocal] = useState<Tarefa[]>(tarefa.subtarefas || [])
   const [processando, setProcessando] = useState<Set<number>>(new Set())
   
+  // ✅ NOVO: Verificar se é tarefa que precisa do seletor de pessoas
+  const tituloLower = tarefa.titulo.toLowerCase()
+  const tarefasComSeletorPessoas = [
+    'documentos pessoais',
+    'procuração administrativa',
+    'procuracao administrativa',
+    'procuração judicial',
+    'procuracao judicial',
+    'formulário consular',
+    'formulario consular'
+  ]
+  const isDocumentosPessoais = tarefasComSeletorPessoas.some(t => tituloLower.includes(t))
+
   useEffect(() => {
     if (processando.size === 0) {
       setAtividadesLocal(tarefa.subtarefas || [])
     }
   }, [tarefa.subtarefas])
+
+  // ✅ NOVO: Fechar seletor de pessoas ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (seletorPessoasRef.current && !seletorPessoasRef.current.contains(event.target as Node)) {
+        setMostrarSeletorPessoas(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  // ✅ NOVO: Criar atividade com nome da pessoa
+  const handleCriarAtividadePessoa = async (pessoa: Pessoa) => {
+    const titulo = pessoa.nome  // Apenas o nome da pessoa
+    setMostrarSeletorPessoas(false)
+    
+    const tempId = -Date.now()
+    const novaAtividadeTemp: Tarefa = {
+      id: tempId,
+      titulo,
+      concluida: false,
+      prioridade: "MEDIA",
+      tarefaPaiId: tarefa.id
+    }
+    
+    setAtividadesLocal(prev => [...prev, novaAtividadeTemp])
+    onSubtarefaAdd?.(novaAtividadeTemp)
+
+    setCriando(true)
+    try {
+      const response = await fetch(`/api/tarefas/${tarefa.id}/subtarefas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ titulo })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.subtarefa) {
+          setAtividadesLocal(prev => 
+            prev.map(s => s.id === tempId ? data.subtarefa : s)
+          )
+        }
+        onUpdate()
+      } else {
+        setAtividadesLocal(prev => prev.filter(s => s.id !== tempId))
+        onSubtarefaRemove?.(tempId)
+      }
+    } catch (error) {
+      setAtividadesLocal(prev => prev.filter(s => s.id !== tempId))
+      onSubtarefaRemove?.(tempId)
+      console.error("Erro ao criar atividade:", error)
+    } finally {
+      setCriando(false)
+    }
+  }
 
   // Calcula progresso baseado em todas as tarefas dentro das atividades
   const calcularProgresso = () => {
@@ -2107,27 +2388,144 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
 
         {/* Footer */}
         {!editandoTarefa && (
-          <div className="border-t p-4 bg-gray-50">
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Adicionar nova atividade..."
-                value={novaAtividade}
-                onChange={(e) => setNovaAtividade(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !criando) handleCriarAtividade()
-                }}
-                disabled={criando}
-                className="flex-1 bg-white"
-              />
-              <Button
-                onClick={handleCriarAtividade}
-                disabled={criando || !novaAtividade.trim()}
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                {criando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              </Button>
-            </div>
+          <div className="border-t p-4 bg-gray-50" ref={seletorPessoasRef}>
+            {isDocumentosPessoais && pessoas.length > 0 ? (
+              // ✅ Footer especial para Documentos Pessoais
+              <div className="relative">
+                {mostrarInputCustom ? (
+                  // Input para digitar manualmente
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Nome da atividade..."
+                      value={novaAtividade}
+                      onChange={(e) => setNovaAtividade(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !criando) handleCriarAtividade()
+                        if (e.key === "Escape") {
+                          setMostrarInputCustom(false)
+                          setNovaAtividade("")
+                        }
+                      }}
+                      disabled={criando}
+                      className="flex-1 bg-white"
+                      autoFocus
+                    />
+                    <Button
+                      onClick={handleCriarAtividade}
+                      disabled={criando || !novaAtividade.trim()}
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {criando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setMostrarInputCustom(false)
+                        setNovaAtividade("")
+                      }}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  // Botão para abrir seletor
+                  <button
+                    onClick={() => setMostrarSeletorPessoas(!mostrarSeletorPessoas)}
+                    disabled={criando}
+                    className="w-full flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl text-left hover:border-blue-300 hover:shadow-sm transition-all disabled:opacity-50 group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                      <Plus className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <span className="flex-1 text-gray-500 text-sm">Adicionar nova atividade...</span>
+                    <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${mostrarSeletorPessoas ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
+
+                {/* Dropdown com pessoas */}
+                {mostrarSeletorPessoas && !mostrarInputCustom && (
+                  <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-72 overflow-y-auto">
+                    {/* Requerentes */}
+                    {pessoas.filter(p => p.tipo === 'REQUERENTE').length > 0 && (
+                      <>
+                        <div className="px-4 py-2 border-b border-gray-100">
+                          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Requerentes</p>
+                        </div>
+                        {pessoas.filter(p => p.tipo === 'REQUERENTE').map((pessoa) => (
+                          <button
+                            key={`req-${pessoa.id}`}
+                            onClick={() => handleCriarAtividadePessoa(pessoa)}
+                            disabled={criando}
+                            className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors disabled:opacity-50 flex items-center gap-3"
+                          >
+                            <User className="h-4 w-4 text-gray-300" />
+                            {pessoa.nome}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                    
+                    {/* Contratantes */}
+                    {pessoas.filter(p => p.tipo === 'CONTRATANTE').length > 0 && (
+                      <>
+                        <div className="px-4 py-2 border-b border-gray-100 border-t">
+                          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Contratantes</p>
+                        </div>
+                        {pessoas.filter(p => p.tipo === 'CONTRATANTE').map((pessoa) => (
+                          <button
+                            key={`cont-${pessoa.id}`}
+                            onClick={() => handleCriarAtividadePessoa(pessoa)}
+                            disabled={criando}
+                            className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors disabled:opacity-50 flex items-center gap-3"
+                          >
+                            <User className="h-4 w-4 text-gray-300" />
+                            {pessoa.nome}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                    
+                    <div className="border-t border-gray-100" />
+                    
+                    {/* Opção para digitar manualmente */}
+                    <button
+                      onClick={() => {
+                        setMostrarSeletorPessoas(false)
+                        setMostrarInputCustom(true)
+                      }}
+                      className="w-full px-4 py-3 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-3 font-medium"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Outro (digitar nome)
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Footer padrão para outras tarefas
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Adicionar nova atividade..."
+                  value={novaAtividade}
+                  onChange={(e) => setNovaAtividade(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !criando) handleCriarAtividade()
+                  }}
+                  disabled={criando}
+                  className="flex-1 bg-white"
+                />
+                <Button
+                  onClick={handleCriarAtividade}
+                  disabled={criando || !novaAtividade.trim()}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {criando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -2136,9 +2534,9 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
 }
 
 // ==========================================
-// COMPONENTE PRINCIPAL: ProcessoTarefas (NÃO MUDA)
+// COMPONENTE PRINCIPAL: ProcessoTarefas (COM DRAG-AND-DROP)
 // ==========================================
-export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasProps) {
+export function ProcessoTarefas({ processoId, pais, onUpdate, pessoas = [] }: ProcessoTarefasProps) {
   const [tarefas, setTarefas] = useState<Tarefa[]>([])
   const [loading, setLoading] = useState(true)
   const [novaTarefa, setNovaTarefa] = useState("")
@@ -2151,6 +2549,18 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
   
   const tarefasPreDefinidas = getTarefasPorPais(pais)
   const modalAbertoIdRef = useRef<number | null>(null)
+
+  // ✅ NOVO: Configuração dos sensores para drag-and-drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Precisa arrastar 8px antes de ativar
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
   
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -2179,10 +2589,12 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
       const response = await fetch(`/api/tarefas?processoId=${processoId}&apenasRaiz=true`)
       const data = await response.json()
       if (data.tarefas) {
-        setTarefas(data.tarefas)
+        // Ordenar por campo 'ordem'
+        const tarefasOrdenadas = data.tarefas.sort((a: Tarefa, b: Tarefa) => (a.ordem || 0) - (b.ordem || 0))
+        setTarefas(tarefasOrdenadas)
         
         if (atualizarModal && modalAbertoIdRef.current !== null) {
-          const atualizada = data.tarefas.find((t: Tarefa) => t.id === modalAbertoIdRef.current)
+          const atualizada = tarefasOrdenadas.find((t: Tarefa) => t.id === modalAbertoIdRef.current)
           if (atualizada) {
             setTarefaSelecionada(atualizada)
           }
@@ -2226,10 +2638,23 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
     setMostrarInputCustom(false)
     
     try {
+      // ✅ Definir ordem baseada na posição no array de tarefas pré-definidas
+      const indicePredefinido = tarefasPreDefinidas.findIndex(
+        t => t.nome.toLowerCase() === tituloFinal.toLowerCase()
+      )
+      // Se está na lista, usa o índice. Se não, vai pro final (999+)
+      const ordem = indicePredefinido >= 0 
+        ? indicePredefinido 
+        : 999 + tarefas.filter(t => (t.ordem || 0) >= 999).length
+      
       const response = await fetch("/api/tarefas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ titulo: tituloFinal, processoId })
+        body: JSON.stringify({ 
+          titulo: tituloFinal, 
+          processoId,
+          ordem
+        })
       })
 
       if (response.ok) {
@@ -2266,6 +2691,38 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
   const handleUpdateFromModal = () => {
     fetchTarefas()
     onUpdate?.()
+  }
+
+  // ✅ NOVO: Handler para quando termina de arrastar
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (over && active.id !== over.id) {
+      const oldIndex = tarefas.findIndex((t) => t.id === active.id)
+      const newIndex = tarefas.findIndex((t) => t.id === over.id)
+
+      // Atualizar estado local imediatamente (otimista)
+      const novaOrdem = arrayMove(tarefas, oldIndex, newIndex)
+      setTarefas(novaOrdem)
+
+      // Salvar no banco
+      try {
+        const tarefasComOrdem = novaOrdem.map((t, index) => ({
+          id: t.id,
+          ordem: index
+        }))
+
+        await fetch('/api/tarefas/reordenar', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tarefas: tarefasComOrdem })
+        })
+      } catch (error) {
+        console.error('Erro ao salvar ordem:', error)
+        // Reverter em caso de erro
+        fetchTarefas()
+      }
+    }
   }
 
   const tarefasPendentes = tarefas.filter(t => !t.concluida)
@@ -2386,7 +2843,7 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
         </div>
       </div>
 
-      {/* Lista de tarefas - MANTÉM */}
+      {/* ✅ ATUALIZADO: Lista de tarefas com DnD Context */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -2402,14 +2859,26 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
           </div>
         ) : (
           <div className="space-y-3">
-            {tarefasPendentes.map(tarefa => (
-              <TarefaCard
-                key={tarefa.id}
-                tarefa={tarefa}
-                onClick={() => abrirModal(tarefa)}
-                onDelete={(e) => handleExcluir(tarefa.id, e)}
-              />
-            ))}
+            {/* ✅ NOVO: Lista arrastável de tarefas pendentes */}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={tarefasPendentes.map(t => t.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {tarefasPendentes.map(tarefa => (
+                  <SortableTarefaCard
+                    key={tarefa.id}
+                    tarefa={tarefa}
+                    onClick={() => abrirModal(tarefa)}
+                    onDelete={(e) => handleExcluir(tarefa.id, e)}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
 
             {tarefasConcluidas.length > 0 && tarefasPendentes.length > 0 && (
               <div className="flex items-center gap-3 py-3">
@@ -2421,6 +2890,7 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
               </div>
             )}
 
+            {/* Tarefas concluídas (sem drag) */}
             {tarefasConcluidas.map(tarefa => (
               <TarefaCard
                 key={tarefa.id}
@@ -2475,6 +2945,7 @@ export function ProcessoTarefas({ processoId, pais, onUpdate }: ProcessoTarefasP
             }))
           }}
           usuarios={usuarios}
+          pessoas={pessoas}  // ✅ NOVO: Passar lista de pessoas
         />
       )}
     </div>
