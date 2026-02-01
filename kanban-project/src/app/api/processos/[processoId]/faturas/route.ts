@@ -31,7 +31,16 @@ export async function GET(
       where: { processoId: processoIdNum },
       include: {
         pagamentos: {
-          orderBy: { data: 'desc' }
+          orderBy: { data: 'desc' },
+          include: {
+            destinatarios: {
+              include: {
+                requerente: {
+                  select: { id: true, nome: true }
+                }
+              }
+            }
+          }
         },
         destinatarios: {
           include: {
@@ -112,7 +121,10 @@ export async function GET(
         status: statusCalculado,
         pagamentos: fatura.pagamentos.map(p => ({
           ...p,
-          valor: toNumber(p.valor)
+          valor: toNumber(p.valor),
+          valorOriginal: (p as any).valorOriginal ? toNumber((p as any).valorOriginal) : null,
+          cambio: (p as any).cambio ? toNumber((p as any).cambio) : null,
+          destinatarios: (p as any).destinatarios?.map((d: any) => d.requerente) || []
         })),
         // Flatten destinatários
         destinatarios: fatura.destinatarios.map(d => d.requerente),

@@ -665,6 +665,7 @@ model Requerente {
   
   // ✅ NOVO: Protocolos vinculados
   protocolos      Protocolo[]
+  pagamentosRecebidos  PagamentoDestinatario[]
 }
 
 // ========================================
@@ -919,6 +920,10 @@ model PagamentoFatura {
   data            DateTime       @default(now())
   formaPagamento  FormaPagamento?
   
+  // Para moedas estrangeiras
+  valorOriginal   Decimal?       @db.Decimal(10, 2)
+  cambio          Decimal?       @db.Decimal(10, 4)
+  
   // Comprovante
   comprovanteUrl  String?        @db.Text
   comprovanteNome String?        @db.VarChar(200)
@@ -926,9 +931,28 @@ model PagamentoFatura {
   // Observação
   observacao      String?        @db.Text
   
+  // Destinatários do pagamento
+  destinatarios   PagamentoDestinatario[]
+  
   createdAt       DateTime       @default(now())
   
   @@index([faturaId])
+}
+
+model PagamentoDestinatario {
+  id              Int             @id @default(autoincrement())
+  
+  pagamentoId     Int
+  pagamento       PagamentoFatura @relation(fields: [pagamentoId], references: [id], onDelete: Cascade)
+  
+  requerenteId    Int
+  requerente      Requerente      @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime        @default(now())
+  
+  @@unique([pagamentoId, requerenteId])
+  @@index([pagamentoId])
+  @@index([requerenteId])
 }
 
 // ========================================
