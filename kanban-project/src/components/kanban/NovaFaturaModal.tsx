@@ -9,7 +9,8 @@ import {
   Coins,
   FileText,
   Check,
-  AlertCircle
+  AlertCircle,
+  ArrowRight
 } from "lucide-react"
 
 // ========================================
@@ -44,6 +45,7 @@ export function NovaFaturaModal({
   const [descricao, setDescricao] = useState('')
   const [moeda, setMoeda] = useState<Moeda>('BRL')
   const [valor, setValor] = useState('')
+  const [cambio, setCambio] = useState('')  // ✅ NOVO: Câmbio
   const [observacoes, setObservacoes] = useState('')
   
   // UI state
@@ -62,22 +64,29 @@ export function NovaFaturaModal({
     return isNaN(num) ? 0 : num
   }, [valor])
 
+  const cambioNumerico = useMemo(() => {
+    const num = parseFloat(cambio.replace(',', '.'))
+    return isNaN(num) ? 0 : num
+  }, [cambio])
+
+  // ✅ NOVO: Valor convertido para BRL
+  const valorEmBRL = useMemo(() => {
+    if (moeda === 'BRL') return valorNumerico
+    if (!cambioNumerico) return 0
+    return valorNumerico * cambioNumerico
+  }, [moeda, valorNumerico, cambioNumerico])
+
   const canSubmit = useMemo(() => {
     if (!descricao.trim()) return false
     if (!valor || valorNumerico <= 0) return false
+    // Se moeda estrangeira, exige câmbio
+    if (moeda !== 'BRL' && (!cambio || cambioNumerico <= 0)) return false
     return true
-  }, [descricao, valor, valorNumerico])
+  }, [descricao, valor, valorNumerico, moeda, cambio, cambioNumerico])
 
   // ========================================
   // HANDLERS
   // ========================================
-  const formatarMoeda = (valor: number, currency: string = 'BRL') => {
-    return valor.toLocaleString('pt-BR', { 
-      style: 'currency', 
-      currency: currency === 'BRL' ? 'BRL' : currency 
-    })
-  }
-
   const handleSubmit = async () => {
     if (!canSubmit) return
 
@@ -89,6 +98,7 @@ export function NovaFaturaModal({
         descricao: descricao.trim(),
         moeda,
         valor: valorNumerico,
+        cambio: moeda !== 'BRL' ? cambioNumerico : null,  // ✅ Enviar câmbio
         observacoes: observacoes.trim() || null
       }
 
@@ -172,7 +182,10 @@ export function NovaFaturaModal({
             </label>
             <select
               value={moeda}
-              onChange={(e) => setMoeda(e.target.value as Moeda)}
+              onChange={(e) => {
+                setMoeda(e.target.value as Moeda)
+                if (e.target.value === 'BRL') setCambio('')
+              }}
               className="w-full h-11 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             >
               {MOEDAS.map(m => (
@@ -200,6 +213,47 @@ export function NovaFaturaModal({
               />
             </div>
           </div>
+
+          {/* ✅ NOVO: Câmbio - apenas para moedas estrangeiras */}
+          {moeda !== 'BRL' && (
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                <Coins className="h-4 w-4 text-gray-400" />
+                Câmbio (1 {moeda} = R$) *
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
+                  R$
+                </span>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={cambio}
+                  onChange={(e) => setCambio(e.target.value)}
+                  className="h-11 pl-10"
+                  placeholder="6,20"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Taxa de câmbio para conversão em Reais
+              </p>
+            </div>
+          )}
+
+          {/* ✅ NOVO: Preview da conversão */}
+          {moeda !== 'BRL' && valorNumerico > 0 && cambioNumerico > 0 && (
+            <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
+              <div className="flex items-center gap-2 text-blue-700 w-full justify-center">
+                <span className="font-medium">
+                  {moedaConfig.symbol} {valorNumerico.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+                <ArrowRight className="h-4 w-4" />
+                <span className="font-bold text-lg">
+                  R$ {valorEmBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Observações */}
           <div>

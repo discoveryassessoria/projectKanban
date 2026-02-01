@@ -1,5 +1,5 @@
 // src/app/api/processos/[processoId]/faturas/route.ts
-// ATUALIZADO - Com geração automática de parcelas para boletos
+// ✅ ATUALIZADO - Com câmbio na fatura e totais convertidos para BRL
 
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
@@ -14,6 +14,15 @@ function toNumber(value: Decimal | number | string | null | undefined): number {
   if (typeof value === 'number') return value
   if (typeof value === 'string') return parseFloat(value) || 0
   return parseFloat(value.toString()) || 0
+}
+
+// ========================================
+// HELPER: Converter valor para BRL usando câmbio
+// ========================================
+function converterParaBRL(valor: number, moeda: string, cambio: number | null): number {
+  if (moeda === 'BRL') return valor
+  if (!cambio || cambio <= 0) return valor // Se não tem câmbio, retorna valor original
+  return valor * cambio
 }
 
 // ========================================
@@ -51,6 +60,7 @@ export async function GET(
                 cpf: true,
                 endereco: true,
                 numero: true,
+                complemento: true,
                 bairro: true,
                 cidade: true,
                 estado: true,
@@ -59,7 +69,6 @@ export async function GET(
             }
           }
         },
-        // ✅ NOVO: Incluir parcelas do boleto
         parcelasBoleto: {
           orderBy: { numero: 'asc' }
         }
@@ -68,8 +77,13 @@ export async function GET(
     })
 
     // Calcular totais e status
+    const hoje = new Date()
+    hoje.setUTCHours(0, 0, 0, 0)
+
     const faturasComCalculos = faturas.map(fatura => {
       const valorTotal = toNumber(fatura.valor)
+      const cambioFatura = toNumber(fatura.cambio)
+      
       // Valor pago via pagamentos normais
       const valorPagoPagamentos = fatura.pagamentos.reduce(
         (sum: number, pag: { valor: Decimal | number | string | null }) => sum + toNumber(pag.valor), 
@@ -81,9 +95,14 @@ export async function GET(
         .filter(p => p.pago)
         .reduce((sum, p) => sum + toNumber(p.valor), 0)
 
-      // Total pago = pagamentos + parcelas pagas
+      // Total pago = pagamentos + parcelas pagas (na moeda da fatura)
       const valorPago = valorPagoPagamentos + valorPagoParcelas
       const valorRestante = Math.max(0, valorTotal - valorPago)
+      
+      // ✅ Valores convertidos para BRL (usando câmbio da fatura)
+      const valorTotalBRL = converterParaBRL(valorTotal, fatura.moeda, cambioFatura)
+      const valorPagoBRL = converterParaBRL(valorPago, fatura.moeda, cambioFatura)
+      const valorRestanteBRL = converterParaBRL(valorRestante, fatura.moeda, cambioFatura)
       
       // Determinar status real
       let statusCalculado: 'PENDENTE' | 'PAGO' | 'VENCIDO' | 'PARCIAL' = fatura.status
@@ -92,10 +111,6 @@ export async function GET(
       } else if (valorPago > 0) {
         statusCalculado = 'PARCIAL'
       } else if (fatura.dataVencimento) {
-        // Comparar apenas as datas (sem horário)
-        const hoje = new Date()
-        hoje.setUTCHours(0, 0, 0, 0)
-        
         const vencimento = new Date(fatura.dataVencimento)
         vencimento.setUTCHours(0, 0, 0, 0)
         
@@ -104,7 +119,7 @@ export async function GET(
         }
       }
 
-      // ✅ NOVO: Processar parcelas do boleto
+      // Processar parcelas do boleto
       const parcelasProcessadas = fatura.parcelasBoleto.map(parcela => ({
         ...parcela,
         valor: toNumber(parcela.valor)
@@ -114,10 +129,14 @@ export async function GET(
         ...fatura,
         valor: valorTotal,
         valorOriginal: toNumber(fatura.valorOriginal),
-        cambio: toNumber(fatura.cambio),
+        cambio: cambioFatura,
         valorParcela: toNumber(fatura.valorParcela),
         valorPago,
         valorRestante,
+        // ✅ NOVO: Valores em BRL
+        valorTotalBRL,
+        valorPagoBRL,
+        valorRestanteBRL,
         status: statusCalculado,
         pagamentos: fatura.pagamentos.map(p => ({
           ...p,
@@ -126,18 +145,21 @@ export async function GET(
           cambio: (p as any).cambio ? toNumber((p as any).cambio) : null,
           destinatarios: (p as any).destinatarios?.map((d: any) => d.requerente) || []
         })),
-        // Flatten destinatários
         destinatarios: fatura.destinatarios.map(d => d.requerente),
-        // ✅ NOVO: Parcelas do boleto
         parcelasBoleto: parcelasProcessadas
       }
     })
 
-    // Totais gerais
-    const hoje = new Date()
-    hoje.setUTCHours(0, 0, 0, 0)
-
-    const totais = faturasComCalculos.reduce((acc, f) => {
+    // ========================================
+    // TOTAIS POR MOEDA (como antes)
+    // ========================================
+    const totaisPorMoeda: Record<string, { total: number; pago: number; pendente: number; vencido: number }> = {}
+    
+    faturasComCalculos.forEach(f => {
+      if (!totaisPorMoeda[f.moeda]) {
+        totaisPorMoeda[f.moeda] = { total: 0, pago: 0, pendente: 0, vencido: 0 }
+      }
+      
       const isBoleto = f.metodoPagamento === 'BOLETO'
       const temParcelas = f.parcelasBoleto && f.parcelasBoleto.length > 0
 
@@ -145,38 +167,75 @@ export async function GET(
       let pendenteFatura = 0
 
       if (isBoleto && temParcelas) {
-        // Para boletos, calcular por parcela
         f.parcelasBoleto.forEach(p => {
-          if (p.pago) return // já foi contado no valorPago
-          
-          // Toda parcela não paga é pendente
+          if (p.pago) return
           pendenteFatura += p.valor
-          
-          // Se também está vencida, conta no vencido
           const vencimento = new Date(p.dataVencimento)
           vencimento.setUTCHours(0, 0, 0, 0)
-          
           if (vencimento < hoje) {
             vencidoFatura += p.valor
           }
         })
       } else {
-        // Para não-boletos, usar lógica original
         pendenteFatura = f.valorRestante
         if (f.status === 'VENCIDO') {
           vencidoFatura = f.valorRestante
         }
       }
 
+      totaisPorMoeda[f.moeda].total += f.valor
+      totaisPorMoeda[f.moeda].pago += f.valorPago
+      totaisPorMoeda[f.moeda].pendente += pendenteFatura
+      totaisPorMoeda[f.moeda].vencido += vencidoFatura
+    })
+
+    // ========================================
+    // ✅ NOVO: TOTAIS GERAIS CONVERTIDOS PARA BRL
+    // ========================================
+    const totaisGeralBRL = faturasComCalculos.reduce((acc, f) => {
+      const cambio = f.cambio || 1
+      const isBoleto = f.metodoPagamento === 'BOLETO'
+      const temParcelas = f.parcelasBoleto && f.parcelasBoleto.length > 0
+
+      let vencidoFatura = 0
+      let pendenteFatura = 0
+
+      if (isBoleto && temParcelas) {
+        f.parcelasBoleto.forEach(p => {
+          if (p.pago) return
+          pendenteFatura += p.valor
+          const vencimento = new Date(p.dataVencimento)
+          vencimento.setUTCHours(0, 0, 0, 0)
+          if (vencimento < hoje) {
+            vencidoFatura += p.valor
+          }
+        })
+      } else {
+        pendenteFatura = f.valorRestante
+        if (f.status === 'VENCIDO') {
+          vencidoFatura = f.valorRestante
+        }
+      }
+
+      // Converter para BRL
+      const totalBRL = converterParaBRL(f.valor, f.moeda, cambio)
+      const pagoBRL = converterParaBRL(f.valorPago, f.moeda, cambio)
+      const pendenteBRL = converterParaBRL(pendenteFatura, f.moeda, cambio)
+      const vencidoBRL = converterParaBRL(vencidoFatura, f.moeda, cambio)
+
       return {
-        total: acc.total + f.valor,
-        pago: acc.pago + f.valorPago,
-        pendente: acc.pendente + pendenteFatura,
-        vencido: acc.vencido + vencidoFatura
+        total: acc.total + totalBRL,
+        pago: acc.pago + pagoBRL,
+        pendente: acc.pendente + pendenteBRL,
+        vencido: acc.vencido + vencidoBRL
       }
     }, { total: 0, pago: 0, pendente: 0, vencido: 0 })
 
-    return NextResponse.json({ faturas: faturasComCalculos, totais })
+    return NextResponse.json({ 
+      faturas: faturasComCalculos, 
+      totaisPorMoeda,           // Totais separados por moeda
+      totaisGeralBRL            // ✅ NOVO: Totais convertidos para BRL
+    })
 
   } catch (error) {
     console.error('Erro ao buscar faturas:', error)
@@ -203,12 +262,10 @@ export async function POST(
     const {
       descricao,
       moeda = 'BRL',
-      valorOriginal,
-      cambio,
       valor,
+      cambio,              // ✅ Câmbio da fatura (1 EUR = X BRL)
       metodoPagamento,
       parcelas = 1,
-      valorParcela,
       dataVencimento,
       observacoes,
       destinatarioIds
@@ -230,11 +287,12 @@ export async function POST(
     }
 
     const valorNumerico = parseFloat(valor)
+    const cambioNumerico = cambio ? parseFloat(cambio) : null
     const quantidadeParcelas = parcelas || 1
     const valorParcelaCalculado = valorNumerico / quantidadeParcelas
     const isBoleto = metodoPagamento === 'BOLETO'
 
-    // ✅ NOVO: Gerar datas de vencimento das parcelas para boletos
+    // Gerar datas de vencimento das parcelas para boletos
     let parcelasParaCriar: { numero: number; valor: number; dataVencimento: Date }[] = []
     
     if (isBoleto && quantidadeParcelas > 0 && dataVencimento) {
@@ -248,27 +306,24 @@ export async function POST(
       }))
     }
 
-    // Criar fatura com parcelas
+    // Criar fatura
     const fatura = await prisma.fatura.create({
       data: {
         processoId: processoIdNum,
         descricao: descricao.trim(),
         moeda,
-        valorOriginal: valorOriginal ? parseFloat(valorOriginal) : null,
-        cambio: cambio ? parseFloat(cambio) : null,
         valor: valorNumerico,
+        cambio: cambioNumerico,        // ✅ Salvar câmbio na fatura
         metodoPagamento: metodoPagamento || null,
         parcelas: quantidadeParcelas,
         valorParcela: valorParcelaCalculado,
         dataVencimento: dataVencimento ? new Date(dataVencimento) : null,
         observacoes: observacoes || null,
-        // Criar relacionamentos com destinatários
         destinatarios: destinatarioIds?.length > 0 ? {
           create: destinatarioIds.map((requerenteId: number) => ({
             requerenteId
           }))
         } : undefined,
-        // ✅ NOVO: Criar parcelas para boletos
         parcelasBoleto: parcelasParaCriar.length > 0 ? {
           create: parcelasParaCriar
         } : undefined
