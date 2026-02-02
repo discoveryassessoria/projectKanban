@@ -42,12 +42,17 @@ export async function POST(
       )
     }
 
-    // Apenas iniciar tarefa (sem criar cobrança)
+    // Calcular dataPrazo baseado no prazoCobranca
+    const prazoFinal = prazoCobranca || tarefa.prazoCobranca || 5
+    const dataPrazo = new Date()
+    dataPrazo.setDate(dataPrazo.getDate() + prazoFinal)
+
     const tarefaAtualizada = await prisma.tarefa.update({
       where: { id },
       data: {
         dataInicio: new Date(),
-        prazoCobranca,
+        dataPrazo,
+        prazoCobranca: prazoFinal,
         statusTarefa: "EM_ANDAMENTO"
       }
     })

@@ -274,7 +274,14 @@ function SortableTarefaCard({ tarefa, onClick, onDelete }: SortableTarefaCardPro
     let tarefasConcluidas = 0
     
     subtarefas.forEach(atividade => {
+      // A atividade conta como tarefa
+      totalTarefas += 1
       const tarefasDaAtividade = atividade.subtarefas || []
+      const atividadeConcluida = atividade.concluida || 
+        (tarefasDaAtividade.length > 0 && tarefasDaAtividade.every(t => t.concluida))
+      if (atividadeConcluida) tarefasConcluidas += 1
+
+      // Subtarefas também contam
       totalTarefas += tarefasDaAtividade.length
       tarefasConcluidas += tarefasDaAtividade.filter(t => t.concluida).length
     })
@@ -290,7 +297,7 @@ function SortableTarefaCard({ tarefa, onClick, onDelete }: SortableTarefaCardPro
 
   // Conta total de tarefas dentro das atividades
   const contarTarefas = () => {
-    let total = 0
+    let total = subtarefas.length  // Atividades contam
     subtarefas.forEach(atividade => {
       total += (atividade.subtarefas || []).length
     })
@@ -417,7 +424,14 @@ function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
     let tarefasConcluidas = 0
     
     subtarefas.forEach(atividade => {
+      // A atividade conta como tarefa
+      totalTarefas += 1
       const tarefasDaAtividade = atividade.subtarefas || []
+      const atividadeConcluida = atividade.concluida || 
+        (tarefasDaAtividade.length > 0 && tarefasDaAtividade.every(t => t.concluida))
+      if (atividadeConcluida) tarefasConcluidas += 1
+
+      // Subtarefas também contam
       totalTarefas += tarefasDaAtividade.length
       tarefasConcluidas += tarefasDaAtividade.filter(t => t.concluida).length
     })
@@ -433,7 +447,7 @@ function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
 
   // Conta total de tarefas dentro das atividades
   const contarTarefas = () => {
-    let total = 0
+    let total = subtarefas.length  // Atividades contam
     subtarefas.forEach(atividade => {
       total += (atividade.subtarefas || []).length
     })
@@ -913,7 +927,7 @@ useEffect(() => {
       const response = await fetch(`/api/tarefas/${tarefa.id}/iniciar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prazoCobranca: tarefa.prazoCobranca || 5 })
+        body: JSON.stringify({ prazoCobranca: editForm.prazoCobranca || tarefa.prazoCobranca || 5 })
       })
 
       if (response.ok) {
@@ -1352,7 +1366,7 @@ const handleConferencia = async () => {
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5 text-xs text-gray-500">
                     <Clock className="w-3 h-3" />
-                    <span>Cobrança:</span>
+                    <span>Conclusão:</span>
                     <select
                       value={editForm.prazoCobranca}
                       onChange={(e) => setEditForm({ ...editForm, prazoCobranca: parseInt(e.target.value) })}
@@ -2075,7 +2089,14 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
     let tarefasConcluidas = 0
     
     atividadesLocal.forEach(atividade => {
+      // A atividade conta como tarefa
+      totalTarefas += 1
       const tarefas = atividade.subtarefas || []
+      const atividadeConcluida = atividade.concluida || 
+        (tarefas.length > 0 && tarefas.every(t => t.concluida))
+      if (atividadeConcluida) tarefasConcluidas += 1
+
+      // Subtarefas também contam
       totalTarefas += tarefas.length
       tarefasConcluidas += tarefas.filter(t => t.concluida).length
     })
@@ -2633,8 +2654,32 @@ export function ProcessoTarefas({ processoId, pais, onUpdate, pessoas = [] }: Pr
     }
   }
 
-  const tarefasPendentes = tarefas.filter(t => !t.concluida)
-  const tarefasConcluidas = tarefas.filter(t => t.concluida)
+  // Verifica se tarefa está efetivamente concluída (campo direto OU progresso 100%)
+  const isTarefaEfetivamenteConcluida = (t: Tarefa): boolean => {
+    if (t.concluida) return true
+
+    const subs = t.subtarefas || []
+    if (subs.length === 0) return false
+
+    let total = 0
+    let concluidas = 0
+
+    subs.forEach(atividade => {
+      total += 1
+      const tarefasDaAtividade = atividade.subtarefas || []
+      const atividadeConcluida = atividade.concluida || 
+        (tarefasDaAtividade.length > 0 && tarefasDaAtividade.every(s => s.concluida))
+      if (atividadeConcluida) concluidas += 1
+
+      total += tarefasDaAtividade.length
+      concluidas += tarefasDaAtividade.filter(s => s.concluida).length
+    })
+
+    return total > 0 && concluidas === total
+  }
+
+  const tarefasPendentes = tarefas.filter(t => !isTarefaEfetivamenteConcluida(t))
+  const tarefasConcluidas = tarefas.filter(t => isTarefaEfetivamenteConcluida(t))
 
   return (
     <div className="flex flex-col h-full min-h-0">

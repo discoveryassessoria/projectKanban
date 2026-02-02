@@ -245,33 +245,33 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
     return (
       <div className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
         <div className="px-4 py-3 border-b border-white/10">
-          <div className="grid grid-cols-12 gap-4 items-center">
-            <div className="col-span-1 h-4 bg-white/10 rounded animate-pulse"></div>
-            <div className="col-span-3 h-4 bg-white/10 rounded animate-pulse"></div>
-            <div className="col-span-2 h-4 bg-white/10 rounded animate-pulse"></div>
-            <div className="col-span-2 h-4 bg-white/10 rounded animate-pulse"></div>
-            <div className="col-span-1 h-4 bg-white/10 rounded animate-pulse"></div>
-            <div className="col-span-1 h-4 bg-white/10 rounded animate-pulse"></div>
-            <div className="col-span-1 h-4 bg-white/10 rounded animate-pulse"></div>
-            <div className="col-span-1 h-4 bg-white/10 rounded animate-pulse"></div>
+          <div className="grid gap-4 items-center" style={{ gridTemplateColumns: '28px repeat(8, 1fr)' }}>
+            <div className=" h-4 bg-white/10 rounded animate-pulse"></div>
+            <div className="h-4 bg-white/10 rounded animate-pulse"></div>
+            <div className=" h-4 bg-white/10 rounded animate-pulse"></div>
+            <div className=" h-4 bg-white/10 rounded animate-pulse"></div>
+            <div className=" h-4 bg-white/10 rounded animate-pulse"></div>
+            <div className=" h-4 bg-white/10 rounded animate-pulse"></div>
+            <div className=" h-4 bg-white/10 rounded animate-pulse"></div>
+            <div className=" h-4 bg-white/10 rounded animate-pulse"></div>
           </div>
         </div>
         
         <div className="divide-y divide-white/10">
           {[1, 2, 3, 4, 5].map(i => (
             <div key={i} className="px-4 py-3">
-              <div className="grid grid-cols-12 gap-4 items-center">
-                <div className="col-span-1 h-4 w-4 bg-white/10 rounded animate-pulse"></div>
-                <div className="col-span-3 space-y-2">
+              <div className="grid gap-4 items-center" style={{ gridTemplateColumns: '28px repeat(8, 1fr)' }}>
+                <div className=" h-4 w-4 bg-white/10 rounded animate-pulse"></div>
+                <div className="space-y-2">
                   <div className="h-4 bg-white/10 rounded animate-pulse"></div>
                   <div className="h-3 bg-white/10 rounded animate-pulse w-3/4"></div>
                 </div>
-                <div className="col-span-2 h-4 bg-white/10 rounded animate-pulse"></div>
-                <div className="col-span-2 h-4 bg-white/10 rounded animate-pulse"></div>
-                <div className="col-span-1 h-6 bg-white/10 rounded-full animate-pulse"></div>
-                <div className="col-span-1 h-6 w-6 bg-white/10 rounded-full animate-pulse"></div>
-                <div className="col-span-1 h-6 w-6 bg-white/10 rounded-full animate-pulse"></div>
-                <div className="col-span-1 h-4 bg-white/10 rounded animate-pulse"></div>
+                <div className=" h-4 bg-white/10 rounded animate-pulse"></div>
+                <div className=" h-4 bg-white/10 rounded animate-pulse"></div>
+                <div className=" h-6 bg-white/10 rounded-full animate-pulse"></div>
+                <div className=" h-6 w-6 bg-white/10 rounded-full animate-pulse"></div>
+                <div className=" h-6 w-6 bg-white/10 rounded-full animate-pulse"></div>
+                <div className=" h-4 bg-white/10 rounded animate-pulse"></div>
               </div>
             </div>
           ))}
@@ -303,8 +303,8 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
     <div className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
       {/* Table Header */}
       <div className="px-4 py-3 border-b border-white/10">
-        <div className="grid grid-cols-12 gap-4 items-center text-sm font-medium text-white/80">
-          <div className="col-span-1">
+        <div className="grid gap-4 items-center text-sm font-medium text-white/80" style={{ gridTemplateColumns: '28px repeat(8, 1fr)' }}>
+          <div className="">
             <input
               type="checkbox"
               checked={selectedItems.length === atividades.length && atividades.length > 0}
@@ -312,13 +312,14 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
               className="rounded border-white/30 bg-transparent"
             />
           </div>
-          <div className="col-span-3">Nome</div>
-          <div className="col-span-2">Data de criação</div>
-          <div className="col-span-2">Prazo final</div>
-          <div className="col-span-1">Status</div>
-          <div className="col-span-1">Criado por</div>
-          <div className="col-span-1">Responsável</div>
-          <div className="col-span-1">País</div>
+          <div className="">Nome</div>
+          <div className="">Processo</div>
+          <div className="">Vinculado a</div>
+          <div className="">Data de criação</div>
+          <div className="">Prazo final</div>
+          <div className="">Status</div>
+          <div className="">Responsável</div>
+          <div className="">País</div>
         </div>
       </div>
 
@@ -341,8 +342,8 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
               className="px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer"
               onClick={() => handleAtividadeClick(atividade)}
             >
-              <div className="grid grid-cols-12 gap-4 items-center text-white/80">
-                <div className="col-span-1">
+              <div className="grid gap-4 items-center text-white/80" style={{ gridTemplateColumns: '28px repeat(8, 1fr)' }}>
+                <div className="">
                   <input
                     type="checkbox"
                     checked={selectedItems.includes(atividade.id)}
@@ -352,44 +353,46 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                   />
                 </div>
                 
-                <div className="col-span-3">
+                <div className="">
                   <div className="space-y-1">
                     <div className="font-medium text-sm text-white">{atividade.nome || 'Sem título'}</div>
-                    <div className="text-xs text-white/50">
-                      {atividade.descricao || 'Sem descrição'}
+                    <div className="text-xs text-white/50 truncate">
+                      {atividade.observacoes || atividade.descricao || ''}
                     </div>
                   </div>
                 </div>
+
+                <div className="">
+                  <div className="text-sm text-white/70 truncate">
+                    {atividade.processo?.nome || '-'}
+                  </div>
+                </div>
+
+                <div className="">
+                  <div className="text-sm text-white/70 truncate">
+                    {atividade.tarefaPai?.titulo || '-'}
+                  </div>
+                </div>
                 
-                <div className="col-span-2">
+                <div className="">
                   <div className="text-sm text-white/70">
                     {formatDateOnly(atividade.data_criacao)}
                   </div>
                 </div>
                 
-                <div className="col-span-2">
+                <div className="">
                   <div className="text-sm text-white/70">
                     {formatDate(atividade.data_termino)}
                   </div>
                 </div>
                 
-                <div className="col-span-1">
+                <div className="">
                   <Badge className={getStatusBadgeClass(atividade.status?.nome)}>
                     {atividade.status?.nome || 'Sem status'}
                   </Badge>
                 </div>
                 
-                <div className="col-span-1">
-                  <div className="flex items-center">
-                    <Avatar className="h-6 w-6 border border-white/20">
-                      <AvatarFallback className="text-xs bg-white/10 text-white">
-                        {atividade.usuarios?.[0]?.usuario?.nome?.slice(0, 2).toUpperCase() || 'NA'}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                </div>
-                
-                <div className="col-span-1">
+                <div className="">
                   <div className="flex items-center">
                     <Avatar className="h-6 w-6 border border-white/20">
                       <AvatarFallback className="text-xs bg-white/10 text-white">
@@ -399,7 +402,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                   </div>
                 </div>
                 
-                <div className="col-span-1">
+                <div className="">
                   <div className="text-sm font-medium text-white/70">
                     {PAIS_LABELS[atividade.pais] || atividade.pais || '-'}
                   </div>

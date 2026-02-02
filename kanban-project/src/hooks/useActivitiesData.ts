@@ -47,6 +47,11 @@ export interface Atividade {
   responsavel?: Usuario | null
   concluida?: boolean
   prioridade?: string
+  observacoes?: string | null  // ← ADICIONAR
+  tarefaPai?: {            // ← ADICIONAR
+    id: number
+    titulo: string
+  }
 }
 
 // Tipo da resposta da API de tarefas
@@ -68,6 +73,11 @@ interface TarefaAPI {
   concluida: boolean
   prioridade: string
   subtarefas?: TarefaAPI[]
+  observacoes?: string | null  // ← ADICIONAR
+  tarefaPai?: {            // ← ADICIONAR
+    id: number
+    titulo: string
+  }
 }
 
 // Fetcher genérico para SWR com tratamento de erro melhorado
@@ -145,7 +155,9 @@ function mapTarefaToAtividade(tarefa: TarefaAPI): Atividade {
     processo: tarefa.processo || undefined,
     responsavel: tarefa.responsavel,
     concluida: tarefa.concluida,
-    prioridade: tarefa.prioridade
+    prioridade: tarefa.prioridade,
+    tarefaPai: tarefa.tarefaPai || undefined,  // ← ADICIONAR
+    observacoes: tarefa.observacoes,  // ← ADICIONAR
   }
 }
 

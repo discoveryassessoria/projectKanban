@@ -185,7 +185,8 @@ export async function PUT(
       statusId,
       pais,
       ordem,
-      observacoes
+      observacoes,
+      prazoCobranca
     } = body
 
     const tarefaExistente = await prisma.tarefa.findUnique({
@@ -235,6 +236,7 @@ export async function PUT(
     if (statusId !== undefined) dataAtualizacao.statusId = statusId
     if (pais !== undefined) dataAtualizacao.pais = pais
     if (ordem !== undefined) dataAtualizacao.ordem = ordem
+    if (prazoCobranca !== undefined) dataAtualizacao.prazoCobranca = prazoCobranca
 
     // Variável para controlar tipo de log
     let tipoLog: "editar" | "concluir" | "reabrir" = "editar"

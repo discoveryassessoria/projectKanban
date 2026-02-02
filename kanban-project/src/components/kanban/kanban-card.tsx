@@ -57,8 +57,20 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
   const email = contratante?.email
 
   // Contagem de tarefas
-  const tarefasCount = _count?.tarefas ?? tarefas?.length ?? 0
-  const tarefasConcluidas = tarefas?.filter(t => t.concluida)?.length ?? 0
+  // Verifica se tarefa está efetivamente concluída (campo direto OU todas filhas concluídas)
+  const isTarefaEfetivamenteConcluida = (tarefa: any, todasTarefas: any[]): boolean => {
+    if (tarefa.concluida) return true
+    const filhas = todasTarefas.filter((t: any) => t.tarefaPaiId === tarefa.id)
+    if (filhas.length === 0) return false
+    return filhas.every((f: any) => isTarefaEfetivamenteConcluida(f, todasTarefas))
+  }
+
+  const todasTarefas = tarefas ?? []
+  const tarefasReais = todasTarefas.filter((t: any) => t.tarefaPaiId != null)
+  const tarefasCount = _count?.tarefas ?? tarefasReais.length
+  const tarefasConcluidas = tarefasReais.filter((t: any) => 
+    isTarefaEfetivamenteConcluida(t, todasTarefas)
+  ).length
 
   // Contagem de requerentes
   const requerentesCount = requerentes?.length ?? 0
