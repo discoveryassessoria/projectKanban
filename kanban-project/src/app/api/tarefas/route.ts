@@ -17,6 +17,7 @@ export async function GET(request: Request) {
     const pais = searchParams.get("pais") as Pais | null
     const statusId = searchParams.get("statusId")
     const apenasRaiz = searchParams.get("apenasRaiz")
+    const excluirEstruturais = searchParams.get("excluirEstruturais")
 
     const where: any = {}
 
@@ -46,6 +47,13 @@ export async function GET(request: Request) {
 
     if (apenasRaiz === "true") {
       where.tarefaPaiId = null
+    }
+
+    if (excluirEstruturais === "true") {
+      where.OR = [
+        { tarefaPaiId: { not: null } },  // É subtarefa (trabalho real)
+        { processoId: null }              // É tarefa independente
+      ]
     }
 
     const tarefas = await prisma.tarefa.findMany({

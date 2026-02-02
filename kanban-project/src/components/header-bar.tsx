@@ -83,7 +83,7 @@ export function HeaderBar({
   // Buscar notificações diretamente da API
   const fetchNotificacoes = useCallback(async () => {
     try {
-      const response = await fetch('/api/tarefas')
+      const response = await fetch('/api/tarefas?excluirEstruturais=true')
       if (!response.ok) return
 
       const data = await response.json()

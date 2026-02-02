@@ -164,6 +164,9 @@ export function useActivities(filters?: any) {
     })
   }
   
+  // Excluir tarefas estruturais (Documentos pessoais, Procuração, etc.)
+  params.append('excluirEstruturais', 'true')
+
   const queryString = params.toString()
   // Usar /api/tarefas (nome correto da API)
   const url = `/api/tarefas${queryString ? `?${queryString}` : ''}`

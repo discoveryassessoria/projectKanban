@@ -26,7 +26,8 @@ import {
   CalendarClock,
   ClipboardCheck,
   FolderOpen,
-  GripVertical
+  GripVertical,
+  Pencil
 } from "lucide-react"
 import { getTarefasPorPais, type TarefaPreDefinida } from "../../lib/tarefas-config"
 import { isPast, formatDateBR } from "@/src/lib/date-utils"
@@ -212,6 +213,41 @@ interface SortableTarefaCardProps {
   onDelete: (e: React.MouseEvent) => void
 }
 
+function calcularPrioridadeMaior(subtarefas: any[]): string | null {
+  const niveis: Record<string, number> = {
+    'URGENTE': 4, 'ALTA': 3, 'MEDIA': 2, 'BAIXA': 1
+  };
+  
+  if (!subtarefas || subtarefas.length === 0) return 'MEDIA';
+  
+  // Verifica se tarefa está efetivamente concluída
+  // (marcada como concluída OU todas sub-subtarefas concluídas)
+  function estaEfetivamenteConcluida(tarefa: any): boolean {
+    if (tarefa.concluida) return true;
+    if (tarefa.subtarefas && tarefa.subtarefas.length > 0) {
+      return tarefa.subtarefas.every((s: any) => estaEfetivamenteConcluida(s));
+    }
+    return false;
+  }
+  
+  const pendentes = subtarefas.filter((a: any) => !estaEfetivamenteConcluida(a));
+  
+  if (pendentes.length === 0) return null;
+  
+  let maiorPrioridade = 'BAIXA';
+  let maiorNivel = 0;
+  
+  for (const atividade of pendentes) {
+    const nivel = niveis[atividade.prioridade] || 0;
+    if (nivel > maiorNivel) {
+      maiorNivel = nivel;
+      maiorPrioridade = atividade.prioridade;
+    }
+  }
+  
+  return maiorPrioridade;
+}
+
 function SortableTarefaCard({ tarefa, onClick, onDelete }: SortableTarefaCardProps) {
   const {
     attributes,
@@ -289,12 +325,12 @@ function SortableTarefaCard({ tarefa, onClick, onDelete }: SortableTarefaCardPro
       </div>
 
       {/* Indicador lateral de prioridade */}
-      {!tarefa.concluida && (
+      {!tarefa.concluida && calcularPrioridadeMaior(tarefa.subtarefas || []) && (
         <div className={`absolute left-0 top-3 bottom-3 w-1 rounded-r-full transition-all
-          ${tarefa.prioridade === 'URGENTE' ? 'bg-red-500' : ''}
-          ${tarefa.prioridade === 'ALTA' ? 'bg-orange-500' : ''}
-          ${tarefa.prioridade === 'MEDIA' ? 'bg-amber-400' : ''}
-          ${tarefa.prioridade === 'BAIXA' ? 'bg-emerald-400' : ''}
+          ${calcularPrioridadeMaior(tarefa.subtarefas || []) === 'URGENTE' ? 'bg-red-500' : ''}
+          ${calcularPrioridadeMaior(tarefa.subtarefas || []) === 'ALTA' ? 'bg-orange-500' : ''}
+          ${calcularPrioridadeMaior(tarefa.subtarefas || []) === 'MEDIA' ? 'bg-amber-400' : ''}
+          ${calcularPrioridadeMaior(tarefa.subtarefas || []) === 'BAIXA' ? 'bg-emerald-400' : ''}
         `} />
       )}
 
@@ -331,31 +367,12 @@ function SortableTarefaCard({ tarefa, onClick, onDelete }: SortableTarefaCardPro
 
         {/* Info adicional */}
         <div className="flex items-center flex-wrap gap-2 text-xs">
-          {!tarefa.concluida && <BadgePrioridade prioridade={tarefa.prioridade} />}
+          {!tarefa.concluida && calcularPrioridadeMaior(tarefa.subtarefas || []) && <BadgePrioridade prioridade={calcularPrioridadeMaior(tarefa.subtarefas || []) as string} />}
           
           {totalTarefas > 0 && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 font-medium border border-blue-100">
               <ListTodo className="w-3 h-3" />
               {totalTarefas} tarefa{totalTarefas !== 1 ? 's' : ''}
-            </span>
-          )}
-          
-          {tarefa.dataPrazo && (
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium border
-              ${atrasada 
-                ? 'bg-red-50 text-red-600 border-red-200' 
-                : 'bg-gray-50 text-gray-600 border-gray-200'
-              }
-            `}>
-              <Calendar className="w-3 h-3" />
-              {formatDateBR(tarefa.dataPrazo)}
-            </span>
-          )}
-          
-          {tarefa.responsavel && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 font-medium border border-gray-200">
-              <User className="w-3 h-3" />
-              {tarefa.responsavel.nome.split(' ')[0]}
             </span>
           )}
         </div>
@@ -481,31 +498,12 @@ function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
 
         {/* Info adicional */}
         <div className="flex items-center flex-wrap gap-2 text-xs">
-          {!tarefa.concluida && <BadgePrioridade prioridade={tarefa.prioridade} />}
+          {!tarefa.concluida && calcularPrioridadeMaior(tarefa.subtarefas || []) && <BadgePrioridade prioridade={calcularPrioridadeMaior(tarefa.subtarefas || []) as string} />}
           
           {totalTarefas > 0 && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 font-medium border border-blue-100">
               <ListTodo className="w-3 h-3" />
               {totalTarefas} tarefa{totalTarefas !== 1 ? 's' : ''}
-            </span>
-          )}
-          
-          {tarefa.dataPrazo && (
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium border
-              ${atrasada 
-                ? 'bg-red-50 text-red-600 border-red-200' 
-                : 'bg-gray-50 text-gray-600 border-gray-200'
-              }
-            `}>
-              <Calendar className="w-3 h-3" />
-              {formatDateBR(tarefa.dataPrazo)}
-            </span>
-          )}
-          
-          {tarefa.responsavel && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 font-medium border border-gray-200">
-              <User className="w-3 h-3" />
-              {tarefa.responsavel.nome.split(' ')[0]}
             </span>
           )}
         </div>
@@ -859,7 +857,8 @@ useEffect(() => {
     prioridade: tarefa.prioridade,
     dataPrazo: tarefa.dataPrazo ? tarefa.dataPrazo.split("T")[0] : "",
     responsavelId: tarefa.responsavelId?.toString() || "",
-    observacoes: tarefa.observacoes || ""
+    observacoes: tarefa.observacoes || "",
+    prazoCobranca: tarefa.prazoCobranca || 5
   })
 
   const isTemporaria = tarefa.id < 0
@@ -914,7 +913,7 @@ useEffect(() => {
       const response = await fetch(`/api/tarefas/${tarefa.id}/iniciar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prazoCobranca: prazoCobrancaConfig })
+        body: JSON.stringify({ prazoCobranca: tarefa.prazoCobranca || 5 })
       })
 
       if (response.ok) {
@@ -1080,7 +1079,8 @@ const handleConferencia = async () => {
           prioridade: editForm.prioridade,
           dataPrazo: editForm.dataPrazo || null,
           responsavelId: editForm.responsavelId ? parseInt(editForm.responsavelId) : null,
-          observacoes: editForm.observacoes || null
+          observacoes: editForm.observacoes || null,
+          prazoCobranca: editForm.prazoCobranca
         })
       })
       if (response.ok) {
@@ -1349,7 +1349,25 @@ const handleConferencia = async () => {
                   rows={2}
                   placeholder="Observações..."
                 />
-                <div className="flex justify-end gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <Clock className="w-3 h-3" />
+                    <span>Cobrança:</span>
+                    <select
+                      value={editForm.prazoCobranca}
+                      onChange={(e) => setEditForm({ ...editForm, prazoCobranca: parseInt(e.target.value) })}
+                      className="pl-1.5 pr-4 py-0.5 text-xs border border-gray-200 rounded-md bg-white appearance-none cursor-pointer"
+                      style={selectStyleSmall}
+                    >
+                      <option value={1}>1 dia</option>
+                      <option value={3}>3 dias</option>
+                      <option value={5}>5 dias</option>
+                      <option value={7}>7 dias</option>
+                      <option value={10}>10 dias</option>
+                    </select>
+                  </div>
+                  <div className="flex-1" />
+                  <div className="flex gap-2">
                   <Button variant="ghost" size="sm" onClick={() => setEditando(false)} className="h-7 text-xs">
                     Cancelar
                   </Button>
@@ -1357,6 +1375,7 @@ const handleConferencia = async () => {
                     {salvando ? <Loader2 className="w-3 h-3 animate-spin" /> : "Salvar"}
                   </Button>
                 </div>
+              </div>
               </>
             ) : (
               <>
@@ -1386,28 +1405,14 @@ const handleConferencia = async () => {
       Editar
     </button>
     
-    <div className="flex items-center gap-1 ml-auto">
-      <select
-        value={prazoCobrancaConfig}
-        onChange={(e) => setPrazoCobrancaConfig(parseInt(e.target.value))}
-        className="pl-2 pr-5 py-0 text-[11px] border border-gray-200 rounded-md bg-white h-[24px] appearance-none cursor-pointer"
-        style={selectStyleSmall}
-      >
-        <option value={1}>1 dia</option>
-        <option value={3}>3 dias</option>
-        <option value={5}>5 dias</option>
-        <option value={7}>7 dias</option>
-        <option value={10}>10 dias</option>
-      </select>
-      <button
-        onClick={handleIniciar}
-        disabled={iniciando}
-        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors disabled:opacity-50"
-      >
-        {iniciando ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-        Iniciar
-      </button>
-    </div>
+    <button
+      onClick={handleIniciar}
+      disabled={iniciando}
+      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors disabled:opacity-50 ml-auto"
+    >
+      {iniciando ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+      Iniciar
+    </button>
   </div>
 )}
 </div>
@@ -1649,7 +1654,8 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios, isProcuracaoAd
     prioridade: atividade.prioridade,
     dataPrazo: atividade.dataPrazo ? atividade.dataPrazo.split("T")[0] : "",
     responsavelId: atividade.responsavelId?.toString() || "",
-    observacoes: atividade.observacoes || ""
+    observacoes: atividade.observacoes || "",
+    prazoCobranca: atividade.prazoCobranca || 5
   })
 
   const isTemporaria = atividade.id < 0
@@ -1717,7 +1723,8 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios, isProcuracaoAd
           prioridade: editForm.prioridade,
           dataPrazo: editForm.dataPrazo || null,
           responsavelId: editForm.responsavelId ? parseInt(editForm.responsavelId) : null,
-          observacoes: editForm.observacoes || null
+          observacoes: editForm.observacoes || null,
+          prazoCobranca: editForm.prazoCobranca
         })
       })
       if (response.ok) {
@@ -1825,7 +1832,7 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios, isProcuracaoAd
                   rows={2}
                   placeholder="Observações..."
                 />
-                <div className="flex gap-2">
+                <div className="flex justify-end gap-2">
                   <select
                     value={editForm.prioridade}
                     onChange={(e) => setEditForm({ ...editForm, prioridade: e.target.value })}
@@ -1977,19 +1984,12 @@ interface SubtarefasModalProps {
 function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubtarefaAdd, onSubtarefaRemove, usuarios, pessoas = [] }: SubtarefasModalProps) {
   const [novaAtividade, setNovaAtividade] = useState("")
   const [criando, setCriando] = useState(false)
-  const [editandoTarefa, setEditandoTarefa] = useState(false)
-  const [mostrarSeletorPessoas, setMostrarSeletorPessoas] = useState(false)  // ✅ NOVO
-  const [mostrarInputCustom, setMostrarInputCustom] = useState(false)  // ✅ NOVO
-  const seletorPessoasRef = useRef<HTMLDivElement>(null)  // ✅ NOVO
-  const [editForm, setEditForm] = useState({
-    titulo: tarefa.titulo,
-    descricao: tarefa.descricao || "",
-    prioridade: tarefa.prioridade,
-    dataPrazo: tarefa.dataPrazo ? tarefa.dataPrazo.split("T")[0] : "",
-    responsavelId: tarefa.responsavelId?.toString() || "",
-    observacoes: tarefa.observacoes || ""
-  })
-  const [salvando, setSalvando] = useState(false)
+  const [editandoTitulo, setEditandoTitulo] = useState(false)
+  const [tituloEditado, setTituloEditado] = useState(tarefa.titulo)
+  const [salvandoTitulo, setSalvandoTitulo] = useState(false)
+  const [mostrarSeletorPessoas, setMostrarSeletorPessoas] = useState(false)
+  const [mostrarInputCustom, setMostrarInputCustom] = useState(false)
+  const seletorPessoasRef = useRef<HTMLDivElement>(null)
   const [atividadesLocal, setAtividadesLocal] = useState<Tarefa[]>(tarefa.subtarefas || [])
   const [processando, setProcessando] = useState<Set<number>>(new Set())
   
@@ -2162,33 +2162,27 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
     }
   }
 
-  const handleSalvarEdicao = async () => {
-    setSalvando(true)
+  const handleSalvarTitulo = async () => {
+    if (!tituloEditado.trim()) return
+    setSalvandoTitulo(true)
     try {
       const response = await fetch(`/api/tarefas/${tarefa.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          titulo: editForm.titulo,
-          descricao: editForm.descricao || null,
-          prioridade: editForm.prioridade,
-          dataPrazo: editForm.dataPrazo || null,
-          responsavelId: editForm.responsavelId ? parseInt(editForm.responsavelId) : null,
-          observacoes: editForm.observacoes || null
-        })
+        body: JSON.stringify({ titulo: tituloEditado.trim() })
       })
 
       if (response.ok) {
-        setEditandoTarefa(false)
+        setEditandoTitulo(false)
         onUpdate()
       } else {
-        alert("Erro ao salvar tarefa")
+        alert("Erro ao salvar título")
       }
     } catch (error) {
       console.error("Erro ao salvar:", error)
-      alert("Erro ao salvar tarefa")
+      alert("Erro ao salvar título")
     } finally {
-      setSalvando(false)
+      setSalvandoTitulo(false)
     }
   }
 
@@ -2202,16 +2196,47 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
         <div className="px-6 py-5 text-white bg-gradient-to-r from-gray-700 to-gray-800">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0 pr-4">
-              {editandoTarefa ? (
-                <input
-                  type="text"
-                  value={editForm.titulo}
-                  onChange={(e) => setEditForm({ ...editForm, titulo: e.target.value })}
-                  className="w-full bg-white/20 backdrop-blur border border-white/30 rounded-lg px-3 py-2 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
-                  placeholder="Título da tarefa"
-                />
+              {editandoTitulo ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={tituloEditado}
+                    onChange={(e) => setTituloEditado(e.target.value)}
+                    className="flex-1 bg-white/20 backdrop-blur border border-white/30 rounded-lg px-3 py-2 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+                    placeholder="Título da tarefa"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSalvarTitulo()
+                      if (e.key === "Escape") { setEditandoTitulo(false); setTituloEditado(tarefa.titulo) }
+                    }}
+                  />
+                  <button
+                    onClick={handleSalvarTitulo}
+                    disabled={salvandoTitulo}
+                    className="p-2 hover:bg-white/20 rounded-full transition-colors"
+                    title="Salvar"
+                  >
+                    {salvandoTitulo ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  </button>
+                  <button
+                    onClick={() => { setEditandoTitulo(false); setTituloEditado(tarefa.titulo) }}
+                    className="p-2 hover:bg-white/20 rounded-full transition-colors"
+                    title="Cancelar"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               ) : (
-                <h2 className="text-xl font-bold truncate">{tarefa.titulo}</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold truncate">{tarefa.titulo}</h2>
+                  <button 
+                    onClick={() => { setTituloEditado(tarefa.titulo); setEditandoTitulo(true) }}
+                    className="p-1.5 hover:bg-white/20 rounded-full transition-colors flex-shrink-0"
+                    title="Editar nome"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                </div>
               )}
               <p className="text-gray-300 text-sm mt-1">
                 {tarefa.dataInicio ? 'Tarefa iniciada' : 'Tarefa não iniciada'}
@@ -2240,115 +2265,10 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b">
-          <button
-            onClick={() => setEditandoTarefa(false)}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              !editandoTarefa 
-                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Atividades
-          </button>
-          <button
-            onClick={() => setEditandoTarefa(true)}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              editandoTarefa 
-                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Detalhes
-          </button>
-        </div>
+
 
         {/* Conteúdo */}
         <div className="flex-1 overflow-y-auto">
-          {editandoTarefa ? (
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <MessageSquare className="w-4 h-4 inline mr-1" />
-                  Observações
-                </label>
-                <textarea
-                  value={editForm.observacoes}
-                  onChange={(e) => setEditForm({ ...editForm, observacoes: e.target.value })}
-                  placeholder="Anotações sobre esta tarefa..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  rows={3}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    <Flag className="w-4 h-4 inline mr-1" />
-                    Prioridade
-                  </label>
-                  <select
-                    value={editForm.prioridade}
-                    onChange={(e) => setEditForm({ ...editForm, prioridade: e.target.value })}
-                    className={selectClass}
-                    style={selectStyle}
-                  >
-                    <option value="BAIXA">🟢 Baixa</option>
-                    <option value="MEDIA">🟡 Média</option>
-                    <option value="ALTA">🟠 Alta</option>
-                    <option value="URGENTE">🔴 Urgente</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    <Calendar className="w-4 h-4 inline mr-1" />
-                    Prazo
-                  </label>
-                  <DatePickerField
-                    value={editForm.dataPrazo}
-                    onChange={(value) => setEditForm({ ...editForm, dataPrazo: value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <User className="w-4 h-4 inline mr-1" />
-                  Responsável
-                </label>
-                <select
-                  value={editForm.responsavelId}
-                  onChange={(e) => setEditForm({ ...editForm, responsavelId: e.target.value })}
-                  className={selectClass}
-                  style={selectStyle}
-                >
-                  <option value="">Sem responsável</option>
-                  {usuarios.map((u) => (
-                    <option key={u.id} value={u.id}>{u.nome}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="pt-4 flex justify-end gap-3">
-                <button
-                  onClick={() => setEditandoTarefa(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSalvarEdicao}
-                  disabled={salvando || !editForm.titulo.trim()}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {salvando && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Salvar
-                </button>
-              </div>
-            </div>
-          ) : (
             <div className="p-4">
               <div className="space-y-3">
                 {atividadesLocal.map((atividade) => (
@@ -2372,11 +2292,10 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
                 )}
               </div>
             </div>
-          )}
         </div>
 
         {/* Footer */}
-        {!editandoTarefa && (
+        {(
           <div className="border-t p-4 bg-gray-50" ref={seletorPessoasRef}>
             {isDocumentosPessoais && pessoas.length > 0 ? (
               // ✅ Footer especial para Documentos Pessoais
