@@ -56,6 +56,7 @@ export function KanbanContent() {
   const [initialTab, setInitialTab] = useState<string | null>(null)
   const [initialPessoaId, setInitialPessoaId] = useState<number | null>(null)
   const [initialSidebarTab, setInitialSidebarTab] = useState<string | null>(null)
+  const [initialTarefaPaiId, setInitialTarefaPaiId] = useState<number | null>(null)
 
   // ✅ NOVO: Estados para modal de processo na aba Clientes
   const [clientesProcessoModal, setClientesProcessoModal] = useState<ProcessoWithStatus | null>(null)
@@ -69,6 +70,7 @@ export function KanbanContent() {
     const pessoaId = searchParams.get("pessoaId")
     const urlPais = searchParams.get("pais") as Pais | null
     const sidebarTab = searchParams.get("sidebarTab")
+    const tarefaPaiId = searchParams.get("tarefaPaiId")
 
     if (processoId) {
       setInitialProcessoId(parseInt(processoId))
@@ -85,6 +87,9 @@ export function KanbanContent() {
     // Se veio um país na URL, usar ele
     if (urlPais && Object.values(Pais).includes(urlPais)) {
       setPaisSelecionado(urlPais)
+    }
+    if (tarefaPaiId) {
+      setInitialTarefaPaiId(parseInt(tarefaPaiId))
     }
   }, [searchParams])
 
@@ -109,6 +114,7 @@ export function KanbanContent() {
     newUrl.searchParams.delete("tab")
     newUrl.searchParams.delete("pessoaId")
     newUrl.searchParams.delete("sidebarTab")
+    newUrl.searchParams.delete("tarefaPaiId")
     window.history.replaceState({}, "", newUrl.toString())
     
     // Limpar estados
@@ -116,6 +122,7 @@ export function KanbanContent() {
     setInitialTab(null)
     setInitialPessoaId(null)
     setInitialSidebarTab(null)
+    setInitialTarefaPaiId(null)
   }, [])
 
   // ✅ NOVO: Callback para abrir processo a partir da aba Clientes (abre modal sem mudar de aba)
@@ -387,6 +394,7 @@ export function KanbanContent() {
                 initialPessoaId={initialPessoaId}
                 initialSidebarTab={initialSidebarTab}
                 onModalOpened={handleModalOpened}
+                initialTarefaPaiId={initialTarefaPaiId}
               />
             )}
 

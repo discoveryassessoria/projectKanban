@@ -208,12 +208,11 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   }
 
   const handleAtividadeClick = (atividade: Atividade) => {
-    // Se tem processo vinculado → vai pro Kanban
     if (atividade.processo?.id) {
       const pais = atividade.processo.pais || atividade.pais || 'PORTUGAL'
-      router.push(`/kanban?processoId=${atividade.processo.id}&tab=tarefas&pais=${pais}`)
+      const tarefaPaiId = atividade.tarefaPai?.id ? `&tarefaPaiId=${atividade.tarefaPai.id}` : ''
+      router.push(`/kanban?processoId=${atividade.processo.id}&tab=tarefas&pais=${pais}${tarefaPaiId}`)
     } else {
-      // Tarefa independente → abre o modal
       setSelectedAtividade(atividade)
       setIsDetailsModalOpen(true)
     }

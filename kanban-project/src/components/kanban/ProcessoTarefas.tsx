@@ -110,6 +110,7 @@ interface ProcessoTarefasProps {
   pais: string
   onUpdate?: () => void
   pessoas?: Pessoa[]  // ✅ NOVO: Lista de requerentes e contratantes
+  tarefaPaiId?: number  // ← NOVO
 }
 
 // ==========================================
@@ -2465,7 +2466,7 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
 // ==========================================
 // COMPONENTE PRINCIPAL: ProcessoTarefas (COM DRAG-AND-DROP)
 // ==========================================
-export function ProcessoTarefas({ processoId, pais, onUpdate, pessoas = [] }: ProcessoTarefasProps) {
+export function ProcessoTarefas({ processoId, pais, onUpdate, pessoas = [], tarefaPaiId }: ProcessoTarefasProps) {
   const [tarefas, setTarefas] = useState<Tarefa[]>([])
   const [loading, setLoading] = useState(true)
   const [novaTarefa, setNovaTarefa] = useState("")
@@ -2557,6 +2558,26 @@ export function ProcessoTarefas({ processoId, pais, onUpdate, pessoas = [] }: Pr
       fetchUsuarios()
     }
   }, [processoId])
+
+  useEffect(() => {
+  if (processoId) {
+    fetchTarefas()
+    fetchUsuarios()
+  }
+}, [processoId])
+
+// Auto-abrir container quando vem da lista de tarefas
+const autoOpenDoneRef = useRef(false)
+
+useEffect(() => {
+  if (tarefaPaiId && tarefas.length > 0 && !tarefaSelecionada && !autoOpenDoneRef.current) {
+    const container = tarefas.find(t => t.id === tarefaPaiId)
+    if (container) {
+      autoOpenDoneRef.current = true
+      abrirModal(container)
+    }
+  }
+}, [tarefaPaiId, tarefas])
 
   const handleCriarTarefa = async (titulo?: string) => {
     const tituloFinal = titulo || novaTarefa.trim()

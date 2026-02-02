@@ -42,6 +42,7 @@ interface KanbanBoardProps {
   initialTab?: string | null
   initialPessoaId?: number | null
   initialSidebarTab?: string | null
+  initialTarefaPaiId?: number | null  // ← NOVO
   onModalOpened?: () => void
 }
 
@@ -75,6 +76,7 @@ export function KanbanBoard({
   initialPessoaId = null,
   initialSidebarTab = null,
   onModalOpened,
+  initialTarefaPaiId = null,  // ← NOVO
 }: KanbanBoardProps) {
   const [localProcessos, setLocalProcessos] = useState<ProcessoWithStatus[]>(processosFromProps)
   
@@ -90,6 +92,7 @@ export function KanbanBoard({
   const [modalInitialTab, setModalInitialTab] = useState<string | undefined>(undefined)
   const [modalInitialPessoaId, setModalInitialPessoaId] = useState<number | undefined>(undefined)
   const [modalInitialSidebarTab, setModalInitialSidebarTab] = useState<string | undefined>(undefined)
+  const [modalInitialTarefaPaiId, setModalInitialTarefaPaiId] = useState<number | undefined>(undefined)
   
   const [isDragging, setIsDragging] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -124,6 +127,7 @@ export function KanbanBoard({
         setModalInitialTab(initialTab || undefined)
         setModalInitialPessoaId(initialPessoaId || undefined)
         setModalInitialSidebarTab(initialSidebarTab || undefined)
+        setModalInitialTarefaPaiId(initialTarefaPaiId || undefined)
         setIsDetailsModalOpen(true)
         setInitialParamsProcessed(true)
         onModalOpened?.()
@@ -190,6 +194,7 @@ export function KanbanBoard({
     setModalInitialPessoaId(undefined)
     setModalInitialSidebarTab(undefined)
     setIsDetailsModalOpen(true)
+    setModalInitialTarefaPaiId(undefined)
   }
 
   const handleProcessoSave = () => onRefresh()
@@ -199,6 +204,7 @@ export function KanbanBoard({
     setModalInitialTab(undefined)
     setModalInitialPessoaId(undefined)
     setModalInitialSidebarTab(undefined)
+    setModalInitialTarefaPaiId(undefined)
   }
 
   // ✅ CORREÇÃO: Drag handlers atualizados para IDs prefixados
@@ -405,6 +411,7 @@ export function KanbanBoard({
         initialTab={modalInitialTab}
         initialPessoaId={modalInitialPessoaId}
         initialSidebarTab={modalInitialSidebarTab}
+        initialTarefaPaiId={modalInitialTarefaPaiId}
       />
     </>
   )
