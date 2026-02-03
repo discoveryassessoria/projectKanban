@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { logTarefa } from "@/lib/auditoria"
+import { hojeBrasil } from "@/src/lib/date-utils"
 
 async function verificarEConcluirTarefaPai(tarefaPaiId: number) {
   const tarefaPai = await prisma.tarefa.findUnique({
@@ -24,7 +25,7 @@ async function verificarEConcluirTarefaPai(tarefaPaiId: number) {
       where: { id: tarefaPaiId },
       data: {
         concluida: true,
-        dataConclusao: new Date()
+        dataConclusao: hojeBrasil()
       }
     })
 

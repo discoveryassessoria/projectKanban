@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { hojeBrasil } from "@/src/lib/date-utils"
 
 export async function POST(
   request: NextRequest,
@@ -44,7 +45,7 @@ export async function POST(
       data: {
         statusTarefa,
         concluida: true,
-        dataConclusao: new Date(),
+        dataConclusao: hojeBrasil(),
         motivoConclusao,
         observacoes: tarefaAtual.observacoes 
           ? `${tarefaAtual.observacoes}\n${observacaoTexto}` 

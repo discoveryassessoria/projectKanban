@@ -18,6 +18,10 @@ export async function GET(request: Request) {
     const statusId = searchParams.get("statusId")
     const apenasRaiz = searchParams.get("apenasRaiz")
     const excluirEstruturais = searchParams.get("excluirEstruturais")
+    const responsavelEmail = searchParams.get("responsavel")
+    const dataInicio = searchParams.get("dataInicio")
+    const dataFim = searchParams.get("dataFim")
+    const status = searchParams.get("status")
 
     const where: any = {}
 
@@ -29,6 +33,40 @@ export async function GET(request: Request) {
       where.responsavelId = parseInt(responsavelId)
     }
 
+    // Filtro por email do responsável (vem do FilterModal)
+    if (responsavelEmail) {
+      const usuario = await prisma.usuario.findFirst({
+        where: { email: responsavelEmail },
+        select: { id: true }
+      })
+      if (usuario) {
+        where.responsavelId = usuario.id
+      }
+    }
+
+    // Filtro por status (Pendente/Concluída)
+    if (status === 'concluida') {
+      where.concluida = true
+    } else if (status === 'pendente') {
+      where.concluida = false
+    }
+
+    if (dataInicio || dataFim) {
+  where.dataInicio = {}
+  if (dataInicio && dataFim) {
+    // Range: de dataInicio até dataFim
+    where.dataInicio.gte = new Date(dataInicio + 'T00:00:00.000Z')
+    where.dataInicio.lte = new Date(dataFim + 'T23:59:59.999Z')
+  } else if (dataInicio) {
+    // Só data início: filtra exatamente nesse dia
+    where.dataInicio.gte = new Date(dataInicio + 'T00:00:00.000Z')
+    where.dataInicio.lte = new Date(dataInicio + 'T23:59:59.999Z')
+  } else if (dataFim) {
+    // Só data fim: filtra até esse dia
+    where.dataInicio.lte = new Date(dataFim + 'T23:59:59.999Z')
+  }
+}
+
     if (concluida !== null && concluida !== undefined && concluida !== "") {
       where.concluida = concluida === "true"
     }
@@ -38,7 +76,21 @@ export async function GET(request: Request) {
     }
 
     if (pais && Object.values(Pais).includes(pais)) {
-      where.pais = pais
+      // Filtrar por país da tarefa OU do processo vinculado
+      const paisCondition = {
+        OR: [
+          { pais: pais },
+          { processo: { pais: pais } }
+        ]
+      }
+      // Combinar com OR existente (excluirEstruturais) via AND
+      if (where.OR) {
+        const existingOR = where.OR
+        delete where.OR
+        where.AND = [...(where.AND || []), { OR: existingOR }, paisCondition]
+      } else {
+        where.AND = [...(where.AND || []), paisCondition]
+      }
     }
 
     if (statusId) {

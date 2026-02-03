@@ -144,6 +144,19 @@ export default function ActivitiesPage() {
     )
   }
 
+  const hasActiveFilters = filters.pais !== 'all' || 
+  filters.status !== 'all' || 
+  filters.responsavel !== 'all' || 
+  filters.dataInicio !== '' || 
+  filters.dataFim !== ''
+
+  const activeFilterCount = [
+    filters.pais !== 'all',
+    filters.status !== 'all',
+    filters.responsavel !== 'all',
+    filters.dataInicio !== '' || filters.dataFim !== '',
+  ].filter(Boolean).length
+
   return (
     <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
       {/* BACKGROUND FIXO */}
@@ -184,9 +197,12 @@ export default function ActivitiesPage() {
             
             {/* Filters and Actions */}
             <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" onClick={() => setFilterModalOpen(true)} className="bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white">
+              <Button variant="outline" size="sm" onClick={() => setFilterModalOpen(true)} className={`group bg-transparent hover:bg-white/10 hover:text-white hover:border-white/30 ${hasActiveFilters ? 'border-amber-500 text-amber-400 bg-amber-500/10' : 'border-white/30 text-white'}`}>
                 <Filter className="mr-2 h-4 w-4" />
                 Filtro
+                {hasActiveFilters && (
+                  <span className="ml-1 bg-amber-500 text-white text-xs rounded-full px-1.5 group-hover:bg-white/20 group-hover:text-white">{activeFilterCount}</span>
+                )}
                 <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
               <Button variant="outline" size="sm" onClick={() => setSearchModalOpen(true)} className="bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white">
@@ -221,6 +237,13 @@ export default function ActivitiesPage() {
           onOpenChange={setSearchModalOpen}
           searchTerm={searchTerm}
           onSearchTermChange={handleSearchTermChange}
+          onActivityClick={(activity) => {
+            if (activity.processo?.id) {
+              const pais = activity.processo.pais || activity.pais || 'PORTUGAL'
+              const tarefaPaiId = activity.tarefaPai?.id ? `&tarefaPaiId=${activity.tarefaPai.id}` : ''
+              router.push(`/kanban?processoId=${activity.processo.id}&tab=tarefas&pais=${pais}${tarefaPaiId}`)
+            }
+          }}
         />
 
         {/* Modal de Filtros */}
@@ -251,30 +274,30 @@ function FilterModal({
   onFiltersChange 
 }: FilterModalProps) {
   const { paises } = usePaises()
-  // ✅ CORRIGIDO: Passa o país selecionado para filtrar os status
-  const { statuses } = useStatuses(filters.pais)
   const { users } = useUsers()
 
+  const [localFilters, setLocalFilters] = useState<Filters>(filters)
+
+  useEffect(() => {
+    if (open) setLocalFilters(filters)
+  }, [open])
+
   const handleApplyFilters = () => {
+    onFiltersChange(localFilters)
     onOpenChange(false)
   }
 
   const handleClearFilters = () => {
-    onFiltersChange({
-      dataInicio: '',
-      dataFim: '',
-      pais: 'all',
-      status: 'all',
-      responsavel: 'all'
-    })
+    const empty = { dataInicio: '', dataFim: '', pais: 'all', status: 'all', responsavel: 'all' }
+    setLocalFilters(empty)
+    onFiltersChange(empty)
   }
 
   const updateFilter = (key: keyof Filters, value: string) => {
-    // ✅ CORRIGIDO: Quando mudar o país, resetar o status
     if (key === 'pais') {
-      onFiltersChange({ ...filters, pais: value, status: 'all' })
+      setLocalFilters(prev => ({ ...prev, pais: value, status: 'all' }))
     } else {
-      onFiltersChange({ ...filters, [key]: value })
+      setLocalFilters(prev => ({ ...prev, [key]: value }))
     }
   }
 
@@ -287,24 +310,25 @@ function FilterModal({
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-gray-700">Data Início</Label>
+              <Label className="text-gray-700">De</Label>
               <DatePickerField
-                value={filters.dataInicio}
+                value={localFilters.dataInicio}
                 onChange={(value) => updateFilter('dataInicio', value)}
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-gray-700">Data Fim</Label>
+              <Label className="text-gray-700">Até</Label>
               <DatePickerField
-                value={filters.dataFim}
+                value={localFilters.dataFim}
                 onChange={(value) => updateFilter('dataFim', value)}
               />
             </div>
+            <p className="text-xs text-gray-400 -mt-2 italic">*Filtrar por data de início</p>
           </div>
           
           <div className="space-y-2">
             <Label className="text-gray-700">País</Label>
-            <Select value={filters.pais} onValueChange={(value) => updateFilter('pais', value)}>
+            <Select value={localFilters.pais} onValueChange={(value) => updateFilter('pais', value)}>
               <SelectTrigger className="bg-white border-gray-300 text-gray-900">
                 <SelectValue placeholder="Selecione um país" />
               </SelectTrigger>
@@ -321,24 +345,21 @@ function FilterModal({
 
           <div className="space-y-2">
             <Label className="text-gray-700">Status</Label>
-            <Select value={filters.status} onValueChange={(value) => updateFilter('status', value)}>
+            <Select value={localFilters.status} onValueChange={(value) => updateFilter('status', value)}>
               <SelectTrigger className="bg-white border-gray-300 text-gray-900">
                 <SelectValue placeholder="Selecione um status" />
               </SelectTrigger>
               <SelectContent className="bg-white border-gray-200 text-gray-900">
                 <SelectItem value="all">Todos os Status</SelectItem>
-                {(statuses || []).map((status: Status) => (
-                  <SelectItem key={status.id} value={String(status.id)}>
-                    {status.nome}
-                  </SelectItem>
-                ))}
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="concluida">Concluída</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
             <Label className="text-gray-700">Responsável</Label>
-            <Select value={filters.responsavel} onValueChange={(value) => updateFilter('responsavel', value)}>
+            <Select value={localFilters.responsavel} onValueChange={(value) => updateFilter('responsavel', value)}>
               <SelectTrigger className="bg-white border-gray-300 text-gray-900">
                 <SelectValue placeholder="Selecione um responsável" />
               </SelectTrigger>
@@ -380,13 +401,15 @@ interface SearchModalProps {
   onOpenChange: (open: boolean) => void
   searchTerm: string
   onSearchTermChange: (term: string) => void
+  onActivityClick?: (activity: Atividade) => void
 }
 
 function SearchModal({ 
   open, 
   onOpenChange, 
   searchTerm, 
-  onSearchTermChange
+  onSearchTermChange,
+  onActivityClick
 }: SearchModalProps) {
   const { activities } = useActivities()
   
@@ -423,6 +446,10 @@ function SearchModal({
                 <div 
                   key={activity.id}
                   className="p-3 rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 transition cursor-pointer"
+                  onClick={() => {
+                    onActivityClick?.(activity)
+                    onOpenChange(false)
+                  }}
                 >
                   <h4 className="font-medium text-gray-900">{activity.nome}</h4>
                   {activity.descricao && (

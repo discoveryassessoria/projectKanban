@@ -2261,7 +2261,12 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
                 </div>
               )}
               <p className="text-gray-300 text-sm mt-1">
-                {tarefa.dataInicio ? 'Tarefa iniciada' : 'Tarefa não iniciada'}
+                {(() => {
+                  const totalTarefas = atividadesLocal.reduce((acc, a) => acc + 1 + (a.subtarefas || []).length, 0)
+                  return totalTarefas === 0 
+                    ? 'Nenhuma atividade' 
+                    : `${totalTarefas} tarefa${totalTarefas !== 1 ? 's' : ''}`
+                })()}
               </p>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition-colors">
@@ -2566,12 +2571,34 @@ export function ProcessoTarefas({ processoId, pais, onUpdate, pessoas = [], tare
   }
 }, [processoId])
 
-// Auto-abrir container quando vem da lista de tarefas
 const autoOpenDoneRef = useRef(false)
 
 useEffect(() => {
+  console.log('🔍 AUTO-OPEN DEBUG:', {
+    tarefaPaiId,
+    tipoPaiId: typeof tarefaPaiId,
+    totalTarefas: tarefas.length,
+    tarefaSelecionada: !!tarefaSelecionada,
+    autoOpenDone: autoOpenDoneRef.current,
+    tarefasIds: tarefas.map(t => ({ id: t.id, titulo: t.titulo })),
+    subtarefasIds: tarefas.flatMap(t => (t.subtarefas || []).map(s => ({ id: s.id, titulo: s.titulo, paiId: t.id })))
+  })
+
   if (tarefaPaiId && tarefas.length > 0 && !tarefaSelecionada && !autoOpenDoneRef.current) {
-    const container = tarefas.find(t => t.id === tarefaPaiId)
+    const id = Number(tarefaPaiId)
+    
+    // 1. Busca direta (tarefaPaiId é um container raiz)
+    let container = tarefas.find(t => t.id === id)
+    
+    // 2. Busca nas subtarefas (tarefaPaiId é uma atividade dentro de um container)
+    if (!container) {
+      container = tarefas.find(t => 
+        t.subtarefas?.some(s => s.id === id)
+      )
+    }
+
+    console.log('🔍 RESULTADO:', { id, containerEncontrado: container?.titulo || 'NÃO ENCONTRADO' })
+    
     if (container) {
       autoOpenDoneRef.current = true
       abrirModal(container)

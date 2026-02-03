@@ -52,6 +52,7 @@ export interface Atividade {
     id: number
     titulo: string
   }
+  data_inicio?: string | null  // ← ADICIONAR
 }
 
 // Tipo da resposta da API de tarefas
@@ -78,6 +79,7 @@ interface TarefaAPI {
     id: number
     titulo: string
   }
+  dataInicio: string | null  // ← ADICIONAR
 }
 
 // Fetcher genérico para SWR com tratamento de erro melhorado
@@ -158,6 +160,7 @@ function mapTarefaToAtividade(tarefa: TarefaAPI): Atividade {
     prioridade: tarefa.prioridade,
     tarefaPai: tarefa.tarefaPai || undefined,  // ← ADICIONAR
     observacoes: tarefa.observacoes,  // ← ADICIONAR
+    data_inicio: tarefa.dataInicio,  // ← ADICIONAR
   }
 }
 

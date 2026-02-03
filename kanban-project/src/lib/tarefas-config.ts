@@ -31,7 +31,18 @@ export const TAREFAS_POR_PAIS: Record<string, TarefaPreDefinida[]> = {
 
 // Função helper para obter tarefas por país
 export function getTarefasPorPais(pais: string): TarefaPreDefinida[] {
-  return TAREFAS_POR_PAIS[pais] || []
+  // Busca direta primeiro
+  if (TAREFAS_POR_PAIS[pais]) return TAREFAS_POR_PAIS[pais]
+  
+  // Busca normalizada (sem acentos)
+  const normalizar = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const paisNorm = normalizar(pais).toLowerCase()
+  
+  const chave = Object.keys(TAREFAS_POR_PAIS).find(
+    k => normalizar(k).toLowerCase() === paisNorm
+  )
+  
+  return chave ? TAREFAS_POR_PAIS[chave] : []
 }
 
 // Lista de todos os países disponíveis

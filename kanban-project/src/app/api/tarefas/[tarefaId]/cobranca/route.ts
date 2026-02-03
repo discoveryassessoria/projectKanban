@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { hojeBrasil } from "@/src/lib/date-utils"
 
 // POST - Ações de cobrança (recebido, cobrado, não possui, alterar prazo)
 export async function POST(
@@ -59,7 +60,7 @@ export async function POST(
               data: {
                 concluida: true,
                 statusTarefa: "CONCLUIDO_RECEBIDO",
-                dataConclusao: new Date(),
+                dataConclusao: hojeBrasil(),
                 observacoes: observacao || "Documento recebido"
               }
             }),
@@ -68,7 +69,7 @@ export async function POST(
               data: {
                 concluida: true,
                 statusTarefa: "CONCLUIDO_RECEBIDO",
-                dataConclusao: new Date(),
+                dataConclusao: hojeBrasil(),
                 observacoes: observacao || "Documento recebido"
               }
             })
@@ -80,7 +81,7 @@ export async function POST(
             data: {
               concluida: true,
               statusTarefa: "CONCLUIDO_RECEBIDO",
-              dataConclusao: new Date(),
+              dataConclusao: hojeBrasil(),
               observacoes: observacao || "Documento recebido"
             }
           })
@@ -108,7 +109,7 @@ export async function POST(
               where: { id },
               data: {
                 concluida: true,
-                dataConclusao: new Date(),
+                dataConclusao: hojeBrasil(),
                 observacoes: observacao || "Cobrado, aguardando retorno"
               }
             }),
@@ -177,7 +178,7 @@ export async function POST(
               data: {
                 concluida: true,
                 statusTarefa: "CONCLUIDO_NAO_POSSUI",
-                dataConclusao: new Date(),
+                dataConclusao: hojeBrasil(),
                 observacoes: observacao || "Cliente não possui o documento"
               }
             }),
@@ -186,7 +187,7 @@ export async function POST(
               data: {
                 concluida: true,
                 statusTarefa: "CONCLUIDO_NAO_POSSUI",
-                dataConclusao: new Date(),
+                dataConclusao: hojeBrasil(),
                 observacoes: observacao || "Cliente não possui o documento"
               }
             })
@@ -197,7 +198,7 @@ export async function POST(
             data: {
               concluida: true,
               statusTarefa: "CONCLUIDO_NAO_POSSUI",
-              dataConclusao: new Date(),
+              dataConclusao: hojeBrasil(),
               observacoes: observacao || "Cliente não possui o documento"
             }
           })
@@ -249,7 +250,7 @@ export async function POST(
         where: { id },
         data: {
           concluida: true,
-          dataConclusao: new Date(),
+          dataConclusao: hojeBrasil(),
           observacoes: observacao || "Enviado para conferência"
         }
       }),

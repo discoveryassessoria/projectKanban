@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { hojeBrasil, hojeBrasilMaisDias } from "@/src/lib/date-utils"
 
 // POST - Iniciar tarefa (SEM criar cobrança)
 export async function POST(
@@ -44,13 +45,15 @@ export async function POST(
 
     // Calcular dataPrazo baseado no prazoCobranca
     const prazoFinal = prazoCobranca || tarefa.prazoCobranca || 5
-    const dataPrazo = new Date()
-    dataPrazo.setDate(dataPrazo.getDate() + prazoFinal)
+    // Usar meio-dia UTC para evitar problemas de timezone
+    // Obter data atual no fuso do Brasil
+    const hoje = hojeBrasil()
+    const dataPrazo = hojeBrasilMaisDias(prazoFinal)
 
     const tarefaAtualizada = await prisma.tarefa.update({
       where: { id },
       data: {
-        dataInicio: new Date(),
+        dataInicio: hoje,
         dataPrazo,
         prazoCobranca: prazoFinal,
         statusTarefa: "EM_ANDAMENTO"

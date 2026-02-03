@@ -314,7 +314,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
           <div className="">Nome</div>
           <div className="">Processo</div>
           <div className="">Vinculado a</div>
-          <div className="">Data de criação</div>
+          <div className="">Data de início</div>
           <div className="">Prazo final</div>
           <div className="">Status</div>
           <div className="">Responsável</div>
@@ -375,13 +375,13 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 
                 <div className="">
                   <div className="text-sm text-white/70">
-                    {formatDateOnly(atividade.data_criacao)}
+                    {atividade.data_inicio ? formatDateOnly(atividade.data_inicio) : '-'}
                   </div>
                 </div>
                 
                 <div className="">
                   <div className="text-sm text-white/70">
-                    {formatDate(atividade.data_termino)}
+                    {atividade.data_termino ? formatDateOnly(atividade.data_termino) : 'Sem prazo'}
                   </div>
                 </div>
                 

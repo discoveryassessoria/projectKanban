@@ -4,6 +4,8 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { PrioridadeTarefa } from "@prisma/client"
 import { logTarefa } from "@/lib/auditoria"
+import { toUTCNoon } from "@/src/lib/date-utils"
+import { hojeBrasil } from "@/src/lib/date-utils"
 
 async function verificarEConcluirTarefaPai(tarefaPaiId: number) {
   const tarefaPai = await prisma.tarefa.findUnique({
@@ -25,7 +27,7 @@ async function verificarEConcluirTarefaPai(tarefaPaiId: number) {
       where: { id: tarefaPaiId },
       data: {
         concluida: true,
-        dataConclusao: new Date()
+        dataConclusao: hojeBrasil()
       }
     })
 
@@ -232,7 +234,7 @@ export async function PUT(
     if (observacoes !== undefined) dataAtualizacao.observacoes = observacoes
     if (responsavelId !== undefined) dataAtualizacao.responsavelId = responsavelId
     if (prioridade !== undefined) dataAtualizacao.prioridade = prioridade
-    if (dataPrazo !== undefined) dataAtualizacao.dataPrazo = dataPrazo ? new Date(dataPrazo) : null
+    if (dataPrazo !== undefined) dataAtualizacao.dataPrazo = dataPrazo ? toUTCNoon(dataPrazo) : null
     if (statusId !== undefined) dataAtualizacao.statusId = statusId
     if (pais !== undefined) dataAtualizacao.pais = pais
     if (ordem !== undefined) dataAtualizacao.ordem = ordem
@@ -253,7 +255,7 @@ export async function PUT(
           }
         }
         dataAtualizacao.concluida = true
-        dataAtualizacao.dataConclusao = new Date()
+        dataAtualizacao.dataConclusao = hojeBrasil()
         tipoLog = "concluir"
       } 
       else if (!concluida && tarefaExistente.concluida) {

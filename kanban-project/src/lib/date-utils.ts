@@ -122,3 +122,24 @@ export function toUTCNoon(dateString: string | null | undefined): Date | null {
   // Isso garante que em qualquer timezone do mundo ainda seja o dia correto
   return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0))
 }
+
+/**
+ * Retorna a data de "hoje" no fuso do Brasil como Date UTC ao meio-dia.
+ * Seguro para uso no servidor (que roda em UTC).
+ * Às 23h BRT do dia 02 (= 02h UTC do dia 03), retorna 02/02 12:00 UTC.
+ */
+export function hojeBrasil(): Date {
+  const now = new Date()
+  const brasilStr = now.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) // formato YYYY-MM-DD
+  const [year, month, day] = brasilStr.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0))
+}
+
+/**
+ * Retorna a data de "hoje" no Brasil + N dias, como Date UTC ao meio-dia.
+ */
+export function hojeBrasilMaisDias(dias: number): Date {
+  const hoje = hojeBrasil()
+  hoje.setUTCDate(hoje.getUTCDate() + dias)
+  return hoje
+}
