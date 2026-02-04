@@ -15,6 +15,7 @@ import { SettingsIcon } from "@/src/components/icons/settings-icon"
 import { ShieldIcon } from "@/src/components/icons/shield-icon"
 import { useSidebarContext } from "@/src/contexts/sidebar-context"
 import { CalendarIcon } from "@/src/components/icons/calendar-icon"
+import { DollarIcon } from "@/src/components/icons/dollar-icon"
 
 const menuItems = [
   {
@@ -62,6 +63,13 @@ const menuItems = [
 ]
 
 const adminMenuItems = [
+    {
+    title: "Financeiro",
+    url: "/financeiro",
+    icon: DollarIcon,
+    textOffset: "",
+    iconOffset: "",
+  },
   {
     title: "Gerenciar Usuários",
     url: "/administrator",
@@ -107,7 +115,7 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
   }
 
   // Função para renderizar o ícone corretamente
-  const renderIcon = (Icon: typeof HouseIcon | typeof GridIcon | typeof CheckIcon | typeof TreeIcon | typeof SettingsIcon | typeof ShieldIcon | typeof CalendarIcon, isActive: boolean, iconOffset: string = "") => {
+  const renderIcon = (Icon: typeof HouseIcon | typeof GridIcon | typeof CheckIcon | typeof TreeIcon | typeof SettingsIcon | typeof ShieldIcon | typeof CalendarIcon | typeof DollarIcon, isActive: boolean, iconOffset: string = "") => {
   // Todos os ícones são customizados agora, passa a prop filled
     return <Icon className={`h-5 w-5 flex-shrink-0 text-white ${iconOffset}`} filled={isActive} />
   }

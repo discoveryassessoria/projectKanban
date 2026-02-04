@@ -4,7 +4,6 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, RefreshCw } from "lucide-react"
 import {
   DndContext,
@@ -27,7 +26,6 @@ import {
   PrazoCategory 
 } from "@/src/utils/prazoUtils"
 import ActivityCard from "./ActivityCard"
-import CustomStatusManager from "./CustomStatusManager"
 import DraggableActivityCard from "./DraggableActivityCard"
 import DroppableColumn from "./DroppableColumn"
 import QuickAddModal, { QuickAddFormData } from "./QuickAddModal"
@@ -43,16 +41,18 @@ interface UserAtv {
   usuario: Usuario
 }
 
-export default function PrazoActivities() {
+interface PrazoActivitiesProps {
+  filters?: any
+}
+
+export default function PrazoActivities({ filters }: PrazoActivitiesProps) {
   // Usar hook de cache para buscar todas as atividades
-  const { activities = [], isLoading, error, mutate } = useActivities()
+  const { activities = [], isLoading, error, mutate } = useActivities(filters)
   const { contratantes = [] } = useContratantes()
   const { requerentes = [] } = useRequerentes()
   
   const [selectedActivity, setSelectedActivity] = useState<Atividade | null>(null)
-  const [activeTab, setActiveTab] = useState("kanban")
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  const [isRefreshing, setIsRefreshing] = useState(false)
   
   // Filtrar apenas atividades não concluídas para o kanban
   const atividades = (activities || []).filter((activity: Atividade) => {
@@ -108,24 +108,6 @@ export default function PrazoActivities() {
     mutate()
     invalidateActivities()
     setIsDetailsModalOpen(false)
-  }
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true)
-    try {
-      // Invalida o cache e força revalidação
-      invalidateActivities()
-      await mutate()
-    } catch (error) {
-      console.error('Erro ao atualizar:', error)
-    } finally {
-      setIsRefreshing(false)
-    }
-  }
-
-  const handleStatusCreated = () => {
-    invalidateActivities()
-    mutate()
   }
 
   const handleQuickAdd = (category: string) => {
@@ -292,7 +274,7 @@ export default function PrazoActivities() {
 
   const totalActivities = atividades.length
 
-  if (isLoading && !isRefreshing) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -308,10 +290,10 @@ export default function PrazoActivities() {
       <Card className="p-6 bg-white/5 backdrop-blur-xl border-white/10">
         <div className="text-center">
           <p className="text-red-400 mb-4">Erro: {error}</p>
-          <Button onClick={handleRefresh} variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Tentar novamente
-          </Button>
+            <Button onClick={() => mutate()} variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Tentar novamente
+            </Button>
         </div>
       </Card>
     )
@@ -363,27 +345,9 @@ export default function PrazoActivities() {
               Criando...
             </Badge>
           )}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleRefresh} 
-            disabled={isRefreshing}
-            className="bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white h-8 text-xs"
-          >
-            <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Atualizando...' : 'Atualizar'}
-          </Button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:w-[300px] bg-transparent border border-white/30 h-9">
-          <TabsTrigger value="kanban" className="data-[state=active]:bg-white/20 text-white text-xs">Kanban por Prazo</TabsTrigger>
-          <TabsTrigger value="status" className="data-[state=active]:bg-white/20 text-white text-xs">Gerenciar Status</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="kanban" className="space-y-3 mt-3">
           {/* Kanban Board */}
           <DndContext
             sensors={sensors}
@@ -448,12 +412,6 @@ export default function PrazoActivities() {
               </div>
             </Card>
           )}
-        </TabsContent>
-
-        <TabsContent value="status" className="space-y-3 mt-3">
-          <CustomStatusManager onStatusCreated={handleStatusCreated} />
-        </TabsContent>
-      </Tabs>
 
       {/* Quick Add Modal */}
       {quickAddCategory && (

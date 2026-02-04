@@ -244,7 +244,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
     return (
       <div className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
         <div className="px-4 py-3 border-b border-white/10">
-          <div className="grid gap-4 items-center" style={{ gridTemplateColumns: '28px repeat(8, 1fr)' }}>
+          <div className="grid gap-4 items-center" style={{ gridTemplateColumns: '28px 2.5fr 0.8fr 1.2fr 0.7fr 0.7fr 0.6fr 0.4fr 0.6fr' }}>
             <div className=" h-4 bg-white/10 rounded animate-pulse"></div>
             <div className="h-4 bg-white/10 rounded animate-pulse"></div>
             <div className=" h-4 bg-white/10 rounded animate-pulse"></div>
@@ -259,7 +259,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
         <div className="divide-y divide-white/10">
           {[1, 2, 3, 4, 5].map(i => (
             <div key={i} className="px-4 py-3">
-              <div className="grid gap-4 items-center" style={{ gridTemplateColumns: '28px repeat(8, 1fr)' }}>
+              <div className="grid gap-4 items-center" style={{ gridTemplateColumns: '28px 2.5fr 0.8fr 1.2fr 0.7fr 0.7fr 0.6fr 0.4fr 0.6fr' }}>
                 <div className=" h-4 w-4 bg-white/10 rounded animate-pulse"></div>
                 <div className="space-y-2">
                   <div className="h-4 bg-white/10 rounded animate-pulse"></div>
@@ -302,7 +302,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
     <div className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
       {/* Table Header */}
       <div className="px-4 py-3 border-b border-white/10">
-        <div className="grid gap-4 items-center text-sm font-medium text-white/80" style={{ gridTemplateColumns: '28px repeat(8, 1fr)' }}>
+        <div className="grid gap-4 items-center text-sm font-medium text-white/80" style={{ gridTemplateColumns: '28px 2.5fr 0.8fr 1.2fr 0.7fr 0.7fr 0.6fr 0.4fr 0.6fr' }}>
           <div className="">
             <input
               type="checkbox"
@@ -341,7 +341,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
               className="px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer"
               onClick={() => handleAtividadeClick(atividade)}
             >
-              <div className="grid gap-4 items-center text-white/80" style={{ gridTemplateColumns: '28px repeat(8, 1fr)' }}>
+              <div className="grid gap-4 items-center text-white/80" style={{ gridTemplateColumns: '28px 2.5fr 0.8fr 1.2fr 0.7fr 0.7fr 0.6fr 0.4fr 0.6fr' }}>
                 <div className="">
                   <input
                     type="checkbox"
@@ -421,10 +421,10 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
             {selectedItems.length > 0 && (
               <div className="flex items-center space-x-2">
                 <Select value={selectedAction} onValueChange={setSelectedAction}>
-                  <SelectTrigger className="w-40 bg-white/10 border-white/20 text-white">
+                  <SelectTrigger className="w-40 bg-white/10 border-white/20 text-white [&_svg]:!text-white/60" style={{ color: selectedAction ? 'white' : 'rgba(255,255,255,0.6)' }}>
                     <SelectValue placeholder="Selecionar ação" />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
+                  <SelectContent className="bg-white border-gray-200 text-gray-900">
                     <SelectItem value="delete">Excluir</SelectItem>
                     <SelectItem value="status">Marcar como...</SelectItem>
                   </SelectContent>
@@ -432,10 +432,10 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 
                 {selectedAction === 'status' && (
                   <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                    <SelectTrigger className="w-32 bg-white/10 border-white/20 text-white">
+                    <SelectTrigger className="w-32 bg-white/10 border-white/20 text-white [&_svg]:!text-white/60" style={{ color: selectedStatus ? 'white' : 'rgba(255,255,255,0.6)' }}>
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#1a1a2e] border-white/20 text-white">
+                    <SelectContent className="bg-white border-gray-200 text-gray-900">
                       {statusTarefas.map((status) => (
                         <SelectItem key={status.id} value={status.id.toString()}>
                           {status.nome}
@@ -454,16 +454,6 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 >
                   {isActionLoading ? 'Aplicando...' : 'Aplicar'}
                 </Button>
-                
-                <label className="flex items-center space-x-2">
-                  <input 
-                    type="checkbox" 
-                    className="rounded border-white/30 bg-transparent" 
-                    checked={selectedItems.length === atividades.length && atividades.length > 0}
-                    onChange={toggleSelectAll}
-                  />
-                  <span className="text-xs">Para todos</span>
-                </label>
               </div>
             )}
           </div>

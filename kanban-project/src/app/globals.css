@@ -651,3 +651,10 @@ input[type="number"].time-white {
   color: white !important;
   -webkit-text-fill-color: white !important;
 }
+
+/* Esconde setas de scroll dos Select dropdowns */
+[role="listbox"] ~ button,
+[data-radix-collection-item] ~ div[style],
+div[data-radix-select-viewport] ~ div {
+  display: none !important;
+}

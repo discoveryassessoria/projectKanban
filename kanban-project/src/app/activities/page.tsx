@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, Filter, ChevronDown } from "lucide-react"
+import RelatorioButton from "@/src/components/activitiesComponents/RelatorioButton"
 import { useRouter } from "next/navigation"
 import ListaActivities from "@/src/components/activitiesComponents/listaActivities"
 import PrazoActivities from "@/src/components/activitiesComponents/prazoActivities"
@@ -197,8 +198,9 @@ export default function ActivitiesPage() {
             
             {/* Filters and Actions */}
             <div className="flex items-center space-x-2">
+              <RelatorioButton atividades={activities || []} filtros={filters} />
               <Button variant="outline" size="sm" onClick={() => setFilterModalOpen(true)} className={`group bg-transparent hover:bg-white/10 hover:text-white hover:border-white/30 ${hasActiveFilters ? 'border-amber-500 text-amber-400 bg-amber-500/10' : 'border-white/30 text-white'}`}>
-                <Filter className="mr-2 h-4 w-4" />
+                <Filter className="mr-1 h-4 w-4" />
                 Filtro
                 {hasActiveFilters && (
                   <span className="ml-1 bg-amber-500 text-white text-xs rounded-full px-1.5 group-hover:bg-white/20 group-hover:text-white">{activeFilterCount}</span>
@@ -206,7 +208,7 @@ export default function ActivitiesPage() {
                 <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
               <Button variant="outline" size="sm" onClick={() => setSearchModalOpen(true)} className="bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white">
-                <Search className="mr-2 h-4 w-4" />
+                <Search className="mr-1 h-4 w-4" />
                 Pesquisar
               </Button>
             </div>
@@ -220,13 +222,13 @@ export default function ActivitiesPage() {
           
           <TabsContent value="deadline" className="space-y-4">
             <div className="p-4">
-              <PrazoActivities />
+              <PrazoActivities filters={filters} />
             </div>
           </TabsContent>
           
           <TabsContent value="calendar" className="space-y-4">
             <div className="p-4">
-              <CalendarioActivities />
+              <CalendarioActivities filters={filters} />
             </div>
           </TabsContent>
         </Tabs>

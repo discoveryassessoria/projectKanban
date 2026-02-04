@@ -62,7 +62,7 @@ export default function StatusCard({
   }
 
   return (
-    <div className="flex flex-col h-full min-w-[300px] max-w-[350px]">
+    <div className="flex flex-col h-full min-w-[300px] max-w-[350px] max-h-[calc(100vh-280px)]">
       <Card className={`
         flex flex-col h-full transition-all duration-200
         backdrop-blur-xl border

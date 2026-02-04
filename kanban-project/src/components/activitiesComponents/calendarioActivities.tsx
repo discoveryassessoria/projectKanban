@@ -29,7 +29,11 @@ interface DayActivityItem extends CalendarActivityItem {
   descricao: string | null
 }
 
-export default function CalendarioActivities() {
+interface CalendarioActivitiesProps {
+  filters?: any
+}
+
+export default function CalendarioActivities({ filters }: CalendarioActivitiesProps) {
   const [value, setValue] = useState<Date>(new Date())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -37,7 +41,7 @@ export default function CalendarioActivities() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   
   // Usar hook de atividades em vez de API de calendário (que não existe)
-  const { activities = [], isLoading, error, mutate } = useActivities()
+  const { activities = [], isLoading, error, mutate } = useActivities(filters)
 
   // Processar atividades para formato de calendário
   const calendarData = (activities || []).reduce((acc: CalendarActivity[], activity: Atividade) => {
@@ -283,7 +287,7 @@ export default function CalendarioActivities() {
         </div>
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-lg p-4">
           <div className="text-2xl font-bold text-blue-400">
-            {calendarData.reduce((total: number, activity: CalendarActivity) => total + activity.activities.length, 0)}
+            {(activities || []).length}
           </div>
           <div className="text-sm text-white/60">Total de Atividades</div>
         </div>
@@ -291,7 +295,10 @@ export default function CalendarioActivities() {
 
       {/* Modal do Dia */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto bg-white/10 backdrop-blur-xl border-white/20 text-white">
+        <DialogContent 
+          className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto bg-white/10 backdrop-blur-xl border-white/20 text-white"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2 text-white">
               <CalendarIcon className="h-5 w-5" />
@@ -353,17 +360,6 @@ export default function CalendarioActivities() {
                           >
                             {activity.tipo_evento === 'criacao' ? 'Criação' : 'Prazo'}
                           </Badge>
-                        </div>
-                        
-                        <div className="flex items-center space-x-4 mt-3 text-xs text-white/50">
-                          <div className="flex items-center space-x-1">
-                            <Clock className="h-3 w-3" />
-                            <span>{activity.hora}</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <User className="h-3 w-3" />
-                            <span>ID: {activity.id}</span>
-                          </div>
                         </div>
                       </div>
                     </div>

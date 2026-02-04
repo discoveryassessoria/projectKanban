@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { CheckCircle2, Clock, Info, RefreshCw, ChevronDown, ChevronUp } from "lucide-react"
+import { CheckCircle2, Clock, Info, ChevronDown, ChevronUp } from "lucide-react"
 import { useActivities, invalidateActivities } from "@/src/hooks/useActivitiesData"
 import type { Atividade } from "@/src/hooks/useActivitiesData"
 
@@ -16,7 +16,6 @@ export default function CustomStatusManager({ onStatusCreated }: CustomStatusMan
   const { activities = [], isLoading, mutate } = useActivities()
   const [showPendentes, setShowPendentes] = useState(true)
   const [showConcluidas, setShowConcluidas] = useState(false)
-  const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Separar tarefas por status
   const tarefasPendentes = activities.filter((a: Atividade) => {
@@ -28,13 +27,6 @@ export default function CustomStatusManager({ onStatusCreated }: CustomStatusMan
     const statusNome = a.status?.nome?.toLowerCase() || ''
     return statusNome === 'concluída' || statusNome === 'concluida' || a.concluida === true
   })
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true)
-    await mutate()
-    invalidateActivities()
-    setIsRefreshing(false)
-  }
 
   const handleToggleConcluida = async (tarefa: Atividade) => {
     try {
@@ -63,25 +55,6 @@ export default function CustomStatusManager({ onStatusCreated }: CustomStatusMan
 
   return (
     <div className="space-y-4">
-      {/* Header com botão atualizar */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Status de Tarefas</h2>
-          <p className="text-sm text-white/60">
-            Visualize e gerencie suas tarefas por status
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={isRefreshing || isLoading}
-          className="bg-transparent border-white/30 text-white hover:bg-white/10"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Atualizar
-        </Button>
-      </div>
 
       {/* Cards de Status com contadores */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

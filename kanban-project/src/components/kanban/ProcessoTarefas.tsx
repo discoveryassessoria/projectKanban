@@ -31,6 +31,7 @@ import {
 } from "lucide-react"
 import { getTarefasPorPais, type TarefaPreDefinida } from "../../lib/tarefas-config"
 import { isPast, formatDateBR } from "@/src/lib/date-utils"
+import { TarefaDetailModal } from "./TarefaDetailModal"
 
 // ✅ NOVO: Imports do dnd-kit para drag-and-drop
 import {
@@ -2007,6 +2008,8 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
   const seletorPessoasRef = useRef<HTMLDivElement>(null)
   const [atividadesLocal, setAtividadesLocal] = useState<Tarefa[]>(tarefa.subtarefas || [])
   const [processando, setProcessando] = useState<Set<number>>(new Set())
+  // ✅ NOVO: Estado para o modal de detalhe da tarefa (Nível 2)
+  const [atividadeDetalhe, setAtividadeDetalhe] = useState<Tarefa | null>(null)
   
   // ✅ NOVO: Verificar se é tarefa que precisa do seletor de pessoas
   const tituloLower = tarefa.titulo.toLowerCase()
@@ -2298,17 +2301,109 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
         <div className="flex-1 overflow-y-auto">
             <div className="p-4">
               <div className="space-y-3">
-                {atividadesLocal.map((atividade) => (
-  <AtividadeItem
-    key={atividade.id}
-    atividade={atividade}
-    onDelete={handleExcluirAtividade}
-    onUpdate={onUpdate}
-    usuarios={usuarios}
-    isProcuracaoAdm={tarefa.titulo.toLowerCase().includes('procuração administrativa') || 
-                     tarefa.titulo.toLowerCase().includes('procuracao administrativa')}
-  />
-))}
+                {atividadesLocal.map((atividade) => {
+                  const isTemp = atividade.id < 0
+                  const subs = atividade.subtarefas || []
+                  const concluidasSubs = subs.filter(s => s.concluida).length
+                  const totalSubs = subs.length
+                  const atrasada = atividade.dataPrazo && isPast(atividade.dataPrazo) && !atividade.concluida
+                  
+                  // Calcula se está efetivamente concluída
+                  const efetivamenteConcluida = atividade.concluida || 
+                    (totalSubs > 0 && subs.every(s => s.concluida || (s.subtarefas && s.subtarefas.length > 0 && s.subtarefas.every(ss => ss.concluida))))
+
+                  return (
+                    <div
+                      key={atividade.id}
+                      onClick={() => {
+                        if (!isTemp) setAtividadeDetalhe(atividade)
+                      }}
+                      className={`
+                        group relative flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer
+                        ${efetivamenteConcluida
+                          ? 'bg-gray-50 border-gray-200 opacity-70'
+                          : atrasada
+                            ? 'bg-white border-red-200 hover:border-red-300 hover:shadow-md hover:shadow-red-100/50'
+                            : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-md hover:shadow-blue-100/50'
+                        }
+                        ${isTemp ? 'opacity-60' : ''}
+                      `}
+                    >
+                      {/* Ícone de progresso ou status */}
+                      <div className="flex-shrink-0">
+                        {totalSubs > 0 ? (
+                          <div className="w-9 h-9 rounded-full border-2 border-gray-200 flex items-center justify-center bg-gray-50">
+                            <span className="text-[10px] font-bold text-gray-500">{concluidasSubs}/{totalSubs}</span>
+                          </div>
+                        ) : (
+                          <div className={`w-9 h-9 rounded-full border-2 flex items-center justify-center
+                            ${efetivamenteConcluida ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300 bg-gray-50 group-hover:border-blue-400'}
+                          `}>
+                            {efetivamenteConcluida ? (
+                              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            ) : (
+                              <User className="w-4 h-4 text-gray-400 group-hover:text-blue-400 transition-colors" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Conteúdo */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-sm font-medium ${efetivamenteConcluida ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                            {atividade.titulo}
+                          </span>
+                          {isTemp && <span className="text-xs text-gray-400 italic">(salvando...)</span>}
+                        </div>
+                        
+                        {/* Info badges */}
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {atividade.dataPrazo && (
+                            <span className={`text-[10px] flex items-center gap-0.5 ${atrasada ? 'text-red-500' : 'text-gray-400'}`}>
+                              <Calendar className="w-3 h-3" />
+                              {formatDateBR(atividade.dataPrazo)}
+                            </span>
+                          )}
+                          {atividade.responsavel && (
+                            <span className="text-[10px] flex items-center gap-0.5 text-gray-400">
+                              <User className="w-3 h-3" />
+                              {atividade.responsavel.nome}
+                            </span>
+                          )}
+                          {atividade.observacoes && (
+                            <span className="text-[10px] flex items-center gap-0.5 text-gray-400">
+                              <MessageSquare className="w-3 h-3" />
+                              {atividade.observacoes.substring(0, 30)}{atividade.observacoes.length > 30 ? '...' : ''}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Delete button */}
+                      {!isTemp && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (confirm("Excluir esta atividade e todas as tarefas?")) {
+                              handleExcluirAtividade(atividade.id)
+                            }
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      {/* Arrow */}
+                      <div className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 group-hover:text-blue-500 group-hover:bg-blue-50 transition-all">
+                        <ChevronRight className="w-5 h-5" />
+                      </div>
+                    </div>
+                  )
+                })}
 
                 {atividadesLocal.length === 0 && (
                   <div className="text-center py-8 text-gray-400">
@@ -2464,6 +2559,39 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
           </div>
         )}
       </div>
+
+      {/* ✅ NOVO: Modal de detalhe da atividade (Nível 2) */}
+      {atividadeDetalhe && (
+        <TarefaDetailModal
+          tarefa={atividadeDetalhe}
+          onClose={() => setAtividadeDetalhe(null)}
+          onUpdate={() => {
+            // Atualizar a atividade no estado local
+            const fetchAtualizada = async () => {
+              try {
+                const response = await fetch(`/api/tarefas/${atividadeDetalhe.id}`)
+                const data = await response.json()
+                if (data.tarefa) {
+                  setAtividadesLocal(prev => prev.map(a => 
+                    a.id === atividadeDetalhe.id ? { ...a, ...data.tarefa } : a
+                  ))
+                  setAtividadeDetalhe(data.tarefa)
+                }
+              } catch (error) {
+                console.error("Erro ao atualizar:", error)
+              }
+            }
+            fetchAtualizada()
+            onUpdate()
+          }}
+          usuarios={usuarios}
+          isProcuracaoAdm={
+            tarefa.titulo.toLowerCase().includes('procuração administrativa') || 
+            tarefa.titulo.toLowerCase().includes('procuracao administrativa')
+          }
+        />
+      )}
+
     </div>
   )
 }
