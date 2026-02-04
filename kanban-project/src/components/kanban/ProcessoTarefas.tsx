@@ -110,8 +110,9 @@ interface ProcessoTarefasProps {
   processoId: number
   pais: string
   onUpdate?: () => void
-  pessoas?: Pessoa[]  // ✅ NOVO: Lista de requerentes e contratantes
-  tarefaPaiId?: number  // ← NOVO
+  pessoas?: Pessoa[]
+  tarefaPaiId?: number
+  atividadeId?: number  // ← Novo
 }
 
 // ==========================================
@@ -1994,10 +1995,12 @@ interface SubtarefasModalProps {
   onSubtarefaAdd?: (subtarefa: Tarefa) => void
   onSubtarefaRemove?: (subtarefaId: number) => void
   usuarios: Responsavel[]
-  pessoas?: Pessoa[]  // ✅ NOVO: Lista de requerentes e contratantes
+  pessoas?: Pessoa[]
+  atividadeParaAbrir?: number | null  // ← Novo
+  onAtividadeAberta?: () => void  // ← Novo
 }
 
-function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubtarefaAdd, onSubtarefaRemove, usuarios, pessoas = [] }: SubtarefasModalProps) {
+function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubtarefaAdd, onSubtarefaRemove, usuarios, pessoas = [], atividadeParaAbrir, onAtividadeAberta }: SubtarefasModalProps) {
   const [novaAtividade, setNovaAtividade] = useState("")
   const [criando, setCriando] = useState(false)
   const [editandoTitulo, setEditandoTitulo] = useState(false)
@@ -2010,6 +2013,17 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
   const [processando, setProcessando] = useState<Set<number>>(new Set())
   // ✅ NOVO: Estado para o modal de detalhe da tarefa (Nível 2)
   const [atividadeDetalhe, setAtividadeDetalhe] = useState<Tarefa | null>(null)
+
+  // Auto-abrir atividade se vier da URL
+useEffect(() => {
+  if (atividadeParaAbrir && atividadesLocal.length > 0) {
+    const atividade = atividadesLocal.find(a => a.id === atividadeParaAbrir)
+    if (atividade) {
+      setAtividadeDetalhe(atividade)
+      onAtividadeAberta?.()
+    }
+  }
+}, [atividadeParaAbrir, atividadesLocal])
   
   // ✅ NOVO: Verificar se é tarefa que precisa do seletor de pessoas
   const tituloLower = tarefa.titulo.toLowerCase()
@@ -2599,7 +2613,7 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
 // ==========================================
 // COMPONENTE PRINCIPAL: ProcessoTarefas (COM DRAG-AND-DROP)
 // ==========================================
-export function ProcessoTarefas({ processoId, pais, onUpdate, pessoas = [], tarefaPaiId }: ProcessoTarefasProps) {
+export function ProcessoTarefas({ processoId, pais, onUpdate, pessoas = [], tarefaPaiId, atividadeId }: ProcessoTarefasProps) {
   const [tarefas, setTarefas] = useState<Tarefa[]>([])
   const [loading, setLoading] = useState(true)
   const [novaTarefa, setNovaTarefa] = useState("")
@@ -2612,6 +2626,7 @@ export function ProcessoTarefas({ processoId, pais, onUpdate, pessoas = [], tare
   
   const tarefasPreDefinidas = getTarefasPorPais(pais)
   const modalAbertoIdRef = useRef<number | null>(null)
+  const [atividadeParaAbrir, setAtividadeParaAbrir] = useState<number | null>(null)
 
   // ✅ NOVO: Configuração dos sensores para drag-and-drop
   const sensors = useSensors(
@@ -2686,13 +2701,6 @@ export function ProcessoTarefas({ processoId, pais, onUpdate, pessoas = [], tare
   }
 
   useEffect(() => {
-    if (processoId) {
-      fetchTarefas()
-      fetchUsuarios()
-    }
-  }, [processoId])
-
-  useEffect(() => {
   if (processoId) {
     fetchTarefas()
     fetchUsuarios()
@@ -2702,37 +2710,42 @@ export function ProcessoTarefas({ processoId, pais, onUpdate, pessoas = [], tare
 const autoOpenDoneRef = useRef(false)
 
 useEffect(() => {
-  console.log('🔍 AUTO-OPEN DEBUG:', {
-    tarefaPaiId,
-    tipoPaiId: typeof tarefaPaiId,
-    totalTarefas: tarefas.length,
-    tarefaSelecionada: !!tarefaSelecionada,
-    autoOpenDone: autoOpenDoneRef.current,
-    tarefasIds: tarefas.map(t => ({ id: t.id, titulo: t.titulo })),
-    subtarefasIds: tarefas.flatMap(t => (t.subtarefas || []).map(s => ({ id: s.id, titulo: s.titulo, paiId: t.id })))
-  })
-
-  if (tarefaPaiId && tarefas.length > 0 && !tarefaSelecionada && !autoOpenDoneRef.current) {
+  if (autoOpenDoneRef.current || tarefas.length === 0 || tarefaSelecionada) return
+  
+  // Prioridade 1: atividadeId (abre direto o modal da atividade)
+  if (atividadeId) {
+    const id = Number(atividadeId)
+    
+    // Procurar o container que contém essa atividade
+    for (const container of tarefas) {
+      const atividade = container.subtarefas?.find(s => s.id === id)
+      if (atividade) {
+        autoOpenDoneRef.current = true
+        setAtividadeParaAbrir(id)  // Guardar para abrir depois que o modal do container abrir
+        abrirModal(container)
+        return
+      }
+    }
+  }
+  
+  // Prioridade 2: tarefaPaiId (comportamento antigo - abre o container)
+  if (tarefaPaiId) {
     const id = Number(tarefaPaiId)
     
-    // 1. Busca direta (tarefaPaiId é um container raiz)
     let container = tarefas.find(t => t.id === id)
     
-    // 2. Busca nas subtarefas (tarefaPaiId é uma atividade dentro de um container)
     if (!container) {
       container = tarefas.find(t => 
         t.subtarefas?.some(s => s.id === id)
       )
     }
-
-    console.log('🔍 RESULTADO:', { id, containerEncontrado: container?.titulo || 'NÃO ENCONTRADO' })
     
     if (container) {
       autoOpenDoneRef.current = true
       abrirModal(container)
     }
   }
-}, [tarefaPaiId, tarefas])
+}, [tarefaPaiId, atividadeId, tarefas])
 
   const handleCriarTarefa = async (titulo?: string) => {
     const tituloFinal = titulo || novaTarefa.trim()
@@ -3074,7 +3087,9 @@ useEffect(() => {
             }))
           }}
           usuarios={usuarios}
-          pessoas={pessoas}  // ✅ NOVO: Passar lista de pessoas
+          pessoas={pessoas}
+          atividadeParaAbrir={atividadeParaAbrir}  // ← Novo
+          onAtividadeAberta={() => setAtividadeParaAbrir(null)}  // ← Novo
         />
       )}
     </div>

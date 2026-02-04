@@ -779,6 +779,7 @@ model AnexoContratante {
   urlArquivo    String   @db.Text
   tamanho       Int?
   mimeType      String?  @db.VarChar(100)
+  categoria    String?
   
   contratanteId Int
   contratante   Contratante @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
@@ -796,6 +797,7 @@ model AnexoRequerente {
   urlArquivo    String   @db.Text
   tamanho       Int?
   mimeType      String?  @db.VarChar(100)
+  categoria    String?
   
   requerenteId  Int
   requerente    Requerente @relation(fields: [requerenteId], references: [id], onDelete: Cascade)

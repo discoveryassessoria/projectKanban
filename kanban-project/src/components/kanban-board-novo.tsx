@@ -43,6 +43,7 @@ interface KanbanBoardProps {
   initialPessoaId?: number | null
   initialSidebarTab?: string | null
   initialTarefaPaiId?: number | null  // ← NOVO
+  initialAtividadeId?: number | null  // ← NOVO
   onModalOpened?: () => void
 }
 
@@ -77,6 +78,7 @@ export function KanbanBoard({
   initialSidebarTab = null,
   onModalOpened,
   initialTarefaPaiId = null,  // ← NOVO
+  initialAtividadeId = null,  // ← NOVO
 }: KanbanBoardProps) {
   const [localProcessos, setLocalProcessos] = useState<ProcessoWithStatus[]>(processosFromProps)
   
@@ -93,6 +95,7 @@ export function KanbanBoard({
   const [modalInitialPessoaId, setModalInitialPessoaId] = useState<number | undefined>(undefined)
   const [modalInitialSidebarTab, setModalInitialSidebarTab] = useState<string | undefined>(undefined)
   const [modalInitialTarefaPaiId, setModalInitialTarefaPaiId] = useState<number | undefined>(undefined)
+  const [modalInitialAtividadeId, setModalInitialAtividadeId] = useState<number | undefined>(undefined)
   
   const [isDragging, setIsDragging] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -128,6 +131,7 @@ export function KanbanBoard({
         setModalInitialPessoaId(initialPessoaId || undefined)
         setModalInitialSidebarTab(initialSidebarTab || undefined)
         setModalInitialTarefaPaiId(initialTarefaPaiId || undefined)
+        setModalInitialAtividadeId(initialAtividadeId || undefined)
         setIsDetailsModalOpen(true)
         setInitialParamsProcessed(true)
         onModalOpened?.()
@@ -195,6 +199,7 @@ export function KanbanBoard({
     setModalInitialSidebarTab(undefined)
     setIsDetailsModalOpen(true)
     setModalInitialTarefaPaiId(undefined)
+    setModalInitialAtividadeId(undefined)
   }
 
   const handleProcessoSave = () => onRefresh()
@@ -205,6 +210,7 @@ export function KanbanBoard({
     setModalInitialPessoaId(undefined)
     setModalInitialSidebarTab(undefined)
     setModalInitialTarefaPaiId(undefined)
+    setModalInitialAtividadeId(undefined)
   }
 
   // ✅ CORREÇÃO: Drag handlers atualizados para IDs prefixados
@@ -412,6 +418,7 @@ export function KanbanBoard({
         initialPessoaId={modalInitialPessoaId}
         initialSidebarTab={modalInitialSidebarTab}
         initialTarefaPaiId={modalInitialTarefaPaiId}
+        initialAtividadeId={modalInitialAtividadeId}
       />
     </>
   )

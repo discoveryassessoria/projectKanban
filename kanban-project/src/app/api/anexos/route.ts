@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma"
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { nome, nomeArquivo, urlArquivo, tamanho, mimeType, tipoCliente, contratanteId, requerenteId } = body
+    const { nome, nomeArquivo, urlArquivo, tamanho, mimeType, tipoCliente, contratanteId, requerenteId, categoria } = body
 
     if (!urlArquivo || !nomeArquivo) {
       return NextResponse.json({ error: "Dados do arquivo são obrigatórios" }, { status: 400 })
@@ -23,6 +23,7 @@ export async function POST(request: Request) {
           mimeType: mimeType || null,
           tipo: "Documento",
           requerenteId: parseInt(requerenteId),
+          categoria: categoria || null,
         },
       })
     } else if (contratanteId) {
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
           mimeType: mimeType || null,
           tipo: "Documento",
           contratanteId: parseInt(contratanteId),
+          categoria: categoria || null,
         },
       })
     } else {

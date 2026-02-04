@@ -33,9 +33,10 @@ import { useActivityOperations } from "@/src/hooks/useActivityOperations"
 import { useQuickAddActivity } from "@/src/hooks/useQuickAddActivity"
 import { useActivities, useContratantes, useRequerentes, invalidateActivities } from "@/src/hooks/useActivitiesData"
 import type { Atividade, Usuario, Status } from "@/src/hooks/useActivitiesData"
-import { ProcessoDetailsModal } from "@/src/components/kanban/atividade-details-modal"
+import { TarefaDetailsModal } from "@/src/components/activitiesComponents/tarefa-details-modal"
 import type { Contratante, Requerente } from "@/src/types/kanban"
 import "@/src/styles/kanban.css"
+import { useRouter } from "next/navigation"
 
 interface UserAtv {
   usuario: Usuario
@@ -46,6 +47,7 @@ interface PrazoActivitiesProps {
 }
 
 export default function PrazoActivities({ filters }: PrazoActivitiesProps) {
+  const router = useRouter()
   // Usar hook de cache para buscar todas as atividades
   const { activities = [], isLoading, error, mutate } = useActivities(filters)
   const { contratantes = [] } = useContratantes()
@@ -100,8 +102,15 @@ export default function PrazoActivities({ filters }: PrazoActivitiesProps) {
   )
 
   const handleActivityClick = (activity: Atividade) => {
-    setSelectedActivity(activity)
-    setIsDetailsModalOpen(true)
+    if (activity.processo?.id) {
+      // Redirecionar para o kanban que vai abrir os modais automaticamente
+      const pais = activity.processo.pais || activity.pais || 'PORTUGAL'
+      router.push(`/kanban?processoId=${activity.processo.id}&tab=tarefas&pais=${pais}&atividadeId=${activity.id}`)
+    } else {
+      // Atividade sem processo - abrir modal simples
+      setSelectedActivity(activity)
+      setIsDetailsModalOpen(true)
+    }
   }
 
   const handleAtividadeSave = () => {
@@ -424,13 +433,15 @@ export default function PrazoActivities({ filters }: PrazoActivitiesProps) {
         />
       )}
 
-      {/* Activity Details Modal */}
-      <ProcessoDetailsModal
-        processo={selectedActivity as any}
-        isOpen={isDetailsModalOpen}
-        onClose={() => setIsDetailsModalOpen(false)}
-        onSave={handleAtividadeSave}
-      />
+        {/* Activity Details Modal - apenas para atividades sem processo */}
+        {isDetailsModalOpen && selectedActivity && (
+          <TarefaDetailsModal
+            tarefa={selectedActivity as any}
+            isOpen={isDetailsModalOpen}
+            onClose={() => setIsDetailsModalOpen(false)}
+            onSave={handleAtividadeSave}
+          />
+        )}
     </div>
   )
 }

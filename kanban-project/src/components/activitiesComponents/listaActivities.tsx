@@ -210,8 +210,8 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   const handleAtividadeClick = (atividade: Atividade) => {
     if (atividade.processo?.id) {
       const pais = atividade.processo.pais || atividade.pais || 'PORTUGAL'
-      const tarefaPaiId = atividade.tarefaPai?.id ? `&tarefaPaiId=${atividade.tarefaPai.id}` : ''
-      router.push(`/kanban?processoId=${atividade.processo.id}&tab=tarefas&pais=${pais}${tarefaPaiId}`)
+      // Passar o ID da atividade clicada para abrir direto o modal dela
+      router.push(`/kanban?processoId=${atividade.processo.id}&tab=tarefas&pais=${pais}&atividadeId=${atividade.id}`)
     } else {
       setSelectedAtividade(atividade)
       setIsDetailsModalOpen(true)

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { gerarRelatorioFinanceiroPDF, gerarRelatorioFinanceiroExcel } from "@/src/utils/relatorioFinanceiro"
 import dynamic from "next/dynamic"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const GraficosFinanceiro = dynamic(() => import("@/src/components/financeiroComponents/GraficosFinanceiro"), { ssr: false, loading: () => <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div> })
 
@@ -251,26 +252,13 @@ export default function FinanceiroPage() {
           {/* Top bar */}
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             {/* View toggle */}
-            <div className="flex bg-white/10 border border-white/30 rounded-md overflow-hidden">
-              <button
-                onClick={() => setViewMode('faturas')}
-                className={`px-4 py-1.5 text-sm font-medium transition ${viewMode === 'faturas' ? 'bg-white/20 text-white' : 'text-white/70 hover:text-white'}`}
-              >
-                Faturas
-              </button>
-              <button
-                onClick={() => setViewMode('processos')}
-                className={`px-4 py-1.5 text-sm font-medium transition ${viewMode === 'processos' ? 'bg-white/20 text-white' : 'text-white/70 hover:text-white'}`}
-              >
-                Por Processo
-              </button>
-              <button
-                onClick={() => setViewMode('graficos')}
-                className={`px-4 py-1.5 text-sm font-medium transition ${viewMode === 'graficos' ? 'bg-white/20 text-white' : 'text-white/70 hover:text-white'}`}
-              >
-                Gráficos
-              </button>
-            </div>
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'faturas' | 'processos' | 'graficos')}>
+              <TabsList className="bg-transparent border border-white/30">
+                <TabsTrigger value="faturas" className="data-[state=active]:bg-white/20 text-white">Faturas</TabsTrigger>
+                <TabsTrigger value="processos" className="data-[state=active]:bg-white/20 text-white">Por Processo</TabsTrigger>
+                <TabsTrigger value="graficos" className="data-[state=active]:bg-white/20 text-white">Gráficos</TabsTrigger>
+              </TabsList>
+            </Tabs>
 
             {/* Actions */}
             <div className="flex items-center space-x-2">
@@ -320,17 +308,19 @@ export default function FinanceiroPage() {
           )}
 
           {/* Content */}
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-8 w-8 animate-spin text-white/50" />
-            </div>
-          ) : viewMode === 'graficos' ? (
-            <GraficosFinanceiro faturas={faturasFiltradas} totaisGeralBRL={totaisGeralBRL} totaisPorMoeda={totaisPorMoeda} porProcesso={porProcesso} />
-          ) : viewMode === 'faturas' ? (
-            <FaturasList faturas={faturasFiltradas} onClickProcesso={(id, pais) => router.push(`/kanban?processoId=${id}&tab=faturas&pais=${pais}`)} />
-          ) : (
-            <ProcessosList processos={porProcesso} onClickProcesso={(id, pais) => router.push(`/kanban?processoId=${id}&tab=faturas&pais=${pais}`)} />
-          )}
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-4">
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-white/50" />
+              </div>
+            ) : viewMode === 'graficos' ? (
+              <GraficosFinanceiro faturas={faturasFiltradas} totaisGeralBRL={totaisGeralBRL} totaisPorMoeda={totaisPorMoeda} porProcesso={porProcesso} />
+            ) : viewMode === 'faturas' ? (
+              <FaturasList faturas={faturasFiltradas} onClickProcesso={(id, pais) => router.push(`/kanban?processoId=${id}&tab=faturas&pais=${pais}`)} />
+            ) : (
+              <ProcessosList processos={porProcesso} onClickProcesso={(id, pais) => router.push(`/kanban?processoId=${id}&tab=faturas&pais=${pais}`)} />
+            )}
+          </div>
 
         </main>
       </div>

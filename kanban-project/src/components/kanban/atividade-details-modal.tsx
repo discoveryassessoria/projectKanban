@@ -72,6 +72,7 @@ interface ProcessoDetailsModalProps {
   initialPessoaId?: number
   initialSidebarTab?: string
   initialTarefaPaiId?: number  // ← ADICIONAR
+  initialAtividadeId?: number  // ← ADICIONAR
 }
 
 export function ProcessoDetailsModal({ 
@@ -86,6 +87,7 @@ export function ProcessoDetailsModal({
   initialPessoaId,
   initialSidebarTab,
   initialTarefaPaiId,    // ← ADICIONAR ESTA LINHA
+  initialAtividadeId,    // ← ADICIONAR ESTA LINHA
 }: ProcessoDetailsModalProps) {
   // ✅ ATUALIZADO: Adicionado "informacoes" como possível aba
   const [activeTab, setActiveTab] = useState<"geral" | "faturas" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos">("geral")
@@ -930,7 +932,6 @@ export function ProcessoDetailsModal({
               </div>
 
               {/* ========== COLUNA DIREITA - TAREFAS (COMPONENTE) ========== */}
-              {/* ✅ CORRIGIDO: Adicionado prop pessoas */}
               <ProcessoTarefas 
                 processoId={processo.id}
                 pais={paisConfig.label}
@@ -939,7 +940,8 @@ export function ProcessoDetailsModal({
                   ...requerentesSelecionados.map(r => ({ id: r.id, nome: r.nome, tipo: 'REQUERENTE' as const })),
                   ...contratantesSelecionados.map(c => ({ id: c.id, nome: c.nome, tipo: 'CONTRATANTE' as const }))
                 ]}
-                tarefaPaiId={initialTarefaPaiId}   // ← ADICIONAR
+                tarefaPaiId={initialTarefaPaiId}
+                atividadeId={initialAtividadeId}
               />
             </div>
           )}

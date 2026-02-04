@@ -27,6 +27,7 @@ import {
   Filter,
 } from "lucide-react"
 import { BandeiraPais } from "@/src/components/ui/bandeira-pais"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface Usuario {
   id: number
@@ -364,31 +365,13 @@ const handleSubmit = async () => {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {/* Toggle Lista/Calendário */}
-              <div className="flex items-center bg-white/10 rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode("lista")}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                    viewMode === "lista"
-                      ? "bg-white text-gray-900"
-                      : "text-white/70 hover:text-white"
-                  }`}
-                >
-                  <List className="h-4 w-4" />
-                  Lista
-                </button>
-                <button
-                  onClick={() => setViewMode("calendario")}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                    viewMode === "calendario"
-                      ? "bg-white text-gray-900"
-                      : "text-white/70 hover:text-white"
-                  }`}
-                >
-                  <Calendar className="h-4 w-4" />
-                  Calendário
-                </button>
-              </div>
+            {/* Toggle Lista/Calendário */}
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "lista" | "calendario")}>
+              <TabsList className="bg-transparent border border-white/30">
+                <TabsTrigger value="lista" className="data-[state=active]:bg-white/20 text-white">Lista</TabsTrigger>
+                <TabsTrigger value="calendario" className="data-[state=active]:bg-white/20 text-white">Calendário</TabsTrigger>
+              </TabsList>
+            </Tabs>
               <Button
                 onClick={() => setShowForm(true)}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"

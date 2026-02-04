@@ -35,6 +35,8 @@ import {
 import { useUploadThing } from "@/src/lib/uploadthing"
 import { PDFThumbnail } from "./pdf-thumbnail"
 import { DatePickerField } from "@/components/ui/date-picker-field"
+import { Upload, CheckCircle2, XCircle, FileImage, Shield, Home, CreditCard as CreditCardIcon, Car } from "lucide-react"
+import RelatorioClientesButton from "@/src/components/contratantesComponents/RelatorioClientesButton"
 
 interface Contratante {
   id: number
@@ -89,6 +91,19 @@ interface ProcessoVinculado {
   status: string
   etapaAtual?: string | null
 }
+
+interface DocumentoObrigatorio {
+  categoria: string
+  label: string
+  icon: any // tipo do Lucide
+  anexo: Anexo | null
+}
+
+const DOCUMENTOS_OBRIGATORIOS = [
+{ categoria: "RG", label: "RG", icon: CreditCardIcon },
+{ categoria: "CNH", label: "CNH", icon: Car },
+{ categoria: "COMPROVANTE_ENDERECO", label: "Comprovante de Endereço", icon: Home },
+] as const
 
 // ✅ Componente de Tooltip para mostrar processos vinculados
 function ProcessosTooltip({ 
@@ -393,7 +408,14 @@ export function ContratanteModal({
   const [activeTab, setActiveTab] = useState<"dados" | "endereco" | "observacoes">("dados")
   const [mounted, setMounted] = useState(false)
   const [buscandoCep, setBuscandoCep] = useState(false)
+  const uploadingCategoriaRef = useRef<string | null>(null)  // ✅ AQUI
   
+  const [documentosObrigatorios, setDocumentosObrigatorios] = useState<Record<string, Anexo | null>>({
+  RG: null,
+  CNH: null,
+  COMPROVANTE_ENDERECO: null,
+  })
+
   // Estados para upload de arquivos
   const [arquivos, setArquivos] = useState<File[]>([])
   const [anexosExistentes, setAnexosExistentes] = useState<Anexo[]>([])
@@ -442,7 +464,26 @@ export function ContratanteModal({
       const response = await fetch(`/api/anexos?tipoCliente=${editingTipo}&id=${editingId}`)
       if (response.ok) {
         const data = await response.json()
-        setAnexosExistentes(data.anexos || [])
+        const todosAnexos: Anexo[] = data.anexos || []
+        
+        // Separar documentos obrigatórios dos genéricos
+        const docs: Record<string, Anexo | null> = {
+          RG: null,
+          CNH: null,
+          COMPROVANTE_ENDERECO: null,
+        }
+        const genericos: Anexo[] = []
+        
+        for (const anexo of todosAnexos) {
+          const cat = (anexo as any).categoria
+          if (cat && docs.hasOwnProperty(cat)) {
+            docs[cat] = anexo
+          }
+          genericos.push(anexo) // sempre adiciona (era dentro do else)
+        }
+        
+        setDocumentosObrigatorios(docs)
+        setAnexosExistentes(genericos)
       }
     } catch (error) {
       console.error("Erro ao carregar anexos:", error)
@@ -451,11 +492,80 @@ export function ContratanteModal({
     }
   }
 
+  const handleDocumentoUpload = async (categoria: string, file: File) => {
+  if (!editingId) return
+  
+  try {
+    uploadingCategoriaRef.current = categoria
+    const uploadResult = await startUpload([file])
+    uploadingCategoriaRef.current = null
+    
+    if (uploadResult && uploadResult.length > 0) {
+      const uploaded = uploadResult[0]
+      
+      // Salvar no banco com categoria
+      const response = await fetch("/api/anexos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome: uploaded.name,
+          nomeArquivo: uploaded.name,
+          urlArquivo: uploaded.url,
+          tamanho: uploaded.size,
+          mimeType: uploaded.type,
+          tipoCliente: editingTipo,
+          contratanteId: editingTipo === "contratante" ? editingId : undefined,
+          requerenteId: editingTipo === "requerente" ? editingId : undefined,
+          categoria: categoria,
+        }),
+      })
+      
+      if (response.ok) {
+          const data = await response.json()
+          setDocumentosObrigatorios(prev => ({
+            ...prev,
+            [categoria]: data.anexo,
+          }))
+          setAnexosExistentes(prev => [...prev, data.anexo])  // ← ADICIONAR
+      }
+    }
+  } catch (error) {
+    console.error(`Erro ao enviar ${categoria}:`, error)
+    alert(`Erro ao enviar documento: ${(error as Error).message}`)
+  }
+}
+
+const removerDocumentoObrigatorio = async (categoria: string) => {
+  const anexo = documentosObrigatorios[categoria]
+  if (!anexo || !editingId) return
+  
+  try {
+    const response = await fetch(`/api/anexos?tipoCliente=${editingTipo}&id=${anexo.id}`, {
+      method: "DELETE",
+    })
+    
+    if (response.ok) {
+      setDocumentosObrigatorios(prev => ({
+        ...prev,
+        [categoria]: null,
+      }))
+    } else {
+      alert("Erro ao excluir documento")
+    }
+  } catch (error) {
+    console.error("Erro ao excluir documento:", error)
+    alert("Erro ao excluir documento")
+  }
+  setAnexosExistentes(prev => prev.filter(a => a.id !== anexo.id))
+}
+
   const { startUpload, isUploading } = useUploadThing("anexoUploader", {
     onUploadProgress: (progress) => {
       setUploadProgress(progress)
     },
     onClientUploadComplete: async (res) => {
+      // Se é upload de documento obrigatório, handleDocumentoUpload já cuida
+      if (uploadingCategoriaRef.current) return
       if (res && editingId) {
         for (const file of res) {
           try {
@@ -539,6 +649,12 @@ export function ContratanteModal({
     } else {
       setAnexosExistentes(prev => prev.filter((_, i) => i !== index))
     }
+
+    // Se era documento obrigatório, limpa de lá também
+    const cat = (anexo as any).categoria
+    if (cat && documentosObrigatorios[cat]?.id === anexo.id) {
+      setDocumentosObrigatorios(prev => ({ ...prev, [cat]: null }))
+    }
   }
 
   const formatFileSize = (bytes: number | null | undefined) => {
@@ -559,6 +675,7 @@ export function ContratanteModal({
       setAnexosExistentes([])
       setUploadProgress(0)
       setActiveTab("dados")
+      setDocumentosObrigatorios({ RG: null, CNH: null, COMPROVANTE_ENDERECO: null }) // ← ADICIONAR
     }
   }, [isOpen])
 
@@ -1041,7 +1158,7 @@ export function ContratanteModal({
                           value={formData.tipo}
                           onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
                           disabled={isViewMode || !!editingId}
-                          className={`w-full h-10 px-3 rounded-lg border text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 ${
+                          className={`w-full h-[42px] px-3 rounded-lg border text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 ${
                             formData.tipo === 'requerente' 
                               ? 'bg-purple-50 border-purple-300' 
                               : 'bg-white border-gray-300'
@@ -1169,7 +1286,7 @@ export function ContratanteModal({
                           value={formData.sexo}
                           onChange={(e) => setFormData({ ...formData, sexo: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-10 px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                         >
                           <option value="">Selecione</option>
                           {SEXO_OPTIONS.map(opt => (
@@ -1189,7 +1306,7 @@ export function ContratanteModal({
                           value={formData.estadoCivil}
                           onChange={(e) => setFormData({ ...formData, estadoCivil: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-10 px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                         >
                           <option value="">Selecione</option>
                           {ESTADO_CIVIL_OPTIONS.map(opt => (
@@ -1206,7 +1323,7 @@ export function ContratanteModal({
                           value={formData.nacionalidade}
                           onChange={(e) => setFormData({ ...formData, nacionalidade: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-10 px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                         >
                           <option value="">Selecione</option>
                           {NACIONALIDADE_OPTIONS.map(opt => (
@@ -1274,7 +1391,7 @@ export function ContratanteModal({
                             value={formData.pais}
                             onChange={(e) => handlePaisChange(e.target.value)}
                             disabled={isViewMode}
-                            className="w-full h-10 px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                            className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                           >
                             {PAISES_OPTIONS.map(pais => (
                               <option key={pais.nome} value={pais.nome}>{pais.nome}</option>
@@ -1322,7 +1439,7 @@ export function ContratanteModal({
                           value={formData.pais}
                           onChange={(e) => handlePaisChange(e.target.value)}
                           disabled={isViewMode}
-                          className="w-full h-10 px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                         >
                           {PAISES_OPTIONS.map(pais => (
                             <option key={pais.nome} value={pais.nome}>{pais.nome}</option>
@@ -1433,9 +1550,9 @@ export function ContratanteModal({
               </div>
             )}
 
-            {/* Tab Observações */}
             {activeTab === "observacoes" && (
               <div className="space-y-6">
+                {/* Seção: Observações */}
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <FileText className="h-4 w-4 text-indigo-600" />
@@ -1445,16 +1562,161 @@ export function ContratanteModal({
                     value={formData.observacoes}
                     onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
                     placeholder="Anotações, informações importantes..."
-                    rows={6}
+                    rows={4}
                     disabled={isViewMode}
                     className="w-full px-3 py-2 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                   />
                 </div>
 
+                {/* Seção: Documentos Obrigatórios */}
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-indigo-600" />
+                    Documentos Obrigatórios
+                    {carregandoAnexos && <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />}
+                  </h3>
+
+                  {!editingId && (
+                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-sm text-amber-700">
+                        ⚠️ Salve o cliente primeiro para poder adicionar documentos.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {DOCUMENTOS_OBRIGATORIOS.map(({ categoria, label, icon: Icon }) => {
+                      const anexo = documentosObrigatorios[categoria]
+                      const temDocumento = !!anexo
+                      
+                      return (
+                        <div
+                          key={categoria}
+                          className={`
+                            relative rounded-xl border-2 p-4 transition-all
+                            ${temDocumento 
+                              ? 'border-emerald-300 bg-emerald-50' 
+                              : 'border-red-200 bg-red-50'
+                            }
+                          `}
+                        >
+                          {/* Header com status */}
+                          <div className="flex items-center justify-between mb-3 min-h-[48px]">
+                            <div className="flex items-center gap-2">
+                              <Icon className={`h-4 w-4 ${temDocumento ? 'text-emerald-600' : 'text-red-500'}`} />
+                              <span className="text-sm font-semibold text-gray-800">{label}</span>
+                            </div>
+                            {temDocumento ? (
+                              <div className="flex items-center gap-1 px-2 py-0.5 bg-emerald-100 rounded-full">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                <span className="text-xs font-medium text-emerald-700">Enviado</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 px-2 py-0.5 bg-red-100 rounded-full">
+                                <XCircle className="h-3.5 w-3.5 text-red-500" />
+                                <span className="text-xs font-medium text-red-600">Pendente</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Conteúdo */}
+                          {temDocumento ? (
+                            <div className="space-y-2">
+                              {/* Preview do arquivo */}
+                              <a
+                                href={anexo.urlArquivo}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block group"
+                              >
+                                <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-white border border-gray-200">
+                                  {anexo.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(anexo.nomeArquivo) ? (
+                                    <img 
+                                      src={anexo.urlArquivo} 
+                                      alt={anexo.nomeArquivo}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (anexo.mimeType === 'application/pdf' || /\.pdf$/i.test(anexo.nomeArquivo)) ? (
+                                    <PDFThumbnail 
+                                      url={anexo.urlArquivo} 
+                                      className="w-full h-full"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                                      <FileText className="h-10 w-10 text-gray-400" />
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                    <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                </div>
+                              </a>
+                              
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs text-gray-600 truncate flex-1" title={anexo.nomeArquivo}>
+                                  {anexo.nomeArquivo}
+                                </p>
+                                {!isViewMode && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removerDocumentoObrigatorio(categoria)}
+                                    className="ml-2 p-1 text-red-500 hover:bg-red-100 rounded transition-colors"
+                                    title="Remover documento"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            /* Área de upload quando não tem documento */
+                            editingId && !isViewMode ? (
+                              <label className="block cursor-pointer">
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept="image/*,.pdf,.doc,.docx"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0]
+                                    if (file) {
+                                      handleDocumentoUpload(categoria, file)
+                                    }
+                                    e.target.value = '' // Reset input
+                                  }}
+                                />
+                                <div className="flex flex-col items-center justify-center py-6 border-2 border-dashed border-red-300 rounded-lg hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors">
+                                  {isUploading ? (
+                                    <>
+                                      <Loader2 className="h-6 w-6 animate-spin text-indigo-500 mb-2" />
+                                      <p className="text-xs text-gray-500">Enviando...</p>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Upload className="h-6 w-6 text-gray-400 mb-2" />
+                                      <p className="text-xs text-gray-600 font-medium">Enviar {label}</p>
+                                      <p className="text-[10px] text-gray-400 mt-0.5">PDF, imagem ou documento</p>
+                                    </>
+                                  )}
+                                </div>
+                              </label>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center py-6 border-2 border-dashed border-gray-200 rounded-lg">
+                                <FileText className="h-6 w-6 text-gray-300 mb-2" />
+                                <p className="text-xs text-gray-400">Nenhum arquivo</p>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Seção: Outros Documentos (genéricos) */}
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <FileText className="h-4 w-4 text-indigo-600" />
-                    Anexos
+                    Todos os Documentos
                     {carregandoAnexos && <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />}
                   </h3>
 
@@ -1468,7 +1730,6 @@ export function ContratanteModal({
                   
                   {anexosExistentes.length > 0 && (
                     <div className="mb-4">
-                      <p className="text-sm text-gray-600 font-medium mb-3">Arquivos enviados:</p>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                         {anexosExistentes.map((anexo, index) => {
                           const fileName = anexo.nomeArquivo || anexo.nome || ''
@@ -1612,7 +1873,7 @@ export function ContratanteModal({
                   {isViewMode && anexosExistentes.length === 0 && !carregandoAnexos && (
                     <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
                       <FileText className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-                      <p className="text-sm text-gray-400">Nenhum anexo</p>
+                      <p className="text-sm text-gray-400">Nenhum documento adicional</p>
                     </div>
                   )}
                 </div>
@@ -1858,13 +2119,16 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
           />
         </div>
         
-        <Button
-          onClick={handleNew}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Cliente
-        </Button>
+        <div className="flex items-center gap-2">
+          <RelatorioClientesButton />
+          <Button
+            onClick={handleNew}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Cliente
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-lg border border-white/20 overflow-hidden">
