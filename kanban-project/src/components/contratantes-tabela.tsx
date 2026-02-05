@@ -24,7 +24,8 @@ import {
   Globe,
   Heart,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  Smartphone,  // ← ADICIONAR
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -37,6 +38,7 @@ import { PDFThumbnail } from "./pdf-thumbnail"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import { Upload, CheckCircle2, XCircle, FileImage, Shield, Home, CreditCard as CreditCardIcon, Car } from "lucide-react"
 import RelatorioClientesButton from "@/src/components/contratantesComponents/RelatorioClientesButton"
+import { AcessoAppTab } from "./contratantesComponents/AcessoAppTab"
 
 interface Contratante {
   id: number
@@ -405,7 +407,7 @@ export function ContratanteModal({
   errors?: { nome?: string; cpf?: string; geral?: string }
   setErrors?: (errors: { nome?: string; cpf?: string; geral?: string }) => void
 }) {
-  const [activeTab, setActiveTab] = useState<"dados" | "endereco" | "observacoes">("dados")
+  const [activeTab, setActiveTab] = useState<"dados" | "endereco" | "observacoes" | "acesso">("dados")
   const [mounted, setMounted] = useState(false)
   const [buscandoCep, setBuscandoCep] = useState(false)
   const uploadingCategoriaRef = useRef<string | null>(null)  // ✅ AQUI
@@ -1116,6 +1118,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
             { id: "dados", label: "Dados Pessoais", icon: User },
             { id: "endereco", label: "Endereço", icon: MapPin },
             { id: "observacoes", label: "Observações e Anexos", icon: FileText },
+            { id: "acesso", label: "Acesso ao App", icon: Smartphone },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -1909,6 +1912,18 @@ style={{
                 </div>
               </div>
             )}
+            
+            {/* Tab Acesso ao App */}
+            {activeTab === "acesso" && (
+              <AcessoAppTab
+                clienteId={editingId}
+                clienteTipo={editingTipo}
+                clienteEmail={formData.email}
+                clienteNome={formData.nome}
+                isViewMode={isViewMode}
+              />
+            )}
+
           </div>
         </div>
       </div>
