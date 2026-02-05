@@ -624,6 +624,7 @@ model Contratante {
   
   // ✅ NOVO: Protocolos vinculados
   protocolos      Protocolo[]
+  clienteAuth     ClienteAuth[]
 }
 
 // ========================================
@@ -666,6 +667,7 @@ model Requerente {
   // ✅ NOVO: Protocolos vinculados
   protocolos      Protocolo[]
   pagamentosRecebidos  PagamentoDestinatario[]
+  clienteAuth     ClienteAuth[]
 }
 
 // ========================================
@@ -1412,4 +1414,34 @@ model Parcela {
   @@index([faturaId])
   @@index([dataVencimento])
   @@index([pago])
+}
+
+model ClienteAuth {
+  id              Int       @id @default(autoincrement())
+  
+  // Login
+  email           String    @unique @db.VarChar(100)
+  senhaHash       String    @db.VarChar(255)
+  
+  // Vínculo flexível: pode ser contratante OU requerente
+  contratanteId   Int?
+  contratante     Contratante? @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
+  
+  requerenteId    Int?
+  requerente      Requerente?  @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+  
+  // Controle
+  ativo           Boolean   @default(true)
+  primeiroAcesso  Boolean   @default(true)  // Forçar troca de senha no 1º login
+  ultimoLogin     DateTime?
+  
+  // Token de reset de senha
+  resetToken      String?   @db.VarChar(255)
+  resetTokenExpira DateTime?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([contratanteId])
+  @@index([requerenteId])
 }

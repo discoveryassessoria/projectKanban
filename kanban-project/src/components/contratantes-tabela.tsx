@@ -1046,7 +1046,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
       />
       
       <div 
-        className="relative bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        className="relative bg-white rounded-lg shadow-2xl flex flex-col overflow-hidden"
         style={{
           position: 'absolute',
           top: '2rem',
@@ -1158,11 +1158,16 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           value={formData.tipo}
                           onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
                           disabled={isViewMode || !!editingId}
-                          className={`w-full h-[42px] px-3 rounded-2xl border text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 ${
+                          className={`w-full h-[42px] px-3 rounded-lg border text-gray-900 disabled:opacity-50 disabled:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer ${
                             formData.tipo === 'requerente' 
                               ? 'bg-purple-50 border-purple-300' 
                               : 'bg-white border-gray-300'
                           }`}
+                          style={{
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'right 12px center'
+                          }}
                         >
                           {TIPO_OPTIONS.map(opt => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -1184,7 +1189,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           onChange={(e) => handleNomeChange(e.target.value)}
                           placeholder="Nome completo"
                           disabled={isViewMode}
-                          className={`bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 ${
+                          className={`bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white ${
                             errors.nome ? 'border-red-500 focus-visible:ring-red-500' : ''
                           }`}
                         />
@@ -1209,7 +1214,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           placeholder="000.000.000-00"
                           maxLength={14}
                           disabled={isViewMode}
-                          className={`bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 ${
+                          className={`bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white ${
                             errors.cpf ? 'border-red-500 focus-visible:ring-red-500' : ''
                           }`}
                         />
@@ -1228,7 +1233,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           onChange={(e) => setFormData({ ...formData, rg: e.target.value })}
                           placeholder="Número do RG"
                           disabled={isViewMode}
-                          className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                          className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
                         />
                       </div>
                     </div>
@@ -1242,7 +1247,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           placeholder="Número do passaporte"
                           maxLength={15}
                           disabled={isViewMode}
-                          className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                          className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
                         />
                       </div>
                       <div>
@@ -1253,7 +1258,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           placeholder="Número do CRNM"
                           maxLength={15}
                           disabled={isViewMode}
-                          className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                          className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
                         />
                       </div>
                     </div>
@@ -1286,7 +1291,12 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           value={formData.sexo}
                           onChange={(e) => setFormData({ ...formData, sexo: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-xl bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
+style={{
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 12px center'
+}}
                         >
                           <option value="">Selecione</option>
                           {SEXO_OPTIONS.map(opt => (
@@ -1306,7 +1316,12 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           value={formData.estadoCivil}
                           onChange={(e) => setFormData({ ...formData, estadoCivil: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-xl bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
+style={{
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 12px center'
+}}
                         >
                           <option value="">Selecione</option>
                           {ESTADO_CIVIL_OPTIONS.map(opt => (
@@ -1323,7 +1338,12 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           value={formData.nacionalidade}
                           onChange={(e) => setFormData({ ...formData, nacionalidade: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-xl bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
+style={{
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 12px center'
+}}
                         >
                           <option value="">Selecione</option>
                           {NACIONALIDADE_OPTIONS.map(opt => (
@@ -1351,7 +1371,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                         placeholder="+55 (11) 99999-9999"
                         maxLength={25}
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
                       />
                     </div>
                     <div>
@@ -1362,7 +1382,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         placeholder="email@exemplo.com"
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
                       />
                     </div>
                   </div>
@@ -1391,7 +1411,12 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                             value={formData.pais}
                             onChange={(e) => handlePaisChange(e.target.value)}
                             disabled={isViewMode}
-                            className="w-full h-[42px] px-3 rounded-xl bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                            className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
+style={{
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 12px center'
+}}
                           >
                             {PAISES_OPTIONS.map(pais => (
                               <option key={pais.nome} value={pais.nome}>{pais.nome}</option>
@@ -1409,7 +1434,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                             onChange={(e) => setFormData({ ...formData, paisOutro: e.target.value })}
                             placeholder="Digite o nome do país"
                             disabled={isViewMode}
-                            className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                            className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
                           />
                         </div>
                         <div>
@@ -1422,7 +1447,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                             placeholder="Código postal"
                             maxLength={15}
                             disabled={isViewMode}
-                            className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                            className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
                           />
                           <p className="text-xs text-gray-500 mt-1">Preencha manualmente</p>
                         </div>
@@ -1439,7 +1464,12 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           value={formData.pais}
                           onChange={(e) => handlePaisChange(e.target.value)}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-xl bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
+style={{
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 12px center'
+}}
                         >
                           {PAISES_OPTIONS.map(pais => (
                             <option key={pais.nome} value={pais.nome}>{pais.nome}</option>
@@ -1459,7 +1489,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                             placeholder={getCEPPlaceholder(formData.pais)}
                             maxLength={isBrasil ? 9 : 15}
                             disabled={isViewMode}
-                            className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 pr-10"
+                            className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white pr-10"
                           />
                           {buscandoCep && (
                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -1482,7 +1512,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                         onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
                         placeholder="Rua, Avenida..."
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
                       />
                     </div>
                     <div>
@@ -1492,7 +1522,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                         onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
                         placeholder="Nº"
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
                       />
                     </div>
                   </div>
@@ -1505,7 +1535,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                         onChange={(e) => setFormData({ ...formData, complemento: e.target.value })}
                         placeholder="Apto, Bloco..."
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
                       />
                     </div>
                     <div>
@@ -1517,7 +1547,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                         onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
                         placeholder="Nome do bairro"
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
                       />
                     </div>
                   </div>
@@ -1530,7 +1560,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                         onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
                         placeholder="Nome da cidade"
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
                       />
                     </div>
                     <div>
@@ -1542,7 +1572,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                         onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
                         placeholder="UF"
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
+                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
                       />
                     </div>
                   </div>
@@ -1564,7 +1594,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                     placeholder="Anotações, informações importantes..."
                     rows={4}
                     disabled={isViewMode}
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                   />
                 </div>
 
