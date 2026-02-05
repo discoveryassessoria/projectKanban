@@ -741,7 +741,14 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                 </div>
                 <span className="text-sm font-semibold text-gray-600">{Math.round(porcentagem)}%</span>
                 <span className="text-xs text-gray-400">
-                  {subtarefas.length} subtarefa{subtarefas.length !== 1 ? 's' : ''}
+                  {(() => {
+                    let total = 0
+                    subtarefas.forEach(sub => {
+                      total += 1  // A subtarefa (nível 3)
+                      total += (sub.subtarefas || []).length  // Sub-subtarefas (nível 4 - cobranças)
+                    })
+                    return `${total} subtarefa${total !== 1 ? 's' : ''}`
+                  })()}
                 </span>
               </div>
             </div>

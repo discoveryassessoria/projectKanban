@@ -1,5 +1,5 @@
 // src/app/api/documentos/[id]/route.ts
-// ✅ ATUALIZADO: Adiciona automação de criar tarefa quando status muda para SOLICITAR
+// ✅ ATUALIZADO: Automação para EM_BUSCA (cria tarefa de busca) e SOLICITAR (cria subtarefa dentro da busca)
 
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
@@ -25,6 +25,101 @@ function getTipoDocumentoLabel(tipo: string): string {
     APOSTILA_HAIA: "Apostila de Haia",
   }
   return labels[tipo] || tipo
+}
+
+// ✅ Helper para criar tarefas de documento
+async function criarTarefasDocumento(
+  statusNovo: string,
+  statusAntigo: string,
+  tipo: string,
+  nomePessoa: string,
+  processoId: number
+) {
+  const tipoLabel = getTipoDocumentoLabel(tipo)
+
+  // Buscar tarefa pai "Emissão da Pasta Documental"
+  const tarefaEmissao = await prisma.tarefa.findFirst({
+    where: {
+      processoId,
+      tarefaPaiId: null,
+      titulo: {
+        contains: 'Emissão',
+        mode: 'insensitive'
+      }
+    }
+  })
+
+  // ✅ Mudou para EM_BUSCA: Criar tarefa de busca
+  if (statusNovo === "EM_BUSCA" && statusAntigo !== "EM_BUSCA") {
+    // Verificar se já existe
+    const tarefaExistente = await prisma.tarefa.findFirst({
+      where: {
+        processoId,
+        titulo: `Buscar ${tipoLabel} - ${nomePessoa}`
+      }
+    })
+
+    if (!tarefaExistente) {
+      await prisma.tarefa.create({
+        data: {
+          titulo: `Buscar ${tipoLabel} - ${nomePessoa}`,
+          descricao: `Buscar ${tipoLabel} de ${nomePessoa}`,
+          processoId,
+          tarefaPaiId: tarefaEmissao?.id || null,
+          prioridade: "MEDIA",
+          concluida: false
+        }
+      })
+    }
+  }
+
+  // ✅ Mudou para SOLICITAR: Criar subtarefa dentro da tarefa de busca
+  if (statusNovo === "SOLICITAR" && statusAntigo !== "SOLICITAR") {
+    // Buscar ou criar a tarefa de busca
+    let tarefaBusca = await prisma.tarefa.findFirst({
+      where: {
+        processoId,
+        titulo: `Buscar ${tipoLabel} - ${nomePessoa}`
+      }
+    })
+
+    if (!tarefaBusca) {
+      // Se não existe tarefa de busca, criar ela primeiro
+      tarefaBusca = await prisma.tarefa.create({
+        data: {
+          titulo: `Buscar ${tipoLabel} - ${nomePessoa}`,
+          descricao: `Buscar ${tipoLabel} de ${nomePessoa}`,
+          processoId,
+          tarefaPaiId: tarefaEmissao?.id || null,
+          prioridade: "MEDIA",
+          concluida: false
+        }
+      })
+    }
+
+    // Verificar se já existe subtarefa de solicitar
+    const subtarefaExistente = await prisma.tarefa.findFirst({
+      where: {
+        processoId,
+        tarefaPaiId: tarefaBusca.id,
+        titulo: `Solicitar ${tipoLabel} - ${nomePessoa}`
+      }
+    })
+
+    if (!subtarefaExistente) {
+      // Criar subtarefa de solicitar DENTRO da tarefa de busca
+      await prisma.tarefa.create({
+        data: {
+          titulo: `Solicitar ${tipoLabel} - ${nomePessoa}`,
+          descricao: `Solicitar ${tipoLabel} de ${nomePessoa}`,
+          processoId,
+          tarefaPaiId: tarefaBusca.id,
+          prioridade: "MEDIA",
+          concluida: false
+        }
+      })
+    }
+  }
 }
 
 // GET - Buscar documento por ID
@@ -174,38 +269,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     })
 
-    // ✅ ATUALIZADO: Automação - Criar tarefa quando status muda para SOLICITAR
-    const statusMudouParaSolicitar = body.status === "SOLICITAR" && documentoAtual.status !== "SOLICITAR"
-
-    if (statusMudouParaSolicitar) {
+    // ✅ AUTOMAÇÃO DE TAREFAS
+    if (body.status !== undefined) {
       const processoId = documentoAtual.pessoa.arvore?.processos[0]?.id
 
       if (processoId) {
-        const tipoLabel = getTipoDocumentoLabel(documentoAtual.tipo)
         const nomePessoa = `${documentoAtual.pessoa.nome} ${documentoAtual.pessoa.sobrenome || ""}`.trim()
-
-        // Buscar tarefa pai "Emissão da Pasta Documental"
-        const tarefaPai = await prisma.tarefa.findFirst({
-          where: {
-            processoId,
-            tarefaPaiId: null,
-            titulo: {
-              contains: 'Emissão',
-              mode: 'insensitive'
-            }
-          }
-        })
-
-        await prisma.tarefa.create({
-          data: {
-            titulo: `Solicitar ${tipoLabel} - ${nomePessoa}`,
-            descricao: `Solicitar ${tipoLabel} de ${nomePessoa}`,
-            processoId,
-            tarefaPaiId: tarefaPai?.id || null,
-            prioridade: "MEDIA",
-            concluida: false
-          }
-        })
+        await criarTarefasDocumento(
+          body.status,
+          documentoAtual.status,
+          documentoAtual.tipo,
+          nomePessoa,
+          processoId
+        )
       }
     }
 
@@ -223,7 +299,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-// DELETE - Excluir documento E tarefa relacionada
+// DELETE - Excluir documento E tarefas relacionadas
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id: idParam } = await params
@@ -233,7 +309,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
 
-    // Buscar documento COM pessoa para encontrar a tarefa relacionada
+    // Buscar documento COM pessoa para encontrar as tarefas relacionadas
     const documento = await prisma.documento.findUnique({
       where: { id },
       include: {
@@ -258,18 +334,40 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: "Documento não encontrado" }, { status: 404 })
     }
 
-    // Tentar excluir a tarefa relacionada (se existir)
+    // Tentar excluir as tarefas relacionadas (se existirem)
     const processoId = documento.pessoa.arvore?.processos[0]?.id
     if (processoId) {
       const tipoLabel = getTipoDocumentoLabel(documento.tipo)
       const nomePessoa = `${documento.pessoa.nome} ${documento.pessoa.sobrenome || ""}`.trim()
-      const tituloTarefa = `Solicitar ${tipoLabel} - ${nomePessoa}`
+      
+      // Buscar tarefa de busca
+      const tarefaBusca = await prisma.tarefa.findFirst({
+        where: {
+          processoId,
+          titulo: `Buscar ${tipoLabel} - ${nomePessoa}`
+        }
+      })
 
-      // Buscar e excluir tarefa com título correspondente
+      if (tarefaBusca) {
+        // Primeiro excluir subtarefas (solicitar)
+        await prisma.tarefa.deleteMany({
+          where: {
+            processoId,
+            tarefaPaiId: tarefaBusca.id
+          }
+        })
+
+        // Depois excluir a tarefa de busca
+        await prisma.tarefa.delete({
+          where: { id: tarefaBusca.id }
+        })
+      }
+
+      // Fallback: excluir tarefas antigas com título "Solicitar..." (caso existam)
       await prisma.tarefa.deleteMany({
         where: {
           processoId,
-          titulo: tituloTarefa
+          titulo: `Solicitar ${tipoLabel} - ${nomePessoa}`
         }
       })
     }
@@ -279,7 +377,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       where: { id }
     })
 
-    return NextResponse.json({ message: "Documento e tarefa excluídos com sucesso", id })
+    return NextResponse.json({ message: "Documento e tarefas excluídos com sucesso", id })
   } catch (error) {
     console.error("Erro ao excluir documento:", error)
 
@@ -352,39 +450,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     })
 
-    // ✅ ATUALIZADO: Automação - Criar tarefa quando status muda para SOLICITAR
-    const statusMudouParaSolicitar = body.status === "SOLICITAR" && documentoAtual.status !== "SOLICITAR"
+    // ✅ AUTOMAÇÃO DE TAREFAS
+    const processoId = documentoAtual.pessoa.arvore?.processos[0]?.id
 
-    if (statusMudouParaSolicitar) {
-      const processoId = documentoAtual.pessoa.arvore?.processos[0]?.id
-
-      if (processoId) {
-        const tipoLabel = getTipoDocumentoLabel(documentoAtual.tipo)
-        const nomePessoa = `${documentoAtual.pessoa.nome} ${documentoAtual.pessoa.sobrenome || ""}`.trim()
-
-        // Buscar tarefa pai "Emissão da Pasta Documental"
-        const tarefaPai = await prisma.tarefa.findFirst({
-          where: {
-            processoId,
-            tarefaPaiId: null,
-            titulo: {
-              contains: 'Emissão',
-              mode: 'insensitive'
-            }
-          }
-        })
-
-        await prisma.tarefa.create({
-          data: {
-            titulo: `Solicitar ${tipoLabel} - ${nomePessoa}`,
-            descricao: `Solicitar ${tipoLabel} de ${nomePessoa}`,
-            processoId,
-            tarefaPaiId: tarefaPai?.id || null,
-            prioridade: "MEDIA",
-            concluida: false
-          }
-        })
-      }
+    if (processoId) {
+      const nomePessoa = `${documentoAtual.pessoa.nome} ${documentoAtual.pessoa.sobrenome || ""}`.trim()
+      await criarTarefasDocumento(
+        body.status,
+        documentoAtual.status,
+        documentoAtual.tipo,
+        nomePessoa,
+        processoId
+      )
     }
 
     return NextResponse.json(documentoAtualizado)

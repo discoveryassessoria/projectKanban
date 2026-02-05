@@ -9,6 +9,7 @@ import { Clock, Calendar as CalendarIcon, User, RefreshCw } from "lucide-react"
 import { useActivities } from "@/src/hooks/useActivitiesData"
 import { ProcessoDetailsModal } from "@/src/components/kanban/atividade-details-modal"
 import type { Atividade } from "@/src/hooks/useActivitiesData"
+import { useRouter } from "next/navigation"
 
 interface CalendarActivityItem {
   id: number
@@ -37,8 +38,7 @@ export default function CalendarioActivities({ filters }: CalendarioActivitiesPr
   const [value, setValue] = useState<Date>(new Date())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
-  const [selectedAtividade, setSelectedAtividade] = useState<Atividade | null>(null)
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const router = useRouter()
   
   // Usar hook de atividades em vez de API de calendário (que não existe)
   const { activities = [], isLoading, error, mutate } = useActivities(filters)
@@ -90,22 +90,31 @@ export default function CalendarioActivities({ filters }: CalendarioActivitiesPr
 
   // Handler para clicar em uma atividade
   const handleActivityClick = async (activityId: number) => {
-    try {
+  try {
+    // Buscar a atividade completa
+    const atividade = activities.find(a => a.id === activityId)
+    
+    if (atividade?.processo) {
+      // Redirecionar para o kanban com o modal aberto
+      const pais = atividade.processo.pais?.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || "PORTUGAL"
+      router.push(`/kanban?processoId=${atividade.processo.id}&tab=tarefas&pais=${pais}&atividadeId=${atividade.id}`)
+    } else {
+      // Se não tem processo, tentar buscar pela API
       const response = await fetch(`/api/tarefas/${activityId}`)
       if (response.ok) {
-        const activity = await response.json()
-        setSelectedAtividade(activity)
-        setIsDetailsModalOpen(true)
+        const data = await response.json()
+        const tarefa = data.tarefa || data
+        
+        if (tarefa.processo) {
+          const pais = tarefa.processo.pais?.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || "PORTUGAL"
+          router.push(`/kanban?processoId=${tarefa.processo.id}&tab=tarefas&pais=${pais}&atividadeId=${activityId}`)
+        }
       }
-    } catch (error) {
-      console.error("Erro ao buscar atividade:", error)
     }
+  } catch (error) {
+    console.error("Erro ao buscar atividade:", error)
   }
-
-  const handleAtividadeSave = () => {
-    mutate()
-    setIsDetailsModalOpen(false)
-  }
+}
 
   // Função para lidar com clique em um dia
   const handleDayClick = (date: Date) => {
@@ -392,13 +401,6 @@ export default function CalendarioActivities({ filters }: CalendarioActivitiesPr
           </div>
         </DialogContent>
       </Dialog>
-
-      <ProcessoDetailsModal
-        processo={selectedAtividade as any}
-        isOpen={isDetailsModalOpen}
-        onClose={() => setIsDetailsModalOpen(false)}
-        onSave={handleAtividadeSave}
-      />
 
       {/* CSS customizado para o calendário */}
       <style jsx global>{`

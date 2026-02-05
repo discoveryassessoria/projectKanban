@@ -1158,7 +1158,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           value={formData.tipo}
                           onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
                           disabled={isViewMode || !!editingId}
-                          className={`w-full h-[42px] px-3 rounded-lg border text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 ${
+                          className={`w-full h-[42px] px-3 rounded-2xl border text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 ${
                             formData.tipo === 'requerente' 
                               ? 'bg-purple-50 border-purple-300' 
                               : 'bg-white border-gray-300'
@@ -1286,7 +1286,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           value={formData.sexo}
                           onChange={(e) => setFormData({ ...formData, sexo: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                          className="w-full h-[42px] px-3 rounded-xl bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                         >
                           <option value="">Selecione</option>
                           {SEXO_OPTIONS.map(opt => (
@@ -1306,7 +1306,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           value={formData.estadoCivil}
                           onChange={(e) => setFormData({ ...formData, estadoCivil: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                          className="w-full h-[42px] px-3 rounded-xl bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                         >
                           <option value="">Selecione</option>
                           {ESTADO_CIVIL_OPTIONS.map(opt => (
@@ -1323,7 +1323,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           value={formData.nacionalidade}
                           onChange={(e) => setFormData({ ...formData, nacionalidade: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                          className="w-full h-[42px] px-3 rounded-xl bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                         >
                           <option value="">Selecione</option>
                           {NACIONALIDADE_OPTIONS.map(opt => (
@@ -1391,7 +1391,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                             value={formData.pais}
                             onChange={(e) => handlePaisChange(e.target.value)}
                             disabled={isViewMode}
-                            className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                            className="w-full h-[42px] px-3 rounded-xl bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                           >
                             {PAISES_OPTIONS.map(pais => (
                               <option key={pais.nome} value={pais.nome}>{pais.nome}</option>
@@ -1439,7 +1439,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           value={formData.pais}
                           onChange={(e) => handlePaisChange(e.target.value)}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                          className="w-full h-[42px] px-3 rounded-xl bg-white border border-gray-300 text-gray-900 disabled:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                         >
                           {PAISES_OPTIONS.map(pais => (
                             <option key={pais.nome} value={pais.nome}>{pais.nome}</option>
@@ -1564,7 +1564,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                     placeholder="Anotações, informações importantes..."
                     rows={4}
                     disabled={isViewMode}
-                    className="w-full px-3 py-2 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                   />
                 </div>
 

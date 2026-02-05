@@ -1,5 +1,5 @@
 // src/app/api/documentos/route.ts
-// ✅ ATUALIZADO: Adiciona automação de criar tarefa quando documento é criado como SOLICITAR
+// ✅ ATUALIZADO: Automação para EM_BUSCA (cria tarefa de busca) e SOLICITAR (cria subtarefa dentro da busca)
 
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
@@ -218,34 +218,70 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // ✅ ATUALIZADO: Automação - Criar tarefa se documento foi criado como SOLICITAR
+    // ✅ AUTOMAÇÃO DE TAREFAS
     const statusFinal = (status as StatusDocumento) || 'PENDENTE'
-    
-    if (statusFinal === "SOLICITAR") {
-      const processoId = pessoa.arvore?.processos[0]?.id
+    const processoId = pessoa.arvore?.processos[0]?.id
 
-      if (processoId) {
-        const tipoLabel = getTipoDocumentoLabel(tipo)
-        const nomePessoa = `${pessoa.nome} ${pessoa.sobrenome || ""}`.trim()
+    if (processoId) {
+      const tipoLabel = getTipoDocumentoLabel(tipo)
+      const nomePessoa = `${pessoa.nome} ${pessoa.sobrenome || ""}`.trim()
 
-        // Buscar tarefa pai "Emissão da Pasta Documental"
-        const tarefaPai = await prisma.tarefa.findFirst({
+      // Buscar tarefa pai "Emissão da Pasta Documental"
+      const tarefaEmissao = await prisma.tarefa.findFirst({
+        where: {
+          processoId,
+          tarefaPaiId: null,
+          titulo: {
+            contains: 'Emissão',
+            mode: 'insensitive'
+          }
+        }
+      })
+
+      // ✅ Status EM_BUSCA: Criar tarefa de busca
+      if (statusFinal === "EM_BUSCA") {
+        await prisma.tarefa.create({
+          data: {
+            titulo: `Buscar ${tipoLabel} - ${nomePessoa}`,
+            descricao: `Buscar ${tipoLabel} de ${nomePessoa}`,
+            processoId,
+            tarefaPaiId: tarefaEmissao?.id || null,
+            prioridade: "MEDIA",
+            concluida: false
+          }
+        })
+      }
+
+      // ✅ Status SOLICITAR: Criar tarefa de busca + subtarefa de solicitar
+      if (statusFinal === "SOLICITAR") {
+        // Primeiro, criar a tarefa de busca (se não existir)
+        let tarefaBusca = await prisma.tarefa.findFirst({
           where: {
             processoId,
-            tarefaPaiId: null,
-            titulo: {
-              contains: 'Emissão',
-              mode: 'insensitive'
-            }
+            titulo: `Buscar ${tipoLabel} - ${nomePessoa}`
           }
         })
 
+        if (!tarefaBusca) {
+          tarefaBusca = await prisma.tarefa.create({
+            data: {
+              titulo: `Buscar ${tipoLabel} - ${nomePessoa}`,
+              descricao: `Buscar ${tipoLabel} de ${nomePessoa}`,
+              processoId,
+              tarefaPaiId: tarefaEmissao?.id || null,
+              prioridade: "MEDIA",
+              concluida: false
+            }
+          })
+        }
+
+        // Depois, criar a subtarefa de solicitar dentro da tarefa de busca
         await prisma.tarefa.create({
           data: {
             titulo: `Solicitar ${tipoLabel} - ${nomePessoa}`,
             descricao: `Solicitar ${tipoLabel} de ${nomePessoa}`,
             processoId,
-            tarefaPaiId: tarefaPai?.id || null,
+            tarefaPaiId: tarefaBusca.id,
             prioridade: "MEDIA",
             concluida: false
           }

@@ -50,7 +50,7 @@ const NODE_SIZES = {
 interface DocumentoIndicadorProps {
   tipo: 'N' | 'C' | 'O'
   label: string
-  status: 'solicitar' | 'solicitado' | 'recebido' | null // null = não mostrar
+  status: 'em_busca' | 'solicitar' | 'solicitado' | 'recebido' | null // null = não mostrar
   mode: ViewMode
 }
 
@@ -58,10 +58,17 @@ function DocumentoIndicador({ tipo, label, status, mode }: DocumentoIndicadorPro
   // Não mostrar se não tem status relevante
   if (!status) return null
   
-  // Verde = Recebido, Vermelho = Solicitar ou Solicitado
+  // ✅ ATUALIZADO: Verde = Recebido, Vermelho = Solicitar ou Solicitado, Azul = Em busca
   const isRecebido = status === 'recebido'
-  const bgColor = isRecebido ? '#22C55E' : '#EF4444'
-  const statusText = status === 'recebido' ? 'Recebido' : status === 'solicitado' ? 'Solicitado' : 'Solicitar'
+  const isEmBusca = status === 'em_busca'
+  const bgColor = isRecebido ? '#22C55E' : isEmBusca ? '#3B82F6' : '#EF4444'
+  const statusText = status === 'recebido' 
+    ? 'Recebido' 
+    : status === 'solicitado' 
+      ? 'Solicitado' 
+      : status === 'em_busca'
+        ? 'Em busca'
+        : 'Solicitar'
   
   // Tooltip posição diferente para cada modo
   const tooltipClass = mode === 'paisagem' 
@@ -89,19 +96,19 @@ function getDocumentosStatus(pessoa: PessoaArvore, temConjuge: boolean) {
   const documentos = pessoa.documentos || []
   const falecido = pessoa.vivo === false || !!pessoa.data_obito
   
-  // Status que fazem o círculo aparecer
-  const statusVisiveis = ['solicitar', 'solicitado', 'recebido']
+  // ✅ ATUALIZADO: Status que fazem o círculo aparecer (agora inclui em_busca)
+  const statusVisiveis = ['em_busca', 'solicitar', 'solicitado', 'recebido']
   
-  const verificarDocumento = (tipo: string): 'solicitar' | 'solicitado' | 'recebido' | null => {
+  const verificarDocumento = (tipo: string): 'em_busca' | 'solicitar' | 'solicitado' | 'recebido' | null => {
     // ✅ CORRIGIDO: Usar includes() ao invés de ===
     const doc = documentos.find(d => d.tipo?.toUpperCase().includes(tipo))
     if (!doc) return null
     
     const statusLower = doc.status?.toLowerCase()
     if (statusVisiveis.includes(statusLower || '')) {
-      return statusLower as 'solicitar' | 'solicitado' | 'recebido'
+      return statusLower as 'em_busca' | 'solicitar' | 'solicitado' | 'recebido'
     }
-    return null // Pendente, Em busca, ou sem status = não mostrar
+    return null // Pendente ou sem status = não mostrar
   }
   
   return {

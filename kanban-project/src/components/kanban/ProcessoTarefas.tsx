@@ -300,9 +300,14 @@ function SortableTarefaCard({ tarefa, onClick, onDelete }: SortableTarefaCardPro
 
   // Conta total de tarefas dentro das atividades
   const contarTarefas = () => {
-    let total = subtarefas.length  // Atividades contam
+    let total = 0
     subtarefas.forEach(atividade => {
-      total += (atividade.subtarefas || []).length
+      total += 1  // A atividade (nível 2)
+      const subs = atividade.subtarefas || []
+      subs.forEach(sub => {
+        total += 1  // Subtarefa (nível 3)
+        total += (sub.subtarefas || []).length  // Sub-subtarefas (nível 4)
+      })
     })
     return total
   }
@@ -450,9 +455,14 @@ function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
 
   // Conta total de tarefas dentro das atividades
   const contarTarefas = () => {
-    let total = subtarefas.length  // Atividades contam
+    let total = 0
     subtarefas.forEach(atividade => {
-      total += (atividade.subtarefas || []).length
+      total += 1  // A atividade (nível 2)
+      const subs = atividade.subtarefas || []
+      subs.forEach(sub => {
+        total += 1  // Subtarefa (nível 3)
+        total += (sub.subtarefas || []).length  // Sub-subtarefas (nível 4)
+      })
     })
     return total
   }
@@ -2015,15 +2025,29 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
   const [atividadeDetalhe, setAtividadeDetalhe] = useState<Tarefa | null>(null)
 
   // Auto-abrir atividade se vier da URL
-useEffect(() => {
-  if (atividadeParaAbrir && atividadesLocal.length > 0) {
-    const atividade = atividadesLocal.find(a => a.id === atividadeParaAbrir)
-    if (atividade) {
-      setAtividadeDetalhe(atividade)
-      onAtividadeAberta?.()
+  useEffect(() => {
+    if (atividadeParaAbrir && atividadesLocal.length > 0) {
+      // Primeiro tenta encontrar diretamente (é uma atividade nível 2)
+      let atividade = atividadesLocal.find(a => a.id === atividadeParaAbrir)
+      
+      // Se não encontrou, procura nas subtarefas (é uma subtarefa nível 3)
+      if (!atividade) {
+        for (const atv of atividadesLocal) {
+          const subtarefa = atv.subtarefas?.find(s => s.id === atividadeParaAbrir)
+          if (subtarefa) {
+            // Encontrou a subtarefa, abrir o modal da atividade pai
+            atividade = atv
+            break
+          }
+        }
+      }
+      
+      if (atividade) {
+        setAtividadeDetalhe(atividade)
+        onAtividadeAberta?.()
+      }
     }
-  }
-}, [atividadeParaAbrir, atividadesLocal])
+  }, [atividadeParaAbrir, atividadesLocal])
   
   // ✅ NOVO: Verificar se é tarefa que precisa do seletor de pessoas
   const tituloLower = tarefa.titulo.toLowerCase()
@@ -2103,24 +2127,36 @@ useEffect(() => {
 
   // Calcula progresso baseado em todas as tarefas dentro das atividades
   const calcularProgresso = () => {
-    let totalTarefas = 0
-    let tarefasConcluidas = 0
+  let totalTarefas = 0
+  let tarefasConcluidas = 0
+  
+  atividadesLocal.forEach(atividade => {
+    // A atividade conta como tarefa (nível 2)
+    totalTarefas += 1
+    const tarefas = atividade.subtarefas || []
     
-    atividadesLocal.forEach(atividade => {
-      // A atividade conta como tarefa
+    // Subtarefas também contam (nível 3)
+    tarefas.forEach(tarefa => {
       totalTarefas += 1
-      const tarefas = atividade.subtarefas || []
-      const atividadeConcluida = atividade.concluida || 
-        (tarefas.length > 0 && tarefas.every(t => t.concluida))
-      if (atividadeConcluida) tarefasConcluidas += 1
-
-      // Subtarefas também contam
-      totalTarefas += tarefas.length
-      tarefasConcluidas += tarefas.filter(t => t.concluida).length
+      if (tarefa.concluida) tarefasConcluidas += 1
+      
+      // Sub-subtarefas também contam (nível 4 - cobranças)
+      const subSubtarefas = tarefa.subtarefas || []
+      totalTarefas += subSubtarefas.length
+      tarefasConcluidas += subSubtarefas.filter(s => s.concluida).length
     })
     
-    return totalTarefas > 0 ? (tarefasConcluidas / totalTarefas) * 100 : 0
-  }
+    // Verificar se atividade está efetivamente concluída
+    const atividadeConcluida = atividade.concluida || 
+      (tarefas.length > 0 && tarefas.every(t => {
+        const subs = t.subtarefas || []
+        return t.concluida || (subs.length > 0 && subs.every(s => s.concluida))
+      }))
+    if (atividadeConcluida) tarefasConcluidas += 1
+  })
+  
+  return totalTarefas > 0 ? (tarefasConcluidas / totalTarefas) * 100 : 0
+}
   
   const porcentagem = calcularProgresso()
 
@@ -2279,7 +2315,15 @@ useEffect(() => {
               )}
               <p className="text-gray-300 text-sm mt-1">
                 {(() => {
-                  const totalTarefas = atividadesLocal.reduce((acc, a) => acc + 1 + (a.subtarefas || []).length, 0)
+                  let totalTarefas = 0
+                  atividadesLocal.forEach(atividade => {
+                    totalTarefas += 1  // A atividade (nível 2)
+                    const subtarefas = atividade.subtarefas || []
+                    subtarefas.forEach(sub => {
+                      totalTarefas += 1  // Subtarefa (nível 3)
+                      totalTarefas += (sub.subtarefas || []).length  // Sub-subtarefas (nível 4)
+                    })
+                  })
                   return totalTarefas === 0 
                     ? 'Nenhuma atividade' 
                     : `${totalTarefas} tarefa${totalTarefas !== 1 ? 's' : ''}`
@@ -2716,17 +2760,44 @@ useEffect(() => {
   if (atividadeId) {
     const id = Number(atividadeId)
     
-    // Procurar o container que contém essa atividade
+    // Procurar o container que contém essa atividade (nível 2)
     for (const container of tarefas) {
       const atividade = container.subtarefas?.find(s => s.id === id)
       if (atividade) {
         autoOpenDoneRef.current = true
-        setAtividadeParaAbrir(id)  // Guardar para abrir depois que o modal do container abrir
+        setAtividadeParaAbrir(id)
         abrirModal(container)
         return
       }
+      
+      // Se não encontrou, procurar nas subtarefas das atividades (nível 3)
+      for (const atividade of container.subtarefas || []) {
+        const subtarefa = atividade.subtarefas?.find(s => s.id === id)
+        if (subtarefa) {
+          // Encontrou no nível 3: abrir container e depois a atividade pai
+          autoOpenDoneRef.current = true
+          setAtividadeParaAbrir(atividade.id)  // Abrir a atividade pai (Elaine)
+          abrirModal(container)
+          return
+        }
+        
+        // Se não encontrou, procurar nas sub-subtarefas (nível 4 - cobrança dentro de subtarefa)
+        for (const subtarefa of atividade.subtarefas || []) {
+          const subSubtarefa = subtarefa.subtarefas?.find(s => s.id === id)
+          if (subSubtarefa) {
+            // Encontrou no nível 4: abrir container e depois a atividade avô
+            autoOpenDoneRef.current = true
+            setAtividadeParaAbrir(atividade.id)  // Abrir a atividade (Elaine)
+            abrirModal(container)
+            return
+          }
+        }
+      }
     }
   }
+  
+  // Prioridade 2: tarefaPaiId (comportamento antigo - abre o container)
+  // ... resto do código
   
   // Prioridade 2: tarefaPaiId (comportamento antigo - abre o container)
   if (tarefaPaiId) {
