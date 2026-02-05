@@ -224,7 +224,7 @@ export function HeaderBar({
   const handleTarefaClick = (tarefa: TarefaNotificacao) => {
     if (tarefa.processoId) {
       const pais = tarefa.pais || 'PORTUGAL'
-      router.push(`/kanban?pais=${pais}&processoId=${tarefa.processoId}&tab=tarefas`)
+      router.push(`/kanban?pais=${pais}&processoId=${tarefa.processoId}&tab=tarefas&atividadeId=${tarefa.id}`)
     } else {
       router.push('/activities')
     }
