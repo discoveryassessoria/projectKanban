@@ -60,6 +60,15 @@ export async function POST(
       }
     })
 
+    // Registrar no histórico
+    await prisma.tarefaHistorico.create({
+      data: {
+        tarefaId: id,
+        acao: "INICIADA",
+        descricao: `Tarefa iniciada com prazo de ${prazoFinal} dias`
+      }
+    })
+
     return NextResponse.json({ 
       tarefa: tarefaAtualizada
     })

@@ -79,6 +79,7 @@ export async function POST(
     // Se for tarefa normal (RG), ela mesma é a tarefa e o pai é a atividade (Carol)
     const tarefaDocumento = isCobranca ? tarefa.tarefaPai : tarefa
     const atividadePessoa = isCobranca ? tarefa.tarefaPai?.tarefaPai : tarefa.tarefaPai
+    const tarefaIdHistorico = isCobranca ? (tarefa.tarefaPaiId || id) : id
 
     switch (acao) {
       case "recebido": {
@@ -122,6 +123,14 @@ export async function POST(
         if (paiIdRecebido) {
           await verificarEConcluirTarefaPai(paiIdRecebido)
         }
+
+        await prisma.tarefaHistorico.create({
+          data: {
+            tarefaId: tarefaIdHistorico,
+            acao: "CONCLUIDA",
+            descricao: `Documento recebido${observacao ? `: ${observacao}` : ""}`
+          }
+        })
         
         return NextResponse.json({ 
           message: "Tarefa concluída - documento recebido",
@@ -166,6 +175,14 @@ export async function POST(
             })
           ])
 
+          await prisma.tarefaHistorico.create({
+            data: {
+              tarefaId: tarefaIdHistorico,
+              acao: "COBRADA",
+              descricao: `Cobrança realizada - próxima em ${diasCobranca} dias`
+            }
+          })
+
           return NextResponse.json({ 
             message: "Nova cobrança agendada",
             novaSubtarefa
@@ -196,6 +213,14 @@ export async function POST(
               }
             })
           ])
+
+          await prisma.tarefaHistorico.create({
+            data: {
+              tarefaId: tarefaIdHistorico,
+              acao: "COBRADA",
+              descricao: `Cobrança agendada para ${diasCobranca} dias`
+            }
+          })
 
           return NextResponse.json({ 
             message: "Cobrança criada",
@@ -246,6 +271,14 @@ export async function POST(
           await verificarEConcluirTarefaPai(paiIdNaoPossui)
         }
 
+        await prisma.tarefaHistorico.create({
+          data: {
+            tarefaId: tarefaIdHistorico,
+            acao: "CONCLUIDA",
+            descricao: `Cliente não possui o documento${observacao ? `: ${observacao}` : ""}`
+          }
+        })
+
         return NextResponse.json({ 
           message: "Tarefa finalizada - cliente não possui",
           tarefaConcluida: true
@@ -265,6 +298,14 @@ export async function POST(
           data: {
             dataPrazo: new Date(novoPrazo + "T12:00:00"),
             observacoes: observacao
+          }
+        })
+
+        await prisma.tarefaHistorico.create({
+          data: {
+            tarefaId: tarefaIdHistorico,
+            acao: "STATUS_ALTERADO",
+            descricao: `Prazo alterado para ${novoPrazo}${observacao ? ` - ${observacao}` : ""}`
           }
         })
 
@@ -312,6 +353,14 @@ export async function POST(
       })
     ])
 
+    await prisma.tarefaHistorico.create({
+      data: {
+        tarefaId: tarefaIdHistorico,
+        acao: "CONFERENCIA",
+        descricao: `Enviado para conferência - prazo de ${diasCobranca} dias`
+      }
+    })
+
     return NextResponse.json({ 
       message: "Conferência agendada",
       novaSubtarefa
@@ -340,6 +389,14 @@ export async function POST(
         }
       })
     ])
+
+    await prisma.tarefaHistorico.create({
+      data: {
+        tarefaId: tarefaIdHistorico,
+        acao: "CONFERENCIA",
+        descricao: `Enviado para conferência - prazo de ${diasCobranca} dias`
+      }
+    })
 
     return NextResponse.json({ 
       message: "Conferência criada",

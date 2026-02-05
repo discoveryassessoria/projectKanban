@@ -178,6 +178,15 @@ export async function POST(
       }
     })
 
+    // Registrar no histórico
+    await prisma.tarefaHistorico.create({
+      data: {
+        tarefaId: tarefaPaiId,
+        acao: "CRIADA",
+        descricao: `Subtarefa "${titulo}" foi criada`
+      }
+    })
+
     // Reabrir tarefa pai se estava concluída
     if (tarefaPai.concluida) {
       await prisma.tarefa.update({

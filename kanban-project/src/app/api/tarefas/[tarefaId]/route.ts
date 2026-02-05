@@ -377,6 +377,17 @@ export async function DELETE(
       where: { id }
     })
 
+    // Registrar no histórico (se tiver pai, registra no pai)
+    if (tarefaPaiId) {
+      await prisma.tarefaHistorico.create({
+        data: {
+          tarefaId: tarefaPaiId,
+          acao: "EXCLUIDA",
+          descricao: `Subtarefa "${tituloTarefa}" foi excluída`
+        }
+      })
+    }
+
     // Verificar se o pai ficou vazio e resetar status
     if (tarefa.tarefaPaiId) {
       const irmãs = await prisma.tarefa.count({

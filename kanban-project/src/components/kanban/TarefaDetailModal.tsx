@@ -411,6 +411,22 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false }: 
           </div>
         )}
 
+        {/* Delete button */}
+        <button
+          onClick={async () => {
+            if (!confirm("Excluir esta subtarefa?")) return
+            try {
+              const response = await fetch(`/api/tarefas/${tarefa.id}`, { method: "DELETE" })
+              if (response.ok) onUpdate()
+            } catch (error) {
+              console.error("Erro ao excluir:", error)
+            }
+          }}
+          className="p-1 text-gray-400 hover:text-red-500 rounded transition-all opacity-0 group-hover:opacity-100"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+
         {/* Expand toggle */}
         <button
           onClick={() => setExpandido(!expandido)}
@@ -614,6 +630,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
       if (response.ok) {
         setNovaTarefa("")
         fetchSubtarefas()
+        fetchHistorico()   // ← ADICIONA ESTA LINHA
         onUpdate()
       }
     } catch (error) {
@@ -760,7 +777,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
         </div>
 
         {/* ====== BODY - TWO COLUMNS ====== */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden min-h-0">
 
           {/* ===== LEFT COLUMN - TASK INFO & SUBTASKS ===== */}
           <div className="flex-1 overflow-y-auto border-r">
