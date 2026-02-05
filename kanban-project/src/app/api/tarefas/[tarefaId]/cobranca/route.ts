@@ -4,6 +4,36 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { hojeBrasil } from "@/src/lib/date-utils"
 
+async function verificarEConcluirTarefaPai(tarefaPaiId: number) {
+  const tarefaPai = await prisma.tarefa.findUnique({
+    where: { id: tarefaPaiId },
+    include: {
+      subtarefas: {
+        select: { concluida: true }
+      }
+    }
+  })
+
+  if (!tarefaPai) return
+
+  const todasConcluidas = tarefaPai.subtarefas.length > 0 && 
+    tarefaPai.subtarefas.every(sub => sub.concluida)
+
+  if (todasConcluidas && !tarefaPai.concluida) {
+    await prisma.tarefa.update({
+      where: { id: tarefaPaiId },
+      data: {
+        concluida: true,
+        dataConclusao: hojeBrasil()
+      }
+    })
+
+    if (tarefaPai.tarefaPaiId) {
+      await verificarEConcluirTarefaPai(tarefaPai.tarefaPaiId)
+    }
+  }
+}
+
 // POST - Ações de cobrança (recebido, cobrado, não possui, alterar prazo)
 export async function POST(
   request: Request,
@@ -85,6 +115,12 @@ export async function POST(
               observacoes: observacao || "Documento recebido"
             }
           })
+        }
+
+        // Propagar conclusão para cima
+        const paiIdRecebido = isCobranca ? tarefa.tarefaPai?.tarefaPaiId : tarefa.tarefaPaiId
+        if (paiIdRecebido) {
+          await verificarEConcluirTarefaPai(paiIdRecebido)
         }
         
         return NextResponse.json({ 
@@ -202,6 +238,12 @@ export async function POST(
               observacoes: observacao || "Cliente não possui o documento"
             }
           })
+        }
+
+        // Propagar conclusão para cima
+        const paiIdNaoPossui = isCobranca ? tarefa.tarefaPai?.tarefaPaiId : tarefa.tarefaPaiId
+        if (paiIdNaoPossui) {
+          await verificarEConcluirTarefaPai(paiIdNaoPossui)
         }
 
         return NextResponse.json({ 
