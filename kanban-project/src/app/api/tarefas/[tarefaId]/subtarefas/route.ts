@@ -189,6 +189,27 @@ export async function POST(
       })
     }
 
+    // Auto-criar subtarefas para atividades dentro de "Procuração administrativa"
+    if (tarefaPai.titulo?.toLowerCase().includes("procuração administrativa")) {
+      await prisma.tarefa.createMany({
+        data: [
+          { titulo: "Preparar procuração administrativa", tarefaPaiId: subtarefa.id, processoId: tarefaPai.processoId, prioridade: prioridadeValida, ordem: 0 },
+          { titulo: "Conferir procuração administrativa", tarefaPaiId: subtarefa.id, processoId: tarefaPai.processoId, prioridade: prioridadeValida, ordem: 1 },
+          { titulo: "Enviar a procuração administrativa ao cliente para assinar", tarefaPaiId: subtarefa.id, processoId: tarefaPai.processoId, prioridade: prioridadeValida, ordem: 2 },
+        ]
+      })
+    }
+
+    if (tarefaPai.titulo?.toLowerCase().includes("procuração judicial")) {
+      await prisma.tarefa.createMany({
+        data: [
+          { titulo: "Preparar procuração judicial", tarefaPaiId: subtarefa.id, processoId: tarefaPai.processoId, prioridade: prioridadeValida, ordem: 0 },
+          { titulo: "Conferir procuração judicial", tarefaPaiId: subtarefa.id, processoId: tarefaPai.processoId, prioridade: prioridadeValida, ordem: 1 },
+          { titulo: "Enviar a procuração judicial ao cliente para assinar", tarefaPaiId: subtarefa.id, processoId: tarefaPai.processoId, prioridade: prioridadeValida, ordem: 2 },
+        ]
+      })
+    }
+
     return NextResponse.json({ subtarefa }, { status: 201 })
   } catch (error) {
     console.error("Erro ao criar subtarefa:", error)

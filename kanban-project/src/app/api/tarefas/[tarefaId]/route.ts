@@ -377,6 +377,21 @@ export async function DELETE(
       where: { id }
     })
 
+    // Verificar se o pai ficou vazio e resetar status
+    if (tarefa.tarefaPaiId) {
+      const irmãs = await prisma.tarefa.count({
+        where: { tarefaPaiId: tarefa.tarefaPaiId }
+      })
+      
+      if (irmãs === 0) {
+        // Pai ficou sem filhos - resetar conclusão
+        await prisma.tarefa.update({
+          where: { id: tarefa.tarefaPaiId },
+          data: { concluida: false }
+        })
+      }
+    }
+
     // ✅ REGISTRAR LOG
     await logTarefa.excluir(tituloTarefa, id)
 

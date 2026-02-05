@@ -129,6 +129,11 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
           })
           
           if (!response.ok) {
+            // 404 = já foi deletada (cascade de tarefa pai) - considerar sucesso
+            if (response.status === 404) {
+              results.push({ id, success: true })
+              continue
+            }
             const errorText = await response.text()
             throw new Error(`Erro ${response.status}: ${errorText}`)
           }

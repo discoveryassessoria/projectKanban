@@ -348,6 +348,34 @@ export async function POST(request: Request) {
     // ✅ REGISTRAR LOG
     await logTarefa.criar(tarefa.titulo, tarefa.id, processoNome)
 
+    // Auto-criar subtarefas para atividades dentro de "Procuração administrativa"
+    if (tarefaPaiId) {
+      const tarefaPaiCheck = await prisma.tarefa.findUnique({
+        where: { id: tarefaPaiId },
+        select: { titulo: true }
+      })
+
+      console.log("DEBUG - tarefaPaiId:", tarefaPaiId, "titulo:", tarefaPaiCheck?.titulo)
+
+      if (tarefaPaiCheck?.titulo?.toLowerCase().includes("procuração administrativa")) {
+        const subtarefasProcuracao = [
+          { titulo: "Preparar procuração administrativa", ordem: 0 },
+          { titulo: "Conferir procuração administrativa", ordem: 1 },
+          { titulo: `Enviar a procuração administrativa ao cliente para assinar`, ordem: 2 },
+        ]
+
+        await prisma.tarefa.createMany({
+          data: subtarefasProcuracao.map(sub => ({
+            titulo: sub.titulo,
+            tarefaPaiId: tarefa.id,
+            processoId: tarefa.processoId,
+            prioridade: tarefa.prioridade,
+            ordem: sub.ordem,
+          }))
+        })
+      }
+    }
+
     return NextResponse.json({ tarefa }, { status: 201 })
   } catch (error) {
     console.error("Erro ao criar tarefa:", error)
