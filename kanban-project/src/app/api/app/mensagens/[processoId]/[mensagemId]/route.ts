@@ -17,7 +17,7 @@ function extrairToken(request: NextRequest) {
 // PATCH - Cliente edita sua própria mensagem
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { processoId: string; mensagemId: string } }
+  { params }: { params: Promise<{ processoId: string; mensagemId: string }> }
 ) {
   try {
     const payload = extrairToken(request);
@@ -68,7 +68,7 @@ export async function PATCH(
 // DELETE - Cliente apaga sua própria mensagem
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { processoId: string; mensagemId: string } }
+  { params }: { params: Promise<{ processoId: string; mensagemId: string }> }
 ) {
   try {
     const payload = extrairToken(request);

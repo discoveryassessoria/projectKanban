@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 // PATCH - Editar mensagem
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { processoId: string; mensagemId: string } }
+  { params }: { params: Promise<{ processoId: string; mensagemId: string }> }
 ) {
   try {
     const { mensagemId: mid } = await params;
@@ -52,7 +52,7 @@ export async function PATCH(
 // DELETE - Apagar mensagem
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { processoId: string; mensagemId: string } }
+  { params }: { params: Promise<{ processoId: string; mensagemId: string }> }
 ) {
   try {
     const { mensagemId: mid } = await params;
