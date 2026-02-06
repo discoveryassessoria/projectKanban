@@ -5,7 +5,7 @@ import { extrairToken } from '@/src/lib/app-auth';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { processoId: string } }
+  { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
     const payload = extrairToken(request);
@@ -109,7 +109,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { processoId: string } }
+  { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
     const payload = extrairToken(request);
