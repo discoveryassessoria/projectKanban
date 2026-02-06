@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { useState, useRef } from "react"
 import {
   Menu,
+  MessageCircle,
 } from "lucide-react"
 
 import { HouseIcon } from "@/src/components/icons/house-icon"
@@ -43,6 +44,13 @@ const menuItems = [
     title: "Eventos",
     url: "/events",
     icon: CalendarIcon,
+    textOffset: "",
+    iconOffset: "",
+  },
+  {
+    title: "Mensagens",
+    url: "/mensagens",
+    icon: ({ className, filled }: any) => <MessageCircle className={className} fill={filled ? "currentColor" : "none"} />,
     textOffset: "",
     iconOffset: "",
   },

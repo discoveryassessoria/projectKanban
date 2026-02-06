@@ -188,6 +188,8 @@ model Usuario {
   // Logs de auditoria
   logs LogAuditoria[]
 
+  mensagens    Mensagem[]
+
   // ✅ NOVO: Histórico de ações em tarefas
   historicoTarefas TarefaHistorico[]
 }
@@ -466,6 +468,8 @@ model Processo {
   
   // ✅ NOVO: Eventos do processo
   eventos      Evento[]
+
+  mensagens    Mensagem[]
 
   @@index([pais])
   @@index([statusId])
@@ -1442,6 +1446,42 @@ model ClienteAuth {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  mensagens    Mensagem[]
+
   @@index([contratanteId])
   @@index([requerenteId])
+}
+
+// ========================================
+// MENSAGEM - CHAT ENTRE CLIENTE E EQUIPE
+// ========================================
+model Mensagem {
+  id              Int       @id @default(autoincrement())
+  editadoEm  DateTime?
+  apagada    Boolean   @default(false)
+  
+  // Vínculo com processo
+  processoId      Int
+  processo        Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  
+  // Conteúdo
+  conteudo        String    @db.Text
+  
+  // Remetente (um dos dois será preenchido)
+  usuarioId       Int?                    // Equipe (admin/funcionário)
+  usuario         Usuario?  @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  
+  clienteAuthId   Int?                    // Cliente (contratante/requerente)
+  clienteAuth     ClienteAuth? @relation(fields: [clienteAuthId], references: [id], onDelete: SetNull)
+  
+  // Controle de leitura
+  lidoPeloCliente   Boolean   @default(false)
+  lidoPelaEquipe    Boolean   @default(false)
+  
+  createdAt       DateTime  @default(now())
+
+  @@index([processoId])
+  @@index([clienteAuthId])
+  @@index([usuarioId])
+  @@index([createdAt])
 }
