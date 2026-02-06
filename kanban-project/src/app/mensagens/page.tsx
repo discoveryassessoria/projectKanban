@@ -324,7 +324,7 @@ export default function MensagensPage() {
   }
 
   return (
-    <div className="relative h-screen text-white overflow-hidden">
+    <div className="relative h-screen text-white overflow-hidden flex flex-col">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
 
       <HeaderBar
