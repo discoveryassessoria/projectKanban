@@ -223,6 +223,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.termo !== undefined) dataToUpdate.termo = body.termo
     if (body.numero_registro !== undefined) dataToUpdate.numero_registro = body.numero_registro
     if (body.data_registro !== undefined) dataToUpdate.data_registro = body.data_registro ? new Date(body.data_registro) : null
+    if (body.data_evento !== undefined) dataToUpdate.data_evento = body.data_evento ? new Date(body.data_evento) : null    // ← adicionar
     if (body.cidade_registro !== undefined) dataToUpdate.cidade_registro = body.cidade_registro
     if (body.estado_registro !== undefined) dataToUpdate.estado_registro = body.estado_registro
     if (body.pais_registro !== undefined) dataToUpdate.pais_registro = body.pais_registro

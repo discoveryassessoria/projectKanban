@@ -367,6 +367,7 @@ model Documento {
   termo               String?   @db.VarChar(30)
   numero_registro     String?   @db.VarChar(50)
   data_registro       DateTime?
+  data_evento         DateTime?
   cidade_registro     String?   @db.VarChar(100)
   estado_registro     String?   @db.VarChar(50)
   pais_registro       String?   @db.VarChar(50)

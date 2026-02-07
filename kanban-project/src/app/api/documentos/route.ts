@@ -103,6 +103,7 @@ export async function POST(request: NextRequest) {
       termo,
       numero_registro,
       data_registro,
+      data_evento,    // ← adicionar
       cidade_registro,
       estado_registro,
       pais_registro,
@@ -180,6 +181,7 @@ export async function POST(request: NextRequest) {
         termo: termo || null,
         numero_registro: numero_registro || null,
         data_registro: data_registro ? new Date(data_registro) : null,
+        data_evento: data_evento ? new Date(data_evento) : null,    // ← adicionar
         cidade_registro: cidade_registro || null,
         estado_registro: estado_registro || null,
         pais_registro: pais_registro || null,

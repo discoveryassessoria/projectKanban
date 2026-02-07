@@ -236,6 +236,16 @@ export function DocumentoModal({
   const [livro, setLivro] = useState(documento?.livro || '')
   const [folha, setFolha] = useState(documento?.folha || '')
   const [termo, setTermo] = useState(documento?.termo || '')
+  const [dataEvento, setDataEvento] = useState(
+    documento?.data_evento 
+      ? String(documento.data_evento).split('T')[0] 
+      : ''
+  )
+  const [dataRegistro, setDataRegistro] = useState(
+    documento?.data_registro 
+      ? String(documento.data_registro).split('T')[0] 
+      : ''
+  )
   const [dataEmissao, setDataEmissao] = useState(
     documento?.data_emissao 
       ? String(documento.data_emissao).split('T')[0] 
@@ -290,6 +300,8 @@ export function DocumentoModal({
         livro: livro.trim() || null,
         folha: folha.trim() || null,
         termo: termo.trim() || null,
+        data_evento: dataEvento || null,
+        data_registro: dataRegistro || null,
         data_emissao: dataEmissao || null,
         traduzido,
         apostilado,
@@ -331,6 +343,14 @@ export function DocumentoModal({
 
   // Verifica se o tipo é uma certidão (para mostrar campos específicos)
   const isCertidao = tipo.includes('CERTIDAO')
+
+  // Label dinâmico e flag para os 3 tipos de certidão civil
+  const certidaoCivilLabel = (() => {
+    if (tipo === 'CERTIDAO_NASCIMENTO_INTEIRO_TEOR') return 'Data de Nascimento'
+    if (tipo === 'CERTIDAO_CASAMENTO_INTEIRO_TEOR') return 'Data de Casamento'
+    if (tipo === 'CERTIDAO_OBITO_INTEIRO_TEOR') return 'Data de Óbito'
+    return null
+  })()
 
   return (
     <>
@@ -466,6 +486,30 @@ export function DocumentoModal({
                     />
                   </div>
                 </div>
+                {/* Após o grid de Livro/Folha/Termo */}
+                
+                {certidaoCivilLabel && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {certidaoCivilLabel}
+                      </label>
+                      <DatePickerField
+                        value={dataEvento}
+                        onChange={(value) => setDataEvento(value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Data do Registro
+                      </label>
+                      <DatePickerField
+                        value={dataRegistro}
+                        onChange={(value) => setDataRegistro(value)}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

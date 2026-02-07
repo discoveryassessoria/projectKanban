@@ -97,6 +97,7 @@ export interface DocumentoArvore {
   termo?: string | null
   data_emissao?: Date | string | null
   data_evento?: Date | string | null
+  data_registro?: Date | string | null
   // Arquivo original
   arquivo_url?: string | null
   arquivo_nome?: string | null
