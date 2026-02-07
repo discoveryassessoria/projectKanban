@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Search, Bell, LogOut } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -79,11 +79,28 @@ export function HeaderBar({
   const [totalNotificacoes, setTotalNotificacoes] = useState(0)
 
   const router = useRouter()
+  const notificacoesRef = useRef<HTMLDivElement>(null)
+
+  // useEffect para fechar ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (notificacoesRef.current && !notificacoesRef.current.contains(event.target as Node)) {
+        setShowNotifications(false)
+      }
+    }
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showNotifications])
 
   // Buscar notificações diretamente da API
   const fetchNotificacoes = useCallback(async () => {
     try {
-      const response = await fetch('/api/tarefas?excluirEstruturais=true')
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
+      const response = await fetch('/api/tarefas?excluirEstruturais=true', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      })
       if (!response.ok) return
 
       const data = await response.json()
@@ -312,7 +329,7 @@ export function HeaderBar({
           </div>
 
           {/* Notificações */}
-          <div className="relative hidden md:block">
+          <div className="relative hidden md:block" ref={notificacoesRef}>
             <button 
               className="relative inline-flex items-center justify-center rounded-full p-2 border border-white/30 hover:bg-white/10 transition"
               onClick={() => setShowNotifications(!showNotifications)}

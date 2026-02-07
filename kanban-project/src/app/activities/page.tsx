@@ -254,6 +254,7 @@ export default function ActivitiesPage() {
           onOpenChange={setFilterModalOpen}
           filters={filters}
           onFiltersChange={handleFiltersChange}
+          userTipo={user.tipo}
         />
       </main>
       </div>
@@ -267,13 +268,15 @@ interface FilterModalProps {
   onOpenChange: (open: boolean) => void
   filters: Filters
   onFiltersChange: (filters: Filters) => void
+  userTipo?: string  // ← ADICIONAR
 }
 
 function FilterModal({ 
   open, 
   onOpenChange, 
   filters, 
-  onFiltersChange 
+  onFiltersChange,
+  userTipo  // ← ADICIONAR
 }: FilterModalProps) {
   const { paises } = usePaises()
   const { users } = useUsers()
@@ -359,6 +362,7 @@ function FilterModal({
             </Select>
           </div>
 
+          {userTipo === 'admin' && (
           <div className="space-y-2">
             <Label className="text-gray-700">Responsável</Label>
             <Select value={localFilters.responsavel} onValueChange={(value) => updateFilter('responsavel', value)}>
@@ -375,6 +379,7 @@ function FilterModal({
               </SelectContent>
             </Select>
           </div>
+        )}
 
           <div className="flex gap-2 pt-4">
             <Button 

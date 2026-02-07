@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { PrioridadeTarefa, Pais } from "@prisma/client"
 import { logTarefa } from "@/lib/auditoria"
 import { toUTCNoon } from "@/src/lib/date-utils"
+import { extrairUsuarioKanban } from "@/lib/kanban-auth"
 
 // GET - Buscar tarefas (com filtros opcionais)
 export async function GET(request: Request) {
@@ -25,22 +26,37 @@ export async function GET(request: Request) {
 
     const where: any = {}
 
+    // =====================================================
+    // 🔒 FILTRO OBRIGATÓRIO POR USUÁRIO
+    // Se o usuário NÃO for admin, só vê as próprias tarefas
+    // =====================================================
+    const usuario = extrairUsuarioKanban(request)
+    
+    if (usuario && usuario.tipo !== 'admin') {
+      // Usuário comum: FORÇAR filtro por responsavelId
+      // Isso NÃO pode ser sobrescrito por nenhum parâmetro da URL
+      where.responsavelId = usuario.userId
+    }
+    // =====================================================
+
     if (processoId) {
       where.processoId = parseInt(processoId)
     }
 
-    if (responsavelId) {
+    // Filtro por responsavelId manual - SÓ aplica se for admin
+    // (para usuário comum, já está fixo acima e não pode mudar)
+    if (responsavelId && (!usuario || usuario.tipo === 'admin')) {
       where.responsavelId = parseInt(responsavelId)
     }
 
-    // Filtro por email do responsável (vem do FilterModal)
-    if (responsavelEmail) {
-      const usuario = await prisma.usuario.findFirst({
+    // Filtro por email do responsável (vem do FilterModal) - SÓ para admin
+    if (responsavelEmail && (!usuario || usuario.tipo === 'admin')) {
+      const usuarioBusca = await prisma.usuario.findFirst({
         where: { email: responsavelEmail },
         select: { id: true }
       })
-      if (usuario) {
-        where.responsavelId = usuario.id
+      if (usuarioBusca) {
+        where.responsavelId = usuarioBusca.id
       }
     }
 
@@ -52,20 +68,17 @@ export async function GET(request: Request) {
     }
 
     if (dataInicio || dataFim) {
-  where.dataInicio = {}
-  if (dataInicio && dataFim) {
-    // Range: de dataInicio até dataFim
-    where.dataInicio.gte = new Date(dataInicio + 'T00:00:00.000Z')
-    where.dataInicio.lte = new Date(dataFim + 'T23:59:59.999Z')
-  } else if (dataInicio) {
-    // Só data início: filtra exatamente nesse dia
-    where.dataInicio.gte = new Date(dataInicio + 'T00:00:00.000Z')
-    where.dataInicio.lte = new Date(dataInicio + 'T23:59:59.999Z')
-  } else if (dataFim) {
-    // Só data fim: filtra até esse dia
-    where.dataInicio.lte = new Date(dataFim + 'T23:59:59.999Z')
-  }
-}
+      where.dataInicio = {}
+      if (dataInicio && dataFim) {
+        where.dataInicio.gte = new Date(dataInicio + 'T00:00:00.000Z')
+        where.dataInicio.lte = new Date(dataFim + 'T23:59:59.999Z')
+      } else if (dataInicio) {
+        where.dataInicio.gte = new Date(dataInicio + 'T00:00:00.000Z')
+        where.dataInicio.lte = new Date(dataInicio + 'T23:59:59.999Z')
+      } else if (dataFim) {
+        where.dataInicio.lte = new Date(dataFim + 'T23:59:59.999Z')
+      }
+    }
 
     if (concluida !== null && concluida !== undefined && concluida !== "") {
       where.concluida = concluida === "true"
@@ -76,14 +89,12 @@ export async function GET(request: Request) {
     }
 
     if (pais && Object.values(Pais).includes(pais)) {
-      // Filtrar por país da tarefa OU do processo vinculado
       const paisCondition = {
         OR: [
           { pais: pais },
           { processo: { pais: pais } }
         ]
       }
-      // Combinar com OR existente (excluirEstruturais) via AND
       if (where.OR) {
         const existingOR = where.OR
         delete where.OR
@@ -103,8 +114,8 @@ export async function GET(request: Request) {
 
     if (excluirEstruturais === "true") {
       where.OR = [
-        { tarefaPaiId: { not: null } },  // É subtarefa (trabalho real)
-        { processoId: null }              // É tarefa independente
+        { tarefaPaiId: { not: null } },
+        { processoId: null }
       ]
     }
 
@@ -149,7 +160,6 @@ export async function GET(request: Request) {
                     email: true
                   }
                 },
-                // NÍVEL 3 - Cobranças
                 subtarefas: {
                   include: {
                     responsavel: {
@@ -227,7 +237,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Buscar nome do processo se fornecido
     let processoNome: string | undefined
     if (processoId) {
       const processo = await prisma.processo.findUnique({
@@ -289,7 +298,6 @@ export async function POST(request: Request) {
 
     const paisValido = pais && Object.values(Pais).includes(pais) ? pais : null
 
-    // Calcular ordem se não fornecida
     let ordemFinal = ordem
     if (ordemFinal === undefined || ordemFinal === null) {
       const ultimaTarefa = await prisma.tarefa.findFirst({
@@ -345,17 +353,13 @@ export async function POST(request: Request) {
       }
     })
 
-    // ✅ REGISTRAR LOG
     await logTarefa.criar(tarefa.titulo, tarefa.id, processoNome)
 
-    // Auto-criar subtarefas para atividades dentro de "Procuração administrativa"
     if (tarefaPaiId) {
       const tarefaPaiCheck = await prisma.tarefa.findUnique({
         where: { id: tarefaPaiId },
         select: { titulo: true }
       })
-
-      console.log("DEBUG - tarefaPaiId:", tarefaPaiId, "titulo:", tarefaPaiCheck?.titulo)
 
       if (tarefaPaiCheck?.titulo?.toLowerCase().includes("procuração administrativa")) {
         const subtarefasProcuracao = [

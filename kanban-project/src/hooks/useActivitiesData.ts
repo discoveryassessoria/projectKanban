@@ -47,12 +47,12 @@ export interface Atividade {
   responsavel?: Usuario | null
   concluida?: boolean
   prioridade?: string
-  observacoes?: string | null  // ← ADICIONAR
-  tarefaPai?: {            // ← ADICIONAR
+  observacoes?: string | null
+  tarefaPai?: {
     id: number
     titulo: string
   }
-  data_inicio?: string | null  // ← ADICIONAR
+  data_inicio?: string | null
 }
 
 // Tipo da resposta da API de tarefas
@@ -74,19 +74,18 @@ interface TarefaAPI {
   concluida: boolean
   prioridade: string
   subtarefas?: TarefaAPI[]
-  observacoes?: string | null  // ← ADICIONAR
-  tarefaPai?: {            // ← ADICIONAR
+  observacoes?: string | null
+  tarefaPai?: {
     id: number
     titulo: string
   }
-  dataInicio: string | null  // ← ADICIONAR
+  dataInicio: string | null
 }
 
 // Fetcher genérico para SWR com tratamento de erro melhorado
 const fetcher = async (url: string) => {
   const response = await fetch(url)
   if (!response.ok) {
-    // Se for 404 ou 401, retorna array vazio silenciosamente
     if (response.status === 404 || response.status === 401) {
       console.warn(`API ${url} retornou ${response.status}`)
       return []
@@ -118,11 +117,8 @@ const swrConfig = {
   revalidateOnReconnect: true,
   keepPreviousData: true,
   onErrorRetry: (error: any, key: string, config: any, revalidate: any, { retryCount }: any) => {
-    // Não retentar em erros 404 ou 401
     if (error?.status === 404 || error?.status === 401) return
-    // Máximo de 3 tentativas
     if (retryCount >= 3) return
-    // Retentar após 5 segundos
     setTimeout(() => revalidate({ retryCount }), 5000)
   }
 }
@@ -142,34 +138,31 @@ function getStatusFromConcluida(concluida: boolean): Status {
 function mapTarefaToAtividade(tarefa: TarefaAPI): Atividade {
   return {
     id: tarefa.id,
-    nome: tarefa.titulo, // titulo -> nome
+    nome: tarefa.titulo,
     descricao: tarefa.descricao,
-    data_termino: tarefa.dataPrazo, // dataPrazo -> data_termino
-    data_criacao: tarefa.createdAt, // createdAt -> data_criacao
+    data_termino: tarefa.dataPrazo,
+    data_criacao: tarefa.createdAt,
     pais: tarefa.pais || tarefa.processo?.pais || 'PORTUGAL' as Pais,
-    // Usar status baseado em concluida ao invés do status do processo
     status: getStatusFromConcluida(tarefa.concluida),
     contratante: null,
     usuarios: tarefa.responsavel 
       ? [{ usuario: tarefa.responsavel }] 
       : [],
-    // Campos extras
     processo: tarefa.processo || undefined,
     responsavel: tarefa.responsavel,
     concluida: tarefa.concluida,
     prioridade: tarefa.prioridade,
-    tarefaPai: tarefa.tarefaPai || undefined,  // ← ADICIONAR
-    observacoes: tarefa.observacoes,  // ← ADICIONAR
-    data_inicio: tarefa.dataInicio,  // ← ADICIONAR
+    tarefaPai: tarefa.tarefaPai || undefined,
+    observacoes: tarefa.observacoes,
+    data_inicio: tarefa.dataInicio,
   }
 }
 
 /**
  * Hook para buscar atividades com filtros
- * Usa /api/tarefas (nome correto da API no sistema)
+ * ✅ Usa fetcherWithAuth para enviar o token - o backend filtra por usuário automaticamente
  */
 export function useActivities(filters?: any) {
-  // Construir query string com filtros
   const params = new URLSearchParams()
   if (filters) {
     Object.entries(filters).forEach(([key, value]) => {
@@ -179,20 +172,17 @@ export function useActivities(filters?: any) {
     })
   }
   
-  // Excluir tarefas estruturais (Documentos pessoais, Procuração, etc.)
   params.append('excluirEstruturais', 'true')
 
   const queryString = params.toString()
-  // Usar /api/tarefas (nome correto da API)
   const url = `/api/tarefas${queryString ? `?${queryString}` : ''}`
   
   const { data, error, isLoading, mutate: revalidate } = useSWR(
     url,
-    fetcher,
+    fetcherWithAuth, // ✅ MUDANÇA: era fetcher, agora envia o token
     swrConfig
   )
   
-  // Normalizar resposta e mapear campos
   let rawTarefas: TarefaAPI[] = []
   
   if (Array.isArray(data)) {
@@ -203,7 +193,6 @@ export function useActivities(filters?: any) {
     rawTarefas = data.atividades
   }
   
-  // Mapear tarefas para o formato esperado pelo componente
   const activities: Atividade[] = rawTarefas.map(mapTarefaToAtividade)
   
   return {
@@ -219,7 +208,6 @@ export function useActivities(filters?: any) {
  * Hook para obter lista de países (enum fixo)
  */
 export function usePaises() {
-  // Países são fixos, não precisam de fetch
   const paises = Object.values(Pais)
   return {
     paises,
@@ -230,10 +218,8 @@ export function usePaises() {
 
 /**
  * Hook para buscar status
- * @param pais - País opcional para filtrar status (se não passar, busca todos)
  */
 export function useStatuses(pais?: string) {
-  // Construir URL com filtro de país se fornecido
   const url = pais && pais !== 'all' 
     ? `/api/status?pais=${pais}` 
     : '/api/status'
@@ -244,15 +230,11 @@ export function useStatuses(pais?: string) {
     swrConfig
   )
   
-  // Normalizar resposta
   let statuses = Array.isArray(data) 
     ? data 
     : (data as any)?.status || []
   
-  // Remover duplicatas por nome (caso a API não filtre corretamente)
   if (pais && pais !== 'all') {
-    // Se temos um país específico, já deve vir filtrado da API
-    // Mas por segurança, removemos duplicatas
     const seen = new Set<string>()
     statuses = statuses.filter((s: Status) => {
       if (seen.has(s.nome)) return false
@@ -260,7 +242,6 @@ export function useStatuses(pais?: string) {
       return true
     })
   } else {
-    // Se não tem país, retorna lista única de nomes (sem duplicatas)
     const seen = new Set<string>()
     statuses = statuses.filter((s: Status) => {
       if (seen.has(s.nome)) return false
@@ -288,7 +269,6 @@ export function useUsers() {
     swrConfig
   )
   
-  // Normalizar resposta
   const users = Array.isArray(data) 
     ? data 
     : (data as any)?.usuarios || []
@@ -304,13 +284,11 @@ export function useUsers() {
 
 /**
  * Hook para buscar dados do calendário
- * @param year - Ano
- * @param month - Mês (1-12)
  */
 export function useCalendarData(year: number, month: number) {
   const { data, error, isLoading, mutate: revalidate } = useSWR(
     `/api/tarefas/calendar?year=${year}&month=${month}`,
-    fetcher,
+    fetcherWithAuth, // ✅ MUDANÇA: também precisa do token para filtrar
     swrConfig
   )
   
@@ -324,13 +302,11 @@ export function useCalendarData(year: number, month: number) {
 
 /**
  * Hook para buscar dados de um dia específico
- * @param date - Data no formato YYYY-MM-DD
- * @param enabled - Se deve buscar os dados
  */
 export function useDayData(date: string | null, enabled = true) {
   const { data, error, isLoading, mutate: revalidate } = useSWR(
     enabled && date ? `/api/tarefas/day?date=${date}` : null,
-    fetcher,
+    fetcherWithAuth, // ✅ MUDANÇA: também precisa do token para filtrar
     swrConfig
   )
   
@@ -345,18 +321,14 @@ export function useDayData(date: string | null, enabled = true) {
 /**
  * Funções utilitárias para invalidar cache
  */
-
-// Invalidar cache de atividades (todas as queries de tarefas)
 export function invalidateActivities() {
   mutate((key) => typeof key === 'string' && key.startsWith('/api/tarefas'))
 }
 
-// Invalidar cache de status
 export function invalidateStatuses() {
   mutate((key) => typeof key === 'string' && key.startsWith('/api/status'))
 }
 
-// Invalidar cache de usuários
 export function invalidateUsers() {
   mutate('/api/usuarios')
 }
@@ -371,7 +343,6 @@ export function useContratantes() {
     swrConfig
   )
   
-  // Normalizar resposta
   const contratantes = Array.isArray(data) 
     ? data 
     : (data as any)?.contratantes || []
@@ -394,7 +365,6 @@ export function useRequerentes() {
     swrConfig
   )
   
-  // Normalizar resposta
   const requerentes = Array.isArray(data) 
     ? data 
     : (data as any)?.requerentes || []
@@ -407,7 +377,6 @@ export function useRequerentes() {
   }
 }
 
-// Invalidar tudo
 export function invalidateAll() {
   invalidateActivities()
   invalidateStatuses()
