@@ -6,6 +6,7 @@ import { PrioridadeTarefa } from "@prisma/client"
 import { logTarefa } from "@/lib/auditoria"
 import { toUTCNoon } from "@/src/lib/date-utils"
 import { hojeBrasil } from "@/src/lib/date-utils"
+import { hojeBrasilMaisDias } from "@/src/lib/date-utils"
 
 async function verificarEConcluirTarefaPai(tarefaPaiId: number) {
   const tarefaPai = await prisma.tarefa.findUnique({
@@ -35,6 +36,48 @@ async function verificarEConcluirTarefaPai(tarefaPaiId: number) {
       await verificarEConcluirTarefaPai(tarefaPai.tarefaPaiId)
     }
   }
+}
+
+async function iniciarProximaSubtarefa(tarefaConcluidaId: number, tarefaPaiId: number) {
+  console.log("🔄 iniciarProximaSubtarefa chamada:", { tarefaConcluidaId, tarefaPaiId })
+  // Buscar todas as subtarefas do mesmo pai, ordenadas
+  const subtarefas = await prisma.tarefa.findMany({
+    where: { tarefaPaiId },
+    orderBy: [
+      { ordem: 'asc' },
+      { createdAt: 'asc' }
+    ]
+  })
+
+  // Encontrar o índice da tarefa que acabou de ser concluída
+  const indexAtual = subtarefas.findIndex(s => s.id === tarefaConcluidaId)
+  if (indexAtual === -1 || indexAtual >= subtarefas.length - 1) return
+
+  // Pegar a próxima
+  const proxima = subtarefas[indexAtual + 1]
+
+  // Só inicia se ainda não foi iniciada
+  if (proxima.dataInicio) return
+
+  const prazoFinal = proxima.prazoCobranca || 5
+
+  await prisma.tarefa.update({
+    where: { id: proxima.id },
+    data: {
+      dataInicio: hojeBrasil(),
+      dataPrazo: hojeBrasilMaisDias(prazoFinal),
+      prazoCobranca: prazoFinal,
+      statusTarefa: "EM_ANDAMENTO"
+    }
+  })
+
+  await prisma.tarefaHistorico.create({
+    data: {
+      tarefaId: proxima.id,
+      acao: "INICIADA",
+      descricao: `Tarefa iniciada automaticamente com prazo de ${prazoFinal} dias`
+    }
+  })
 }
 
 async function reabrirTarefaPaiSeNecessario(tarefaPaiId: number) {
@@ -323,6 +366,11 @@ export async function PUT(
 
     if (concluida && tarefaExistente.tarefaPaiId) {
       await verificarEConcluirTarefaPai(tarefaExistente.tarefaPaiId)
+    }
+
+    if (concluida && tarefaExistente.tarefaPaiId) {
+      console.log("🟢 Vai chamar iniciarProximaSubtarefa", { id, tarefaPaiId: tarefaExistente.tarefaPaiId, concluida })
+      await iniciarProximaSubtarefa(id, tarefaExistente.tarefaPaiId)
     }
 
     if (concluida === false && tarefaExistente.tarefaPaiId) {

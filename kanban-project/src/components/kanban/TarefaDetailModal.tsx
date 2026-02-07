@@ -140,9 +140,10 @@ interface SubtarefaLineProps {
   onUpdate: () => void
   usuarios: Responsavel[]
   isProcuracaoAdm?: boolean
+  mostrarBotaoIniciar?: boolean  // ← NOVO
 }
 
-function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false }: SubtarefaLineProps) {
+function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mostrarBotaoIniciar = true }: SubtarefaLineProps) {
   const [processando, setProcessando] = useState(false)
   const [expandido, setExpandido] = useState(false)
   const [editando, setEditando] = useState(false)
@@ -360,7 +361,7 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false }: 
         </div>
 
         {/* Actions */}
-        {!tarefa.concluida && !iniciada && (
+        {!tarefa.concluida && !iniciada && mostrarBotaoIniciar && (
           <button
             onClick={handleIniciar}
             disabled={processando}
@@ -877,15 +878,24 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
 
                 {subtarefas.length > 0 ? (
                   <div className="space-y-2">
-                    {subtarefas.map(sub => (
-                      <SubtarefaLine
-                        key={sub.id}
-                        tarefa={sub}
-                        onUpdate={() => { fetchSubtarefas(); fetchHistorico(); onUpdate() }}
-                        usuarios={usuarios}
-                        isProcuracaoAdm={isProcuracaoAdm}
-                      />
-                    ))}
+                    {subtarefas.map((sub, index) => {
+                      // Mostrar "Iniciar" só na primeira subtarefa não iniciada,
+                      // e somente se nenhuma outra está EM ANDAMENTO (iniciada e não concluída)
+                      const algumaEmAndamento = subtarefas.some(s => !!s.dataInicio && !s.concluida)
+                      const primeiraNaoIniciada = subtarefas.findIndex(s => !s.dataInicio && !s.concluida)
+                      const mostrarIniciar = !algumaEmAndamento && index === primeiraNaoIniciada
+
+                      return (
+                        <SubtarefaLine
+                          key={sub.id}
+                          tarefa={sub}
+                          onUpdate={() => { fetchSubtarefas(); fetchHistorico(); onUpdate() }}
+                          usuarios={usuarios}
+                          isProcuracaoAdm={isProcuracaoAdm}
+                          mostrarBotaoIniciar={mostrarIniciar}
+                        />
+                      )
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-6 text-gray-400">

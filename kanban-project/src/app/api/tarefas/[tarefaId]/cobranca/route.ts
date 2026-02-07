@@ -2,7 +2,53 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { hojeBrasil } from "@/src/lib/date-utils"
+import { hojeBrasil, hojeBrasilMaisDias } from "@/src/lib/date-utils"
+
+async function iniciarProximaSubtarefa(tarefaConcluidaId: number, tarefaPaiId: number) {
+  console.log("🔄 [COBRANCA] iniciarProximaSubtarefa chamada:", { tarefaConcluidaId, tarefaPaiId })
+  
+  const subtarefas = await prisma.tarefa.findMany({
+    where: { tarefaPaiId },
+    orderBy: [
+      { ordem: 'asc' },
+      { createdAt: 'asc' }
+    ]
+  })
+
+  const indexAtual = subtarefas.findIndex(s => s.id === tarefaConcluidaId)
+  if (indexAtual === -1 || indexAtual >= subtarefas.length - 1) {
+    console.log("🔄 [COBRANCA] Sem próxima subtarefa")
+    return
+  }
+
+  const proxima = subtarefas[indexAtual + 1]
+
+  if (proxima.dataInicio) {
+    console.log("🔄 [COBRANCA] Próxima já iniciada:", proxima.titulo)
+    return
+  }
+
+  const prazoFinal = proxima.prazoCobranca || 5
+
+  await prisma.tarefa.update({
+    where: { id: proxima.id },
+    data: {
+      dataInicio: hojeBrasil(),
+      dataPrazo: hojeBrasilMaisDias(prazoFinal),
+      prazoCobranca: prazoFinal
+    }
+  })
+
+  await prisma.tarefaHistorico.create({
+    data: {
+      tarefaId: proxima.id,
+      acao: "INICIADA",
+      descricao: `Tarefa iniciada automaticamente com prazo de ${prazoFinal} dias`
+    }
+  })
+
+  console.log("✅ [COBRANCA] Próxima subtarefa iniciada:", proxima.titulo)
+}
 
 async function verificarEConcluirTarefaPai(tarefaPaiId: number) {
   const tarefaPai = await prisma.tarefa.findUnique({
@@ -122,6 +168,13 @@ export async function POST(
         const paiIdRecebido = isCobranca ? tarefa.tarefaPai?.tarefaPaiId : tarefa.tarefaPaiId
         if (paiIdRecebido) {
           await verificarEConcluirTarefaPai(paiIdRecebido)
+        }
+
+        // ✅ Iniciar próxima subtarefa automaticamente
+        const tarefaConcluidaId = isCobranca ? tarefa.tarefaPaiId! : id
+        const paiParaProgressao = isCobranca ? tarefa.tarefaPai?.tarefaPaiId : tarefa.tarefaPaiId
+        if (paiParaProgressao) {
+          await iniciarProximaSubtarefa(tarefaConcluidaId, paiParaProgressao)
         }
 
         await prisma.tarefaHistorico.create({
