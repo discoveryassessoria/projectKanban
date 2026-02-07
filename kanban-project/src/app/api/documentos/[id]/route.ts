@@ -30,95 +30,70 @@ function getTipoDocumentoLabel(tipo: string): string {
 // ✅ Helper para criar tarefas de documento
 async function criarTarefasDocumento(
   statusNovo: string,
-  statusAntigo: string,
   tipo: string,
   nomePessoa: string,
   processoId: number
 ) {
+  // Só para certidões inteiro teor
+  const certidoesInteiroTeor = [
+    'CERTIDAO_NASCIMENTO_INTEIRO_TEOR',
+    'CERTIDAO_CASAMENTO_INTEIRO_TEOR',
+    'CERTIDAO_OBITO_INTEIRO_TEOR'
+  ]
+  if (!certidoesInteiroTeor.includes(tipo)) return
+
+  // Só dispara em EM_BUSCA ou SOLICITAR
+  if (statusNovo !== 'EM_BUSCA' && statusNovo !== 'SOLICITAR') return
+
   const tipoLabel = getTipoDocumentoLabel(tipo)
+  const tituloTarefaPai = `${tipoLabel} - ${nomePessoa}`
+
+  // Só cria se não existir
+  const tarefaExistente = await prisma.tarefa.findFirst({
+    where: { processoId, titulo: tituloTarefaPai }
+  })
+  if (tarefaExistente) return
 
   // Buscar tarefa pai "Emissão da Pasta Documental"
   const tarefaEmissao = await prisma.tarefa.findFirst({
     where: {
       processoId,
       tarefaPaiId: null,
-      titulo: {
-        contains: 'Emissão',
-        mode: 'insensitive'
-      }
+      titulo: { contains: 'Emissão', mode: 'insensitive' }
     }
   })
 
-  // ✅ Mudou para EM_BUSCA: Criar tarefa de busca
-  if (statusNovo === "EM_BUSCA" && statusAntigo !== "EM_BUSCA") {
-    // Verificar se já existe
-    const tarefaExistente = await prisma.tarefa.findFirst({
-      where: {
+  // Criar tarefa pai
+  const tarefaPai = await prisma.tarefa.create({
+    data: {
+      titulo: tituloTarefaPai,
+      descricao: `${tipoLabel} de ${nomePessoa}`,
+      processoId,
+      tarefaPaiId: tarefaEmissao?.id || null,
+      prioridade: "MEDIA",
+      concluida: false
+    }
+  })
+
+  // Criar 5 subtarefas
+  const subtarefas = [
+    'Buscar certidão em inteiro teor',
+    'Preencher e assinar requerimento da solicitação da certidão em inteiro teor',
+    'Enviar ao cartório requerimento da solicitação da certidão em inteiro teor',
+    'Enviar ao CRC requerimento da solicitação da certidão em inteiro teor',
+    'Receber certidão em inteiro teor',
+  ]
+
+  for (const titulo of subtarefas) {
+    await prisma.tarefa.create({
+      data: {
+        titulo,
         processoId,
-        titulo: `Buscar ${tipoLabel} - ${nomePessoa}`
+        tarefaPaiId: tarefaPai.id,
+        prioridade: "MEDIA",
+        concluida: false
       }
     })
-
-    if (!tarefaExistente) {
-      await prisma.tarefa.create({
-        data: {
-          titulo: `Buscar ${tipoLabel} - ${nomePessoa}`,
-          descricao: `Buscar ${tipoLabel} de ${nomePessoa}`,
-          processoId,
-          tarefaPaiId: tarefaEmissao?.id || null,
-          prioridade: "MEDIA",
-          concluida: false
-        }
-      })
-    }
-  }
-
-  // ✅ Mudou para SOLICITAR: Criar subtarefa dentro da tarefa de busca
-  if (statusNovo === "SOLICITAR" && statusAntigo !== "SOLICITAR") {
-    // Buscar ou criar a tarefa de busca
-    let tarefaBusca = await prisma.tarefa.findFirst({
-      where: {
-        processoId,
-        titulo: `Buscar ${tipoLabel} - ${nomePessoa}`
-      }
-    })
-
-    if (!tarefaBusca) {
-      // Se não existe tarefa de busca, criar ela primeiro
-      tarefaBusca = await prisma.tarefa.create({
-        data: {
-          titulo: `Buscar ${tipoLabel} - ${nomePessoa}`,
-          descricao: `Buscar ${tipoLabel} de ${nomePessoa}`,
-          processoId,
-          tarefaPaiId: tarefaEmissao?.id || null,
-          prioridade: "MEDIA",
-          concluida: false
-        }
-      })
-    }
-
-    // Verificar se já existe subtarefa de solicitar
-    const subtarefaExistente = await prisma.tarefa.findFirst({
-      where: {
-        processoId,
-        tarefaPaiId: tarefaBusca.id,
-        titulo: `Solicitar ${tipoLabel} - ${nomePessoa}`
-      }
-    })
-
-    if (!subtarefaExistente) {
-      // Criar subtarefa de solicitar DENTRO da tarefa de busca
-      await prisma.tarefa.create({
-        data: {
-          titulo: `Solicitar ${tipoLabel} - ${nomePessoa}`,
-          descricao: `Solicitar ${tipoLabel} de ${nomePessoa}`,
-          processoId,
-          tarefaPaiId: tarefaBusca.id,
-          prioridade: "MEDIA",
-          concluida: false
-        }
-      })
-    }
   }
 }
 
@@ -276,13 +251,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
       if (processoId) {
         const nomePessoa = `${documentoAtual.pessoa.nome} ${documentoAtual.pessoa.sobrenome || ""}`.trim()
-        await criarTarefasDocumento(
-          body.status,
-          documentoAtual.status,
-          documentoAtual.tipo,
-          nomePessoa,
-          processoId
-        )
+        await criarTarefasDocumento(body.status, documentoAtual.tipo, nomePessoa, processoId)
       }
     }
 
@@ -345,7 +314,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       const tarefaBusca = await prisma.tarefa.findFirst({
         where: {
           processoId,
-          titulo: `Buscar ${tipoLabel} - ${nomePessoa}`
+          titulo: `${tipoLabel} - ${nomePessoa}`
         }
       })
 
@@ -456,13 +425,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (processoId) {
       const nomePessoa = `${documentoAtual.pessoa.nome} ${documentoAtual.pessoa.sobrenome || ""}`.trim()
-      await criarTarefasDocumento(
-        body.status,
-        documentoAtual.status,
-        documentoAtual.tipo,
-        nomePessoa,
-        processoId
-      )
+      await criarTarefasDocumento(body.status, documentoAtual.tipo, nomePessoa, processoId)
     }
 
     return NextResponse.json(documentoAtualizado)

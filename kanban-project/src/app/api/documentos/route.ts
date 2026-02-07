@@ -224,70 +224,66 @@ export async function POST(request: NextRequest) {
     const statusFinal = (status as StatusDocumento) || 'PENDENTE'
     const processoId = pessoa.arvore?.processos[0]?.id
 
-    if (processoId) {
-      const tipoLabel = getTipoDocumentoLabel(tipo)
-      const nomePessoa = `${pessoa.nome} ${pessoa.sobrenome || ""}`.trim()
+    if (processoId && (statusFinal === 'EM_BUSCA' || statusFinal === 'SOLICITAR')) {
+      const certidoesInteiroTeor = [
+        'CERTIDAO_NASCIMENTO_INTEIRO_TEOR',
+        'CERTIDAO_CASAMENTO_INTEIRO_TEOR',
+        'CERTIDAO_OBITO_INTEIRO_TEOR'
+      ]
 
-      // Buscar tarefa pai "Emissão da Pasta Documental"
-      const tarefaEmissao = await prisma.tarefa.findFirst({
-        where: {
-          processoId,
-          tarefaPaiId: null,
-          titulo: {
-            contains: 'Emissão',
-            mode: 'insensitive'
-          }
-        }
-      })
+      if (certidoesInteiroTeor.includes(tipo)) {
+        const tipoLabel = getTipoDocumentoLabel(tipo)
+        const nomePessoa = `${pessoa.nome} ${pessoa.sobrenome || ""}`.trim()
+        const tituloTarefaPai = `${tipoLabel} - ${nomePessoa}`
 
-      // ✅ Status EM_BUSCA: Criar tarefa de busca
-      if (statusFinal === "EM_BUSCA") {
-        await prisma.tarefa.create({
-          data: {
-            titulo: `Buscar ${tipoLabel} - ${nomePessoa}`,
-            descricao: `Buscar ${tipoLabel} de ${nomePessoa}`,
-            processoId,
-            tarefaPaiId: tarefaEmissao?.id || null,
-            prioridade: "MEDIA",
-            concluida: false
-          }
-        })
-      }
-
-      // ✅ Status SOLICITAR: Criar tarefa de busca + subtarefa de solicitar
-      if (statusFinal === "SOLICITAR") {
-        // Primeiro, criar a tarefa de busca (se não existir)
-        let tarefaBusca = await prisma.tarefa.findFirst({
-          where: {
-            processoId,
-            titulo: `Buscar ${tipoLabel} - ${nomePessoa}`
-          }
+        // Só cria se não existir
+        const tarefaExistente = await prisma.tarefa.findFirst({
+          where: { processoId, titulo: tituloTarefaPai }
         })
 
-        if (!tarefaBusca) {
-          tarefaBusca = await prisma.tarefa.create({
+        if (!tarefaExistente) {
+          // Buscar tarefa pai "Emissão da Pasta Documental"
+          const tarefaEmissao = await prisma.tarefa.findFirst({
+            where: {
+              processoId,
+              tarefaPaiId: null,
+              titulo: { contains: 'Emissão', mode: 'insensitive' }
+            }
+          })
+
+          // Criar tarefa pai
+          const tarefaPai = await prisma.tarefa.create({
             data: {
-              titulo: `Buscar ${tipoLabel} - ${nomePessoa}`,
-              descricao: `Buscar ${tipoLabel} de ${nomePessoa}`,
+              titulo: tituloTarefaPai,
+              descricao: `${tipoLabel} de ${nomePessoa}`,
               processoId,
               tarefaPaiId: tarefaEmissao?.id || null,
               prioridade: "MEDIA",
               concluida: false
             }
           })
-        }
 
-        // Depois, criar a subtarefa de solicitar dentro da tarefa de busca
-        await prisma.tarefa.create({
-          data: {
-            titulo: `Solicitar ${tipoLabel} - ${nomePessoa}`,
-            descricao: `Solicitar ${tipoLabel} de ${nomePessoa}`,
-            processoId,
-            tarefaPaiId: tarefaBusca.id,
-            prioridade: "MEDIA",
-            concluida: false
+          // Criar 5 subtarefas
+          const subtarefas = [
+            'Buscar certidão em inteiro teor',
+            'Preencher e assinar requerimento da solicitação da certidão em inteiro teor',
+            'Enviar ao cartório requerimento da solicitação da certidão em inteiro teor',
+            'Enviar ao CRC requerimento da solicitação da certidão em inteiro teor',
+            'Receber certidão em inteiro teor',
+          ]
+
+          for (const titulo of subtarefas) {
+            await prisma.tarefa.create({
+              data: {
+                titulo,
+                processoId,
+                tarefaPaiId: tarefaPai.id,
+                prioridade: "MEDIA",
+                concluida: false
+              }
+            })
           }
-        })
+        }
       }
     }
 
