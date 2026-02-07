@@ -59,16 +59,20 @@ function DocumentoIndicador({ tipo, label, status, mode }: DocumentoIndicadorPro
   if (!status) return null
   
   // ✅ ATUALIZADO: Verde = Recebido, Vermelho = Solicitar ou Solicitado, Azul = Em busca
-  const isRecebido = status === 'recebido'
-  const isEmBusca = status === 'em_busca'
-  const bgColor = isRecebido ? '#22C55E' : isEmBusca ? '#3B82F6' : '#EF4444'
-  const statusText = status === 'recebido' 
-    ? 'Recebido' 
-    : status === 'solicitado' 
-      ? 'Solicitado' 
-      : status === 'em_busca'
-        ? 'Em busca'
-        : 'Solicitar'
+  const colorMap: Record<string, string> = {
+    'em_busca': '#EF4444',   // Vermelho
+    'solicitar': '#F59E0B',  // Amarelo
+    'solicitado': '#22C55E', // Verde
+    'recebido': '#3B82F6',   // Azul
+  }
+  const labelMap: Record<string, string> = {
+    'em_busca': 'Em busca',
+    'solicitar': 'Solicitar',
+    'solicitado': 'Solicitado',
+    'recebido': 'Recebido',
+  }
+  const bgColor = colorMap[status] || '#EF4444'
+  const statusText = labelMap[status] || status
   
   // Tooltip posição diferente para cada modo
   const tooltipClass = mode === 'paisagem' 

@@ -180,38 +180,35 @@ interface DocumentoIndicadorProps {
   temArquivo: boolean
 }
 
-function DocumentoIndicador({ tipo, temDocumento, temArquivo }: DocumentoIndicadorProps) {
-  const config = {
-    NASCIMENTO: { label: 'Nascimento', abbrev: 'N' },
-    CASAMENTO: { label: 'Casamento', abbrev: 'C' },
-    OBITO: { label: 'Óbito', abbrev: 'O' }
+function DocumentoIndicador({ doc }: { doc: DocumentoArvore }) {
+  const tipoLabels: Record<string, string> = {
+    'CERTIDAO_NASCIMENTO_INTEIRO_TEOR': 'Nascimento',
+    'CERTIDAO_CASAMENTO_INTEIRO_TEOR': 'Casamento',
+    'CERTIDAO_OBITO_INTEIRO_TEOR': 'Óbito',
   }
-  
-  const { label, abbrev } = config[tipo]
-  
-  // Verde = tem arquivo, Amarelo = tem doc mas sem arquivo, Vermelho = não tem doc
-  let bgColor = '#EF4444' // vermelho
-  let statusText = 'Pendente'
-  
-  if (temArquivo) {
-    bgColor = '#22C55E' // verde
-    statusText = 'Anexado'
-  } else if (temDocumento) {
-    bgColor = '#F59E0B' // amarelo
-    statusText = 'Sem arquivo'
+
+  const statusConfig: Record<string, { color: string; label: string }> = {
+    'EM_BUSCA':    { color: '#EF4444', label: 'Em busca' },
+    'SOLICITAR':   { color: '#F59E0B', label: 'Solicitar' },
+    'SOLICITADO':  { color: '#22C55E', label: 'Solicitado' },
+    'RECEBIDO':    { color: '#3B82F6', label: 'Recebido' },
   }
-  
+
+  const config = statusConfig[doc.status]
+  if (!config) return null // PENDENTE = sem bolinha
+
+  const tipoLabel = tipoLabels[doc.tipo] || doc.tipo
+
   return (
     <div className="group/tooltip relative">
       <div
         className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold cursor-help transition-transform hover:scale-110 shadow-sm"
-        style={{ backgroundColor: bgColor }}
+        style={{ backgroundColor: config.color }}
       >
-        {abbrev}
+        {tipoLabel.charAt(0)}
       </div>
-      {/* Tooltip */}
       <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-[100] pointer-events-none shadow-lg">
-        {label}: {statusText}
+        {tipoLabel}: {config.label}
         <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900" />
       </div>
     </div>
@@ -223,49 +220,22 @@ interface DocumentosIndicadoresProps {
   temConjuge: boolean
 }
 
-function DocumentosIndicadores({ pessoa, temConjuge }: DocumentosIndicadoresProps) {
+function DocumentosIndicadores({ pessoa }: { pessoa: PessoaArvore }) {
   const documentos = pessoa.documentos || []
-  const falecido = isDeceased(pessoa)
-  
-  // Função para verificar documento por tipo
-  const verificarDocumento = (tipo: string) => {
-    const doc = documentos.find(d => d.tipo?.toUpperCase() === tipo)
-    return {
-      temDocumento: !!doc,
-      temArquivo: !!(doc?.arquivo_url)
-    }
-  }
-  
-  const nascimento = verificarDocumento('NASCIMENTO')
-  const casamento = verificarDocumento('CASAMENTO')
-  const obito = verificarDocumento('OBITO')
-  
+
+  // Filtrar só certidões civis que NÃO são PENDENTE
+  const docsVisiveis = documentos.filter(d => 
+    ['CERTIDAO_NASCIMENTO_INTEIRO_TEOR', 'CERTIDAO_CASAMENTO_INTEIRO_TEOR', 'CERTIDAO_OBITO_INTEIRO_TEOR'].includes(d.tipo) &&
+    d.status !== 'PENDENTE'
+  )
+
+  if (docsVisiveis.length === 0) return null
+
   return (
     <div className="absolute left-0 top-0 bottom-0 flex flex-col items-center justify-center gap-1.5 px-1.5 z-10" style={{ transform: 'translateX(-50%)' }}>
-      {/* Nascimento - sempre aparece */}
-      <DocumentoIndicador 
-        tipo="NASCIMENTO" 
-        temDocumento={nascimento.temDocumento}
-        temArquivo={nascimento.temArquivo}
-      />
-      
-      {/* Casamento - só aparece se tem cônjuge */}
-      {temConjuge && (
-        <DocumentoIndicador 
-          tipo="CASAMENTO" 
-          temDocumento={casamento.temDocumento}
-          temArquivo={casamento.temArquivo}
-        />
-      )}
-      
-      {/* Óbito - só aparece se falecido */}
-      {falecido && (
-        <DocumentoIndicador 
-          tipo="OBITO" 
-          temDocumento={obito.temDocumento}
-          temArquivo={obito.temArquivo}
-        />
-      )}
+      {docsVisiveis.map(doc => (
+        <DocumentoIndicador key={doc.id} doc={doc} />
+      ))}
     </div>
   )
 }
@@ -329,7 +299,7 @@ export function PessoaCard({
       }}
     >
       {/* ✅ NOVO: Indicadores de documentos na lateral */}
-      <DocumentosIndicadores pessoa={pessoa} temConjuge={temConjuge} />
+      <DocumentosIndicadores pessoa={pessoa} />
       
       {/* Pessoa principal */}
       <div
