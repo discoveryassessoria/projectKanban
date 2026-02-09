@@ -203,6 +203,19 @@ export async function GET(request: Request) {
       ]
     })
 
+    // =====================================================
+    // 🔒 FILTRO DE TAREFAS ACIONÁVEIS (só para usuários)
+    // Usuário só vê tarefas que pode agir AGORA:
+    //   - Em andamento (iniciada e não concluída)
+    //   - Próxima a iniciar (botão "Iniciar" visível)
+    // Esconde containers, atividades pai e subtarefas bloqueadas
+    // =====================================================
+    if (usuario && usuario.tipo !== 'admin' && !processoId) {
+      const tarefasAcionaveis = await filtrarTarefasAcionaveis(tarefas)
+      return NextResponse.json({ tarefas: tarefasAcionaveis })
+    }
+    // =====================================================
+
     return NextResponse.json({ tarefas })
   } catch (error) {
     console.error("Erro ao buscar tarefas:", error)
@@ -211,6 +224,93 @@ export async function GET(request: Request) {
       { status: 500 }
     )
   }
+}
+
+// =====================================================
+// 🔒 HELPER: Filtrar apenas tarefas acionáveis
+// Replica a lógica do frontend (TarefaDetailModal):
+//   - mostrarIniciar = !algumaEmAndamento && index === primeiraNaoIniciada
+// =====================================================
+async function filtrarTarefasAcionaveis(tarefas: any[]) {
+  // Passo 1: Separar tarefas "folha" de containers estruturais
+  // Um container tem subtarefas que NÃO são cobrança/conferência
+  const tarefasFolha = tarefas.filter((t: any) => {
+    const subs = t.subtarefas || []
+    if (subs.length === 0) return true // Sem filhos = é folha
+
+    // Se tem filhos que NÃO são cobrança/conferência, é container
+    const temFilhosEstruturais = subs.some((s: any) =>
+      !s.tipoSubtarefa || (s.tipoSubtarefa !== 'COBRANCA' && s.tipoSubtarefa !== 'CONFERENCIA')
+    )
+    return !temFilhosEstruturais
+  })
+
+  // Passo 2: Coletar todos os parentIds para buscar irmãs completas
+  // (irmãs podem ter responsáveis diferentes, então precisamos de TODAS)
+  const parentIds = [...new Set(
+    tarefasFolha
+      .filter((t: any) => t.tarefaPaiId)
+      .map((t: any) => t.tarefaPaiId as number)
+  )]
+
+  // Passo 3: Buscar todas as irmãs de cada pai (não apenas as do usuário)
+  let siblingsData: any[] = []
+  if (parentIds.length > 0) {
+    siblingsData = await prisma.tarefa.findMany({
+      where: {
+        tarefaPaiId: { in: parentIds }
+      },
+      select: {
+        id: true,
+        tarefaPaiId: true,
+        dataInicio: true,
+        concluida: true,
+        ordem: true,
+        createdAt: true
+      },
+      orderBy: [
+        { ordem: 'asc' },
+        { createdAt: 'asc' }
+      ]
+    })
+  }
+
+  // Agrupar irmãs por pai
+  const irmãsPorPai = new Map<number, typeof siblingsData>()
+  for (const s of siblingsData) {
+    if (s.tarefaPaiId) {
+      if (!irmãsPorPai.has(s.tarefaPaiId)) {
+        irmãsPorPai.set(s.tarefaPaiId, [])
+      }
+      irmãsPorPai.get(s.tarefaPaiId)!.push(s)
+    }
+  }
+
+  // Passo 4: Filtrar apenas tarefas acionáveis
+  const acionaveis = tarefasFolha.filter((t: any) => {
+    // Tarefas concluídas: esconder
+    if (t.concluida) return false
+
+    // Sem pai: se chegou até aqui como folha sem pai, provavelmente
+    // é uma tarefa avulsa - manter visível
+    if (!t.tarefaPaiId) return true
+
+    // ✅ Em andamento (iniciada e não concluída) → MOSTRAR
+    if (t.dataInicio && !t.concluida) return true
+
+    // Buscar todas as irmãs (mesma atividade pai)
+    const irmas = irmãsPorPai.get(t.tarefaPaiId) || []
+
+    // Se alguma irmã está em andamento, esta tarefa está bloqueada
+    const algumaEmAndamento = irmas.some((s: any) => !!s.dataInicio && !s.concluida)
+    if (algumaEmAndamento) return false
+
+    // ✅ É a primeira não-iniciada na ordem → MOSTRAR (botão "Iniciar")
+    const primeiraNaoIniciada = irmas.find((s: any) => !s.dataInicio && !s.concluida)
+    return primeiraNaoIniciada?.id === t.id
+  })
+
+  return acionaveis
 }
 
 // POST - Criar nova tarefa ou subtarefa
