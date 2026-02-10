@@ -354,8 +354,8 @@ export default function SettingsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
-                    <div>
+                  <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-white/5 border border-white/10">
+                    <div className="min-w-0">
                       <h3 className="font-medium text-white">Sair da conta</h3>
                       <p className="text-sm text-white/60">
                         Você será redirecionado para a página de login
@@ -364,7 +364,7 @@ export default function SettingsPage() {
                     <Button 
                       onClick={handleLogoutWithConfirm}
                       variant="outline"
-                      className="flex items-center gap-2 border-white/30 bg-white/10 text-white hover:bg-white/20"
+                      className="flex-shrink-0 flex items-center gap-2 border-white/30 bg-white/10 text-white hover:bg-white/20"
                     >
                       <LogOut className="h-4 w-4" />
                       Logout
