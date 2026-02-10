@@ -1,6 +1,7 @@
 // CRIAR EM: src/app/api/contas-pagar/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Buscar conta por ID
 export async function GET(
@@ -48,6 +49,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.contas_pagar')
+    if (erro) return erro
+
     const { id: idParam } = await params
     const id = parseInt(idParam)
     const body = await request.json()
@@ -87,6 +91,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.contas_pagar')
+    if (erro) return erro
+    
     const { id: idParam } = await params
     const id = parseInt(idParam)
 

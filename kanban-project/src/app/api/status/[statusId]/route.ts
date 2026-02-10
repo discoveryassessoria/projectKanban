@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ statusId: string }> }) {
   try {
@@ -34,6 +35,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ statusId: string }> }) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar_status')
+    if (erro) return erro
+
     const { statusId } = await params
     const body = await request.json()
     const { nome } = body
@@ -102,6 +106,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ statusId: string }> }) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar_status')
+    if (erro) return erro
+
     const { statusId } = await params
     const parsedStatusId = Number.parseInt(statusId)
 

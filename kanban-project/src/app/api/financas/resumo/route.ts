@@ -2,9 +2,13 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 export async function GET(request: NextRequest) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.dashboard')
+    if (erro) return erro
+
     const { searchParams } = new URL(request.url)
     const mes = searchParams.get("mes") // formato: "2026-01"
     

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { logTarefa } from "@/lib/auditoria"
 import { hojeBrasil } from "@/src/lib/date-utils"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 async function verificarEConcluirTarefaPai(tarefaPaiId: number) {
   const tarefaPai = await prisma.tarefa.findUnique({
@@ -60,6 +61,9 @@ export async function POST(
   { params }: { params: Promise<{ tarefaId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'tarefas.iniciar_concluir')
+    if (erro) return erro
+
     const { tarefaId } = await params
     const id = parseInt(tarefaId)
 

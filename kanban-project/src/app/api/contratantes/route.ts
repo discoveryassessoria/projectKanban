@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { logContratante } from "@/lib/auditoria"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Buscar todos os contratantes
 export async function GET(request: Request) {
@@ -43,6 +44,9 @@ export async function GET(request: Request) {
 // POST - Criar novo contratante
 export async function POST(request: Request) {
   try {
+    const erro = await verificarPermissao(request, 'clientes.criar')
+    if (erro) return erro
+
     const body = await request.json()
 
     // ✅ VALIDAÇÃO: Nome obrigatório

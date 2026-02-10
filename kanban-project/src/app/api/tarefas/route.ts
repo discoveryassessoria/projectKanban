@@ -6,6 +6,7 @@ import { PrioridadeTarefa, Pais } from "@prisma/client"
 import { logTarefa } from "@/lib/auditoria"
 import { toUTCNoon } from "@/src/lib/date-utils"
 import { extrairUsuarioKanban } from "@/lib/kanban-auth"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Buscar tarefas (com filtros opcionais)
 export async function GET(request: Request) {
@@ -316,6 +317,9 @@ async function filtrarTarefasAcionaveis(tarefas: any[]) {
 // POST - Criar nova tarefa ou subtarefa
 export async function POST(request: Request) {
   try {
+    const erro = await verificarPermissao(request, 'tarefas.criar')
+    if (erro) return erro
+
     const body = await request.json()
     const { 
       titulo, 

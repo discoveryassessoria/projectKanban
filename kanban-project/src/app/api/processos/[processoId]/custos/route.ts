@@ -3,6 +3,7 @@
 
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // Serviços padrão que serão criados automaticamente
 const SERVICOS_PADRAO = [
@@ -342,6 +343,9 @@ export async function POST(
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.criar')
+    if (erro) return erro
+
     const { processoId } = await params
     const procId = parseInt(processoId)
 
@@ -393,6 +397,9 @@ export async function PUT(
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.editar')
+    if (erro) return erro
+
     const { processoId } = await params
     const procId = parseInt(processoId)
 
@@ -448,6 +455,9 @@ export async function PATCH(
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.editar')
+    if (erro) return erro
+    
     const { ordens } = await request.json()
     
     // ordens é um array de { pessoaId: number, ordemCusto: number }

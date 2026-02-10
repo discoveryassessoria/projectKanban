@@ -1,6 +1,7 @@
 // app/api/eventos/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Buscar evento por ID
 export async function GET(
@@ -47,6 +48,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+
     const { id } = await params
     const eventoId = parseInt(id)
     const body = await request.json()
@@ -105,6 +109,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+    
     const { id } = await params
     const eventoId = parseInt(id)
 

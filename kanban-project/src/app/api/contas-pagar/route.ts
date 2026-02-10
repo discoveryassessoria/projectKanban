@@ -2,10 +2,13 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Listar contas a pagar
 export async function GET(request: NextRequest) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.contas_pagar')
+    if (erro) return erro
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status")
     const fornecedorId = searchParams.get("fornecedorId")
@@ -71,6 +74,9 @@ export async function GET(request: NextRequest) {
 // POST - Criar conta a pagar
 export async function POST(request: NextRequest) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.contas_pagar')
+    if (erro) return erro
+
     const body = await request.json()
 
     const conta = await prisma.contaPagar.create({

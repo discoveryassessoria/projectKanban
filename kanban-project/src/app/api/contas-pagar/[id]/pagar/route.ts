@@ -1,6 +1,7 @@
 // CRIAR EM: src/app/api/contas-pagar/[id]/pagar/route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // POST - Registrar pagamento
 export async function POST(
@@ -8,6 +9,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.contas_pagar')
+    if (erro) return erro
+    
     const { id: idParam } = await params
     const id = parseInt(idParam)
     const body = await request.json()

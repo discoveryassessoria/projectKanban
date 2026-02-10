@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // DELETE - Excluir anexo específico
 export async function DELETE(
@@ -9,6 +10,9 @@ export async function DELETE(
   { params }: { params: Promise<{ protocoloId: string; anexoId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+
     const { protocoloId, anexoId } = await params
     const protocoloIdNum = parseInt(protocoloId)
     const anexoIdNum = parseInt(anexoId)

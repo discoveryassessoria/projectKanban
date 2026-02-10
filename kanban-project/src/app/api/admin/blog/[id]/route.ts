@@ -2,7 +2,8 @@
 // CRIAR ARQUIVO: app/api/admin/blog/[id]/route.ts
 // ========================================
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { prisma } from '@/lib/prisma'
 
 // GET - Buscar post por ID
@@ -29,10 +30,13 @@ export async function GET(
 
 // PUT - Atualizar post
 export async function PUT(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'usuarios.gerenciar')
+    if (erro) return erro
+
     const { id } = await params
     const data = await request.json()
     
@@ -72,10 +76,13 @@ export async function PUT(
 
 // DELETE - Excluir post
 export async function DELETE(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'usuarios.gerenciar')
+    if (erro) return erro
+
     const { id } = await params
     
     await prisma.blogPost.delete({

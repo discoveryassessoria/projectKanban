@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -48,6 +49,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+
     const { id: idParam } = await params
 
     if (!idParam) {
@@ -125,6 +129,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+    
     const { id: idParam } = await params
 
     if (!idParam) {

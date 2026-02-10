@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { hojeBrasil, hojeBrasilMaisDias } from "@/src/lib/date-utils"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 async function iniciarProximaSubtarefa(tarefaConcluidaId: number, tarefaPaiId: number) {
   console.log("🔄 [COBRANCA] iniciarProximaSubtarefa chamada:", { tarefaConcluidaId, tarefaPaiId })
@@ -86,6 +87,9 @@ export async function POST(
   { params }: { params: Promise<{ tarefaId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'tarefas.iniciar_concluir')
+    if (erro) return erro
+
     const { tarefaId } = await params
     const id = parseInt(tarefaId)
 

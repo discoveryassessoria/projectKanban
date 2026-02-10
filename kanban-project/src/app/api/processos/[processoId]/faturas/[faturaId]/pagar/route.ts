@@ -3,12 +3,16 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ processoId: string; faturaId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.editar')
+    if (erro) return erro
+
     const { processoId, faturaId } = await params
     const pId = parseInt(processoId)
     const fId = parseInt(faturaId)

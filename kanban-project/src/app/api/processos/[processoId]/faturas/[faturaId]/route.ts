@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Buscar fatura específica
 export async function GET(
@@ -64,6 +65,9 @@ export async function PUT(
   { params }: { params: Promise<{ processoId: string; faturaId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.editar')
+    if (erro) return erro
+
     const { processoId, faturaId } = await params
     const pId = parseInt(processoId)
     const fId = parseInt(faturaId)
@@ -127,6 +131,9 @@ export async function DELETE(
   { params }: { params: Promise<{ processoId: string; faturaId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.editar')
+    if (erro) return erro
+
     const { processoId, faturaId } = await params
     const pId = parseInt(processoId)
     const fId = parseInt(faturaId)

@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Buscar anexos de um protocolo
 export async function GET(
@@ -40,6 +41,9 @@ export async function POST(
   { params }: { params: Promise<{ protocoloId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+
     const { protocoloId } = await params
     const id = parseInt(protocoloId)
 
@@ -100,6 +104,9 @@ export async function DELETE(
   { params }: { params: Promise<{ protocoloId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+
     const { protocoloId } = await params
     const id = parseInt(protocoloId)
 

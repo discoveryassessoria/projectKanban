@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { NextRequest, NextResponse } from "next/server"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // POST - Salvar anexo
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { nome, nomeArquivo, urlArquivo, tamanho, mimeType, tipoCliente, contratanteId, requerenteId, categoria } = body
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
 }
 
 // GET - Buscar anexos por cliente
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const tipoCliente = searchParams.get("tipoCliente")
@@ -83,7 +84,7 @@ export async function GET(request: Request) {
 }
 
 // DELETE - Excluir anexo
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const tipoCliente = searchParams.get("tipoCliente")

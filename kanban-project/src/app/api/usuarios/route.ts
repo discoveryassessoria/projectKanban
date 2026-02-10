@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // Função auxiliar para verificar autenticação
 function verifyAuth(request: NextRequest): { isAuthenticated: boolean; isAdmin: boolean } {
@@ -29,6 +30,9 @@ function verifyAuth(request: NextRequest): { isAuthenticated: boolean; isAdmin: 
 
 export async function GET(request: NextRequest) {
   try {
+    const erro = await verificarPermissao(request, 'usuarios.gerenciar')
+    if (erro) return erro
+    
     const { isAuthenticated, isAdmin } = verifyAuth(request)
 
     if (!isAuthenticated) {

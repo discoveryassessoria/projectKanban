@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Listar todas as uniões
 export async function GET(request: NextRequest) {
@@ -45,6 +46,9 @@ export async function GET(request: NextRequest) {
 // POST - Criar nova união
 export async function POST(request: NextRequest) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+    
     const body = await request.json()
 
     const {

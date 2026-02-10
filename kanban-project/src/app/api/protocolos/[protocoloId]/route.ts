@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Consulado } from "@prisma/client"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Buscar protocolo por ID
 export async function GET(
@@ -72,6 +73,9 @@ export async function PUT(
   { params }: { params: Promise<{ protocoloId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+
     const { protocoloId } = await params
     const id = parseInt(protocoloId)
 
@@ -180,6 +184,9 @@ export async function DELETE(
   { params }: { params: Promise<{ protocoloId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+
     const { protocoloId } = await params
     const id = parseInt(protocoloId)
 

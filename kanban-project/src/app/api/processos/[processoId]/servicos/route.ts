@@ -2,6 +2,7 @@
 
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Listar tipos de serviço do processo
 export async function GET(
@@ -34,6 +35,9 @@ export async function POST(
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+
     const { processoId } = await params
     const id = parseInt(processoId)
 

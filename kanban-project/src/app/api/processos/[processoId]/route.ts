@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { logProcesso } from "@/lib/auditoria"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Buscar processo por ID
 export async function GET(
@@ -84,6 +85,9 @@ export async function PUT(
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+
     const { processoId } = await params
     const id = parseInt(processoId)
 
@@ -261,6 +265,9 @@ export async function DELETE(
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'processos.excluir')
+    if (erro) return erro
+
     const { processoId } = await params
     const id = parseInt(processoId)
 

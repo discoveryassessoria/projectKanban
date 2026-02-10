@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
 import { Decimal } from "@prisma/client/runtime/library"
 import { gerarVencimentosParcelas } from "@/src/lib/diasUteis"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // ========================================
 // HELPER: Converter Decimal para number
@@ -254,6 +255,9 @@ export async function POST(
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.criar')
+    if (erro) return erro
+
     const { processoId } = await params
     const processoIdNum = parseInt(processoId)
     

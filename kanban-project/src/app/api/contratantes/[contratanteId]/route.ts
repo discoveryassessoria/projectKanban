@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { logContratante } from "@/lib/auditoria"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Buscar contratante por ID
 export async function GET(
@@ -63,6 +64,9 @@ export async function PUT(
   { params }: { params: Promise<{ contratanteId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'clientes.editar')
+    if (erro) return erro
+
     const { contratanteId } = await params
     const id = parseInt(contratanteId)
 
@@ -152,6 +156,9 @@ export async function DELETE(
   { params }: { params: Promise<{ contratanteId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'clientes.excluir')
+    if (erro) return erro
+
     const { contratanteId } = await params
     const id = parseInt(contratanteId)
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { PrioridadeTarefa } from "@prisma/client"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 export async function GET(
   request: Request,
@@ -87,6 +88,9 @@ export async function POST(
   { params }: { params: Promise<{ tarefaId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'tarefas.criar')
+    if (erro) return erro
+
     const { tarefaId } = await params
     const tarefaPaiId = parseInt(tarefaId)
 
@@ -234,6 +238,9 @@ export async function PUT(
   { params }: { params: Promise<{ tarefaId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'tarefas.editar')
+    if (erro) return erro
+
     const { tarefaId } = await params
     const tarefaPaiId = parseInt(tarefaId)
 

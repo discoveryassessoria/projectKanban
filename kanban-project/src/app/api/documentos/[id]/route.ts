@@ -4,6 +4,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma, TipoDocumento, StatusDocumento } from "@prisma/client"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // Helper para obter label do tipo de documento
 function getTipoDocumentoLabel(tipo: string): string {
@@ -138,6 +139,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 // PUT - Atualizar documento
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+
     const { id: idParam } = await params
     const id = Number.parseInt(idParam)
 
@@ -272,6 +276,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 // DELETE - Excluir documento E tarefas relacionadas
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+
     const { id: idParam } = await params
     const id = Number.parseInt(idParam)
 
@@ -364,6 +371,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 // PATCH - Atualizar status do documento (atalho)
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+    
     const { id: idParam } = await params
     const id = Number.parseInt(idParam)
 

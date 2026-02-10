@@ -2,12 +2,16 @@
 
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ processoId: string; faturaId: string; parcelaId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.editar')
+    if (erro) return erro
+
     const { processoId, faturaId, parcelaId } = await params
     const parcelaIdNum = parseInt(parcelaId)
     const faturaIdNum = parseInt(faturaId)
@@ -74,6 +78,9 @@ export async function DELETE(
   { params }: { params: Promise<{ processoId: string; faturaId: string; parcelaId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.editar')
+    if (erro) return erro
+
     const { processoId, faturaId, parcelaId } = await params
     const parcelaIdNum = parseInt(parcelaId)
     const faturaIdNum = parseInt(faturaId)

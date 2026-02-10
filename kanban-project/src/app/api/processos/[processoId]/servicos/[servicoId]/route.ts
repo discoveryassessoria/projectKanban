@@ -2,6 +2,7 @@
 
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // DELETE - Remover tipo de serviço
 export async function DELETE(
@@ -9,6 +10,9 @@ export async function DELETE(
   { params }: { params: Promise<{ processoId: string; servicoId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+
     const { processoId, servicoId } = await params
     const procId = parseInt(processoId)
     const servId = parseInt(servicoId)
@@ -47,6 +51,9 @@ export async function PUT(
   { params }: { params: Promise<{ processoId: string; servicoId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+
     const { processoId, servicoId } = await params
     const procId = parseInt(processoId)
     const servId = parseInt(servicoId)

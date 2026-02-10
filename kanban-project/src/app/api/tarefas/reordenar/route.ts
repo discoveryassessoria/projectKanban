@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // PUT /api/tarefas/reordenar
 export async function PUT(request: NextRequest) {
   try {
+    const erro = await verificarPermissao(request, 'tarefas.editar')
+    if (erro) return erro
+
     const body = await request.json()
     const { tarefas } = body
 

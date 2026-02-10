@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Pais } from "@prisma/client"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Buscar status (filtrado por país)
 export async function GET(request: Request) {
@@ -33,6 +34,9 @@ export async function GET(request: Request) {
 // POST - Criar novo status
 export async function POST(request: Request) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar_status')
+    if (erro) return erro
+
     const body = await request.json()
     const { nome, pais } = body
 

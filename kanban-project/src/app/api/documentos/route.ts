@@ -4,6 +4,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { TipoDocumento, StatusDocumento } from "@prisma/client"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // Helper para obter label do tipo de documento
 function getTipoDocumentoLabel(tipo: string): string {
@@ -89,6 +90,9 @@ export async function GET(request: NextRequest) {
 // POST - Criar novo documento (COM AUTOMAÇÃO)
 export async function POST(request: NextRequest) {
   try {
+    const erro = await verificarPermissao(request, 'processos.editar')
+    if (erro) return erro
+    
     const body = await request.json()
 
     const {

@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { hash } from "bcrypt"
 import { UserType } from "@/src/utils/userTypes"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // Função auxiliar para verificar se o usuário é admin
 function verifyAdmin(request: NextRequest): { isAdmin: boolean; userId?: number; tipo?: string } {
@@ -33,6 +34,9 @@ function verifyAdmin(request: NextRequest): { isAdmin: boolean; userId?: number;
 // PUT - Atualizar usuário
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const erro = await verificarPermissao(request, 'usuarios.gerenciar')
+    if (erro) return erro
+
     const { isAdmin, userId: requesterId } = verifyAdmin(request)
 
     if (!isAdmin) {
@@ -112,6 +116,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 // DELETE - Deletar usuário
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const erro = await verificarPermissao(request, 'usuarios.gerenciar')
+    if (erro) return erro
+    
     const { isAdmin, userId: requesterId, tipo: requesterTipo } = verifyAdmin(request)
 
     const { id: idParam } = await params

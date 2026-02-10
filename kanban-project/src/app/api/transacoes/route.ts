@@ -2,10 +2,14 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Listar transações
 export async function GET(request: NextRequest) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.ver')
+    if (erro) return erro
+    
     const { searchParams } = new URL(request.url)
     const tipo = searchParams.get("tipo") // ENTRADA ou SAIDA
     const contaBancariaId = searchParams.get("contaBancariaId")
@@ -63,6 +67,9 @@ export async function GET(request: NextRequest) {
 // POST - Criar transação manual
 export async function POST(request: NextRequest) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.editar')
+    if (erro) return erro
+    
     const body = await request.json()
 
     const valor = parseFloat(body.valor)

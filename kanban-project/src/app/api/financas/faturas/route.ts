@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Decimal } from "@prisma/client/runtime/library"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 function toNumber(value: Decimal | number | string | null | undefined): number {
   if (value === null || value === undefined) return 0
@@ -20,6 +21,9 @@ function converterParaBRL(valor: number, moeda: string, cambio: number | null): 
 // GET - Listar TODAS as faturas de todos os processos
 export async function GET(request: NextRequest) {
   try {
+    const erro = await verificarPermissao(request, 'financeiro.ver')
+    if (erro) return erro
+
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status")
     const pais = searchParams.get("pais")
