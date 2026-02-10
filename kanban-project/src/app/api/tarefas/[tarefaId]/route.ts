@@ -7,6 +7,7 @@ import { logTarefa } from "@/lib/auditoria"
 import { toUTCNoon } from "@/src/lib/date-utils"
 import { hojeBrasil } from "@/src/lib/date-utils"
 import { hojeBrasilMaisDias } from "@/src/lib/date-utils"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 async function verificarEConcluirTarefaPai(tarefaPaiId: number) {
   const tarefaPai = await prisma.tarefa.findUnique({
@@ -209,6 +210,9 @@ export async function PUT(
   { params }: { params: Promise<{ tarefaId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'tarefas.editar')
+    if (erro) return erro
+
     const { tarefaId } = await params
     const id = parseInt(tarefaId)
 
@@ -392,6 +396,9 @@ export async function DELETE(
   { params }: { params: Promise<{ tarefaId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'tarefas.excluir')
+    if (erro) return erro
+
     const { tarefaId } = await params
     const id = parseInt(tarefaId)
 

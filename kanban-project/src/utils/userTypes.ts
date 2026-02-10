@@ -1,11 +1,13 @@
 export enum UserType {
   ADMIN = "admin",
-  USUARIO = "usuario",
-  GESTOR = "gestor"
+  GERENTE = "gerente",
+  ASSISTENTE = "assistente",
+  ESTAGIARIO = "estagiario"
 }
 
 export const userTypeLabels = {
   [UserType.ADMIN]: "Administrador",
-  [UserType.USUARIO]: "Usuário",
-  [UserType.GESTOR]: "Gestor"
+  [UserType.GERENTE]: "Gerente",
+  [UserType.ASSISTENTE]: "Assistente",
+  [UserType.ESTAGIARIO]: "Estagiário"
 }

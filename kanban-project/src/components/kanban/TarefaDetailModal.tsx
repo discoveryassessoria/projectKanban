@@ -32,6 +32,7 @@ import {
   AlertCircle
 } from "lucide-react"
 import { isPast, formatDateBR } from "@/src/lib/date-utils"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 // ==========================================
 // STYLES (reusados do ProcessoTarefas)
@@ -144,6 +145,7 @@ interface SubtarefaLineProps {
 }
 
 function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mostrarBotaoIniciar = true }: SubtarefaLineProps) {
+  const { pode } = usePermissoes()
   const [processando, setProcessando] = useState(false)
   const [expandido, setExpandido] = useState(false)
   const [editando, setEditando] = useState(false)
@@ -413,7 +415,7 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
         )}
 
         {/* Delete button */}
-        <button
+        {pode('tarefas.excluir') && <button
           onClick={async () => {
             if (!confirm("Excluir esta subtarefa?")) return
             try {
@@ -427,6 +429,7 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
         >
           <Trash2 className="w-4 h-4" />
         </button>
+        }
 
         {/* Expand toggle */}
         <button
@@ -494,6 +497,7 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
 // COMPONENTE PRINCIPAL: TarefaDetailModal
 // ==========================================
 export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcuracaoAdm = false }: TarefaDetailModalProps) {
+  const { pode } = usePermissoes()
   const [editandoTitulo, setEditandoTitulo] = useState(false)
   const [tituloEditado, setTituloEditado] = useState(tarefa.titulo)
   const [salvandoTitulo, setSalvandoTitulo] = useState(false)
@@ -905,7 +909,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                 )}
 
                 {/* Add subtarefa */}
-                <div className="flex items-center gap-2 mt-3">
+                {pode('tarefas.criar') && <div className="flex items-center gap-2 mt-3">
                   <Input
                     placeholder="Adicionar subtarefa..."
                     value={novaTarefa}
@@ -918,6 +922,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                     {criandoTarefa ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                   </Button>
                 </div>
+                }
               </div>
             </div>
           </div>

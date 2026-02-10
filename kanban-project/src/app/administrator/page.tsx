@@ -2,7 +2,7 @@
 
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useIsAdmin } from "@/src/hooks/use-is-admin"
 import { Button } from "@/components/ui/button"
@@ -29,16 +29,114 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { UserPlus, Pencil, Trash2, Search, Shield, User, Users } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { UserPlus, Pencil, Trash2, Search, Shield, User, Users, ChevronDown, ChevronUp, Lock, RotateCcw } from "lucide-react"
 import { UserType, userTypeLabels } from "@/src/utils/userTypes"
 import { getUsers, createUser, updateUser, deleteUser } from "@/src/services/userService"
 import { HeaderBar } from "@/src/components/header-bar"
+
+// ========================================
+// CONSTANTES DE PERMISSÕES (mesmo mapa do permissoes.ts)
+// ========================================
+const MODULOS_PERMISSOES = [
+  {
+    modulo: 'Tarefas',
+    icone: '✅',
+    permissoes: [
+      { chave: 'tarefas.ver', label: 'Ver tarefas' },
+      { chave: 'tarefas.criar', label: 'Criar tarefas' },
+      { chave: 'tarefas.editar', label: 'Editar tarefas' },
+      { chave: 'tarefas.excluir', label: 'Excluir tarefas' },
+      { chave: 'tarefas.iniciar_concluir', label: 'Iniciar e concluir tarefas' },
+    ],
+  },
+  {
+    modulo: 'Processos',
+    icone: '📋',
+    permissoes: [
+      { chave: 'processos.ver', label: 'Ver processos' },
+      { chave: 'processos.criar', label: 'Criar processos' },
+      { chave: 'processos.editar', label: 'Editar processos' },
+      { chave: 'processos.editar_status', label: 'Alterar status/etapa' },
+      { chave: 'processos.excluir', label: 'Excluir processos' },
+    ],
+  },
+  {
+    modulo: 'Clientes / Cadastros',
+    icone: '👤',
+    permissoes: [
+      { chave: 'clientes.ver', label: 'Ver contratantes e requerentes' },
+      { chave: 'clientes.criar', label: 'Cadastrar clientes' },
+      { chave: 'clientes.editar', label: 'Editar dados cadastrais' },
+      { chave: 'clientes.excluir', label: 'Excluir clientes' },
+    ],
+  },
+  {
+    modulo: 'Financeiro',
+    icone: '💰',
+    permissoes: [
+      { chave: 'financeiro.ver', label: 'Ver faturas e pagamentos' },
+      { chave: 'financeiro.criar', label: 'Criar faturas' },
+      { chave: 'financeiro.editar', label: 'Editar faturas' },
+      { chave: 'financeiro.dashboard', label: 'Ver dashboard financeiro' },
+      { chave: 'financeiro.contas_pagar', label: 'Gerenciar contas a pagar' },
+    ],
+  },
+  {
+    modulo: 'Mensagens',
+    icone: '💬',
+    permissoes: [
+      { chave: 'mensagens.ver', label: 'Ver mensagens' },
+      { chave: 'mensagens.responder', label: 'Responder mensagens' },
+    ],
+  },
+  {
+    modulo: 'Eventos',
+    icone: '📅',
+    permissoes: [
+      { chave: 'eventos.ver', label: 'Ver eventos' },
+      { chave: 'eventos.criar', label: 'Criar eventos' },
+      { chave: 'eventos.editar', label: 'Editar eventos' },
+      { chave: 'eventos.excluir', label: 'Excluir eventos' },
+    ],
+  },
+  {
+    modulo: 'Árvore Genealógica',
+    icone: '🌳',
+    permissoes: [
+      { chave: 'arvore.ver', label: 'Ver árvore' },
+      { chave: 'arvore.editar', label: 'Editar árvore' },
+    ],
+  },
+  {
+    modulo: 'Administração',
+    icone: '🛡️',
+    permissoes: [
+      { chave: 'usuarios.gerenciar', label: 'Gerenciar usuários' },
+    ],
+  },
+]
+
+// Todas as chaves de permissão
+const TODAS_CHAVES = MODULOS_PERMISSOES.flatMap(m => m.permissoes.map(p => p.chave))
 
 interface Usuario {
   id: number
   nome: string
   email: string
   tipo: string
+  perfilId?: number | null
+  perfilNome?: string | null
+}
+
+interface Perfil {
+  id: number
+  nome: string
+  descricao: string | null
+  cor: string | null
+  sistema: boolean
+  permissoes: Record<string, boolean>
+  _count?: { usuarios: number }
 }
 
 interface UserData {
@@ -52,6 +150,7 @@ export default function AdministratorPage() {
   const { isAdmin, isLoading: isAdminLoading } = useIsAdmin()
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  const [perfis, setPerfis] = useState<Perfil[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [error, setError] = useState("")
@@ -75,6 +174,13 @@ export default function AdministratorPage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Estados para permissões no modal
+  const [selectedPerfilId, setSelectedPerfilId] = useState<number | null>(null)
+  const [permissoesEfetivas, setPermissoesEfetivas] = useState<Record<string, boolean>>({})
+  const [permissoesCustom, setPermissoesCustom] = useState<Record<string, boolean>>({})
+  const [showPermissoes, setShowPermissoes] = useState(false)
+  const [expandedModulos, setExpandedModulos] = useState<string[]>([])
+
   // Estados para modal de confirmação de exclusão
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<Usuario | null>(null)
@@ -85,10 +191,25 @@ export default function AdministratorPage() {
     router.push("/login")
   }
 
+  // Buscar perfis disponíveis
+  const fetchPerfis = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("authToken")
+      const response = await fetch("/api/perfis", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setPerfis(data.perfis || [])
+      }
+    } catch (error) {
+      console.error("Erro ao buscar perfis:", error)
+    }
+  }, [])
+
   useEffect(() => {
-    // Carregar usuário do localStorage
-    if (typeof window !== 'undefined') {
-      const storedUser = localStorage.getItem('user')
+    if (typeof window !== "undefined") {
+      const storedUser = localStorage.getItem("user")
       if (storedUser) {
         try {
           setUser(JSON.parse(storedUser))
@@ -109,22 +230,21 @@ export default function AdministratorPage() {
     }
 
     fetchHeaderData()
-  }, [isAdmin, isAdminLoading, router])
+    fetchPerfis()
+  }, [isAdmin, isAdminLoading, router, fetchPerfis])
 
   const fetchHeaderData = async () => {
     try {
       const [projetosRes, processosRes, arvoresRes] = await Promise.all([
         fetch("/api/projetos"),
         fetch("/api/processos"),
-        fetch("/api/arvore")
+        fetch("/api/arvore"),
       ])
 
-      // Verificar se as respostas foram bem-sucedidas antes de fazer parse
       if (projetosRes.ok) {
         const projetosData = await projetosRes.json()
         setProjetos(projetosData.projetos || [])
       } else {
-        console.warn("Erro ao buscar projetos:", projetosRes.status)
         setProjetos([])
       }
 
@@ -132,7 +252,6 @@ export default function AdministratorPage() {
         const processosData = await processosRes.json()
         setProcessos(processosData.processos || [])
       } else {
-        console.warn("Erro ao buscar processos:", processosRes.status)
         setProcessos([])
       }
 
@@ -140,12 +259,10 @@ export default function AdministratorPage() {
         const arvoresData = await arvoresRes.json()
         setArvores(Array.isArray(arvoresData) ? arvoresData : [])
       } else {
-        console.warn("Erro ao buscar árvores:", arvoresRes.status)
         setArvores([])
       }
     } catch (error) {
       console.error("Erro ao buscar dados:", error)
-      // Garantir que os estados são arrays vazios em caso de erro
       setProjetos([])
       setProcessos([])
       setArvores([])
@@ -157,22 +274,18 @@ export default function AdministratorPage() {
     try {
       setIsLoading(true)
       setError("")
-      
-      // Verificar se tem token antes de tentar carregar
+
       const token = localStorage.getItem("authToken")
       if (!token) {
-        console.warn("Token não encontrado, aguardando autenticação...")
         setUsuarios([])
         return
       }
-      
+
       const users = await getUsers(searchTerm)
       const validUsers = users.filter((u): u is Usuario => u.id !== undefined) as Usuario[]
       setUsuarios(validUsers)
     } catch (err: any) {
-      // Não mostrar erro de autenticação na UI - apenas log
       if (err.message?.includes("autenticado") || err.message?.includes("401")) {
-        console.warn("Erro de autenticação:", err.message)
         setUsuarios([])
       } else {
         setError(err.message || "Erro ao carregar usuários")
@@ -183,14 +296,12 @@ export default function AdministratorPage() {
   }
 
   useEffect(() => {
-    // Só carregar usuários quando for admin E tiver token
     const token = localStorage.getItem("authToken")
     if (isAdmin && token) {
       loadUsers()
     }
   }, [isAdmin])
 
-  // Buscar com debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       const token = localStorage.getItem("authToken")
@@ -202,18 +313,121 @@ export default function AdministratorPage() {
     return () => clearTimeout(timer)
   }, [searchTerm])
 
-  // Abrir modal para criar usuário
+  // ========================================
+  // LÓGICA DE PERMISSÕES
+  // ========================================
+
+  // Quando muda o perfil selecionado, recalcular permissões efetivas
+  useEffect(() => {
+    const perfil = perfis.find((p) => p.id === selectedPerfilId)
+    const perfilPerms = perfil?.permissoes || {}
+
+    // Começar com tudo false
+    const resultado: Record<string, boolean> = {}
+    for (const chave of TODAS_CHAVES) {
+      resultado[chave] = false
+    }
+
+    // Aplicar permissões do perfil
+    for (const [key, value] of Object.entries(perfilPerms)) {
+      if (key in resultado) {
+        resultado[key] = !!value
+      }
+    }
+
+    // Aplicar overrides custom
+    for (const [key, value] of Object.entries(permissoesCustom)) {
+      if (key in resultado) {
+        resultado[key] = !!value
+      }
+    }
+
+    // Se tipo é admin, tudo true
+    if (formData.tipo === "admin") {
+      for (const chave of TODAS_CHAVES) {
+        resultado[chave] = true
+      }
+    }
+
+    setPermissoesEfetivas(resultado)
+  }, [selectedPerfilId, permissoesCustom, perfis, formData.tipo])
+
+  // Toggle de uma permissão individual (cria override)
+  const togglePermissao = (chave: string) => {
+    if (formData.tipo === "admin") return // Admin não pode alterar
+
+    const perfil = perfis.find((p) => p.id === selectedPerfilId)
+    const valorPerfil = !!(perfil?.permissoes as Record<string, boolean>)?.[chave]
+    const valorAtual = permissoesEfetivas[chave]
+    const novoValor = !valorAtual
+
+    // Se o novo valor é igual ao do perfil, remover o override
+    if (novoValor === valorPerfil) {
+      const novoCustom = { ...permissoesCustom }
+      delete novoCustom[chave]
+      setPermissoesCustom(novoCustom)
+    } else {
+      // Criar override
+      setPermissoesCustom({ ...permissoesCustom, [chave]: novoValor })
+    }
+  }
+
+  // Verificar se uma permissão tem override
+  const temOverride = (chave: string): boolean => {
+    return chave in permissoesCustom
+  }
+
+  // Resetar todas as customizações
+  const resetarCustom = () => {
+    setPermissoesCustom({})
+  }
+
+  // Toggle módulo inteiro
+  const toggleModulo = (modulo: typeof MODULOS_PERMISSOES[0]) => {
+    if (formData.tipo === "admin") return
+
+    const todasAtivas = modulo.permissoes.every((p) => permissoesEfetivas[p.chave])
+    const novoValor = !todasAtivas
+
+    const novoCustom = { ...permissoesCustom }
+    for (const perm of modulo.permissoes) {
+      const perfil = perfis.find((p) => p.id === selectedPerfilId)
+      const valorPerfil = !!(perfil?.permissoes as Record<string, boolean>)?.[perm.chave]
+
+      if (novoValor === valorPerfil) {
+        delete novoCustom[perm.chave]
+      } else {
+        novoCustom[perm.chave] = novoValor
+      }
+    }
+    setPermissoesCustom(novoCustom)
+  }
+
+  // Expand/collapse módulo
+  const toggleExpandModulo = (modulo: string) => {
+    setExpandedModulos((prev) =>
+      prev.includes(modulo) ? prev.filter((m) => m !== modulo) : [...prev, modulo]
+    )
+  }
+
+  // ========================================
+  // HANDLERS DE MODAL
+  // ========================================
+
   const handleCreate = () => {
     setIsEditing(false)
     setCurrentUser(null)
     setFormData({ nome: "", email: "", senha: "", tipo: "" })
+    setSelectedPerfilId(null)
+    setPermissoesCustom({})
+    setShowPermissoes(false)
+    setExpandedModulos([])
     setIsDialogOpen(true)
     setError("")
     setSuccess("")
   }
 
-  // Abrir modal para editar usuário
-  const handleEdit = (usuario: Usuario) => {
+  const handleEdit = async (usuario: Usuario) => {
     setIsEditing(true)
     setCurrentUser(usuario)
     setFormData({
@@ -222,12 +436,33 @@ export default function AdministratorPage() {
       senha: "",
       tipo: usuario.tipo,
     })
-    setIsDialogOpen(true)
+    setShowPermissoes(false)
+    setExpandedModulos([])
     setError("")
     setSuccess("")
+
+    // Buscar permissões atuais do usuário
+    try {
+      const token = localStorage.getItem("authToken")
+      const response = await fetch(`/api/usuarios/${usuario.id}/permissoes`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setSelectedPerfilId(data.usuario.perfilId || null)
+        setPermissoesCustom(data.permissoesCustom || {})
+      } else {
+        setSelectedPerfilId(null)
+        setPermissoesCustom({})
+      }
+    } catch {
+      setSelectedPerfilId(null)
+      setPermissoesCustom({})
+    }
+
+    setIsDialogOpen(true)
   }
 
-  // Abrir modal de confirmação de exclusão
   const handleDeleteClick = (usuario: Usuario) => {
     setUserToDelete(usuario)
     setIsDeleteDialogOpen(true)
@@ -235,7 +470,6 @@ export default function AdministratorPage() {
     setSuccess("")
   }
 
-  // Confirmar exclusão
   const confirmDelete = async () => {
     if (!userToDelete) return
 
@@ -254,14 +488,18 @@ export default function AdministratorPage() {
     }
   }
 
-  // Submeter formulário (criar ou editar)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setSuccess("")
 
-    if (!formData.nome || !formData.email || !formData.tipo) {
+    if (!formData.nome || !formData.email) {
       setError("Preencha todos os campos obrigatórios")
+      return
+    }
+
+    if (!formData.tipo) {
+      setError("Selecione um perfil de permissões")
       return
     }
 
@@ -279,12 +517,30 @@ export default function AdministratorPage() {
           email: formData.email,
           tipo: formData.tipo,
         }
-        
+
         if (formData.senha) {
           dataToUpdate.senha = formData.senha
         }
 
         await updateUser(currentUser.id, dataToUpdate)
+
+        // Salvar permissões
+        if (formData.tipo !== "admin") {
+          const token = localStorage.getItem("authToken")
+          const temCustom = Object.keys(permissoesCustom).length > 0
+          await fetch(`/api/usuarios/${currentUser.id}/permissoes`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              perfilId: selectedPerfilId,
+              permissoesCustom: temCustom ? permissoesCustom : null,
+            }),
+          })
+        }
+
         setSuccess("Usuário atualizado com sucesso!")
       } else {
         await createUser({
@@ -293,6 +549,9 @@ export default function AdministratorPage() {
           senha: formData.senha,
           tipo: formData.tipo,
         })
+
+        // TODO: Se quiser já atribuir perfil na criação,
+        // precisa buscar o ID do novo usuário e chamar a rota de permissões
         setSuccess("Usuário criado com sucesso!")
       }
 
@@ -306,12 +565,15 @@ export default function AdministratorPage() {
     }
   }
 
-  // Obter badge de tipo
+  // ========================================
+  // BADGES E UI HELPERS
+  // ========================================
+
   const getBadgeVariant = (tipo: string): "default" | "secondary" | "outline" => {
     switch (tipo) {
       case UserType.ADMIN:
         return "default"
-      case UserType.GESTOR:
+      case UserType.GERENTE:
         return "secondary"
       default:
         return "outline"
@@ -322,12 +584,33 @@ export default function AdministratorPage() {
     switch (tipo) {
       case UserType.ADMIN:
         return <Shield className="h-3 w-3 mr-1" />
-      case UserType.GESTOR:
+      case UserType.GERENTE:
         return <Users className="h-3 w-3 mr-1" />
       default:
         return <User className="h-3 w-3 mr-1" />
     }
   }
+
+  const getPerfilBadge = (usuario: Usuario) => {
+    if (usuario.tipo === "admin") return null
+    if (!usuario.perfilNome) return null
+
+    const perfil = perfis.find((p) => p.nome === usuario.perfilNome)
+    return (
+      <span
+        className="text-[10px] font-medium px-1.5 py-0.5 rounded-full ml-2"
+        style={{
+          backgroundColor: `${perfil?.cor || "#6B7280"}20`,
+          color: perfil?.cor || "#6B7280",
+        }}
+      >
+        {usuario.perfilNome}
+      </span>
+    )
+  }
+
+  // Contar overrides
+  const totalOverrides = Object.keys(permissoesCustom).length
 
   if (isAdminLoading) {
     return (
@@ -348,7 +631,7 @@ export default function AdministratorPage() {
   }
 
   return (
-    <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
+    <div className="relative min-h-screen text-white overflow-hidden">
       {/* BACKGROUND FIXO */}
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
 
@@ -358,7 +641,7 @@ export default function AdministratorPage() {
         subtitle="Crie e gerencie usuários do sistema"
         userName={user.nome}
         userRole="Administrador"
-        userEmail={user.email || ''}
+        userEmail={user.email || ""}
         projetos={projetos}
         processos={processos}
         arvores={arvores}
@@ -368,7 +651,7 @@ export default function AdministratorPage() {
       {/* CONTEÚDO COM OVERLAY */}
       <div className="min-h-screen relative">
         <div className="absolute inset-0 bg-black/40 pointer-events-none" />
-        
+
         <main className="relative px-6 py-8 max-w-7xl mx-auto space-y-6">
           {/* Ações do topo */}
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-end">
@@ -380,14 +663,14 @@ export default function AdministratorPage() {
 
           {/* Mensagens de feedback */}
           {error && (
-            <Alert variant="destructive" className="bg-red-500/20 border-red-500/50 text-white">
-              <AlertDescription>{error}</AlertDescription>
+            <Alert className="bg-red-500/20 border-red-500/50 text-white">
+              <AlertDescription className="text-white">{error}</AlertDescription>
             </Alert>
           )}
 
           {success && (
-            <Alert className="border-green-500/50 bg-green-500/20 text-green-100">
-              <AlertDescription>{success}</AlertDescription>
+            <Alert className="border-green-500/50 bg-green-500/20 text-white">
+              <AlertDescription className="text-white">{success}</AlertDescription>
             </Alert>
           )}
 
@@ -416,9 +699,7 @@ export default function AdministratorPage() {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
                 </div>
               ) : usuarios.length === 0 ? (
-                <div className="text-center py-8 text-white/50">
-                  Nenhum usuário encontrado
-                </div>
+                <div className="text-center py-8 text-white/50">Nenhum usuário encontrado</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -433,16 +714,21 @@ export default function AdministratorPage() {
                     <tbody>
                       {usuarios.map((usuario) => (
                         <tr key={usuario.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
-                          <td className="py-3 px-4 text-white">{usuario.nome}</td>
+                          <td className="py-3 px-4 text-white">
+                            {usuario.nome}
+                            {getPerfilBadge(usuario)}
+                          </td>
                           <td className="py-3 px-4 text-white/70">{usuario.email}</td>
                           <td className="py-3 px-4">
-                            <Badge 
-                              variant={getBadgeVariant(usuario.tipo)} 
-                              className={`gap-1 ${usuario.tipo !== UserType.ADMIN && usuario.tipo !== UserType.GESTOR ? 'bg-white text-gray-800 border-gray-300' : ''}`}
-                            >
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+                              usuario.tipo === 'admin' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                              usuario.tipo === 'gerente' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
+                              usuario.tipo === 'estagiario' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                              'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            }`}>
                               {getBadgeIcon(usuario.tipo)}
                               {userTypeLabels[usuario.tipo as UserType]}
-                            </Badge>
+                            </span>
                           </td>
                           <td className="py-3 px-4">
                             <div className="flex justify-end gap-2">
@@ -478,65 +764,58 @@ export default function AdministratorPage() {
           </Card>
         </main>
 
-        {/* Modal de Criar/Editar */}
+        {/* ========================================
+            MODAL DE CRIAR/EDITAR COM PERMISSÕES
+            ======================================== */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="bg-white">
+          <DialogContent className="bg-white max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-gray-900">{isEditing ? "Editar Usuário" : "Novo Usuário"}</DialogTitle>
+              <DialogTitle className="text-gray-900">
+                {isEditing ? "Editar Usuário" : "Novo Usuário"}
+              </DialogTitle>
               <DialogDescription>
                 {isEditing
-                  ? "Atualize as informações do usuário"
+                  ? "Atualize as informações e permissões do usuário"
                   : "Preencha os dados para criar um novo usuário"}
               </DialogDescription>
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="nome" className="text-gray-700">Nome *</Label>
-                <Input
-                  id="nome"
-                  value={formData.nome}
-                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                  placeholder="Nome completo"
-                  required
-                  className="bg-white border-gray-300"
-                />
-              </div>
+              {/* Campos básicos */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="nome" className="text-gray-700">
+                    Nome *
+                  </Label>
+                  <Input
+                    id="nome"
+                    value={formData.nome}
+                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                    placeholder="Nome completo"
+                    required
+                    className="bg-white border-gray-300"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-gray-700">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="email@exemplo.com"
-                  required
-                  className="bg-white border-gray-300"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="tipo" className="text-gray-700">Tipo de Usuário *</Label>
-                <select
-                  id="tipo"
-                  value={formData.tipo}
-                  onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
-                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                  required
-                >
-                  <option value="">Selecione o tipo</option>
-                  {Object.entries(userTypeLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-gray-700">
+                    Email *
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="email@exemplo.com"
+                    required
+                    className="bg-white border-gray-300"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="senha" className="text-gray-700">
-                  Senha {!isEditing && "*"} {isEditing && "(deixe em branco para manter)"}
+                  Senha {!isEditing && "*"} {isEditing && "(em branco = manter)"}
                 </Label>
                 <Input
                   id="senha"
@@ -549,6 +828,200 @@ export default function AdministratorPage() {
                 />
               </div>
 
+              {/* ========================================
+                  SEÇÃO DE PERFIL E PERMISSÕES
+                  ======================================== */}
+                  <div className="border-t border-gray-200 pt-4 space-y-4">
+                  {/* Seleção de perfil */}
+                  <div className="space-y-2">
+                    <Label className="text-gray-700 flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      Perfil de Permissões
+                    </Label>
+                    <select
+                      value={selectedPerfilId || ""}
+                      onChange={(e) => {
+                        const val = e.target.value ? parseInt(e.target.value) : null
+                        setSelectedPerfilId(val)
+                        setPermissoesCustom({})
+                        // Setar tipo automaticamente baseado no perfil
+                        const perfilSelecionado = perfis.find(p => p.id === val)
+                        if (perfilSelecionado) {
+                          const tipoMap: Record<string, string> = {
+                            'Administrador': 'admin',
+                            'Gerente': 'gerente',
+                            'Assistente': 'assistente',
+                            'Estagiário': 'estagiario',
+                          }
+                          setFormData(prev => ({ ...prev, tipo: tipoMap[perfilSelecionado.nome] || 'assistente' }))
+                        } else {
+                          setFormData(prev => ({ ...prev, tipo: '' }))
+                        }
+                      }}
+                      className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none"
+                    >
+                      <option value="">Sem perfil (todas permissões desligadas)</option>
+                      {perfis.map((perfil) => (
+                        <option key={perfil.id} value={perfil.id}>
+                          {perfil.nome}
+                          {perfil.descricao ? ` — ${perfil.descricao}` : ""}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Descrição do perfil selecionado */}
+                    {selectedPerfilId && (
+                      <p className="text-xs text-gray-500">
+                        {perfis.find((p) => p.id === selectedPerfilId)?.descricao}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Botão para expandir permissões detalhadas */}
+                  <button
+                    type="button"
+                    onClick={() => setShowPermissoes(!showPermissoes)}
+                    className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    <Lock className="h-4 w-4" />
+                    {showPermissoes ? "Ocultar permissões detalhadas" : "Personalizar permissões"}
+                    {showPermissoes ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                    {totalOverrides > 0 && (
+                      <span className="bg-amber-100 text-amber-700 text-[10px] font-medium px-1.5 py-0.5 rounded-full">
+                        {totalOverrides} {totalOverrides === 1 ? "ajuste" : "ajustes"}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Painel de permissões detalhadas */}
+                  {showPermissoes && (
+                    <div className="space-y-3 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      {/* Header com reset */}
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-gray-500">
+                          Toggle individual sobrescreve o perfil. Indicador{" "}
+                          <span className="inline-block w-2 h-2 rounded-full bg-amber-400 mx-0.5" />{" "}
+                          = personalizado
+                        </p>
+                        {totalOverrides > 0 && (
+                          <button
+                            type="button"
+                            onClick={resetarCustom}
+                            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                            Resetar ajustes
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Módulos */}
+                      {MODULOS_PERMISSOES.map((modulo) => {
+                        const expanded = expandedModulos.includes(modulo.modulo)
+                        const todasAtivas = modulo.permissoes.every(
+                          (p) => permissoesEfetivas[p.chave]
+                        )
+                        const algAtiva = modulo.permissoes.some(
+                          (p) => permissoesEfetivas[p.chave]
+                        )
+                        const temOverrides = modulo.permissoes.some((p) =>
+                          temOverride(p.chave)
+                        )
+
+                        return (
+                          <div
+                            key={modulo.modulo}
+                            className="bg-white rounded-lg border border-gray-200 overflow-hidden"
+                          >
+                            {/* Header do módulo */}
+                            <div
+                              className="flex items-center justify-between px-3 py-2.5 cursor-pointer hover:bg-gray-50"
+                              onClick={() => toggleExpandModulo(modulo.modulo)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">{modulo.icone}</span>
+                                <span className="text-sm font-medium text-gray-800">
+                                  {modulo.modulo}
+                                </span>
+                                {temOverrides && (
+                                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  checked={todasAtivas}
+                                  onCheckedChange={() => toggleModulo(modulo)}
+                                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                                  className="scale-75"
+                                />
+                                {expanded ? (
+                                  <ChevronUp className="h-4 w-4 text-gray-400" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Permissões individuais */}
+                            {expanded && (
+                              <div className="border-t border-gray-100 px-3 py-2 space-y-1">
+                                {modulo.permissoes.map((perm) => {
+                                  const ativa = !!permissoesEfetivas[perm.chave]
+                                  const override = temOverride(perm.chave)
+
+                                  return (
+                                    <div
+                                      key={perm.chave}
+                                      className={`flex items-center justify-between py-1.5 px-2 rounded ${
+                                        override ? "bg-amber-50" : ""
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        {override && (
+                                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                                        )}
+                                        <span
+                                          className={`text-xs ${
+                                            ativa ? "text-gray-700" : "text-gray-400"
+                                          }`}
+                                        >
+                                          {perm.label}
+                                        </span>
+                                      </div>
+                                      <Switch
+                                        checked={ativa}
+                                        onCheckedChange={() => togglePermissao(perm.chave)}
+                                        className="scale-75"
+                                      />
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+              {/* Aviso para admin */}
+              {formData.tipo === "admin" && (
+                <div className="border-t border-gray-200 pt-4">
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                    <Shield className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                    <p className="text-xs text-blue-700">
+                      Administradores têm acesso total ao sistema. Não é necessário configurar
+                      permissões.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <DialogFooter>
                 <Button
                   type="button"
@@ -558,7 +1031,11 @@ export default function AdministratorPage() {
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
                   {isSubmitting ? (
                     <>
                       <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />

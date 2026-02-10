@@ -182,6 +182,10 @@ model Usuario {
   senha String @db.VarChar(255)
   tipo  String @db.VarChar(20)
 
+  perfilId            Int?
+  perfil              Perfil?   @relation(fields: [perfilId], references: [id], onDelete: SetNull)
+  permissoesCustom Json?
+
   // Tarefas atribuídas ao usuário
   tarefas Tarefa[]
   
@@ -192,6 +196,8 @@ model Usuario {
 
   // ✅ NOVO: Histórico de ações em tarefas
   historicoTarefas TarefaHistorico[]
+
+  @@index([perfilId])
 }
 
 // ========================================
@@ -1485,4 +1491,23 @@ model Mensagem {
   @@index([clienteAuthId])
   @@index([usuarioId])
   @@index([createdAt])
+}
+
+model Perfil {
+  id          Int       @id @default(autoincrement())
+  nome        String    @unique @db.VarChar(50)   // "Administrador", "Gerente", "Assistente", "Estagiário"
+  descricao   String?   @db.VarChar(200)
+  
+  // Permissões padrão do perfil (JSON com todas as permissões)
+  permissoes  Json      // { "tarefas.ver": true, "tarefas.criar": false, ... }
+  
+  // Se é perfil padrão do sistema (não pode ser excluído)
+  sistema     Boolean   @default(false)
+  
+  cor         String?   @db.VarChar(7)  // Cor para identificação visual
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  usuarios    Usuario[]
 }

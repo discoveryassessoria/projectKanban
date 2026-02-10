@@ -58,7 +58,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     // Impedir que admin edite outro admin (exceto a si mesmo)
     if (usuarioExistente.tipo === "admin" && usuarioExistente.id !== requesterId) {
-      return NextResponse.json({ error: "Você não pode editar outro administrador" }, { status: 403 })
+      return NextResponse.json({ error: "Você não pode editar outro administrador." }, { status: 403 })
     }
 
     // Validar tipo de usuário se estiver sendo alterado

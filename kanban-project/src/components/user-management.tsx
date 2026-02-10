@@ -203,7 +203,7 @@ export function UserManagement() {
     switch (tipo) {
       case UserType.ADMIN:
         return "default"
-      case UserType.GESTOR:
+      case UserType.GERENTE:
         return "secondary"
       default:
         return "outline"
@@ -214,7 +214,7 @@ export function UserManagement() {
     switch (tipo) {
       case UserType.ADMIN:
         return <Shield className="h-3 w-3 mr-1" />
-      case UserType.GESTOR:
+      case UserType.GERENTE:
         return <Users className="h-3 w-3 mr-1" />
       default:
         return <User className="h-3 w-3 mr-1" />
