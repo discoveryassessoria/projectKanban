@@ -459,7 +459,7 @@ export function HeaderBar({
                 {userName}
               </p>
               <p className="text-[11px] text-white/70 leading-tight">
-                {userRole}
+                {userRole === 'admin' ? 'Administrador' : userRole === 'gerente' ? 'Gerente' : userRole === 'assistente' ? 'Assistente' : userRole === 'estagiario' ? 'Estagiário' : userRole}
               </p>
             </div>
           </div>
