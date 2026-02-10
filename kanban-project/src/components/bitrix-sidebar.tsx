@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import {
   Menu,
   MessageCircle,
@@ -53,6 +53,7 @@ const menuItems = [
     icon: ({ className, filled }: any) => <MessageCircle className={className} fill={filled ? "currentColor" : "none"} />,
     textOffset: "",
     iconOffset: "",
+    badge: "mensagens", // Identificador para badge dinâmico
   },
   {
     title: "Árvore Genealógica",
@@ -97,6 +98,33 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pathname = usePathname()
 
+  // =====================================================
+  // 🔴 Badge de mensagens não lidas
+  // =====================================================
+  const [mensagensNaoLidas, setMensagensNaoLidas] = useState(0)
+
+  const fetchMensagensNaoLidas = useCallback(async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
+      const response = await fetch('/api/admin/mensagens/nao-lidas', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      })
+      if (!response.ok) return
+      const data = await response.json()
+      setMensagensNaoLidas(data.totalNaoLidas || 0)
+    } catch (error) {
+      // Silencioso - não bloqueia a UI
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchMensagensNaoLidas()
+    // Polling a cada 30 segundos (mesmo intervalo das notificações do header)
+    const interval = setInterval(fetchMensagensNaoLidas, 30000)
+    return () => clearInterval(interval)
+  }, [fetchMensagensNaoLidas])
+  // =====================================================
+
   const isExpanded = !isCollapsed || isHovered
 
   const handleMouseEnter = () => {
@@ -126,6 +154,12 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
   const renderIcon = (Icon: typeof HouseIcon | typeof GridIcon | typeof CheckIcon | typeof TreeIcon | typeof SettingsIcon | typeof ShieldIcon | typeof CalendarIcon | typeof DollarIcon, isActive: boolean, iconOffset: string = "") => {
   // Todos os ícones são customizados agora, passa a prop filled
     return <Icon className={`h-5 w-5 flex-shrink-0 text-white ${iconOffset}`} filled={isActive} />
+  }
+
+  // Função para obter o valor do badge de um item
+  const getBadgeCount = (badgeKey?: string): number => {
+    if (badgeKey === 'mensagens') return mensagensNaoLidas
+    return 0
   }
 
   return (
@@ -182,6 +216,7 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
           <nav className="space-y-1">
             {menuItems.map((item) => {
               const isActive = pathname === item.url
+              const badgeCount = getBadgeCount((item as any).badge)
 
               return (
                 <Link
@@ -189,15 +224,32 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
                   href={item.url}
                   className={`
                     flex items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium transition-colors
-                    hover:bg-white/10
+                    hover:bg-white/10 relative
                     ${isActive ? "bg-white/15 text-white" : "text-white/90"}
                     ${!isExpanded ? "justify-center" : ""}
                   `}
                   title={!isExpanded ? item.title : undefined}
                 >
-                  {renderIcon(item.icon, isActive, item.iconOffset)}
+                  {/* Ícone com badge quando sidebar colapsada */}
+                  <span className="relative flex-shrink-0">
+                    {renderIcon(item.icon, isActive, item.iconOffset)}
+                    {badgeCount > 0 && !isExpanded && (
+                      <span className="absolute -top-2 -right-2 h-4 w-4 rounded-full bg-red-500 text-[9px] font-bold flex items-center justify-center leading-none">
+                        {badgeCount > 9 ? '9+' : badgeCount}
+                      </span>
+                    )}
+                  </span>
+
                   {isExpanded && (
-                    <span className={`whitespace-nowrap leading-none ${item.textOffset}`}>{item.title}</span>
+                    <>
+                      <span className={`whitespace-nowrap leading-none ${item.textOffset}`}>{item.title}</span>
+                      {/* Badge quando sidebar expandida - à direita */}
+                      {badgeCount > 0 && (
+                        <span className="ml-auto h-5 min-w-[20px] px-1 rounded-full bg-red-500 text-[10px] font-bold flex items-center justify-center leading-none">
+                          {badgeCount > 99 ? '99+' : badgeCount}
+                        </span>
+                      )}
+                    </>
                   )}
                 </Link>
               )
