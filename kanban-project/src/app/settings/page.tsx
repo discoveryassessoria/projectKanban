@@ -289,11 +289,11 @@ export default function SettingsPage() {
       {/* CONTEÚDO COM OVERLAY */}
       <div className="min-h-screen relative">
         <div className="absolute inset-0 bg-black/40 pointer-events-none" />
-        <main className="relative px-6 py-8 max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <main className="relative px-6 py-8 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             
             {/* COLUNA ESQUERDA - Informações */}
-            <div className="space-y-6">
+            <div className="lg:col-span-2 space-y-6">
               {/* Meu Perfil */}
               <Card className="bg-white/5 backdrop-blur-xl border border-white/10">
                 <CardHeader>
@@ -403,7 +403,7 @@ export default function SettingsPage() {
             </div>
 
             {/* COLUNA DIREITA - Permissões */}
-            <div className="flex flex-col">
+            <div className="lg:col-span-3 flex flex-col">
               <Card className="bg-white/5 backdrop-blur-xl border border-white/10 flex-1">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-white">
@@ -433,11 +433,11 @@ export default function SettingsPage() {
                         return (
                           <div key={modulo.modulo} className="rounded-lg bg-white/5 border border-white/10 overflow-hidden">
                             <div className="flex items-center justify-between px-3 py-2.5 bg-white/5">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-sm">{modulo.icone}</span>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-sm flex-shrink-0">{modulo.icone}</span>
                                 <span className="text-xs font-medium text-white">{modulo.modulo}</span>
                               </div>
-                              <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${
+                              <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap ${
                                 todasAtivas 
                                   ? 'bg-green-500/20 text-green-400' 
                                   : nenhumaAtiva 

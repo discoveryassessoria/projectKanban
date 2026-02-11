@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import type { ProcessoWithStatus } from "@/src/types/kanban"
 import { parseLocalDate, formatDateBR, getToday, isToday, isPast, isWithinDays } from "@/src/lib/date-utils"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 // Mapeamento de bandeiras por país
 const BANDEIRAS_PAIS: Record<string, string> = {
@@ -77,6 +78,8 @@ export function HeaderBar({
     novas: TarefaNotificacao[]
   }>({ vencidas: [], hoje: [], proximos3Dias: [], novas: [] })
   const [totalNotificacoes, setTotalNotificacoes] = useState(0)
+
+  const { pode } = usePermissoes()
 
   const router = useRouter()
   const notificacoesRef = useRef<HTMLDivElement>(null)
@@ -275,7 +278,7 @@ export function HeaderBar({
           <div className="hidden lg:block h-8 w-px bg-white/20" />
 
           {/* Campo de busca */}
-          <div className="relative hidden md:block">
+          {pode('processos.ver') && <div className="relative hidden md:block">
             <div className="flex items-center gap-2 px-3 py-2 rounded-full border border-white/30">
               <Search className="h-4 w-4 text-white/70" />
               <input
@@ -326,10 +329,10 @@ export function HeaderBar({
                 )}
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Notificações */}
-          <div className="relative hidden md:block" ref={notificacoesRef}>
+          {pode('tarefas.ver') && <div className="relative hidden md:block" ref={notificacoesRef}>
             <button 
               className="relative inline-flex items-center justify-center rounded-full p-2 border border-white/30 hover:bg-white/10 transition"
               onClick={() => setShowNotifications(!showNotifications)}
@@ -445,7 +448,7 @@ export function HeaderBar({
                 )}
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Usuário */}
           <div className="flex items-center gap-2">

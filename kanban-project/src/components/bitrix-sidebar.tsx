@@ -17,6 +17,7 @@ import { ShieldIcon } from "@/src/components/icons/shield-icon"
 import { useSidebarContext } from "@/src/contexts/sidebar-context"
 import { CalendarIcon } from "@/src/components/icons/calendar-icon"
 import { DollarIcon } from "@/src/components/icons/dollar-icon"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 const menuItems = [
   {
@@ -32,6 +33,7 @@ const menuItems = [
     icon: GridIcon,
     textOffset: "-translate-y-[0.2px]",
     iconOffset: "",
+    permissao: "processos.ver",
   },
   {
     title: "Tarefas e Projetos",
@@ -39,6 +41,7 @@ const menuItems = [
     icon: CheckIcon,
     textOffset: "",
     iconOffset: "translate-y-[0.5px]",
+    permissao: "tarefas.ver",
   },
   {
     title: "Eventos",
@@ -46,6 +49,7 @@ const menuItems = [
     icon: CalendarIcon,
     textOffset: "",
     iconOffset: "",
+    permissao: "eventos.ver",
   },
   {
     title: "Mensagens",
@@ -53,7 +57,8 @@ const menuItems = [
     icon: ({ className, filled }: any) => <MessageCircle className={className} fill={filled ? "currentColor" : "none"} />,
     textOffset: "",
     iconOffset: "",
-    badge: "mensagens", // Identificador para badge dinâmico
+    badge: "mensagens",
+    permissao: "mensagens.ver",
   },
   {
     title: "Árvore Genealógica",
@@ -61,6 +66,7 @@ const menuItems = [
     icon: TreeIcon,
     textOffset: "",
     iconOffset: "",
+    permissao: "processos.ver",
   },
   {
     title: "Configurações",
@@ -72,12 +78,13 @@ const menuItems = [
 ]
 
 const adminMenuItems = [
-    {
+  {
     title: "Financeiro",
     url: "/financeiro",
     icon: DollarIcon,
     textOffset: "",
     iconOffset: "",
+    permissao: "financeiro.ver",
   },
   {
     title: "Gerenciar Usuários",
@@ -85,14 +92,12 @@ const adminMenuItems = [
     icon: ShieldIcon,
     textOffset: "",
     iconOffset: "",
+    permissao: "usuarios.gerenciar",
   },
 ]
 
-interface BitrixSidebarProps {
-  isAdmin?: boolean
-}
-
-export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
+export function BitrixSidebar() {
+  const { pode, carregando } = usePermissoes()
   const { isCollapsed, setIsCollapsed } = useSidebarContext()
   const [isHovered, setIsHovered] = useState(false)
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -214,7 +219,7 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
             </div>
           )}
           <nav className="space-y-1">
-            {menuItems.map((item) => {
+            {menuItems.filter((item) => !item.permissao || pode(item.permissao)).map((item) => {
               const isActive = pathname === item.url
               const badgeCount = getBadgeCount((item as any).badge)
 
@@ -258,7 +263,7 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
         </div>
 
         {/* Seção Administração */}
-        {isAdmin && (
+        {adminMenuItems.filter((item) => !item.permissao || pode(item.permissao)).length > 0 && (
           <div>
             {isExpanded && (
               <div className="text-xs uppercase tracking-wide text-white/70 font-medium px-3 mb-3 whitespace-nowrap">
@@ -266,7 +271,7 @@ export function BitrixSidebar({ isAdmin = false }: BitrixSidebarProps) {
               </div>
             )}
             <nav className="space-y-1">
-              {adminMenuItems.map((item) => {
+              {adminMenuItems.filter((item) => !item.permissao || pode(item.permissao)).map((item) => {
                 const isActive = pathname === item.url
 
                 return (

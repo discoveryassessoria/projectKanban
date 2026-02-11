@@ -32,6 +32,7 @@ import {
 import { getTarefasPorPais, type TarefaPreDefinida } from "../../lib/tarefas-config"
 import { isPast, formatDateBR } from "@/src/lib/date-utils"
 import { TarefaDetailModal } from "./TarefaDetailModal"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 // ✅ NOVO: Imports do dnd-kit para drag-and-drop
 import {
@@ -268,6 +269,8 @@ function SortableTarefaCard({ tarefa, onClick, onDelete }: SortableTarefaCardPro
     zIndex: isDragging ? 1000 : 1,
   }
 
+  const { pode } = usePermissoes()
+
   const subtarefas = tarefa.subtarefas || []
   const temSubtarefas = subtarefas.length > 0
   
@@ -395,13 +398,13 @@ function SortableTarefaCard({ tarefa, onClick, onDelete }: SortableTarefaCardPro
 
       {/* Ações */}
       <div className="flex items-center gap-1">
-        <button
+        {pode('tarefas.excluir') && <button
           onClick={onDelete}
           className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
           title="Excluir"
         >
           <Trash2 className="w-4 h-4" />
-        </button>
+        </button>}
         <div 
           onClick={onClick}
           className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 group-hover:text-blue-500 group-hover:bg-blue-50 transition-all cursor-pointer"
@@ -423,6 +426,7 @@ interface TarefaCardProps {
 }
 
 function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
+  const { pode } = usePermissoes()
   const subtarefas = tarefa.subtarefas || []
   const temSubtarefas = subtarefas.length > 0
   
@@ -538,13 +542,13 @@ function TarefaCard({ tarefa, onClick, onDelete }: TarefaCardProps) {
 
       {/* Ações */}
       <div className="flex items-center gap-1">
-        <button
+        {pode('tarefas.excluir') && <button
           onClick={onDelete}
           className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
           title="Excluir"
         >
           <Trash2 className="w-4 h-4" />
-        </button>
+        </button>}
         <div className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 group-hover:text-blue-500 group-hover:bg-blue-50 transition-all">
           <ChevronRight className="w-5 h-5" />
         </div>
@@ -839,6 +843,7 @@ interface TarefaItemProps {
 }
 
 function TarefaItem({ tarefa, onDelete, onUpdate, usuarios, isProcuracaoAdm = false }: TarefaItemProps) {
+  const { pode } = usePermissoes()
   const [expandido, setExpandido] = useState(false)
   const [editando, setEditando] = useState(false)
   const [salvando, setSalvando] = useState(false)
@@ -1669,6 +1674,7 @@ interface AtividadeItemProps {
 }
 
 function AtividadeItem({ atividade, onDelete, onUpdate, usuarios, isProcuracaoAdm = false }: AtividadeItemProps) {
+  const { pode } = usePermissoes()
   const [expandido, setExpandido] = useState(true)
   const [editando, setEditando] = useState(false)
   const [novaTarefa, setNovaTarefa] = useState("")
@@ -1814,7 +1820,7 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios, isProcuracaoAd
 </div>
 
         {/* Botão excluir */}
-        {!isTemporaria && (
+        {!isTemporaria && pode('tarefas.excluir') && (
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -1963,7 +1969,7 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios, isProcuracaoAd
                     <p className="text-xs text-gray-400 mb-2">Nenhuma tarefa</p>
                   )}
 
-                  <div className="flex items-center gap-2">
+                  {pode('tarefas.criar') && <div className="flex items-center gap-2">
                     <Input
                       placeholder="Adicionar subtarefa..."
                       value={novaTarefa}
@@ -1982,7 +1988,7 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios, isProcuracaoAd
                     >
                       {criandoTarefa ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
                     </Button>
-                  </div>
+                  </div>}
                 </div>
               </div>
               </>
@@ -2011,6 +2017,7 @@ interface SubtarefasModalProps {
 }
 
 function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubtarefaAdd, onSubtarefaRemove, usuarios, pessoas = [], atividadeParaAbrir, onAtividadeAberta }: SubtarefasModalProps) {
+  const { pode } = usePermissoes()
   const [novaAtividade, setNovaAtividade] = useState("")
   const [criando, setCriando] = useState(false)
   const [editandoTitulo, setEditandoTitulo] = useState(false)
@@ -2441,7 +2448,7 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
                       </div>
 
                       {/* Delete button */}
-                      {!isTemp && (
+                      {!isTemp && pode('tarefas.excluir') && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -2475,7 +2482,7 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
         </div>
 
         {/* Footer */}
-        {(
+        {pode('tarefas.criar') && (
           <div className="border-t p-4 bg-gray-50" ref={seletorPessoasRef}>
             {isDocumentosPessoais && pessoas.length > 0 ? (
               // ✅ Footer especial para Documentos Pessoais
@@ -2671,6 +2678,8 @@ export function ProcessoTarefas({ processoId, pais, onUpdate, pessoas = [], tare
   const tarefasPreDefinidas = getTarefasPorPais(pais)
   const modalAbertoIdRef = useRef<number | null>(null)
   const [atividadeParaAbrir, setAtividadeParaAbrir] = useState<number | null>(null)
+
+  const { pode } = usePermissoes()
 
   // ✅ NOVO: Configuração dos sensores para drag-and-drop
   const sensors = useSensors(
@@ -2961,8 +2970,8 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* Seletor de nova tarefa - MANTÉM */}
-      <div className="p-4 border-b flex-shrink-0 bg-gray-50/50" ref={seletorRef}>
+      {/* Seletor de nova tarefa */}
+      {pode('tarefas.criar') && <div className="p-4 border-b flex-shrink-0 bg-gray-50/50" ref={seletorRef}>
         <div className="relative">
           {mostrarInputCustom ? (
             <div className="flex items-center gap-2">
@@ -3054,7 +3063,7 @@ useEffect(() => {
             </div>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* ✅ ATUALIZADO: Lista de tarefas com DnD Context */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4">

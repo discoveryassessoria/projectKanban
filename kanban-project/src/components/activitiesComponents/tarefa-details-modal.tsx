@@ -24,6 +24,7 @@ import {
   Loader2
 } from "lucide-react"
 import { useUsers } from "@/src/hooks/useActivitiesData"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 // Mapeamento de países para exibição
 const PAIS_LABELS: Record<string, string> = {
@@ -105,6 +106,7 @@ export function TarefaDetailsModal({
   onSave 
 }: TarefaDetailsModalProps) {
   const { users = [] } = useUsers()
+  const { pode } = usePermissoes()
   
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -489,7 +491,7 @@ export function TarefaDetailsModal({
           )}
 
           {/* Adicionar subtarefa */}
-          <div className="flex items-center gap-2">
+          {pode('tarefas.criar') && <div className="flex items-center gap-2">
             <Input
               value={novaSubtarefa}
               onChange={(e) => setNovaSubtarefa(e.target.value)}
@@ -512,12 +514,12 @@ export function TarefaDetailsModal({
             >
               <Plus className="h-4 w-4" />
             </Button>
-          </div>
+          </div>}
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-          <Button
+          {pode('tarefas.excluir') && <Button
             type="button"
             variant="ghost"
             onClick={handleDelete}
@@ -530,7 +532,7 @@ export function TarefaDetailsModal({
               <Trash2 className="h-4 w-4 mr-2" />
             )}
             Excluir
-          </Button>
+          </Button>}
           
           <div className="flex gap-2">
             <Button

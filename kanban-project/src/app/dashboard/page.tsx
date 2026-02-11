@@ -30,6 +30,7 @@ import { HeaderBar } from "@/src/components/header-bar"
 import { HistoryIcon } from "@/src/components/icons/history-icon"
 import { BandeiraPais } from "@/src/components/ui/bandeira-pais"
 import { Pais, PAISES_CONFIG, type ProcessoWithStatus } from "@/src/types/kanban"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 interface Usuario {
   id: number
@@ -69,6 +70,8 @@ export default function DashboardPage() {
   const [processos, setProcessos] = useState<ProcessoWithStatus[]>([])
   const [arvores, setArvores] = useState<Arvore[]>([])
   const [logs, setLogs] = useState<LogAuditoria[]>([])
+
+  const { pode } = usePermissoes()
 
   const router = useRouter()
 
@@ -258,18 +261,18 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button 
+              {pode('processos.criar') && <Button 
                 className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-9 px-4"
                 onClick={() => router.push('/kanban')}
               >
                 + Novo Processo
-              </Button>
-              <Button 
+              </Button>}
+              {pode('tarefas.criar') && <Button 
                 className="bg-sky-600 hover:bg-sky-700 text-white text-xs h-9 px-4"
                 onClick={() => router.push('/activities')}
               >
                 + Nova Tarefa
-              </Button>
+              </Button>}
               <Button
                 variant="outline"
                 className="border-white/30 bg-transparent text-xs text-white/80 hover:bg-white/10 hover:text-white h-9 px-2.5 gap-1.5"
@@ -281,8 +284,25 @@ export default function DashboardPage() {
             </div>
           </section>
 
+          {/* Mensagem quando não tem permissões */}
+          {!pode('processos.ver') && !pode('tarefas.ver') && (
+            <section className="flex flex-col items-center justify-center py-20">
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-10 text-center max-w-md">
+                <div className="p-4 rounded-full bg-white/10 w-fit mx-auto mb-4">
+                  <Settings className="h-8 w-8 text-white/60" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  Conta configurada com sucesso!
+                </h3>
+                <p className="text-sm text-white/60">
+                  Seu acesso ainda não foi liberado pelo administrador. Entre em contato para solicitar as permissões necessárias.
+                </p>
+              </div>
+            </section>
+          )}
+
           {/* ===== CARDS DE MÉTRICAS PRINCIPAIS ===== */}
-          <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {pode('processos.ver') && <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {/* Total de Processos */}
             <Card className="bg-white/10 backdrop-blur-sm border border-white/20 text-white">
               <CardContent className="p-5">
@@ -350,10 +370,10 @@ export default function DashboardPage() {
                 </div>
               </CardContent>
             </Card>
-          </section>
+          </section>}
 
           {/* ===== PROCESSOS POR PAÍS ===== */}
-          <section>
+          {pode('processos.ver') && <section>
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-white">Processos por País</h3>
               <p className="text-xs text-white/50">Distribuição dos processos ativos</p>
@@ -384,10 +404,10 @@ export default function DashboardPage() {
                 )
               })}
             </div>
-          </section>
+          </section>}
 
           {/* ===== VISÃO PROCESSOS + HISTÓRICO ===== */}
-          <section className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          {pode('processos.ver') && <section className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             {/* Visão Processos - 3 colunas */}
             <Card className="lg:col-span-3 bg-white/5 backdrop-blur-sm border border-white/10">
               <CardHeader className="pb-3">
@@ -548,10 +568,10 @@ export default function DashboardPage() {
                 )}
               </CardContent>
             </Card>
-          </section>
+          </section>}
 
           {/* ===== PRÓXIMOS PRAZOS ===== */}
-          {proximosPrazos.length > 0 && (
+          {pode('tarefas.ver') && proximosPrazos.length > 0 && (
             <section>
               <Card className="bg-white/5 backdrop-blur-sm border border-white/10">
                 <CardHeader className="pb-3">
