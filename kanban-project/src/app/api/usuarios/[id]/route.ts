@@ -34,14 +34,10 @@ function verifyAdmin(request: NextRequest): { isAdmin: boolean; userId?: number;
 // PUT - Atualizar usuário
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const erro = await verificarPermissao(request, 'usuarios.gerenciar')
+    const erro = await verificarPermissao(request, 'usuarios.editar')
     if (erro) return erro
 
     const { isAdmin, userId: requesterId } = verifyAdmin(request)
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Acesso negado. Apenas administradores podem atualizar usuários." }, { status: 403 })
-    }
 
     const { id: idParam } = await params
     const userId = parseInt(idParam)
@@ -116,9 +112,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 // DELETE - Deletar usuário
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const erro = await verificarPermissao(request, 'usuarios.gerenciar')
+    const erro = await verificarPermissao(request, 'usuarios.excluir')
     if (erro) return erro
-    
+
     const { isAdmin, userId: requesterId, tipo: requesterTipo } = verifyAdmin(request)
 
     const { id: idParam } = await params
@@ -138,11 +134,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     // Verificar se é a própria conta ou se é admin deletando outro
     const isDeletandoPropriaConta = usuarioExistente.id === requesterId
-
-    // Se não é admin e não está deletando a própria conta
-    if (!isAdmin && !isDeletandoPropriaConta) {
-      return NextResponse.json({ error: "Acesso negado. Você só pode deletar sua própria conta." }, { status: 403 })
-    }
 
     // Admin tentando deletar OUTRO admin (não permitido)
     if (isAdmin && usuarioExistente.tipo === "admin" && !isDeletandoPropriaConta) {

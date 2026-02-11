@@ -528,22 +528,20 @@ export default function AdministratorPage() {
 
         await updateUser(currentUser.id, dataToUpdate)
 
-        // Salvar permissões
-        if (formData.tipo !== "admin") {
-          const token = localStorage.getItem("authToken")
-          const temCustom = Object.keys(permissoesCustom).length > 0
-          await fetch(`/api/usuarios/${currentUser.id}/permissoes`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify({
-              perfilId: selectedPerfilId,
-              permissoesCustom: temCustom ? permissoesCustom : null,
-            }),
-          })
-        }
+        // Salvar permissões (sempre, inclusive admin para manter perfilId correto)
+        const token = localStorage.getItem("authToken")
+        const temCustom = Object.keys(permissoesCustom).length > 0
+        await fetch(`/api/usuarios/${currentUser.id}/permissoes`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            perfilId: selectedPerfilId,
+            permissoesCustom: formData.tipo === "admin" ? null : (temCustom ? permissoesCustom : null),
+          }),
+        })
 
         setSuccess("Usuário atualizado com sucesso!")
       } else {

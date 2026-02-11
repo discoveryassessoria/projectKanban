@@ -2,38 +2,12 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { UserType } from "@/src/utils/userTypes"
 import { hash } from "bcrypt"
-
-// Função auxiliar para verificar se o usuário é admin
-function verifyAdmin(request: NextRequest): boolean {
-  try {
-    const authHeader = request.headers.get("authorization")
-    const token = authHeader?.replace("Bearer ", "")
-
-    if (!token) {
-      return false
-    }
-
-    const decoded = JSON.parse(atob(token))
-    
-    // Verificar se o token não expirou
-    if (decoded.exp && Date.now() > decoded.exp) {
-      return false
-    }
-
-    return decoded.tipo === "admin"
-  } catch (error) {
-    return false
-  }
-}
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 export async function POST(request: NextRequest) {
   try {
-    // Verificar se o usuário é admin
-    const isAdmin = verifyAdmin(request)
-    
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Acesso negado. Apenas administradores podem criar usuários." }, { status: 403 })
-    }
+    const erro = await verificarPermissao(request, 'usuarios.criar')
+    if (erro) return erro
 
     const { nome, email, senha, tipo } = await request.json()
 
