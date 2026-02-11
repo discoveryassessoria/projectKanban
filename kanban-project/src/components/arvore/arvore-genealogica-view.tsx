@@ -21,6 +21,18 @@ import {
   FileDown,
 } from "lucide-react"
 
+// Helper para fetch autenticado
+function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+}
+
 interface ArvoreGenealogicaViewProps {
   processoId: number
   arvoreId?: number | null
@@ -282,7 +294,7 @@ export function ArvoreGenealogicaView({
 
   const handleDeleteDocumento = async (documento: DocumentoArvore) => {
     try {
-      const response = await fetch(`/api/documentos/${documento.id}`, {
+      const response = await authFetch(`/api/documentos/${documento.id}`, {
         method: 'DELETE'
       })
 
@@ -306,7 +318,7 @@ export function ArvoreGenealogicaView({
 
   const handleDeletePerson = async (pessoa: PessoaArvore) => {
     try {
-      const response = await fetch(`/api/pessoas/${pessoa.id}`, {
+      const response = await authFetch(`/api/pessoas/${pessoa.id}`, {
         method: 'DELETE'
       })
 
@@ -332,7 +344,7 @@ export function ArvoreGenealogicaView({
   const handleCreateArvore = async () => {
     setCreating(true)
     try {
-      const response = await fetch('/api/arvore', {
+      const response = await authFetch('/api/arvore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -363,7 +375,7 @@ export function ArvoreGenealogicaView({
     if (!arvoreId) return
 
     try {
-      const response = await fetch(`/api/arvore/${arvoreId}`)
+      const response = await authFetch(`/api/arvore/${arvoreId}`)
 
       if (response.ok) {
         const data = await response.json()
@@ -928,7 +940,7 @@ function AddPersonModal({
         }
       }
 
-      const response = await fetch('/api/pessoas', {
+      const response = await authFetch('/api/pessoas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -941,7 +953,7 @@ function AddPersonModal({
           const pessoa1Id = conjugeDePessoaId || novaPessoa.id
           const pessoa2Id = conjugeDePessoaId ? novaPessoa.id : Number(conjugeId)
 
-          await fetch('/api/unioes', {
+          await authFetch('/api/unioes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1272,7 +1284,7 @@ function EditPersonModal({
 
     setSaving(true)
     try {
-      const response = await fetch(`/api/pessoas/${pessoa.id}`, {
+      const response = await authFetch(`/api/pessoas/${pessoa.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1300,7 +1312,7 @@ function EditPersonModal({
 
       if (isCasado && conjugeId) {
         if (uniaoExistente) {
-          await fetch(`/api/unioes/${uniaoExistente.id}`, {
+          await authFetch(`/api/unioes/${uniaoExistente.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1309,7 +1321,7 @@ function EditPersonModal({
             })
           })
         } else {
-          await fetch('/api/unioes', {
+          await authFetch('/api/unioes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1322,7 +1334,7 @@ function EditPersonModal({
           })
         }
       } else if (!isCasado && uniaoExistente) {
-        await fetch(`/api/unioes/${uniaoExistente.id}`, { method: 'DELETE' })
+        await authFetch(`/api/unioes/${uniaoExistente.id}`, { method: 'DELETE' })
       }
 
       onSuccess()

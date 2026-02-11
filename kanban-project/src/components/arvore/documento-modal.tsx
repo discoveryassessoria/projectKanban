@@ -5,6 +5,18 @@ import { X, FileText, Upload, File, Trash2, Eye, Loader2 } from "lucide-react"
 import { useUploadThing } from "@/src/lib/uploadthing"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 
+// Helper para fetch autenticado
+function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+}
+
 // Tipos de documento
 const TIPO_DOCUMENTO_OPTIONS = [
   { value: 'CERTIDAO_NASCIMENTO_INTEIRO_TEOR', label: 'Certidão de Nascimento (Inteiro Teor)' },
@@ -320,7 +332,7 @@ export function DocumentoModal({
       const url = isEditing ? `/api/documentos/${documento.id}` : '/api/documentos'
       const method = isEditing ? 'PUT' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await authFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)

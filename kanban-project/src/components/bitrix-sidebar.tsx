@@ -66,7 +66,7 @@ const menuItems = [
     icon: TreeIcon,
     textOffset: "",
     iconOffset: "",
-    permissao: "processos.ver",
+    permissao: "arvore.ver",
   },
   {
     title: "Configurações",

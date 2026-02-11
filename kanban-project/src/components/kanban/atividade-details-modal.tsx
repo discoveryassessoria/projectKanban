@@ -16,6 +16,7 @@ import { ProcessoFaturas } from "./ProcessoFaturas"
 // ✅ IMPORTAR o modal e o initialFormData
 import { ContratanteModal, initialFormData } from "../contratantes-tabela"
 import { ProcessoEventos } from "./ProcessoEventos"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { 
   X, 
   Phone, 
@@ -90,6 +91,7 @@ export function ProcessoDetailsModal({
   initialAtividadeId,    // ← ADICIONAR ESTA LINHA
 }: ProcessoDetailsModalProps) {
   // ✅ ATUALIZADO: Adicionado "informacoes" como possível aba
+  const { pode } = usePermissoes()
   const [activeTab, setActiveTab] = useState<"geral" | "faturas" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos">("geral")
   const [etapas, setEtapas] = useState<Status[]>([])
   const [statusIdAtual, setStatusIdAtual] = useState(processo?.statusId)
@@ -460,7 +462,7 @@ export function ProcessoDetailsModal({
   // ✅ Definir abas dinamicamente baseado no país
   const tabs = [
     { id: "geral", label: "Geral" },
-    { id: "arvore", label: "Árvore Genealógica" },
+    ...(pode('arvore.ver') ? [{ id: "arvore", label: "Árvore Genealógica" }] : []),
     // Aba Informações só aparece para ITÁLIA
     ...(isItalia ? [{ id: "informacoes", label: "Informações" }] : []),
     // Aba Protocolos só aparece para ESPANHA

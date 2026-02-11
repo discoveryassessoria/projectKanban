@@ -49,6 +49,18 @@ import Swal from "sweetalert2"
 import withReactContent from "sweetalert2-react-content"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 
+// Helper para fetch autenticado
+function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+}
+
 const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
   const { pessoa, onAddChild, onAddParent, onAddSpouse, onEdit, onDelete, relationshipType } = data
 
@@ -340,7 +352,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
 
             if (isExistingPersonData(data)) {
               // Para pessoa existente, apenas vincula como filho
-              const updateResponse = await fetch(`/api/pessoas/${data.id}`, {
+              const updateResponse = await authFetch(`/api/pessoas/${data.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(parentRelationship),
@@ -354,7 +366,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
               }
             } else {
               // Para pessoa nova, cria e vincula
-              const response = await fetch("/api/pessoas", {
+              const response = await authFetch("/api/pessoas", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -405,7 +417,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
                 arvoreId: arvore.id,
               }
 
-              const parentResponse = await fetch("/api/pessoas", {
+              const parentResponse = await authFetch("/api/pessoas", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(parentData),
@@ -426,7 +438,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
               [parentType === "pai" ? "paiId" : "maeId"]: parentId,
             }
 
-            const updateResponse = await fetch(`/api/pessoas/${childId}`, {
+            const updateResponse = await authFetch(`/api/pessoas/${childId}`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(updatePayload),
@@ -482,7 +494,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
               return
             }
             
-            const response = await fetch(`/api/pessoas/${pessoa.id}`, {
+            const response = await authFetch(`/api/pessoas/${pessoa.id}`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(data),
@@ -521,7 +533,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
         cancelButtonText: "Cancelar",
       }).then(async (result) => {
         if (result.isConfirmed) {
-          const response = await fetch(`/api/pessoas/${pessoaId}`, {
+          const response = await authFetch(`/api/pessoas/${pessoaId}`, {
             method: "DELETE",
           })
 
@@ -548,7 +560,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
 
   const handleSaveTreeComment = useCallback(async (newComment: string) => {
     try {
-      const response = await fetch(`/api/arvore/${arvore.id}`, {
+      const response = await authFetch(`/api/arvore/${arvore.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ descricao: newComment }),
@@ -700,7 +712,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
 
       if (id === "tree-comment") {
         // Salva a posição do comentário
-        await fetch(`/api/arvore/${arvore.id}`, {
+        await authFetch(`/api/arvore/${arvore.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ commentPosX: position.x, commentPosY: position.y }),
@@ -710,7 +722,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
         const personId = Number(id)
         if (isNaN(personId)) return
 
-        await fetch(`/api/pessoas/${personId}`, {
+        await authFetch(`/api/pessoas/${personId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ x: position.x, y: position.y }),
@@ -758,7 +770,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
       onSubmit: async (data: PersonFormData | ExistingPersonFormData) => {
         if (isExistingPersonData(data)) return; // Não deve acontecer
         try {
-          const response = await fetch("/api/pessoas", {
+          const response = await authFetch("/api/pessoas", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ...data, arvoreId: arvore.id }),
@@ -800,7 +812,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
 
     try {
       // 1. Criar nova pessoa
-      const response = await fetch("/api/pessoas", {
+      const response = await authFetch("/api/pessoas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -819,7 +831,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
       const newPerson = await response.json()
 
       // 2. Criar união
-      const unionResponse = await fetch("/api/unioes", {
+      const unionResponse = await authFetch("/api/unioes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -866,7 +878,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
     }
 
     try {
-      const response = await fetch("/api/unioes", {
+      const response = await authFetch("/api/unioes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
