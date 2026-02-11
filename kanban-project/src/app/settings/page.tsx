@@ -100,7 +100,10 @@ const MODULOS_DISPLAY = [
     modulo: 'Administração',
     icone: '🛡️',
     permissoes: {
-      'usuarios.gerenciar': 'Gerenciar usuários',
+      'usuarios.gerenciar': 'Ver usuários',
+      'usuarios.criar': 'Criar usuários',
+      'usuarios.editar': 'Editar usuários',
+      'usuarios.excluir': 'Excluir usuários',
     },
   },
 ]
@@ -318,7 +321,7 @@ export default function SettingsPage() {
                     <Mail className="h-5 w-5 text-white/50" />
                     <div>
                       <p className="text-xs text-white/50 uppercase tracking-wide">Email</p>
-                      <p className="text-white font-medium">{user?.email}</p>
+                      <p className="text-white font-medium text-sm break-all">{user?.email}</p>
                     </div>
                   </div>
 

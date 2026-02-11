@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { useIsAdmin } from "@/src/hooks/use-is-admin"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -112,7 +112,10 @@ const MODULOS_PERMISSOES = [
     modulo: 'Administração',
     icone: '🛡️',
     permissoes: [
-      { chave: 'usuarios.gerenciar', label: 'Gerenciar usuários' },
+      { chave: 'usuarios.gerenciar', label: 'Ver usuários' },
+      { chave: 'usuarios.criar', label: 'Criar usuários' },
+      { chave: 'usuarios.editar', label: 'Editar usuários' },
+      { chave: 'usuarios.excluir', label: 'Excluir usuários' },
     ],
   },
 ]
@@ -147,7 +150,8 @@ interface UserData {
 
 export default function AdministratorPage() {
   const router = useRouter()
-  const { isAdmin, isLoading: isAdminLoading } = useIsAdmin()
+  const { pode, carregando: isAdminLoading } = usePermissoes()
+  const isAdmin = pode('usuarios.gerenciar')
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [perfis, setPerfis] = useState<Perfil[]>([])
@@ -655,10 +659,10 @@ export default function AdministratorPage() {
         <main className="relative px-6 py-8 max-w-7xl mx-auto space-y-6">
           {/* Ações do topo */}
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-end">
-            <Button onClick={handleCreate} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white">
+            {pode('usuarios.criar') && <Button onClick={handleCreate} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white">
               <UserPlus className="h-4 w-4" />
               Novo Usuário
-            </Button>
+            </Button>}
           </div>
 
           {/* Mensagens de feedback */}
@@ -732,7 +736,7 @@ export default function AdministratorPage() {
                           </td>
                           <td className="py-3 px-4">
                             <div className="flex justify-end gap-2">
-                              <Button
+                              {pode('usuarios.editar') && <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleEdit(usuario)}
@@ -740,8 +744,8 @@ export default function AdministratorPage() {
                                 className="text-white/70 hover:text-white hover:bg-white/10"
                               >
                                 <Pencil className="h-4 w-4" />
-                              </Button>
-                              {usuario.tipo !== UserType.ADMIN && (
+                              </Button>}
+                              {pode('usuarios.excluir') && usuario.tipo !== UserType.ADMIN && (
                                 <Button
                                   variant="ghost"
                                   size="icon"

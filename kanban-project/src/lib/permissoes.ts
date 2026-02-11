@@ -48,7 +48,10 @@ export const PERMISSOES = {
   'arvore.editar': 'Editar árvore genealógica',
 
   // Administração
-  'usuarios.gerenciar': 'Gerenciar usuários e permissões',
+  'usuarios.gerenciar': 'Ver usuários',
+  'usuarios.criar': 'Criar usuários',
+  'usuarios.editar': 'Editar usuários',
+  'usuarios.excluir': 'Excluir usuários',
 } as const
 
 export type PermissaoChave = keyof typeof PERMISSOES
@@ -132,6 +135,9 @@ export const MODULOS_PERMISSOES = [
     icone: '🛡️',
     permissoes: [
       'usuarios.gerenciar',
+      'usuarios.criar',
+      'usuarios.editar',
+      'usuarios.excluir',
     ],
   },
 ] as const
@@ -168,6 +174,9 @@ export const PERFIS_PADRAO = [
     permissoes: {
       ...TODAS_PERMISSOES,
       'usuarios.gerenciar': false,
+      'usuarios.criar': false,
+      'usuarios.editar': false,
+      'usuarios.excluir': false,
     },
   },
   {
