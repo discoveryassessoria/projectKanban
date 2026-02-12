@@ -44,8 +44,13 @@ export const PERMISSOES = {
   'eventos.excluir': 'Excluir eventos',
 
   // Árvore Genealógica
-  'arvore.ver': 'Ver árvore genealógica',
-  'arvore.editar': 'Editar árvore genealógica',
+  'arvore.ver': 'Ver árvore',
+  'arvore.criar': 'Criar pessoas na árvore',
+  'arvore.editar': 'Editar pessoas na árvore',
+  'arvore.excluir': 'Excluir pessoas da árvore',
+  'arvore.criar_documento': 'Criar documentos na árvore',
+  'arvore.editar_documento': 'Editar documentos na árvore',
+  'arvore.excluir_documento': 'Excluir documentos na árvore',
 
   // Administração
   'usuarios.gerenciar': 'Ver usuários',
@@ -127,7 +132,12 @@ export const MODULOS_PERMISSOES = [
     icone: '🌳',
     permissoes: [
       'arvore.ver',
+      'arvore.criar',
       'arvore.editar',
+      'arvore.excluir',
+      'arvore.criar_documento',
+      'arvore.editar_documento',
+      'arvore.excluir_documento',
     ],
   },
   {

@@ -4,6 +4,7 @@ import { useState, useCallback } from "react"
 import { X, FileText, Upload, File, Trash2, Eye, Loader2 } from "lucide-react"
 import { useUploadThing } from "@/src/lib/uploadthing"
 import { DatePickerField } from "@/components/ui/date-picker-field"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 // Helper para fetch autenticado
 function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
@@ -197,7 +198,7 @@ function FilePreview({
 }: {
   file: UploadedFile
   label: string
-  onRemove: () => void
+  onRemove?: () => void
 }) {
   return (
     <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -216,14 +217,16 @@ function FilePreview({
         >
           <Eye className="w-4 h-4 text-green-600" />
         </a>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="p-2 hover:bg-red-100 rounded-lg transition-colors"
-          title="Remover"
-        >
-          <Trash2 className="w-4 h-4 text-red-500" />
-        </button>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="p-2 hover:bg-red-100 rounded-lg transition-colors"
+            title="Remover"
+          >
+            <Trash2 className="w-4 h-4 text-red-500" />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -238,6 +241,8 @@ export function DocumentoModal({
   processoId
 }: DocumentoModalProps) {
   const isEditing = !!documento
+  const { pode } = usePermissoes()
+  const somenteVisualizar = !pode('arvore.editar_documento')
   const [saving, setSaving] = useState(false)
   
   // Campos do formulário
@@ -376,7 +381,7 @@ export function DocumentoModal({
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
-                {isEditing ? 'Editar Documento' : 'Adicionar Documento'}
+                {somenteVisualizar ? 'Visualizar Documento' : (isEditing ? 'Editar Documento' : 'Adicionar Documento')}
               </h2>
               <p className="text-sm text-gray-500">{pessoaNome}</p>
             </div>
@@ -404,6 +409,7 @@ export function DocumentoModal({
                   className={selectClass}
                   style={selectStyle}
                   required
+                  disabled={somenteVisualizar}
                 >
                   {TIPO_DOCUMENTO_OPTIONS.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -420,6 +426,7 @@ export function DocumentoModal({
                   className={selectClass}
                   style={selectStyle}
                   required
+                  disabled={somenteVisualizar}
                 >
                   {STATUS_OPTIONS.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -439,6 +446,7 @@ export function DocumentoModal({
                 onChange={(e) => setDescricao(e.target.value)}
                 className={inputClass}
                 placeholder="Ex: Segunda via, Inteiro teor..."
+                disabled={somenteVisualizar}
               />
             </div>
 
@@ -457,6 +465,7 @@ export function DocumentoModal({
                     onChange={(e) => setCartorio(e.target.value)}
                     className={inputClass}
                     placeholder="Nome do cartório"
+                    disabled={somenteVisualizar}
                   />
                 </div>
 
@@ -471,6 +480,7 @@ export function DocumentoModal({
                       onChange={(e) => setLivro(e.target.value)}
                       className={inputClass}
                       placeholder="Ex: B2"
+                      disabled={somenteVisualizar}
                     />
                   </div>
                   <div>
@@ -483,6 +493,7 @@ export function DocumentoModal({
                       onChange={(e) => setFolha(e.target.value)}
                       className={inputClass}
                       placeholder="Ex: 123"
+                      disabled={somenteVisualizar}
                     />
                   </div>
                   <div>
@@ -495,6 +506,7 @@ export function DocumentoModal({
                       onChange={(e) => setTermo(e.target.value)}
                       className={inputClass}
                       placeholder="Ex: 456"
+                      disabled={somenteVisualizar}
                     />
                   </div>
                 </div>
@@ -509,6 +521,7 @@ export function DocumentoModal({
                       <DatePickerField
                         value={dataEvento}
                         onChange={(value) => setDataEvento(value)}
+                        disabled={somenteVisualizar}
                       />
                     </div>
                     <div>
@@ -518,6 +531,7 @@ export function DocumentoModal({
                       <DatePickerField
                         value={dataRegistro}
                         onChange={(value) => setDataRegistro(value)}
+                        disabled={somenteVisualizar}
                       />
                     </div>
                   </div>
@@ -533,6 +547,7 @@ export function DocumentoModal({
               <DatePickerField
                 value={dataEmissao}
                 onChange={(value) => setDataEmissao(value)}
+                disabled={somenteVisualizar}
               />
             </div>
 
@@ -545,14 +560,16 @@ export function DocumentoModal({
                 <FilePreview
                   file={arquivoOriginal}
                   label="Documento original enviado"
-                  onRemove={() => setArquivoOriginal(null)}
+                  onRemove={somenteVisualizar ? undefined : () => setArquivoOriginal(null)}
                 />
-              ) : (
+              ) : !somenteVisualizar ? (
                 <FileUploadZone
                   label="Enviar documento original"
                   onFileUploaded={setArquivoOriginal}
                   colorScheme="teal"
                 />
+              ) : (
+                <p className="text-sm text-gray-400 italic">Nenhum arquivo enviado</p>
               )}
             </div>
 
@@ -565,6 +582,7 @@ export function DocumentoModal({
                   checked={traduzido}
                   onChange={(e) => setTraduzido(e.target.checked)}
                   className="w-4 h-4 text-cyan-600 border-gray-300 rounded focus:ring-cyan-500"
+                  disabled={somenteVisualizar}
                 />
                 <label htmlFor="traduzido" className="text-sm font-medium text-gray-700">
                   Documento traduzido
@@ -580,6 +598,7 @@ export function DocumentoModal({
                     <DatePickerField
                       value={dataTraducao}
                       onChange={(value) => setDataTraducao(value)}
+                      disabled={somenteVisualizar}
                     />
                   </div>
 
@@ -591,14 +610,16 @@ export function DocumentoModal({
                       <FilePreview
                         file={arquivoTraducao}
                         label="Tradução enviada"
-                        onRemove={() => setArquivoTraducao(null)}
+                        onRemove={somenteVisualizar ? undefined : () => setArquivoTraducao(null)}
                       />
-                    ) : (
+                    ) : !somenteVisualizar ? (
                       <FileUploadZone
                         label="Enviar tradução"
                         onFileUploaded={setArquivoTraducao}
                         colorScheme="cyan"
                       />
+                    ) : (
+                      <p className="text-sm text-gray-400 italic">Nenhum arquivo enviado</p>
                     )}
                   </div>
                 </>
@@ -614,6 +635,7 @@ export function DocumentoModal({
                   checked={apostilado}
                   onChange={(e) => setApostilado(e.target.checked)}
                   className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  disabled={somenteVisualizar}
                 />
                 <label htmlFor="apostilado" className="text-sm font-medium text-gray-700">
                   Documento apostilado
@@ -629,6 +651,7 @@ export function DocumentoModal({
                     <DatePickerField
                       value={dataApostilamento}
                       onChange={(value) => setDataApostilamento(value)}
+                      disabled={somenteVisualizar}
                     />
                   </div>
 
@@ -640,14 +663,16 @@ export function DocumentoModal({
                       <FilePreview
                         file={arquivoApostila}
                         label="Apostila enviada"
-                        onRemove={() => setArquivoApostila(null)}
+                        onRemove={somenteVisualizar ? undefined : () => setArquivoApostila(null)}
                       />
-                    ) : (
+                    ) : !somenteVisualizar ? (
                       <FileUploadZone
                         label="Enviar apostila"
                         onFileUploaded={setArquivoApostila}
                         colorScheme="purple"
                       />
+                    ) : (
+                      <p className="text-sm text-gray-400 italic">Nenhum arquivo enviado</p>
                     )}
                   </div>
                 </>
@@ -665,6 +690,7 @@ export function DocumentoModal({
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm resize-none"
                 placeholder="Observações adicionais..."
+                disabled={somenteVisualizar}
               />
             </div>
           </div>
@@ -676,16 +702,18 @@ export function DocumentoModal({
               onClick={onClose}
               className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
             >
-              Cancelar
+              {somenteVisualizar ? 'Fechar' : 'Cancelar'}
             </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-            >
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {saving ? 'Salvando...' : (isEditing ? 'Salvar Alterações' : 'Adicionar Documento')}
-            </button>
+            {!somenteVisualizar && (
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {saving ? 'Salvando...' : (isEditing ? 'Salvar Alterações' : 'Adicionar Documento')}
+              </button>
+            )}
           </div>
         </form>
       </div>

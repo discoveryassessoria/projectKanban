@@ -93,7 +93,12 @@ const MODULOS_DISPLAY = [
     icone: '🌳',
     permissoes: {
       'arvore.ver': 'Ver árvore',
-      'arvore.editar': 'Editar árvore',
+      'arvore.criar': 'Criar pessoas na árvore',
+      'arvore.editar': 'Editar pessoas na árvore',
+      'arvore.excluir': 'Excluir pessoas da árvore',
+      'arvore.criar_documento': 'Criar documentos',
+      'arvore.editar_documento': 'Editar documentos',
+      'arvore.excluir_documento': 'Excluir documentos',
     },
   },
   {

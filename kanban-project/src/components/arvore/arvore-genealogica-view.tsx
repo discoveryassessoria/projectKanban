@@ -20,6 +20,7 @@ import {
   Maximize2,
   FileDown,
 } from "lucide-react"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 // Helper para fetch autenticado
 function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
@@ -59,6 +60,7 @@ export function ArvoreGenealogicaView({
   sidebarTabParaFocar,
   nomeFamilia  // ✅ NOVA PROP
 }: ArvoreGenealogicaViewProps) {
+  const { pode } = usePermissoes()
   const [viewMode, setViewMode] = useState<ViewMode>('paisagem')
   const [pessoas, setPessoas] = useState<PessoaArvore[]>([])
   const [unioes, setUnioes] = useState<UniaoArvore[]>([])
@@ -715,10 +717,10 @@ export function ArvoreGenealogicaView({
             pessoaPrincipal={pessoaPrincipal}
             mode={viewMode}
             onPersonClick={handlePersonClick}
-            onAddPai={handleAddPai}
-            onAddMae={handleAddMae}
-            onAddFilho={handleAddFilho}
-            onAddConjuge={handleAddConjugeById}
+            onAddPai={pode('arvore.criar') ? handleAddPai : undefined}
+            onAddMae={pode('arvore.criar') ? handleAddMae : undefined}
+            onAddFilho={pode('arvore.criar') ? handleAddFilho : undefined}
+            onAddConjuge={pode('arvore.criar') ? handleAddConjugeById : undefined}
           />
         )}
       </div>
@@ -735,15 +737,15 @@ export function ArvoreGenealogicaView({
         casamentos={selectedPerson ? findCasamentos(selectedPerson) : []}
         onClose={handleCloseSidebar}
         onOpenFullDetails={handleOpenFullDetails}
-        onEdit={handleEditPerson}
-        onDelete={handleDeletePerson}
-        onAddFilho={handleAddFilho}
-        onAddPai={handleAddPai}
-        onAddMae={handleAddMae}
-        onAddConjuge={handleAddConjugeById}
-        onAddDocumento={handleAddDocumento}
+        onEdit={pode('arvore.editar') ? handleEditPerson : undefined}
+        onDelete={pode('arvore.excluir') ? handleDeletePerson : undefined}
+        onAddFilho={pode('arvore.criar') ? handleAddFilho : undefined}
+        onAddPai={pode('arvore.criar') ? handleAddPai : undefined}
+        onAddMae={pode('arvore.criar') ? handleAddMae : undefined}
+        onAddConjuge={pode('arvore.criar') ? handleAddConjugeById : undefined}
+        onAddDocumento={pode('arvore.criar_documento') ? handleAddDocumento : undefined}
         onEditDocumento={handleEditDocumento}
-        onDeleteDocumento={handleDeleteDocumento}
+        onDeleteDocumento={pode('arvore.excluir_documento') ? handleDeleteDocumento : undefined}
         onSelectPerson={handleSelectPersonFromSidebar}
         initialTab={sidebarTabInicial}
       />
@@ -1312,14 +1314,33 @@ function EditPersonModal({
 
       if (isCasado && conjugeId) {
         if (uniaoExistente) {
-          await authFetch(`/api/unioes/${uniaoExistente.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              data_inicio: dataCasamento ? new Date(dataCasamento).toISOString() : null,
-              local: localCasamento.trim() || null
+          const conjugeAtualId = uniaoExistente.pessoa1Id === pessoa.id 
+            ? uniaoExistente.pessoa2Id 
+            : uniaoExistente.pessoa1Id
+
+          if (Number(conjugeId) !== conjugeAtualId) {
+            // Cônjuge mudou: atualiza via PUT
+            await authFetch(`/api/unioes/${uniaoExistente.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                pessoa1Id: pessoa.id,
+                pessoa2Id: Number(conjugeId),
+                data_inicio: dataCasamento ? new Date(dataCasamento).toISOString() : null,
+                local: localCasamento.trim() || null
+              })
             })
-          })
+          } else {
+            // Mesmo cônjuge: só atualiza data/local
+            await authFetch(`/api/unioes/${uniaoExistente.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                data_inicio: dataCasamento ? new Date(dataCasamento).toISOString() : null,
+                local: localCasamento.trim() || null
+              })
+            })
+          }
         } else {
           await authFetch('/api/unioes', {
             method: 'POST',

@@ -49,7 +49,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar')
+    const erro = await verificarPermissao(request, 'arvore.editar')
     if (erro) return erro
 
     const { id: idParam } = await params
@@ -129,7 +129,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar')
+    const erro = await verificarPermissao(request, 'arvore.excluir')
     if (erro) return erro
     
     const { id: idParam } = await params

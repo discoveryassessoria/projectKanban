@@ -22,6 +22,7 @@ import {
   ExternalLink
 } from "lucide-react"
 import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 // ========================================
 // TIPOS
@@ -413,6 +414,7 @@ export function PessoaSidebar({
   const [activeTab, setActiveTab] = useState<"info" | "familia" | "docs">("info")
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [initialTabProcessed, setInitialTabProcessed] = useState(false)
+  const { pode } = usePermissoes()
   
   // Efeito para definir aba inicial quando a sidebar abre (vindo da pesquisa)
   useEffect(() => {
@@ -500,34 +502,42 @@ export function PessoaSidebar({
         </div>
         
         {/* Ações */}
-        <div className="mt-4 flex items-center gap-2">
-          <button 
-            onClick={() => onEdit?.(pessoa)}
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-teal-50 text-teal-700 rounded-lg hover:bg-teal-100 transition-colors"
-          >
-            <Pencil className="h-4 w-4" />
-            <span className="text-sm font-medium">Editar</span>
-          </button>
-          <button 
-            onClick={handleDelete}
-            className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-              confirmDelete 
-                ? 'bg-red-600 text-white hover:bg-red-700 flex-1' 
-                : 'bg-red-50 text-red-600 hover:bg-red-100'
-            }`}
-          >
-            <Trash2 className="h-4 w-4" />
-            {confirmDelete && <span className="text-sm font-medium">Confirmar?</span>}
-          </button>
-          {confirmDelete && (
-            <button 
-              onClick={() => setConfirmDelete(false)}
-              className="px-3 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg"
-            >
-              Cancelar
-            </button>
-          )}
-        </div>
+        {(pode('arvore.editar') || pode('arvore.excluir')) && (onEdit || onDelete) && (
+          <div className="mt-4 flex items-center gap-2">
+            {onEdit && (
+              <button 
+                onClick={() => onEdit(pessoa)}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-teal-50 text-teal-700 rounded-lg hover:bg-teal-100 transition-colors"
+              >
+                <Pencil className="h-4 w-4" />
+                <span className="text-sm font-medium">Editar</span>
+              </button>
+            )}
+            {pode('arvore.excluir') && onDelete && (
+              <>
+                <button 
+                  onClick={handleDelete}
+                  className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                    confirmDelete 
+                      ? 'bg-red-600 text-white hover:bg-red-700 flex-1' 
+                      : 'bg-red-50 text-red-600 hover:bg-red-100'
+                  }`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {confirmDelete && <span className="text-sm font-medium">Confirmar?</span>}
+                </button>
+                {confirmDelete && (
+                  <button 
+                    onClick={() => setConfirmDelete(false)}
+                    className="px-3 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg"
+                  >
+                    Cancelar
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
       
       {/* Tabs */}
@@ -697,9 +707,9 @@ export function PessoaSidebar({
                     />
                   )}
                   {/* Botão para adicionar pai se não tem */}
-                  {!pessoa.pai && (
+                  {pode('arvore.criar') && !pessoa.pai && onAddPai && (
                     <button 
-                      onClick={() => onAddPai?.(pessoa.id)}
+                      onClick={() => onAddPai(pessoa.id)}
                       className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
                     >
                       <Plus className="w-4 h-4" />
@@ -707,9 +717,9 @@ export function PessoaSidebar({
                     </button>
                   )}
                   {/* Botão para adicionar mãe se não tem */}
-                  {!pessoa.mae && (
+                  {pode('arvore.criar') && !pessoa.mae && onAddMae && (
                     <button 
-                      onClick={() => onAddMae?.(pessoa.id)}
+                      onClick={() => onAddMae(pessoa.id)}
                       className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
                     >
                       <Plus className="w-4 h-4" />
@@ -717,7 +727,7 @@ export function PessoaSidebar({
                     </button>
                   )}
                 </div>
-              ) : (
+              ) : pode('arvore.criar') ? (
                 <div className="space-y-2">
                   <button 
                     onClick={() => onAddPai?.(pessoa.id)}
@@ -734,7 +744,7 @@ export function PessoaSidebar({
                     <span className="text-sm font-medium">Adicionar Mãe</span>
                   </button>
                 </div>
-              )}
+              ) : null}
             </div>
             
             {/* Cônjuges */}
@@ -779,13 +789,13 @@ export function PessoaSidebar({
                 })}
                 
                 {/* Botão para adicionar cônjuge - sempre visível */}
-                <button 
+                {pode('arvore.criar') && <button 
                   onClick={() => onAddConjuge?.(pessoa.id)}
                   className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
                 >
                   <Heart className="w-4 h-4" />
                   <span className="text-sm font-medium">Adicionar cônjuge</span>
-                </button>
+                </button>}
               </div>
             </div>
             
@@ -810,13 +820,13 @@ export function PessoaSidebar({
                         onClick={() => handleSelectFamiliar(filho)}
                       />
                     ))}
-                    <button 
+                    {pode('arvore.criar') && <button 
                       onClick={() => onAddFilho?.(pessoa.id)}
                       className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                       <span className="text-sm font-medium">Adicionar filho(a)</span>
-                    </button>
+                    </button>}
                   </div>
                 )
               })()}
@@ -834,7 +844,7 @@ export function PessoaSidebar({
                     key={doc.id} 
                     documento={doc} 
                     onClick={() => onEditDocumento?.(doc)}
-                    onDelete={() => onDeleteDocumento?.(doc)}
+                    onDelete={pode('arvore.excluir_documento') ? () => onDeleteDocumento?.(doc) : undefined}
                   />
                 ))}
               </div>
@@ -847,13 +857,13 @@ export function PessoaSidebar({
               </div>
             )}
             
-            <button 
+            {pode('arvore.criar_documento') && <button 
               onClick={() => onAddDocumento?.(pessoa.id)}
               className="w-full mt-4 flex items-center justify-center gap-2 p-3 bg-teal-50 text-teal-700 rounded-lg hover:bg-teal-100 transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span className="text-sm font-medium">Adicionar documento</span>
-            </button>
+            </button>}
           </div>
         )}
       </div>

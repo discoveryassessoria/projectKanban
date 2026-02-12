@@ -139,7 +139,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 // PUT - Atualizar documento
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar')
+    const erro = await verificarPermissao(request, 'arvore.editar_documento')
     if (erro) return erro
 
     const { id: idParam } = await params
@@ -276,7 +276,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 // DELETE - Excluir documento E tarefas relacionadas
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar')
+    const erro = await verificarPermissao(request, 'arvore.excluir_documento')
     if (erro) return erro
 
     const { id: idParam } = await params
@@ -371,7 +371,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 // PATCH - Atualizar status do documento (atalho)
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar')
+    const erro = await verificarPermissao(request, 'arvore.editar_documento')
     if (erro) return erro
     
     const { id: idParam } = await params

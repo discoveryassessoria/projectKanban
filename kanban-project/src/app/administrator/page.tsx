@@ -105,7 +105,12 @@ const MODULOS_PERMISSOES = [
     icone: '🌳',
     permissoes: [
       { chave: 'arvore.ver', label: 'Ver árvore' },
-      { chave: 'arvore.editar', label: 'Editar árvore' },
+      { chave: 'arvore.criar', label: 'Criar pessoas na árvore' },
+      { chave: 'arvore.editar', label: 'Editar pessoas na árvore' },
+      { chave: 'arvore.excluir', label: 'Excluir pessoas da árvore' },
+      { chave: 'arvore.criar_documento', label: 'Criar documentos' },
+      { chave: 'arvore.editar_documento', label: 'Editar documentos' },
+      { chave: 'arvore.excluir_documento', label: 'Excluir documentos' },
     ],
   },
   {

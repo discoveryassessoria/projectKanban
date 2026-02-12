@@ -47,7 +47,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 // PUT - Atualizar união
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar')
+    const erro = await verificarPermissao(request, 'arvore.editar')
     if (erro) return erro
 
     const { id: idParam } = await params
@@ -78,6 +78,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.data_registro !== undefined) dataToUpdate.data_registro = body.data_registro ? new Date(body.data_registro) : null
     if (body.observacoes !== undefined) dataToUpdate.observacoes = body.observacoes
 
+    // Trocar cônjuge via edição
+    if (body.pessoa1Id !== undefined) dataToUpdate.pessoa1 = { connect: { id: Number(body.pessoa1Id) } }
+    if (body.pessoa2Id !== undefined) dataToUpdate.pessoa2 = { connect: { id: Number(body.pessoa2Id) } }
+
     const uniaoAtualizada = await prisma.uniao.update({
       where: { id },
       data: dataToUpdate,
@@ -104,7 +108,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 // DELETE - Excluir união
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar')
+    const erro = await verificarPermissao(request, 'arvore.excluir')
     if (erro) return erro
     
     const { id: idParam } = await params

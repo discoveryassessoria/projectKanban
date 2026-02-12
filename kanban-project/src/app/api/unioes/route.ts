@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 // POST - Criar nova união
 export async function POST(request: NextRequest) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar')
+    const erro = await verificarPermissao(request, 'arvore.criar')
     if (erro) return erro
     
     const body = await request.json()
