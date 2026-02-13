@@ -255,7 +255,7 @@ export async function POST(
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.criar')
+    const erro = await verificarPermissao(request, 'financeiro.fatura_criar')
     if (erro) return erro
 
     const { processoId } = await params

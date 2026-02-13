@@ -76,10 +76,15 @@ const MODULOS_PERMISSOES = [
     icone: '💰',
     permissoes: [
       { chave: 'financeiro.ver', label: 'Ver faturas e pagamentos' },
-      { chave: 'financeiro.criar', label: 'Criar faturas' },
-      { chave: 'financeiro.editar', label: 'Editar faturas' },
-      { chave: 'financeiro.dashboard', label: 'Ver dashboard financeiro' },
-      { chave: 'financeiro.contas_pagar', label: 'Gerenciar contas a pagar' },
+      { chave: 'financeiro.fatura_criar', label: 'Criar faturas' },
+      { chave: 'financeiro.fatura_excluir', label: 'Excluir faturas' },
+      { chave: 'financeiro.pagamento_criar', label: 'Registrar pagamentos' },
+      { chave: 'financeiro.pagamento_editar', label: 'Editar pagamentos' },
+      { chave: 'financeiro.pagamento_excluir', label: 'Excluir pagamentos' },
+      { chave: 'financeiro.coluna_criar', label: 'Adicionar coluna na planilha' },
+      { chave: 'financeiro.coluna_editar', label: 'Editar nome de coluna' },
+      { chave: 'financeiro.coluna_excluir', label: 'Excluir coluna da planilha' },
+      { chave: 'financeiro.custos_editar', label: 'Editar valores e reordenar planilha' },
     ],
   },
   {
@@ -88,6 +93,7 @@ const MODULOS_PERMISSOES = [
     permissoes: [
       { chave: 'mensagens.ver', label: 'Ver mensagens' },
       { chave: 'mensagens.responder', label: 'Responder mensagens' },
+      { chave: 'mensagens.apagar', label: 'Apagar mensagens de outros' },
     ],
   },
   {

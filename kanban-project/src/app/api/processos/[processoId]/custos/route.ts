@@ -243,42 +243,6 @@ export async function GET(
             documentoId: doc.id
           })
         })
-      } else {
-        // Pessoa sem documentos - só incluir se for da linhagem principal (não 999)
-        if (numeroLinhagem !== 999) {
-          // Valores de custos (sem tipoRegistro)
-          const valoresPorServico: Record<number, number> = {}
-          let totalLinha = 0
-          servicos.forEach(servico => {
-            const key = `${pessoa.id}--${servico.id}`
-            const valor = custosMap[key]?.valor || 0
-            valoresPorServico[servico.id] = valor
-            totalLinha += valor
-          })
-
-          linhasTabela.push({
-            pessoaId: pessoa.id,
-            numeroLinhagem,
-            nome: nomeCompleto,
-            tipoRegistro: '-',
-            ordemRegistro: 0,
-            data: null,
-            local: '',
-            cartorio: '',
-            livro: '',
-            folha: '',
-            termo: '',
-            dadosRegistro: '',
-            conjuge: conjuges[0] || '',
-            paiNome,
-            maeNome,
-            observacao: '',
-            valores: valoresPorServico,
-            total: totalLinha,
-            isPrimeiraLinha: true,
-            documentoId: null
-          })
-        }
       }
     })
 
@@ -343,7 +307,7 @@ export async function POST(
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.criar')
+    const erro = await verificarPermissao(request, 'financeiro.custos_editar')
     if (erro) return erro
 
     const { processoId } = await params
@@ -397,7 +361,7 @@ export async function PUT(
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.editar')
+    const erro = await verificarPermissao(request, 'financeiro.custos_editar')
     if (erro) return erro
 
     const { processoId } = await params
@@ -423,7 +387,7 @@ export async function PUT(
               processoId: procId,
               pessoaId: parseInt(c.pessoaId),
               tipoServicoId: parseInt(c.tipoServicoId),
-              tipoRegistro: c.tipoRegistro || null
+              tipoRegistro: c.tipoRegistro || '-'
             }
           },
           update: {
@@ -434,7 +398,7 @@ export async function PUT(
             processoId: procId,
             pessoaId: parseInt(c.pessoaId),
             tipoServicoId: parseInt(c.tipoServicoId),
-            tipoRegistro: c.tipoRegistro || null,
+            tipoRegistro: c.tipoRegistro || '-',
             valor: c.valor || 0,
             observacao: c.observacao || null
           }
@@ -455,7 +419,7 @@ export async function PATCH(
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.editar')
+    const erro = await verificarPermissao(request, 'financeiro.custos_editar')
     if (erro) return erro
     
     const { ordens } = await request.json()

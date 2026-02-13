@@ -104,18 +104,14 @@ export async function PUT(
       }
     }
 
-    // Validar chaves de permissão custom (se informadas)
+    // Limpar chaves de permissão inválidas/obsoletas
     if (permissoesCustom) {
       const chavesValidas = Object.keys(PERMISSOES)
-      const chavesInvalidas = Object.keys(permissoesCustom).filter(
-        k => !chavesValidas.includes(k)
-      )
-      if (chavesInvalidas.length > 0) {
-        return NextResponse.json(
-          { error: `Permissões inválidas: ${chavesInvalidas.join(', ')}` },
-          { status: 400 }
-        )
-      }
+      Object.keys(permissoesCustom).forEach(k => {
+        if (!chavesValidas.includes(k)) {
+          delete permissoesCustom[k]
+        }
+      })
     }
 
     // Atualizar

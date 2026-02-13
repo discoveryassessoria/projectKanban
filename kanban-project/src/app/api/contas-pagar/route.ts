@@ -7,7 +7,7 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
 // GET - Listar contas a pagar
 export async function GET(request: NextRequest) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.contas_pagar')
+    const erro = await verificarPermissao(request, 'financeiro.ver')
     if (erro) return erro
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status")
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
 // POST - Criar conta a pagar
 export async function POST(request: NextRequest) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.contas_pagar')
+    const erro = await verificarPermissao(request, 'financeiro.ver')
     if (erro) return erro
 
     const body = await request.json()

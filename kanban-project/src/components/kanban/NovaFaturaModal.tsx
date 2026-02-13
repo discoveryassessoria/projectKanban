@@ -104,7 +104,10 @@ export function NovaFaturaModal({
 
       const response = await fetch(`/api/processos/${processoId}/faturas`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
         body: JSON.stringify(payload)
       })
 

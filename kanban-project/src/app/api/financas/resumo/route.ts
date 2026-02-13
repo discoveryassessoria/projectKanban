@@ -6,7 +6,7 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 export async function GET(request: NextRequest) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.dashboard')
+    const erro = await verificarPermissao(request, 'financeiro.ver')
     if (erro) return erro
 
     const { searchParams } = new URL(request.url)

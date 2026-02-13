@@ -33,6 +33,7 @@ import { TabelaCustos } from "./TabelaCustos"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import { NovaFaturaModal } from "./NovaFaturaModal"
 import { ExportarFaturaModal } from "./ExportarFaturaModal"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 // ========================================
 // TYPES
@@ -175,6 +176,8 @@ const MOEDA_SYMBOLS: Record<string, string> = {
 // COMPONENT
 // ========================================
 export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoFaturasProps) {
+  const { pode } = usePermissoes()
+
   const [faturas, setFaturas] = useState<Fatura[]>([])
   const [totais, setTotais] = useState<Totais>({ total: 0, pago: 0, pendente: 0, vencido: 0 })
   // ✅ NOVO: Totais gerais em BRL vindos da API
@@ -293,8 +296,12 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
       setLoading(true)
       
       const [faturasRes, processoRes] = await Promise.all([
-        fetch(`/api/processos/${processoId}/faturas`),
-        fetch(`/api/processos/${processoId}`)
+        fetch(`/api/processos/${processoId}/faturas`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+        }),
+        fetch(`/api/processos/${processoId}`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+        })
       ])
       
       if (faturasRes.ok) {
@@ -332,7 +339,10 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
       
       const response = await fetch(
         `/api/processos/${processoId}/faturas/${fatura.id}/parcelas/${parcela.id}/pagar`,
-        { method: 'POST' }
+        { 
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+        }
       )
 
       if (response.ok) {
@@ -354,7 +364,10 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
     try {
       const response = await fetch(
         `/api/processos/${processoId}/faturas/${fatura.id}/parcelas/${parcela.id}/pagar`,
-        { method: 'DELETE' }
+        { 
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+        }
       )
 
       if (response.ok) {
@@ -405,7 +418,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
 
       const response = await fetch(`/api/processos/${processoId}/faturas/${showPagar.id}/pagar`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('authToken')}` },
         body: JSON.stringify({
           formaPagamento: pagarMetodo,
           valorPago: pagarValorNumerico,
@@ -442,7 +455,8 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
 
     try {
       const response = await fetch(`/api/processos/${processoId}/faturas/${fatura.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
       })
 
       if (response.ok) {
@@ -494,7 +508,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
         `/api/processos/${processoId}/faturas/${fatura.id}/pagamentos/${pagamento.id}`,
         {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('authToken')}` },
           body: JSON.stringify({
             valor: valorNumerico,
             valorOriginal: valorEmReais,
@@ -530,7 +544,10 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
       
       const response = await fetch(
         `/api/processos/${processoId}/faturas/${fatura.id}/pagamentos/${pagamento.id}`,
-        { method: 'DELETE' }
+        { 
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+        }
       )
 
       if (response.ok) {
@@ -648,17 +665,19 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                 <FileDown className="h-4 w-4" />
                 Exportar PDF
               </Button>
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowNovaFatura(true)
-                }}
-                size="sm"
-                className="bg-emerald-600 hover:bg-emerald-700"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Nova Fatura
-              </Button>
+              {pode('financeiro.fatura_criar') && (
+                <Button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowNovaFatura(true)
+                  }}
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Nova Fatura
+                </Button>
+              )}
               {showFaturas ? (
                 <ChevronUp className="h-5 w-5 text-gray-400" />
               ) : (
@@ -981,35 +1000,39 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                         </div>
 
                                         <div className="flex justify-center">
-                                          {parcela.pago ? (
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleDesmarcarParcela(fatura, parcela)
-                                              }}
-                                              className="text-xs text-gray-500 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition-colors"
-                                            >
-                                              Desfazer
-                                            </button>
-                                          ) : (
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={(e) => {
-                                                e.stopPropagation()
-                                                setConfirmarParcela({ fatura, parcela })
-                                              }}
-                                              className={`
-                                                text-xs h-8
-                                                ${vencida 
-                                                  ? 'border-red-300 text-red-700 hover:bg-red-100' 
-                                                  : 'border-green-300 text-green-700 hover:bg-green-100'
-                                                }
-                                              `}
-                                            >
-                                              <Check className="h-3 w-3 mr-1" />
-                                              Marcar Pago
-                                            </Button>
+                                          {pode('financeiro.pagamento_criar') && (
+                                            <>
+                                              {parcela.pago ? (
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleDesmarcarParcela(fatura, parcela)
+                                                  }}
+                                                  className="text-xs text-gray-500 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                                                >
+                                                  Desfazer
+                                                </button>
+                                              ) : (
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setConfirmarParcela({ fatura, parcela })
+                                                  }}
+                                                  className={`
+                                                    text-xs h-8
+                                                    ${vencida 
+                                                      ? 'border-red-300 text-red-700 hover:bg-red-100' 
+                                                      : 'border-green-300 text-green-700 hover:bg-green-100'
+                                                    }
+                                                  `}
+                                                >
+                                                  <Check className="h-3 w-3 mr-1" />
+                                                  Marcar Pago
+                                                </Button>
+                                              )}
+                                            </>
                                           )}
                                         </div>
                                       </div>
@@ -1125,7 +1148,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
 
                           {/* Ações */}
                           <div className="flex items-center gap-2 pt-3 border-t">
-                            {fatura.status !== 'PAGO' && !isBoleto && (
+                            {fatura.status !== 'PAGO' && !isBoleto && pode('financeiro.pagamento_criar') && (
                               <Button
                                 size="sm"
                                 onClick={(e) => {
@@ -1138,17 +1161,19 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                 {fatura.status === 'PARCIAL' ? 'Registrar Pagamento' : 'Marcar como Pago'}
                               </Button>
                             )}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleExcluir(fatura)
-                              }}
-                              className="text-red-500 hover:text-red-600 hover:bg-red-50 ml-auto"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            {pode('financeiro.fatura_excluir') && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleExcluir(fatura)
+                                }}
+                                className="text-red-500 hover:text-red-600 hover:bg-red-50 ml-auto"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -1753,21 +1778,25 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                 </>
               ) : (
                 <>
-                  <Button
-                    variant="outline"
-                    onClick={excluirPagamento}
-                    className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Excluir
-                  </Button>
-                  <Button
-                    onClick={iniciarEdicaoPagamento}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <Pencil className="h-4 w-4 mr-2" />
-                    Editar
-                  </Button>
+                  {pode('financeiro.pagamento_excluir') && (
+                    <Button
+                      variant="outline"
+                      onClick={excluirPagamento}
+                      className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Excluir
+                    </Button>
+                  )}
+                  {pode('financeiro.pagamento_editar') && (
+                    <Button
+                      onClick={iniciarEdicaoPagamento}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Editar
+                    </Button>
+                  )}
                 </>
               )}
             </div>

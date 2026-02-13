@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 // POST - Criar categoria
 export async function POST(request: NextRequest) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.editar')
+    const erro = await verificarPermissao(request, 'financeiro.custos_editar')
     if (erro) return erro
     
     const body = await request.json()

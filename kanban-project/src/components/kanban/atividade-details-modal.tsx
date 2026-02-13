@@ -467,8 +467,8 @@ export function ProcessoDetailsModal({
     ...(isItalia ? [{ id: "informacoes", label: "Informações" }] : []),
     // Aba Protocolos só aparece para ESPANHA
     ...(isEspanha ? [{ id: "protocolos", label: "Protocolos" }] : []),
-    { id: "faturas", label: "Faturas" },
-    { id: "eventos", label: "Eventos" },  // ✅ NOVO
+    ...(pode('financeiro.ver') ? [{ id: "faturas", label: "Faturas" }] : []),
+    ...(pode('eventos.ver') ? [{ id: "eventos", label: "Eventos" }] : []),
     { id: "historico", label: "Histórico" },
   ]
 
@@ -980,7 +980,7 @@ export function ProcessoDetailsModal({
             />
           )}
 
-          {activeTab === "faturas" && (
+          {activeTab === "faturas" && pode('financeiro.ver') && (
             <ProcessoFaturas
             processoId={processo.id}
             nomeFamilia={processo.nome}

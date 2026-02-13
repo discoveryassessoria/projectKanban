@@ -6,6 +6,7 @@ import {
   Download, FileDown, ChevronDown, ChevronUp, CheckSquare, Square,
   ArrowUp, ArrowDown
 } from "lucide-react"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 interface TipoServico {
   id: number
@@ -43,6 +44,8 @@ interface TabelaCustosProps {
 }
 
 export function TabelaCustos({ processoId, nomeFamilia }: TabelaCustosProps) {
+  const { pode } = usePermissoes()
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [linhas, setLinhas] = useState<LinhaTabela[]>([])
@@ -85,7 +88,9 @@ export function TabelaCustos({ processoId, nomeFamilia }: TabelaCustosProps) {
     
     try {
       setLoading(true)
-      const response = await fetch(`/api/processos/${processoId}/custos`)
+      const response = await fetch(`/api/processos/${processoId}/custos`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      })
       if (response.ok) {
         const data = await response.json()
         setLinhas(data.linhas || [])
@@ -153,7 +158,7 @@ export function TabelaCustos({ processoId, nomeFamilia }: TabelaCustosProps) {
       
       await fetch(`/api/processos/${processoId}/custos`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('authToken')}` },
         body: JSON.stringify({ ordens })
       })
     } catch (error) {
@@ -284,7 +289,7 @@ export function TabelaCustos({ processoId, nomeFamilia }: TabelaCustosProps) {
 
       const response = await fetch(`/api/processos/${processoId}/custos`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('authToken')}` },
         body: JSON.stringify({ custos })
       })
 
@@ -310,7 +315,7 @@ export function TabelaCustos({ processoId, nomeFamilia }: TabelaCustosProps) {
       setAddingServico(true)
       const response = await fetch(`/api/processos/${processoId}/servicos`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('authToken')}` },
         body: JSON.stringify({ nome: novoServico.trim() })
       })
 
@@ -346,7 +351,7 @@ export function TabelaCustos({ processoId, nomeFamilia }: TabelaCustosProps) {
       setSalvandoNome(true)
       const response = await fetch(`/api/processos/${processoId}/servicos/${servicoId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('authToken')}` },
         body: JSON.stringify({ nome: novoNomeServico.trim() })
       })
 
@@ -372,7 +377,8 @@ export function TabelaCustos({ processoId, nomeFamilia }: TabelaCustosProps) {
 
     try {
       const response = await fetch(`/api/processos/${processoId}/servicos/${servicoId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
       })
 
       if (response.ok) {
@@ -749,7 +755,7 @@ export function TabelaCustos({ processoId, nomeFamilia }: TabelaCustosProps) {
             <FileDown className="w-4 h-4" />
             Exportar Todos
           </button>
-          {temAlteracoes && (
+          {temAlteracoes && pode('financeiro.custos_editar') && (
             <button
               onClick={salvarAlteracoes}
               disabled={saving}
@@ -759,13 +765,15 @@ export function TabelaCustos({ processoId, nomeFamilia }: TabelaCustosProps) {
               Salvar
             </button>
           )}
-          <button
-            onClick={() => setShowAddServico(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition"
-          >
-            <Plus className="w-4 h-4" />
-            Adicionar Coluna
-          </button>
+          {pode('financeiro.coluna_criar') && (
+            <button
+              onClick={() => setShowAddServico(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition"
+            >
+              <Plus className="w-4 h-4" />
+              Adicionar Coluna
+            </button>
+          )}
         </div>
       </div>
 
@@ -838,7 +846,7 @@ export function TabelaCustos({ processoId, nomeFamilia }: TabelaCustosProps) {
                         type="text"
                         value={novoNomeServico}
                         onChange={(e) => setNovoNomeServico(e.target.value)}
-                        className="w-full px-1 py-0.5 text-xs border rounded text-gray-800"
+                        className="w-full px-1 py-0.5 text-xs border border-blue-300 rounded bg-[#2d4a6f] text-white placeholder-gray-300"
                         onKeyPress={(e) => e.key === 'Enter' && salvarNomeServico(servico.id)}
                         autoFocus
                       />
@@ -853,12 +861,16 @@ export function TabelaCustos({ processoId, nomeFamilia }: TabelaCustosProps) {
                     <div className="flex items-center justify-center gap-1 group">
                       <span className="truncate" title={servico.nome}>{servico.nome}</span>
                       <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => iniciarEdicaoNome(servico)} className="text-blue-200 hover:text-white p-0.5">
-                          <Pencil className="w-3 h-3" />
-                        </button>
-                        <button onClick={() => removerServico(servico.id, servico.nome)} className="text-red-300 hover:text-red-100 p-0.5">
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                        {pode('financeiro.coluna_editar') && (
+                          <button onClick={() => iniciarEdicaoNome(servico)} className="text-blue-200 hover:text-white p-0.5">
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        )}
+                        {pode('financeiro.coluna_excluir') && (
+                          <button onClick={() => removerServico(servico.id, servico.nome)} className="text-red-300 hover:text-red-100 p-0.5">
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -915,7 +927,7 @@ export function TabelaCustos({ processoId, nomeFamilia }: TabelaCustosProps) {
                   <td className="px-3 py-1.5 font-medium text-gray-800 border-r border-gray-200">
                     <div className="flex items-center justify-between gap-1">
                       <span>{linha.nome}</span>
-                      {isFirstOfPerson && (canMoveUp || canMoveDown) && (
+                      {isFirstOfPerson && (canMoveUp || canMoveDown) && pode('financeiro.custos_editar') && (
                         <div className="flex flex-col gap-0.5">
                           <button
                             onClick={() => moverPessoaParaCima(linha.pessoaId, linha.numeroLinhagem)}
@@ -1015,7 +1027,8 @@ export function TabelaCustos({ processoId, nomeFamilia }: TabelaCustosProps) {
                         value={valoresEditados[`${linha.pessoaId}-${linha.tipoRegistro}-${servico.id}`] || ''}
                         onChange={(e) => handleValorChange(linha.pessoaId, linha.tipoRegistro, servico.id, e.target.value)}
                         placeholder="0"
-                        className="w-full px-1 py-0.5 text-right text-xs border border-gray-200 rounded focus:ring-1 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                        readOnly={!pode('financeiro.custos_editar')}
+                        className={`w-full px-1 py-0.5 text-right text-xs border border-gray-200 rounded focus:ring-1 focus:ring-amber-500 focus:border-amber-500 ${pode('financeiro.custos_editar') ? 'bg-white' : 'bg-gray-100 cursor-default'}`}
                       />
                     </td>
                   ))}

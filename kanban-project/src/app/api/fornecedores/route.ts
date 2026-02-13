@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 // POST - Criar fornecedor
 export async function POST(request: NextRequest) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.contas_pagar')
+    const erro = await verificarPermissao(request, 'financeiro.ver')
     if (erro) return erro
     
     const body = await request.json()

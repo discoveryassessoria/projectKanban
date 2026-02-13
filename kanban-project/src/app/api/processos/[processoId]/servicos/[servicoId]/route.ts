@@ -10,7 +10,7 @@ export async function DELETE(
   { params }: { params: Promise<{ processoId: string; servicoId: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar')
+    const erro = await verificarPermissao(request, 'financeiro.coluna_excluir')
     if (erro) return erro
 
     const { processoId, servicoId } = await params
@@ -51,7 +51,7 @@ export async function PUT(
   { params }: { params: Promise<{ processoId: string; servicoId: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar')
+    const erro = await verificarPermissao(request, 'financeiro.coluna_editar')
     if (erro) return erro
 
     const { processoId, servicoId } = await params

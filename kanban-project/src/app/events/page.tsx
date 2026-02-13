@@ -25,9 +25,11 @@ import {
   FileText,
   AlertCircle,
   Filter,
+  Trash2,
 } from "lucide-react"
 import { BandeiraPais } from "@/src/components/ui/bandeira-pais"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 interface Usuario {
   id: number
@@ -95,6 +97,7 @@ const [local, setLocal] = useState("")
 const [lembreteDias, setLembreteDias] = useState("")
 
   const router = useRouter()
+  const { pode } = usePermissoes()
 
   useEffect(() => {
     const token = localStorage.getItem("authToken")
@@ -254,9 +257,13 @@ const handleSubmit = async () => {
     const url = editingId ? `/api/eventos/${editingId}` : "/api/eventos"
     const method = editingId ? "PUT" : "POST"
 
+    const token = localStorage.getItem('authToken')
     const res = await fetch(url, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(payload),
     })
 
@@ -372,13 +379,15 @@ const handleSubmit = async () => {
                 <TabsTrigger value="calendario" className="data-[state=active]:bg-white/20 text-white">Calendário</TabsTrigger>
               </TabsList>
             </Tabs>
-              <Button
-                onClick={() => setShowForm(true)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                <Plus className="h-4 w-4 mr-1.5" />
-                Novo Evento
-              </Button>
+              {pode('eventos.criar') && (
+                <Button
+                  onClick={() => setShowForm(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Novo Evento
+                </Button>
+              )}
             </div>
           </section>
 
@@ -738,15 +747,39 @@ const handleSubmit = async () => {
                                     </div>
 
                                     <div className="flex items-center gap-2 flex-shrink-0">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleEdit(evento)
-                                            }}
-                                        className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                                        >
-                                        <Edit2 className="h-4 w-4" />
-                                        </button>
+                                       {pode('eventos.editar') && (
+                                          <button
+                                              onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  handleEdit(evento)
+                                              }}
+                                          className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                          >
+                                          <Edit2 className="h-4 w-4" />
+                                          </button>
+                                        )}
+
+                                        {pode('eventos.excluir') && (
+                                          <button
+                                              onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  if (confirm("Tem certeza que deseja excluir este evento?")) {
+                                                    const token = localStorage.getItem('authToken')
+                                                    fetch(`/api/eventos/${evento.id}`, { 
+                                                      method: "DELETE",
+                                                      headers: {
+                                                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                                                      },
+                                                    }).then(res => {
+                                                      if (res.ok) fetchEventos()
+                                                    })
+                                                  }
+                                              }}
+                                          className="p-2 text-white/40 hover:text-red-400 hover:bg-white/10 rounded-lg transition-colors"
+                                          >
+                                          <Trash2 className="h-4 w-4" />
+                                          </button>
+                                        )}
                                       {evento.processo && <BandeiraPais pais={evento.processo.pais as any} size="sm" />}
                                       <span className="text-sm text-white/60">
                                         {evento.processo?.nome || "Sem processo"}

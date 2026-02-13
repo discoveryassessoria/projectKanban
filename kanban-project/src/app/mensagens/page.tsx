@@ -4,6 +4,7 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { getStoredUser, isAuthenticated } from "@/lib/auth"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { HeaderBar } from "@/src/components/header-bar"
 import { Send, MessageCircle, ArrowLeft, Pencil, Trash2, X, Check } from "lucide-react"
 
@@ -76,6 +77,7 @@ function formatarDataSeparador(dataStr: string): string {
 
 export default function MensagensPage() {
   const router = useRouter()
+  const { pode } = usePermissoes()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -178,8 +180,12 @@ export default function MensagensPage() {
   }, [conversaAberta])
 
   // Scroll
+  const prevCountRef = useRef(0)
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (mensagens.length > prevCountRef.current) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+    prevCountRef.current = mensagens.length
   }, [mensagens])
 
   // Focus edit input
@@ -263,9 +269,13 @@ export default function MensagensPage() {
     if (!user || !conversaAberta) return
 
     try {
+      const token = localStorage.getItem('authToken')
       const res = await fetch(
         `/api/admin/mensagens/${conversaAberta}/${msgId}?usuarioId=${user.id}`,
-        { method: "DELETE" }
+        { 
+          method: "DELETE",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
       )
 
       if (res.ok) {
@@ -481,38 +491,44 @@ export default function MensagensPage() {
                           const msg = item as Mensagem
                           const isEditing = editandoId === msg.id
                           // Equipe só pode editar/apagar suas próprias mensagens
-                          const podeEditar = msg.ehEquipe && msg.usuarioId === user?.id
+                          const podeEditarPropria = msg.ehEquipe && msg.usuarioId === user?.id && pode('mensagens.responder')
+                          const podeApagarOutros = pode('mensagens.apagar') && !(msg.usuarioId === user?.id && msg.ehEquipe)
 
                           return (
                             <div
                               key={msg.id}
                               className={`flex ${
                                 msg.ehEquipe ? "justify-end" : "justify-start"
-                              } mb-2 group`}
+                              } mb-2`}
                             >
+                            <div className="flex items-center group max-w-[70%]">
                               {/* Botões de ação (à esquerda do balão, para msgs da equipe) */}
-                              {msg.ehEquipe && podeEditar && !isEditing && (
-                                <div className="flex items-center gap-0.5 mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button
-                                    onClick={() => iniciarEdicao(msg)}
-                                    className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
-                                    title="Editar"
-                                  >
-                                    <Pencil className="h-3.5 w-3.5 text-white/40 hover:text-white/70" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleApagar(msg.id)}
-                                    className="p-1.5 rounded-lg hover:bg-red-500/20 transition-colors"
-                                    title="Apagar"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5 text-white/40 hover:text-red-400" />
-                                  </button>
+                              {msg.ehEquipe && (podeEditarPropria || podeApagarOutros) && !isEditing && (
+                                <div className="flex items-center gap-0.5 mr-2 opacity-0 group-hover:opacity-100">
+                                  {podeEditarPropria && (
+                                    <button
+                                      onClick={() => iniciarEdicao(msg)}
+                                      className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                                      title="Editar"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5 text-white/40 hover:text-white/70" />
+                                    </button>
+                                  )}
+                                  {(podeEditarPropria || podeApagarOutros) && (
+                                    <button
+                                      onClick={() => handleApagar(msg.id)}
+                                      className="p-1.5 rounded-lg hover:bg-red-500/20 transition-colors"
+                                      title="Apagar"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5 text-white/40 hover:text-red-400" />
+                                    </button>
+                                  )}
                                 </div>
                               )}
 
                               {/* Balão */}
                               <div
-                                className={`max-w-[70%] px-4 py-2.5 rounded-2xl ${
+                                className={`px-4 py-2.5 rounded-2xl ${
                                   msg.ehEquipe
                                     ? "bg-indigo-600 text-white rounded-br-md"
                                     : "bg-white/10 text-white rounded-bl-md"
@@ -595,6 +611,18 @@ export default function MensagensPage() {
                                   </>
                                 )}
                               </div>
+                              {!msg.ehEquipe && podeApagarOutros && (
+                                <div className="flex items-center gap-0.5 ml-2 opacity-0 group-hover:opacity-100">
+                                  <button
+                                    onClick={() => handleApagar(msg.id)}
+                                    className="p-1.5 rounded-lg hover:bg-red-500/20 transition-colors"
+                                    title="Apagar"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 text-white/40 hover:text-red-400" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                             </div>
                           )
                         })
@@ -603,7 +631,7 @@ export default function MensagensPage() {
                     </div>
 
                     {/* Input */}
-                    <div className="px-4 py-3 border-t border-white/10">
+                    {pode('mensagens.responder') && <div className="px-4 py-3 border-t border-white/10">
                       <div className="flex items-end gap-2">
                         <textarea
                           ref={inputRef}
@@ -639,7 +667,7 @@ export default function MensagensPage() {
                       <p className="text-xs text-white/20 mt-1.5">
                         Enter para enviar · Shift+Enter para nova linha
                       </p>
-                    </div>
+                    </div>}
                   </>
                 )}
               </div>

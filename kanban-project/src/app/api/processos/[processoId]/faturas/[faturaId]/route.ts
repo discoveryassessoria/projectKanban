@@ -65,7 +65,7 @@ export async function PUT(
   { params }: { params: Promise<{ processoId: string; faturaId: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.editar')
+    const erro = await verificarPermissao(request, 'financeiro.pagamento_editar')
     if (erro) return erro
 
     const { processoId, faturaId } = await params
@@ -131,7 +131,7 @@ export async function DELETE(
   { params }: { params: Promise<{ processoId: string; faturaId: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.editar')
+    const erro = await verificarPermissao(request, 'financeiro.fatura_excluir')
     if (erro) return erro
 
     const { processoId, faturaId } = await params

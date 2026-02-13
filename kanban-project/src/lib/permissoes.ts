@@ -26,16 +26,23 @@ export const PERMISSOES = {
   'clientes.editar': 'Editar dados cadastrais',
   'clientes.excluir': 'Excluir contratantes e requerentes',
 
-  // Financeiro
+  // Financeiro - Faturas
   'financeiro.ver': 'Ver faturas e pagamentos',
-  'financeiro.criar': 'Criar faturas',
-  'financeiro.editar': 'Editar faturas e registrar pagamentos',
-  'financeiro.dashboard': 'Ver dashboard financeiro',
-  'financeiro.contas_pagar': 'Gerenciar contas a pagar',
+  'financeiro.fatura_criar': 'Criar faturas',
+  'financeiro.fatura_excluir': 'Excluir faturas',
+  'financeiro.pagamento_criar': 'Registrar pagamentos',
+  'financeiro.pagamento_editar': 'Editar pagamentos',
+  'financeiro.pagamento_excluir': 'Excluir pagamentos',
+  // Financeiro - Planilha de Custos
+  'financeiro.coluna_criar': 'Adicionar coluna na planilha',
+  'financeiro.coluna_editar': 'Editar nome de coluna',
+  'financeiro.coluna_excluir': 'Excluir coluna da planilha',
+  'financeiro.custos_editar': 'Editar valores e reordenar planilha',
 
   // Mensagens
   'mensagens.ver': 'Ver mensagens de clientes',
   'mensagens.responder': 'Responder mensagens',
+  'mensagens.apagar': 'Apagar mensagens de outros',
 
   // Eventos
   'eventos.ver': 'Ver eventos',
@@ -103,10 +110,15 @@ export const MODULOS_PERMISSOES = [
     icone: '💰',
     permissoes: [
       'financeiro.ver',
-      'financeiro.criar',
-      'financeiro.editar',
-      'financeiro.dashboard',
-      'financeiro.contas_pagar',
+      'financeiro.fatura_criar',
+      'financeiro.fatura_excluir',
+      'financeiro.pagamento_criar',
+      'financeiro.pagamento_editar',
+      'financeiro.pagamento_excluir',
+      'financeiro.coluna_criar',
+      'financeiro.coluna_editar',
+      'financeiro.coluna_excluir',
+      'financeiro.custos_editar',
     ],
   },
   {
@@ -115,6 +127,7 @@ export const MODULOS_PERMISSOES = [
     permissoes: [
       'mensagens.ver',
       'mensagens.responder',
+      'mensagens.apagar',
     ],
   },
   {
@@ -202,10 +215,15 @@ export const PERFIS_PADRAO = [
       'clientes.excluir': false,
       'eventos.excluir': false,
       // Sem financeiro avançado
-      'financeiro.criar': false,
-      'financeiro.editar': false,
-      'financeiro.dashboard': false,
-      'financeiro.contas_pagar': false,
+      'financeiro.fatura_criar': false,
+      'financeiro.fatura_excluir': false,
+      'financeiro.pagamento_criar': false,
+      'financeiro.pagamento_editar': false,
+      'financeiro.pagamento_excluir': false,
+      'financeiro.coluna_criar': false,
+      'financeiro.coluna_editar': false,
+      'financeiro.coluna_excluir': false,
+      'financeiro.custos_editar': false,
       // Sem admin
       'usuarios.gerenciar': false,
     },

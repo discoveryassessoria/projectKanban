@@ -45,7 +45,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.contas_pagar')
+    const erro = await verificarPermissao(request, 'financeiro.ver')
     if (erro) return erro
 
     const { id: idParam } = await params
@@ -99,7 +99,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.contas_pagar')
+    const erro = await verificarPermissao(request, 'financeiro.ver')
     if (erro) return erro
     
     const { id: idParam } = await params

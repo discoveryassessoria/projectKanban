@@ -22,6 +22,7 @@ import {
 import { gerarRelatorioFinanceiroPDF, gerarRelatorioFinanceiroExcel } from "@/src/utils/relatorioFinanceiro"
 import dynamic from "next/dynamic"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 const GraficosFinanceiro = dynamic(() => import("@/src/components/financeiroComponents/GraficosFinanceiro"), { ssr: false, loading: () => <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div> })
 
@@ -137,6 +138,7 @@ export default function FinanceiroPage() {
   // Dados para HeaderBar
   const [arvores, setArvores] = useState<any[]>([])
   const [processos, setProcessos] = useState<any[]>([])
+  const { pode, carregando } = usePermissoes()
 
   useEffect(() => {
     setMounted(true)
@@ -146,11 +148,6 @@ export default function FinanceiroPage() {
         try {
           const parsed = JSON.parse(storedUser)
           setUser(parsed)
-          // Admin check
-          if (parsed.tipo !== 'admin') {
-            router.push('/')
-            return
-          }
         } catch { setUser({ nome: "Usuário" }) }
       }
     }
@@ -173,7 +170,10 @@ export default function FinanceiroPage() {
       if (filters.dataInicio) params.set('dataInicio', filters.dataInicio)
       if (filters.dataFim) params.set('dataFim', filters.dataFim)
 
-      const res = await fetch(`/api/financas/faturas?${params.toString()}`)
+      const token = localStorage.getItem('authToken')
+      const res = await fetch(`/api/financas/faturas?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
       if (res.ok) {
         const data = await res.json()
         setFaturas(data.faturas || [])
@@ -215,7 +215,13 @@ export default function FinanceiroPage() {
   const hasActiveFilters = filters.pais !== 'all' || filters.status !== 'all' || filters.moeda !== 'all' || filters.dataInicio !== '' || filters.dataFim !== ''
   const activeFilterCount = [filters.pais !== 'all', filters.status !== 'all', filters.moeda !== 'all', filters.dataInicio !== '' || filters.dataFim !== ''].filter(Boolean).length
 
-  if (!mounted) {
+  useEffect(() => {
+    if (mounted && !carregando && !pode('financeiro.ver')) {
+      router.push('/')
+    }
+  }, [mounted, carregando, pode, router])
+
+  if (!mounted || carregando || !pode('financeiro.ver')) {
     return (
       <div className="relative min-h-screen text-white overflow-x-hidden">
         <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />

@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 // POST - Criar evento
 export async function POST(request: NextRequest) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar')
+    const erro = await verificarPermissao(request, 'eventos.criar')
     if (erro) return erro
     
     const body = await request.json()

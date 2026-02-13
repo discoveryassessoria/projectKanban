@@ -72,9 +72,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Mensagem não encontrada' }, { status: 404 });
     }
 
-    // Equipe pode apagar suas próprias mensagens
-    if (mensagem.usuarioId !== parseInt(usuarioId || '0')) {
-      return NextResponse.json({ error: 'Sem permissão para apagar esta mensagem' }, { status: 403 });
+    // Verificar se é dono da mensagem OU tem permissão de apagar mensagens de outros
+    const isDono = mensagem.usuarioId === parseInt(usuarioId || '0')
+    
+    if (!isDono) {
+      // Verificar permissão mensagens.apagar
+      const { verificarPermissao } = await import('@/src/lib/verificar-permissao')
+      const erro = await verificarPermissao(request, 'mensagens.apagar')
+      if (erro) {
+        return NextResponse.json({ error: 'Sem permissão para apagar esta mensagem' }, { status: 403 })
+      }
     }
 
     await prisma.mensagem.delete({ where: { id: mensagemId } });

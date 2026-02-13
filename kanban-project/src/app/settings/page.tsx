@@ -64,10 +64,15 @@ const MODULOS_DISPLAY = [
     icone: '💰',
     permissoes: {
       'financeiro.ver': 'Ver faturas e pagamentos',
-      'financeiro.criar': 'Criar faturas',
-      'financeiro.editar': 'Editar faturas',
-      'financeiro.dashboard': 'Ver dashboard financeiro',
-      'financeiro.contas_pagar': 'Gerenciar contas a pagar',
+      'financeiro.fatura_criar': 'Criar faturas',
+      'financeiro.fatura_excluir': 'Excluir faturas',
+      'financeiro.pagamento_criar': 'Registrar pagamentos',
+      'financeiro.pagamento_editar': 'Editar pagamentos',
+      'financeiro.pagamento_excluir': 'Excluir pagamentos',
+      'financeiro.coluna_criar': 'Adicionar coluna na planilha',
+      'financeiro.coluna_editar': 'Editar nome de coluna',
+      'financeiro.coluna_excluir': 'Excluir coluna da planilha',
+      'financeiro.custos_editar': 'Editar valores e reordenar planilha',
     },
   },
   {
@@ -76,6 +81,7 @@ const MODULOS_DISPLAY = [
     permissoes: {
       'mensagens.ver': 'Ver mensagens',
       'mensagens.responder': 'Responder mensagens',
+      'mensagens.apagar': 'Apagar mensagens de outros',
     },
   },
   {

@@ -20,6 +20,7 @@ import {
   Bell,
   AlertCircle,
 } from "lucide-react"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 interface Evento {
   id: number
@@ -55,6 +56,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
   const [isLoading, setIsLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   // Form state
   const [titulo, setTitulo] = useState("")
@@ -67,6 +69,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
   const [diaInteiro, setDiaInteiro] = useState(false)
   const [local, setLocal] = useState("")
   const [lembreteDias, setLembreteDias] = useState("")
+  const { pode } = usePermissoes()
 
   useEffect(() => {
     fetchEventos()
@@ -106,6 +109,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
     }
 
     try {
+      setIsSaving(true)
       const dataInicioCompleta = diaInteiro
         ? `${dataInicio}T00:00:00`
         : `${dataInicio}T${horaInicio || "00:00"}:00`
@@ -132,9 +136,13 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
       const url = editingId ? `/api/eventos/${editingId}` : "/api/eventos"
       const method = editingId ? "PUT" : "POST"
 
+      const token = localStorage.getItem('authToken')
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(payload),
       })
 
@@ -148,6 +156,8 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
     } catch (error) {
       console.error("Erro ao salvar evento:", error)
       alert("Erro ao salvar evento")
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -174,7 +184,13 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
     if (!confirm("Tem certeza que deseja excluir este evento?")) return
 
     try {
-      const res = await fetch(`/api/eventos/${id}`, { method: "DELETE" })
+      const token = localStorage.getItem('authToken')
+      const res = await fetch(`/api/eventos/${id}`, { 
+        method: "DELETE",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      })
       if (res.ok) {
         fetchEventos()
         onUpdate?.()
@@ -228,7 +244,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
             </div>
           </div>
 
-          {!showForm && (
+          {!showForm && pode('eventos.criar') && (
             <Button
               onClick={() => setShowForm(true)}
               className="bg-emerald-600 hover:bg-emerald-700"
@@ -390,9 +406,9 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
 
               {/* Botões */}
               <div className="flex gap-2 pt-2">
-                <Button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700">
+                <Button onClick={handleSubmit} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
                   <Check className="h-4 w-4 mr-1.5" />
-                  {editingId ? "Salvar" : "Criar Evento"}
+                  {isSaving ? "Salvando..." : (editingId ? "Salvar" : "Criar Evento")}
                 </Button>
                 <Button variant="outline" onClick={resetForm}>
                   Cancelar
@@ -462,18 +478,22 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleEdit(evento)}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(evento.id)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {pode('eventos.editar') && (
+                        <button
+                          onClick={() => handleEdit(evento)}
+                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                      )}
+                      {pode('eventos.excluir') && (
+                        <button
+                          onClick={() => handleDelete(evento.id)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

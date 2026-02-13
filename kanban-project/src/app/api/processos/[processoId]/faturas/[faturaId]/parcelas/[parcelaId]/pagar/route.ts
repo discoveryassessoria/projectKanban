@@ -9,7 +9,7 @@ export async function POST(
   { params }: { params: Promise<{ processoId: string; faturaId: string; parcelaId: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.editar')
+    const erro = await verificarPermissao(request, 'financeiro.pagamento_criar')
     if (erro) return erro
 
     const { processoId, faturaId, parcelaId } = await params
@@ -78,7 +78,7 @@ export async function DELETE(
   { params }: { params: Promise<{ processoId: string; faturaId: string; parcelaId: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.editar')
+    const erro = await verificarPermissao(request, 'financeiro.pagamento_criar')
     if (erro) return erro
 
     const { processoId, faturaId, parcelaId } = await params

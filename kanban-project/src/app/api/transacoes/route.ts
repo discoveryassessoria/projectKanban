@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
 // POST - Criar transação manual
 export async function POST(request: NextRequest) {
   try {
-    const erro = await verificarPermissao(request, 'financeiro.editar')
+    const erro = await verificarPermissao(request, 'financeiro.pagamento_criar')
     if (erro) return erro
     
     const body = await request.json()

@@ -242,7 +242,7 @@ export function DocumentoModal({
 }: DocumentoModalProps) {
   const isEditing = !!documento
   const { pode } = usePermissoes()
-  const somenteVisualizar = !pode('arvore.editar_documento')
+  const somenteVisualizar = isEditing ? !pode('arvore.editar_documento') : !pode('arvore.criar_documento')
   const [saving, setSaving] = useState(false)
   
   // Campos do formulário
