@@ -30,6 +30,7 @@ import {
   type Contratante, 
   type Requerente 
 } from "@/src/types/kanban"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 interface KanbanBoardProps {
   pais: Pais
@@ -96,6 +97,7 @@ export function KanbanBoard({
   const [modalInitialSidebarTab, setModalInitialSidebarTab] = useState<string | undefined>(undefined)
   const [modalInitialTarefaPaiId, setModalInitialTarefaPaiId] = useState<number | undefined>(undefined)
   const [modalInitialAtividadeId, setModalInitialAtividadeId] = useState<number | undefined>(undefined)
+  const { pode } = usePermissoes()
   
   const [isDragging, setIsDragging] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -111,15 +113,14 @@ export function KanbanBoard({
   const paisConfig = PAISES_CONFIG[pais]
 
   // Sensores
-  const pointerSensor = useSensor(PointerSensor, {
-    activationConstraint: { distance: 8 },
-  })
-  
-  const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: { delay: 150, tolerance: 5 },
-  })
-
-  const sensors = useSensors(pointerSensor, touchSensor)
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 150, tolerance: 5 },
+    })
+  )
 
   // Efeito para abrir modal automaticamente
   useEffect(() => {
@@ -158,7 +159,10 @@ export function KanbanBoard({
     try {
       const response = await fetch("/api/status", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify({ nome: newStatusName, pais }),
       })
 
@@ -178,10 +182,17 @@ export function KanbanBoard({
 
   const handleAddNewProcesso = async (nome: string, statusId: number) => {
     try {
-      const response = await fetch("/api/processos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome, statusId, pais }),
+      const response = await fetch('/api/processos', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem("authToken")}`
+        },
+        body: JSON.stringify({
+          nome: nome,
+          statusId: statusId,
+          pais: pais
+        })
       })
 
       if (!response.ok) throw new Error("Falha ao criar novo processo")
@@ -234,7 +245,8 @@ export function KanbanBoard({
     
     setActiveProcesso(null)
     setIsDragging(false)
-    
+    if (!pode('processos.editar_status')) return
+
     if (!over) return
 
     // Extrair ID numérico do card arrastado
@@ -275,7 +287,10 @@ export function KanbanBoard({
     try {
       const response = await fetch(`/api/processos/${activeId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify({ statusId: targetStatusId }),
       })
 
@@ -347,11 +362,15 @@ export function KanbanBoard({
                     onProcessoClick={handleProcessoClick}
                     onStatusUpdate={onRefresh}
                     pais={pais}
+                    podeCriarProcesso={pode('processos.criar')}
+                    podeEditarColuna={pode('processos.editar_coluna')}
+                    podeExcluirColuna={pode('processos.excluir_coluna')}
                   />
                 </div>
               ))}
 
               {/* Botão Adicionar Coluna */}
+              {pode('processos.criar_coluna') && (
               <div className="flex-shrink-0 w-[260px] p-2 h-full">
                 {isAddingStatus ? (
                   <div className="p-3 rounded-lg bg-white border border-gray-200 shadow-sm h-full">
@@ -389,6 +408,7 @@ export function KanbanBoard({
                   </Button>
                 )}
               </div>
+              )}
             </div>
           </div>
         </div>

@@ -38,6 +38,9 @@ interface KanbanColumnProps {
   onProcessoClick?: (processo: ProcessoWithStatus) => void
   onStatusUpdate?: () => void
   pais?: Pais
+  podeCriarProcesso?: boolean
+  podeEditarColuna?: boolean
+  podeExcluirColuna?: boolean
 }
 
 export function KanbanColumn({
@@ -51,6 +54,9 @@ export function KanbanColumn({
   onProcessoClick,
   onStatusUpdate,
   pais,
+  podeCriarProcesso = true,
+  podeEditarColuna = true,
+  podeExcluirColuna = true,
 }: KanbanColumnProps) {
   // ✅ CORREÇÃO: Usar ID com prefixo "column-" para evitar conflito com IDs de cards
   const { setNodeRef, isOver } = useDroppable({ 
@@ -93,8 +99,11 @@ export function KanbanColumn({
 
     try {
       const response = await fetch(`/api/status/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify({ nome: trimmedName }),
       })
 
@@ -115,6 +124,9 @@ export function KanbanColumn({
     try {
       const response = await fetch(`/api/status/${id}`, {
         method: "DELETE",
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem("authToken")}`
+        },
       })
 
       if (!response.ok) {
@@ -154,14 +166,17 @@ export function KanbanColumn({
               </span>
             </div>
             <div className="flex items-center gap-0.5 flex-shrink-0">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsAdding(true)}
-                className="h-5 w-5 p-0 hover:bg-white/20 text-white/50 hover:text-white"
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
+              {podeCriarProcesso && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsAdding(true)}
+                  className="h-5 w-5 p-0 hover:bg-white/20 text-white/50 hover:text-white"
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              )}
+              {(podeEditarColuna || podeExcluirColuna) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -173,27 +188,30 @@ export function KanbanColumn({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="bg-white border-gray-200 text-gray-900 shadow-lg">
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setEditedStatusName(title)
-                      setEditError(null)
-                      setIsEditDialogOpen(true)
-                    }}
-                    className="text-gray-700 hover:bg-gray-100 cursor-pointer"
-                  >
-                    <Edit2 className="h-4 w-4 mr-2" />
-                    Editar nome
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-gray-200" />
-                  <DropdownMenuItem
-                    onClick={() => setIsDeleteDialogOpen(true)}
-                    className="text-red-600 hover:bg-red-50 hover:text-red-700 cursor-pointer"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Excluir status
-                  </DropdownMenuItem>
+                  {podeEditarColuna && (
+                    <DropdownMenuItem
+                      onClick={() => { setEditedStatusName(title); setEditError(null); setIsEditDialogOpen(true) }}
+                      className="text-gray-700 hover:bg-gray-100 cursor-pointer"
+                    >
+                      <Edit2 className="h-4 w-4 mr-2" />
+                      Editar nome
+                    </DropdownMenuItem>
+                  )}
+                  {podeEditarColuna && podeExcluirColuna && (
+                    <DropdownMenuSeparator className="bg-gray-200" />
+                  )}
+                  {podeExcluirColuna && (
+                    <DropdownMenuItem
+                      onClick={() => setIsDeleteDialogOpen(true)}
+                      className="text-red-600 hover:bg-red-50 hover:text-red-700 cursor-pointer"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Excluir status
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
             </div>
           </div>
         </div>
@@ -210,7 +228,7 @@ export function KanbanColumn({
             ))}
           </SortableContext>
 
-          {isAdding && (
+          {isAdding && podeCriarProcesso && (
             <form onSubmit={handleAddSubmit} className="mt-2 p-2 bg-white rounded-lg border border-gray-200 shadow-sm">
               <Input
                 autoFocus

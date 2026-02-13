@@ -17,8 +17,13 @@ export const PERMISSOES = {
   'processos.ver': 'Ver processos',
   'processos.criar': 'Criar processos',
   'processos.editar': 'Editar processos',
-  'processos.editar_status': 'Alterar status/etapa do processo',
   'processos.excluir': 'Excluir processos',
+  'processos.editar_status': 'Alterar status/etapa',
+  'processos.criar_coluna': 'Criar colunas no kanban',
+  'processos.editar_coluna': 'Editar colunas no kanban',
+  'processos.excluir_coluna': 'Excluir colunas no kanban',
+  'processos.ver_paginas': 'Ver páginas específicas (Protocolos/Informações)',
+  'processos.editar_paginas': 'Editar páginas específicas',
 
   // Clientes/Cadastros
   'clientes.ver': 'Ver contratantes e requerentes',
@@ -91,8 +96,13 @@ export const MODULOS_PERMISSOES = [
       'processos.ver',
       'processos.criar',
       'processos.editar',
-      'processos.editar_status',
       'processos.excluir',
+      'processos.editar_status',
+      'processos.criar_coluna',
+      'processos.editar_coluna',
+      'processos.excluir_coluna',
+      'processos.ver_paginas',
+      'processos.editar_paginas',
     ],
   },
   {
@@ -212,6 +222,7 @@ export const PERFIS_PADRAO = [
       // Sem exclusões
       'tarefas.excluir': false,
       'processos.excluir': false,
+      'processos.excluir_coluna': false,
       'clientes.excluir': false,
       'eventos.excluir': false,
       // Sem financeiro avançado
@@ -239,6 +250,7 @@ export const PERFIS_PADRAO = [
       'tarefas.ver': true,
       'tarefas.iniciar_concluir': true,
       'processos.ver': true,
+      'processos.ver_paginas': true,
       'clientes.ver': true,
       'mensagens.ver': true,
       'eventos.ver': true,

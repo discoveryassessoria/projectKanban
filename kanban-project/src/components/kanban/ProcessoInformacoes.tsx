@@ -22,6 +22,7 @@ import {
   Gavel,
   Info
 } from "lucide-react"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 interface Anexo {
   id: number
@@ -109,20 +110,8 @@ export function ProcessoInformacoes({
   const [uploadProgress, setUploadProgress] = useState(0)
   
   // Verificar permissão do usuário
-  const [podeEditar, setPodeEditar] = useState(false)
-  
-  useEffect(() => {
-    const userData = localStorage.getItem("user")
-    if (userData) {
-      try {
-        const user = JSON.parse(userData)
-        const tiposComPermissao = ["admin", "Administrador", "gestor", "Gestor"]
-        setPodeEditar(tiposComPermissao.includes(user.tipo))
-      } catch {
-        setPodeEditar(false)
-      }
-    }
-  }, [])
+  const { pode } = usePermissoes()
+  const podeEditar = pode('processos.editar_paginas')
 
   // Form state
   const [form, setForm] = useState({
@@ -144,7 +133,10 @@ export function ProcessoInformacoes({
           try {
             await fetch(`/api/informacoes-italia/${informacao.id}/anexos`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { 
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+              },
               body: JSON.stringify({
                 nome: file.name,
                 nomeArquivo: file.name,
@@ -247,7 +239,10 @@ export function ProcessoInformacoes({
 
       const response = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify(payload)
       })
 
@@ -274,7 +269,10 @@ export function ProcessoInformacoes({
 
     try {
       const response = await fetch(`/api/informacoes-italia/${informacao.id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
       })
 
       if (response.ok) {
@@ -293,7 +291,10 @@ export function ProcessoInformacoes({
 
     try {
       const response = await fetch(`/api/informacoes-italia/${informacao.id}/anexos/${anexoId}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
       })
 
       if (response.ok) {
@@ -334,16 +335,6 @@ export function ProcessoInformacoes({
           <Gavel className="h-5 w-5 text-green-600" />
           <h3 className="font-semibold text-gray-900">Informações do Processo</h3>
         </div>
-        {!informacao && podeEditar && !showForm && (
-          <Button
-            onClick={() => setShowForm(true)}
-            size="sm"
-            className="bg-green-600 hover:bg-green-700"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Cadastrar Informações
-          </Button>
-        )}
       </div>
 
       {/* Conteúdo */}

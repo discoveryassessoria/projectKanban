@@ -47,6 +47,11 @@ const MODULOS_DISPLAY = [
       'processos.editar': 'Editar processos',
       'processos.editar_status': 'Alterar status/etapa',
       'processos.excluir': 'Excluir processos',
+      'processos.criar_coluna': 'Criar colunas no kanban',
+      'processos.editar_coluna': 'Editar colunas no kanban',
+      'processos.excluir_coluna': 'Excluir colunas no kanban',
+      'processos.ver_paginas': 'Ver páginas (Protocolos/Informações)',
+      'processos.editar_paginas': 'Editar páginas (Protocolos/Informações)',
     },
   },
   {

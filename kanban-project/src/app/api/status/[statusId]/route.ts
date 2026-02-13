@@ -35,7 +35,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ statusId: string }> }) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar_status')
+    const erro = await verificarPermissao(request, 'processos.editar_coluna')
     if (erro) return erro
 
     const { statusId } = await params
@@ -106,7 +106,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ statusId: string }> }) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar_status')
+    const erro = await verificarPermissao(request, 'processos.excluir_coluna')
     if (erro) return erro
 
     const { statusId } = await params

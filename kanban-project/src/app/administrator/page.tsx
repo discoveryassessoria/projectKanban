@@ -59,6 +59,11 @@ const MODULOS_PERMISSOES = [
       { chave: 'processos.editar', label: 'Editar processos' },
       { chave: 'processos.editar_status', label: 'Alterar status/etapa' },
       { chave: 'processos.excluir', label: 'Excluir processos' },
+      { chave: 'processos.criar_coluna', label: 'Criar colunas no kanban' },
+      { chave: 'processos.editar_coluna', label: 'Editar colunas no kanban' },
+      { chave: 'processos.excluir_coluna', label: 'Excluir colunas no kanban' },
+      { chave: 'processos.ver_paginas', label: 'Ver páginas (Protocolos/Info)' },
+      { chave: 'processos.editar_paginas', label: 'Editar páginas (Protocolos/Info)' },
     ],
   },
   {

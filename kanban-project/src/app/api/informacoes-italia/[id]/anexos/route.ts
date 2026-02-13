@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Listar anexos de uma informação
 export async function GET(
@@ -32,6 +33,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const erro = await verificarPermissao(request, 'processos.editar_paginas')
+  if (erro) return erro
+  
   try {
     const { id } = await params
     const informacaoItaliaId = parseInt(id)

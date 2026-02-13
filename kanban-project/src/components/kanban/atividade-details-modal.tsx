@@ -205,8 +205,10 @@ export function ProcessoDetailsModal({
 
       const response = await fetch(url, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dataToSend),
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
       })
 
       if (response.ok) {
@@ -353,9 +355,13 @@ export function ProcessoDetailsModal({
     try {
       const response = await fetch(`/api/processos/${processo.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify({
           nome: nomeEditado,
+          statusId: statusIdAtual,
           contratanteIds: contratantesSelecionados.map(c => c.id),
           requerenteIds: requerentesSelecionados.map(r => r.id)
         })
@@ -391,7 +397,10 @@ export function ProcessoDetailsModal({
     
     try {
       const response = await fetch(`/api/processos/${processo.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem("authToken")}`
+        }
       })
       
       if (response.ok) {
@@ -463,10 +472,8 @@ export function ProcessoDetailsModal({
   const tabs = [
     { id: "geral", label: "Geral" },
     ...(pode('arvore.ver') ? [{ id: "arvore", label: "Árvore Genealógica" }] : []),
-    // Aba Informações só aparece para ITÁLIA
-    ...(isItalia ? [{ id: "informacoes", label: "Informações" }] : []),
-    // Aba Protocolos só aparece para ESPANHA
-    ...(isEspanha ? [{ id: "protocolos", label: "Protocolos" }] : []),
+    ...(isItalia && pode('processos.ver_paginas') ? [{ id: "informacoes", label: "Informações" }] : []),
+    ...(isEspanha && pode('processos.ver_paginas') ? [{ id: "protocolos", label: "Protocolos" }] : []),
     ...(pode('financeiro.ver') ? [{ id: "faturas", label: "Faturas" }] : []),
     ...(pode('eventos.ver') ? [{ id: "eventos", label: "Eventos" }] : []),
     { id: "historico", label: "Histórico" },
@@ -506,14 +513,16 @@ export function ProcessoDetailsModal({
             <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700">
               <Settings className="h-5 w-5" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="text-red-400 hover:text-red-500 hover:bg-red-500/10"
-              onClick={handleDelete}
-            >
-              <Trash2 className="h-5 w-5" />
-            </Button>
+            {pode('processos.excluir') && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                onClick={handleDelete}
+              >
+                <Trash2 className="h-5 w-5" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -528,11 +537,15 @@ export function ProcessoDetailsModal({
                 <button
                   key={etapa.id}
                   onClick={async () => {
+                    if (!pode('processos.editar_status')) return
                     if (etapa.id === statusIdAtual) return
                     try {
                       const response = await fetch(`/api/processos/${processo.id}`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${localStorage.getItem("authToken")}`
+                        },
                         body: JSON.stringify({ statusId: etapa.id })
                       })
                       if (response.ok) {
@@ -548,8 +561,9 @@ export function ProcessoDetailsModal({
                     }
                   }}
                   className={`
-                    flex-shrink-0 px-4 py-3 text-sm font-medium transition-colors relative cursor-pointer
-                    ${isActive ? `${cor} text-white` : isPast ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}
+                    flex-shrink-0 px-4 py-3 text-sm font-medium transition-colors relative
+                    ${!pode('processos.editar_status') ? 'cursor-default' : etapa.id === statusIdAtual ? 'cursor-default' : 'cursor-pointer'}
+                    ${isActive ? `${cor} text-white` : isPast ? `bg-gray-200 text-gray-600 ${pode('processos.editar_status') ? 'hover:bg-gray-300' : ''}` : `bg-gray-100 text-gray-500 ${pode('processos.editar_status') ? 'hover:bg-gray-200' : ''}`}
                   `}
                 >
                   {etapa.nome}
@@ -588,12 +602,14 @@ export function ProcessoDetailsModal({
                     Sobre o Negócio
                   </h2>
                   {!isEditing ? (
-                    <button 
-                      onClick={() => setIsEditing(true)}
-                      className="text-sm text-blue-600 hover:text-blue-700"
-                    >
-                      editar
-                    </button>
+                    pode('processos.editar') && (
+                      <button 
+                        onClick={() => setIsEditing(true)}
+                        className="text-sm text-blue-600 hover:text-blue-700"
+                      >
+                        editar
+                      </button>
+                    )
                   ) : (
                     <button 
                       onClick={handleCancelEdit}
@@ -629,8 +645,8 @@ export function ProcessoDetailsModal({
                           {[...contratantesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((cont) => (
                             <div 
                               key={cont.id} 
-                              onClick={() => abrirDetalhesCliente(cont, "contratante")}
-                              className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                              onClick={() => pode('clientes.ver') && abrirDetalhesCliente(cont, "contratante")}
+                              className={`p-4 bg-gray-50 rounded-lg transition-colors ${pode('clientes.ver') ? 'hover:bg-gray-100 cursor-pointer' : 'cursor-default'}`}
                             >
                               <p className="text-gray-900 font-semibold">{cont.nome}</p>
                               
@@ -701,8 +717,8 @@ export function ProcessoDetailsModal({
                           {[...requerentesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((req) => (
                             <div 
                               key={req.id} 
-                              onClick={() => abrirDetalhesCliente(req, "requerente")}
-                              className="p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
+                              onClick={() => pode('clientes.ver') && abrirDetalhesCliente(req, "requerente")}
+                              className={`p-3 bg-blue-50 rounded-lg transition-colors ${pode('clientes.ver') ? 'hover:bg-blue-100 cursor-pointer' : 'cursor-default'}`}
                             >
                               <p className="text-gray-900 font-medium">{req.nome}</p>
                               {req.telefone && (
@@ -771,6 +787,7 @@ export function ProcessoDetailsModal({
                         onChange={(e) => setStatusIdAtual(Number(e.target.value))}
                         className={selectClass}
                         style={selectStyle}
+                        disabled={!pode('processos.editar_status')}
                       >
                         {sortedEtapas.map((etapa) => (
                           <option key={etapa.id} value={etapa.id}>{etapa.nome}</option>
@@ -1020,6 +1037,7 @@ export function ProcessoDetailsModal({
         setFormData={setClienteFormData}
         onSave={handleSaveCliente}
         isLoading={false}
+        podeEditar={pode('clientes.editar')}
       />
     </>
   )

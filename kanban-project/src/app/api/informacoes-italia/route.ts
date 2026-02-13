@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Buscar informação por processoId
 export async function GET(request: NextRequest) {
@@ -37,6 +38,9 @@ export async function GET(request: NextRequest) {
 
 // POST - Criar informação
 export async function POST(request: NextRequest) {
+  const erro = await verificarPermissao(request, 'processos.editar_paginas')
+  if (erro) return erro
+
   try {
     const body = await request.json()
     const { 

@@ -41,7 +41,7 @@ export async function POST(
   { params }: { params: Promise<{ protocoloId: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar')
+    const erro = await verificarPermissao(request, 'processos.editar_paginas')
     if (erro) return erro
 
     const { protocoloId } = await params
@@ -104,7 +104,7 @@ export async function DELETE(
   { params }: { params: Promise<{ protocoloId: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar')
+    const erro = await verificarPermissao(request, 'processos.editar_paginas')
     if (erro) return erro
 
     const { protocoloId } = await params

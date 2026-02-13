@@ -21,6 +21,7 @@ import {
   Paperclip,
   Eye
 } from "lucide-react"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 // Tipos compatíveis com os do modal
 interface PessoaBase {
@@ -105,22 +106,8 @@ export function ProcessoProtocolos({
   const [uploadProgress, setUploadProgress] = useState(0)
   
   // Verificar permissão do usuário
-  const [podeEditar, setPodeEditar] = useState(false)
-  
-  useEffect(() => {
-    // Pegar tipo do usuário do localStorage
-    const userData = localStorage.getItem("user")
-    if (userData) {
-      try {
-        const user = JSON.parse(userData)
-        // admin e gestor podem editar, usuario não
-        const tiposComPermissao = ["admin", "Administrador", "gestor", "Gestor"]
-        setPodeEditar(tiposComPermissao.includes(user.tipo))
-      } catch {
-        setPodeEditar(false)
-      }
-    }
-  }, [])
+  const { pode } = usePermissoes()
+  const podeEditar = pode('processos.editar_paginas')
 
   // Form state
   const [form, setForm] = useState({
@@ -145,7 +132,10 @@ export function ProcessoProtocolos({
           try {
             await fetch(`/api/protocolos/${uploadingProtocoloId}/anexos`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { 
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+              },
               body: JSON.stringify({
                 nome: file.name,
                 nomeArquivo: file.name,
@@ -274,7 +264,10 @@ export function ProcessoProtocolos({
 
       const response = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify(payload)
       })
 
@@ -300,7 +293,10 @@ export function ProcessoProtocolos({
 
     try {
       const response = await fetch(`/api/protocolos/${id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
       })
 
       if (response.ok) {
@@ -318,7 +314,10 @@ export function ProcessoProtocolos({
 
     try {
       const response = await fetch(`/api/protocolos/${protocoloId}/anexos/${anexoId}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
       })
 
       if (response.ok) {
@@ -390,7 +389,7 @@ export function ProcessoProtocolos({
             setShowForm(true)
           }}
           size="sm"
-          className={`bg-orange-600 hover:bg-orange-700 ${!podeEditar ? 'hidden' : ''}`}
+          className={`bg-orange-600 hover:bg-orange-700 ${!podeEditar || protocolos.length === 0 ? 'hidden' : ''}`}
         >
           <Plus className="h-4 w-4 mr-1" />
           Novo Protocolo

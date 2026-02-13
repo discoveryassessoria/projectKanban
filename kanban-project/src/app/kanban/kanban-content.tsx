@@ -18,6 +18,8 @@ import {
   type Contratante, 
   type Requerente 
 } from "@/src/types/kanban"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { Shield } from "lucide-react"
 
 interface User {
   id: number
@@ -63,6 +65,8 @@ export function KanbanContent() {
   const [clientesProcessoModal, setClientesProcessoModal] = useState<ProcessoWithStatus | null>(null)
   const [isClientesProcessoModalOpen, setIsClientesProcessoModalOpen] = useState(false)
   const [clientesStatusList, setClientesStatusList] = useState<Status[]>([])
+
+  const { pode } = usePermissoes()
 
   // Ler parâmetros da URL para abertura automática do modal
   useEffect(() => {
@@ -312,6 +316,7 @@ export function KanbanContent() {
                 >
                   Processos
                 </button>
+                {pode('clientes.ver') && (
                 <button
                   onClick={() => setTabPrincipal("contratantes")}
                   className={`
@@ -324,10 +329,11 @@ export function KanbanContent() {
                 >
                   Clientes
                 </button>
+                )}
               </div>
 
               {/* Sub-tabs Kanban / Lista (só aparece em Processos) */}
-              {tabPrincipal === "processos" && (
+              {tabPrincipal === "processos" && pode('processos.ver') && (
                 <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
                   <button
                     onClick={() => setSubTab("kanban")}
@@ -357,7 +363,7 @@ export function KanbanContent() {
               )}
 
               {/* Contador + Países (só em Processos) */}
-              {tabPrincipal === "processos" && (
+              {tabPrincipal === "processos" && pode('processos.ver') && (
                 <div className="flex items-center gap-4">
                   <div className="flex flex-col items-center px-4 py-2 bg-white/10 rounded-lg">
                     <span className="text-2xl font-bold text-white">
@@ -388,6 +394,7 @@ export function KanbanContent() {
           <div className="bg-white/5 border border-white/15 rounded-2xl p-4 backdrop-blur-xl shadow-lg overflow-hidden" style={{ maxWidth: '100%' }}>
             {/* Processos - Kanban */}
             {tabPrincipal === "processos" && subTab === "kanban" && (
+              pode('processos.ver') ? (
               <KanbanBoard 
                 pais={paisSelecionado}
                 processos={processos}
@@ -403,17 +410,32 @@ export function KanbanContent() {
                 initialTarefaPaiId={initialTarefaPaiId}
                 initialAtividadeId={initialAtividadeId}
               />
-            )}
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 text-white/60">
+                <Shield className="h-12 w-12 mb-4 text-white/30" />
+                <p className="text-lg font-medium">Sem permissão para visualizar processos</p>
+                <p className="text-sm mt-1">Solicite acesso ao administrador</p>
+              </div>
+            )
+          )}
 
-            {/* Processos - Lista */}
-            {tabPrincipal === "processos" && subTab === "lista" && (
+          {/* Processos - Lista */}
+          {tabPrincipal === "processos" && subTab === "lista" && (
+            pode('processos.ver') ? (
               <ProcessosLista
                 processos={processos}
                 statusList={statusList}
                 contratantes={contratantes}
                 onRefresh={handleRefresh}
               />
-            )}
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 text-white/60">
+                <Shield className="h-12 w-12 mb-4 text-white/30" />
+                <p className="text-lg font-medium">Sem permissão para visualizar processos</p>
+                <p className="text-sm mt-1">Solicite acesso ao administrador</p>
+              </div>
+            )
+          )}
 
             {/* Clientes - Tabela */}
             {tabPrincipal === "contratantes" && (

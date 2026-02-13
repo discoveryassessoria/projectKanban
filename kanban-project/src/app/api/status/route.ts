@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 // POST - Criar novo status
 export async function POST(request: Request) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar_status')
+    const erro = await verificarPermissao(request, 'processos.criar_coluna')
     if (erro) return erro
 
     const body = await request.json()

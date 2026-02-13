@@ -39,6 +39,7 @@ import { DatePickerField } from "@/components/ui/date-picker-field"
 import { Upload, CheckCircle2, XCircle, FileImage, Shield, Home, CreditCard as CreditCardIcon, Car } from "lucide-react"
 import RelatorioClientesButton from "@/src/components/contratantesComponents/RelatorioClientesButton"
 import { AcessoAppTab } from "./contratantesComponents/AcessoAppTab"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 interface Contratante {
   id: number
@@ -389,6 +390,7 @@ export function ContratanteModal({
   setFormData,
   onSave,
   isLoading,
+  podeEditar = true,  // ← NOVO
   // ✅ NOVO: Props para erros
   errors = {},
   setErrors,
@@ -403,6 +405,7 @@ export function ContratanteModal({
   setFormData: (data: typeof initialFormData) => void
   onSave: () => void
   isLoading: boolean
+  podeEditar?: boolean  // ← NOVO
   // ✅ NOVO: Tipagem dos erros
   errors?: { nome?: string; cpf?: string; geral?: string }
   setErrors?: (errors: { nome?: string; cpf?: string; geral?: string }) => void
@@ -1079,13 +1082,15 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
           
           <div className="flex items-center gap-3">
             {isViewMode ? (
-              <Button
-                onClick={() => setIsViewMode(false)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Editar
-              </Button>
+              podeEditar && (
+                <Button
+                  onClick={() => setIsViewMode(false)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Editar
+                </Button>
+              )
             ) : (
               <Button
                 onClick={onSave}
@@ -1934,6 +1939,7 @@ style={{
 }
 
 export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: ContratantesTabelaProps) {
+  const { pode } = usePermissoes()
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -2090,7 +2096,10 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
 
       const response = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
         body: JSON.stringify(dataToSend),
       })
 
@@ -2131,6 +2140,9 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
       const baseUrl = tipo === "requerente" ? "/api/requerentes" : "/api/contratantes"
       const response = await fetch(`${baseUrl}/${id}`, {
         method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
       })
 
       if (!response.ok) {
@@ -2166,13 +2178,15 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
         
         <div className="flex items-center gap-2">
           <RelatorioClientesButton />
-          <Button
-            onClick={handleNew}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Cliente
-          </Button>
+          {pode('clientes.criar') && (
+            <Button
+              onClick={handleNew}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Cliente
+            </Button>
+          )}
         </div>
       </div>
 
@@ -2274,20 +2288,24 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
                           <Eye className="h-4 w-4 mr-2" />
                           Visualizar
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleEdit(contratante)}
-                          className="text-gray-700 hover:bg-gray-100 cursor-pointer"
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleDelete(contratante.id, contratante.tipo)}
-                          className="text-red-500 focus:text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-red-500/10 cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2 text-red-500" />
-                          Excluir
-                        </DropdownMenuItem>
+                        {pode('clientes.editar') && (
+                          <DropdownMenuItem 
+                            onClick={() => handleEdit(contratante)}
+                            className="text-gray-700 hover:bg-gray-100 cursor-pointer"
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                        )}
+                        {pode('clientes.excluir') && (
+                          <DropdownMenuItem 
+                            onClick={() => handleDelete(contratante.id, contratante.tipo)}
+                            className="text-red-500 focus:text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-red-500/10 cursor-pointer"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2 text-red-500" />
+                            Excluir
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
@@ -2342,6 +2360,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
         isLoading={isLoading}
         errors={errors}
         setErrors={setErrors}
+        podeEditar={pode('clientes.editar')}
       />
     </>
   )

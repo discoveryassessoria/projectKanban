@@ -33,7 +33,6 @@ const menuItems = [
     icon: GridIcon,
     textOffset: "-translate-y-[0.2px]",
     iconOffset: "",
-    permissao: "processos.ver",
   },
   {
     title: "Tarefas e Projetos",
