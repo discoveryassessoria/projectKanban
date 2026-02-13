@@ -43,6 +43,8 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
 } from '@dnd-kit/core'
 import {
   arrayMove,
@@ -52,6 +54,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers'
 
 // ==========================================
 // CLASSES PADRÃO PARA FORMULÁRIOS
@@ -263,9 +266,9 @@ function SortableTarefaCard({ tarefa, onClick, onDelete }: SortableTarefaCardPro
   } = useSortable({ id: tarefa.id })
 
   const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transform: transform ? CSS.Translate.toString(transform) : undefined,
+    transition: transform ? transition : undefined,
+    opacity: isDragging ? 0 : 1,
     zIndex: isDragging ? 1000 : 1,
   }
 
@@ -332,15 +335,17 @@ function SortableTarefaCard({ tarefa, onClick, onDelete }: SortableTarefaCardPro
         ${isDragging ? 'shadow-lg ring-2 ring-blue-400' : ''}
       `}
     >
-      {/* ✅ NOVO: Handle de arraste */}
-      <div
-        {...attributes}
-        {...listeners}
-        className="flex-shrink-0 cursor-grab active:cursor-grabbing p-1 -ml-2 rounded hover:bg-gray-100 transition-colors"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <GripVertical className="w-4 h-4 text-gray-400" />
-      </div>
+      {/* Handle de arraste - só aparece com permissão de editar */}
+      {pode('tarefas.editar') && (
+        <div
+          {...attributes}
+          {...listeners}
+          className="flex-shrink-0 cursor-grab active:cursor-grabbing p-1 -ml-2 rounded hover:bg-gray-100 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="w-4 h-4 text-gray-400" />
+        </div>
+      )}
 
       {/* Indicador lateral de prioridade */}
       {!tarefa.concluida && calcularPrioridadeMaior(tarefa.subtarefas || []) && (
@@ -583,7 +588,10 @@ function CobrancaModal({ subtarefa, onClose, onUpdate, isProcuracaoAdm = false, 
     try {
       await fetch(`/api/tarefas/${subtarefa.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify({
           responsavelId: novoResponsavelId ? parseInt(novoResponsavelId) : null
         })
@@ -599,7 +607,10 @@ function CobrancaModal({ subtarefa, onClose, onUpdate, isProcuracaoAdm = false, 
     try {
       const response = await fetch(`/api/tarefas/${subtarefa.id}/cobranca`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify({
           acao,
           observacao: observacao || undefined,
@@ -944,7 +955,10 @@ useEffect(() => {
     try {
       const response = await fetch(`/api/tarefas/${tarefa.id}/iniciar`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify({ prazoCobranca: editForm.prazoCobranca || tarefa.prazoCobranca || 5 })
       })
 
@@ -968,7 +982,10 @@ useEffect(() => {
     if (isTemporaria) return
     setConcluindo(true)
     try {
-      const response = await fetch(`/api/tarefas/${tarefa.id}/toggle`, { method: "POST" })
+      const response = await fetch(`/api/tarefas/${tarefa.id}/toggle`, { 
+        method: "POST",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("authToken")}` }
+      })
       if (response.ok) {
         onUpdate()
       }
@@ -990,7 +1007,10 @@ const handleConcluirComStatus = async (status: string) => {
     
     const response = await fetch(`/api/tarefas/${idParaAcao}/cobranca`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+      },
       body: JSON.stringify({ 
         acao: status === "recebido" ? "recebido" : "nao_possui" 
       })
@@ -1021,7 +1041,10 @@ const handleAguardandoCliente = async () => {
     
     const response = await fetch(`/api/tarefas/${idParaAcao}/cobranca`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+      },
       body: JSON.stringify({
         acao: "cobrado",
         observacao: "Aguardando cliente",
@@ -1054,7 +1077,10 @@ const handleConferencia = async () => {
     
     const response = await fetch(`/api/tarefas/${idParaAcao}/cobranca`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+      },
       body: JSON.stringify({
         acao: "conferencia",
         diasCobranca: diasConferencia
@@ -1083,7 +1109,10 @@ const handleConferencia = async () => {
     try {
       const response = await fetch(`/api/tarefas/${tarefa.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify({ dataPrazo: novoPrazo })
       })
       if (response.ok) {
@@ -1104,7 +1133,10 @@ const handleConferencia = async () => {
     try {
       const response = await fetch(`/api/tarefas/${tarefa.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify({
           titulo: editForm.titulo,
           descricao: editForm.descricao || null,
@@ -1302,7 +1334,7 @@ const handleConferencia = async () => {
         )}
 
         {/* Botão excluir */}
-        {!isTemporaria && (
+        {!isTemporaria && pode('tarefas.excluir') && (
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -1428,37 +1460,37 @@ const handleConferencia = async () => {
                   
                   <div className="flex items-center gap-2 flex-wrap">
   
-  {!tarefa.concluida && !iniciada && (
-  <div className="flex items-center gap-2 flex-wrap w-full">
-    <button
-      onClick={() => setEditando(true)}
-      className="py-1.5 px-3 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-    >
-      Editar
-    </button>
-    
-    <button
-      onClick={handleIniciar}
-      disabled={iniciando}
-      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors disabled:opacity-50 ml-auto"
-    >
-      {iniciando ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-      Iniciar
-    </button>
-  </div>
-)}
-</div>
+                  {!tarefa.concluida && !iniciada && (
+                  <div className="flex items-center gap-2 flex-wrap w-full">
+                    {pode('tarefas.editar') && <button
+                      onClick={() => setEditando(true)}
+                      className="py-1.5 px-3 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                    >
+                      Editar
+                    </button>}
+                    
+                    {pode('tarefas.iniciar_concluir') && <button
+                      onClick={handleIniciar}
+                      disabled={iniciando}
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors disabled:opacity-50 ml-auto"
+                    >
+                      {iniciando ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                      Iniciar
+                    </button>}
+                  </div>
+                )}
+                </div>
                     
                     {!tarefa.concluida && iniciada && (
   <div className="flex items-center gap-2 flex-wrap">
-    <button
+    {pode('tarefas.editar') && <button
       onClick={() => setEditando(true)}
       className="py-1.5 px-3 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
     >
       Editar
-    </button>
+    </button>}
     
-    <div className="flex items-center gap-1 flex-wrap ml-auto">
+    {pode('tarefas.iniciar_concluir') && <div className="flex items-center gap-1 flex-wrap ml-auto">
       {/* Recebido */}
 {!confirmandoRecebido ? (
   <button
@@ -1600,7 +1632,7 @@ const handleConferencia = async () => {
         <Calendar className="w-3 h-3" />
         Prazo
       </button>
-    </div>
+    </div>}
   </div>
 )}
 </div>
@@ -1716,7 +1748,10 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios, isProcuracaoAd
     try {
       const response = await fetch(`/api/tarefas/${atividade.id}/subtarefas`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify({ titulo: novaTarefa.trim() })
       })
       if (response.ok) {
@@ -1733,7 +1768,10 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios, isProcuracaoAd
 
   const handleDeleteTarefa = async (tarefaId: number) => {
     try {
-      const response = await fetch(`/api/tarefas/${tarefaId}`, { method: "DELETE" })
+      const response = await fetch(`/api/tarefas/${tarefaId}`, { 
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("authToken")}` }
+      })
       if (response.ok) {
         setTarefas(prev => prev.filter(t => t.id !== tarefaId))
         onUpdate()
@@ -1749,7 +1787,10 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios, isProcuracaoAd
     try {
       const response = await fetch(`/api/tarefas/${atividade.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify({
           titulo: editForm.titulo,
           descricao: editForm.descricao || null,
@@ -1937,12 +1978,12 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios, isProcuracaoAd
                         {atividade.responsavel.nome}
                       </span>
                     )}
-                    <button
+                    {pode('tarefas.editar') && <button
                       onClick={() => setEditando(true)}
                       className="py-0.5 px-2 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200 transition-colors"
                     >
                       Editar
-                    </button>
+                    </button>}
                   </div>
 
               {/* Tarefas dentro da atividade */}
@@ -2107,7 +2148,10 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
     try {
       const response = await fetch(`/api/tarefas/${tarefa.id}/subtarefas`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify({ titulo })
       })
 
@@ -2189,7 +2233,10 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
     try {
       const response = await fetch(`/api/tarefas/${tarefa.id}/subtarefas`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify({ titulo: tituloNovo })
       })
 
@@ -2226,7 +2273,8 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
 
     try {
       const response = await fetch(`/api/tarefas/${atividadeId}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("authToken")}` }
       })
 
       if (!response.ok) {
@@ -2250,7 +2298,10 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
     try {
       const response = await fetch(`/api/tarefas/${tarefa.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify({ titulo: tituloEditado.trim() })
       })
 
@@ -2311,13 +2362,13 @@ function SubtarefasModal({ tarefa, onClose, onUpdate, onSubtarefaToggle, onSubta
               ) : (
                 <div className="flex items-center gap-2">
                   <h2 className="text-xl font-bold truncate">{tarefa.titulo}</h2>
-                  <button 
+                  {pode('tarefas.editar') && <button 
                     onClick={() => { setTituloEditado(tarefa.titulo); setEditandoTitulo(true) }}
                     className="p-1.5 hover:bg-white/20 rounded-full transition-colors flex-shrink-0"
                     title="Editar nome"
                   >
                     <Pencil className="w-4 h-4" />
-                  </button>
+                  </button>}
                 </div>
               )}
               <p className="text-gray-300 text-sm mt-1">
@@ -2681,6 +2732,10 @@ export function ProcessoTarefas({ processoId, pais, onUpdate, pessoas = [], tare
 
   const { pode } = usePermissoes()
 
+  const [activeId, setActiveId] = useState<number | null>(null)
+
+  const [dragCount, setDragCount] = useState(0)
+
   // ✅ NOVO: Configuração dos sensores para drag-and-drop
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -2847,7 +2902,10 @@ useEffect(() => {
       
       const response = await fetch("/api/tarefas", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+        },
         body: JSON.stringify({ 
           titulo: tituloFinal, 
           processoId,
@@ -2876,7 +2934,10 @@ useEffect(() => {
     if (!confirm("Excluir esta tarefa e todas as subtarefas?")) return
 
     try {
-      const response = await fetch(`/api/tarefas/${tarefaId}`, { method: "DELETE" })
+      const response = await fetch(`/api/tarefas/${tarefaId}`, { 
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("authToken")}` }
+      })
       if (response.ok) {
         fetchTarefas()
         onUpdate?.()
@@ -2891,8 +2952,15 @@ useEffect(() => {
     onUpdate?.()
   }
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as number)
+  }
+
   // ✅ NOVO: Handler para quando termina de arrastar
   const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveId(null)
+    setDragCount(c => c + 1)
+    if (!pode('tarefas.editar')) return
     const { active, over } = event
 
     if (over && active.id !== over.id) {
@@ -2912,7 +2980,10 @@ useEffect(() => {
 
         await fetch('/api/tarefas/reordenar', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem("authToken")}`
+          },
           body: JSON.stringify({ tarefas: tarefasComOrdem })
         })
       } catch (error) {
@@ -3076,15 +3147,31 @@ useEffect(() => {
             <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
               <CheckCircle2 className="h-8 w-8 text-gray-300" />
             </div>
-            <p className="font-medium text-gray-600">Nenhuma tarefa ainda</p>
-            <p className="text-sm text-gray-400 mt-1">Adicione tarefas para acompanhar o progresso</p>
+            {pode('tarefas.ver') ? (
+              <>
+                <p className="font-medium text-gray-600">Nenhuma tarefa ainda</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  {pode('tarefas.criar') 
+                    ? 'Adicione tarefas para acompanhar o progresso' 
+                    : 'Nenhuma tarefa foi adicionada a este processo'}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-medium text-gray-600">Acesso restrito</p>
+                <p className="text-sm text-gray-400 mt-1">Você não tem permissão para visualizar tarefas</p>
+              </>
+            )}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             {/* ✅ NOVO: Lista arrastável de tarefas pendentes */}
             <DndContext
+              key={dragCount}
               sensors={sensors}
               collisionDetection={closestCenter}
+              modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+              onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
             >
               <SortableContext
@@ -3100,6 +3187,18 @@ useEffect(() => {
                   />
                 ))}
               </SortableContext>
+              <DragOverlay>
+                {activeId ? (() => {
+                  const tarefa = tarefasPendentes.find(t => t.id === activeId)
+                  return tarefa ? (
+                    <TarefaCard
+                      tarefa={tarefa}
+                      onClick={() => {}}
+                      onDelete={() => {}}
+                    />
+                  ) : null
+                })() : null}
+              </DragOverlay>
             </DndContext>
 
             {tarefasConcluidas.length > 0 && tarefasPendentes.length > 0 && (

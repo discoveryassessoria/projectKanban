@@ -203,7 +203,7 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
     try {
       const response = await fetch(`/api/tarefas/${tarefa.id}/iniciar`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
         body: JSON.stringify({ prazoCobranca: editForm.prazoCobranca || 5 })
       })
       if (response.ok) {
@@ -221,12 +221,14 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
   const handleConcluirComStatus = async (statusAcao: string) => {
     setProcessando(true)
     try {
-      const cobrancaPendente = subtarefas.find(s => s.tipoSubtarefa === "COBRANCA" && !s.concluida)
-      const idParaAcao = cobrancaPendente?.id || tarefa.id
+      // Se EU sou a cobrança/conferência, age direto em mim
+      const isEuCobranca = tarefa.tipoSubtarefa === "COBRANCA" || tarefa.tipoSubtarefa === "CONFERENCIA"
+      const cobrancaPendente = !isEuCobranca ? subtarefas.find(s => s.tipoSubtarefa === "COBRANCA" && !s.concluida) : null
+      const idParaAcao = isEuCobranca ? tarefa.id : (cobrancaPendente?.id || tarefa.id)
 
       const response = await fetch(`/api/tarefas/${idParaAcao}/cobranca`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
         body: JSON.stringify({ acao: statusAcao })
       })
       if (response.ok) {
@@ -244,12 +246,13 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
   const handleAguardando = async (dias: number) => {
     setProcessando(true)
     try {
-      const cobrancaPendente = subtarefas.find(s => s.tipoSubtarefa === "COBRANCA" && !s.concluida)
-      const idParaAcao = cobrancaPendente?.id || tarefa.id
+      const isEuCobranca = tarefa.tipoSubtarefa === "COBRANCA" || tarefa.tipoSubtarefa === "CONFERENCIA"
+      const cobrancaPendente = !isEuCobranca ? subtarefas.find(s => s.tipoSubtarefa === "COBRANCA" && !s.concluida) : null
+      const idParaAcao = isEuCobranca ? tarefa.id : (cobrancaPendente?.id || tarefa.id)
 
       const response = await fetch(`/api/tarefas/${idParaAcao}/cobranca`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
         body: JSON.stringify({ acao: "cobrado", observacao: "Aguardando cliente", diasCobranca: dias })
       })
       if (response.ok) {
@@ -269,7 +272,7 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
     try {
       const response = await fetch(`/api/tarefas/${tarefa.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
         body: JSON.stringify({
           titulo: editForm.titulo,
           prioridade: editForm.prioridade,
@@ -290,7 +293,7 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
     }
   }
 
-  // Render subtarefa de cobrança/conferência (compacto)
+  // Render subtarefa de cobrança/conferência (com ações)
   if (isCobranca || isConferencia) {
     const cores = isConferencia
       ? { bg: tarefa.concluida ? 'bg-gray-50' : 'bg-violet-50', border: tarefa.concluida ? 'border-gray-200' : 'border-violet-200', text: tarefa.concluida ? 'text-gray-400 line-through' : 'text-violet-800' }
@@ -312,6 +315,46 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
           <span className={`text-[10px] ${isPast(tarefa.dataPrazo) && !tarefa.concluida ? 'text-red-500' : 'text-gray-400'}`}>
             {formatDateBR(tarefa.dataPrazo)}
           </span>
+        )}
+        {/* Botões de ação para cobrança/conferência pendentes */}
+        {!tarefa.concluida && pode('tarefas.iniciar_concluir') && (
+          <div className="flex items-center gap-1 ml-1">
+            <button
+              onClick={() => handleConcluirComStatus("recebido")}
+              disabled={processando}
+              className="px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded transition-colors disabled:opacity-50"
+              title="Recebido"
+            >
+              <CheckCircle2 className="w-3 h-3" />
+            </button>
+            <button
+              onClick={() => handleAguardando(5)}
+              disabled={processando}
+              className="px-1.5 py-0.5 text-[10px] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded transition-colors disabled:opacity-50"
+              title="Cobrar novamente (5 dias)"
+            >
+              <RefreshCw className="w-3 h-3" />
+            </button>
+            {isProcuracaoAdm ? (
+              <button
+                onClick={() => handleConcluirComStatus("conferencia")}
+                disabled={processando}
+                className="px-1.5 py-0.5 text-[10px] font-medium text-violet-600 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded transition-colors disabled:opacity-50"
+                title="Conferência"
+              >
+                <ClipboardCheck className="w-3 h-3" />
+              </button>
+            ) : (
+              <button
+                onClick={() => handleConcluirComStatus("nao_possui")}
+                disabled={processando}
+                className="px-1.5 py-0.5 text-[10px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded transition-colors disabled:opacity-50"
+                title="Não possui"
+              >
+                <FileX className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         )}
       </div>
     )
@@ -363,7 +406,7 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
         </div>
 
         {/* Actions */}
-        {!tarefa.concluida && !iniciada && mostrarBotaoIniciar && (
+        {!tarefa.concluida && !iniciada && mostrarBotaoIniciar && pode('tarefas.iniciar_concluir') && (
           <button
             onClick={handleIniciar}
             disabled={processando}
@@ -374,7 +417,7 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
           </button>
         )}
 
-        {!tarefa.concluida && iniciada && (
+        {!tarefa.concluida && iniciada && pode('tarefas.iniciar_concluir') && (
           <div className="flex items-center gap-1">
             <button
               onClick={() => handleConcluirComStatus("recebido")}
@@ -419,7 +462,7 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
           onClick={async () => {
             if (!confirm("Excluir esta subtarefa?")) return
             try {
-              const response = await fetch(`/api/tarefas/${tarefa.id}`, { method: "DELETE" })
+              const response = await fetch(`/api/tarefas/${tarefa.id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${localStorage.getItem("authToken")}` } })
               if (response.ok) onUpdate()
             } catch (error) {
               console.error("Erro ao excluir:", error)
@@ -468,9 +511,9 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
             </div>
           ) : (
             <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={() => setEditando(true)} className="px-2 py-1 rounded text-[10px] font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+              {pode('tarefas.editar') && <button onClick={() => setEditando(true)} className="px-2 py-1 rounded text-[10px] font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
                 Editar
-              </button>
+              </button>}
               {tarefa.responsavel && (
                 <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-white border text-[10px] text-gray-600">
                   <User className="w-3 h-3" /> {tarefa.responsavel.nome}
@@ -583,7 +626,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
     try {
       const response = await fetch(`/api/tarefas/${tarefa.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
         body: JSON.stringify({ titulo: tituloEditado.trim() })
       })
       if (response.ok) {
@@ -603,7 +646,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
     try {
       const response = await fetch(`/api/tarefas/${tarefa.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
         body: JSON.stringify({
           prioridade: editForm.prioridade,
           dataPrazo: editForm.dataPrazo || null,
@@ -629,7 +672,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
     try {
       const response = await fetch(`/api/tarefas/${tarefa.id}/subtarefas`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
         body: JSON.stringify({ titulo: novaTarefa.trim() })
       })
       if (response.ok) {
@@ -649,7 +692,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
   const handleExcluirSubtarefa = async (id: number) => {
     if (!confirm("Excluir esta subtarefa?")) return
     try {
-      const response = await fetch(`/api/tarefas/${id}`, { method: "DELETE" })
+      const response = await fetch(`/api/tarefas/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${localStorage.getItem("authToken")}` } })
       if (response.ok) {
         fetchSubtarefas()
         onUpdate()
@@ -676,7 +719,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
 
       const response = await fetch(`/api/tarefas/${tarefa.id}/historico`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
         body: JSON.stringify({
           texto: novoComentario.trim(),
           usuarioId,
@@ -750,9 +793,9 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
               ) : (
                 <div className="flex items-center gap-2">
                   <h2 className="text-xl font-bold text-gray-900 truncate">{tarefa.titulo}</h2>
-                  <button onClick={() => { setTituloEditado(tarefa.titulo); setEditandoTitulo(true) }} className="p-1.5 hover:bg-gray-100 rounded-lg flex-shrink-0">
+                  {pode('tarefas.editar') && <button onClick={() => { setTituloEditado(tarefa.titulo); setEditandoTitulo(true) }} className="p-1.5 hover:bg-gray-100 rounded-lg flex-shrink-0">
                     <Pencil className="w-4 h-4 text-gray-400" />
-                  </button>
+                  </button>}
                 </div>
               )}
 
@@ -793,7 +836,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Detalhes</h3>
                   {!editandoCampos ? (
-                    <button onClick={() => setEditandoCampos(true)} className="text-xs text-blue-600 hover:text-blue-700 font-medium">
+                    pode('tarefas.editar') && <button onClick={() => setEditandoCampos(true)} className="text-xs text-blue-600 hover:text-blue-700 font-medium">
                       Editar
                     </button>
                   ) : (
@@ -938,7 +981,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
             </div>
 
             {/* Comment input */}
-            <div className="px-4 py-3 border-b bg-white flex-shrink-0">
+            {pode('tarefas.editar') && <div className="px-4 py-3 border-b bg-white flex-shrink-0">
               <div className="flex items-center gap-2">
                 <textarea
                     value={novoComentario}
@@ -965,7 +1008,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                   {enviandoComentario ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
               </div>
-            </div>
+            </div>}
 
             {/* Feed content */}
             <div ref={feedRef} className="flex-1 overflow-y-auto">

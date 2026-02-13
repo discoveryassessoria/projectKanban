@@ -19,6 +19,7 @@ import { HeaderBar } from "@/src/components/header-bar"
 import { usePaises, useStatuses, useUsers, useActivities, invalidateActivities } from "@/src/hooks/useActivitiesData"
 import type { Atividade, Status } from "@/src/hooks/useActivitiesData"
 import { DatePickerField } from "@/components/ui/date-picker-field"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 // Mapeamento de países para exibição
 const PAIS_LABELS: Record<string, string> = {
@@ -69,6 +70,7 @@ export default function ActivitiesPage() {
   // Estados para árvores e processos (para o HeaderBar)
   const [arvores, setArvores] = useState<any[]>([])
   const [processos, setProcessos] = useState<any[]>([])
+  const { pode } = usePermissoes()
 
   // Dados
   const { activities } = useActivities()
@@ -183,7 +185,7 @@ export default function ActivitiesPage() {
         <main className="relative px-4 py-4 max-w-full">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <CreateActivityModal />
+            {pode('tarefas.criar') && <CreateActivityModal />}
           </div>
         </div>
 
@@ -491,6 +493,7 @@ function SearchModal({
 // COMPONENTE: CreateActivityModal
 function CreateActivityModal() {
   const [open, setOpen] = useState(false)
+  const [criando, setCriando] = useState(false)
   const [formData, setFormData] = useState<ActivityFormData>({
     nome: '',
     descricao: '',
@@ -505,6 +508,8 @@ function CreateActivityModal() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (criando) return
+    setCriando(true)
     
     try {
       const token = localStorage.getItem('authToken')
@@ -537,6 +542,8 @@ function CreateActivityModal() {
       }
     } catch (error) {
       console.error('Erro ao criar atividade:', error)
+    } finally {
+      setCriando(false)
     }
   }
 
@@ -583,8 +590,8 @@ function CreateActivityModal() {
             />
           </div>
 
-          <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-            Criar Atividade
+          <Button type="submit" disabled={criando} className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
+            {criando ? "Criando..." : "Criar Atividade"}
           </Button>
         </form>
       </DialogContent>

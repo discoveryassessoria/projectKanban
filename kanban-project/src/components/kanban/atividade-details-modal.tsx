@@ -594,9 +594,9 @@ export function ProcessoDetailsModal({
         {/* Conteúdo principal */}
         <div className="flex-1 overflow-hidden">
           {activeTab === "geral" && (
-            <div className="grid grid-cols-2 h-full">
+            <div className="grid grid-cols-2 h-full overflow-hidden">
               {/* ========== COLUNA ESQUERDA - SOBRE O NEGÓCIO ========== */}
-              <div className="border-r overflow-y-auto p-6">
+              <div className="border-r overflow-y-auto p-6 min-h-0">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
                     Sobre o Negócio
@@ -951,6 +951,7 @@ export function ProcessoDetailsModal({
               </div>
 
               {/* ========== COLUNA DIREITA - TAREFAS (COMPONENTE) ========== */}
+              <div className="overflow-hidden min-h-0">
               <ProcessoTarefas 
                 processoId={processo.id}
                 pais={paisConfig.label}
@@ -962,6 +963,7 @@ export function ProcessoDetailsModal({
                 tarefaPaiId={initialTarefaPaiId}
                 atividadeId={initialAtividadeId}
               />
+              </div>
             </div>
           )}
 
