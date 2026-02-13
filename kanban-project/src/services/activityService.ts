@@ -26,10 +26,12 @@ export class ActivityService {
   ): Promise<UpdateActivityResponse> {
     try {
       // ✅ CORRIGIDO: Endpoint /api/tarefas e método PUT
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
       const response = await fetch(`/api/tarefas/${id}`, {
-        method: 'PUT',  // ✅ A API só suporta PUT, não PATCH
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify(data),
       })
@@ -74,7 +76,10 @@ export class ActivityService {
    */
   static async getActivities(): Promise<any[]> {
     try {
-      const response = await fetch('/api/tarefas')
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
+      const response = await fetch('/api/tarefas', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      })
       
       if (!response.ok) {
         throw new Error('Erro ao carregar atividades')

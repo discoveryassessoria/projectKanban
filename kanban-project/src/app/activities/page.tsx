@@ -95,7 +95,9 @@ export default function ActivitiesPage() {
 
   const buscarArvores = async () => {
     try {
-      const response = await fetch("/api/arvore")
+      const response = await fetch("/api/arvore", {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      })
       if (response.ok) {
         const data = await response.json()
         setArvores(Array.isArray(data) ? data : [])
@@ -107,7 +109,9 @@ export default function ActivitiesPage() {
 
   const buscarProcessos = async () => {
     try {
-      const response = await fetch("/api/processos")
+      const response = await fetch("/api/processos", {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      })
       if (response.ok) {
         const data = await response.json()
         setProcessos(data.processos || [])

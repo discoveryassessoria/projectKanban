@@ -159,7 +159,7 @@ export function TarefaDetailsModal({
     try {
       const response = await fetch(`/api/tarefas/${tarefa.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('authToken')}` },
         body: JSON.stringify({
           titulo,
           descricao,
@@ -193,7 +193,8 @@ export function TarefaDetailsModal({
     setIsDeleting(true)
     try {
       const response = await fetch(`/api/tarefas/${tarefa.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
       })
 
       if (response.ok) {
@@ -215,7 +216,7 @@ export function TarefaDetailsModal({
     try {
       const response = await fetch(`/api/tarefas/${subtarefaId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('authToken')}` },
         body: JSON.stringify({ concluida: novoStatus })
       })
 
@@ -235,7 +236,7 @@ export function TarefaDetailsModal({
     try {
       const response = await fetch('/api/tarefas', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('authToken')}` },
         body: JSON.stringify({
           titulo: novaSubtarefa,
           tarefaPaiId: tarefa.id,

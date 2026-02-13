@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useActivities, useStatuses, useContratantes, useRequerentes, invalidateActivities } from "@/src/hooks/useActivitiesData"
 import type { Atividade, Status, Usuario } from "@/src/hooks/useActivitiesData"
 import { TarefaDetailsModal } from "@/src/components/activitiesComponents/tarefa-details-modal"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 // Mapeamento de países para exibição
 const PAIS_LABELS: Record<string, string> = {
@@ -41,6 +42,8 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [selectedAtividade, setSelectedAtividade] = useState<Atividade | null>(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+
+  const { pode } = usePermissoes()
 
   // Garantir que atividades é sempre um array
   const atividades = Array.isArray(activities) ? activities : []
@@ -125,7 +128,8 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       for (const id of selectedItems) {
         try {
           const response = await fetch(`/api/tarefas/${id}`, { 
-            method: 'DELETE' 
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
           })
           
           if (!response.ok) {
@@ -183,7 +187,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       const updatePromises = selectedItems.map(id => 
         fetch(`/api/tarefas/${id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('authToken')}` },
           body: JSON.stringify({ concluida })
         })
       )
@@ -309,12 +313,14 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       <div className="px-4 py-3 border-b border-white/10">
         <div className="grid gap-4 items-center text-sm font-medium text-white/80" style={{ gridTemplateColumns: '28px 2.5fr 0.8fr 1.2fr 0.7fr 0.7fr 0.6fr 0.4fr 0.6fr' }}>
           <div className="">
-            <input
-              type="checkbox"
-              checked={selectedItems.length === atividades.length && atividades.length > 0}
-              onChange={toggleSelectAll}
-              className="rounded border-white/30 bg-transparent"
-            />
+            {(pode('tarefas.excluir') || pode('tarefas.editar')) && (
+              <input
+                type="checkbox"
+                checked={selectedItems.length === atividades.length && atividades.length > 0}
+                onChange={toggleSelectAll}
+                className="rounded border-white/30 bg-transparent"
+              />
+            )}
           </div>
           <div className="">Nome</div>
           <div className="">Processo</div>
@@ -348,13 +354,15 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
             >
               <div className="grid gap-4 items-center text-white/80" style={{ gridTemplateColumns: '28px 2.5fr 0.8fr 1.2fr 0.7fr 0.7fr 0.6fr 0.4fr 0.6fr' }}>
                 <div className="">
-                  <input
-                    type="checkbox"
-                    checked={selectedItems.includes(atividade.id)}
-                    onChange={() => toggleSelectItem(atividade.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="rounded border-white/30 bg-transparent"
-                  />
+                  {(pode('tarefas.excluir') || pode('tarefas.editar')) && (
+                    <input
+                      type="checkbox"
+                      checked={selectedItems.includes(atividade.id)}
+                      onChange={() => toggleSelectItem(atividade.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="rounded border-white/30 bg-transparent"
+                    />
+                  )}
                 </div>
                 
                 <div className="">
@@ -423,15 +431,15 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
           <div className="flex items-center space-x-4">
             <span>Selecionado: {selectedItems.length} / {atividades.length}</span>
             <span>Total mostrando: {atividades.length}</span>
-            {selectedItems.length > 0 && (
+            {selectedItems.length > 0 && (pode('tarefas.excluir') || pode('tarefas.editar')) && (
               <div className="flex items-center space-x-2">
                 <Select value={selectedAction} onValueChange={setSelectedAction}>
                   <SelectTrigger className="w-40 bg-white/10 border-white/20 text-white [&_svg]:!text-white/60" style={{ color: selectedAction ? 'white' : 'rgba(255,255,255,0.6)' }}>
                     <SelectValue placeholder="Selecionar ação" />
                   </SelectTrigger>
                   <SelectContent className="bg-white border-gray-200 text-gray-900">
-                    <SelectItem value="delete">Excluir</SelectItem>
-                    <SelectItem value="status">Marcar como...</SelectItem>
+                    {pode('tarefas.excluir') && <SelectItem value="delete">Excluir</SelectItem>}
+                    {pode('tarefas.editar') && <SelectItem value="status">Marcar como...</SelectItem>}
                   </SelectContent>
                 </Select>
                 
