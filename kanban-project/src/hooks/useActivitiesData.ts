@@ -142,7 +142,7 @@ function mapTarefaToAtividade(tarefa: TarefaAPI): Atividade {
     descricao: tarefa.descricao,
     data_termino: tarefa.dataPrazo,
     data_criacao: tarefa.createdAt,
-    pais: tarefa.pais || tarefa.processo?.pais || 'PORTUGAL' as Pais,
+    pais: tarefa.pais || tarefa.processo?.pais || null as any,
     status: getStatusFromConcluida(tarefa.concluida),
     contratante: null,
     usuarios: tarefa.responsavel 
