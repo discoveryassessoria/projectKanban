@@ -1721,6 +1721,7 @@ function AtividadeItem({ atividade, onDelete, onUpdate, usuarios, isProcuracaoAd
     responsavelId: atividade.responsavelId?.toString() || "",
     observacoes: atividade.observacoes || "",
     prazoCobranca: atividade.prazoCobranca || 5
+    
   })
 
   const isTemporaria = atividade.id < 0

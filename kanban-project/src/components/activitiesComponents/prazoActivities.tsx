@@ -33,7 +33,8 @@ import { useActivityOperations } from "@/src/hooks/useActivityOperations"
 import { useQuickAddActivity } from "@/src/hooks/useQuickAddActivity"
 import { useActivities, useContratantes, useRequerentes, invalidateActivities } from "@/src/hooks/useActivitiesData"
 import type { Atividade, Usuario, Status } from "@/src/hooks/useActivitiesData"
-import { TarefaDetailsModal } from "@/src/components/activitiesComponents/tarefa-details-modal"
+import { TarefaDetailModal } from "@/src/components/kanban/TarefaDetailModal"
+import { useUsers } from "@/src/hooks/useActivitiesData"
 import type { Contratante, Requerente } from "@/src/types/kanban"
 import "@/src/styles/kanban.css"
 import { useRouter } from "next/navigation"
@@ -70,6 +71,8 @@ export default function PrazoActivities({ filters }: PrazoActivitiesProps) {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false)
   const [quickAddCategory, setQuickAddCategory] = useState<PrazoCategory | null>(null)
   const [hoveredColumn, setHoveredColumn] = useState<string | null>(null)
+
+  const { users = [] } = useUsers()
   
   // Hook para operações de atividade
   const { updateDeadline, isUpdating, error: updateError, clearError } = useActivityOperations()
@@ -101,13 +104,37 @@ export default function PrazoActivities({ filters }: PrazoActivitiesProps) {
     })
   )
 
-  const handleActivityClick = (activity: Atividade) => {
+  const handleActivityClick = async (activity: Atividade) => {
     if (activity.processo?.id) {
-      // Redirecionar para o kanban que vai abrir os modais automaticamente
       const pais = activity.processo.pais || activity.pais || 'PORTUGAL'
       router.push(`/kanban?processoId=${activity.processo.id}&tab=tarefas&pais=${pais}&atividadeId=${activity.id}`)
+    } else if (activity.tarefaPai?.id) {
+      try {
+        const response = await fetch(`/api/tarefas/${activity.tarefaPai.id}`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+        })
+        if (response.ok) {
+          const data = await response.json()
+          const pai = data.tarefa
+          setSelectedActivity({
+            ...activity,
+            id: pai.id,
+            nome: pai.titulo,
+            descricao: pai.descricao,
+            concluida: pai.concluida,
+            prioridade: pai.prioridade,
+            data_termino: pai.dataPrazo,
+            data_criacao: pai.createdAt,
+            responsavel: pai.responsavel,
+            observacoes: pai.observacoes,
+            tarefaPai: undefined,
+          } as any)
+          setIsDetailsModalOpen(true)
+        }
+      } catch (error) {
+        console.error('Erro ao buscar tarefa pai:', error)
+      }
     } else {
-      // Atividade sem processo - abrir modal simples
       setSelectedActivity(activity)
       setIsDetailsModalOpen(true)
     }
@@ -435,11 +462,23 @@ export default function PrazoActivities({ filters }: PrazoActivitiesProps) {
 
         {/* Activity Details Modal - apenas para atividades sem processo */}
         {isDetailsModalOpen && selectedActivity && (
-          <TarefaDetailsModal
-            tarefa={selectedActivity as any}
-            isOpen={isDetailsModalOpen}
+          <TarefaDetailModal
+            tarefa={{
+              id: selectedActivity.id,
+              titulo: selectedActivity.nome,
+              descricao: selectedActivity.descricao || undefined,
+              concluida: selectedActivity.concluida || false,
+              prioridade: selectedActivity.prioridade || 'MEDIA',
+              dataPrazo: selectedActivity.data_termino || undefined,
+              responsavel: selectedActivity.responsavel?.id ? selectedActivity.responsavel as any : undefined,
+              responsavelId: selectedActivity.responsavel?.id,
+              createdAt: selectedActivity.data_criacao,
+              observacoes: selectedActivity.observacoes || undefined,
+              subtarefas: [],
+            }}
             onClose={() => setIsDetailsModalOpen(false)}
-            onSave={handleAtividadeSave}
+            onUpdate={() => { mutate(); invalidateActivities() }}
+            usuarios={users.map((u: any) => ({ id: u.id, nome: u.nome, email: u.email }))}
           />
         )}
     </div>

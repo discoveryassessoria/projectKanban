@@ -171,7 +171,9 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
 
   const fetchSubtarefas = async () => {
     try {
-      const response = await fetch(`/api/tarefas/${tarefa.id}`)
+      const response = await fetch(`/api/tarefas/${tarefa.id}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      })
       const data = await response.json()
       if (data.tarefa?.subtarefas) {
         setSubtarefas(data.tarefa.subtarefas)
@@ -542,7 +544,8 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
 export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcuracaoAdm = false }: TarefaDetailModalProps) {
   const { pode } = usePermissoes()
   const [editandoTitulo, setEditandoTitulo] = useState(false)
-  const [tituloEditado, setTituloEditado] = useState(tarefa.titulo)
+  const [tituloLocal, setTituloLocal] = useState(tarefa.titulo)
+  const [tituloEditado, setTituloEditado] = useState(tarefa.titulo)  // ← Adicionar esta linha
   const [salvandoTitulo, setSalvandoTitulo] = useState(false)
 
   // Subtarefas
@@ -558,6 +561,13 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
     dataPrazo: tarefa.dataPrazo ? tarefa.dataPrazo.split("T")[0] : "",
     responsavelId: tarefa.responsavelId?.toString() || "",
     observacoes: tarefa.observacoes || ""
+  })
+
+  const [dadosLocais, setDadosLocais] = useState({
+    prioridade: tarefa.prioridade || "MEDIA",
+    dataPrazo: tarefa.dataPrazo,
+    responsavelNome: tarefa.responsavel?.nome,
+    observacoes: tarefa.observacoes
   })
 
   // Histórico
@@ -585,7 +595,9 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
   // Fetch subtarefas atualizadas
   const fetchSubtarefas = async () => {
     try {
-      const response = await fetch(`/api/tarefas/${tarefa.id}`)
+      const response = await fetch(`/api/tarefas/${tarefa.id}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      })
       const data = await response.json()
       if (data.tarefa?.subtarefas) {
         setSubtarefas(data.tarefa.subtarefas)
@@ -598,7 +610,9 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
   // Fetch histórico
   const fetchHistorico = async () => {
     try {
-      const response = await fetch(`/api/tarefas/${tarefa.id}/historico`)
+      const response = await fetch(`/api/tarefas/${tarefa.id}/historico`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      })
       const data = await response.json()
       if (data.historico) {
         setHistorico(data.historico)
@@ -615,9 +629,35 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
     fetchHistorico()
   }, [tarefa.id])
 
-  useEffect(() => {
-    setSubtarefas(tarefa.subtarefas || [])
-  }, [tarefa.subtarefas])
+  // Adicionar:
+  const fetchTarefaCompleta = async () => {
+    try {
+      const response = await fetch(`/api/tarefas/${tarefa.id}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      })
+      const data = await response.json()
+      if (data.tarefa) {
+        const t = data.tarefa
+        setTituloLocal(t.titulo)
+        setTituloEditado(t.titulo)
+        setSubtarefas(t.subtarefas || [])
+        setDadosLocais({
+          prioridade: t.prioridade || "MEDIA",
+          dataPrazo: t.dataPrazo,
+          responsavelNome: t.responsavel?.nome,
+          observacoes: t.observacoes
+        })
+        setEditForm({
+          prioridade: t.prioridade || "MEDIA",
+          dataPrazo: t.dataPrazo ? t.dataPrazo.split("T")[0] : "",
+          responsavelId: t.responsavelId?.toString() || "",
+          observacoes: t.observacoes || ""
+        })
+      }
+    } catch (error) {
+      console.error("Erro ao buscar tarefa:", error)
+    }
+  }
 
   // Salvar título
   const handleSalvarTitulo = async () => {
@@ -631,6 +671,8 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
       })
       if (response.ok) {
         setEditandoTitulo(false)
+        setTituloLocal(tituloEditado.trim())
+        fetchTarefaCompleta()
         onUpdate()
       }
     } catch (error) {
@@ -656,6 +698,8 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
       })
       if (response.ok) {
         setEditandoCampos(false)
+        fetchTarefaCompleta()
+        fetchHistorico()
         onUpdate()
       }
     } catch (error) {
@@ -677,8 +721,8 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
       })
       if (response.ok) {
         setNovaTarefa("")
-        fetchSubtarefas()
-        fetchHistorico()   // ← ADICIONA ESTA LINHA
+        fetchTarefaCompleta()
+        fetchHistorico()
         onUpdate()
       }
     } catch (error) {
@@ -755,7 +799,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
     BAIXA: { emoji: "🟢", label: "Baixa", color: "text-emerald-600" },
   }
 
-  const prioridade = prioridadeConfig[tarefa.prioridade] || prioridadeConfig.MEDIA
+  const prioridade = prioridadeConfig[dadosLocais.prioridade] || prioridadeConfig.MEDIA
 
   return (
     <div
@@ -763,7 +807,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden"
+        className="bg-white text-gray-900 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ====== HEADER ====== */}
@@ -792,7 +836,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-bold text-gray-900 truncate">{tarefa.titulo}</h2>
+                  <h2 className="text-xl font-bold text-gray-900 truncate">{tituloLocal}</h2>
                   {pode('tarefas.editar') && <button onClick={() => { setTituloEditado(tarefa.titulo); setEditandoTitulo(true) }} className="p-1.5 hover:bg-gray-100 rounded-lg flex-shrink-0">
                     <Pencil className="w-4 h-4 text-gray-400" />
                   </button>}
@@ -887,13 +931,13 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                     <div>
                       <span className="text-[10px] text-gray-400 uppercase">Responsável</span>
                       <p className="text-sm font-medium text-gray-900">
-                        {tarefa.responsavel?.nome || <span className="text-gray-400">Não atribuído</span>}
+                        {dadosLocais.responsavelNome || <span className="text-gray-400">Não atribuído</span>}
                       </p>
                     </div>
                     <div>
                       <span className="text-[10px] text-gray-400 uppercase">Prazo</span>
-                      <p className={`text-sm font-medium ${tarefa.dataPrazo && isPast(tarefa.dataPrazo) ? 'text-red-500' : 'text-gray-900'}`}>
-                        {tarefa.dataPrazo ? formatDateBR(tarefa.dataPrazo) : <span className="text-gray-400">Sem prazo</span>}
+                      <p className={`text-sm font-medium ${dadosLocais.dataPrazo && isPast(dadosLocais.dataPrazo) ? 'text-red-500' : 'text-gray-900'}`}>
+                        {dadosLocais.dataPrazo ? formatDateBR(dadosLocais.dataPrazo) : <span className="text-gray-400">Sem prazo</span>}
                       </p>
                     </div>
                     <div>
@@ -902,11 +946,11 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                         {tarefa.createdAt ? formatDateBR(tarefa.createdAt) : "—"}
                       </p>
                     </div>
-                    {tarefa.observacoes && (
+                    {dadosLocais.observacoes && (
                       <div className="col-span-2">
                         <span className="text-[10px] text-gray-400 uppercase">Observações</span>
                         <p className="text-sm text-gray-700 mt-0.5 bg-amber-50 rounded-lg p-2 border border-amber-100">
-                          {tarefa.observacoes}
+                          {dadosLocais.observacoes}
                         </p>
                       </div>
                     )}
@@ -936,7 +980,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                         <SubtarefaLine
                           key={sub.id}
                           tarefa={sub}
-                          onUpdate={() => { fetchSubtarefas(); fetchHistorico(); onUpdate() }}
+                          onUpdate={() => { fetchTarefaCompleta(); fetchHistorico(); onUpdate() }}
                           usuarios={usuarios}
                           isProcuracaoAdm={isProcuracaoAdm}
                           mostrarBotaoIniciar={mostrarIniciar}

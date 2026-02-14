@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useActivities, useStatuses, useContratantes, useRequerentes, invalidateActivities } from "@/src/hooks/useActivitiesData"
 import type { Atividade, Status, Usuario } from "@/src/hooks/useActivitiesData"
-import { TarefaDetailsModal } from "@/src/components/activitiesComponents/tarefa-details-modal"
+import { TarefaDetailModal } from "@/src/components/kanban/TarefaDetailModal"
+import { useUsers } from "@/src/hooks/useActivitiesData"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 // Mapeamento de países para exibição
@@ -42,6 +43,8 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [selectedAtividade, setSelectedAtividade] = useState<Atividade | null>(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+
+  const { users = [] } = useUsers()
 
   const { pode } = usePermissoes()
 
@@ -216,11 +219,37 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
     }
   }
 
-  const handleAtividadeClick = (atividade: Atividade) => {
+  const handleAtividadeClick = async (atividade: Atividade) => {
     if (atividade.processo?.id) {
       const pais = atividade.processo.pais || atividade.pais || 'PORTUGAL'
-      // Passar o ID da atividade clicada para abrir direto o modal dela
       router.push(`/kanban?processoId=${atividade.processo.id}&tab=tarefas&pais=${pais}&atividadeId=${atividade.id}`)
+    } else if (atividade.tarefaPai?.id) {
+      // Subtarefa sem processo — abrir modal da tarefa pai
+      try {
+        const response = await fetch(`/api/tarefas/${atividade.tarefaPai.id}`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+        })
+        if (response.ok) {
+          const data = await response.json()
+          const pai = data.tarefa
+          setSelectedAtividade({
+            ...atividade,
+            id: pai.id,
+            nome: pai.titulo,
+            descricao: pai.descricao,
+            concluida: pai.concluida,
+            prioridade: pai.prioridade,
+            data_termino: pai.dataPrazo,
+            data_criacao: pai.createdAt,
+            responsavel: pai.responsavel,
+            observacoes: pai.observacoes,
+            tarefaPai: undefined,
+          } as any)
+          setIsDetailsModalOpen(true)
+        }
+      } catch (error) {
+        console.error('Erro ao buscar tarefa pai:', error)
+      }
     } else {
       setSelectedAtividade(atividade)
       setIsDetailsModalOpen(true)
@@ -308,6 +337,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   }
 
   return (
+    <>
     <div className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
       {/* Table Header */}
       <div className="px-4 py-3 border-b border-white/10">
@@ -476,14 +506,29 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
           </div>
         </div>
       </div>
+    </div>
 
       {/* ✅ NOVO: Modal específico para tarefas */}
-      <TarefaDetailsModal
-        tarefa={selectedAtividade as any}
-        isOpen={isDetailsModalOpen}
-        onClose={() => setIsDetailsModalOpen(false)}
-        onSave={handleAtividadeSave}
-      />
-    </div>
+      {isDetailsModalOpen && selectedAtividade && (
+        <TarefaDetailModal
+          tarefa={{
+            id: selectedAtividade.id,
+            titulo: selectedAtividade.nome,
+            descricao: selectedAtividade.descricao || undefined,
+            concluida: selectedAtividade.concluida || false,
+            prioridade: selectedAtividade.prioridade || 'MEDIA',
+            dataPrazo: selectedAtividade.data_termino || undefined,
+            responsavel: selectedAtividade.responsavel?.id ? selectedAtividade.responsavel as any : undefined,
+            responsavelId: selectedAtividade.responsavel?.id,
+            createdAt: selectedAtividade.data_criacao,
+            observacoes: selectedAtividade.observacoes || undefined,
+            subtarefas: [],
+          }}
+          onClose={() => setIsDetailsModalOpen(false)}
+          onUpdate={() => { mutate() }}
+          usuarios={users.map((u: any) => ({ id: u.id, nome: u.nome, email: u.email }))}
+        />
+      )}
+    </>
   )
 }
