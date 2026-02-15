@@ -658,7 +658,7 @@ export default function AdministratorPage() {
         title="Gerenciar Usuários"
         subtitle="Crie e gerencie usuários do sistema"
         userName={user.nome}
-        userRole="Administrador"
+        userRole={user.tipo || "Usuário"}
         userEmail={user.email || ""}
         projetos={projetos}
         processos={processos}
