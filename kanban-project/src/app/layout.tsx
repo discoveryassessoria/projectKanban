@@ -5,6 +5,7 @@ import "./globals.css";
 import { SidebarWrapper } from "@/src/components/sidebar-wrapper";
 import { Providers } from "@/src/components/providers";
 import { Toaster } from "@/components/ui/toaster";
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -40,6 +41,7 @@ export default async function RootLayout({
           </SidebarWrapper>
             <Toaster />
         </Providers>
+        <SpeedInsights />
       </body>
     </html>
   );
