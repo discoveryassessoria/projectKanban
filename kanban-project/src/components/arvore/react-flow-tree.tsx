@@ -1305,6 +1305,8 @@ interface ReactFlowTreeProps {
   unioes: UniaoArvore[]
   pessoaPrincipal: PessoaArvore | null
   mode: ViewMode
+  savedPositions?: Record<string, Record<string, { x: number; y: number }>> // { paisagem: { "123": {x,y} }, retrato: { "456": {x,y} } }
+  onSavePositions?: (positions: Record<string, Record<string, { x: number; y: number }>>) => void
   onPersonClick?: (pessoa: PessoaArvore) => void
   onAddPai?: (pessoaId: number) => void
   onAddMae?: (pessoaId: number) => void
@@ -1317,6 +1319,8 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
   unioes,
   pessoaPrincipal,
   mode,
+  savedPositions,
+  onSavePositions,
   onPersonClick,
   onAddPai,
   onAddMae,
@@ -1328,6 +1332,9 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
   const [isLocked, setIsLocked] = useState(false)
   
   const { zoomIn, zoomOut, fitView, setCenter, getNodes } = useReactFlow()
+
+  const savedPositionsRef = useRef(savedPositions)
+  const onSavePositionsRef = useRef(onSavePositions)
 
   const onPersonClickRef = useRef(onPersonClick)
   const onAddPaiRef = useRef(onAddPai)
@@ -1341,7 +1348,9 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
     onAddMaeRef.current = onAddMae
     onAddFilhoRef.current = onAddFilho
     onAddConjugeRef.current = onAddConjuge
-  }, [onPersonClick, onAddPai, onAddMae, onAddFilho, onAddConjuge])
+    savedPositionsRef.current = savedPositions
+    onSavePositionsRef.current = onSavePositions
+  }, [onPersonClick, onAddPai, onAddMae, onAddFilho, onAddConjuge, savedPositions, onSavePositions])
 
   const calculateLayout = useCallback(() => {
     const { nodes: rawNodes, edges: rawEdges } = buildTreeNodesAndEdges({
@@ -1358,6 +1367,22 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
 
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rawNodes, rawEdges, mode, pessoas, unioes)
 
+    // ✅ NOVO: Aplicar posições salvas (override do dagre)
+    const modePositions = savedPositionsRef.current?.[mode]
+    if (modePositions) {
+      layoutedNodes.forEach(node => {
+        // Extrair pessoaId do node.id (formato: "person-123")
+        const match = node.id.match(/^person-(\d+)$/)
+        if (match) {
+          const pessoaId = match[1]
+          const saved = modePositions[pessoaId]
+          if (saved) {
+            node.position = { x: saved.x, y: saved.y }
+          }
+        }
+      })
+    }
+
     setNodes(layoutedNodes)
     setEdges(layoutedEdges)
   }, [pessoas, unioes, pessoaPrincipal, mode])
@@ -1367,8 +1392,44 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
   }, [calculateLayout])
 
   const handleResetLayout = useCallback(() => {
+    // Limpar posições salvas do modo atual
+    const currentPositions = { ...(savedPositionsRef.current || {}) }
+    delete currentPositions[mode]
+    savedPositionsRef.current = currentPositions
+    onSavePositionsRef.current?.(currentPositions)
+    
     calculateLayout()
-  }, [calculateLayout])
+  }, [calculateLayout, mode])
+
+  // ✅ NOVO: Salvar posição ao arrastar
+  const handleNodeDragStop = useCallback((_: any, node: Node) => {
+    const match = node.id.match(/^person-(\d+)$/)
+    if (!match) return
+
+    const pessoaId = match[1]
+    const currentPositions = { ...(savedPositionsRef.current || {}) }
+    
+    if (!currentPositions[mode]) {
+      currentPositions[mode] = {}
+    }
+    
+    currentPositions[mode] = {
+      ...currentPositions[mode],
+      [pessoaId]: { x: node.position.x, y: node.position.y }
+    }
+
+    // Salvar posição de todos os nós person- visíveis
+    const currentNodes = getNodes()
+    currentNodes.forEach(n => {
+      const m = n.id.match(/^person-(\d+)$/)
+      if (m) {
+        currentPositions[mode][m[1]] = { x: n.position.x, y: n.position.y }
+      }
+    })
+
+    savedPositionsRef.current = currentPositions
+    onSavePositionsRef.current?.(currentPositions)
+  }, [mode, getNodes])
 
   useImperativeHandle(ref, () => ({
     centerOnPerson: (pessoaId: number) => {
@@ -1391,6 +1452,7 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
       edges={edges}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
+      onNodeDragStop={handleNodeDragStop}
       nodeTypes={nodeTypes}
       connectionLineType={ConnectionLineType.SmoothStep}
       fitView

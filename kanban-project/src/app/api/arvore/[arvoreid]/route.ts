@@ -53,7 +53,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { arvoreid } = await params
     const id = Number.parseInt(arvoreid)
-    const { nome, descricao, pessoaPrincipalId, commentPosX, commentPosY } = await request.json()
+    const { nome, descricao, pessoaPrincipalId, commentPosX, commentPosY, posicoesNodes } = await request.json()
 
     if (isNaN(id)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
@@ -66,6 +66,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (pessoaPrincipalId !== undefined) dataToUpdate.pessoaPrincipalId = pessoaPrincipalId
     if (commentPosX !== undefined) dataToUpdate.commentPosX = commentPosX
     if (commentPosY !== undefined) dataToUpdate.commentPosY = commentPosY
+    if (posicoesNodes !== undefined) dataToUpdate.posicoesNodes = posicoesNodes
 
     if (Object.keys(dataToUpdate).length === 0) {
       return NextResponse.json({ error: "Nenhum dado para atualizar" }, { status: 400 })

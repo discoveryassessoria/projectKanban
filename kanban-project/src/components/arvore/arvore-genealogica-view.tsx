@@ -95,6 +95,8 @@ export function ArvoreGenealogicaView({
   const [pessoaFocada, setPessoaFocada] = useState(false)
   const [sidebarTabInicial, setSidebarTabInicial] = useState<string | undefined>(undefined)
 
+  const [posicoesNodes, setPosicoesNodes] = useState<Record<string, any> | null>(null)
+
   useEffect(() => {
     if (pessoaIdParaFocar && pessoas.length > 0 && !pessoaFocada) {
       const pessoaParaSelecionar = pessoas.find(p => p.id === pessoaIdParaFocar)
@@ -373,6 +375,31 @@ export function ArvoreGenealogicaView({
     }
   }
 
+  // ✅ NOVO: Salvar posições com debounce
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  const handleSavePositions = useCallback((positions: Record<string, any>) => {
+    setPosicoesNodes(positions)
+    
+    // Debounce de 1 segundo
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+    
+    saveTimeoutRef.current = setTimeout(async () => {
+      if (!arvoreId) return
+      try {
+        await authFetch(`/api/arvore/${arvoreId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ posicoesNodes: positions })
+        })
+      } catch (error) {
+        console.error('Erro ao salvar posições:', error)
+      }
+    }, 1000)
+  }, [arvoreId])
+
   const fetchArvore = async () => {
     if (!arvoreId) return
 
@@ -382,6 +409,7 @@ export function ArvoreGenealogicaView({
       if (response.ok) {
         const data = await response.json()
         setPessoas(data.pessoas || [])
+        setPosicoesNodes(data.posicoesNodes || null)  // ✅ NOVO
 
         if (!data.pessoas || data.pessoas.length === 0) {
           setShowOnboarding(true)
@@ -716,6 +744,8 @@ export function ArvoreGenealogicaView({
             unioes={unioes}
             pessoaPrincipal={pessoaPrincipal}
             mode={viewMode}
+            savedPositions={posicoesNodes || undefined}
+            onSavePositions={handleSavePositions}
             onPersonClick={handlePersonClick}
             onAddPai={pode('arvore.criar') ? handleAddPai : undefined}
             onAddMae={pode('arvore.criar') ? handleAddMae : undefined}
