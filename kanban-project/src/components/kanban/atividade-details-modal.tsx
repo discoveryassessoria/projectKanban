@@ -13,6 +13,7 @@ import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoInformacoes } from "./ProcessoInformacoes"
 import { ProcessoHistorico } from "./ProcessoHistorico"
 import { ProcessoFaturas } from "./ProcessoFaturas"
+import { ProcessoFaturasV2 } from "./ProcessoFaturasV2"
 // ✅ IMPORTAR o modal e o initialFormData
 import { ContratanteModal, initialFormData } from "../contratantes-tabela"
 import { ProcessoEventos } from "./ProcessoEventos"
@@ -92,7 +93,7 @@ export function ProcessoDetailsModal({
 }: ProcessoDetailsModalProps) {
   // ✅ ATUALIZADO: Adicionado "informacoes" como possível aba
   const { pode } = usePermissoes()
-  const [activeTab, setActiveTab] = useState<"geral" | "faturas" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos">("geral")
+  const [activeTab, setActiveTab] = useState<"geral" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos">("geral")
   const [etapas, setEtapas] = useState<Status[]>([])
   const [statusIdAtual, setStatusIdAtual] = useState(processo?.statusId)
   const [mudouEtapa, setMudouEtapa] = useState(false)
@@ -468,16 +469,16 @@ export function ProcessoDetailsModal({
   const dataCriacao = processo.createdAt
   const dataFormatada = dataCriacao ? new Date(dataCriacao).toLocaleDateString('pt-BR') : ""
 
-  // ✅ Definir abas dinamicamente baseado no país
   const tabs = [
-    { id: "geral", label: "Geral" },
-    ...(pode('arvore.ver') ? [{ id: "arvore", label: "Árvore Genealógica" }] : []),
-    ...(isItalia && pode('processos.ver_paginas') ? [{ id: "informacoes", label: "Informações" }] : []),
-    ...(isEspanha && pode('processos.ver_paginas') ? [{ id: "protocolos", label: "Protocolos" }] : []),
-    ...(pode('financeiro.ver') ? [{ id: "faturas", label: "Faturas" }] : []),
-    ...(pode('eventos.ver') ? [{ id: "eventos", label: "Eventos" }] : []),
-    { id: "historico", label: "Histórico" },
-  ]
+  { id: "geral", label: "Geral" },
+  ...(pode('arvore.ver') ? [{ id: "arvore", label: "Árvore Genealógica" }] : []),
+  ...(isItalia && pode('processos.ver_paginas') ? [{ id: "informacoes", label: "Informações" }] : []),
+  ...(isEspanha && pode('processos.ver_paginas') ? [{ id: "protocolos", label: "Protocolos" }] : []),
+  ...(pode('financeiro.ver') ? [{ id: "faturas", label: "Faturas" }] : []),
+  ...(pode('financeiro.ver') ? [{ id: "financeiroV2", label: "Financeiro V2 ✨" }] : []),
+  ...(pode('eventos.ver') ? [{ id: "eventos", label: "Eventos" }] : []),
+  { id: "historico", label: "Histórico" },
+]
 
   const modalContent = (
     <>
@@ -1004,6 +1005,14 @@ export function ProcessoDetailsModal({
             processoId={processo.id}
             nomeFamilia={processo.nome}
             onUpdate={onSave}
+            />
+          )}
+
+          {activeTab === "financeiroV2" && pode('financeiro.ver') && (
+            <ProcessoFaturasV2
+              processoId={processo.id}
+              nomeFamilia={processo.nome}
+              onUpdate={onSave}
             />
           )}
 

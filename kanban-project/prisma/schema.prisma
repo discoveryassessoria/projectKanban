@@ -15,8 +15,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("PRISMA_DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("PRISMA_DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 // ========================================
@@ -196,6 +197,8 @@ model Usuario {
 
   // ✅ NOVO: Histórico de ações em tarefas
   historicoTarefas TarefaHistorico[]
+
+  recibosEmitidos Recibo[]  @relation("ReciboEmitente")
 
   @@index([perfilId])
 }
@@ -478,6 +481,9 @@ model Processo {
 
   mensagens    Mensagem[]
 
+  recibos         Recibo[]
+  counterRecibo   CounterRecibo?
+
   @@index([pais])
   @@index([statusId])
 }
@@ -636,6 +642,8 @@ model Contratante {
   // ✅ NOVO: Protocolos vinculados
   protocolos      Protocolo[]
   clienteAuth     ClienteAuth[]
+
+  recibosPagos    Recibo[]  @relation("ReciboContratante")
 }
 
 // ========================================
@@ -679,6 +687,8 @@ model Requerente {
   protocolos      Protocolo[]
   pagamentosRecebidos  PagamentoDestinatario[]
   clienteAuth     ClienteAuth[]
+
+  recibosPagos    Recibo[]  @relation("ReciboRequerente")
 }
 
 // ========================================
@@ -948,6 +958,11 @@ model PagamentoFatura {
   
   // Destinatários do pagamento
   destinatarios   PagamentoDestinatario[]
+
+  estornado       Boolean   @default(false)
+  estornadoEm     DateTime?
+  estornoMotivo   String?   @db.VarChar(200)
+  recibos         Recibo[]  @relation("ReciboPagamento")
   
   createdAt       DateTime       @default(now())
   
@@ -1510,4 +1525,58 @@ model Perfil {
   updatedAt   DateTime  @updatedAt
   
   usuarios    Usuario[]
+}
+
+// ========================================
+// RECIBO - Recibos de pagamento numerados
+// ========================================
+model Recibo {
+  id              Int       @id @default(autoincrement())
+
+  // Vínculo com processo
+  processoId      Int
+  processo        Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  // Numeração sequencial RCB-XXXX
+  numero          String    @unique @db.VarChar(20)
+
+  // Dados do recibo
+  data            DateTime  @default(now())
+  valorTotal      Decimal   @db.Decimal(12, 2)
+  descricao       String    @db.Text
+
+  // Pagador (um dos dois)
+  pagadorRequerenteId    Int?
+  pagadorRequerente      Requerente?  @relation("ReciboRequerente", fields: [pagadorRequerenteId], references: [id], onDelete: SetNull)
+  pagadorContratanteId   Int?
+  pagadorContratante     Contratante? @relation("ReciboContratante", fields: [pagadorContratanteId], references: [id], onDelete: SetNull)
+  pagadorNome            String?      @db.VarChar(200)
+
+  // Pagamentos que compõem este recibo (M:N)
+  pagamentos      PagamentoFatura[]  @relation("ReciboPagamento")
+
+  // PDF gerado
+  pdfUrl          String?   @db.Text
+  pdfNome         String?   @db.VarChar(200)
+
+  // Auditoria
+  emitidoPorId    Int?
+  emitidoPor      Usuario?  @relation("ReciboEmitente", fields: [emitidoPorId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime  @default(now())
+
+  @@index([processoId])
+  @@index([numero])
+  @@index([pagadorRequerenteId])
+  @@index([pagadorContratanteId])
+}
+
+// ========================================
+// COUNTER RECIBO - Contador sequencial por processo
+// ========================================
+model CounterRecibo {
+  processoId    Int       @id
+  processo      Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  proximoNumero Int       @default(1)
+  atualizadoEm  DateTime  @updatedAt
 }
