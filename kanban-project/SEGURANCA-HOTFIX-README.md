@@ -1,228 +1,125 @@
-// src/components/HistoricoAuditoria.tsx
-// ============================================================
-// Componente de visualização do histórico/auditoria.
-//
-// ⚠️ COMPONENTE DORMENTE: não é renderizado em lugar nenhum
-// ainda. Para ativar, basta importar e incluir no modal desejado:
-//
-//   import { HistoricoAuditoria } from "@/src/components/HistoricoAuditoria"
-//   ...
-//   <HistoricoAuditoria entidade="PAGAMENTO" entidadeId={pagamento.id} />
-//
-// Depende da API /api/logs existente (já mapeada no sistema).
-// Se a API /api/logs ainda não aceitar filtros por entidade/entidadeId,
-// ajustar o fetch abaixo ou criar /api/logs/[entidade]/[id].
-// ============================================================
+# Hotfix de Segurança + Histórico Financeiro — Checklist de Ativação
 
-"use client"
+**Branch:** `seguranca-hotfix`
+**Cliente:** Discovery Assessoria
+**Criado em:** 22/04/2026
+**Contexto:** Marco (dono da empresa) está com acesso limitado ao dev original por conta do fuso horário. Foi feito um levantamento de segurança do sistema com apoio de IA e identificados problemas graves. Como Marco não programa, preparamos esta branch com **arquivos dormentes** (não alteram comportamento) que você pode ativar de forma controlada quando puder.
 
-import { useEffect, useState } from "react"
+> ⚠️ **NADA AQUI ESTÁ ATIVO AINDA.** Todos os arquivos criados nesta branch são novos e não são importados por nenhum código existente. Fazer merge desta branch para `main` **não muda o comportamento do sistema.**
 
-// ============================================================
-// TIPOS
-// ============================================================
+---
 
-export type EntidadeAuditoria =
-  | "PROCESSO"
-  | "TAREFA"
-  | "CONTRATANTE"
-  | "REQUERENTE"
-  | "PESSOA"
-  | "DOCUMENTO"
-  | "PROTOCOLO"
-  | "PAGAMENTO"
-  | "FATURA"
-  | "RECIBO"
-  | "CONTA_PAGAR"
-  | "TRANSACAO"
-  | "FORNECEDOR"
-  | "CATEGORIA_FINANCEIRA"
-  | "CONTA_BANCARIA"
+## 🚨 Problemas críticos identificados
 
-interface LogEntry {
-  id: number
-  acao: string
-  entidade: string
-  entidadeId: number | null
-  descricao: string
-  detalhes: Record<string, any> | null
-  usuarioId: number | null
-  usuario?: { id: number; nome: string; email: string } | null
-  criadoEm: string
+1. **Rotas `/api/*` sem autenticação.** O middleware em `middleware.ts` só protege `/dashboard/*` e `/administrator/*`. Qualquer pessoa com a URL pode chamar a API diretamente e criar/editar/excluir dados.
+2. **Token de autenticação é Base64 puro**, sem assinatura (ver `lib/kanban-auth.ts`). Qualquer um gera um token válido no navegador e vira `tipo: "admin"`:
+```js
+   btoa(JSON.stringify({ userId: 1, email: "x", tipo: "admin", exp: 9999999999999 }))
+```
+3. **Rotas financeiras não verificam permissões** (ver exemplo `app/api/financeiro/pagamentos-fatura/[id]/estorno/route.ts`).
+4. **Auditoria incompleta:** `lib/auditoria.ts` existente só cobre processos, tarefas, contratantes e requerentes. Não há auditoria de pagamentos, faturas, recibos, contas-a-pagar, transações, fornecedores, categorias ou contas bancárias.
+
+---
+
+## 📦 O que foi adicionado nesta branch
+
+| Arquivo | Tipo | Status |
+|---|---|---|
+| `lib/api-auth.ts` | Novo | Dormente |
+| `lib/auditoria.ts` | Editado (append) | Dormente (helpers novos não são chamados ainda) |
+| `src/components/HistoricoAuditoria.tsx` | Novo | Dormente |
+| `SEGURANCA-HOTFIX-README.md` | Novo | Este arquivo |
+
+**Variável de ambiente adicionada no Vercel (Production + Preview):**
+- `JWT_SECRET` — valor aleatório de 64 caracteres hex. Já está configurado, não precisa mexer.
+
+---
+
+## ✅ Checklist de ativação (ordem importa)
+
+### Etapa 1 — Validar as dependências do `api-auth.ts`
+
+O `lib/api-auth.ts` importa:
+- `jsonwebtoken` (já existe em `package.json`)
+- `@/lib/prisma` (já existe)
+- `@/src/lib/permissoes` (já existe)
+
+Nada a instalar. Só confirme que o build passa sem erros de TS.
+
+### Etapa 2 — Criar rota de login segura
+
+Criar `src/app/api/auth/login-equipe/route.ts` que:
+1. Recebe `{ email, senha }`
+2. Busca `Usuario` no Prisma, compara senha com `bcrypt`
+3. Emite token via `gerarTokenEquipe({ id, email, tipo })` de `@/lib/api-auth`
+4. Retorna `{ token, usuario }`
+
+Não reaproveite a rota atual de login — crie paralela para permitir rollback.
+
+### Etapa 3 — Estender o middleware para `/api/*`
+
+Em `middleware.ts`:
+- Adicionar `/api/:path*` ao `matcher` (com exceções para rotas públicas como `/api/auth/login`, `/api/auth/login-equipe`, webhooks, rotas do app mobile que já usam `lib/app-auth.ts`)
+- **Não validar token no middleware via `jwt.verify`** (Edge runtime não tem suporte completo ao `jsonwebtoken`). Em vez disso, deixar cada rota validar via `getUsuarioLogado()`.
+- O middleware serve só para rejeitar requisições sem Authorization header ou cookie `authToken` nas rotas protegidas (fail-fast).
+
+### Etapa 4 — Migração cuidadosa do frontend
+
+Frontend hoje guarda token em `localStorage.authToken` (via `lib/auth.ts`). O token novo vai no mesmo lugar, só muda o formato (JWT assinado em vez de Base64).
+
+Fluxo recomendado:
+1. Adicionar o login-equipe novo ao frontend mantendo o antigo temporariamente
+2. Todos os `fetch()` do frontend já enviam `Authorization: Bearer <token>`? Se não, auditar e corrigir.
+3. Quando tudo estiver enviando token, desligar a rota de login antiga.
+
+### Etapa 5 — Proteger rotas críticas
+
+Para cada `route.ts` em `src/app/api/*`, substituir lógica anônima por:
+
+```ts
+import { exigirAutenticacao, exigirPermissao } from "@/lib/api-auth"
+
+export async function PATCH(request: NextRequest, { params }) {
+  const auth = await exigirPermissao(request, "financeiro.pagamento_editar")
+  if (auth instanceof NextResponse) return auth
+  const usuario = auth
+
+  // ... lógica existente, agora com acesso a `usuario.id`
 }
+```
 
-interface HistoricoAuditoriaProps {
-  entidade: EntidadeAuditoria
-  entidadeId: number
-  /** Título exibido no cabeçalho (opcional). Default: "Registro de atividades" */
-  titulo?: string
-  /** Inicia expandido? Default: false (colapsado) */
-  expandidoInicial?: boolean
-  /** Classe CSS extra no container */
-  className?: string
-}
+**Prioridade:**
+1. Rotas financeiras (`/api/financeiro/*`, `/api/contas-pagar/*`, `/api/transacoes/*`, `/api/recibos/*`, `/api/fornecedores/*`, `/api/categorias-financeiras/*`, `/api/contas-bancarias/*`)
+2. Rotas administrativas (`/api/usuarios/*`, `/api/perfis/*`)
+3. Rotas de processos, tarefas, clientes
+4. Demais rotas
 
-// ============================================================
-// HELPERS
-// ============================================================
+### Etapa 6 — Ativar auditoria financeira
 
-function formatarData(iso: string): string {
-  try {
-    const d = new Date(iso)
-    return d.toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  } catch {
-    return iso
-  }
-}
+Em cada rota financeira, após a operação bem-sucedida, chamar o helper correspondente de `lib/auditoria.ts`:
 
-function iconeAcao(acao: string): string {
-  switch (acao) {
-    case "criou":
-      return "➕"
-    case "editou":
-      return "✏️"
-    case "excluiu":
-      return "🗑️"
-    case "moveu":
-      return "↔️"
-    case "concluiu":
-      return "✅"
-    case "reabriu":
-      return "🔄"
-    default:
-      return "•"
-  }
-}
+```ts
+import { logPagamento } from "@/lib/auditoria"
 
-// ============================================================
-// COMPONENTE
-// ============================================================
+// ... depois de criar/editar/estornar pagamento ...
+await logPagamento.estornar(
+  descricao,
+  pagamento.id,
+  body.motivo,
+  usuario.id
+)
+```
 
-export function HistoricoAuditoria({
-  entidade,
-  entidadeId,
-  titulo = "Registro de atividades",
-  expandidoInicial = false,
-  className = "",
-}: HistoricoAuditoriaProps) {
-  const [expandido, setExpandido] = useState(expandidoInicial)
-  const [logs, setLogs] = useState<LogEntry[]>([])
-  const [carregando, setCarregando] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
+Helpers novos disponíveis (todos com assinaturas documentadas no arquivo):
+- `logPagamento.{criar, editar, estornar, reverterEstorno, excluir}`
+- `logFatura.{criar, editar, mudarStatus, excluir}`
+- `logRecibo.{emitir, excluir}`
+- `logContaPagar.{criar, editar, pagar, excluir}`
+- `logTransacao.{criar, editar, excluir}`
+- `logFornecedor.{criar, editar, excluir}`
+- `logCategoria.{criar, editar, excluir}`
+- `logContaBancaria.{criar, editar, excluir}`
 
-  useEffect(() => {
-    if (!expandido) return
-    if (logs.length > 0) return // já carregado
+### Etapa 7 — Garantir que `/api/logs` aceita filtros
 
-    setCarregando(true)
-    setErro(null)
-
-    // Tenta a rota genérica /api/logs com filtros.
-    // Se o backend usar outra convenção, ajustar aqui.
-    const url = `/api/logs?entidade=${encodeURIComponent(
-      entidade
-    )}&entidadeId=${entidadeId}`
-
-    const token =
-      typeof window !== "undefined"
-        ? localStorage.getItem("authToken") || ""
-        : ""
-
-    fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then(async (r) => {
-        if (!r.ok) {
-          throw new Error(`HTTP ${r.status}`)
-        }
-        return r.json()
-      })
-      .then((data) => {
-        // Aceita tanto { logs: [...] } quanto [...] direto
-        const lista: LogEntry[] = Array.isArray(data)
-          ? data
-          : data.logs || data.itens || []
-        setLogs(lista)
-      })
-      .catch((e) => {
-        console.error("[HistoricoAuditoria] erro ao carregar:", e)
-        setErro("Não foi possível carregar o histórico.")
-      })
-      .finally(() => setCarregando(false))
-  }, [expandido, entidade, entidadeId, logs.length])
-
-  return (
-    <div
-      className={`hist-auditoria border rounded-lg overflow-hidden ${className}`}
-      style={{ fontSize: "14px" }}
-    >
-      {/* Cabeçalho clicável */}
-      <button
-        type="button"
-        onClick={() => setExpandido((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition"
-      >
-        <span className="font-semibold text-gray-700">
-          {titulo}
-          {logs.length > 0 && (
-            <span className="ml-2 inline-block px-2 py-0.5 text-xs rounded-full bg-gray-200 text-gray-700">
-              {logs.length}
-            </span>
-          )}
-        </span>
-        <span className="text-gray-500">{expandido ? "▲" : "▼"}</span>
-      </button>
-
-      {/* Conteúdo */}
-      {expandido && (
-        <div className="p-4 bg-white">
-          {carregando && (
-            <div className="text-gray-500 text-center py-4">
-              Carregando...
-            </div>
-          )}
-
-          {erro && (
-            <div className="text-red-600 text-center py-4">{erro}</div>
-          )}
-
-          {!carregando && !erro && logs.length === 0 && (
-            <div className="text-gray-500 text-center py-4">
-              Nenhum registro encontrado.
-            </div>
-          )}
-
-          {!carregando && !erro && logs.length > 0 && (
-            <ul className="space-y-2">
-              {logs.map((log) => (
-                <li
-                  key={log.id}
-                  className="flex gap-3 items-start border-b border-gray-100 pb-2 last:border-0"
-                >
-                  <span className="text-lg">{iconeAcao(log.acao)}</span>
-                  <div className="flex-1">
-                    <div className="text-gray-800">{log.descricao}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {log.usuario?.nome
-                        ? `${log.usuario.nome} · `
-                        : log.usuarioId
-                        ? `Usuário #${log.usuarioId} · `
-                        : "Sistema · "}
-                      {formatarData(log.criadoEm)}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
+O componente `HistoricoAuditoria.tsx` faz:
