@@ -200,3 +200,105 @@ export const logRequerente = {
       usuarioId
     }),
 }
+
+// ============================================
+// HELPERS PARA PAGAMENTOS (FATURA)
+// ============================================
+export const logPagamento = {
+  criar: (descricao: string, id: number, valor: number, moeda: string, usuarioId?: number) =>
+    registrarLog({
+      acao: "criou",
+      entidade: "PAGAMENTO",
+      entidadeId: id,
+      descricao: `Pagamento de ${moeda} ${valor.toFixed(2)} registrado (${descricao})`,
+      detalhes: { valor, moeda },
+      usuarioId
+    }),
+
+  editar: (descricao: string, id: number, antes: Record<string, any>, depois: Record<string, any>, usuarioId?: number) =>
+    registrarLog({
+      acao: "editou",
+      entidade: "PAGAMENTO",
+      entidadeId: id,
+      descricao: `Pagamento editado (${descricao})`,
+      detalhes: { antes, depois },
+      usuarioId
+    }),
+
+  estornar: (descricao: string, id: number, motivo: string, usuarioId?: number) =>
+    registrarLog({
+      acao: "editou",
+      entidade: "PAGAMENTO",
+      entidadeId: id,
+      descricao: `Pagamento estornado (${descricao}) — motivo: ${motivo}`,
+      detalhes: { motivo, tipo: "estorno" },
+      usuarioId
+    }),
+
+  reverterEstorno: (descricao: string, id: number, usuarioId?: number) =>
+    registrarLog({
+      acao: "editou",
+      entidade: "PAGAMENTO",
+      entidadeId: id,
+      descricao: `Estorno revertido (${descricao})`,
+      detalhes: { tipo: "reversao_estorno" },
+      usuarioId
+    }),
+
+  excluir: (descricao: string, id: number, usuarioId?: number) =>
+    registrarLog({
+      acao: "excluiu",
+      entidade: "PAGAMENTO",
+      entidadeId: id,
+      descricao: `Pagamento excluído (${descricao})`,
+      usuarioId
+    }),
+}
+
+// ============================================
+// HELPERS PARA FATURAS
+// ============================================
+export const logFatura = {
+  criar: (descricao: string, id: number, valor: number, moeda: string, usuarioId?: number) =>
+    registrarLog({
+      acao: "criou",
+      entidade: "FATURA",
+      entidadeId: id,
+      descricao: `Fatura "${descricao}" criada no valor de ${moeda} ${valor.toFixed(2)}`,
+      detalhes: { valor, moeda },
+      usuarioId
+    }),
+
+  editar: (descricao: string, id: number, antes: Record<string, any>, depois: Record<string, any>, usuarioId?: number) =>
+    registrarLog({
+      acao: "editou",
+      entidade: "FATURA",
+      entidadeId: id,
+      descricao: `Fatura "${descricao}" foi editada`,
+      detalhes: { antes, depois },
+      usuarioId
+    }),
+
+  mudarStatus: (descricao: string, id: number, statusAnterior: string, statusNovo: string, usuarioId?: number) =>
+    registrarLog({
+      acao: "editou",
+      entidade: "FATURA",
+      entidadeId: id,
+      descricao: `Fatura "${descricao}" mudou de ${statusAnterior} para ${statusNovo}`,
+      detalhes: { statusAnterior, statusNovo },
+      usuarioId
+    }),
+
+  excluir: (descricao: string, id: number, usuarioId?: number) =>
+    registrarLog({
+      acao: "excluiu",
+      entidade: "FATURA",
+      entidadeId: id,
+      descricao: `Fatura "${descricao}" foi excluída`,
+      usuarioId
+    }),
+}
+
+// ============================================
+// HELPERS PARA RECIBOS
+// ==================
