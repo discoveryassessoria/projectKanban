@@ -2053,62 +2053,125 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
   }
 
   const handleSave = async () => {
-    // ✅ NOVO: Limpar erros anteriores
+    // Limpar erros anteriores
     setErrors({})
-
-    // ✅ NOVO: Validação local - Nome obrigatório
+  
+    // Validação local - Nome obrigatório
     if (!formData.nome.trim()) {
       setErrors({ nome: "Nome é obrigatório" })
       return
     }
-
-    // ✅ NOVO: Validação local - CPF obrigatório
+  
+    // Validação local - CPF obrigatório
     const cpfLimpo = formData.cpf.replace(/\D/g, "")
     if (!cpfLimpo) {
       setErrors({ cpf: "CPF é obrigatório" })
       return
     }
-
-    // ✅ NOVO: Validação local - CPF deve ter 11 dígitos
+  
+    // Validação local - CPF deve ter 11 dígitos
     if (cpfLimpo.length !== 11) {
       setErrors({ cpf: "CPF deve ter 11 dígitos" })
       return
     }
-
+  
     setIsLoading(true)
-
+  
     try {
       const isRequerente = formData.tipo === "requerente"
       const baseUrl = isRequerente ? "/api/requerentes" : "/api/contratantes"
-      
-      const url = editingId 
-        ? `${editingTipo === "requerente" ? "/api/requerentes" : "/api/contratantes"}/${editingId}` 
+  
+      const url = editingId
+        ? `${editingTipo === "requerente" ? "/api/requerentes" : "/api/contratantes"}/${editingId}`
         : baseUrl
-      
+  
       const method = editingId ? "PUT" : "POST"
-
+  
       const { tipo, paisOutro, ...restData } = formData
-      
+  
       const dataToSend = {
         ...restData,
         pais: formData.pais === "Outro" ? (paisOutro || "Outro") : formData.pais,
       }
-
+  
+      // 🛡️ BLINDAGEM: serializa ANTES e garante que não tá vazio
+      const bodySerialized = JSON.stringify(dataToSend)
+  
+      if (!bodySerialized || bodySerialized === '{}' || bodySerialized.length < 10) {
+        console.error('[handleSave] body vazio detectado antes do envio:', {
+          dataToSend,
+          bodySerialized,
+          formData,
+        })
+        setErrors({
+          geral: 'Erro interno: nenhum dado foi montado para envio. Recarregue a página e tente novamente.',
+        })
+        setIsLoading(false)
+        return
+      }
+  
+      // 🔍 Log de debug — aparece no console do navegador
+      console.log('[handleSave]', {
+        url,
+        method,
+        bodyLength: bodySerialized.length,
+        campos: Object.keys(dataToSend),
+      })
+  
+      // 🛡️ Checa token antes de mandar
+      const authToken = localStorage.getItem("authToken")
+      if (!authToken) {
+        setErrors({
+          geral: 'Sua sessão expirou. Faça login novamente.',
+        })
+        setIsLoading(false)
+        // Opcional: redirecionar pra página de login
+        // window.location.href = '/login'
+        return
+      }
+  
       const response = await fetch(url, {
         method,
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+          "Authorization": `Bearer ${authToken}`,
         },
-        body: JSON.stringify(dataToSend),
+        body: bodySerialized,
       })
-
-      const data = await response.json()
-
+  
+      // 🛡️ Parse defensivo da resposta (caso venha vazio ou corrompido)
+      let data: any
+      try {
+        const raw = await response.text()
+        data = raw ? JSON.parse(raw) : {}
+      } catch (parseErr) {
+        console.error('[handleSave] resposta do servidor corrompida:', parseErr)
+        setErrors({
+          geral: 'O servidor retornou uma resposta inválida. Tente novamente.',
+        })
+        setIsLoading(false)
+        return
+      }
+  
       if (!response.ok) {
-        // ✅ NOVO: Tratar erros de duplicidade da API
+        // 401 = sessão expirada
+        if (response.status === 401) {
+          setErrors({
+            geral: 'Sua sessão expirou. Faça login novamente.',
+          })
+          return
+        }
+  
+        // 403 = sem permissão
+        if (response.status === 403) {
+          setErrors({
+            geral: 'Você não tem permissão para editar clientes.',
+          })
+          return
+        }
+  
+        // 409 = conflito (duplicidade)
         if (response.status === 409) {
-          // Erro de conflito (duplicidade)
           if (data.campo === 'nome') {
             setErrors({ nome: data.error })
           } else if (data.campo === 'cpf') {
@@ -2118,16 +2181,26 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
           }
           return
         }
+  
+        // 400 = request ruim (inclui body vazio)
+        if (response.status === 400) {
+          setErrors({ geral: data.error || 'Dados inválidos. Verifique e tente novamente.' })
+          return
+        }
+  
         throw new Error(data.error || "Erro ao salvar")
       }
-
+  
       setIsModalOpen(false)
       setFormData(initialFormData)
       setEditingId(null)
       setErrors({})
       onRefresh()
     } catch (error: any) {
-      setErrors({ geral: error.message || "Erro ao salvar cliente" })
+      console.error('[handleSave] erro inesperado:', error)
+      setErrors({
+        geral: error.message || "Erro ao salvar cliente. Tente novamente.",
+      })
     } finally {
       setIsLoading(false)
     }

@@ -1,8 +1,13 @@
+// @ts-nocheck
 // Script de migração das etapas do Kanban por país
 // Execute com: npx ts-node prisma/migrate-etapas.ts
-// Ou adicione ao package.json: "migrate:etapas": "ts-node prisma/migrate-etapas.ts"
+// ...
 
-import { PrismaClient, Pais } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
+import type { Prisma, $Enums } from '@prisma/client'
+
+type Pais = $Enums.Pais
+type Status = Prisma.StatusGetPayload<{ include: { processos: { select: { id: true } }, tarefas: { select: { id: true } } } }>
 
 const prisma = new PrismaClient()
 
@@ -61,30 +66,29 @@ const etapasPorPais: Record<Pais, string[]> = {
 }
 
 // Mapeamento de etapas antigas para novas (quando removidas)
-// Chave: nome antigo (lowercase), Valor: nome novo sugerido
 const mapeamentoEtapas: Record<string, string> = {
-  'transcrição': 'Protocolado', // Se Transcrição não existir no país, vai para Protocolado
-  'tradução juramentada': 'Retificação', // Se não existir, volta para Retificação
-  'apostilamento': 'Retificação', // Se não existir, volta para Retificação
+  'transcrição': 'Protocolado',
+  'tradução juramentada': 'Retificação',
+  'apostilamento': 'Retificação',
 }
 
 async function encontrarEtapaDestino(pais: Pais, nomeEtapaAntiga: string): Promise<string> {
   const etapasNoPais = etapasPorPais[pais]
   const nomeNormalizado = nomeEtapaAntiga.toLowerCase()
-  
+
   // 1. Tenta encontrar mapeamento direto
   const mapeado = mapeamentoEtapas[nomeNormalizado]
-  if (mapeado && etapasNoPais.some(e => e.toLowerCase() === mapeado.toLowerCase())) {
+  if (mapeado && etapasNoPais.some((e: string) => e.toLowerCase() === mapeado.toLowerCase())) {
     return mapeado
   }
-  
+
   // 2. Tenta encontrar etapa com nome similar no país
-  const similar = etapasNoPais.find(e => 
-    e.toLowerCase().includes(nomeNormalizado) || 
+  const similar = etapasNoPais.find((e: string) =>
+    e.toLowerCase().includes(nomeNormalizado) ||
     nomeNormalizado.includes(e.toLowerCase())
   )
   if (similar) return similar
-  
+
   // 3. Retorna primeira etapa (Genealogia)
   return etapasNoPais[0]
 }
@@ -115,11 +119,10 @@ async function migrarEtapas() {
 
       // Verifica se já existe
       const existente = etapasExistentes.find(
-        (e) => e.nome.toLowerCase() === nomeEtapa.toLowerCase()
+        (e: Status) => e.nome.toLowerCase() === nomeEtapa.toLowerCase()
       )
 
       if (existente) {
-        // Atualiza ordem se necessário
         if (existente.ordem !== ordem) {
           await prisma.status.update({
             where: { id: existente.id },
@@ -130,7 +133,6 @@ async function migrarEtapas() {
           console.log(`   ✅ Mantido: "${nomeEtapa}" (ordem ${ordem})`)
         }
       } else {
-        // Cria nova etapa
         await prisma.status.create({
           data: {
             nome: nomeEtapa,
@@ -143,9 +145,9 @@ async function migrarEtapas() {
     }
 
     // 3. Identificar etapas que precisam ser removidas
-    const nomesNovos = etapas.map((e) => e.toLowerCase())
+    const nomesNovos = etapas.map((e: string) => e.toLowerCase())
     const etapasParaRemover = etapasExistentes.filter(
-      (e) => !nomesNovos.includes(e.nome.toLowerCase())
+      (e: Status) => !nomesNovos.includes(e.nome.toLowerCase())
     )
 
     if (etapasParaRemover.length > 0) {
@@ -156,9 +158,8 @@ async function migrarEtapas() {
         const tarefasVinculadas = etapaAntiga.tarefas.length
 
         if (processosVinculados > 0 || tarefasVinculadas > 0) {
-          // Encontrar etapa destino usando mapeamento inteligente
           const nomeEtapaDestino = await encontrarEtapaDestino(pais, etapaAntiga.nome)
-          
+
           const etapaDestino = await prisma.status.findFirst({
             where: {
               pais,
@@ -167,7 +168,6 @@ async function migrarEtapas() {
           })
 
           if (etapaDestino) {
-            // Mover processos
             if (processosVinculados > 0) {
               await prisma.processo.updateMany({
                 where: { statusId: etapaAntiga.id },
@@ -178,7 +178,6 @@ async function migrarEtapas() {
               )
             }
 
-            // Mover tarefas
             if (tarefasVinculadas > 0) {
               await prisma.tarefa.updateMany({
                 where: { statusId: etapaAntiga.id },
@@ -191,7 +190,6 @@ async function migrarEtapas() {
           }
         }
 
-        // Remover etapa antiga
         await prisma.status.delete({
           where: { id: etapaAntiga.id },
         })
@@ -221,7 +219,7 @@ async function migrarEtapas() {
 }
 
 migrarEtapas()
-  .catch((error) => {
+  .catch((error: unknown) => {
     console.error('❌ Erro na migração:', error)
     process.exit(1)
   })
