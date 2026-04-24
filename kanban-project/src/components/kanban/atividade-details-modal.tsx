@@ -203,12 +203,29 @@ export function ProcessoDetailsModal({
         pais: clienteFormData.pais === "Outro" ? (paisOutro || "Outro") : clienteFormData.pais,
       }
 
+      // 🛡️ BLINDAGEM: serializa e checa antes de mandar
+      const bodySerialized = JSON.stringify(dataToSend)
+      
+      if (!bodySerialized || bodySerialized === '{}' || bodySerialized.length < 10) {
+        console.error('[handleSaveCliente] body vazio detectado:', { dataToSend, bodySerialized })
+        alert('Erro interno: nenhum dado foi montado para envio. Recarregue a página e tente novamente.')
+        return
+      }
+
+      console.log('[handleSaveCliente]', {
+        url,
+        method: 'PUT',
+        bodyLength: bodySerialized.length,
+        campos: Object.keys(dataToSend),
+      })
+
       const response = await fetch(url, {
         method: "PUT",
         headers: { 
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem("authToken")}`
         },
+        body: bodySerialized,  // ← 🎯 A CORREÇÃO CRÍTICA
       })
 
       if (response.ok) {
@@ -227,10 +244,11 @@ export function ProcessoDetailsModal({
         }
         onSave?.()
       } else {
-        const data = await response.json()
+        const data = await response.json().catch(() => ({}))
         throw new Error(data.error || "Erro ao salvar")
       }
     } catch (error: any) {
+      console.error('[handleSaveCliente] erro:', error)
       alert(error.message || "Erro ao salvar cliente")
     }
   }
