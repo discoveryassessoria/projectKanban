@@ -2,11 +2,11 @@
 
 import jsPDF from "jspdf"
 import "jspdf-autotable"
-import { fmt, fmtBRL, fmtDataBR, nomeDoPagador, pagamentosAtivos } from "@/src/lib/financeiro/helpers-v2"
+import { fmt, fmtBRL, fmtDataBR, nomeDoPagador, pagamentosAtivos } from "@/src/lib/financeiro/helpers"
 import { PDF_CORES, pdfCapa, pdfHeader, pdfKPI, pdfSecao, pdfObs, finalizarPDF } from "./pdf-base"
 import type {
   FaturaEnriquecida, ResumoFinanceiro, ProcessoContext, MoedaV2
-} from "@/src/types/financeiro-v2"
+} from "@/src/types/financeiro"
 
 export interface DadosRelatorio {
   faturas: FaturaEnriquecida[]

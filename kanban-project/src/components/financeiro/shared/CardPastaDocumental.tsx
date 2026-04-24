@@ -1,8 +1,8 @@
 // src/components/financeiro/shared/CardPastaDocumental.tsx
 "use client"
 
-import type { FinanceiroContext } from "@/src/types/financeiro-context"
-import { fmtBRL } from "@/src/lib/financeiro/helpers-v2"
+import type { FinanceiroContext } from "@/src/types/financeiro"
+import { fmtBRL } from "@/src/lib/financeiro/helpers"
 
 interface Props {
   ctx: FinanceiroContext

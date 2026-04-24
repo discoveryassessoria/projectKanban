@@ -173,6 +173,12 @@ enum Moeda {
   USD
 }
 
+// ✅ NOVO: Natureza de Outro Custo
+enum NaturezaOutroCusto {
+  COBRAR    // Receita (ex: Honorários Discovery)
+  REPASSAR  // Despesa a pagar a terceiros (ex: Advogado, Cartório)
+}
+
 // ========================================
 // USUÁRIOS
 // ========================================
@@ -483,6 +489,9 @@ model Processo {
 
   recibos         Recibo[]
   counterRecibo   CounterRecibo?
+
+  // ✅ NOVO: Outros custos e receitas manuais (advogado, cartório, honorários, etc.)
+  outrosCustos    OutroCusto[]
 
   @@index([pais])
   @@index([statusId])
@@ -1579,4 +1588,87 @@ model CounterRecibo {
   processo      Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
   proximoNumero Int       @default(1)
   atualizadoEm  DateTime  @updatedAt
+}
+
+// ========================================
+// ✅ NOVO: OUTRO CUSTO - Lançamentos manuais de custos/receitas do processo
+// (Honorários Discovery, Advogado Itália, Cartório, Consulado, Taxas, etc.)
+// ========================================
+model OutroCusto {
+  id              Int       @id @default(autoincrement())
+
+  // Vínculo com processo
+  processoId      Int
+  processo        Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  // Natureza: COBRAR (receita) ou REPASSAR (despesa a pagar)
+  natureza        NaturezaOutroCusto
+
+  // Classificação
+  tipo            String    @db.VarChar(100)   // "Honorários Discovery", "Advogado", "Cartório", etc.
+  descricao       String    @db.VarChar(200)
+  fornecedor      String?   @db.VarChar(150)
+
+  // Valor e moeda
+  valor           Decimal   @db.Decimal(12, 2)
+  moeda           Moeda     @default(BRL)
+  cambio          Decimal?  @db.Decimal(10, 4)
+
+  // Datas
+  vencimento      DateTime?
+
+  // Flags
+  interno         Boolean   @default(false)   // Custo interno (não repassado ao cliente)
+  repassado       Boolean   @default(false)   // Já foi repassado ao cliente
+  pago            Boolean   @default(false)   // Marcação manual de "pago"
+
+  // Observações
+  observacao      String?   @db.Text
+
+  // Pagamentos parciais
+  pagamentos      PagamentoOutroCusto[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([processoId])
+  @@index([natureza])
+  @@index([vencimento])
+}
+
+// ========================================
+// ✅ NOVO: PAGAMENTO DE OUTRO CUSTO - Histórico de pagamentos parciais
+// ========================================
+model PagamentoOutroCusto {
+  id              Int             @id @default(autoincrement())
+
+  // Vínculo
+  outroCustoId    Int
+  outroCusto      OutroCusto      @relation(fields: [outroCustoId], references: [id], onDelete: Cascade)
+
+  // Dados do pagamento
+  valor           Decimal         @db.Decimal(12, 2)
+  data            DateTime        @default(now())
+  forma           FormaPagamento?
+
+  // Quem pagou (opcional - pode ser requerente, contratante ou texto livre)
+  pagadorTipo     String?         @db.VarChar(20)   // "REQUERENTE" | "CONTRATANTE" | "OUTRO"
+  pagadorId       Int?
+  pagadorNome     String?         @db.VarChar(200)
+
+  // Comprovante
+  comprovanteUrl  String?         @db.Text
+  comprovanteNome String?         @db.VarChar(200)
+
+  // Observação
+  observacao      String?         @db.Text
+
+  // Estorno
+  estornado       Boolean         @default(false)
+  estornadoEm     DateTime?
+  estornoMotivo   String?         @db.VarChar(200)
+
+  createdAt       DateTime        @default(now())
+
+  @@index([outroCustoId])
 }

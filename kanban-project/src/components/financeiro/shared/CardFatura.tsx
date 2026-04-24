@@ -3,11 +3,11 @@
 
 import { useState } from "react"
 import { Paperclip, RotateCcw, FileText } from "lucide-react"
-import type { FaturaEnriquecida, PagamentoFaturaEnriquecido } from "@/src/types/financeiro-v2"
-import type { FinanceiroContext } from "@/src/types/financeiro-context"
+import type { FaturaEnriquecida, PagamentoFaturaEnriquecido } from "@/src/types/financeiro"
+import type { FinanceiroContext } from "@/src/types/financeiro"
 import {
   fmt, fmtBRL, fmtDataBR, simboloMoeda, nomeDoPagador, pagamentosAtivos
-} from "@/src/lib/financeiro/helpers-v2"
+} from "@/src/lib/financeiro/helpers"
 import { ComprovanteModal } from "@/src/components/financeiro/modals/ComprovanteModal"
 import { gerarReciboIndividualPDF } from "@/src/lib/pdf/gerar-recibo"
 

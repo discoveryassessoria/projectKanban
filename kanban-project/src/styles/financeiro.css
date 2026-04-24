@@ -1,0 +1,266 @@
+/* ============================================================================
+ * Módulo Financeiro — estilos globais
+ *
+ * Paleta extraída do mockup do Marco (grupo-discovery-sistema-TESTE.html, lin 440+).
+ * Importe este arquivo UMA vez (ex.: no layout do modal ou no ProcessoFaturas).
+ *
+ * Prefixos:
+ *   .fin-*  base (wrapper, header, sub-abas)
+ *   .vg-*   Visão Geral
+ *   .rc-*   Receitas
+ *   .cs-*   Custos
+ *   .ex-*   Extrato
+ * ============================================================================ */
+
+/* -------- Variáveis de cor (escopo do módulo) -------- */
+.fin-root {
+  /* Paleta Marco */
+  --fin-purple: #8b5cf6;
+  --fin-purple-600: #7c3aed;
+  --fin-purple-50: #f5f3ff;
+  --fin-green: #22c55e;
+  --fin-green-50: #f0fdf4;
+  --fin-red: #ef4444;
+  --fin-red-50: #fef2f2;
+  --fin-blue: #3b82f6;
+  --fin-blue-50: #eff6ff;
+  --fin-yellow: #f59e0b;
+  --fin-yellow-50: #fffbeb;
+  --fin-pink: #ec4899;
+  --fin-cyan: #06b6d4;
+
+  /* Neutros */
+  --fin-ink: #0f172a;
+  --fin-ink-2: #334155;
+  --fin-ink-3: #64748b;
+  --fin-line: #e2e8f0;
+  --fin-line-2: #f1f5f9;
+  --fin-bg: #ffffff;
+  --fin-bg-soft: #f8fafc;
+
+  /* Sombras */
+  --fin-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --fin-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.04);
+  --fin-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+
+  /* Raio */
+  --fin-radius: 12px;
+  --fin-radius-sm: 8px;
+  --fin-radius-lg: 16px;
+
+  /* Fonte (sem importar Google Fonts; usa a do sistema) */
+  color: var(--fin-ink);
+  background: var(--fin-bg);
+}
+
+/* -------- Wrapper principal das 4 sub-abas -------- */
+.fin-root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* -------- Sub-abas internas (Visão / Receitas / Custos / Extrato) -------- */
+.fin-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--fin-line-2);
+  border-radius: var(--fin-radius);
+  width: fit-content;
+}
+
+.fin-tab {
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fin-ink-3);
+  background: transparent;
+  border: none;
+  border-radius: var(--fin-radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.fin-tab:hover {
+  color: var(--fin-ink);
+}
+
+.fin-tab.active {
+  background: var(--fin-bg);
+  color: var(--fin-purple-600);
+  box-shadow: var(--fin-shadow-sm);
+  font-weight: 600;
+}
+
+/* -------- Card base (usado em KPIs, listas, etc.) -------- */
+.fin-card {
+  background: var(--fin-bg);
+  border: 1px solid var(--fin-line);
+  border-radius: var(--fin-radius);
+  padding: 20px;
+  box-shadow: var(--fin-shadow-sm);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.fin-card:hover {
+  box-shadow: var(--fin-shadow);
+}
+
+.fin-card--interactive {
+  cursor: pointer;
+}
+
+.fin-card--interactive:hover {
+  transform: translateY(-1px);
+}
+
+/* Variantes coloridas com borda superior em gradiente (padrão Marco) */
+.fin-card--purple { border-top: 3px solid var(--fin-purple); }
+.fin-card--green  { border-top: 3px solid var(--fin-green); }
+.fin-card--red    { border-top: 3px solid var(--fin-red); }
+.fin-card--blue   { border-top: 3px solid var(--fin-blue); }
+.fin-card--yellow { border-top: 3px solid var(--fin-yellow); }
+
+/* -------- KPI (valor grande + label) -------- */
+.fin-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fin-kpi__label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fin-ink-3);
+}
+
+.fin-kpi__value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--fin-ink);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.fin-kpi__value--purple { color: var(--fin-purple-600); }
+.fin-kpi__value--green  { color: var(--fin-green); }
+.fin-kpi__value--red    { color: var(--fin-red); }
+.fin-kpi__value--blue   { color: var(--fin-blue); }
+.fin-kpi__value--yellow { color: var(--fin-yellow); }
+
+.fin-kpi__hint {
+  font-size: 12px;
+  color: var(--fin-ink-3);
+  margin-top: 6px;
+}
+
+/* -------- Grid de KPIs (4 colunas responsivas) -------- */
+.fin-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+/* -------- Badges (status, moeda) -------- */
+.fin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  line-height: 1.6;
+}
+
+.fin-badge--pendente { background: var(--fin-yellow-50); color: #a16207; }
+.fin-badge--pago     { background: var(--fin-green-50);  color: #15803d; }
+.fin-badge--vencido  { background: var(--fin-red-50);    color: #b91c1c; }
+.fin-badge--parcial  { background: var(--fin-blue-50);   color: #1d4ed8; }
+.fin-badge--cobrar   { background: var(--fin-purple-50); color: var(--fin-purple-600); }
+.fin-badge--repassar { background: var(--fin-red-50);    color: #b91c1c; }
+
+/* -------- Botões -------- */
+.fin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--fin-radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.fin-btn--primary {
+  background: var(--fin-purple);
+  color: #fff;
+}
+.fin-btn--primary:hover {
+  background: var(--fin-purple-600);
+}
+
+.fin-btn--ghost {
+  background: transparent;
+  color: var(--fin-ink-2);
+  border-color: var(--fin-line);
+}
+.fin-btn--ghost:hover {
+  background: var(--fin-bg-soft);
+}
+
+/* -------- Empty state -------- */
+.fin-empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--fin-ink-3);
+  background: var(--fin-bg-soft);
+  border: 1px dashed var(--fin-line);
+  border-radius: var(--fin-radius);
+}
+
+.fin-empty__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fin-ink-2);
+  margin-bottom: 4px;
+}
+
+.fin-empty__hint {
+  font-size: 13px;
+}
+
+/* -------- Secções (title + ação) -------- */
+.fin-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fin-section__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.fin-section__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fin-ink);
+}
+
+/* -------- Placeholders pra os próximos lotes -------- */
+.vg-root, .rc-root, .cs-root, .ex-root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

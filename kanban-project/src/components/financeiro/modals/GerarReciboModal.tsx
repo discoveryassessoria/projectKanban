@@ -2,10 +2,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import type { FinanceiroContext } from "@/src/types/financeiro-context"
-import type { Recibo } from "@/src/types/financeiro-v2"
+import type { FinanceiroContext } from "@/src/types/financeiro"
+import type { Recibo } from "@/src/types/financeiro"
 import { ModalBase } from "./ModalBase"
-import { fmtBRL, fmtDataBR } from "@/src/lib/financeiro/helpers-v2"
+import { fmtBRL, fmtDataBR } from "@/src/lib/financeiro/helpers"
 
 interface Props {
   ctx: FinanceiroContext

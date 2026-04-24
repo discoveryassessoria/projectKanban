@@ -3,8 +3,8 @@
 
 import jsPDF from "jspdf"
 import "jspdf-autotable"
-import { fmtDataBR, today } from "@/src/lib/financeiro/helpers-v2"
-import type { ProcessoContext } from "@/src/types/financeiro-v2"
+import { fmtDataBR, today } from "@/src/lib/financeiro/helpers"
+import type { ProcessoContext } from "@/src/types/financeiro"
 
 export type RGB = readonly [number, number, number]
 
@@ -179,7 +179,7 @@ export function pdfObs(
 }
 
 export function finalizarPDF(doc: jsPDF, nomeArquivo: string) {
-  const total = doc.internal.getNumberOfPages()
+  const total = (doc.internal as any).getNumberOfPages()
   const W = 210, H = 297
   for (let i = 1; i <= total; i++) {
     doc.setPage(i)

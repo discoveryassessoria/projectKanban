@@ -13,7 +13,6 @@ import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoInformacoes } from "./ProcessoInformacoes"
 import { ProcessoHistorico } from "./ProcessoHistorico"
 import { ProcessoFaturas } from "./ProcessoFaturas"
-import { ProcessoFaturasV2 } from "./ProcessoFaturasV2"
 // ✅ IMPORTAR o modal e o initialFormData
 import { ContratanteModal, initialFormData } from "../contratantes-tabela"
 import { ProcessoEventos } from "./ProcessoEventos"
@@ -470,15 +469,14 @@ export function ProcessoDetailsModal({
   const dataFormatada = dataCriacao ? new Date(dataCriacao).toLocaleDateString('pt-BR') : ""
 
   const tabs = [
-  { id: "geral", label: "Geral" },
-  ...(pode('arvore.ver') ? [{ id: "arvore", label: "Árvore Genealógica" }] : []),
-  ...(isItalia && pode('processos.ver_paginas') ? [{ id: "informacoes", label: "Informações" }] : []),
-  ...(isEspanha && pode('processos.ver_paginas') ? [{ id: "protocolos", label: "Protocolos" }] : []),
-  ...(pode('financeiro.ver') ? [{ id: "faturas", label: "Faturas" }] : []),
-  ...(pode('financeiro.ver') ? [{ id: "financeiroV2", label: "Financeiro V2 ✨" }] : []),
-  ...(pode('eventos.ver') ? [{ id: "eventos", label: "Eventos" }] : []),
-  { id: "historico", label: "Histórico" },
-]
+    { id: "geral", label: "Geral" },
+    ...(pode('arvore.ver') ? [{ id: "arvore", label: "Árvore Genealógica" }] : []),
+    ...(isItalia && pode('processos.ver_paginas') ? [{ id: "informacoes", label: "Informações" }] : []),
+    ...(isEspanha && pode('processos.ver_paginas') ? [{ id: "protocolos", label: "Protocolos" }] : []),
+    ...(pode('financeiro.ver') ? [{ id: "faturas", label: "Financeiro" }] : []),  // ← label "Faturas" → "Financeiro"
+    ...(pode('eventos.ver') ? [{ id: "eventos", label: "Eventos" }] : []),        // (linha do V2 removida)
+    { id: "historico", label: "Histórico" },
+  ]
 
   const modalContent = (
     <>
@@ -1005,14 +1003,6 @@ export function ProcessoDetailsModal({
             processoId={processo.id}
             nomeFamilia={processo.nome}
             onUpdate={onSave}
-            />
-          )}
-
-          {activeTab === "financeiroV2" && pode('financeiro.ver') && (
-            <ProcessoFaturasV2
-              processoId={processo.id}
-              nomeFamilia={processo.nome}
-              onUpdate={onSave}
             />
           )}
 

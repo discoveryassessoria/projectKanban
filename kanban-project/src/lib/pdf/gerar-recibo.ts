@@ -2,9 +2,9 @@
 
 import jsPDF from "jspdf"
 import "jspdf-autotable"
-import { fmt, fmtBRL, fmtDataBR, today, valorPorExtenso } from "@/src/lib/financeiro/helpers-v2"
+import { fmt, fmtBRL, fmtDataBR, today, valorPorExtenso } from "@/src/lib/financeiro/helpers"
 import { DADOS_EMPRESA, PDF_CORES, fill, textColor } from "./pdf-base"
-import type { MoedaV2, ProcessoContext } from "@/src/types/financeiro-v2"
+import type { MoedaV2, ProcessoContext } from "@/src/types/financeiro"
 
 export interface DadosRecibo {
   numero: string
@@ -14,7 +14,7 @@ export interface DadosRecibo {
   pagadorEndereco?: string
   descricao: string
   origem: string
-  etapa?: string
+  etapa?: string | null
   dataPagamento: string
   formaPagamento: string
   moedaOriginal?: MoedaV2
