@@ -3,17 +3,17 @@
 // Sub-aba "Custos" do Financeiro.
 //
 // Estrutura:
-//   1. TabelaCustos (planilha de custos por pessoa) — INTACTA, do Lote 2
-//   2. Bloco "Outros Custos" — VISUAL completo, dados ainda mockados:
-//      - 4 KPIs (A Repassar / Já Repassado / Custos Internos / Total Geral)
-//      - Lista de cards (vazia por enquanto)
-//      - Botão "Novo Custo" desabilitado com badge "Em breve"
-//
-// O esqueleto visual está pronto pro Lote 4 plugar a API de OutroCusto
-// (a tabela já existe no banco depois das migrations que rodamos).
+//   1. 🆕 LOTE 4 BLOCO 2: Cards "Custos por Tipo" (Certidões, Apostilamentos,
+//      Traduções, Outros, Total Geral) — em cima, pedido do Marco. Os dados
+//      vêm da TabelaCustos via callback `onTotaisChange`, então quando o
+//      usuário edita um valor na planilha, os cards atualizam AO VIVO.
+//   2. TabelaCustos (planilha de custos por pessoa) — INTACTA, do Lote 2.
+//      Agora recebe um `onTotaisChange` opcional.
+//   3. Bloco "Outros Custos" — VISUAL completo, dados ainda mockados.
 
 'use client'
 
+import { useState } from 'react'
 import { Plus, Lock, Wallet } from 'lucide-react'
 import { TabelaCustos } from '@/src/components/kanban/TabelaCustos'
 import { fmtBRL } from '@/src/lib/financeiro/helpers'
@@ -21,6 +21,7 @@ import {
   OutroCustoCard,
   type OutroCustoData,
 } from '@/src/components/financeiro/cards/OutroCustoCard'
+import { CustosPorTipoCards } from '@/src/components/financeiro/cards/CustosPorTipoCards'
 
 // ----------------------------------------------------------------------------
 // Tipos
@@ -30,10 +31,37 @@ export interface CustosProps {
   nomeFamilia?: string
 }
 
+interface TipoServico {
+  id: number
+  nome: string
+  ordem: number
+}
+
 // ----------------------------------------------------------------------------
 // Componente
 // ----------------------------------------------------------------------------
 export function Custos({ processoId, nomeFamilia }: CustosProps) {
+  // 🆕 Estado que reflete os totais atuais da TabelaCustos em tempo real
+  const [servicos, setServicos] = useState<TipoServico[]>([])
+  const [totaisPorServico, setTotaisPorServico] = useState<
+    Record<number, number>
+  >({})
+  const [totalGeralTabela, setTotalGeralTabela] = useState(0)
+  const [custosLoading, setCustosLoading] = useState(true)
+
+  // Callback disparado pela TabelaCustos sempre que os valores mudam
+  // (no mount inicial e a cada edição de célula)
+  const handleTotaisChange = (dados: {
+    servicos: TipoServico[]
+    totaisPorServico: Record<number, number>
+    totalGeral: number
+  }) => {
+    setServicos(dados.servicos)
+    setTotaisPorServico(dados.totaisPorServico)
+    setTotalGeralTabela(dados.totalGeral)
+    setCustosLoading(false)
+  }
+
   // ⚠️ DADOS MOCKADOS — no Lote 4, vão vir da API /api/processos/:id/outros-custos
   const outrosCustos: OutroCustoData[] = []
 
@@ -54,8 +82,22 @@ export function Custos({ processoId, nomeFamilia }: CustosProps) {
 
   return (
     <div className="cs-root">
+      {/* ===== 🆕 Bloco novo (Lote 4 Bloco 2): Cards por tipo de documento ===== */}
+      {/* Atualiza AO VIVO quando o user edita valores na TabelaCustos abaixo */}
+      <CustosPorTipoCards
+        servicos={servicos}
+        totaisPorServico={totaisPorServico}
+        totalGeral={totalGeralTabela}
+        loading={custosLoading}
+      />
+
       {/* ===== Bloco 1: TabelaCustos (intacta, do Lote 2) ===== */}
-      <TabelaCustos processoId={processoId} nomeFamilia={nomeFamilia} />
+      {/* 🆕 Passa o callback pra os cards acima atualizarem ao vivo */}
+      <TabelaCustos
+        processoId={processoId}
+        nomeFamilia={nomeFamilia}
+        onTotaisChange={handleTotaisChange}
+      />
 
       {/* ===== Bloco 2: Outros Custos (visual do Lote 3, dados no Lote 4) ===== */}
       <div className="cs-outros">

@@ -41,9 +41,16 @@ interface LinhaTabela {
 interface TabelaCustosProps {
   processoId: number
   nomeFamilia?: string
+  // 🆕 LOTE 4: Callback opcional disparado quando os totais mudam.
+  // Usado pela aba Custos pra atualizar os cards "Custos por Tipo" ao vivo.
+  onTotaisChange?: (dados: {
+    servicos: TipoServico[]
+    totaisPorServico: Record<number, number>
+    totalGeral: number
+  }) => void
 }
 
-export function TabelaCustos({ processoId, nomeFamilia }: TabelaCustosProps) {
+export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: TabelaCustosProps) {
   const { pode } = usePermissoes()
 
   const [loading, setLoading] = useState(true)
@@ -131,6 +138,36 @@ export function TabelaCustos({ processoId, nomeFamilia }: TabelaCustosProps) {
   useEffect(() => {
     carregarDados()
   }, [carregarDados])
+
+  // 🆕 LOTE 4: Notifica o pai sempre que os valores editados mudam,
+  // permitindo que os cards "Custos por Tipo" (em Custos.tsx) atualizem
+  // ao vivo sem precisar dar refresh na aba.
+  useEffect(() => {
+    if (!onTotaisChange) return
+    if (servicos.length === 0) return
+
+    // Recalcula os totais por serviço usando os valores editados localmente
+    const totaisPorServicoAtual: Record<number, number> = {}
+    servicos.forEach((s) => {
+      totaisPorServicoAtual[s.id] = linhas.reduce((acc, linha) => {
+        const key = `${linha.pessoaId}-${linha.tipoRegistro}-${s.id}`
+        const valor = parseFloat(valoresEditados[key] || '0') || 0
+        return acc + valor
+      }, 0)
+    })
+
+    const totalGeralAtual = Object.values(totaisPorServicoAtual).reduce(
+      (a, b) => a + b,
+      0,
+    )
+
+    onTotaisChange({
+      servicos,
+      totaisPorServico: totaisPorServicoAtual,
+      totalGeral: totalGeralAtual,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valoresEditados, servicos, linhas])
 
   // ✅ CORRIGIDO: Funções para reordenar pessoas dentro do mesmo grupo de linhagem
   const getPessoasDoGrupo = (numeroLinhagem: number): number[] => {
