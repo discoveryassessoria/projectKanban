@@ -9,6 +9,9 @@
 //   2. Foram adicionados os 4 KPIs do mockup do Marco no topo (Total Cobrado,
 //      Recebido, A Receber, Vencido) — estilo roxo/verde/laranja/vermelho.
 //   3. O <div className="h-2 bg-gray-100" /> (divisor visual) também sumiu.
+//   4. ✨ LOTE 4 BLOCO 0: Botões "Exportar PDF" e "+ Nova Fatura" saíram do
+//      topo (header da seção Faturas) e agora ficam no rodapé, depois da
+//      lista de faturas (feedback do Marco).
 //
 // Todo o resto — lista de faturas, modais de pagamento, parcelas de boleto,
 // câmbio, edição de pagamento, exportar PDF, nova fatura, excluir, etc —
@@ -44,16 +47,13 @@ import {
   FileDown,
 } from "lucide-react"
 import { DatePickerField } from "@/components/ui/date-picker-field"
-// ⚠️ NovaFaturaModal e ExportarFaturaModal vivem em src/components/kanban/.
-// No ProcessoFaturas.tsx original, esses imports eram relativos ('./NovaFaturaModal').
-// Como este arquivo mora em src/components/financeiro/subabas/, precisamos subir 2 níveis.
 import { NovaFaturaModal } from "../../kanban/NovaFaturaModal"
 import { ExportarFaturaModal } from "../../kanban/ExportarFaturaModal"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { fmtBRL } from "@/src/lib/financeiro/helpers"
 
 // ========================================
-// TYPES (idênticos ao ProcessoFaturas original)
+// TYPES
 // ========================================
 interface Requerente {
   id: number
@@ -208,7 +208,6 @@ export function Receitas({ processoId, nomeFamilia, onUpdate }: ReceitasProps) {
   const [requerentes, setRequerentes] = useState<Requerente[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Controle de seção (só Faturas agora; Custos foi pra outra sub-aba)
   const [showFaturas, setShowFaturas] = useState(true)
 
   // Modais
@@ -278,7 +277,6 @@ export function Receitas({ processoId, nomeFamilia, onUpdate }: ReceitasProps) {
 
   const temMultiplasMoedas = moedasOrdenadas.length > 1
 
-  // Contadores pros KPIs de topo (Mockup Marco)
   const qtdFaturas = faturas.length
   const qtdPendentes = faturas.filter(
     (f) => f.status === 'PENDENTE' || f.status === 'PARCIAL',
@@ -649,7 +647,8 @@ export function Receitas({ processoId, nomeFamilia, onUpdate }: ReceitasProps) {
       </div>
 
       {/* ========================================================== */}
-      {/* SEÇÃO: FATURAS (idêntica ao ProcessoFaturas original)      */}
+      {/* SEÇÃO: FATURAS                                              */}
+      {/* ✨ LOTE 4 BLOCO 0: Header SEM os botões de ação            */}
       {/* ========================================================== */}
       <div className="flex-1 flex flex-col mt-4">
         <div className="bg-white border-b">
@@ -667,32 +666,9 @@ export function Receitas({ processoId, nomeFamilia, onUpdate }: ReceitasProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowExportarPDF(true)
-                }}
-                size="sm"
-                variant="outline"
-                disabled={faturas.length === 0}
-                className="gap-1 text-blue-600 border-blue-200 hover:bg-blue-50"
-              >
-                <FileDown className="h-4 w-4" />
-                Exportar PDF
-              </Button>
-              {pode('financeiro.fatura_criar') && (
-                <Button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setShowNovaFatura(true)
-                  }}
-                  size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Nova Fatura
-                </Button>
-              )}
+              {/* ✨ Botões "Exportar PDF" e "+ Nova Fatura" foram movidos
+                  pro rodapé da lista (pedido do Marco). Aqui só sobrou o
+                  chevron de abrir/fechar. */}
               {showFaturas ? (
                 <ChevronUp className="h-5 w-5 text-gray-400" />
               ) : (
@@ -803,7 +779,7 @@ export function Receitas({ processoId, nomeFamilia, onUpdate }: ReceitasProps) {
           )}
         </div>
 
-        {/* Lista de faturas (preservada idêntica) */}
+        {/* Lista de faturas + rodapé com ações */}
         {showFaturas && (
           <div className="flex-1 p-6">
             {loading ? (
@@ -812,6 +788,8 @@ export function Receitas({ processoId, nomeFamilia, onUpdate }: ReceitasProps) {
                 <p className="text-gray-500 text-sm">Carregando faturas...</p>
               </div>
             ) : faturas.length === 0 ? (
+              /* ✨ LOTE 4 BLOCO 0: No empty state, mantemos o botão "+ Nova Fatura"
+                  porque o usuário precisa de um lugar pra criar a primeira fatura. */
               <div className="flex flex-col items-center justify-center h-64 text-center">
                 <div className="p-4 bg-gray-100 rounded-full mb-4">
                   <Receipt className="h-10 w-10 text-gray-300" />
@@ -820,361 +798,400 @@ export function Receitas({ processoId, nomeFamilia, onUpdate }: ReceitasProps) {
                 <p className="text-gray-500 text-sm max-w-xs mb-4">
                   Clique em &quot;Nova Fatura&quot; para adicionar
                 </p>
+                {pode('financeiro.fatura_criar') && (
+                  <Button
+                    onClick={() => setShowNovaFatura(true)}
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Nova Fatura
+                  </Button>
+                )}
               </div>
             ) : (
-              <div className="space-y-3">
-                {faturas.map((fatura) => {
-                  const config = STATUS_CONFIG[fatura.status]
-                  const StatusIcon = config.icon
-                  const isExpanded = expandedFatura === fatura.id
-                  const temMoedaEstrangeira = fatura.moeda !== 'BRL'
-                  const isBoleto = fatura.metodoPagamento === 'BOLETO'
-                  const temParcelas = fatura.parcelasBoleto && fatura.parcelasBoleto.length > 0
+              <>
+                {/* Lista de faturas */}
+                <div className="space-y-3">
+                  {faturas.map((fatura) => {
+                    const config = STATUS_CONFIG[fatura.status]
+                    const StatusIcon = config.icon
+                    const isExpanded = expandedFatura === fatura.id
+                    const temMoedaEstrangeira = fatura.moeda !== 'BRL'
+                    const isBoleto = fatura.metodoPagamento === 'BOLETO'
+                    const temParcelas = fatura.parcelasBoleto && fatura.parcelasBoleto.length > 0
 
-                  return (
-                    <div key={fatura.id} className="bg-white rounded-xl border shadow-sm overflow-hidden">
-                      <div
-                        className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                        onClick={() => setExpandedFatura(isExpanded ? null : fatura.id)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4 flex-1">
-                            <div className={`p-2 rounded-lg ${config.color}`}>
-                              <StatusIcon className="h-4 w-4" />
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-900 truncate">{fatura.descricao}</p>
-                              <div className="flex items-center gap-3 mt-1 text-sm text-gray-500 flex-wrap">
-                                {fatura.metodoPagamento && (
-                                  <span className="flex items-center gap-1">
-                                    <CreditCard className="h-3 w-3" />
-                                    {FORMAS_PAGAMENTO[fatura.metodoPagamento] || fatura.metodoPagamento}
-                                  </span>
-                                )}
-                                {temMoedaEstrangeira && (
-                                  <span className="flex items-center gap-1 text-blue-600">
-                                    <Coins className="h-3 w-3" />
-                                    {fatura.moeda}
-                                    {fatura.cambio && (
-                                      <span className="text-xs text-gray-400">
-                                        (câmbio: {fatura.cambio})
-                                      </span>
-                                    )}
-                                  </span>
-                                )}
-                                {fatura.parcelas > 1 && (
-                                  <span className="text-amber-600 font-medium">{fatura.parcelas}x</span>
-                                )}
-                                {fatura.dataVencimento && (
-                                  <span className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
-                                    Venc: {formatarData(fatura.dataVencimento)}
-                                  </span>
-                                )}
-                                {fatura.destinatarios?.length > 0 && (
-                                  <span className="flex items-center gap-1">
-                                    <Users className="h-3 w-3" />
-                                    {fatura.destinatarios.length} pessoa(s)
-                                  </span>
-                                )}
+                    return (
+                      <div key={fatura.id} className="bg-white rounded-xl border shadow-sm overflow-hidden">
+                        <div
+                          className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                          onClick={() => setExpandedFatura(isExpanded ? null : fatura.id)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4 flex-1">
+                              <div className={`p-2 rounded-lg ${config.color}`}>
+                                <StatusIcon className="h-4 w-4" />
                               </div>
-                            </div>
 
-                            <div className="text-right">
-                              <p className="font-bold text-gray-900 text-lg">
-                                {formatarMoeda(fatura.valor, fatura.moeda)}
-                              </p>
-                              {temMoedaEstrangeira && fatura.cambio && (
-                                <p className="text-xs text-gray-500">
-                                  ≈ {formatarMoeda(fatura.valor * fatura.cambio, 'BRL')}
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-gray-900 truncate">{fatura.descricao}</p>
+                                <div className="flex items-center gap-3 mt-1 text-sm text-gray-500 flex-wrap">
+                                  {fatura.metodoPagamento && (
+                                    <span className="flex items-center gap-1">
+                                      <CreditCard className="h-3 w-3" />
+                                      {FORMAS_PAGAMENTO[fatura.metodoPagamento] || fatura.metodoPagamento}
+                                    </span>
+                                  )}
+                                  {temMoedaEstrangeira && (
+                                    <span className="flex items-center gap-1 text-blue-600">
+                                      <Coins className="h-3 w-3" />
+                                      {fatura.moeda}
+                                      {fatura.cambio && (
+                                        <span className="text-xs text-gray-400">
+                                          (câmbio: {fatura.cambio})
+                                        </span>
+                                      )}
+                                    </span>
+                                  )}
+                                  {fatura.parcelas > 1 && (
+                                    <span className="text-amber-600 font-medium">{fatura.parcelas}x</span>
+                                  )}
+                                  {fatura.dataVencimento && (
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="h-3 w-3" />
+                                      Venc: {formatarData(fatura.dataVencimento)}
+                                    </span>
+                                  )}
+                                  {fatura.destinatarios?.length > 0 && (
+                                    <span className="flex items-center gap-1">
+                                      <Users className="h-3 w-3" />
+                                      {fatura.destinatarios.length} pessoa(s)
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="text-right">
+                                <p className="font-bold text-gray-900 text-lg">
+                                  {formatarMoeda(fatura.valor, fatura.moeda)}
                                 </p>
-                              )}
-                              <span
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border mt-1 ${config.color}`}
-                              >
-                                {config.label}
-                              </span>
-                            </div>
+                                {temMoedaEstrangeira && fatura.cambio && (
+                                  <p className="text-xs text-gray-500">
+                                    ≈ {formatarMoeda(fatura.valor * fatura.cambio, 'BRL')}
+                                  </p>
+                                )}
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border mt-1 ${config.color}`}
+                                >
+                                  {config.label}
+                                </span>
+                              </div>
 
-                            <button className="text-gray-400 hover:text-gray-600 ml-2">
-                              {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                            </button>
+                              <button className="text-gray-400 hover:text-gray-600 ml-2">
+                                {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {isExpanded && (
-                        <div className="border-t bg-gray-50 p-4">
-                          {fatura.destinatarios?.length > 0 && (
-                            <div className="mb-4">
-                              <p className="text-xs text-gray-500 uppercase mb-2 flex items-center gap-1">
-                                <Users className="h-3 w-3" />
-                                Destinatários
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {fatura.destinatarios.map((dest) => (
-                                  <span key={dest.id} className="px-2 py-1 bg-white border rounded-lg text-sm">
-                                    {dest.nome}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {isBoleto && temParcelas && (
-                            <div className="mb-4">
-                              <p className="text-xs text-gray-500 uppercase mb-3 flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                Parcelas do Boleto
-                              </p>
-                              <div className="bg-white rounded-lg border overflow-hidden">
-                                <div className="grid grid-cols-[auto_1fr_auto_auto] gap-4 p-3 bg-gray-100 text-xs font-medium text-gray-600 uppercase">
-                                  <span></span>
-                                  <span>Vencimento</span>
-                                  <span className="text-right">Valor</span>
-                                  <span className="text-center">Ação</span>
+                        {isExpanded && (
+                          <div className="border-t bg-gray-50 p-4">
+                            {fatura.destinatarios?.length > 0 && (
+                              <div className="mb-4">
+                                <p className="text-xs text-gray-500 uppercase mb-2 flex items-center gap-1">
+                                  <Users className="h-3 w-3" />
+                                  Destinatários
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {fatura.destinatarios.map((dest) => (
+                                    <span key={dest.id} className="px-2 py-1 bg-white border rounded-lg text-sm">
+                                      {dest.nome}
+                                    </span>
+                                  ))}
                                 </div>
-                                <div className="divide-y">
-                                  {fatura.parcelasBoleto!.map((parcela) => {
-                                    const vencida = isParcelaVencida(parcela)
-                                    return (
-                                      <div
-                                        key={parcela.id}
-                                        className={`grid grid-cols-[auto_1fr_auto_auto] gap-4 p-3 items-center ${
-                                          parcela.pago ? 'bg-green-50' : vencida ? 'bg-red-50' : ''
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-2">
-                                          {parcela.pago ? (
-                                            <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                          ) : vencida ? (
-                                            <AlertCircle className="h-5 w-5 text-red-500" />
-                                          ) : (
-                                            <CircleDot className="h-5 w-5 text-gray-400" />
-                                          )}
-                                          <span
-                                            className={`font-medium ${
+                              </div>
+                            )}
+
+                            {isBoleto && temParcelas && (
+                              <div className="mb-4">
+                                <p className="text-xs text-gray-500 uppercase mb-3 flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  Parcelas do Boleto
+                                </p>
+                                <div className="bg-white rounded-lg border overflow-hidden">
+                                  <div className="grid grid-cols-[auto_1fr_auto_auto] gap-4 p-3 bg-gray-100 text-xs font-medium text-gray-600 uppercase">
+                                    <span></span>
+                                    <span>Vencimento</span>
+                                    <span className="text-right">Valor</span>
+                                    <span className="text-center">Ação</span>
+                                  </div>
+                                  <div className="divide-y">
+                                    {fatura.parcelasBoleto!.map((parcela) => {
+                                      const vencida = isParcelaVencida(parcela)
+                                      return (
+                                        <div
+                                          key={parcela.id}
+                                          className={`grid grid-cols-[auto_1fr_auto_auto] gap-4 p-3 items-center ${
+                                            parcela.pago ? 'bg-green-50' : vencida ? 'bg-red-50' : ''
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            {parcela.pago ? (
+                                              <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                            ) : vencida ? (
+                                              <AlertCircle className="h-5 w-5 text-red-500" />
+                                            ) : (
+                                              <CircleDot className="h-5 w-5 text-gray-400" />
+                                            )}
+                                            <span
+                                              className={`font-medium ${
+                                                parcela.pago
+                                                  ? 'text-green-700'
+                                                  : vencida
+                                                  ? 'text-red-700'
+                                                  : 'text-gray-700'
+                                              }`}
+                                            >
+                                              {parcela.numero}/{fatura.parcelas}
+                                            </span>
+                                          </div>
+
+                                          <div>
+                                            <span
+                                              className={`${
+                                                parcela.pago
+                                                  ? 'text-green-700'
+                                                  : vencida
+                                                  ? 'text-red-700 font-medium'
+                                                  : 'text-gray-700'
+                                              }`}
+                                            >
+                                              {formatarData(parcela.dataVencimento)}
+                                            </span>
+                                            {parcela.pago && parcela.dataPagamento && (
+                                              <span className="text-xs text-green-600 ml-2">
+                                                (pago em {formatarData(parcela.dataPagamento)})
+                                              </span>
+                                            )}
+                                            {vencida && !parcela.pago && (
+                                              <span className="text-xs text-red-600 ml-2">Vencida</span>
+                                            )}
+                                          </div>
+
+                                          <div
+                                            className={`text-right font-medium ${
                                               parcela.pago
                                                 ? 'text-green-700'
                                                 : vencida
                                                 ? 'text-red-700'
-                                                : 'text-gray-700'
+                                                : 'text-gray-900'
                                             }`}
                                           >
-                                            {parcela.numero}/{fatura.parcelas}
-                                          </span>
-                                        </div>
+                                            {formatarMoeda(parcela.valor)}
+                                          </div>
 
-                                        <div>
-                                          <span
-                                            className={`${
-                                              parcela.pago
-                                                ? 'text-green-700'
-                                                : vencida
-                                                ? 'text-red-700 font-medium'
-                                                : 'text-gray-700'
-                                            }`}
-                                          >
-                                            {formatarData(parcela.dataVencimento)}
+                                          <div className="flex justify-center">
+                                            {pode('financeiro.pagamento_criar') && (
+                                              <>
+                                                {parcela.pago ? (
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                      handleDesmarcarParcela(fatura, parcela)
+                                                    }}
+                                                    className="text-xs text-gray-500 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                                                  >
+                                                    Desfazer
+                                                  </button>
+                                                ) : (
+                                                  <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                      setConfirmarParcela({ fatura, parcela })
+                                                    }}
+                                                    className={`text-xs h-8 ${
+                                                      vencida
+                                                        ? 'border-red-300 text-red-700 hover:bg-red-100'
+                                                        : 'border-green-300 text-green-700 hover:bg-green-100'
+                                                    }`}
+                                                  >
+                                                    <Check className="h-3 w-3 mr-1" />
+                                                    Marcar Pago
+                                                  </Button>
+                                                )}
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4 p-3 bg-gray-100 border-t">
+                                    <div className="text-sm">
+                                      <span className="text-gray-600">Pagas: </span>
+                                      <span className="font-medium text-green-700">
+                                        {fatura.parcelasBoleto!.filter((p) => p.pago).length} de {fatura.parcelas}
+                                      </span>
+                                    </div>
+                                    <div className="text-sm text-right">
+                                      <span className="text-gray-600">Restante: </span>
+                                      <span className="font-medium text-gray-900">
+                                        {formatarMoeda(
+                                          fatura.parcelasBoleto!.filter((p) => !p.pago).reduce((sum, p) => sum + p.valor, 0),
+                                        )}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {(!isBoleto || !temParcelas) && (
+                              <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-white rounded-lg border">
+                                <div>
+                                  <p className="text-xs text-gray-500 uppercase">Valor Total</p>
+                                  <p className="text-sm font-bold text-gray-900">
+                                    {formatarMoeda(fatura.valor, fatura.moeda)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-500 uppercase">Pago</p>
+                                  <p className="text-sm font-bold text-green-600">
+                                    {formatarMoeda(fatura.valorPago, fatura.moeda)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-500 uppercase">Restante</p>
+                                  <p className="text-sm font-bold text-orange-600">
+                                    {formatarMoeda(fatura.valorRestante, fatura.moeda)}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
+                            {fatura.pagamentos && fatura.pagamentos.length > 0 && (
+                              <div className="mb-4">
+                                <p className="text-xs text-gray-500 uppercase mb-2">Histórico de Pagamentos</p>
+                                <div className="space-y-2">
+                                  {fatura.pagamentos.map((pag, idx) => (
+                                    <div
+                                      key={pag.id}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        abrirVisualizarPagamento(fatura, pag)
+                                      }}
+                                      className="p-3 bg-white rounded-lg border hover:border-green-300 hover:bg-green-50 cursor-pointer transition-colors"
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                          <span className="text-gray-400 text-sm">#{idx + 1}</span>
+                                          <span className="font-bold text-green-600">
+                                            {formatarMoeda(pag.valor, fatura.moeda)}
                                           </span>
-                                          {parcela.pago && parcela.dataPagamento && (
-                                            <span className="text-xs text-green-600 ml-2">
-                                              (pago em {formatarData(parcela.dataPagamento)})
+                                          {fatura.moeda !== 'BRL' && pag.valorOriginal && (
+                                            <span className="text-gray-500 text-sm">
+                                              ({formatarMoeda(pag.valorOriginal, 'BRL')})
                                             </span>
                                           )}
-                                          {vencida && !parcela.pago && (
-                                            <span className="text-xs text-red-600 ml-2">Vencida</span>
+                                          <span className="text-gray-500 text-sm">{formatarData(pag.data)}</span>
+                                          {pag.formaPagamento && (
+                                            <span className="px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">
+                                              {FORMAS_PAGAMENTO[pag.formaPagamento] || pag.formaPagamento}
+                                            </span>
                                           )}
                                         </div>
-
-                                        <div
-                                          className={`text-right font-medium ${
-                                            parcela.pago
-                                              ? 'text-green-700'
-                                              : vencida
-                                              ? 'text-red-700'
-                                              : 'text-gray-900'
-                                          }`}
-                                        >
-                                          {formatarMoeda(parcela.valor)}
-                                        </div>
-
-                                        <div className="flex justify-center">
-                                          {pode('financeiro.pagamento_criar') && (
-                                            <>
-                                              {parcela.pago ? (
-                                                <button
-                                                  onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    handleDesmarcarParcela(fatura, parcela)
-                                                  }}
-                                                  className="text-xs text-gray-500 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition-colors"
-                                                >
-                                                  Desfazer
-                                                </button>
-                                              ) : (
-                                                <Button
-                                                  size="sm"
-                                                  variant="outline"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    setConfirmarParcela({ fatura, parcela })
-                                                  }}
-                                                  className={`text-xs h-8 ${
-                                                    vencida
-                                                      ? 'border-red-300 text-red-700 hover:bg-red-100'
-                                                      : 'border-green-300 text-green-700 hover:bg-green-100'
-                                                  }`}
-                                                >
-                                                  <Check className="h-3 w-3 mr-1" />
-                                                  Marcar Pago
-                                                </Button>
-                                              )}
-                                            </>
-                                          )}
-                                        </div>
+                                        <ChevronDown className="h-4 w-4 text-gray-400" />
                                       </div>
-                                    )
-                                  })}
-                                </div>
-                                <div className="grid grid-cols-2 gap-4 p-3 bg-gray-100 border-t">
-                                  <div className="text-sm">
-                                    <span className="text-gray-600">Pagas: </span>
-                                    <span className="font-medium text-green-700">
-                                      {fatura.parcelasBoleto!.filter((p) => p.pago).length} de {fatura.parcelas}
-                                    </span>
-                                  </div>
-                                  <div className="text-sm text-right">
-                                    <span className="text-gray-600">Restante: </span>
-                                    <span className="font-medium text-gray-900">
-                                      {formatarMoeda(
-                                        fatura.parcelasBoleto!.filter((p) => !p.pago).reduce((sum, p) => sum + p.valor, 0),
-                                      )}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
 
-                          {(!isBoleto || !temParcelas) && (
-                            <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-white rounded-lg border">
-                              <div>
-                                <p className="text-xs text-gray-500 uppercase">Valor Total</p>
-                                <p className="text-sm font-bold text-gray-900">
-                                  {formatarMoeda(fatura.valor, fatura.moeda)}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-gray-500 uppercase">Pago</p>
-                                <p className="text-sm font-bold text-green-600">
-                                  {formatarMoeda(fatura.valorPago, fatura.moeda)}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-gray-500 uppercase">Restante</p>
-                                <p className="text-sm font-bold text-orange-600">
-                                  {formatarMoeda(fatura.valorRestante, fatura.moeda)}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          {fatura.pagamentos && fatura.pagamentos.length > 0 && (
-                            <div className="mb-4">
-                              <p className="text-xs text-gray-500 uppercase mb-2">Histórico de Pagamentos</p>
-                              <div className="space-y-2">
-                                {fatura.pagamentos.map((pag, idx) => (
-                                  <div
-                                    key={pag.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      abrirVisualizarPagamento(fatura, pag)
-                                    }}
-                                    className="p-3 bg-white rounded-lg border hover:border-green-300 hover:bg-green-50 cursor-pointer transition-colors"
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-3">
-                                        <span className="text-gray-400 text-sm">#{idx + 1}</span>
-                                        <span className="font-bold text-green-600">
-                                          {formatarMoeda(pag.valor, fatura.moeda)}
-                                        </span>
-                                        {fatura.moeda !== 'BRL' && pag.valorOriginal && (
-                                          <span className="text-gray-500 text-sm">
-                                            ({formatarMoeda(pag.valorOriginal, 'BRL')})
+                                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                                        {pag.destinatarios && pag.destinatarios.length > 0 && (
+                                          <span className="flex items-center gap-1 text-gray-500">
+                                            <Users className="h-3 w-3" />
+                                            {pag.destinatarios.map((d) => d.nome).join(', ')}
                                           </span>
                                         )}
-                                        <span className="text-gray-500 text-sm">{formatarData(pag.data)}</span>
-                                        {pag.formaPagamento && (
-                                          <span className="px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">
-                                            {FORMAS_PAGAMENTO[pag.formaPagamento] || pag.formaPagamento}
+                                        {pag.observacao && (
+                                          <span className="text-gray-500 italic truncate max-w-xs">
+                                            &quot;{pag.observacao}&quot;
                                           </span>
                                         )}
                                       </div>
-                                      <ChevronDown className="h-4 w-4 text-gray-400" />
                                     </div>
-
-                                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                                      {pag.destinatarios && pag.destinatarios.length > 0 && (
-                                        <span className="flex items-center gap-1 text-gray-500">
-                                          <Users className="h-3 w-3" />
-                                          {pag.destinatarios.map((d) => d.nome).join(', ')}
-                                        </span>
-                                      )}
-                                      {pag.observacao && (
-                                        <span className="text-gray-500 italic truncate max-w-xs">
-                                          &quot;{pag.observacao}&quot;
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                          )}
-
-                          {fatura.observacoes && (
-                            <div className="mb-4">
-                              <p className="text-xs text-gray-500 uppercase">Observações</p>
-                              <p className="text-sm">{fatura.observacoes}</p>
-                            </div>
-                          )}
-
-                          <div className="flex items-center gap-2 pt-3 border-t">
-                            {fatura.status !== 'PAGO' && !isBoleto && pode('financeiro.pagamento_criar') && (
-                              <Button
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  abrirModalPagamento(fatura)
-                                }}
-                                className="bg-green-600 hover:bg-green-700"
-                              >
-                                <Check className="h-4 w-4 mr-1" />
-                                {fatura.status === 'PARCIAL' ? 'Registrar Pagamento' : 'Marcar como Pago'}
-                              </Button>
                             )}
-                            {pode('financeiro.fatura_excluir') && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleExcluir(fatura)
-                                }}
-                                className="text-red-500 hover:text-red-600 hover:bg-red-50 ml-auto"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+
+                            {fatura.observacoes && (
+                              <div className="mb-4">
+                                <p className="text-xs text-gray-500 uppercase">Observações</p>
+                                <p className="text-sm">{fatura.observacoes}</p>
+                              </div>
                             )}
+
+                            <div className="flex items-center gap-2 pt-3 border-t">
+                              {fatura.status !== 'PAGO' && !isBoleto && pode('financeiro.pagamento_criar') && (
+                                <Button
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    abrirModalPagamento(fatura)
+                                  }}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  <Check className="h-4 w-4 mr-1" />
+                                  {fatura.status === 'PARCIAL' ? 'Registrar Pagamento' : 'Marcar como Pago'}
+                                </Button>
+                              )}
+                              {pode('financeiro.fatura_excluir') && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleExcluir(fatura)
+                                  }}
+                                  className="text-red-500 hover:text-red-600 hover:bg-red-50 ml-auto"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* ✨ LOTE 4 BLOCO 0: Rodapé com ações (pedido do Marco) 
+                    Botões "Exportar PDF" e "+ Nova Fatura" ficam AQUI, no
+                    fim da lista, em vez de no topo competindo visualmente
+                    com os KPIs. Aparecem apenas quando há faturas. */}
+                <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-gray-200">
+                  <Button
+                    onClick={() => setShowExportarPDF(true)}
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+                  >
+                    <FileDown className="h-4 w-4" />
+                    Exportar PDF
+                  </Button>
+                  {pode('financeiro.fatura_criar') && (
+                    <Button
+                      onClick={() => setShowNovaFatura(true)}
+                      size="sm"
+                      className="bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Nova Fatura
+                    </Button>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}
