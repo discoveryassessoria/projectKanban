@@ -12,7 +12,7 @@ import { ProcessoTarefas } from "./ProcessoTarefas"
 import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoInformacoes } from "./ProcessoInformacoes"
 import { ProcessoHistorico } from "./ProcessoHistorico"
-import { ProcessoFaturas } from "./ProcessoFaturas"
+import { ProcessoFinanceiro } from "./ProcessoFinanceiro"
 // ✅ IMPORTAR o modal e o initialFormData
 import { ContratanteModal, initialFormData } from "../contratantes-tabela"
 import { ProcessoEventos } from "./ProcessoEventos"
@@ -999,7 +999,7 @@ export function ProcessoDetailsModal({
           )}
 
           {activeTab === "faturas" && pode('financeiro.ver') && (
-            <ProcessoFaturas
+            <ProcessoFinanceiro
             processoId={processo.id}
             nomeFamilia={processo.nome}
             onUpdate={onSave}
