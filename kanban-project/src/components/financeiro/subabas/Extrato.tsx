@@ -2,22 +2,21 @@
 //
 // Sub-aba "Extrato" do Financeiro.
 //
-// 🆕 LOTE 4 BLOCO 3 (reforma completa pro mockup do Marco):
+// 🆕 LOTE 5 BLOCO F parte 2/3: integração com OutrosCustos.
 //
-//   - Gráfico "Saldo progressivo do processo" no topo (linha verde
-//     acumulada ao longo do tempo).
-//   - Header de filtros com: tipo, pagador, intervalo de datas (de/até),
-//     botão Limpar, botão Exportar PDF (placeholder).
-//   - Timeline agrupada por DIA, com header "22 DE ABRIL" + saldo do dia
-//     à direita.
-//   - Eventos mais ricos:
-//       🟣 Lançamento criado (fatura emitida) — descrição + categoria + moeda
-//       🟢 Pagamento recebido — valor em destaque grande, pagador, forma
-//       🔴 Atrasado — faturas vencidas com "Venceu DD/MM/YYYY · X dias em atraso"
+// Replica 1:1 a função renderExtrato do protótipo HTML (sistema-code.js
+// linhas 5842-6037). Eventos adicionados:
 //
-// Os custos da aba Custos não aparecem aqui ainda porque a TabelaCustos
-// não guarda data por lançamento (só o total). No Lote 5 quando OutrosCustos
-// entrar em produção, esses eventos também virão pra cá.
+//   1. Faturas tradicionais + pagamentos  (já existia)
+//   2. OutrosCustos COBRAR criado         (🆕 evento roxo "↙ Lançamento criado")
+//   3. OutrosCustos REPASSAR criado       (🆕 evento laranja "↗ Repasse criado")
+//   4. Pagamentos de OutrosCustos COBRAR  (🆕 "💰 Pagamento recebido" — entrada)
+//   5. Pagamentos de OutrosCustos REPASSAR(🆕 "💸 Pagamento efetuado" — saída)
+//   6. Atrasados faturas                  (já existia)
+//   7. Atrasados OutrosCustos             (🆕 vencidos sem pagamento integral)
+//
+// Saldo progressivo agora considera entradas (faturas + COBRAR) e saídas
+// (REPASSAR), igual ao protótipo.
 
 'use client'
 
@@ -33,15 +32,25 @@ import {
   Inbox,
   X as XIcon,
   FileDown,
+  TrendingDown,
+  TrendingUp,
 } from 'lucide-react'
 import { fmtBRL, fmtBRLCompact, fmtDataBR } from '@/src/lib/financeiro/helpers'
 import { MiniLinhaSVG } from '@/src/components/financeiro/charts/MiniLinhaSVG'
+import type { OutroCustoData } from '@/src/types/outros-custos'
 
 // ============================================================================
 // Tipos
 // ============================================================================
 
-type TipoEvento = 'fatura' | 'pagamento' | 'atrasado' | 'custo' | 'estorno'
+type TipoEvento =
+  | 'fatura'
+  | 'pagamento'
+  | 'atrasado'
+  | 'custo'
+  | 'estorno'
+  | 'repasse_criado'
+  | 'pagamento_saida'
 
 interface Pagador {
   id: number
@@ -54,7 +63,7 @@ interface EventoExtrato {
   data: string // ISO
   titulo: string
   descricao?: string
-  valor: number
+  valor: number // positivo = entrada, negativo = saída, 0 = neutro (criação)
   moeda?: 'BRL' | 'EUR' | 'USD'
   meta?: string
   pagador?: string
@@ -145,6 +154,20 @@ const META_TIPO: Record<
     border: '#fecaca',
     icon: RotateCcw,
   },
+  repasse_criado: {
+    label: 'Repasse criado',
+    cor: '#f59e0b',
+    bg: '#fffbeb',
+    border: '#fde68a',
+    icon: TrendingDown,
+  },
+  pagamento_saida: {
+    label: 'Pagamento efetuado',
+    cor: '#dc2626',
+    bg: '#fef2f2',
+    border: '#fecaca',
+    icon: TrendingUp,
+  },
 }
 
 // ============================================================================
@@ -182,6 +205,7 @@ function diasEntre(a: Date, b: Date): number {
 
 export function Extrato({ processoId }: ExtratoProps) {
   const [faturas, setFaturas] = useState<FaturaApi[]>([])
+  const [outrosCustos, setOutrosCustos] = useState<OutroCustoData[]>([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -192,7 +216,7 @@ export function Extrato({ processoId }: ExtratoProps) {
   const [dataFim, setDataFim] = useState<string>('')
 
   // ========================================================================
-  // Fetch
+  // Fetch — agora busca faturas + OutrosCustos em paralelo
   // ========================================================================
   useEffect(() => {
     let cancelado = false
@@ -201,32 +225,45 @@ export function Extrato({ processoId }: ExtratoProps) {
       try {
         setLoading(true)
         setErro(null)
-        const res = await fetch(`/api/processos/${processoId}/faturas`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-          },
-        })
+
+        const token = localStorage.getItem('authToken') || ''
+        const headers = { Authorization: `Bearer ${token}` }
+
+        const [resFaturas, resOutros] = await Promise.all([
+          fetch(`/api/processos/${processoId}/faturas`, { headers }),
+          fetch(`/api/processos/${processoId}/outros-custos`, { headers }),
+        ])
 
         if (cancelado) return
 
-        if (!res.ok) {
-          console.warn(`[Extrato] /faturas respondeu ${res.status}`)
+        if (!resFaturas.ok) {
+          console.warn(`[Extrato] /faturas respondeu ${resFaturas.status}`)
           setErro('Não foi possível carregar o extrato.')
           setFaturas([])
+          setOutrosCustos([])
           return
         }
 
-        const data = await res.json()
+        const dataFat = await resFaturas.json()
         if (cancelado) return
 
-        // 🐛 FIX: A API retorna { faturas: [...], totais: {...} }, não um array direto
-        const lista = data?.faturas ?? (Array.isArray(data) ? data : [])
-        setFaturas(lista)
+        const listaFat = dataFat?.faturas ?? (Array.isArray(dataFat) ? dataFat : [])
+        setFaturas(listaFat)
+
+        // OutrosCustos: falha silenciosa pra não derrubar o extrato inteiro
+        if (resOutros.ok) {
+          const dataOc = await resOutros.json()
+          if (!cancelado) setOutrosCustos(dataOc?.outrosCustos || [])
+        } else {
+          console.warn(`[Extrato] /outros-custos respondeu ${resOutros.status}`)
+          if (!cancelado) setOutrosCustos([])
+        }
       } catch (err) {
-        console.error('[Extrato] erro carregando faturas:', err)
+        console.error('[Extrato] erro carregando dados:', err)
         if (!cancelado) {
           setErro('Não foi possível se conectar ao servidor.')
           setFaturas([])
+          setOutrosCustos([])
         }
       } finally {
         if (!cancelado) setLoading(false)
@@ -247,6 +284,7 @@ export function Extrato({ processoId }: ExtratoProps) {
     const pagadoresSet = new Set<string>()
     const hoje = toDateOnly(new Date().toISOString())
 
+    // ----- 1. FATURAS -----
     for (const f of faturas) {
       const valorBRL =
         f.moeda === 'BRL' || !f.moeda
@@ -255,7 +293,7 @@ export function Extrato({ processoId }: ExtratoProps) {
           ? Number(f.valor ?? 0) * Number(f.cambio)
           : Number(f.valor ?? 0)
 
-      // ---- Evento: Lançamento criado (fatura) ----
+      // Fatura emitida
       const dataEmissao = f.dataEmissao || f.createdAt
       if (dataEmissao) {
         lista.push({
@@ -264,14 +302,14 @@ export function Extrato({ processoId }: ExtratoProps) {
           data: dataEmissao,
           titulo: f.descricao || `Fatura #${f.id}`,
           descricao: 'Honorários',
-          valor: valorBRL,
+          valor: 0,
           moeda: (f.moeda ?? 'BRL') as 'BRL' | 'EUR' | 'USD',
           meta: `Fatura #${f.id}`,
           categoria: f.moeda && f.moeda !== 'BRL' ? f.moeda : undefined,
         })
       }
 
-      // ---- Eventos: Pagamentos recebidos ----
+      // Pagamentos da fatura
       for (const p of f.pagamentos ?? []) {
         if (!p.data) continue
 
@@ -281,7 +319,6 @@ export function Extrato({ processoId }: ExtratoProps) {
           ? Number(p.valor ?? 0) * Number(p.cambio)
           : Number(p.valor ?? 0)
 
-        // Determina o nome do pagador (primeiro destinatário, se houver)
         let nomePagador: string | undefined
         if (p.destinatarios && p.destinatarios.length > 0) {
           nomePagador = p.destinatarios[0].nome
@@ -307,7 +344,7 @@ export function Extrato({ processoId }: ExtratoProps) {
         })
       }
 
-      // ---- Evento: Atrasado (fatura vencida com saldo em aberto) ----
+      // Fatura atrasada
       if (
         f.dataVencimento &&
         (f.status === 'VENCIDO' ||
@@ -318,20 +355,109 @@ export function Extrato({ processoId }: ExtratoProps) {
         const dataVenc = toDateOnly(f.dataVencimento)
         const dias = diasEntre(dataVenc, hoje)
 
-        // Mostra o evento "Atrasado" com data = hoje (pra aparecer no topo
-        // quando o user olha o extrato), mas com a info do vencimento no texto.
-        // Usamos a data de vencimento como chave do grupo pra ficar junto
-        // com o que aconteceu naquele dia.
         lista.push({
-          id: `atraso-${f.id}`,
+          id: `atraso-fat-${f.id}`,
           tipo: 'atrasado',
           data: f.dataVencimento,
           titulo: f.descricao || `Fatura #${f.id}`,
-          descricao: `Venceu ${fmtDataBR(f.dataVencimento)}`,
+          descricao: `Venceu ${fmtDataBR(f.dataVencimento.slice(0, 10))}`,
           valor: Number(f.valorRestante ?? 0),
           moeda: 'BRL',
           diasAtraso: dias,
         })
+      }
+    }
+
+    // ----- 2. OUTROS CUSTOS (COBRAR + REPASSAR) -----
+    for (const oc of outrosCustos) {
+      const cambio =
+        oc.moeda === 'BRL' ? 1 : oc.cambio ? Number(oc.cambio) : 1
+      const entrada = oc.natureza === 'COBRAR'
+      const valorTotalBRL = Number(oc.valor ?? 0) * cambio
+
+      // 2a. Lançamento criado (COBRAR = roxo "↙", REPASSAR = laranja "↗")
+      const dataCriacao =
+        (oc as unknown as { createdAt?: string }).createdAt ||
+        (oc as unknown as { criadoEm?: string }).criadoEm
+      if (dataCriacao) {
+        lista.push({
+          id: `oc-criado-${oc.id}`,
+          tipo: entrada ? 'fatura' : 'repasse_criado',
+          data: dataCriacao,
+          titulo: oc.descricao || oc.tipo,
+          descricao: oc.fornecedor
+            ? `${oc.tipo} · ${oc.fornecedor}`
+            : oc.tipo,
+          valor: 0,
+          moeda: oc.moeda as 'BRL' | 'EUR' | 'USD',
+          meta: oc.moeda !== 'BRL' ? oc.moeda : undefined,
+          categoria: oc.moeda !== 'BRL' ? oc.moeda : undefined,
+        })
+      }
+
+      // 2b. Pagamentos do OutroCusto
+      const pagamentos = (oc as unknown as { pagamentos?: Array<{
+        id: number
+        valor?: number | null
+        data?: string | null
+        forma?: string | null
+        formaPagamento?: string | null
+        estornado?: boolean
+        pagadorId?: number | null
+        pagadorNome?: string | null
+      }> }).pagamentos ?? []
+
+      for (const p of pagamentos) {
+        if (!p.data || p.estornado) continue
+
+        const valorPagBRL = Number(p.valor ?? 0) * cambio
+        const forma = p.formaPagamento || p.forma || undefined
+
+        let nomePagador: string | undefined
+        if (entrada && p.pagadorNome) {
+          nomePagador = p.pagadorNome
+          pagadoresSet.add(p.pagadorNome)
+        }
+
+        lista.push({
+          id: `oc-pag-${p.id}`,
+          tipo: entrada ? 'pagamento' : 'pagamento_saida',
+          data: p.data,
+          titulo: entrada ? 'Pagamento recebido' : 'Pagamento efetuado',
+          descricao: oc.descricao || oc.tipo,
+          // Entrada = valor positivo, saída = valor negativo (afeta saldo)
+          valor: entrada ? valorPagBRL : -valorPagBRL,
+          moeda: 'BRL',
+          meta: forma,
+          pagador: nomePagador,
+        })
+      }
+
+      // 2c. OutroCusto atrasado (vencimento passou e não foi quitado)
+      if (oc.vencimento) {
+        const pagosAtivos = pagamentos
+          .filter((p) => !p.estornado)
+          .reduce((s, p) => s + Number(p.valor ?? 0), 0)
+        const restante = Number(oc.valor ?? 0) - pagosAtivos
+
+        if (
+          restante > 0.005 &&
+          toDateOnly(oc.vencimento).getTime() < hoje.getTime()
+        ) {
+          const dataVenc = toDateOnly(oc.vencimento)
+          const dias = diasEntre(dataVenc, hoje)
+
+          lista.push({
+            id: `atraso-oc-${oc.id}`,
+            tipo: 'atrasado',
+            data: oc.vencimento,
+            titulo: oc.descricao || oc.tipo,
+            descricao: `Venceu ${fmtDataBR(oc.vencimento.slice(0, 10))}`,
+            valor: restante * cambio,
+            moeda: 'BRL',
+            diasAtraso: dias,
+          })
+        }
       }
     }
 
@@ -344,7 +470,7 @@ export function Extrato({ processoId }: ExtratoProps) {
       eventos: lista,
       pagadoresUnicos: Array.from(pagadoresSet).sort(),
     }
-  }, [faturas])
+  }, [faturas, outrosCustos])
 
   // ========================================================================
   // Filtros aplicados
@@ -353,7 +479,18 @@ export function Extrato({ processoId }: ExtratoProps) {
     let r = eventos
 
     if (filtroTipo !== 'todos') {
-      r = r.filter((e) => e.tipo === filtroTipo)
+      // Agrupa filtros: "pagamento" cobre entrada+saída, "lancamento" cobre fatura+repasse
+      if (filtroTipo === 'pagamento') {
+        r = r.filter(
+          (e) => e.tipo === 'pagamento' || e.tipo === 'pagamento_saida',
+        )
+      } else if (filtroTipo === 'lancamento') {
+        r = r.filter(
+          (e) => e.tipo === 'fatura' || e.tipo === 'repasse_criado',
+        )
+      } else {
+        r = r.filter((e) => e.tipo === filtroTipo)
+      }
     }
 
     if (filtroPagador !== 'todos') {
@@ -373,24 +510,41 @@ export function Extrato({ processoId }: ExtratoProps) {
     return r
   }, [eventos, filtroTipo, filtroPagador, dataInicio, dataFim])
 
+  // Contadores pros selects (usa eventos brutos, não filtrados)
+  const contadores = useMemo(() => {
+    return {
+      todos: eventos.length,
+      lancamento: eventos.filter(
+        (e) => e.tipo === 'fatura' || e.tipo === 'repasse_criado',
+      ).length,
+      pagamento: eventos.filter(
+        (e) => e.tipo === 'pagamento' || e.tipo === 'pagamento_saida',
+      ).length,
+      atrasado: eventos.filter((e) => e.tipo === 'atrasado').length,
+    }
+  }, [eventos])
+
   // ========================================================================
-  // Saldo progressivo (todos os pagamentos recebidos, acumulado por dia)
+  // Saldo progressivo (todas as movimentações — entradas e saídas)
   // ========================================================================
   const pontosSaldo = useMemo(() => {
-    const pagamentos = eventos
-      .filter((e) => e.tipo === 'pagamento')
+    const movimentacoes = eventos
+      .filter(
+        (e) =>
+          e.tipo === 'pagamento' ||
+          e.tipo === 'pagamento_saida' ||
+          e.tipo === 'estorno',
+      )
       .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime())
 
-    if (pagamentos.length === 0) return []
+    if (movimentacoes.length === 0) return []
 
-    // Agrupa por dia, somando
     const porDia = new Map<string, number>()
-    pagamentos.forEach((p) => {
+    movimentacoes.forEach((p) => {
       const chave = dataKey(p.data)
       porDia.set(chave, (porDia.get(chave) || 0) + p.valor)
     })
 
-    // Converte pra pontos acumulados
     let acumulado = 0
     const pontos: { x: string; y: number }[] = []
     Array.from(porDia.entries())
@@ -423,14 +577,13 @@ export function Extrato({ processoId }: ExtratoProps) {
       grupos.get(chave)!.push(ev)
     })
 
-    // Ordena por data decrescente
     return Array.from(grupos.entries()).sort(([a], [b]) => b.localeCompare(a))
   }, [eventosFiltrados])
 
-  // Saldo do dia = soma dos pagamentos - estornos desse dia
-  function saldoDoDia(eventos: EventoExtrato[]): number {
-    return eventos.reduce((acc, ev) => {
+  function saldoDoDia(eventosDia: EventoExtrato[]): number {
+    return eventosDia.reduce((acc, ev) => {
       if (ev.tipo === 'pagamento') return acc + ev.valor
+      if (ev.tipo === 'pagamento_saida') return acc + ev.valor // valor já negativo
       if (ev.tipo === 'estorno') return acc - ev.valor
       return acc
     }, 0)
@@ -489,11 +642,17 @@ export function Extrato({ processoId }: ExtratoProps) {
             className="ex-filtro__select"
           >
             <option value="todos">
-              Todos os tipos ({eventos.length})
+              Todos os tipos ({contadores.todos})
             </option>
-            <option value="fatura">Faturas</option>
-            <option value="pagamento">Pagamentos</option>
-            <option value="atrasado">Atrasados</option>
+            <option value="lancamento">
+              🟣 Lançamento criado ({contadores.lancamento})
+            </option>
+            <option value="pagamento">
+              🟢 Pagamento feito ({contadores.pagamento})
+            </option>
+            <option value="atrasado">
+              🔴 Pagamento atrasado ({contadores.atrasado})
+            </option>
           </select>
         </div>
 
@@ -569,8 +728,12 @@ export function Extrato({ processoId }: ExtratoProps) {
             </div>
             <div className="ex-saldo-valor">
               <span className="ex-saldo-valor__label">SALDO ATUAL</span>
-              <span className="ex-saldo-valor__num">
-                +{fmtBRL(saldoAtual)}
+              <span
+                className="ex-saldo-valor__num"
+                style={{ color: saldoAtual >= 0 ? '#15803d' : '#b91c1c' }}
+              >
+                {saldoAtual >= 0 ? '+' : ''}
+                {fmtBRL(saldoAtual)}
               </span>
             </div>
           </div>
@@ -580,7 +743,7 @@ export function Extrato({ processoId }: ExtratoProps) {
               points={pontosSaldo}
               width={720}
               height={180}
-              color="#16a34a"
+              color={saldoAtual >= 0 ? '#16a34a' : '#dc2626'}
               formatY={(v) => fmtBRLCompact(v)}
               ariaLabel="Gráfico de saldo progressivo"
             />
@@ -639,7 +802,18 @@ export function Extrato({ processoId }: ExtratoProps) {
                     const meta = META_TIPO[ev.tipo]
                     const Icon = meta.icon
                     const destaque =
-                      ev.tipo === 'pagamento' || ev.tipo === 'atrasado'
+                      ev.tipo === 'pagamento' ||
+                      ev.tipo === 'pagamento_saida' ||
+                      ev.tipo === 'atrasado'
+
+                    // Prefixo visual do título (igual ao protótipo)
+                    let prefixo = ''
+                    if (ev.tipo === 'fatura') prefixo = '↙ '
+                    else if (ev.tipo === 'repasse_criado') prefixo = '↗ '
+                    else if (ev.tipo === 'pagamento') prefixo = '💰 '
+                    else if (ev.tipo === 'pagamento_saida') prefixo = '💸 '
+                    else if (ev.tipo === 'atrasado') prefixo = '⏰ '
+
                     return (
                       <div
                         key={ev.id}
@@ -650,19 +824,17 @@ export function Extrato({ processoId }: ExtratoProps) {
                         }}
                       >
                         <div
-                        className="ex-evento__dot"
-                        aria-hidden
-                        style={{ color: meta.cor }}
+                          className="ex-evento__dot"
+                          aria-hidden
+                          style={{ color: meta.cor }}
                         >
-                        <Icon className="ex-evento__dot-icon" />
+                          <Icon className="ex-evento__dot-icon" />
                         </div>
 
                         <div className="ex-evento__body">
                           <div className="ex-evento__linha1">
                             <span className="ex-evento__titulo">
-                              {ev.tipo === 'fatura' && '↙ '}
-                              {ev.tipo === 'pagamento' && '💰 '}
-                              {ev.tipo === 'atrasado' && '⏰ '}
+                              {prefixo}
                               {meta.label} · {ev.titulo}
                             </span>
                             {ev.diasAtraso !== undefined &&
@@ -713,12 +885,13 @@ export function Extrato({ processoId }: ExtratoProps) {
                               style={{ color: meta.cor }}
                             >
                               {ev.tipo === 'pagamento' && '+'}
-                              {fmtBRL(ev.valor)}
+                              {ev.tipo === 'pagamento_saida' && '−'}
+                              {fmtBRL(Math.abs(ev.valor))}
                             </div>
                           )}
                         </div>
 
-                        {!destaque && (
+                        {!destaque && ev.valor !== 0 && (
                           <div className="ex-evento__valor">
                             {fmtBRL(ev.valor)}
                           </div>
@@ -889,7 +1062,6 @@ export function Extrato({ processoId }: ExtratoProps) {
         .ex-saldo-valor__num {
           font-size: 18px;
           font-weight: 700;
-          color: #15803d;
           font-variant-numeric: tabular-nums;
         }
         .ex-saldo-grafico {
