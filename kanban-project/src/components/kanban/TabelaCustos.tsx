@@ -714,9 +714,10 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
       doc.setFontSize(8)
       doc.setTextColor(255, 255, 255)
       const pessoasUnicasFiltradas = [...new Set(linhasParaExportar.map(l => l.pessoaId))]
+      // 🆕 Marco 29/04/2026: "Total Geral do Processo" → "Total Geral da Pasta Documental"
       const tituloTotal = apenasSelecionadas && linhasSelecionadas.size > 0 
         ? `Total (${linhasParaExportar.length} documento${linhasParaExportar.length > 1 ? 's' : ''})`
-        : 'Total Geral do Processo'
+        : 'Total Geral da Pasta Documental'
       doc.text(tituloTotal, boxX + 4, boxY + 5)
       doc.setFontSize(11)
       doc.setFont('helvetica', 'bold')
@@ -1098,9 +1099,10 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
       </div>
 
       {/* Resumo Total */}
+      {/* 🆕 Marco 29/04/2026: "Total Geral do Processo" → "Total Geral da Pasta Documental" */}
       <div className="flex justify-end">
         <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-6 py-4 rounded-xl shadow-lg">
-          <p className="text-sm opacity-90">Total Geral do Processo</p>
+          <p className="text-sm opacity-90">Total Geral da Pasta Documental</p>
           <p className="text-2xl font-bold">{formatarMoeda(calcularTotalGeral())}</p>
         </div>
       </div>

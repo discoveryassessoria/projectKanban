@@ -165,8 +165,6 @@ export function VisaoGeral({
   })
   const [loadingFaturas, setLoadingFaturas] = useState(true)
   const [erroFaturas, setErroFaturas] = useState<string | null>(null)
-  const [totalCustos, setTotalCustos] = useState<number>(0)
-  const [loadingCustos, setLoadingCustos] = useState(true)
   const [outrosCustos, setOutrosCustos] = useState<OutroCustoData[]>([])
   const [totaisOC, setTotaisOC] = useState<TotaisOutrosCustos | null>(null)
   const [loadingOutros, setLoadingOutros] = useState(true)
@@ -177,7 +175,6 @@ export function VisaoGeral({
 
     async function carregar() {
       setLoadingFaturas(true)
-      setLoadingCustos(true)
       setLoadingOutros(true)
       setErroFaturas(null)
 
@@ -185,9 +182,8 @@ export function VisaoGeral({
       const headers = { Authorization: `Bearer ${token}` }
 
       try {
-        const [resFat, resCustos, resOc, resProc] = await Promise.all([
+        const [resFat, resOc, resProc] = await Promise.all([
           fetch(`/api/processos/${processoId}/faturas`, { headers }),
-          fetch(`/api/processos/${processoId}/custos`, { headers }),
           fetch(`/api/processos/${processoId}/outros-custos`, { headers }),
           fetch(`/api/processos/${processoId}`, { headers }),
         ])
@@ -205,11 +201,6 @@ export function VisaoGeral({
         } else {
           setErroFaturas(`A API de faturas respondeu HTTP ${resFat.status}.`)
           setFaturas([])
-        }
-
-        if (resCustos.ok) {
-          const d = await resCustos.json()
-          if (!cancelado) setTotalCustos(d.totalGeral || 0)
         }
 
         if (resOc.ok) {
@@ -232,7 +223,6 @@ export function VisaoGeral({
       } finally {
         if (!cancelado) {
           setLoadingFaturas(false)
-          setLoadingCustos(false)
           setLoadingOutros(false)
         }
       }
@@ -254,12 +244,20 @@ export function VisaoGeral({
   const recebido = recebidoFaturas + recebidoOutrosCobrar
   const receitaAberta = Math.max(0, receitaTotal - recebido)
 
-  const custoTabela = totalCustos
+  // 🆕 Conforme decisão do Marco (29/04/2026): a Planilha de Custos
+  // (TabelaCustos) NÃO entra mais automaticamente nos totais financeiros
+  // do processo. O valor `totalCustos` recebido da API continua disponível
+  // pra exibição interna da própria planilha, mas é tratado como ZERO no
+  // cálculo de RECEITA / CUSTO / LUCRO da Visão Geral.
+  // Motivo: cada requerente tem sua pasta individual, e em alguns países
+  // a pasta era contada duas vezes. Quem precisa cobrar/repassar deve
+  // criar Outro Custo COBRAR (receita) ou REPASSAR (custo).
+  const custoTabela = 0
   const custoOutrosRepassar = totaisOC?.totalRepassarBRL ?? 0
-  const custoTotal = custoTabela + custoOutrosRepassar
+  const custoTotal = custoOutrosRepassar
 
   const pagoOutrosRepassar = totaisOC?.totalPagoBRL ?? 0
-  const pagoCustos = custoTabela + pagoOutrosRepassar
+  const pagoCustos = pagoOutrosRepassar
   const custoEmAberto = Math.max(0, custoTotal - pagoCustos)
 
   const resultadoRealizado = recebido - pagoCustos
@@ -484,7 +482,7 @@ export function VisaoGeral({
   const margemResumo =
     receitaTotal > 0 ? (lucroResumo / receitaTotal) * 100 : 0
 
-  const loading = loadingFaturas || loadingCustos || loadingOutros
+  const loading = loadingFaturas || loadingOutros
 
   // ====== Render ======
   if (loading) {
@@ -991,7 +989,7 @@ export function VisaoGeral({
         <div className="vg-card__head vg-card__head--with-legend">
           <h3 className="vg-card__title">Custos por etapa</h3>
           <span className="vg-card__sub">
-            Evolução do gasto ao longo do processo
+            Apenas Outros Custos REPASSAR vinculados a etapas
           </span>
         </div>
         <div className="vg-timeline">

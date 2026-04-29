@@ -2,12 +2,20 @@
 //
 // Sub-aba "Custos" do Financeiro — VERSÃO LOTE 5 (funcional completa).
 //
-// Estrutura:
-//   1. Cards "Custos por Tipo" — do Lote 4 (Certidões/Apostilamentos/etc.)
-//   2. TabelaCustos — do Lote 2, intacta
-//   3. 🆕 LOTE 5: Bloco "Outros Lançamentos" FUNCIONAL:
+// 🆕 Atualização Marco 29/04/2026:
+//   Os 5 cards "Custos por Tipo" do topo (CustosPorTipoCards) foram removidos
+//   porque somavam automaticamente a Planilha de Custos (Pasta Documental),
+//   o que causava duplicação no financeiro do processo. A Planilha continua
+//   visível e editável logo abaixo, com seu próprio "Total Geral da Pasta
+//   Documental" no rodapé. Os 4 KPIs do bloco "Outros Lançamentos"
+//   continuam intactos — eles refletem só Outros Custos REPASSAR.
+//
+// Estrutura atual:
+//   1. (removido) Cards "Custos por Tipo" — somavam a Planilha
+//   2. TabelaCustos — Planilha de Custos / Pasta Documental, intacta
+//   3. Bloco "Outros Lançamentos" funcional:
 //      - Header com busca + ordenação + botão "+ Novo Lançamento"
-//      - 4 KPIs reais (A Repassar / Já Pago / Internos / Total)
+//      - 4 KPIs reais (A Pagar / Já Pago / Internos / Total)
 //      - Lista de OutroCustoCard (apenas REPASSAR)
 //      - Empty state amigável
 //      - Modal "Novo Lançamento" pra criar
@@ -20,7 +28,6 @@ import { Plus, Wallet, AlertCircle, Search } from 'lucide-react'
 import { TabelaCustos } from '@/src/components/kanban/TabelaCustos'
 import { fmtBRL } from '@/src/lib/financeiro/helpers'
 import { OutroCustoCard } from '@/src/components/financeiro/cards/OutroCustoCard'
-import { CustosPorTipoCards } from '@/src/components/financeiro/cards/CustosPorTipoCards'
 import { NovoOutroCustoModal } from '@/src/components/financeiro/modals/NovoOutroCustoModal'
 import type {
   OutroCustoData,
@@ -40,36 +47,11 @@ export interface CustosProps {
   nomeFamilia?: string
 }
 
-interface TipoServico {
-  id: number
-  nome: string
-  ordem: number
-}
-
 // ----------------------------------------------------------------------------
 // Componente
 // ----------------------------------------------------------------------------
 export function Custos({ processoId, nomeFamilia }: CustosProps) {
-  // ===== Estado dos cards "Custos por Tipo" (Lote 4) =====
-  const [servicos, setServicos] = useState<TipoServico[]>([])
-  const [totaisPorServico, setTotaisPorServico] = useState<
-    Record<number, number>
-  >({})
-  const [totalGeralTabela, setTotalGeralTabela] = useState(0)
-  const [custosLoading, setCustosLoading] = useState(true)
-
-  const handleTotaisChange = (dados: {
-    servicos: TipoServico[]
-    totaisPorServico: Record<number, number>
-    totalGeral: number
-  }) => {
-    setServicos(dados.servicos)
-    setTotaisPorServico(dados.totaisPorServico)
-    setTotalGeralTabela(dados.totalGeral)
-    setCustosLoading(false)
-  }
-
-  // ===== 🆕 LOTE 5: Estado dos OutrosCustos =====
+  // ===== Estado dos OutrosCustos =====
   const [outrosCustos, setOutrosCustos] = useState<OutroCustoData[]>([])
   const [totais, setTotais] = useState<TotaisOutrosCustos | null>(null)
   const [loadingOutros, setLoadingOutros] = useState(true)
@@ -142,7 +124,6 @@ export function Custos({ processoId, nomeFamilia }: CustosProps) {
   // ===== Handlers de atualização =====
   function handleNovoLancamento(novo: OutroCustoData) {
     setOutrosCustos((atuais) => [novo, ...atuais])
-    // Após criar, recarrega totais (ou recalcula localmente — vamos refazer fetch)
     recarregarOutrosCustos()
   }
 
@@ -187,22 +168,20 @@ export function Custos({ processoId, nomeFamilia }: CustosProps) {
   // ===== Render =====
   return (
     <div className="cs-root">
-      {/* Bloco 1: Cards por tipo de documento (Lote 4) */}
-      <CustosPorTipoCards
-        servicos={servicos}
-        totaisPorServico={totaisPorServico}
-        totalGeral={totalGeralTabela}
-        loading={custosLoading}
-      />
+      {/* ============================================================ */}
+      {/* 🚫 Bloco "Custos por Tipo" (5 cards) removido (Marco 29/04)  */}
+      {/*    Somavam a Planilha de Custos automaticamente, causando    */}
+      {/*    duplicação. A Planilha continua visível abaixo, com seu   */}
+      {/*    próprio rótulo "Total Geral da Pasta Documental".         */}
+      {/* ============================================================ */}
 
-      {/* Bloco 2: TabelaCustos (Lote 2) */}
+      {/* Bloco 1: TabelaCustos (Planilha de Custos / Pasta Documental) */}
       <TabelaCustos
         processoId={processoId}
         nomeFamilia={nomeFamilia}
-        onTotaisChange={handleTotaisChange}
       />
 
-      {/* Bloco 3: 🆕 Outros Lançamentos (Lote 5 — funcional!) */}
+      {/* Bloco 2: Outros Lançamentos */}
       <div className="cs-outros">
         {/* Header */}
         <div className="cs-outros__header">
