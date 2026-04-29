@@ -216,17 +216,22 @@ export function Custos({ processoId, nomeFamilia }: CustosProps) {
   const totalOutros = totais?.totalRepassarBRL ?? 0
   const totalGeral = totalPasta + totalOutros
 
-  // Pago / Pendente — combina pasta (heurística: tudo pendente) + outros
-  // Como ainda não temos o campo "repassado" / "pagamentos detalhados" da
-  // planilha, contamos toda a pasta como "pendente" e usamos os pagamentos
-  // dos OutrosCustos pra "pago"/"pendente".
+  // 🆕 Marco 29/04/2026: O card "PAGAMENTO A FORNECEDORES" reflete APENAS
+  // os Outros Custos (lançamentos manuais a terceiros). A Pasta Documental
+  // NÃO entra aqui — ela é cálculo da planilha, não pagamento a fornecedor.
+  // Além disso, o card só aparece quando há pelo menos 1 Outro Custo
+  // cadastrado (controlado por `contagemTotal > 0` no JSX abaixo).
   const pagoOutros = totais?.totalPagoBRL ?? 0
   const aPagarOutros = totais?.totalAPagarBRL ?? 0
-  const pagoTotal = pagoOutros // pasta sem pagamento ainda (Lote 6+)
-  const pendenteTotal = totalPasta + aPagarOutros
+  const pagoTotal = pagoOutros
+  const pendenteTotal = aPagarOutros
 
   const contagemTotal = outrosCustos.filter((oc) => oc.natureza === 'REPASSAR').length
   const contagemRepasses = repassesFiltrados.length
+
+  // Total usado pra calcular as proporções das mini-barras do card
+  // de "PAGAMENTO A FORNECEDORES" (só Outros Custos).
+  const totalPagFornecedores = pagoTotal + pendenteTotal
 
   // ===== Render =====
   const filtros = [
@@ -450,39 +455,44 @@ export function Custos({ processoId, nomeFamilia }: CustosProps) {
           </div>
         </div>
 
-        <div className="cs-aside-card">
-          <div className="cs-aside-titulo">PAGAMENTO A FORNECEDORES</div>
-          <div className="cs-aside-status">
-            <div className="cs-aside-status-row">
-              <span>✓ Pagos</span>
-              <span style={{ color: '#22c55e' }}>{fmtBRL(pagoTotal)}</span>
+        {/* 🆕 Marco 29/04/2026: card só aparece quando há pelo menos um
+            Outro Custo cadastrado. Antes disso, "Pagamento a Fornecedores"
+            não faz sentido — não há fornecedor pra pagar. */}
+        {contagemTotal > 0 && (
+          <div className="cs-aside-card">
+            <div className="cs-aside-titulo">PAGAMENTO A FORNECEDORES</div>
+            <div className="cs-aside-status">
+              <div className="cs-aside-status-row">
+                <span>✓ Pagos</span>
+                <span style={{ color: '#22c55e' }}>{fmtBRL(pagoTotal)}</span>
+              </div>
+              <div className="cs-aside-bar">
+                <div
+                  className="cs-aside-bar-fill"
+                  style={{
+                    width: `${totalPagFornecedores ? (pagoTotal / totalPagFornecedores) * 100 : 0}%`,
+                    background: '#22c55e',
+                  }}
+                />
+              </div>
             </div>
-            <div className="cs-aside-bar">
-              <div
-                className="cs-aside-bar-fill"
-                style={{
-                  width: `${totalGeral ? (pagoTotal / totalGeral) * 100 : 0}%`,
-                  background: '#22c55e',
-                }}
-              />
+            <div className="cs-aside-status">
+              <div className="cs-aside-status-row">
+                <span>⏰ Pendentes</span>
+                <span style={{ color: '#3b82f6' }}>{fmtBRL(pendenteTotal)}</span>
+              </div>
+              <div className="cs-aside-bar">
+                <div
+                  className="cs-aside-bar-fill"
+                  style={{
+                    width: `${totalPagFornecedores ? (pendenteTotal / totalPagFornecedores) * 100 : 0}%`,
+                    background: '#3b82f6',
+                  }}
+                />
+              </div>
             </div>
           </div>
-          <div className="cs-aside-status">
-            <div className="cs-aside-status-row">
-              <span>⏰ Pendentes</span>
-              <span style={{ color: '#3b82f6' }}>{fmtBRL(pendenteTotal)}</span>
-            </div>
-            <div className="cs-aside-bar">
-              <div
-                className="cs-aside-bar-fill"
-                style={{
-                  width: `${totalGeral ? (pendenteTotal / totalGeral) * 100 : 0}%`,
-                  background: '#3b82f6',
-                }}
-              />
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Modal "Novo Lançamento" */}
