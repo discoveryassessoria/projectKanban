@@ -421,39 +421,60 @@ export function Custos({ processoId, nomeFamilia }: CustosProps) {
       {/* ================================================================ */}
       {/* SIDEBAR (DIREITA)                                                 */}
       {/* ================================================================ */}
+      {/* 🆕 Marco 30/04/2026: cards do sidebar são condicionais.
+          Card "TOTAL DE CUSTOS":
+            - Some inteiro quando não há Pasta nem Outros
+            - Linha "📋 Pasta Documental" só aparece se totalPasta > 0
+            - Linha "💼 Outros Custos" só aparece se totalOutros > 0
+          Card "PAGAMENTO A FORNECEDORES":
+            - Só aparece quando há ao menos 1 Outro Custo (contagemTotal > 0)
+      */}
       <div className="cs-aside">
-        <div className="cs-aside-card">
-          <div className="cs-aside-titulo">TOTAL DE CUSTOS</div>
-          <div className="cs-aside-total-big">{fmtBRL(totalGeral)}</div>
-          <div className="cs-aside-breakdown">
-            <div className="cs-aside-row">
-              <span>📋 Pasta Documental</span>
-              <span>{fmtBRL(totalPasta)}</span>
-            </div>
-            <div className="cs-aside-bar">
-              <div
-                className="cs-aside-bar-fill"
-                style={{
-                  width: `${totalGeral ? (totalPasta / totalGeral) * 100 : 0}%`,
-                  background: '#3b82f6',
-                }}
-              />
-            </div>
-            <div className="cs-aside-row" style={{ marginTop: 10 }}>
-              <span>💼 Outros Custos</span>
-              <span>{fmtBRL(totalOutros)}</span>
-            </div>
-            <div className="cs-aside-bar">
-              <div
-                className="cs-aside-bar-fill"
-                style={{
-                  width: `${totalGeral ? (totalOutros / totalGeral) * 100 : 0}%`,
-                  background: '#a855f7',
-                }}
-              />
+        {totalGeral > 0 && (
+          <div className="cs-aside-card">
+            <div className="cs-aside-titulo">TOTAL DE CUSTOS</div>
+            <div className="cs-aside-total-big">{fmtBRL(totalGeral)}</div>
+            <div className="cs-aside-breakdown">
+              {totalPasta > 0 && (
+                <>
+                  <div className="cs-aside-row">
+                    <span>📋 Pasta Documental</span>
+                    <span>{fmtBRL(totalPasta)}</span>
+                  </div>
+                  <div className="cs-aside-bar">
+                    <div
+                      className="cs-aside-bar-fill"
+                      style={{
+                        width: `${totalGeral ? (totalPasta / totalGeral) * 100 : 0}%`,
+                        background: '#3b82f6',
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+              {totalOutros > 0 && (
+                <>
+                  <div
+                    className="cs-aside-row"
+                    style={{ marginTop: totalPasta > 0 ? 10 : 0 }}
+                  >
+                    <span>💼 Outros Custos</span>
+                    <span>{fmtBRL(totalOutros)}</span>
+                  </div>
+                  <div className="cs-aside-bar">
+                    <div
+                      className="cs-aside-bar-fill"
+                      style={{
+                        width: `${totalGeral ? (totalOutros / totalGeral) * 100 : 0}%`,
+                        background: '#a855f7',
+                      }}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
-        </div>
+        )}
 
         {/* 🆕 Marco 29/04/2026: card só aparece quando há pelo menos um
             Outro Custo cadastrado. Antes disso, "Pagamento a Fornecedores"
