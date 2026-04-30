@@ -247,7 +247,7 @@ export function Custos({ processoId, nomeFamilia }: CustosProps) {
       : `SUBTOTAL ${filtroAtual.lbl.toUpperCase()}`
 
   return (
-    <div className="cs-layout">
+    <div className={`cs-layout ${contagemTotal === 0 ? 'cs-layout--solo' : ''}`}>
       {/* ================================================================ */}
       {/* COLUNA PRINCIPAL                                                  */}
       {/* ================================================================ */}
@@ -421,16 +421,25 @@ export function Custos({ processoId, nomeFamilia }: CustosProps) {
       {/* ================================================================ */}
       {/* SIDEBAR (DIREITA)                                                 */}
       {/* ================================================================ */}
-      {/* 🆕 Marco 30/04/2026: cards do sidebar são condicionais.
-          Card "TOTAL DE CUSTOS":
-            - Some inteiro quando não há Pasta nem Outros
-            - Linha "📋 Pasta Documental" só aparece se totalPasta > 0
-            - Linha "💼 Outros Custos" só aparece se totalOutros > 0
+      {/* 🆕 Marco 30/04/2026: regra unificada do sidebar.
+          A sidebar inteira é condicionada à existência de Outros Custos
+          lançados (contagemTotal > 0). Se o usuário só tem dados na
+          Pasta Documental e nenhum Outro Custo cadastrado embaixo, a
+          sidebar não aparece — porque a planilha de Pasta é só pra
+          cálculo/exportação, não conta como custo do processo até o
+          usuário lançar manualmente.
+
+          Resumo:
+            Sem nada                 → sidebar some
+            Só Pasta                 → sidebar some
+            Só Outros (sem Pasta)    → aparece, só linha 💼 Outros
+            Pasta + Outros           → aparece com 📋 Pasta + 💼 Outros
+
           Card "PAGAMENTO A FORNECEDORES":
-            - Só aparece quando há ao menos 1 Outro Custo (contagemTotal > 0)
+            - Mesma condição (contagemTotal > 0)
       */}
-      <div className="cs-aside">
-        {totalGeral > 0 && (
+      {contagemTotal > 0 && (
+        <div className="cs-aside">
           <div className="cs-aside-card">
             <div className="cs-aside-titulo">TOTAL DE CUSTOS</div>
             <div className="cs-aside-total-big">{fmtBRL(totalGeral)}</div>
@@ -474,12 +483,10 @@ export function Custos({ processoId, nomeFamilia }: CustosProps) {
               )}
             </div>
           </div>
-        )}
 
-        {/* 🆕 Marco 29/04/2026: card só aparece quando há pelo menos um
-            Outro Custo cadastrado. Antes disso, "Pagamento a Fornecedores"
-            não faz sentido — não há fornecedor pra pagar. */}
-        {contagemTotal > 0 && (
+          {/* 🆕 Marco 29/04/2026: card de Pagamento a Fornecedores. A
+              condicional externa contagemTotal > 0 já garante que ele
+              só renderiza quando há lançamentos, então aqui é incondicional. */}
           <div className="cs-aside-card">
             <div className="cs-aside-titulo">PAGAMENTO A FORNECEDORES</div>
             <div className="cs-aside-status">
@@ -513,8 +520,8 @@ export function Custos({ processoId, nomeFamilia }: CustosProps) {
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Modal "Novo Lançamento" */}
       <NovoOutroCustoModal
@@ -532,6 +539,12 @@ export function Custos({ processoId, nomeFamilia }: CustosProps) {
           grid-template-columns: 1fr 320px;
           gap: 18px;
           align-items: start;
+        }
+        /* 🆕 Marco 30/04/2026: quando a sidebar inteira é ocultada
+           (sem Outros Custos cadastrados), o conteúdo principal ocupa
+           a tela toda em 1 coluna full width. */
+        .cs-layout--solo {
+          grid-template-columns: 1fr;
         }
         @media (max-width: 1100px) {
           .cs-layout { grid-template-columns: 1fr; }

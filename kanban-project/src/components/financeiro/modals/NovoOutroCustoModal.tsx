@@ -2,21 +2,25 @@
 //
 // 🆕 LOTE 5: Modal para criar OU editar um OutroCusto.
 //
+// 🆕 Atualização Marco 30/04/2026:
+//   Aba COBRAR (receber do cliente) NÃO tem mais:
+//     - Câmbio (cliente paga em parcelas, câmbio se define no momento de
+//       cada pagamento parcial)
+//     - Vencimento (honorário não tem vencimento fixo)
+//     - "Já recebido" (sempre lança como pendente, paga depois)
+//   Aba REPASSAR continua com câmbio + vencimento + "já pago" (faz sentido
+//   pra fatura de fornecedor com data real).
+//
+//   Novo campo "Etapa" em AMBAS as naturezas:
+//     dropdown com as etapas do processo (Genealogia / Emissão / etc),
+//     pra que cada lançamento apareça vinculado à sua etapa na Visão
+//     Geral (bloco "Custos por etapa").
+//
 // Modos:
 //   - CRIAR (modo padrão, sem prop `editando`)
 //     POST /api/processos/:processoId/outros-custos
 //   - EDITAR (passa prop `editando` com dados do OutroCusto)
 //     PUT /api/outros-custos/:id
-//
-// Layout do form (igual mockup do Marco):
-//   1. Toggle "Cobrar do cliente / Repassar a terceiro" (natureza)
-//   2. Tipo (select dinâmico baseado em natureza)
-//   3. Descrição
-//   4. Fornecedor (só aparece se REPASSAR)
-//   5. Valor + Moeda + Câmbio (câmbio só se moeda != BRL)
-//   6. Vencimento (opcional)
-//   7. Flags: Interno / Já pago (checkboxes)
-//   8. Observação
 
 'use client'
 
@@ -33,6 +37,27 @@ import {
   validarFormOutroCusto,
   type ErrosFormOutroCusto,
 } from '@/src/lib/financeiro/outros-custos-helpers'
+
+// ============================================================================
+// Constantes
+// ============================================================================
+
+// 🆕 Lista de etapas do processo (mesma fonte do VisaoGeral.tsx).
+// Quando o sistema tiver um endpoint /api/etapas, trocar por fetch.
+const ETAPAS = [
+  { id: 'fechamen', label: 'Fechamento do Contrato' },
+  { id: 'genealog', label: 'Genealogia' },
+  { id: 'busca', label: 'Busca Documental' },
+  { id: 'emissao', label: 'Emissão de Documentos' },
+  { id: 'analise', label: 'Análise Documental' },
+  { id: 'retifica', label: 'Retificação' },
+  { id: 'traducao', label: 'Tradução Juramentada' },
+  { id: 'apostila', label: 'Apostilamento' },
+  { id: 'aguardan', label: 'Aguardando Protocolo' },
+  { id: 'protocol', label: 'Protocolado' },
+  { id: 'transcri', label: 'Transcrição' },
+  { id: 'finaliza', label: 'Finalizado' },
+]
 
 // ============================================================================
 // Props
@@ -77,6 +102,8 @@ export function NovoOutroCustoModal({
   const [interno, setInterno] = useState(false)
   const [pago, setPago] = useState(false)
   const [observacao, setObservacao] = useState('')
+  // 🆕 Etapa do processo (Marco 30/04/2026)
+  const [etapa, setEtapa] = useState('')
 
   // ---- Estado de UI ----
   const [erros, setErros] = useState<ErrosFormOutroCusto>({})
@@ -113,6 +140,8 @@ export function NovoOutroCustoModal({
       setInterno(editando.interno)
       setPago(editando.pago)
       setObservacao(editando.observacao || '')
+      // @ts-expect-error - etapa pode ainda não existir no OutroCustoData (campo novo)
+      setEtapa(editando.etapa || '')
     } else {
       // Modo criação: limpa
       setNatureza(naturezaPadrao)
@@ -127,6 +156,7 @@ export function NovoOutroCustoModal({
       setInterno(false)
       setPago(false)
       setObservacao('')
+      setEtapa('')
     }
 
     setErros({})
@@ -148,6 +178,22 @@ export function NovoOutroCustoModal({
     }
   }, [natureza, tipo, tiposDisponiveis])
 
+  // 🆕 Marco 30/04/2026: ao trocar pra COBRAR, limpar campos que não
+  // existem mais nessa natureza pra não enviar lixo no submit.
+  useEffect(() => {
+    if (natureza === 'COBRAR') {
+      // COBRAR não tem câmbio (cliente paga em parcelas, câmbio se define
+      // no momento do pagamento parcial)
+      setCambio('')
+      // COBRAR não tem vencimento
+      setVencimento('')
+      // COBRAR não tem "já recebido" — sempre lança como pendente
+      setPago(false)
+      // COBRAR não tem flag "interno"
+      setInterno(false)
+    }
+  }, [natureza])
+
   // ---- Handler de submit ----
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -155,13 +201,17 @@ export function NovoOutroCustoModal({
 
     const tipoFinal = tipo === 'Outros' ? tipoCustom.trim() : tipo
 
+    // 🆕 Validação: COBRAR não exige câmbio (não tem mais o campo)
     const errosValidacao = validarFormOutroCusto({
       natureza,
       tipo: tipoFinal,
       descricao,
       valor: Number(valor),
       moeda,
-      cambio: moeda !== 'BRL' ? Number(cambio) : undefined,
+      cambio:
+        natureza === 'REPASSAR' && moeda !== 'BRL'
+          ? Number(cambio)
+          : undefined,
     })
 
     if (Object.keys(errosValidacao).length > 0) {
@@ -178,11 +228,19 @@ export function NovoOutroCustoModal({
         fornecedor: natureza === 'REPASSAR' ? fornecedor.trim() || null : null,
         valor: Number(valor),
         moeda,
-        cambio: moeda !== 'BRL' ? Number(cambio) : null,
-        vencimento: vencimento || null,
+        // 🆕 Câmbio só faz sentido em REPASSAR (e quando moeda != BRL)
+        cambio:
+          natureza === 'REPASSAR' && moeda !== 'BRL'
+            ? Number(cambio)
+            : null,
+        // 🆕 Vencimento só em REPASSAR
+        vencimento: natureza === 'REPASSAR' ? vencimento || null : null,
         interno: natureza === 'REPASSAR' ? interno : false,
-        pago,
+        // 🆕 "Já pago" só em REPASSAR
+        pago: natureza === 'REPASSAR' ? pago : false,
         observacao: observacao.trim() || null,
+        // 🆕 Etapa (vale pras duas naturezas)
+        etapa: etapa || null,
       }
 
       const url = ehEdicao
@@ -218,6 +276,8 @@ export function NovoOutroCustoModal({
   }
 
   if (!isOpen) return null
+
+  const ehCobrar = natureza === 'COBRAR'
 
   // ---- Render ----
   return (
@@ -256,7 +316,7 @@ export function NovoOutroCustoModal({
             <button
               type="button"
               className={`oc-nat-btn oc-nat-btn--cobrar ${
-                natureza === 'COBRAR' ? 'is-active' : ''
+                ehCobrar ? 'is-active' : ''
               }`}
               onClick={() => setNatureza('COBRAR')}
             >
@@ -269,7 +329,7 @@ export function NovoOutroCustoModal({
             <button
               type="button"
               className={`oc-nat-btn oc-nat-btn--repassar ${
-                natureza === 'REPASSAR' ? 'is-active' : ''
+                !ehCobrar ? 'is-active' : ''
               }`}
               onClick={() => setNatureza('REPASSAR')}
             >
@@ -335,7 +395,7 @@ export function NovoOutroCustoModal({
           </div>
 
           {/* Fornecedor (só REPASSAR) */}
-          {natureza === 'REPASSAR' && (
+          {!ehCobrar && (
             <div className="oc-form-row">
               <label className="oc-form-label">
                 Fornecedor / Pagador a terceiro
@@ -350,8 +410,31 @@ export function NovoOutroCustoModal({
             </div>
           )}
 
-          {/* Valor + Moeda + Câmbio */}
-          <div className="oc-form-grid-3">
+          {/* 🆕 Etapa (ambas naturezas — Marco 30/04/2026) */}
+          <div className="oc-form-row">
+            <label className="oc-form-label">Etapa do processo</label>
+            <select
+              value={etapa}
+              onChange={(e) => setEtapa(e.target.value)}
+              className="oc-form-input"
+            >
+              <option value="">Selecione uma etapa...</option>
+              {ETAPAS.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.label}
+                </option>
+              ))}
+            </select>
+            <span className="oc-form-hint">
+              Aparecerá vinculado a esta etapa na Visão Geral.
+            </span>
+          </div>
+
+          {/* ===== Valor + Moeda + Câmbio =====
+              🆕 Câmbio só aparece em REPASSAR (Marco 30/04/2026):
+              em COBRAR, o câmbio é definido na hora de cada pagamento
+              parcial recebido — não fixado no lançamento. */}
+          <div className={ehCobrar ? 'oc-form-grid-2' : 'oc-form-grid-3'}>
             <div className="oc-form-row">
               <label className="oc-form-label">
                 Valor <span className="oc-required">*</span>
@@ -383,7 +466,8 @@ export function NovoOutroCustoModal({
               </select>
             </div>
 
-            {moeda !== 'BRL' && (
+            {/* Câmbio: só REPASSAR + moeda estrangeira */}
+            {!ehCobrar && moeda !== 'BRL' && (
               <div className="oc-form-row">
                 <label className="oc-form-label">
                   Câmbio (1 {moeda} = R$){' '}
@@ -405,8 +489,9 @@ export function NovoOutroCustoModal({
             )}
           </div>
 
-          {/* Total em BRL (só se moeda estrangeira e câmbio preenchido) */}
-          {moeda !== 'BRL' &&
+          {/* Total em BRL — só REPASSAR (em COBRAR não fixamos câmbio aqui) */}
+          {!ehCobrar &&
+            moeda !== 'BRL' &&
             Number(valor) > 0 &&
             Number(cambio) > 0 && (
               <div className="oc-conversao">
@@ -421,20 +506,31 @@ export function NovoOutroCustoModal({
               </div>
             )}
 
-          {/* Vencimento */}
-          <div className="oc-form-row">
-            <label className="oc-form-label">Vencimento (opcional)</label>
-            <input
-              type="date"
-              value={vencimento}
-              onChange={(e) => setVencimento(e.target.value)}
-              className="oc-form-input"
-            />
-          </div>
+          {/* 🆕 Aviso em COBRAR + moeda estrangeira: explica que câmbio
+              vem no momento do pagamento */}
+          {ehCobrar && moeda !== 'BRL' && (
+            <div className="oc-info-aviso">
+              💡 O câmbio será informado no momento de cada pagamento parcial
+              recebido do cliente, e não aqui no lançamento.
+            </div>
+          )}
 
-          {/* Flags */}
-          <div className="oc-flags">
-            {natureza === 'REPASSAR' && (
+          {/* Vencimento — 🆕 só REPASSAR */}
+          {!ehCobrar && (
+            <div className="oc-form-row">
+              <label className="oc-form-label">Vencimento (opcional)</label>
+              <input
+                type="date"
+                value={vencimento}
+                onChange={(e) => setVencimento(e.target.value)}
+                className="oc-form-input"
+              />
+            </div>
+          )}
+
+          {/* Flags — 🆕 só REPASSAR (COBRAR não tem "já recebido" nem "interno") */}
+          {!ehCobrar && (
+            <div className="oc-flags">
               <label className="oc-checkbox">
                 <input
                   type="checkbox"
@@ -446,21 +542,19 @@ export function NovoOutroCustoModal({
                   <small>Não será repassado ao cliente</small>
                 </span>
               </label>
-            )}
-            <label className="oc-checkbox">
-              <input
-                type="checkbox"
-                checked={pago}
-                onChange={(e) => setPago(e.target.checked)}
-              />
-              <span>
-                <strong>
-                  {natureza === 'COBRAR' ? 'Já recebido' : 'Já pago'}
-                </strong>
-                <small>Marca como quitado sem registrar pagamento</small>
-              </span>
-            </label>
-          </div>
+              <label className="oc-checkbox">
+                <input
+                  type="checkbox"
+                  checked={pago}
+                  onChange={(e) => setPago(e.target.checked)}
+                />
+                <span>
+                  <strong>Já pago</strong>
+                  <small>Marca como quitado sem registrar pagamento</small>
+                </span>
+              </label>
+            </div>
+          )}
 
           {/* Observação */}
           <div className="oc-form-row">
@@ -637,8 +731,14 @@ export function NovoOutroCustoModal({
           grid-template-columns: 1.4fr 1fr 1.2fr;
           gap: 10px;
         }
+        .oc-form-grid-2 {
+          display: grid;
+          grid-template-columns: 1.4fr 1fr;
+          gap: 10px;
+        }
         @media (max-width: 600px) {
-          .oc-form-grid-3 {
+          .oc-form-grid-3,
+          .oc-form-grid-2 {
             grid-template-columns: 1fr;
           }
         }
@@ -646,6 +746,11 @@ export function NovoOutroCustoModal({
           font-size: 12px;
           font-weight: 600;
           color: #475569;
+        }
+        .oc-form-hint {
+          font-size: 11px;
+          color: #94a3b8;
+          margin-top: 2px;
         }
         .oc-required {
           color: #dc2626;
@@ -686,6 +791,17 @@ export function NovoOutroCustoModal({
           color: #6b21a8;
           display: flex;
           justify-content: space-between;
+        }
+
+        /* 🆕 Aviso de câmbio em COBRAR */
+        .oc-info-aviso {
+          padding: 10px 12px;
+          background: #f0f9ff;
+          border: 1px solid #bae6fd;
+          border-radius: 8px;
+          font-size: 12.5px;
+          color: #075985;
+          line-height: 1.5;
         }
 
         /* === Flags === */
