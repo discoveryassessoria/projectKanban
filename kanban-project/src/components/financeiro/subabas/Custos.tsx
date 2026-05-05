@@ -213,14 +213,15 @@ export function Custos({ processoId, nomeFamilia }: CustosProps) {
   }
 
   // ===== KPIs do sidebar =====
+  // 🆕 Marco 30/04/2026: Pasta Documental NÃO entra no financeiro do
+  // processo (é simulação que ele exporta pro cliente — o valor real
+  // vai ser lançado depois manualmente em COBRAR ou Outros Custos).
+  // Por isso "TOTAL DE CUSTOS" do sidebar é apenas totalOutros.
   const totalOutros = totais?.totalRepassarBRL ?? 0
-  const totalGeral = totalPasta + totalOutros
 
-  // 🆕 Marco 29/04/2026: O card "PAGAMENTO A FORNECEDORES" reflete APENAS
-  // os Outros Custos (lançamentos manuais a terceiros). A Pasta Documental
-  // NÃO entra aqui — ela é cálculo da planilha, não pagamento a fornecedor.
-  // Além disso, o card só aparece quando há pelo menos 1 Outro Custo
-  // cadastrado (controlado por `contagemTotal > 0` no JSX abaixo).
+  // O card "PAGAMENTO A FORNECEDORES" reflete APENAS os Outros Custos
+  // (lançamentos manuais a terceiros). Só aparece quando há pelo menos
+  // 1 Outro Custo cadastrado (controlado por `contagemTotal > 0` no JSX).
   const pagoOutros = totais?.totalPagoBRL ?? 0
   const aPagarOutros = totais?.totalAPagarBRL ?? 0
   const pagoTotal = pagoOutros
@@ -421,66 +422,43 @@ export function Custos({ processoId, nomeFamilia }: CustosProps) {
       {/* ================================================================ */}
       {/* SIDEBAR (DIREITA)                                                 */}
       {/* ================================================================ */}
-      {/* 🆕 Marco 30/04/2026: regra unificada do sidebar.
+      {/* 🆕 Marco 30/04/2026: regra unificada e simplificada do sidebar.
+          A Pasta Documental é tratada como simulação interna (Marco
+          calcula valores na planilha pra exportar pro cliente, mas o
+          valor real cobrado/pago vai variar — ele lança depois
+          manualmente em COBRAR ou Outros Custos REPASSAR). Por isso
+          a Pasta NÃO entra em nenhum cálculo do sidebar.
+
           A sidebar inteira é condicionada à existência de Outros Custos
-          lançados (contagemTotal > 0). Se o usuário só tem dados na
-          Pasta Documental e nenhum Outro Custo cadastrado embaixo, a
-          sidebar não aparece — porque a planilha de Pasta é só pra
-          cálculo/exportação, não conta como custo do processo até o
-          usuário lançar manualmente.
+          lançados (contagemTotal > 0).
 
           Resumo:
-            Sem nada                 → sidebar some
-            Só Pasta                 → sidebar some
-            Só Outros (sem Pasta)    → aparece, só linha 💼 Outros
-            Pasta + Outros           → aparece com 📋 Pasta + 💼 Outros
-
-          Card "PAGAMENTO A FORNECEDORES":
-            - Mesma condição (contagemTotal > 0)
+            Sem Outros Custos    → sidebar some (independente da Pasta)
+            Com Outros Custos    → sidebar aparece com:
+              - Card TOTAL DE CUSTOS     → só linha 💼 Outros
+              - Card PAGAMENTO A FORN.   → ✓ Pagos / ⏰ Pendentes
       */}
       {contagemTotal > 0 && (
         <div className="cs-aside">
           <div className="cs-aside-card">
             <div className="cs-aside-titulo">TOTAL DE CUSTOS</div>
-            <div className="cs-aside-total-big">{fmtBRL(totalGeral)}</div>
+            {/* 🆕 Marco 30/04/2026: Pasta Documental NÃO entra no financeiro
+                do processo — é simulação que ele exporta pro cliente, e o
+                valor real é lançado depois manualmente em COBRAR ou Outros
+                Custos. Por isso o card mostra apenas o total de Outros
+                Custos (totalOutros), sem somar a pasta. */}
+            <div className="cs-aside-total-big">{fmtBRL(totalOutros)}</div>
             <div className="cs-aside-breakdown">
-              {totalPasta > 0 && (
-                <>
-                  <div className="cs-aside-row">
-                    <span>📋 Pasta Documental</span>
-                    <span>{fmtBRL(totalPasta)}</span>
-                  </div>
-                  <div className="cs-aside-bar">
-                    <div
-                      className="cs-aside-bar-fill"
-                      style={{
-                        width: `${totalGeral ? (totalPasta / totalGeral) * 100 : 0}%`,
-                        background: '#3b82f6',
-                      }}
-                    />
-                  </div>
-                </>
-              )}
-              {totalOutros > 0 && (
-                <>
-                  <div
-                    className="cs-aside-row"
-                    style={{ marginTop: totalPasta > 0 ? 10 : 0 }}
-                  >
-                    <span>💼 Outros Custos</span>
-                    <span>{fmtBRL(totalOutros)}</span>
-                  </div>
-                  <div className="cs-aside-bar">
-                    <div
-                      className="cs-aside-bar-fill"
-                      style={{
-                        width: `${totalGeral ? (totalOutros / totalGeral) * 100 : 0}%`,
-                        background: '#a855f7',
-                      }}
-                    />
-                  </div>
-                </>
-              )}
+              <div className="cs-aside-row">
+                <span>💼 Outros Custos</span>
+                <span>{fmtBRL(totalOutros)}</span>
+              </div>
+              <div className="cs-aside-bar">
+                <div
+                  className="cs-aside-bar-fill"
+                  style={{ width: '100%', background: '#a855f7' }}
+                />
+              </div>
             </div>
           </div>
 
