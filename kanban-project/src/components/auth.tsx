@@ -14,6 +14,29 @@ interface AuthProps {
   redirectTo?: string
 }
 
+// 🆕 07/05/2026 — Helpers de leitura/limpeza de auth no cliente.
+//
+// Regra: o COOKIE é a fonte da verdade pra estado de "logado". O middleware
+// só lê o cookie; se ele expirou ou foi removido, qualquer token velho que
+// sobrou no localStorage é lixo. Mantemos os dois sincronizados pra que
+// auth.tsx e middleware nunca discordem (essa discordância era a causa
+// do pisca infinito na tela de login).
+function lerCookie(nome: string): string | null {
+  if (typeof document === "undefined") return null
+  const match = document.cookie
+    .split("; ")
+    .find((linha) => linha.startsWith(`${nome}=`))
+  return match ? decodeURIComponent(match.split("=")[1]) : null
+}
+
+function limparAuth(): void {
+  if (typeof window === "undefined") return
+  localStorage.removeItem("authToken")
+  localStorage.removeItem("user")
+  document.cookie =
+    "authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+}
+
 export default function AuthComponent({
   onAuthSuccess,
   redirectTo = "/dashboard",
@@ -22,11 +45,38 @@ export default function AuthComponent({
   const [error, setError] = useState("")
   const router = useRouter()
 
-  // redirecionar se já estiver logado
+  // 🆕 07/05/2026 — redirect "já logado" sem causar loop.
+  //
+  // Antes este useEffect tinha [router, redirectTo] como dependência e
+  // chamava window.location.href = redirectTo se houvesse QUALQUER token
+  // no localStorage. Isso causava um loop visível na URL piscando:
+  //
+  //   1. Usuário abre /login com token velho no localStorage mas SEM
+  //      cookie válido (cookie expirou ou nunca existiu)
+  //   2. useEffect dispara → window.location.href = "/dashboard"
+  //   3. middleware.ts intercepta /dashboard, vê que não tem cookie,
+  //      redireciona pra /login
+  //   4. /login monta de novo, useEffect dispara de novo, repete
+  //
+  // Correção: só redireciona pra /dashboard se houver token no
+  // localStorage E cookie correspondente. Se um existir sem o outro,
+  // limpa tudo e fica no /login. Roda apenas no mount.
   useEffect(() => {
-    const token = localStorage.getItem("authToken")
-    if (token) window.location.href = redirectTo
-  }, [router, redirectTo])
+    const tokenLS = localStorage.getItem("authToken")
+    const tokenCookie = lerCookie("authToken")
+
+    if (tokenLS && tokenCookie) {
+      // Ambos presentes: confia no middleware pra validar quando chegar
+      // em /dashboard. Usa router.replace pra navegação SPA (sem reload).
+      router.replace(redirectTo)
+    } else if (tokenLS || tokenCookie) {
+      // Só um deles: estado inconsistente, limpa tudo e fica no login.
+      // Isso quebra o ciclo do loop.
+      limparAuth()
+    }
+    // Se nenhum: fica no login normalmente, sem fazer nada.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // ← deps vazias: roda só uma vez no mount
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -44,7 +94,7 @@ export default function AuthComponent({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, senha }),
       })
-      
+
       console.log("Status da resposta:", response.status)
       const data = await response.json()
       console.log("Dados da resposta:", data)
@@ -54,14 +104,16 @@ export default function AuthComponent({
         localStorage.setItem("authToken", data.token)
         localStorage.setItem("user", JSON.stringify(data.user))
 
-        // Salvar também no cookie para o middleware funcionar
-        document.cookie = `authToken=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}` // 7 dias
+        // Cookie pro middleware ler. 7 dias de validade.
+        document.cookie = `authToken=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}`
+
         if (onAuthSuccess) {
           onAuthSuccess()
         } else {
-          window.location.href = redirectTo
+          // 🆕 router.replace em vez de window.location.href:
+          // navegação SPA sem reload da página inteira.
+          router.replace(redirectTo)
         }
-        
       } else {
         console.log("Erro no login:", data.error)
         setError(data.error || "Erro ao fazer login")
