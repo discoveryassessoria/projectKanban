@@ -47,6 +47,7 @@
     "framer-motion": "^12.23.24",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
+    "jose": "^6.2.3",
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.7",
