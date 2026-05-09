@@ -1,1405 +1,817 @@
 // src/components/financeiro/subabas/VisaoGeral.tsx
 //
-// 🆕 LOTE 5 BLOCO F-1: Visão Geral reformada pra bater com o protótipo HTML.
+// 🆕 Fase 3 v2.3 — Clone FIEL de `renderVisaoGeralPrem()` (linha 7469 do
+// html_final_marco.html). Versão Premium consolidada em BRL (caixa real).
 //
-// Estrutura (de cima pra baixo):
-//   1. Score Financeiro (card roxo grande com letra A/B/C/D + barra)
-//   2. 4 KPIs: RECEITA TOTAL / CUSTO TOTAL / RESULTADO REALIZADO / SALDO DE CAIXA
-//   3. Linha 2 colunas: Fluxo de Caixa + Break-even
-//   4. Saldo por Requerente (tabela)
-//   5. Trilha de Auditoria (placeholder)
-//   6. Contas a Receber (faturas pendentes)
-//   7. Resumo visual: mini-KPIs + linha de evolução + donuts Entradas/Saídas
-//   8. Custos por etapa (timeline horizontal)
-//   9. Projeção ao finalizar
+// Estrutura (4 linhas, igual HTML mestre):
+//   Linha 1: 5 KPIs coloridos com ícone + barra de cor inferior
+//            Receita Total | Recebida | Pendente | Custo Total | Lucro Líquido
+//   Linha 2: Resumo Financeiro (lista) | Donut Receitas (% no centro) | Donut Custos
+//   Linha 3: Resultado do Processo (sparkline) | Inadimplência | Fluxo de Caixa 30d
+//   Linha 4: Saldos por Moeda (EUR/BRL/USD) | Resumo Rápido (4 cells)
 //
-// Fórmula do Score (do protótipo, linhas 10103-10145):
-//   margem (0-40) + recebimento (0-20) + controle custo (0-20)
-//   + inadimplência (0-10) + fluxo (0-10) → A≥85 B≥70 C≥50 D<50
+// Endpoints: /api/financeiro/receitas e /api/financeiro/custos.
+// Imposto: 10% sobre receita total (placeholder do HTML — linha 7494).
+// FX hoje: 5.5 (placeholder — props `fxHoje` futura).
 
 'use client'
 
+import '@/src/styles/financeiro-paginas.css'
 import { useEffect, useMemo, useState } from 'react'
-import { fmtBRL, fmtBRLCompact } from '@/src/lib/financeiro/helpers'
-import { MiniLinhaSVG } from '@/src/components/financeiro/charts/MiniLinhaSVG'
-import { DonutSVG } from '@/src/components/financeiro/charts/DonutSVG'
-import type {
-  OutroCustoData,
-  TotaisOutrosCustos,
-} from '@/src/types/outros-custos'
-
-// ============================================================================
-// Configuração
-// ============================================================================
-
-const PREMISSAS_PROJECAO_DEFAULT = {
-  transcricao: 2000,
-  finalizacao: 500,
-}
-
-const ETAPAS_TIMELINE = [
-  { id: 'fechamen', label: 'FECHAMEN.' },
-  { id: 'genealog', label: 'GENEALOG.' },
-  { id: 'busca', label: 'BUSCA DO.' },
-  { id: 'emissao', label: 'EMISSÃO' },
-  { id: 'analise', label: 'ANÁLISE' },
-  { id: 'retifica', label: 'RETIFICA.' },
-  { id: 'traducao', label: 'TRADUÇÃO' },
-  { id: 'apostila', label: 'APOSTILA.' },
-  { id: 'aguardan', label: 'AGUARDAN.' },
-  { id: 'protocol', label: 'PROTOCOL.' },
-  { id: 'transcri', label: 'TRANSCRI.' },
-  { id: 'finaliza', label: 'FINALIZA.' },
-]
 
 // ============================================================================
 // Tipos
 // ============================================================================
 
-interface Requerente {
+type Moeda = 'BRL' | 'EUR' | 'USD'
+type FxRule = 'FIXO' | 'VARIAVEL'
+type StatusParcela = 'PENDENTE' | 'RECEBIDA' | 'PAGA' | 'CANCELADA'
+
+interface ParcelaAPI {
   id: number
-  nome: string
+  numero: number
+  vencimento: string
+  valor: number | string
+  status: StatusParcela
+  dataPagamento?: string | null
+  cambioAplicado?: number | string | null
+  valorBrl?: number | string | null
 }
 
-interface PagamentoAPI {
+interface ItemAPI {
   id: number
-  valor: number
-  data: string
-  valorOriginal?: number | null
-  cambio?: number | null
-  destinatarios?: Requerente[]
-}
-
-interface FaturaAPI {
-  id: number
+  codigo: string
+  categoria: string
   descricao: string
-  moeda: 'BRL' | 'EUR' | 'USD'
-  cambio: number | null
-  valor: number
-  valorPago: number
-  valorRestante: number
-  status: 'PENDENTE' | 'PAGO' | 'VENCIDO' | 'PARCIAL'
-  dataEmissao: string
-  dataVencimento: string | null
-  pagamentos?: PagamentoAPI[]
-  destinatarios?: Requerente[]
-}
-
-interface TotaisGeralBRL {
-  total: number
-  pago: number
-  pendente: number
-  vencido: number
+  moeda: Moeda
+  valor: number | string
+  fxEstimado: number | string
+  fxRule: FxRule
+  fxFixo?: number | string | null
+  parcelas: ParcelaAPI[]
 }
 
 export interface VisaoGeralProps {
   processoId: number
   nomeFamilia?: string
-  refreshKey?: number
+  fxHoje?: number
 }
 
 // ============================================================================
-// Cálculo do Score (replica protótipo linhas 10112-10145)
+// Helpers (replicam fmtBRL, fmtEUR, _fmtUSD, _fmtDateShort do HTML)
 // ============================================================================
 
-function calcularScore(m: {
-  margemRealizada: number
-  receitaTotal: number
-  receitaAberta: number
-  desvioPct: number
-  inadimplenciaBRL: number
-  saldoAtual: number
-}): { nota: number; grade: 'A' | 'B' | 'C' | 'D' } {
-  let s = 0
-  const pct = (a: number, b: number) => (b > 0 ? (a / b) * 100 : 0)
+const num = (v: unknown): number => {
+  if (v == null) return 0
+  if (typeof v === 'number') return v
+  const n = parseFloat(String(v))
+  return isFinite(n) ? n : 0
+}
+const fmtBRL = (v: number) =>
+  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+const fmtEUR = (v: number) =>
+  v.toLocaleString('pt-BR', { style: 'currency', currency: 'EUR' })
+const fmtUSD = (v: number) =>
+  'US$ ' +
+  (v || 0)
+    .toFixed(2)
+    .replace('.', ',')
+    .replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 
-  if (m.margemRealizada >= 40) s += 40
-  else if (m.margemRealizada >= 25) s += 30
-  else if (m.margemRealizada >= 15) s += 20
-  else if (m.margemRealizada >= 0) s += 10
+const fmtPctBR = (v: number) => v.toFixed(2).replace('.', ',') + '%'
 
-  const recebPct = pct(m.receitaTotal - m.receitaAberta, m.receitaTotal)
-  if (recebPct >= 90) s += 20
-  else if (recebPct >= 70) s += 15
-  else if (recebPct >= 40) s += 10
-  else s += 5
-
-  const dp = Math.abs(m.desvioPct || 0)
-  if (dp <= 5) s += 20
-  else if (dp <= 15) s += 14
-  else if (dp <= 30) s += 8
-  else s += 2
-
-  const inadPct = pct(m.inadimplenciaBRL, m.receitaTotal)
-  if (inadPct < 2) s += 10
-  else if (inadPct < 10) s += 6
-  else if (inadPct < 25) s += 3
-
-  if (m.saldoAtual > 0) s += 10
-  else if (m.saldoAtual === 0) s += 5
-
-  let grade: 'A' | 'B' | 'C' | 'D'
-  if (s >= 85) grade = 'A'
-  else if (s >= 70) grade = 'B'
-  else if (s >= 50) grade = 'C'
-  else grade = 'D'
-
-  return { nota: s, grade }
+function fmtDateShort(iso: string): string {
+  if (!iso) return '—'
+  const d = new Date(iso.includes('T') ? iso : iso + 'T00:00:00')
+  if (isNaN(d.getTime())) return '—'
+  return (
+    d.getDate().toString().padStart(2, '0') +
+    '/' +
+    (d.getMonth() + 1).toString().padStart(2, '0')
+  )
+}
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10)
 }
 
 // ============================================================================
-// Componente
+// _parcToBrl (clone EXATO do helper do HTML, linha 7327)
 // ============================================================================
 
-export function VisaoGeral({
-  processoId,
-  nomeFamilia,
-  refreshKey = 0,
-}: VisaoGeralProps) {
-  const [faturas, setFaturas] = useState<FaturaAPI[]>([])
-  const [totaisGeralBRL, setTotaisGeralBRL] = useState<TotaisGeralBRL>({
-    total: 0,
-    pago: 0,
-    pendente: 0,
-    vencido: 0,
+function parcToBrl(item: ItemAPI, p: ParcelaAPI, FX: number): number {
+  const moeda = item.moeda || 'EUR'
+  const vBrlSalvo = num(p.valorBrl)
+  if (vBrlSalvo > 0) return vBrlSalvo
+  if (moeda === 'BRL') return num(p.valor)
+  const isPago = p.status === 'PAGA' || p.status === 'RECEBIDA'
+  const cambio = num(p.cambioAplicado)
+  if (isPago && cambio > 0) return num(p.valor) * cambio
+  const fx =
+    item.fxRule === 'FIXO'
+      ? num(item.fxFixo) || num(item.fxEstimado) || FX
+      : num(item.fxEstimado) || num(item.fxFixo) || FX
+  return num(p.valor) * fx
+}
+
+// ============================================================================
+// Donut SVG (clone EXATO de _donutSvg do HTML, linha 5877)
+// ============================================================================
+
+interface DonutSeg {
+  value: number
+  color: string
+}
+
+function DonutSvg({
+  segments,
+  size = 160,
+  thickness = 18,
+}: {
+  segments: DonutSeg[]
+  size?: number
+  thickness?: number
+}) {
+  const r = (size - thickness) / 2
+  const cx = size / 2
+  const cy = size / 2
+  const total = segments.reduce((s, x) => s + x.value, 0) || 1
+  let acc = 0
+  const paths: React.ReactNode[] = [
+    <circle
+      key="bg"
+      cx={cx}
+      cy={cy}
+      r={r}
+      fill="none"
+      stroke="#f1f5f9"
+      strokeWidth={thickness}
+    />,
+  ]
+  segments.forEach((seg, idx) => {
+    if (seg.value <= 0) return
+    const ratio = seg.value / total
+    if (ratio >= 0.9999) {
+      paths.push(
+        <circle
+          key={`s-${idx}`}
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke={seg.color}
+          strokeWidth={thickness}
+        />,
+      )
+      acc += seg.value
+      return
+    }
+    const start = (acc / total) * Math.PI * 2 - Math.PI / 2
+    const end = ((acc + seg.value) / total) * Math.PI * 2 - Math.PI / 2
+    const x1 = cx + r * Math.cos(start)
+    const y1 = cy + r * Math.sin(start)
+    const x2 = cx + r * Math.cos(end)
+    const y2 = cy + r * Math.sin(end)
+    const large = seg.value / total > 0.5 ? 1 : 0
+    paths.push(
+      <path
+        key={`s-${idx}`}
+        d={`M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`}
+        fill="none"
+        stroke={seg.color}
+        strokeWidth={thickness}
+        strokeLinecap="round"
+      />,
+    )
+    acc += seg.value
   })
-  const [loadingFaturas, setLoadingFaturas] = useState(true)
-  const [erroFaturas, setErroFaturas] = useState<string | null>(null)
-  const [outrosCustos, setOutrosCustos] = useState<OutroCustoData[]>([])
-  const [totaisOC, setTotaisOC] = useState<TotaisOutrosCustos | null>(null)
-  const [loadingOutros, setLoadingOutros] = useState(true)
-  const [requerentes, setRequerentes] = useState<Requerente[]>([])
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {paths}
+    </svg>
+  )
+}
 
+// ============================================================================
+// Sparkline SVG (clone de _sparkSvg do HTML, linha 5909)
+// ============================================================================
+
+function SparkSvg({
+  values,
+  width = 300,
+  height = 90,
+  color = '#10b981',
+}: {
+  values: number[]
+  width?: number
+  height?: number
+  color?: string
+}) {
+  if (!values || values.length === 0) return null
+  const max = Math.max(...values)
+  const min = Math.min(...values)
+  const range = max - min || 1
+  const step = width / (values.length - 1 || 1)
+  let path = ''
+  values.forEach((v, i) => {
+    const x = i * step
+    const y = height - ((v - min) / range) * (height - 6) - 3
+    path += (i === 0 ? 'M' : 'L') + ` ${x.toFixed(1)} ${y.toFixed(1)} `
+  })
+  const area = path + `L ${width} ${height} L 0 ${height} Z`
+  return (
+    <svg
+      width="100%"
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d={area} fill={color + '20'} />
+      <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+// ============================================================================
+// Componente principal
+// ============================================================================
+
+export function VisaoGeral({ processoId, fxHoje = 5.5 }: VisaoGeralProps) {
+  const [receitas, setReceitas] = useState<ItemAPI[]>([])
+  const [custos, setCustos] = useState<ItemAPI[]>([])
+  const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState<string | null>(null)
+
+  // ---- Load ----
   useEffect(() => {
     let cancelado = false
-
     async function carregar() {
-      setLoadingFaturas(true)
-      setLoadingOutros(true)
-      setErroFaturas(null)
-
-      const token = localStorage.getItem('authToken') || ''
-      const headers = { Authorization: `Bearer ${token}` }
-
+      setLoading(true)
+      setErro(null)
       try {
-        const [resFat, resOc, resProc] = await Promise.all([
-          fetch(`/api/processos/${processoId}/faturas`, { headers }),
-          fetch(`/api/processos/${processoId}/outros-custos`, { headers }),
-          fetch(`/api/processos/${processoId}`, { headers }),
+        const headers = {
+          Authorization: `Bearer ${localStorage.getItem('authToken') || ''}`,
+        }
+        const [resR, resC] = await Promise.all([
+          fetch(`/api/financeiro/receitas?processoId=${processoId}`, { headers }),
+          fetch(`/api/financeiro/custos?processoId=${processoId}`, { headers }),
         ])
-
         if (cancelado) return
-
-        if (resFat.ok) {
-          const d = await resFat.json()
-          if (!cancelado) {
-            setFaturas(d.faturas || [])
-            setTotaisGeralBRL(
-              d.totaisGeralBRL || { total: 0, pago: 0, pendente: 0, vencido: 0 },
-            )
-          }
-        } else {
-          setErroFaturas(`A API de faturas respondeu HTTP ${resFat.status}.`)
-          setFaturas([])
+        if (resR.ok) {
+          const d = await resR.json()
+          const lst: ItemAPI[] = d?.receitas || d?.data || []
+          if (!cancelado) setReceitas(Array.isArray(lst) ? lst : [])
         }
-
-        if (resOc.ok) {
-          const d = await resOc.json()
-          if (!cancelado) {
-            setOutrosCustos(d.outrosCustos || [])
-            setTotaisOC(d.totais || null)
-          }
+        if (resC.ok) {
+          const d = await resC.json()
+          const lst: ItemAPI[] = d?.custos || d?.data || []
+          if (!cancelado) setCustos(Array.isArray(lst) ? lst : [])
         }
-
-        if (resProc.ok) {
-          const d = await resProc.json()
-          if (!cancelado) setRequerentes(d.processo?.requerentes || [])
-        }
-      } catch (e) {
-        if (!cancelado) {
-          console.error('[VisaoGeral] erro:', e)
-          setErroFaturas('Não foi possível se conectar ao servidor.')
-        }
+      } catch (err) {
+        console.error('[VisaoGeral] erro:', err)
+        if (!cancelado) setErro('Erro de conexão ao carregar dados financeiros.')
       } finally {
-        if (!cancelado) {
-          setLoadingFaturas(false)
-          setLoadingOutros(false)
-        }
+        if (!cancelado) setLoading(false)
       }
     }
-
     carregar()
     return () => {
       cancelado = true
     }
-  }, [processoId, refreshKey])
+  }, [processoId])
 
-  // ====== Métricas ======
-  const receitaFaturas = totaisGeralBRL.total
-  const recebidoFaturas = totaisGeralBRL.pago
-  const receitaOutrosCobrar = totaisOC?.totalCobrarBRL ?? 0
-  const recebidoOutrosCobrar = totaisOC?.totalRecebidoBRL ?? 0
-
-  const receitaTotal = receitaFaturas + receitaOutrosCobrar
-  const recebido = recebidoFaturas + recebidoOutrosCobrar
-  const receitaAberta = Math.max(0, receitaTotal - recebido)
-
-  // 🆕 Conforme decisão do Marco (29/04/2026): a Planilha de Custos
-  // (TabelaCustos) NÃO entra mais automaticamente nos totais financeiros
-  // do processo. O valor `totalCustos` recebido da API continua disponível
-  // pra exibição interna da própria planilha, mas é tratado como ZERO no
-  // cálculo de RECEITA / CUSTO / LUCRO da Visão Geral.
-  // Motivo: cada requerente tem sua pasta individual, e em alguns países
-  // a pasta era contada duas vezes. Quem precisa cobrar/repassar deve
-  // criar Outro Custo COBRAR (receita) ou REPASSAR (custo).
-  const custoTabela = 0
-  const custoOutrosRepassar = totaisOC?.totalRepassarBRL ?? 0
-  const custoTotal = custoOutrosRepassar
-
-  const pagoOutrosRepassar = totaisOC?.totalPagoBRL ?? 0
-  const pagoCustos = pagoOutrosRepassar
-  const custoEmAberto = Math.max(0, custoTotal - pagoCustos)
-
-  const resultadoRealizado = recebido - pagoCustos
-  const saldoCaixa = recebido - pagoOutrosRepassar
-  const margemRealizada =
-    receitaTotal > 0 ? ((receitaTotal - custoTotal) / receitaTotal) * 100 : 0
-
-  const lucroProjetado =
-    receitaTotal -
-    (custoTotal +
-      PREMISSAS_PROJECAO_DEFAULT.transcricao +
-      PREMISSAS_PROJECAO_DEFAULT.finalizacao)
-  const margemProjetada =
-    receitaTotal > 0 ? (lucroProjetado / receitaTotal) * 100 : 0
-
-  const inadimplenciaBRL = totaisGeralBRL.vencido
-
-  const score = useMemo(
-    () =>
-      calcularScore({
-        margemRealizada,
-        receitaTotal,
-        receitaAberta,
-        desvioPct: 0,
-        inadimplenciaBRL,
-        saldoAtual: saldoCaixa,
-      }),
-    [margemRealizada, receitaTotal, receitaAberta, inadimplenciaBRL, saldoCaixa],
-  )
-
-  // Saldo por requerente
-  const saldoPorRequerente = useMemo(() => {
-    if (requerentes.length === 0) return []
-    const map = new Map<number, { total: number; pago: number }>()
-    requerentes.forEach((r) => map.set(r.id, { total: 0, pago: 0 }))
-
-    faturas.forEach((f) => {
-      const dests = f.destinatarios || []
-      const valorBRL =
-        f.moeda === 'BRL' || !f.moeda
-          ? Number(f.valor || 0)
-          : Number(f.valor || 0) * Number(f.cambio || 1)
-      const pagoBRL =
-        f.moeda === 'BRL' || !f.moeda
-          ? Number(f.valorPago || 0)
-          : Number(f.valorPago || 0) * Number(f.cambio || 1)
-
-      const lista = dests.length > 0 ? dests : requerentes
-      const fatia = valorBRL / lista.length
-      const fatiaPaga = pagoBRL / lista.length
-      lista.forEach((d) => {
-        const cur = map.get(d.id)
-        if (cur) {
-          cur.total += fatia
-          cur.pago += fatiaPaga
-        }
-      })
-    })
-
-    return requerentes.map((r) => {
-      const v = map.get(r.id) || { total: 0, pago: 0 }
-      const aReceber = Math.max(0, v.total - v.pago)
-      return {
-        id: r.id,
-        nome: r.nome,
-        total: v.total,
-        pago: v.pago,
-        aReceber,
-        status: aReceber < 0.005 ? 'PAGO' : 'PENDENTE',
-      }
-    })
-  }, [requerentes, faturas])
-
-  const custosPorEtapa = useMemo(
-    () =>
-      ETAPAS_TIMELINE.map((etapa) => ({
-        ...etapa,
-        valor: etapa.id === 'emissao' ? custoTabela : 0,
-      })),
-    [custoTabela],
-  )
-
-  // Fluxo de caixa
-  const fluxoCaixa = useMemo(() => {
-    type Mov = {
-      data: string
-      tipo: 'entrada' | 'saida'
-      valor: number
-      desc: string
+  // ---- Agregação BRL (clone EXATO de _aggrBrl do HTML, linha 7285) ----
+  const a = useMemo(() => {
+    const o = {
+      rec: { totalBrl: 0, recebidoBrl: 0, pendenteBrl: 0 },
+      cus: { totalBrl: 0, recebidoBrl: 0, pendenteBrl: 0 },
     }
-    const movs: Mov[] = []
+    for (const r of receitas) {
+      for (const p of r.parcelas) {
+        const v = parcToBrl(r, p, fxHoje)
+        o.rec.totalBrl += v
+        if (p.status === 'RECEBIDA' || p.status === 'PAGA') o.rec.recebidoBrl += v
+        else o.rec.pendenteBrl += v
+      }
+    }
+    for (const c of custos) {
+      for (const p of c.parcelas) {
+        const v = parcToBrl(c, p, fxHoje)
+        o.cus.totalBrl += v
+        if (p.status === 'PAGA' || p.status === 'RECEBIDA') o.cus.recebidoBrl += v
+        else o.cus.pendenteBrl += v
+      }
+    }
+    return o
+  }, [receitas, custos, fxHoje])
 
-    faturas.forEach((f) => {
-      ;(f.pagamentos || []).forEach((p) => {
-        if (!p.data) return
-        const v = p.valorOriginal
-          ? Number(p.valorOriginal)
-          : p.cambio
-          ? Number(p.valor) * Number(p.cambio)
-          : Number(p.valor)
-        movs.push({
-          data: p.data,
-          tipo: 'entrada',
-          valor: v,
-          desc: f.descricao || `Fatura #${f.id}`,
-        })
-      })
-    })
+  // ---- Métricas derivadas (linha 7488 do HTML) ----
+  const metrics = useMemo(() => {
+    const recT = a.rec.totalBrl
+    const recR = a.rec.recebidoBrl
+    const recP = a.rec.pendenteBrl
+    const cusT = a.cus.totalBrl
+    const cusPagos = a.cus.recebidoBrl
+    const cusAPagar = cusT - cusPagos
+    const impostoBrl = recT * 0.1 // 10% — igual HTML
+    const recLiq = recT - impostoBrl
+    const lucroBruto = recLiq - cusT
+    const lucroLiquido = recT - cusT
+    const margem = recT > 0 ? (lucroBruto / recT) * 100 : 0
+    const margemLucroLiq = recT > 0 ? (lucroLiquido / recT) * 100 : 0
+    const pctR = recT > 0 ? (recR / recT) * 100 : 0
+    const pctP = recT > 0 ? (recP / recT) * 100 : 0
+    const pctCustos = recT > 0 ? (cusT / recT) * 100 : 0
+    const pctCustoPagos = cusT > 0 ? (cusPagos / cusT) * 100 : 0
+    return {
+      recT,
+      recR,
+      recP,
+      cusT,
+      cusPagos,
+      cusAPagar,
+      impostoBrl,
+      recLiq,
+      lucroBruto,
+      lucroLiquido,
+      margem,
+      margemLucroLiq,
+      pctR,
+      pctP,
+      pctCustos,
+      pctCustoPagos,
+    }
+  }, [a])
 
-    outrosCustos.forEach((oc) => {
-      const cambio =
-        oc.moeda === 'BRL' ? 1 : oc.cambio ? Number(oc.cambio) : 1
-      const pags =
-        (
-          oc as unknown as {
-            pagamentos?: Array<{
-              valor?: number | null
-              data?: string | null
-              estornado?: boolean
-            }>
-          }
-        ).pagamentos ?? []
-      pags.forEach((p) => {
-        if (!p.data || p.estornado) return
-        movs.push({
-          data: p.data,
-          tipo: oc.natureza === 'COBRAR' ? 'entrada' : 'saida',
-          valor: Number(p.valor || 0) * cambio,
-          desc: oc.descricao || oc.tipo,
-        })
-      })
-    })
+  // ---- Inadimplência (parcelas vencidas) ----
+  const inad = useMemo(() => {
+    const today = todayISO()
+    let totalInadBrl = 0
+    let inadCount = 0
+    for (const r of receitas) {
+      for (const p of r.parcelas) {
+        const venc = (p.vencimento || '').slice(0, 10)
+        if (p.status === 'PENDENTE' && venc && venc < today) {
+          totalInadBrl += parcToBrl(r, p, fxHoje)
+          inadCount += 1
+        }
+      }
+    }
+    return { totalInadBrl, inadCount }
+  }, [receitas, fxHoje])
 
-    movs.sort(
-      (a, b) => new Date(b.data).getTime() - new Date(a.data).getTime(),
+  // ---- Fluxo de Caixa 30 dias ----
+  const fluxo = useMemo(() => {
+    const today = todayISO()
+    const dueIn30 = new Date()
+    dueIn30.setDate(dueIn30.getDate() + 30)
+    const dueIn30Iso = dueIn30.toISOString().split('T')[0]
+    const fluxos: Array<{
+      date: string
+      dir: 'in' | 'out'
+      label: string
+      valBrl: number
+    }> = []
+    for (const r of receitas) {
+      for (const p of r.parcelas) {
+        if (p.status === 'RECEBIDA' || p.status === 'PAGA') continue
+        const venc = (p.vencimento || '').slice(0, 10)
+        if (venc && venc >= today && venc <= dueIn30Iso) {
+          fluxos.push({
+            date: venc,
+            dir: 'in',
+            label: 'Recebimento previsto',
+            valBrl: parcToBrl(r, p, fxHoje),
+          })
+        }
+      }
+    }
+    for (const c of custos) {
+      for (const p of c.parcelas) {
+        if (p.status === 'PAGA' || p.status === 'RECEBIDA') continue
+        const venc = (p.vencimento || '').slice(0, 10)
+        if (venc && venc >= today && venc <= dueIn30Iso) {
+          fluxos.push({
+            date: venc,
+            dir: 'out',
+            label: 'Pagamento previsto',
+            valBrl: parcToBrl(c, p, fxHoje),
+          })
+        }
+      }
+    }
+    fluxos.sort((x, y) => x.date.localeCompare(y.date))
+    const fluxos5 = fluxos.slice(0, 5)
+    const saldoPrevisto = fluxos.reduce(
+      (s, f) => s + (f.dir === 'in' ? f.valBrl : -f.valBrl),
+      0,
     )
-    return movs.slice(0, 5)
-  }, [faturas, outrosCustos])
+    return { fluxos5, saldoPrevisto, total: fluxos.length }
+  }, [receitas, custos, fxHoje])
 
-  const faltaParaBreakEven = Math.max(0, custoTotal - recebido)
+  // ---- Sparkline do lucro (cosmético, igual HTML) ----
+  const lucroSpark = useMemo(() => {
+    const out: number[] = []
+    let acc = metrics.lucroLiquido * 0.45
+    for (let i = 0; i < 14; i++) {
+      acc +=
+        metrics.lucroLiquido * 0.045 * (Math.sin(i * 0.55) + 1) +
+        metrics.lucroLiquido * 0.025
+      out.push(Math.max(metrics.lucroLiquido * 0.35, acc))
+    }
+    return out
+  }, [metrics.lucroLiquido])
 
-  const contasReceber = useMemo(
-    () =>
-      faturas.filter(
-        (f) => f.status !== 'PAGO' && Number(f.valorRestante || 0) > 0,
-      ),
-    [faturas],
+  // ---- Saldos por moeda (placeholder zero — backend pendente) ----
+  const saldos = useMemo(
+    () => ({ EUR: 0, BRL: 0, USD: 0 }),
+    [],
   )
 
-  // Pontos de evolução acumulada (entradas - saídas mês a mês) para o
-  // mini-gráfico de linha do "resumo visual"
-  const pontosEvolucao = useMemo(() => {
-    const map = new Map<string, number>()
-
-    faturas.forEach((f) => {
-      ;(f.pagamentos || []).forEach((p) => {
-        if (!p.data) return
-        const d = new Date(p.data)
-        if (isNaN(d.getTime())) return
-        const chave = `${d.getUTCFullYear()}-${String(
-          d.getUTCMonth() + 1,
-        ).padStart(2, '0')}`
-        const v = p.valorOriginal
-          ? Number(p.valorOriginal)
-          : p.cambio
-          ? Number(p.valor) * Number(p.cambio)
-          : Number(p.valor)
-        map.set(chave, (map.get(chave) || 0) + v)
-      })
-    })
-
-    outrosCustos.forEach((oc) => {
-      const cambio =
-        oc.moeda === 'BRL' ? 1 : oc.cambio ? Number(oc.cambio) : 1
-      const pags =
-        (
-          oc as unknown as {
-            pagamentos?: Array<{
-              valor?: number | null
-              data?: string | null
-              estornado?: boolean
-            }>
-          }
-        ).pagamentos ?? []
-      pags.forEach((p) => {
-        if (!p.data || p.estornado) return
-        const d = new Date(p.data)
-        if (isNaN(d.getTime())) return
-        const chave = `${d.getUTCFullYear()}-${String(
-          d.getUTCMonth() + 1,
-        ).padStart(2, '0')}`
-        const sinal = oc.natureza === 'COBRAR' ? 1 : -1
-        map.set(
-          chave,
-          (map.get(chave) || 0) + sinal * Number(p.valor || 0) * cambio,
-        )
-      })
-    })
-
-    const entries = Array.from(map.entries()).sort(([a], [b]) =>
-      a.localeCompare(b),
-    )
-
-    let acc = 0
-    const nomesMeses = [
-      'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
-      'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
-    ]
-    return entries.map(([chave, v]) => {
-      acc += v
-      const [ano, mes] = chave.split('-')
-      const label = `${nomesMeses[parseInt(mes, 10) - 1]}/${ano.slice(2)}`
-      return { x: label, y: acc }
-    })
-  }, [faturas, outrosCustos])
-
-  // Percentuais para os donuts do "resumo visual"
-  const pctEntrou = receitaTotal > 0 ? (recebido / receitaTotal) * 100 : 0
-  const pctSaiu = custoTotal > 0 ? (pagoCustos / custoTotal) * 100 : 0
-
-  const lucroResumo = receitaTotal - custoTotal
-  const margemResumo =
-    receitaTotal > 0 ? (lucroResumo / receitaTotal) * 100 : 0
-
-  const loading = loadingFaturas || loadingOutros
-
-  // ====== Render ======
+  // ---- Render ----
   if (loading) {
     return (
-      <div className="vg-root">
-        <div className="vg-loading">
-          <div className="vg-spinner" />
-          <p>Carregando visão geral...</p>
+      <div className="fpag-page">
+        <div className="empty-state" style={{ padding: 60 }}>
+          Carregando dados financeiros...
         </div>
-        <style jsx>{`
-          .vg-loading {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 80px 24px;
-            gap: 12px;
-            color: var(--fin-ink-3);
-            font-size: 14px;
-          }
-          .vg-spinner {
-            width: 32px;
-            height: 32px;
-            border: 3px solid var(--fin-line);
-            border-top-color: #7c3aed;
-            border-radius: 50%;
-            animation: vg-spin 0.8s linear infinite;
-          }
-          @keyframes vg-spin { to { transform: rotate(360deg); } }
-        `}</style>
-      </div>
-    )
-  }
-
-  if (erroFaturas) {
-    return (
-      <div className="vg-root">
-        <div className="vg-error-card">
-          <div className="vg-error-icon" aria-hidden>⚠️</div>
-          <h3 className="vg-error-title">
-            Não foi possível carregar a Visão Geral
-          </h3>
-          <p className="vg-error-msg">{erroFaturas}</p>
-        </div>
-        <style jsx>{`
-          .vg-error-card {
-            background: #fef2f2;
-            border: 1px solid #fecaca;
-            border-radius: 12px;
-            padding: 32px 28px;
-            text-align: center;
-            max-width: 560px;
-            margin: 24px auto;
-          }
-          .vg-error-icon { font-size: 36px; margin-bottom: 12px; }
-          .vg-error-title {
-            margin: 0 0 8px;
-            font-size: 16px;
-            font-weight: 600;
-            color: #991b1b;
-          }
-          .vg-error-msg {
-            margin: 0;
-            font-size: 14px;
-            color: #7f1d1d;
-          }
-        `}</style>
       </div>
     )
   }
 
   return (
-    <div className="vg-root">
-      <div className="vg-header">
-        <div className="vg-header__title-wrap">
-          <div className="vg-header__icon" aria-hidden>📊</div>
-          <div>
-            <h2 className="vg-header__title">Visão Geral do Financeiro</h2>
-            <p className="vg-header__subtitle">Indicadores consolidados</p>
+    <div className="fpag-page">
+      <div className="vg-prem-root">
+        {erro && (
+          <div className="alert alert-warning">
+            <i className="alert-icon">⚠</i>
+            <span>{erro}</span>
           </div>
-        </div>
-        <button className="vg-header__btn" type="button" disabled>
-          ⬇ Relatórios ▼
-        </button>
-      </div>
-
-      {/* Score Financeiro */}
-      <div className="vg-score-card">
-        <div className={`vg-score-grade vg-score-grade--${score.grade}`}>
-          {score.grade}
-        </div>
-        <div className="vg-score-info">
-          <div className="vg-score-titulo">SCORE FINANCEIRO DO PROCESSO</div>
-          <div className="vg-score-nome">{nomeFamilia || 'Processo'}</div>
-          <div className="vg-score-barra">
-            <div style={{ width: `${score.nota}%` }} />
-          </div>
-          <div className="vg-score-num">
-            {score.nota} / 100 · calculado por margem, recebimento, controle
-            de custo e inadimplência
-          </div>
-        </div>
-      </div>
-
-      {/* 4 KPIs */}
-      <div className="vg-kpis">
-        <div className="vg-kpi vg-kpi--blue">
-          <span className="vg-kpi__arrow">↗</span>
-          <span className="vg-kpi__label">RECEITA TOTAL</span>
-          <span className="vg-kpi__value">{fmtBRL(receitaTotal)}</span>
-          <span className="vg-kpi__hint">
-            {fmtBRL(recebido)} recebido · {fmtBRL(receitaAberta)} a receber
-          </span>
-        </div>
-
-        <div className="vg-kpi vg-kpi--orange">
-          <span className="vg-kpi__arrow">↘</span>
-          <span className="vg-kpi__label">CUSTO TOTAL</span>
-          <span className="vg-kpi__value">{fmtBRL(custoTotal)}</span>
-          <span className="vg-kpi__hint">
-            {fmtBRL(pagoCustos)} pago · {fmtBRL(custoEmAberto)} em aberto
-          </span>
-        </div>
-
-        <div
-          className={`vg-kpi ${
-            resultadoRealizado >= 0 ? 'vg-kpi--green' : 'vg-kpi--red'
-          }`}
-        >
-          <span className="vg-kpi__arrow">◆</span>
-          <span className="vg-kpi__label">
-            RESULTADO REALIZADO
-            {resultadoRealizado < 0 && (
-              <span className="vg-kpi__badge-neg">PREJUÍZO</span>
-            )}
-          </span>
-          <span className="vg-kpi__value">{fmtBRL(resultadoRealizado)}</span>
-          <span className="vg-kpi__hint">
-            Margem {margemRealizada.toFixed(1)}% · Bruta projetada{' '}
-            {margemProjetada.toFixed(1)}%
-          </span>
-        </div>
-
-        <div
-          className={`vg-kpi ${
-            saldoCaixa >= 0 ? 'vg-kpi--red-soft' : 'vg-kpi--red'
-          }`}
-        >
-          <span className="vg-kpi__arrow">≡</span>
-          <span className="vg-kpi__label">SALDO DE CAIXA</span>
-          <span className="vg-kpi__value">{fmtBRL(saldoCaixa)}</span>
-          <span className="vg-kpi__hint">
-            Projetado ao fim: {fmtBRL(receitaTotal - custoTotal)}
-          </span>
-        </div>
-      </div>
-
-      {/* Fluxo de Caixa + Break-even */}
-      <div className="vg-row-2col">
-        <div className="vg-card">
-          <div className="vg-card__head vg-card__head--with-legend">
-            <h3 className="vg-card__title">
-              <span className="vg-card__icon" aria-hidden>◐</span>
-              Fluxo de Caixa (últimos movimentos)
-            </h3>
-            <span className="vg-card__sub">Entradas · Saídas · Saldo acumulado</span>
-          </div>
-          {fluxoCaixa.length === 0 ? (
-            <div className="vg-empty-soft">
-              Sem movimentações registradas ainda.
-            </div>
-          ) : (
-            <ul className="vg-fluxo">
-              {fluxoCaixa.map((m, i) => (
-                <li
-                  key={i}
-                  className={`vg-fluxo__item vg-fluxo__item--${m.tipo}`}
-                >
-                  <span className="vg-fluxo__dir">
-                    {m.tipo === 'entrada' ? '↙' : '↗'}
-                  </span>
-                  <div className="vg-fluxo__body">
-                    <div className="vg-fluxo__desc">{m.desc}</div>
-                    <div className="vg-fluxo__data">
-                      {new Date(m.data).toLocaleDateString('pt-BR')}
-                    </div>
-                  </div>
-                  <span
-                    className={`vg-fluxo__valor vg-fluxo__valor--${m.tipo}`}
-                  >
-                    {m.tipo === 'entrada' ? '+' : '−'}
-                    {fmtBRL(m.valor)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="vg-card">
-          <div className="vg-card__head">
-            <h3 className="vg-card__title">
-              <span className="vg-card__icon" aria-hidden>✦</span>
-              Break-even
-            </h3>
-          </div>
-          <div className="vg-breakeven">
-            <div className="vg-breakeven__icon" aria-hidden>⏳</div>
-            <div className="vg-breakeven__body">
-              <div className="vg-breakeven__titulo">
-                {faltaParaBreakEven > 0
-                  ? 'Break-even não atingido'
-                  : 'Break-even atingido'}
-              </div>
-              <div className="vg-breakeven__sub">
-                {faltaParaBreakEven > 0
-                  ? `Falta ${fmtBRL(faltaParaBreakEven)} para o processo se pagar.`
-                  : 'O processo já se pagou.'}
-              </div>
-            </div>
-          </div>
-          <p className="vg-breakeven__nota">
-            O ponto de equilíbrio representa quando a receita recebida
-            acumulada cobre todos os custos pagos do processo.
-          </p>
-        </div>
-      </div>
-
-      {/* Saldo por Requerente */}
-      <div className="vg-card">
-        <div className="vg-card__head vg-card__head--with-legend">
-          <h3 className="vg-card__title">
-            <span className="vg-card__icon" aria-hidden>◉</span>
-            Saldo por Requerente
-          </h3>
-          <span className="vg-card__sub">
-            Receita · Recebido · Saldo em aberto
-          </span>
-        </div>
-        {saldoPorRequerente.length === 0 ? (
-          <div className="vg-empty-soft">
-            Nenhum requerente cadastrado neste processo.
-          </div>
-        ) : (
-          <table className="vg-tabela">
-            <thead>
-              <tr>
-                <th>REQUERENTE</th>
-                <th className="vg-tabela__num">TOTAL</th>
-                <th className="vg-tabela__num">PAGO</th>
-                <th className="vg-tabela__num">A RECEBER</th>
-                <th>STATUS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {saldoPorRequerente.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.nome}</td>
-                  <td className="vg-tabela__num">{fmtBRL(r.total)}</td>
-                  <td className="vg-tabela__num vg-tabela__num--green">
-                    {fmtBRL(r.pago)}
-                  </td>
-                  <td className="vg-tabela__num vg-tabela__num--red">
-                    {fmtBRL(r.aReceber)}
-                  </td>
-                  <td>
-                    <span
-                      className={`vg-status vg-status--${
-                        r.status === 'PAGO' ? 'pago' : 'pendente'
-                      }`}
-                    >
-                      {r.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         )}
-      </div>
 
-      {/* Trilha de Auditoria */}
-      <div className="vg-card">
-        <div className="vg-card__head vg-card__head--with-legend">
-          <h3 className="vg-card__title">
-            <span className="vg-card__icon" aria-hidden>▤</span>
-            Trilha de Auditoria
-          </h3>
-          <span className="vg-card__sub">0 lançamentos financeiros</span>
+        {/* ============ LINHA 1: 5 KPIs ============ */}
+        <div className="vg-kpis">
+          <Kpi
+            iconCls="green"
+            iconChar="$"
+            label="RECEITA TOTAL"
+            value={fmtBRL(metrics.recT)}
+            sub="100% do previsto"
+            barColor="#22c55e"
+          />
+          <Kpi
+            iconCls="blue"
+            iconChar="💳"
+            label="RECEITA RECEBIDA"
+            value={fmtBRL(metrics.recR)}
+            sub={`${fmtPctBR(metrics.pctR)} do total`}
+            barColor="#3b82f6"
+          />
+          <Kpi
+            iconCls="amber"
+            iconChar="🕐"
+            label="RECEITA PENDENTE"
+            value={fmtBRL(metrics.recP)}
+            sub={`${fmtPctBR(metrics.pctP)} do total`}
+            barColor="#f97316"
+          />
+          <Kpi
+            iconCls="red"
+            iconChar="📈"
+            label="CUSTO TOTAL"
+            value={fmtBRL(metrics.cusT)}
+            sub={`${fmtPctBR(metrics.pctCustos)} da receita`}
+            barColor="#ef4444"
+          />
+          <Kpi
+            iconCls="purple"
+            iconChar="📊"
+            label="LUCRO LÍQUIDO"
+            value={fmtBRL(metrics.lucroLiquido)}
+            sub={`${fmtPctBR(metrics.margemLucroLiq)} da receita`}
+            barColor="#7c3aed"
+          />
         </div>
-        <div className="vg-empty-soft">
-          Nenhum lançamento financeiro registrado ainda.
-        </div>
-      </div>
 
-      {/* Contas a Receber */}
-      {contasReceber.length > 0 && (
-        <div className="vg-card">
-          <div className="vg-card__head vg-card__head--with-legend">
-            <h3 className="vg-card__title">
-              <span className="vg-card__icon" aria-hidden>⏰</span>
-              Contas a Receber
-            </h3>
-            <span className="vg-card__sub">
-              {contasReceber.length}{' '}
-              {contasReceber.length === 1 ? 'pendente' : 'pendentes'}
-            </span>
-          </div>
-          <ul className="vg-contas">
-            {contasReceber.map((f) => {
-              const valorBRL =
-                f.moeda === 'BRL' || !f.moeda
-                  ? Number(f.valorRestante || 0)
-                  : Number(f.valorRestante || 0) * Number(f.cambio || 1)
-              return (
-                <li key={f.id} className="vg-contas__item">
-                  <div className="vg-contas__data-block">
-                    <span className="vg-contas__data-label">
-                      {f.dataVencimento ? 'VENC.' : 'SEM DATA'}
-                    </span>
-                    <span className="vg-contas__data-val">
-                      {f.dataVencimento
-                        ? new Date(f.dataVencimento).toLocaleDateString('pt-BR')
-                        : '—'}
-                    </span>
-                  </div>
-                  <div className="vg-contas__body">
-                    <div className="vg-contas__desc">{f.descricao}</div>
-                    <div className="vg-contas__meta">
-                      <span className="vg-contas__badge">
-                        {f.dataVencimento ? f.status : 'SEM VENCIMENTO'}
-                      </span>
-                      <span>#F-{String(f.id).padStart(4, '0')}</span>
-                    </div>
-                  </div>
-                  <div className="vg-contas__valor">
-                    {f.moeda !== 'BRL' && (
-                      <div className="vg-contas__valor-orig">
-                        {f.moeda}{' '}
-                        {Number(f.valorRestante).toLocaleString('pt-BR', {
-                          minimumFractionDigits: 2,
-                        })}
-                      </div>
-                    )}
-                    <div className="vg-contas__valor-brl">
-                      ≈ {fmtBRL(valorBRL)}
-                    </div>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-      )}
-
-      {/* Resumo Visual: mini-KPIs + linha de evolução + donuts */}
-      <div className="vg-resumo-row">
-        <div className="vg-card vg-resumo-card vg-resumo-card--linha">
-          <div className="vg-resumo-mini-kpis">
-            <div className="vg-resumo-mini">
-              <span className="vg-resumo-mini__arrow vg-resumo-mini__arrow--up">↗</span>
-              <span className="vg-resumo-mini__label">RECEITA</span>
-              <span className="vg-resumo-mini__value vg-resumo-mini__value--green">
-                {fmtBRL(receitaTotal)}
-              </span>
-              <span className="vg-resumo-mini__hint">
-                {(faturas.length + (totaisOC?.contagem ?? 0))}{' '}
-                {(faturas.length + (totaisOC?.contagem ?? 0)) === 1
-                  ? 'lançamento'
-                  : 'lançamentos'}
-              </span>
-            </div>
-            <div className="vg-resumo-mini">
-              <span className="vg-resumo-mini__arrow vg-resumo-mini__arrow--down">↘</span>
-              <span className="vg-resumo-mini__label">CUSTO</span>
-              <span className="vg-resumo-mini__value vg-resumo-mini__value--red">
-                {fmtBRL(custoTotal)}
-              </span>
-              <span className="vg-resumo-mini__hint">19 lançamentos</span>
-            </div>
-            <div className="vg-resumo-mini">
-              <span className="vg-resumo-mini__arrow">=</span>
-              <span className="vg-resumo-mini__label">LUCRO</span>
-              <span
-                className={`vg-resumo-mini__value ${
-                  lucroResumo >= 0
-                    ? 'vg-resumo-mini__value--blue'
-                    : 'vg-resumo-mini__value--red'
-                }`}
-              >
-                {fmtBRL(lucroResumo)}
-              </span>
-              <span className="vg-resumo-mini__hint">Líquido</span>
-            </div>
-            <div className="vg-resumo-mini">
-              <span className="vg-resumo-mini__arrow">◆</span>
-              <span className="vg-resumo-mini__label">MARGEM</span>
-              <span
-                className={`vg-resumo-mini__value ${
-                  margemResumo >= 40
-                    ? 'vg-resumo-mini__value--purple'
-                    : 'vg-resumo-mini__value--orange'
-                }`}
-              >
-                {margemResumo.toFixed(1)}%
-              </span>
-              <span className="vg-resumo-mini__hint">
-                {margemResumo >= 70
-                  ? 'Saudável'
-                  : margemResumo >= 40
-                  ? 'Aceitável'
-                  : 'Atenção'}
-              </span>
+        {/* ============ LINHA 2: Resumo Financeiro + 2 Donuts ============ */}
+        <div className="vg-r2">
+          {/* Resumo Financeiro */}
+          <div className="vg-card-clean">
+            <h3>Resumo Financeiro</h3>
+            <div className="resumo-fin">
+              <div className="rf-row">
+                <span className="rf-l">Receita Total</span>
+                <span className="rf-c">{fmtBRL(metrics.recT)}</span>
+              </div>
+              <div className="rf-row">
+                <span className="rf-l">(-) Impostos</span>
+                <span className="rf-c">-{fmtBRL(metrics.impostoBrl)}</span>
+              </div>
+              <div className="rf-row high">
+                <span className="rf-l">Receita Líquida</span>
+                <span className="rf-c">{fmtBRL(metrics.recLiq)}</span>
+              </div>
+              <div className="rf-row">
+                <span className="rf-l">(-) Custos Totais</span>
+                <span className="rf-c">-{fmtBRL(metrics.cusT)}</span>
+              </div>
+              <div className="rf-row high">
+                <span className="rf-l">Lucro Bruto</span>
+                <span className="rf-c">{fmtBRL(metrics.lucroBruto)}</span>
+              </div>
+              <div className="rf-row margem">
+                <span className="rf-l">Margem de Lucro</span>
+                <span className="rf-c">{fmtPctBR(metrics.margem)}</span>
+              </div>
             </div>
           </div>
 
-          <div className="vg-resumo-linha">
-            {pontosEvolucao.length > 0 ? (
-              <MiniLinhaSVG
-                points={pontosEvolucao}
-                width={480}
-                height={140}
-                color={lucroResumo >= 0 ? '#16a34a' : '#dc2626'}
-                formatY={(v) => fmtBRLCompact(v)}
-                ariaLabel="Evolução acumulada de movimentações no tempo"
-              />
+          {/* Donut Receitas */}
+          <div className="vg-card-clean">
+            <h3>Receitas</h3>
+            <div className="donut-clean">
+              <div className="donut-clean-svg">
+                <DonutSvg
+                  segments={
+                    metrics.recT > 0
+                      ? [
+                          { value: metrics.recR, color: '#22c55e' },
+                          { value: metrics.recP, color: '#f97316' },
+                          { value: 0, color: '#9ca3af' },
+                        ]
+                      : [{ value: 1, color: '#e5e7eb' }]
+                  }
+                  size={160}
+                  thickness={18}
+                />
+                <div className="donut-clean-center">
+                  <div className="pct">{Math.round(metrics.pctR)}%</div>
+                  <div className="lbl">recebido</div>
+                </div>
+              </div>
+              <div className="donut-clean-leg">
+                <div className="dlg-row">
+                  <div className="dot" style={{ background: '#22c55e' }} />
+                  <div className="lbl">Recebido</div>
+                  <div className="val">{fmtBRL(metrics.recR)}</div>
+                </div>
+                <div className="dlg-row">
+                  <div className="dot" style={{ background: '#f97316' }} />
+                  <div className="lbl">Pendente</div>
+                  <div className="val">{fmtBRL(metrics.recP)}</div>
+                </div>
+                <div className="dlg-row">
+                  <div className="dot" style={{ background: '#9ca3af' }} />
+                  <div className="lbl">A vencer</div>
+                  <div className="val">{fmtBRL(0)}</div>
+                </div>
+              </div>
+            </div>
+            <div className="donut-total">
+              <span>Total</span>
+              <span>{fmtBRL(metrics.recT)}</span>
+            </div>
+          </div>
+
+          {/* Donut Custos */}
+          <div className="vg-card-clean">
+            <h3>Custos</h3>
+            <div className="donut-clean">
+              <div className="donut-clean-svg">
+                <DonutSvg
+                  segments={
+                    metrics.cusT > 0
+                      ? [
+                          { value: metrics.cusPagos, color: '#ef4444' },
+                          { value: metrics.cusAPagar, color: '#fb923c' },
+                        ]
+                      : [{ value: 1, color: '#e5e7eb' }]
+                  }
+                  size={160}
+                  thickness={18}
+                />
+                <div className="donut-clean-center">
+                  <div className="pct">{Math.round(metrics.pctCustoPagos)}%</div>
+                  <div className="lbl">do total</div>
+                </div>
+              </div>
+              <div className="donut-clean-leg">
+                <div className="dlg-row">
+                  <div className="dot" style={{ background: '#ef4444' }} />
+                  <div className="lbl">Custos pagos</div>
+                  <div className="val">{fmtBRL(metrics.cusPagos)}</div>
+                </div>
+                <div className="dlg-row">
+                  <div className="dot" style={{ background: '#fb923c' }} />
+                  <div className="lbl">A pagar</div>
+                  <div className="val">{fmtBRL(metrics.cusAPagar)}</div>
+                </div>
+              </div>
+            </div>
+            <div className="donut-total">
+              <span>Total</span>
+              <span>{fmtBRL(metrics.cusT)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ============ LINHA 3: Resultado + Inadimplência + Fluxo ============ */}
+        <div className="vg-r3-new">
+          {/* Resultado do Processo */}
+          <div className="vg-card-clean">
+            <h3>Resultado do Processo</h3>
+            <div className="res-proc-val">{fmtBRL(metrics.lucroLiquido)}</div>
+            <div className="res-proc-lbl">Lucro líquido</div>
+            <div className="res-proc-badge">{fmtPctBR(metrics.margem)} de margem</div>
+            <div className="res-proc-chart">
+              {metrics.lucroLiquido > 0 ? (
+                <SparkSvg values={lucroSpark} width={300} height={90} color="#10b981" />
+              ) : null}
+            </div>
+          </div>
+
+          {/* Inadimplência */}
+          <div className="vg-card-clean">
+            <h3>Inadimplência</h3>
+            <div className={`inad-val${inad.totalInadBrl === 0 ? ' zero' : ''}`}>
+              {fmtBRL(inad.totalInadBrl)}
+            </div>
+            <div className="inad-lbl">
+              {inad.totalInadBrl === 0 ? 'Nenhum atraso' : 'Em atraso'}
+            </div>
+            {inad.totalInadBrl > 0 ? (
+              <div className="inad-alert">
+                <div className="inad-alert-icon">!</div>
+                <div className="inad-alert-text">
+                  <strong>
+                    {inad.inadCount} {inad.inadCount === 1 ? 'parcela' : 'parcelas'} em atraso
+                  </strong>
+                  <small>Cobrança recomendada</small>
+                </div>
+              </div>
             ) : (
-              <div className="vg-resumo-linha__vazio">
-                Sem movimentações registradas ainda
+              <div className="inad-empty">
+                <div className="inad-empty-icon">✓</div>
+                <div className="inad-alert-text">
+                  <strong style={{ color: '#065f46' }}>Tudo em dia</strong>
+                  <small>Sem parcelas em atraso</small>
+                </div>
               </div>
             )}
           </div>
-        </div>
 
-        <div className="vg-card vg-resumo-card vg-resumo-card--donut">
-          <div className="vg-resumo-donut__head">
-            <span aria-hidden>💰</span>
-            <span>ENTRADAS</span>
-          </div>
-          <DonutSVG
-            slices={[
-              {
-                label: 'Entrou',
-                value: recebido,
-                color: '#22c55e',
-              },
-              {
-                label: 'A entrar',
-                value: Math.max(0, receitaTotal - recebido),
-                color: 'var(--fin-line)',
-              },
-            ]}
-            size={140}
-            thickness={20}
-            centerLabel="ENTROU"
-            centerValue={`${pctEntrou.toFixed(0)}%`}
-            showLegend={false}
-            ariaLabel="Percentual de entradas recebidas"
-          />
-          <div className="vg-resumo-donut__foot">
-            <span className="vg-resumo-donut__foot-lbl">Falta entrar:</span>
-            <span className="vg-resumo-donut__foot-val vg-resumo-donut__foot-val--yellow">
-              {fmtBRL(Math.max(0, receitaTotal - recebido))}
-            </span>
-          </div>
-        </div>
-
-        <div className="vg-card vg-resumo-card vg-resumo-card--donut">
-          <div className="vg-resumo-donut__head">
-            <span aria-hidden>💸</span>
-            <span>SAÍDAS</span>
-          </div>
-          <DonutSVG
-            slices={[
-              {
-                label: 'Saiu',
-                value: pagoCustos,
-                color: '#3b82f6',
-              },
-              {
-                label: 'A sair',
-                value: custoEmAberto,
-                color: 'var(--fin-line)',
-              },
-            ]}
-            size={140}
-            thickness={20}
-            centerLabel="SAIU"
-            centerValue={`${pctSaiu.toFixed(0)}%`}
-            showLegend={false}
-            ariaLabel="Percentual de saídas pagas"
-          />
-          <div className="vg-resumo-donut__foot">
-            <span className="vg-resumo-donut__foot-lbl">Falta pagar:</span>
-            <span className="vg-resumo-donut__foot-val vg-resumo-donut__foot-val--blue">
-              {fmtBRL(custoEmAberto)}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Custos por etapa */}
-      <div className="vg-card vg-timeline-card">
-        <div className="vg-card__head vg-card__head--with-legend">
-          <h3 className="vg-card__title">Custos por etapa</h3>
-          <span className="vg-card__sub">
-            Apenas Outros Custos REPASSAR vinculados a etapas
-          </span>
-        </div>
-        <div className="vg-timeline">
-          <div className="vg-timeline-line" aria-hidden />
-          <div className="vg-timeline-track">
-            {custosPorEtapa.map((etapa) => {
-              const temValor = etapa.valor > 0
-              return (
-                <div
-                  key={etapa.id}
-                  className={`vg-timeline-step ${
-                    temValor ? 'vg-timeline-step--ativo' : ''
-                  }`}
-                >
-                  <div className="vg-timeline-step__label">{etapa.label}</div>
+          {/* Fluxo de Caixa 30 dias */}
+          <div className="vg-card-clean">
+            <h3>
+              Fluxo de Caixa{' '}
+              <span style={{ fontSize: 13, color: 'var(--fpag-gray-500)', fontWeight: 400 }}>
+                (Próximos 30 dias)
+              </span>
+            </h3>
+            <div className="fluxo-grid">
+              <div className="fluxo-list">
+                {fluxo.fluxos5.length === 0 ? (
                   <div
-                    className={`vg-timeline-step__dot ${
-                      temValor ? 'vg-timeline-step__dot--ativo' : ''
-                    }`}
-                    aria-hidden
-                  />
-                  <div className="vg-timeline-step__value">
-                    {temValor ? fmtBRLCompact(etapa.valor) : '—'}
+                    style={{
+                      textAlign: 'center',
+                      padding: 20,
+                      color: 'var(--fpag-gray-500)',
+                      fontSize: 13,
+                    }}
+                  >
+                    Nenhuma movimentação prevista
                   </div>
+                ) : (
+                  fluxo.fluxos5.map((f, i) => (
+                    <div className="fluxo-row" key={i}>
+                      <span className="fdate">{fmtDateShort(f.date)}</span>
+                      <span className={`farrow ${f.dir}`}>
+                        {f.dir === 'in' ? '↓' : '↑'}
+                      </span>
+                      <span className="flbl">{f.label}</span>
+                      <span className="fval">
+                        {f.dir === 'in' ? '' : '-'}
+                        {fmtBRL(f.valBrl)}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="fluxo-saldo">
+                <div className="fluxo-saldo-lbl">Saldo previsto</div>
+                <div className="fluxo-saldo-val">{fmtBRL(fluxo.saldoPrevisto)}</div>
+                <div className="fluxo-saldo-sub">para os próximos 30 dias</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ============ LINHA 4: Saldos por Moeda + Resumo Rápido ============ */}
+        <div className="vg-r4-new">
+          {/* Saldos por Moeda */}
+          <div className="vg-card-clean">
+            <div className="saldos-h">
+              <h3>Saldos por Moeda</h3>
+            </div>
+            <div className="saldos-grid">
+              <div className="saldo-mc">
+                <div className="saldo-mc-h">
+                  <div className="saldo-mc-icon eur">€</div>
+                  <div className="saldo-mc-lbl">EUR</div>
                 </div>
-              )
-            })}
+                <div className="saldo-mc-val">{fmtEUR(saldos.EUR)}</div>
+                <div className="saldo-mc-sub">Saldo disponível</div>
+              </div>
+              <div className="saldo-mc">
+                <div className="saldo-mc-h">
+                  <div className="saldo-mc-icon brl">R$</div>
+                  <div className="saldo-mc-lbl">BRL</div>
+                </div>
+                <div className="saldo-mc-val">{fmtBRL(saldos.BRL)}</div>
+                <div className="saldo-mc-sub">Saldo disponível</div>
+              </div>
+              <div className="saldo-mc">
+                <div className="saldo-mc-h">
+                  <div className="saldo-mc-icon usd">$</div>
+                  <div className="saldo-mc-lbl">USD</div>
+                </div>
+                <div className="saldo-mc-val">{fmtUSD(saldos.USD)}</div>
+                <div className="saldo-mc-sub">Saldo disponível</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Resumo Rápido */}
+          <div className="vg-card-clean">
+            <div className="saldos-h">
+              <h3>Resumo Rápido</h3>
+            </div>
+            <div className="rr-grid-4">
+              <div className="rr-cell">
+                <div className="rr-cell-icon fa">📄</div>
+                <div className="rr-cell-lbl">Faturas emitidas</div>
+                <div className="rr-cell-val">0</div>
+              </div>
+              <div className="rr-cell">
+                <div className="rr-cell-icon re">📋</div>
+                <div className="rr-cell-lbl">Recibos emitidos</div>
+                <div className="rr-cell-val">0</div>
+              </div>
+              <div className="rr-cell">
+                <div className="rr-cell-icon in">⚠</div>
+                <div className="rr-cell-lbl">Inadimplência</div>
+                <div className={`rr-cell-val${inad.totalInadBrl > 0 ? ' red' : ''}`}>
+                  {inad.totalInadBrl > 0 ? fmtBRL(inad.totalInadBrl) : '0'}
+                </div>
+              </div>
+              <div className="rr-cell">
+                <div className="rr-cell-icon do">📁</div>
+                <div className="rr-cell-lbl">Documentos</div>
+                <div className="rr-cell-val">0</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+    </div>
+  )
+}
 
-      {/* Projeção */}
-      <div className="vg-projecao">
-        <div className="vg-projecao__icon" aria-hidden>🔮</div>
-        <div className="vg-projecao__body">
-          <span className="vg-projecao__label">PROJEÇÃO AO FINALIZAR</span>
-          <div className="vg-projecao__headline">
-            Lucro estimado de{' '}
-            <strong
-              className={
-                lucroProjetado >= 0
-                  ? 'vg-projecao__amount-pos'
-                  : 'vg-projecao__amount-neg'
-              }
-            >
-              {fmtBRL(lucroProjetado)}
-            </strong>{' '}
-            · margem <strong>{margemProjetada.toFixed(1)}%</strong>
-          </div>
-          <p className="vg-projecao__note">
-            Assumindo custos médios para Transcrição (
-            {fmtBRL(PREMISSAS_PROJECAO_DEFAULT.transcricao)}) e Finalização (
-            {fmtBRL(PREMISSAS_PROJECAO_DEFAULT.finalizacao)}). Todas as
-            faturas pagas.
-          </p>
+// ============================================================================
+// KPI subcomponente
+// ============================================================================
+
+function Kpi({
+  iconCls,
+  iconChar,
+  label,
+  value,
+  sub,
+  barColor,
+}: {
+  iconCls: 'green' | 'blue' | 'amber' | 'red' | 'purple'
+  iconChar: string
+  label: string
+  value: string
+  sub: string
+  barColor: string
+}) {
+  return (
+    <div className="vg-kpi">
+      <div className="vg-kpi-h">
+        <div className={`vg-kpi-icon ${iconCls}`}>{iconChar}</div>
+        <div className="vg-kpi-text">
+          <div className="vg-kpi-label">{label}</div>
+          <div className="vg-kpi-value">{value}</div>
         </div>
-        <button className="vg-projecao__btn" type="button" disabled>
-          Ajustar premissas
-        </button>
       </div>
-
-      <style jsx>{`
-        .vg-root { display: flex; flex-direction: column; gap: 16px; }
-        .vg-header {
-          display: flex; align-items: center; justify-content: space-between;
-          gap: 16px; flex-wrap: wrap;
-        }
-        .vg-header__title-wrap { display: flex; align-items: center; gap: 12px; }
-        .vg-header__icon { font-size: 22px; }
-        .vg-header__title { margin: 0; font-size: 16px; font-weight: 600; color: var(--fin-ink); }
-        .vg-header__subtitle { margin: 2px 0 0; font-size: 12px; color: var(--fin-ink-3); }
-        .vg-header__btn {
-          border: 1px solid var(--fin-line); background: var(--fin-bg);
-          border-radius: 8px; padding: 6px 12px; font-size: 12px;
-          color: var(--fin-ink-2); cursor: not-allowed; opacity: 0.6;
-        }
-
-        .vg-score-card {
-          background: linear-gradient(135deg, #faf5ff 0%, #ede9fe 100%);
-          border: 1px solid #ddd6fe; padding: 22px; border-radius: 16px;
-          display: flex; align-items: center; gap: 22px;
-        }
-        .vg-score-grade {
-          width: 86px; height: 86px; border-radius: 22px; display: flex;
-          align-items: center; justify-content: center; font-size: 44px;
-          font-weight: 900; color: #fff;
-          box-shadow: 0 10px 30px rgba(124, 58, 237, 0.35);
-          flex-shrink: 0; letter-spacing: -0.04em;
-        }
-        .vg-score-grade--A { background: linear-gradient(135deg, #059669, #047857); }
-        .vg-score-grade--B { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
-        .vg-score-grade--C { background: linear-gradient(135deg, #d97706, #b45309); }
-        .vg-score-grade--D { background: linear-gradient(135deg, #dc2626, #991b1b); }
-        .vg-score-info { flex: 1; min-width: 0; }
-        .vg-score-titulo {
-          font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
-          text-transform: uppercase; color: #6b46c1; margin-bottom: 4px;
-        }
-        .vg-score-nome {
-          font-size: 20px; font-weight: 800; color: #1f2937;
-          margin-bottom: 6px; letter-spacing: -0.02em;
-        }
-        .vg-score-barra {
-          height: 8px; background: rgba(124, 58, 237, 0.15);
-          border-radius: 999px; overflow: hidden;
-        }
-        .vg-score-barra > div {
-          height: 100%; background: linear-gradient(90deg, #7c3aed, #a855f7);
-          border-radius: 999px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .vg-score-num { font-size: 13px; color: #6b7280; margin-top: 6px; }
-
-        .vg-kpis {
-          display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;
-        }
-        @media (max-width: 900px) { .vg-kpis { grid-template-columns: repeat(2, 1fr); } }
-        .vg-kpi {
-          position: relative; border-radius: 12px; padding: 14px 16px;
-          border: 1px solid var(--fin-line); background: var(--fin-bg);
-          display: flex; flex-direction: column; gap: 4px; min-height: 100px;
-        }
-        .vg-kpi__arrow {
-          position: absolute; top: 12px; right: 14px; font-size: 14px;
-          font-weight: 700; opacity: 0.75;
-        }
-        .vg-kpi__label {
-          font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
-          color: var(--fin-ink-3); display: inline-flex; align-items: center; gap: 8px;
-        }
-        .vg-kpi__badge-neg {
-          padding: 2px 8px; background: #fef2f2; color: #b91c1c;
-          border-radius: 999px; border: 1px solid #fecaca; font-size: 9px;
-          letter-spacing: 0.04em;
-        }
-        .vg-kpi__value {
-          font-size: 22px; font-weight: 700; line-height: 1.15;
-          font-variant-numeric: tabular-nums;
-        }
-        .vg-kpi__hint { font-size: 11px; color: var(--fin-ink-3); }
-        .vg-kpi--blue { background: #eff6ff; border-color: #bfdbfe; }
-        .vg-kpi--blue .vg-kpi__value, .vg-kpi--blue .vg-kpi__arrow { color: #1d4ed8; }
-        .vg-kpi--blue .vg-kpi__label { color: #1e40af; }
-        .vg-kpi--orange { background: #fff7ed; border-color: #fed7aa; }
-        .vg-kpi--orange .vg-kpi__value, .vg-kpi--orange .vg-kpi__arrow { color: #c2410c; }
-        .vg-kpi--orange .vg-kpi__label { color: #9a3412; }
-        .vg-kpi--green { background: #f0fdf4; border-color: #bbf7d0; }
-        .vg-kpi--green .vg-kpi__value, .vg-kpi--green .vg-kpi__arrow { color: #15803d; }
-        .vg-kpi--green .vg-kpi__label { color: #166534; }
-        .vg-kpi--red { background: #fef2f2; border-color: #fecaca; }
-        .vg-kpi--red .vg-kpi__value, .vg-kpi--red .vg-kpi__arrow { color: #b91c1c; }
-        .vg-kpi--red .vg-kpi__label { color: #991b1b; }
-        .vg-kpi--red-soft { background: #fff1f2; border-color: #fecdd3; }
-        .vg-kpi--red-soft .vg-kpi__value, .vg-kpi--red-soft .vg-kpi__arrow { color: #be123c; }
-        .vg-kpi--red-soft .vg-kpi__label { color: #9f1239; }
-
-        .vg-card {
-          background: var(--fin-bg); border: 1px solid var(--fin-line);
-          border-radius: 12px; padding: 18px 20px;
-        }
-        .vg-card__head {
-          display: flex; align-items: center; justify-content: space-between;
-          margin-bottom: 14px; gap: 12px;
-        }
-        .vg-card__head--with-legend { flex-wrap: wrap; }
-        .vg-card__title {
-          margin: 0; font-size: 14px; font-weight: 600; color: var(--fin-ink);
-          display: inline-flex; align-items: center; gap: 8px;
-        }
-        .vg-card__icon { font-size: 14px; }
-        .vg-card__sub { font-size: 11px; color: var(--fin-ink-3); }
-        .vg-empty-soft {
-          padding: 24px; text-align: center; font-size: 13px;
-          color: var(--fin-ink-3); background: var(--fin-bg-soft);
-          border: 1px dashed var(--fin-line); border-radius: 8px;
-        }
-
-        .vg-row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        @media (max-width: 900px) { .vg-row-2col { grid-template-columns: 1fr; } }
-
-        .vg-fluxo { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
-        .vg-fluxo__item {
-          display: flex; align-items: center; gap: 12px; padding: 8px 12px;
-          border-radius: 8px; border: 1px solid var(--fin-line);
-        }
-        .vg-fluxo__item--entrada { background: #f0fdf4; border-color: #bbf7d0; }
-        .vg-fluxo__item--saida { background: #fef2f2; border-color: #fecaca; }
-        .vg-fluxo__dir { font-size: 16px; font-weight: 700; }
-        .vg-fluxo__item--entrada .vg-fluxo__dir { color: #15803d; }
-        .vg-fluxo__item--saida .vg-fluxo__dir { color: #b91c1c; }
-        .vg-fluxo__body { flex: 1; min-width: 0; }
-        .vg-fluxo__desc { font-size: 13px; font-weight: 500; color: var(--fin-ink); }
-        .vg-fluxo__data { font-size: 11px; color: var(--fin-ink-3); }
-        .vg-fluxo__valor { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
-        .vg-fluxo__valor--entrada { color: #15803d; }
-        .vg-fluxo__valor--saida { color: #b91c1c; }
-
-        .vg-breakeven {
-          display: flex; align-items: center; gap: 14px; padding: 14px 16px;
-          background: #fefce8; border: 1px solid #fef08a; border-radius: 8px;
-        }
-        .vg-breakeven__icon { font-size: 24px; }
-        .vg-breakeven__body { flex: 1; min-width: 0; }
-        .vg-breakeven__titulo { font-size: 13px; font-weight: 600; color: #854d0e; }
-        .vg-breakeven__sub { margin-top: 2px; font-size: 12px; color: #713f12; }
-        .vg-breakeven__nota {
-          margin: 12px 0 0; font-size: 11px; color: var(--fin-ink-3); line-height: 1.5;
-        }
-
-        .vg-tabela { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .vg-tabela th {
-          text-align: left; padding: 10px 12px; font-size: 10px; font-weight: 700;
-          letter-spacing: 0.06em; color: var(--fin-ink-3); border-bottom: 1px solid var(--fin-line);
-        }
-        .vg-tabela td { padding: 12px; border-bottom: 1px solid var(--fin-line); }
-        .vg-tabela tr:last-child td { border-bottom: none; }
-        .vg-tabela__num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-        .vg-tabela__num--green { color: #15803d; }
-        .vg-tabela__num--red { color: #b91c1c; }
-        .vg-status {
-          display: inline-block; padding: 3px 10px; font-size: 10px;
-          font-weight: 700; letter-spacing: 0.04em; border-radius: 999px;
-        }
-        .vg-status--pago { background: #dcfce7; color: #166534; }
-        .vg-status--pendente { background: #fef9c3; color: #854d0e; }
-
-        .vg-contas { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
-        .vg-contas__item {
-          display: flex; align-items: center; gap: 14px; padding: 12px 16px;
-          border: 1px solid var(--fin-line); border-radius: 8px; background: #fff;
-        }
-        .vg-contas__data-block {
-          display: flex; flex-direction: column; align-items: center; gap: 2px;
-          padding: 8px 12px; background: var(--fin-bg-soft); border-radius: 6px; min-width: 88px;
-        }
-        .vg-contas__data-label { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; color: var(--fin-ink-3); }
-        .vg-contas__data-val { font-size: 13px; font-weight: 600; }
-        .vg-contas__body { flex: 1; min-width: 0; }
-        .vg-contas__desc { font-size: 14px; font-weight: 600; color: var(--fin-ink); }
-        .vg-contas__meta {
-          margin-top: 4px; display: flex; gap: 8px; font-size: 11px; color: var(--fin-ink-3);
-        }
-        .vg-contas__badge {
-          padding: 2px 8px; background: #fef9c3; color: #854d0e;
-          border-radius: 4px; font-weight: 700; letter-spacing: 0.04em;
-        }
-        .vg-contas__valor { text-align: right; flex-shrink: 0; }
-        .vg-contas__valor-orig { font-size: 16px; font-weight: 700; color: var(--fin-ink); }
-        .vg-contas__valor-brl { font-size: 11px; color: var(--fin-ink-3); margin-top: 2px; }
-
-        .vg-timeline { position: relative; overflow-x: auto; padding: 8px 4px 4px; }
-        .vg-timeline-line {
-          position: absolute; left: 24px; right: 24px; top: calc(50% + 6px);
-          height: 1px; background: var(--fin-line);
-        }
-        .vg-timeline-track {
-          position: relative; display: flex; justify-content: space-between;
-          gap: 12px; min-width: 820px;
-        }
-        .vg-timeline-step {
-          display: flex; flex-direction: column; align-items: center;
-          flex: 1; min-width: 60px; text-align: center; gap: 6px;
-        }
-        .vg-timeline-step__label {
-          font-size: 9px; font-weight: 700; letter-spacing: 0.06em; color: var(--fin-ink-3);
-        }
-        .vg-timeline-step__dot {
-          width: 14px; height: 14px; border-radius: 50%;
-          background: var(--fin-bg); border: 2px solid var(--fin-line); z-index: 1;
-        }
-        .vg-timeline-step__dot--ativo {
-          background: #f59e0b; border-color: #d97706;
-          box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
-        }
-        .vg-timeline-step__value { font-size: 11px; font-weight: 600; color: var(--fin-ink-3); min-height: 14px; }
-        .vg-timeline-step--ativo .vg-timeline-step__value { color: #b45309; }
-
-        .vg-projecao {
-          display: flex; align-items: flex-start; gap: 14px; padding: 16px 18px;
-          background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 12px;
-        }
-        .vg-projecao__icon { font-size: 24px; flex-shrink: 0; }
-        .vg-projecao__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-        .vg-projecao__label {
-          font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: #6b21a8;
-        }
-        .vg-projecao__headline { font-size: 14px; color: var(--fin-ink); line-height: 1.4; }
-        .vg-projecao__amount-pos { color: #15803d; }
-        .vg-projecao__amount-neg { color: #b91c1c; }
-        .vg-projecao__note { margin: 0; font-size: 11px; color: var(--fin-ink-3); line-height: 1.4; }
-        .vg-projecao__btn {
-          align-self: flex-start; border: 1px solid #e9d5ff; background: #fff;
-          border-radius: 8px; padding: 8px 14px; font-size: 12px; color: #6b21a8;
-          cursor: not-allowed; opacity: 0.6; white-space: nowrap;
-        }
-
-        /* ======== Resumo Visual ======== */
-        .vg-resumo-row {
-          display: grid;
-          grid-template-columns: 2fr 1fr 1fr;
-          gap: 12px;
-        }
-        @media (max-width: 1100px) {
-          .vg-resumo-row { grid-template-columns: 1fr 1fr; }
-          .vg-resumo-card--linha { grid-column: 1 / -1; }
-        }
-        @media (max-width: 640px) {
-          .vg-resumo-row { grid-template-columns: 1fr; }
-        }
-        .vg-resumo-card { display: flex; flex-direction: column; }
-        .vg-resumo-card--linha { gap: 12px; }
-
-        .vg-resumo-mini-kpis {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 10px;
-          padding-bottom: 8px;
-          border-bottom: 1px solid var(--fin-line);
-        }
-        @media (max-width: 640px) {
-          .vg-resumo-mini-kpis { grid-template-columns: repeat(2, 1fr); }
-        }
-        .vg-resumo-mini {
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-          padding: 8px 4px;
-        }
-        .vg-resumo-mini__arrow {
-          position: absolute;
-          top: 6px;
-          right: 6px;
-          font-size: 12px;
-          opacity: 0.5;
-        }
-        .vg-resumo-mini__arrow--up { color: #16a34a; }
-        .vg-resumo-mini__arrow--down { color: #dc2626; }
-        .vg-resumo-mini__label {
-          font-size: 9px;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          color: var(--fin-ink-3);
-        }
-        .vg-resumo-mini__value {
-          font-size: 16px;
-          font-weight: 700;
-          font-variant-numeric: tabular-nums;
-          line-height: 1.2;
-        }
-        .vg-resumo-mini__value--green { color: #16a34a; }
-        .vg-resumo-mini__value--red { color: #dc2626; }
-        .vg-resumo-mini__value--blue { color: #2563eb; }
-        .vg-resumo-mini__value--purple { color: #7c3aed; }
-        .vg-resumo-mini__value--orange { color: #d97706; }
-        .vg-resumo-mini__hint {
-          font-size: 10px;
-          color: var(--fin-ink-3);
-        }
-
-        .vg-resumo-linha {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 8px 0 4px;
-          min-height: 140px;
-          overflow-x: auto;
-        }
-        .vg-resumo-linha__vazio {
-          color: var(--fin-ink-3);
-          font-size: 12px;
-          font-style: italic;
-        }
-
-        .vg-resumo-card--donut {
-          align-items: center;
-          gap: 8px;
-        }
-        .vg-resumo-donut__head {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          color: var(--fin-ink-3);
-          margin-bottom: 4px;
-        }
-        .vg-resumo-donut__foot {
-          margin-top: 4px;
-          padding-top: 8px;
-          border-top: 1px dashed var(--fin-line);
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 2px;
-        }
-        .vg-resumo-donut__foot-lbl {
-          font-size: 11px;
-          color: var(--fin-ink-3);
-        }
-        .vg-resumo-donut__foot-val {
-          font-size: 14px;
-          font-weight: 700;
-          font-variant-numeric: tabular-nums;
-        }
-        .vg-resumo-donut__foot-val--yellow { color: #ca8a04; }
-        .vg-resumo-donut__foot-val--blue { color: #2563eb; }
-      `}</style>
+      <div className="vg-kpi-sub">{sub}</div>
+      <div className="vg-kpi-bar" style={{ background: barColor }} />
     </div>
   )
 }

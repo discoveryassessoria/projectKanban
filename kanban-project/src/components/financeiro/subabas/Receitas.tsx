@@ -1,710 +1,511 @@
 // src/components/financeiro/subabas/Receitas.tsx
 //
-// 🆕 LOTE 5 BLOCO F-2: Receitas reformada conforme decisões do Marco (29/04/2026):
-//   1. Pasta Documental NÃO entra mais nas Receitas (já removido em rodada anterior)
-//   2. ✨ FATURAS removidas da aba Receitas — Marco: "deve sair esse 'incluir
-//      fatura' porque os custos devem ser lançados somente na parte 'custos'"
-//      → Receitas agora trata apenas de Honorários Discovery e serviços
-//        (Outros Custos COBRAR). Faturas permanecem sendo gerenciadas no
-//        componente ProcessoFaturas (kanban) onde já existem e funcionam.
+// 🆕 Fase 3 v2 — Receitas com view router interno (não usa mais modais).
 //
-// Estrutura:
-//   1. 4 KPIs: Total Cobrado / Recebido / A Receber / Vencido
-//      (todos calculados a partir de Outros Custos COBRAR)
-//   2. Card "🔔 Próximos vencimentos" (honorários vencendo em 7d)
-//   3. Header "Receitas do processo · N itens · Recebimentos do cliente"
-//      com busca, select de ordenação e dropdowns Recibos/Relatórios
-//   4. Label "💼 Honorários Discovery e serviços (N)"
-//   5. Lista de OutroCustoCard
+// Views:
+//   - 'lista'   → KPIs + tabela de receitas (clone visual do #page-receitas)
+//   - 'nova'    → renderiza <NovaReceitaPagina />
+//   - 'lancar'  → renderiza <LancarParcelaPagina tipo="receita" />
+//
+// Endpoint: GET /api/financeiro/receitas?processoId=X
 
-"use client"
+'use client'
 
-import { useState, useEffect, useMemo } from "react"
+import '@/src/styles/financeiro-paginas.css'
+import { useEffect, useState, useMemo } from 'react'
+import { NovaReceitaPagina } from '@/src/components/financeiro/paginas/NovaReceitaPagina'
 import {
-  FileText,
-  FileDown,
-  Search,
-  Bell,
-} from "lucide-react"
-import { fmtBRL } from "@/src/lib/financeiro/helpers"
-import { OutroCustoCard } from "@/src/components/financeiro/cards/OutroCustoCard"
-import { NovoOutroCustoModal } from "@/src/components/financeiro/modals/NovoOutroCustoModal"
-import type {
-  OutroCustoData,
-  TotaisOutrosCustos,
-} from "@/src/types/outros-custos"
-import {
-  filtrarPorBusca,
-  ordenarOutrosCustos,
-  type OrdemOutroCusto,
-} from "@/src/lib/financeiro/outros-custos-helpers"
+  LancarParcelaPagina,
+  type ParcelaLancavel,
+  type EntidadeLancavel,
+} from '@/src/components/financeiro/paginas/LancarParcelaPagina'
 
-// ========================================
-// TYPES
-// ========================================
-interface ReceitasProps {
+// ============================================================================
+// Tipos
+// ============================================================================
+
+type Moeda = 'BRL' | 'EUR' | 'USD'
+type FxRule = 'FIXO' | 'VARIAVEL'
+type StatusParcela = 'PENDENTE' | 'RECEBIDA' | 'PAGA' | 'CANCELADA'
+type CategoriaReceita = 'HONORARIOS' | 'REEMBOLSO' | 'PASTA_DOCUMENTAL' | 'OUTROS'
+
+interface ParcelaAPI {
+  id: number
+  numero: number
+  vencimento: string
+  valor: number | string
+  status: StatusParcela
+  dataPagamento?: string | null
+  cambioAplicado?: number | string | null
+  valorBrl?: number | string | null
+}
+
+interface ReceitaRequerenteAPI {
+  id: number
+  percentual: number | string
+  nome?: string
+  requerente?: { id: number; nome: string }
+}
+
+interface ReceitaAPI {
+  id: number
+  codigo: string
+  categoria: CategoriaReceita
+  descricao: string
+  moeda: Moeda
+  valor: number | string
+  fxEstimado: number | string
+  fxRule: FxRule
+  fxFixo?: number | string | null
+  nParcelas: number
+  data1: string
+  parcelas: ParcelaAPI[]
+  requerentes?: ReceitaRequerenteAPI[]
+}
+
+type Filter = 'todas' | 'recebidas' | 'pendentes'
+
+export interface ReceitasProps {
   processoId: number
   nomeFamilia?: string
   onUpdate?: () => void
+  fxHoje?: number
 }
 
-// ========================================
-// COMPONENT
-// ========================================
-export function Receitas({ processoId, onUpdate }: ReceitasProps) {
-  // ---- ESTADO OUTROS CUSTOS (COBRAR) ----
-  const [outrosCustos, setOutrosCustos] = useState<OutroCustoData[]>([])
-  const [totaisOC, setTotaisOC] = useState<TotaisOutrosCustos | null>(null)
+// ============================================================================
+// Helpers
+// ============================================================================
+
+const num = (v: unknown): number => {
+  if (v == null) return 0
+  if (typeof v === 'number') return v
+  const n = parseFloat(String(v))
+  return isFinite(n) ? n : 0
+}
+const fmtBRL = (v: number) =>
+  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+const fmtMoeda = (v: number, m: Moeda) =>
+  v.toLocaleString('pt-BR', { style: 'currency', currency: m })
+const fmtFX = (v: number) => v.toFixed(4).replace('.', ',')
+const fmtDate = (iso?: string | null) => {
+  if (!iso) return '—'
+  const d = new Date(iso.includes('T') ? iso : iso + 'T00:00:00')
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('pt-BR')
+}
+
+const CATEGORIA_LABEL: Record<CategoriaReceita, string> = {
+  HONORARIOS: 'Honorários',
+  REEMBOLSO: 'Reembolso',
+  PASTA_DOCUMENTAL: 'Pasta Documental',
+  OUTROS: 'Outros',
+}
+
+function cambioEfetivo(r: ReceitaAPI): number {
+  if (r.moeda === 'BRL') return 1
+  if (r.fxRule === 'FIXO' && r.fxFixo) return num(r.fxFixo)
+  return num(r.fxEstimado) || 1
+}
+function isVencida(p: ParcelaAPI): boolean {
+  if (p.status !== 'PENDENTE') return false
+  if (!p.vencimento) return false
+  const v = new Date(p.vencimento.includes('T') ? p.vencimento : p.vencimento + 'T00:00:00')
+  v.setHours(0, 0, 0, 0)
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+  return v.getTime() < hoje.getTime()
+}
+
+// ============================================================================
+// Componente
+// ============================================================================
+
+type View =
+  | { kind: 'lista' }
+  | { kind: 'nova' }
+  | { kind: 'lancar'; parcela: ParcelaLancavel; entidade: EntidadeLancavel }
+
+export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) {
+  const [view, setView] = useState<View>({ kind: 'lista' })
+  const [receitas, setReceitas] = useState<ReceitaAPI[]>([])
   const [loading, setLoading] = useState(true)
-  const [modalNovoCobrarAberto, setModalNovoCobrarAberto] = useState(false)
-  const [buscaOC, setBuscaOC] = useState('')
-  const [ordemOC, setOrdemOC] = useState<OrdemOutroCusto>('vencimento')
+  const [erro, setErro] = useState<string | null>(null)
+  const [filtro, setFiltro] = useState<Filter>('todas')
 
-  // ---- DROPDOWNS Recibos / Relatórios ----
-  const [dropdownAberto, setDropdownAberto] = useState<null | 'recibos' | 'relatorios'>(null)
-
-  // ========================================
-  // COMPUTED VALUES
-  // ========================================
-  const honorariosFiltrados = useMemo(() => {
-    let lista = outrosCustos.filter((oc) => oc.natureza === 'COBRAR')
-    lista = filtrarPorBusca(lista, buscaOC)
-    lista = ordenarOutrosCustos(lista, ordemOC)
-    return lista
-  }, [outrosCustos, buscaOC, ordemOC])
-
-  const honorariosTotal = outrosCustos.filter((oc) => oc.natureza === 'COBRAR').length
-
-  // KPIs CONSOLIDADOS — agora apenas Honorários COBRAR
-  const kpisConsolidados = useMemo(() => {
-    const honTotal = totaisOC?.totalCobrarBRL ?? 0
-    const honPago = totaisOC?.totalRecebidoBRL ?? 0
-    const honPendente = totaisOC?.totalARecebidoBRL ?? 0
-
-    // Calcula vencido a partir das datas dos Outros Custos COBRAR
-    const hoje = new Date()
-    hoje.setHours(0, 0, 0, 0)
-    let vencido = 0
-    let qtdVencidas = 0
-    outrosCustos
-      .filter((oc) => oc.natureza === 'COBRAR' && oc.vencimento)
-      .forEach((oc) => {
-        const venc = new Date(oc.vencimento as string)
-        venc.setHours(0, 0, 0, 0)
-        if (venc.getTime() >= hoje.getTime()) return
-        const cambio = oc.moeda === 'BRL' ? 1 : oc.cambio ? Number(oc.cambio) : 1
-        const pagos =
-          (
-            oc as unknown as {
-              pagamentos?: Array<{
-                valor?: number | null
-                estornado?: boolean
-              }>
-            }
-          ).pagamentos
-            ?.filter((p) => !p.estornado)
-            .reduce((s, p) => s + Number(p.valor || 0), 0) || 0
-        const restanteOriginal = Number(oc.valor || 0) - pagos
-        if (restanteOriginal <= 0.005) return
-        vencido += restanteOriginal * cambio
-        qtdVencidas += 1
-      })
-
-    const qtdPendentes = outrosCustos
-      .filter((oc) => oc.natureza === 'COBRAR')
-      .filter((oc) => {
-        const pagos =
-          (
-            oc as unknown as {
-              pagamentos?: Array<{
-                valor?: number | null
-                estornado?: boolean
-              }>
-            }
-          ).pagamentos
-            ?.filter((p) => !p.estornado)
-            .reduce((s, p) => s + Number(p.valor || 0), 0) || 0
-        return Number(oc.valor || 0) - pagos > 0.005
-      }).length
-
-    return {
-      total: honTotal,
-      pago: honPago,
-      pendente: honPendente,
-      vencido,
-      qtdItens: honorariosTotal,
-      qtdPendentes,
-      qtdVencidas,
-    }
-  }, [totaisOC, outrosCustos, honorariosTotal])
-
-  const pctRecebido =
-    kpisConsolidados.total > 0
-      ? (kpisConsolidados.pago / kpisConsolidados.total) * 100
-      : 0
-
-  // Próximos vencimentos (honorários COBRAR vencendo em 7d)
-  const proximosVencimentos = useMemo(() => {
-    const hoje = new Date()
-    hoje.setHours(0, 0, 0, 0)
-    const lista: { nome: string; dias: number; valor: number; moeda: string }[] = []
-
-    outrosCustos
-      .filter((oc) => oc.natureza === 'COBRAR' && oc.vencimento)
-      .forEach((oc) => {
-        const venc = new Date(oc.vencimento as string)
-        venc.setHours(0, 0, 0, 0)
-        const dias = Math.ceil((venc.getTime() - hoje.getTime()) / 86400000)
-        if (dias < 0 || dias > 7) return
-        const pagos =
-          (
-            oc as unknown as {
-              pagamentos?: Array<{
-                valor?: number | null
-                estornado?: boolean
-              }>
-            }
-          ).pagamentos
-            ?.filter((p) => !p.estornado)
-            .reduce((s, p) => s + Number(p.valor || 0), 0) || 0
-        const restante = Number(oc.valor || 0) - pagos
-        if (restante <= 0.005) return
-        lista.push({
-          nome: oc.descricao || oc.tipo,
-          dias,
-          valor: restante,
-          moeda: oc.moeda,
-        })
-      })
-
-    lista.sort((a, b) => a.dias - b.dias)
-    return lista
-  }, [outrosCustos])
-
-  // ========================================
-  // DATA LOADING
-  // ========================================
+  // ---- Load ----
   useEffect(() => {
-    carregarOutrosCustos()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [processoId])
-
-  // Fecha dropdowns ao clicar fora
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      const target = e.target as HTMLElement
-      if (!target.closest('.rc-dropdown')) {
-        setDropdownAberto(null)
+    let cancelado = false
+    async function carregar() {
+      setLoading(true)
+      setErro(null)
+      try {
+        const res = await fetch(
+          `/api/financeiro/receitas?processoId=${processoId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('authToken') || ''}`,
+            },
+          },
+        )
+        if (cancelado) return
+        if (!res.ok) {
+          setErro(`Não foi possível carregar receitas (HTTP ${res.status}).`)
+          setReceitas([])
+          return
+        }
+        const data = await res.json()
+        const lista: ReceitaAPI[] = data?.receitas || data?.data || []
+        if (!cancelado) setReceitas(Array.isArray(lista) ? lista : [])
+      } catch (err) {
+        console.error('[Receitas] erro:', err)
+        if (!cancelado) {
+          setErro('Erro de conexão ao carregar receitas.')
+          setReceitas([])
+        }
+      } finally {
+        if (!cancelado) setLoading(false)
       }
     }
-    document.addEventListener('click', handleClick)
-    return () => document.removeEventListener('click', handleClick)
-  }, [])
+    carregar()
+    return () => {
+      cancelado = true
+    }
+  }, [processoId])
 
-  async function carregarOutrosCustos() {
+  async function recarregar() {
     try {
-      setLoading(true)
-      const res = await fetch(`/api/processos/${processoId}/outros-custos`, {
+      const res = await fetch(`/api/financeiro/receitas?processoId=${processoId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('authToken') || ''}`,
         },
       })
       if (!res.ok) return
       const data = await res.json()
-      setOutrosCustos(data.outrosCustos || [])
-      setTotaisOC(data.totais || null)
+      const lista: ReceitaAPI[] = data?.receitas || data?.data || []
+      setReceitas(Array.isArray(lista) ? lista : [])
     } catch (err) {
-      console.error('[Receitas] erro ao carregar outros custos:', err)
-    } finally {
-      setLoading(false)
+      console.error('[Receitas] recarregar:', err)
     }
   }
 
-  function handleNovoHonorario(novo: OutroCustoData) {
-    setOutrosCustos((atuais) => [novo, ...atuais])
-    carregarOutrosCustos()
-    onUpdate?.()
-  }
-
-  function handleAtualizarOutroCusto(atualizado: OutroCustoData) {
-    setOutrosCustos((atuais) =>
-      atuais.map((oc) => (oc.id === atualizado.id ? atualizado : oc)),
-    )
-    carregarOutrosCustos()
-    onUpdate?.()
-  }
-
-  function handleExcluirOutroCusto(id: number) {
-    setOutrosCustos((atuais) => atuais.filter((oc) => oc.id !== id))
-    carregarOutrosCustos()
-    onUpdate?.()
-  }
-
-  // ========================================
-  // FORMATTERS
-  // ========================================
-  const formatarMoeda = (valor: number, moeda: string = 'BRL') => {
-    return valor.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: moeda === 'BRL' ? 'BRL' : moeda,
+  // ---- KPIs ----
+  const kpis = useMemo(() => {
+    let totalEur = 0
+    let totalBrl = 0
+    let recebidoEur = 0
+    let recebidoBrl = 0
+    let pendenteEur = 0
+    let pendenteBrl = 0
+    let atrasadoEur = 0
+    let qtdAtrasadas = 0
+    receitas.forEach((r) => {
+      const cx = cambioEfetivo(r)
+      r.parcelas?.forEach((p) => {
+        const v = num(p.valor)
+        const vBrl = num(p.valorBrl) || v * cx
+        totalEur += v
+        totalBrl += vBrl
+        if (p.status === 'RECEBIDA' || p.status === 'PAGA') {
+          recebidoEur += v
+          recebidoBrl += num(p.valorBrl) || v * (num(p.cambioAplicado) || cx)
+        } else if (p.status === 'PENDENTE') {
+          pendenteEur += v
+          pendenteBrl += vBrl
+          if (isVencida(p)) {
+            atrasadoEur += v
+            qtdAtrasadas++
+          }
+        }
+      })
     })
-  }
+    return {
+      totalEur,
+      totalBrl,
+      recebidoEur,
+      recebidoBrl,
+      pendenteEur,
+      pendenteBrl,
+      atrasadoEur,
+      qtdAtrasadas,
+    }
+  }, [receitas])
 
-  // Stub pra "Detalhar →" — placeholder até Lote 6
-  function abrirDetalhesKPI(qual: string) {
-    alert(`Detalhar KPI "${qual}" — em breve.`)
-  }
+  // ---- Filtro ----
+  const receitasFiltradas = useMemo(() => {
+    if (filtro === 'todas') return receitas
+    if (filtro === 'recebidas') {
+      return receitas.filter((r) => {
+        const tot = r.parcelas?.length || 0
+        const rec = r.parcelas?.filter(
+          (p) => p.status === 'RECEBIDA' || p.status === 'PAGA',
+        ).length
+        return tot > 0 && rec === tot
+      })
+    }
+    return receitas.filter((r) =>
+      r.parcelas?.some((p) => p.status === 'PENDENTE'),
+    )
+  }, [receitas, filtro])
 
-  // ========================================
-  // RENDER
-  // ========================================
-  return (
-    <div className="flex flex-col bg-gray-50">
-      {/* ========================================================== */}
-      {/* KPIs CONSOLIDADOS                                            */}
-      {/* ========================================================== */}
-      <div className="px-6 pt-6">
-        <div className="fin-kpi-grid">
-          <div className="fin-card fin-card--purple rc-card-wrap">
-            <div className="fin-kpi">
-              <span className="fin-kpi__label">Total Cobrado</span>
-              <span className="fin-kpi__value fin-kpi__value--purple">
-                {fmtBRL(kpisConsolidados.total)}
-              </span>
-              <span className="fin-kpi__hint">
-                {kpisConsolidados.qtdItens} {kpisConsolidados.qtdItens === 1 ? 'lançamento' : 'lançamentos'}
-              </span>
-            </div>
-            <button
-              type="button"
-              className="rc-card-detalhar"
-              onClick={() => abrirDetalhesKPI('totalCobrado')}
-            >
-              Detalhar →
-            </button>
-          </div>
-
-          <div className="fin-card fin-card--green rc-card-wrap">
-            <div className="fin-kpi">
-              <span className="fin-kpi__label">Recebido</span>
-              <span className="fin-kpi__value fin-kpi__value--green">
-                {fmtBRL(kpisConsolidados.pago)}
-              </span>
-              <span className="fin-kpi__hint">
-                {pctRecebido.toFixed(0)}% do total
-              </span>
-            </div>
-            <button
-              type="button"
-              className="rc-card-detalhar"
-              onClick={() => abrirDetalhesKPI('recebido')}
-            >
-              Detalhar →
-            </button>
-          </div>
-
-          <div className="fin-card fin-card--yellow rc-card-wrap">
-            <div className="fin-kpi">
-              <span className="fin-kpi__label">A Receber</span>
-              <span className="fin-kpi__value fin-kpi__value--yellow">
-                {fmtBRL(kpisConsolidados.pendente)}
-              </span>
-              <span className="fin-kpi__hint">
-                {kpisConsolidados.qtdPendentes} {kpisConsolidados.qtdPendentes === 1 ? 'item pendente' : 'itens pendentes'}
-              </span>
-            </div>
-            <button
-              type="button"
-              className="rc-card-detalhar"
-              onClick={() => abrirDetalhesKPI('aReceber')}
-            >
-              Detalhar →
-            </button>
-          </div>
-
-          <div className="fin-card fin-card--red rc-card-wrap">
-            <div className="fin-kpi">
-              <span className="fin-kpi__label">Vencido</span>
-              <span className="fin-kpi__value fin-kpi__value--red">
-                {fmtBRL(kpisConsolidados.vencido)}
-              </span>
-              <span className="fin-kpi__hint">
-                {kpisConsolidados.qtdVencidas} {kpisConsolidados.qtdVencidas === 1 ? 'item em atraso' : 'itens em atraso'}
-              </span>
-            </div>
-            <button
-              type="button"
-              className="rc-card-detalhar"
-              onClick={() => abrirDetalhesKPI('vencido')}
-            >
-              Detalhar →
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================================== */}
-      {/* Próximos vencimentos (7d)                                   */}
-      {/* ========================================================== */}
-      {proximosVencimentos.length > 0 && (
-        <div className="px-6 pt-4">
-          <div className="rc-proxvenc-card">
-            <div className="rc-proxvenc-head">
-              <Bell className="h-4 w-4 text-amber-600" />
-              <span>Próximos vencimentos ({proximosVencimentos.length})</span>
-            </div>
-            <div className="rc-proxvenc-list">
-              {proximosVencimentos.slice(0, 3).map((v, i) => (
-                <div key={i} className="rc-proxvenc-item">
-                  <span className="rc-proxvenc-nome">
-                    <strong>{v.nome}</strong> · {formatarMoeda(v.valor, v.moeda)}
-                  </span>
-                  <span className={`rc-proxvenc-dias ${v.dias <= 1 ? 'urgente' : ''}`}>
-                    {v.dias === 0 ? 'Hoje' : v.dias === 1 ? 'Amanhã' : `${v.dias} dias`}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================== */}
-      {/* Header: "Receitas do processo" + busca + dropdowns          */}
-      {/* ========================================================== */}
-      <div className="px-6 pt-4">
-        <div className="rc-listagem-head">
-          <div>
-            <div className="rc-titulo">Receitas do processo</div>
-            <div className="rc-sub">
-              {kpisConsolidados.qtdItens} {kpisConsolidados.qtdItens === 1 ? 'item' : 'itens'} · Recebimentos do cliente
-            </div>
-          </div>
-          <div className="rc-topbar-acoes">
-            <div className="rc-busca-wrap">
-              <Search className="rc-busca-icon" />
-              <input
-                type="text"
-                value={buscaOC}
-                onChange={(e) => setBuscaOC(e.target.value)}
-                placeholder="Buscar..."
-                className="rc-busca"
-              />
-            </div>
-            <select
-              value={ordemOC}
-              onChange={(e) => setOrdemOC(e.target.value as OrdemOutroCusto)}
-              className="rc-ordem"
-            >
-              <option value="vencimento">Vencimento</option>
-              <option value="valor">Valor</option>
-              <option value="criacao">Mais recentes</option>
-            </select>
-
-            <div className="rc-dropdown">
-              <button
-                type="button"
-                className="rc-dropdown-btn"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setDropdownAberto(dropdownAberto === 'recibos' ? null : 'recibos')
-                }}
-              >
-                <FileText className="h-4 w-4" />
-                Recibos ▾
-              </button>
-              {dropdownAberto === 'recibos' && (
-                <div className="rc-dropdown-menu">
-                  <button onClick={() => alert('Em breve')}>Gerar recibo individual</button>
-                  <button onClick={() => alert('Em breve')}>Por requerente</button>
-                  <button onClick={() => alert('Em breve')}>Recibo consolidado do processo</button>
-                  <button onClick={() => alert('Em breve')}>Histórico emitidos</button>
-                </div>
-              )}
-            </div>
-
-            <div className="rc-dropdown">
-              <button
-                type="button"
-                className="rc-dropdown-btn"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setDropdownAberto(dropdownAberto === 'relatorios' ? null : 'relatorios')
-                }}
-              >
-                <FileDown className="h-4 w-4" />
-                Relatórios ▾
-              </button>
-              {dropdownAberto === 'relatorios' && (
-                <div className="rc-dropdown-menu">
-                  <button onClick={() => alert('Em breve')}>Extrato de Receitas (PDF)</button>
-                  <button onClick={() => alert('Em breve')}>Extrato por Requerente (PDF)</button>
-                  <button onClick={() => alert('Em breve')}>Relatório de Inadimplência (PDF)</button>
-                  <button onClick={() => alert('Em breve')}>Export CSV</button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================================== */}
-      {/* 🚫 Seção FATURAS removida (Marco 29/04/2026)                */}
-      {/*    Faturas continuam sendo gerenciadas em ProcessoFaturas   */}
-      {/*    no kanban. Aqui em Receitas ficam apenas honorários.    */}
-      {/* ========================================================== */}
-
-      {/* ========================================================== */}
-      {/* SEÇÃO: HONORÁRIOS DISCOVERY                                  */}
-      {/*                                                              */}
-      {/* 🚫 Estado vazio "Nenhum honorário lançado" e botão           */}
-      {/*    "+ Novo Lançamento" removidos (Marco 29/04/2026):         */}
-      {/*    "Nem esse novo lançamento". A criação de honorários       */}
-      {/*    acontece em outra aba; aqui é apenas visualização.        */}
-      {/* ========================================================== */}
-      {honorariosTotal > 0 && (
-        <div className="px-6 pt-4">
-          <div className="rc-secao-lbl">💼 Honorários Discovery e serviços ({honorariosTotal})</div>
-        </div>
-      )}
-
-      <div className="flex flex-col">
-        <div className="px-6 pb-6 pt-2">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center h-64">
-              <div className="animate-spin h-8 w-8 border-2 border-gray-200 border-t-purple-500 rounded-full mb-3" />
-              <p className="text-gray-500 text-sm">Carregando lançamentos...</p>
-            </div>
-          ) : honorariosTotal > 0 ? (
-            <div className="space-y-3">
-              {honorariosFiltrados.map((oc) => (
-                <OutroCustoCard
-                  key={oc.id}
-                  outroCusto={oc}
-                  onAtualizar={handleAtualizarOutroCusto}
-                  onExcluir={handleExcluirOutroCusto}
-                />
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      {/* ========================================================== */}
-      {/* MODAIS                                                       */}
-      {/*                                                              */}
-      {/* O modal NovoOutroCustoModal foi mantido aqui pra que outras  */}
-      {/* partes do sistema (ou ações futuras de pagamento dentro do  */}
-      {/* OutroCustoCard, como estornos) continuem funcionando sem    */}
-      {/* quebrar. Não é mais aberto por nenhum botão dentro desta    */}
-      {/* aba — fica apenas como "garagem" técnica.                   */}
-      {/* ========================================================== */}
-      <NovoOutroCustoModal
+  // ---- Render por view ----
+  if (view.kind === 'nova') {
+    return (
+      <NovaReceitaPagina
         processoId={processoId}
-        isOpen={modalNovoCobrarAberto}
-        onClose={() => setModalNovoCobrarAberto(false)}
-        onSuccess={handleNovoHonorario}
-        naturezaPadrao="COBRAR"
+        fxHoje={fxHoje}
+        onVoltar={() => setView({ kind: 'lista' })}
+        onCriado={() => {
+          setView({ kind: 'lista' })
+          recarregar()
+          onUpdate?.()
+        }}
       />
+    )
+  }
 
-      {/* CSS dos elementos novos */}
-      <style jsx>{`
-        /* Detalhar nos KPIs */
-        .rc-card-wrap { position: relative; }
-        .rc-card-detalhar {
-          position: absolute;
-          top: 12px;
-          right: 14px;
-          background: transparent;
-          border: none;
-          padding: 0;
-          font-size: 11px;
-          font-weight: 500;
-          color: #6b7280;
-          cursor: pointer;
-          transition: color 0.15s;
-        }
-        .rc-card-detalhar:hover {
-          color: #18181b;
-          text-decoration: underline;
-        }
+  if (view.kind === 'lancar') {
+    return (
+      <LancarParcelaPagina
+        parcela={view.parcela}
+        entidade={view.entidade}
+        fxHoje={fxHoje}
+        onVoltar={() => setView({ kind: 'lista' })}
+        onLancado={() => {
+          setView({ kind: 'lista' })
+          recarregar()
+          onUpdate?.()
+        }}
+      />
+    )
+  }
 
-        /* Próximos vencimentos */
-        .rc-proxvenc-card {
-          background: #fffbeb;
-          border: 1px solid #fde68a;
-          border-radius: 12px;
-          padding: 14px 18px;
-        }
-        .rc-proxvenc-head {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 13px;
-          font-weight: 700;
-          color: #92400e;
-          margin-bottom: 10px;
-        }
-        .rc-proxvenc-list {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .rc-proxvenc-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 12px;
-          padding: 6px 10px;
-          background: rgba(255, 255, 255, 0.5);
-          border-radius: 6px;
-          font-size: 13px;
-          color: #78350f;
-        }
-        .rc-proxvenc-nome { flex: 1; min-width: 0; }
-        .rc-proxvenc-dias {
-          font-size: 11px;
-          font-weight: 700;
-          padding: 2px 8px;
-          border-radius: 999px;
-          background: #fde68a;
-          color: #78350f;
-          flex-shrink: 0;
-        }
-        .rc-proxvenc-dias.urgente {
-          background: #fecaca;
-          color: #991b1b;
-        }
+  // ---- View 'lista' ----
+  return (
+    <div className="fpag-page">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Receitas</h1>
+          <div className="page-subtitle">Honorários e demais entradas do processo</div>
+        </div>
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => setView({ kind: 'nova' })}
+        >
+          + Nova Receita
+        </button>
+      </div>
 
-        /* Header listagem */
-        .rc-listagem-head {
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          gap: 16px;
-          flex-wrap: wrap;
-          padding: 12px 0;
-        }
-        .rc-titulo {
-          font-size: 18px;
-          font-weight: 700;
-          color: #18181b;
-        }
-        .rc-sub {
-          font-size: 12px;
-          color: #71717a;
-          margin-top: 2px;
-        }
-        .rc-topbar-acoes {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-          align-items: center;
-        }
-        .rc-busca-wrap {
-          position: relative;
-        }
-        .rc-busca-icon {
-          position: absolute;
-          left: 12px;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 16px;
-          height: 16px;
-          color: #9ca3af;
-          pointer-events: none;
-        }
-        .rc-busca {
-          padding: 10px 14px 10px 38px;
-          font-size: 14px;
-          border: 1px solid #e5e7eb;
-          border-radius: 10px;
-          background: #fff;
-          color: #18181b;
-          font-family: inherit;
-          outline: none;
-          width: 220px;
-          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-        }
-        .rc-busca::placeholder { color: #9ca3af; }
-        .rc-busca:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,.1); }
-        .rc-ordem {
-          padding: 10px 32px 10px 14px;
-          font-size: 14px;
-          border: 1px solid #e5e7eb;
-          border-radius: 10px;
-          background: #fff;
-          color: #18181b;
-          font-family: inherit;
-          cursor: pointer;
-          outline: none;
-          appearance: none;
-          background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e");
-          background-repeat: no-repeat;
-          background-position: right 12px center;
-          background-size: 12px;
-          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-          min-width: 140px;
-        }
-        .rc-dropdown {
-          position: relative;
-        }
-        .rc-dropdown-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 16px;
-          background: #fff;
-          color: #4b5563;
-          border: 1px solid #e5e7eb;
-          border-radius: 10px;
-          font-size: 14px;
-          font-weight: 500;
-          cursor: pointer;
-          font-family: inherit;
-          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-        }
-        .rc-dropdown-btn:hover { background: #f9fafb; }
-        .rc-dropdown-menu {
-          position: absolute;
-          top: calc(100% + 4px);
-          right: 0;
-          min-width: 240px;
-          background: #fff;
-          border: 1px solid #e5e7eb;
-          border-radius: 8px;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-          padding: 6px;
-          z-index: 30;
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-        .rc-dropdown-menu button {
-          text-align: left;
-          padding: 8px 12px;
-          background: transparent;
-          border: none;
-          border-radius: 6px;
-          font-size: 13px;
-          color: #18181b;
-          cursor: pointer;
-          font-family: inherit;
-        }
-        .rc-dropdown-menu button:hover { background: #f3f4f6; }
+      {/* KPIs */}
+      <div className="grid-4">
+        <div className="kpi">
+          <div className="kpi-label">📈 Total Previsto</div>
+          <div className="kpi-value">{fmtMoeda(kpis.totalEur, 'EUR')}</div>
+          <div className="kpi-sub">{fmtBRL(kpis.totalBrl)}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">✓ Recebido</div>
+          <div className="kpi-value pos">{fmtMoeda(kpis.recebidoEur, 'EUR')}</div>
+          <div className="kpi-sub pos">{fmtBRL(kpis.recebidoBrl)}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">⏳ Pendente</div>
+          <div className="kpi-value">{fmtMoeda(kpis.pendenteEur, 'EUR')}</div>
+          <div className="kpi-sub">{fmtBRL(kpis.pendenteBrl)}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">⚠ Inadimplente</div>
+          <div className="kpi-value neg">{fmtMoeda(kpis.atrasadoEur, 'EUR')}</div>
+          <div className="kpi-sub">
+            {kpis.qtdAtrasadas} {kpis.qtdAtrasadas === 1 ? 'parcela' : 'parcelas'}
+          </div>
+        </div>
+      </div>
 
-        /* Labels de seção */
-        .rc-secao-lbl {
-          font-size: 12px;
-          font-weight: 700;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: #6b7280;
-          padding: 16px 0 8px;
-          border-bottom: 1px solid #e5e7eb;
-          margin-bottom: 12px;
-        }
-      `}</style>
+      {/* Filter tabs */}
+      <div className="filter-tabs">
+        <button
+          type="button"
+          className={`filter-tab ${filtro === 'todas' ? 'active' : ''}`}
+          onClick={() => setFiltro('todas')}
+        >
+          Todas
+        </button>
+        <button
+          type="button"
+          className={`filter-tab ${filtro === 'recebidas' ? 'active' : ''}`}
+          onClick={() => setFiltro('recebidas')}
+        >
+          Recebidas
+        </button>
+        <button
+          type="button"
+          className={`filter-tab ${filtro === 'pendentes' ? 'active' : ''}`}
+          onClick={() => setFiltro('pendentes')}
+        >
+          Pendentes
+        </button>
+      </div>
+
+      {/* Erro / Loading / Lista */}
+      {erro && (
+        <div className="alert alert-danger" style={{ marginBottom: 16 }}>
+          <i className="alert-icon">⚠</i>
+          <span>{erro}</span>
+        </div>
+      )}
+
+      <div className="table-card">
+        {loading ? (
+          <div className="empty-state">Carregando receitas...</div>
+        ) : receitasFiltradas.length === 0 && receitas.length === 0 ? (
+          <div className="empty-state">
+            Nenhuma receita cadastrada. Clique em <strong>+ Nova Receita</strong> para começar.
+          </div>
+        ) : receitasFiltradas.length === 0 ? (
+          <div className="empty-state">Nenhuma receita corresponde ao filtro.</div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th style={{ width: 30 }}></th>
+                <th>Descrição</th>
+                <th>Tipo</th>
+                <th>Total (EUR)</th>
+                <th>Total (BRL)</th>
+                <th>Câmbio</th>
+                <th>Parcelas</th>
+                <th>Progresso</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {receitasFiltradas.map((r) => {
+                const cx = cambioEfetivo(r)
+                const totEur = num(r.valor)
+                const totBrl = totEur * cx
+                let recCount = 0
+                r.parcelas?.forEach((p) => {
+                  if (p.status === 'RECEBIDA' || p.status === 'PAGA') recCount++
+                })
+                const totParc = r.parcelas?.length || 0
+                const pct = totParc > 0 ? (recCount / totParc) * 100 : 0
+                const isQuit = totParc > 0 && recCount === totParc
+                const temAtraso = r.parcelas?.some(isVencida)
+
+                let statusBadge: React.ReactNode
+                if (isQuit)
+                  statusBadge = <span className="badge badge-recebida">Quitada</span>
+                else if (temAtraso)
+                  statusBadge = <span className="badge badge-atrasada">Atrasada</span>
+                else statusBadge = <span className="badge badge-pendente">Em aberto</span>
+
+                const fxBadge =
+                  r.moeda === 'BRL' ? (
+                    <span className="badge badge-pendente">BRL</span>
+                  ) : r.fxRule === 'FIXO' ? (
+                    <span className="badge-fx-fixo-sm">FIXO</span>
+                  ) : (
+                    <span className="badge-fx-var-sm">VAR</span>
+                  )
+
+                const proximaPendente = r.parcelas?.find((p) => p.status === 'PENDENTE')
+
+                return (
+                  <tr key={r.id}>
+                    <td>📑</td>
+                    <td>
+                      <strong>{r.descricao}</strong>
+                      <span className="muted-xs">{r.codigo}</span>
+                    </td>
+                    <td>{CATEGORIA_LABEL[r.categoria]}</td>
+                    <td>{fmtMoeda(totEur, r.moeda)}</td>
+                    <td className="brl">
+                      <strong>
+                        {fmtBRL(totBrl)}
+                        {r.moeda !== 'BRL' && r.fxRule === 'VARIAVEL' && (
+                          <span className="muted-xs">(est.)</span>
+                        )}
+                      </strong>
+                    </td>
+                    <td>
+                      {r.moeda === 'BRL' ? (
+                        <span className="muted">—</span>
+                      ) : r.fxRule === 'FIXO' ? (
+                        <>
+                          {fmtFX(num(r.fxFixo))} {fxBadge}
+                        </>
+                      ) : (
+                        <>
+                          {fmtFX(num(r.fxEstimado))} {fxBadge}
+                        </>
+                      )}
+                    </td>
+                    <td>
+                      {recCount}/{totParc}
+                    </td>
+                    <td>
+                      <div
+                        style={{
+                          width: 100,
+                          height: 6,
+                          background: 'var(--fpag-gray-100)',
+                          borderRadius: 3,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${pct}%`,
+                            height: '100%',
+                            background: 'var(--fpag-success)',
+                            transition: 'width .3s',
+                          }}
+                        />
+                      </div>
+                      <div className="muted-xs">{pct.toFixed(0)}%</div>
+                    </td>
+                    <td>{statusBadge}</td>
+                    <td>
+                      {proximaPendente ? (
+                        <button
+                          type="button"
+                          className="btn-link-sm"
+                          onClick={() =>
+                            setView({
+                              kind: 'lancar',
+                              parcela: {
+                                id: proximaPendente.id,
+                                numero: proximaPendente.numero,
+                                valor: num(proximaPendente.valor),
+                                vencimento: proximaPendente.vencimento,
+                              },
+                              entidade: {
+                                tipo: 'receita',
+                                descricao: r.descricao,
+                                moeda: r.moeda,
+                                fxRule: r.fxRule,
+                                fxFixo: r.fxFixo != null ? num(r.fxFixo) : null,
+                                fxEstimado: num(r.fxEstimado) || 1,
+                                totalParcelas: r.nParcelas,
+                              },
+                            })
+                          }
+                        >
+                          Lançar
+                        </button>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   )
 }
