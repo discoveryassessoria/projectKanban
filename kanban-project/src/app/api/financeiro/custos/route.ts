@@ -1,6 +1,6 @@
 // src/app/api/financeiro/custos/route.ts
 // GET  /api/financeiro/custos?processoId=X  → lista custos do processo
-// POST /api/financeiro/custos               → cria custo (com parcelas)
+// POST /api/financeiro/custos               → cria custo (com parcelas, exceto rascunho)
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -71,8 +71,12 @@ export async function POST(req: NextRequest) {
         ? Number((data.valor * data.fxFixo).toFixed(2))
         : null;
 
-    // 1ª parcela vence em "vencimento"; demais seguem mensalmente
-    const parcelas = gerarParcelas(data.valor, data.nParcelas, data.vencimento);
+    // 🆕 Rascunho não gera parcelas — só são criadas quando promove pra ATIVA
+    // (via PATCH, que detecta a mudança e regenera com os valores efetivos)
+    const isRascunho = data.status === "RASCUNHO";
+    const parcelas = isRascunho
+      ? []
+      : gerarParcelas(data.valor, data.nParcelas, data.vencimento);
 
     const cambioReferencia = data.fxFixo ?? data.fxEstimado;
     const valorBrlReferencia = Number(
@@ -101,18 +105,25 @@ export async function POST(req: NextRequest) {
         percentualVinculado: data.percentualVinculado ?? null,
         formaPagamento: data.formaPagamento ?? null,
         observacoes: data.observacoes ?? null,
-        parcelas: {
-          create: parcelas.map((p) => ({
-            numero: p.numero,
-            vencimento: p.vencimento,
-            valor: p.valor,
-            status: "PENDENTE" as const,
-          })),
-        },
+        // 🆕 status agora é persistido (era ignorado antes)
+        status: data.status,
+        // Cria parcelas só se NÃO é rascunho
+        ...(parcelas.length > 0 && {
+          parcelas: {
+            create: parcelas.map((p) => ({
+              numero: p.numero,
+              vencimento: p.vencimento,
+              valor: p.valor,
+              status: "PENDENTE" as const,
+            })),
+          },
+        }),
         eventos: {
           create: {
             tipo: "CRIACAO" as const,
-            descricao: `Custo criado: ${data.descricao}`,
+            descricao: isRascunho
+              ? `Rascunho criado: ${data.descricao}`
+              : `Custo criado: ${data.descricao}`,
             valor: data.valor,
             cambio: cambioReferencia,
             valorBrl: valorBrlReferencia,

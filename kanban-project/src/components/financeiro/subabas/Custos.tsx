@@ -1,20 +1,21 @@
 // src/components/financeiro/subabas/Custos.tsx
 //
-// 🆕 Fase 3 v2 — Custos com view router interno.
+// 🆕 Fase 3 v2.1 — Custos com view router interno.
 //
 // Estrutura:
 //   - View 'lista':
 //       Section 1: 📂 Pasta Documental (TabelaCustos antiga, intocada)
 //       Section 2: 🧾 Registrar Custos (Fase 3 — KPIs + tabela)
-//   - View 'nova'  → renderiza <NovoCustoPagina />
+//   - View 'nova'   → renderiza <NovoCustoPagina />
+//   - View 'editar' → renderiza <NovoCustoPagina custoInicial={...} />
 //   - View 'lancar' → renderiza <LancarParcelaPagina tipo="custo" />
 //
-// Decisão Marco (30/04/2026): Pasta Documental NÃO entra no totalizador
-// "PAGAMENTO A FORNECEDORES" da sidebar — é apenas reposição/repasse documental.
-//
-// ⚠️ Importação da TabelaCustos: usa o caminho que você já tem no projeto
-// (provavelmente `@/src/components/financeiro/financeiroComponents/TabelaCustos`).
-// Se a sua importação for outra, ajuste a linha do import abaixo.
+// 🆕 v2.1 — KPIs em BRL principal (igual ao Receitas).
+// 🆕 v2   — Header da coluna "Total (orig.)" sempre.
+//         — Filtra custos cancelados (cancelado=true) antes de tudo.
+//         — Aba 📝 Rascunhos após "A pagar".
+//         — Linha de rascunho com botões Editar / Excluir.
+//         — KPIs agora consideram apenas custos ATIVOS (rascunhos fora).
 
 'use client'
 
@@ -27,8 +28,8 @@ import {
   type EntidadeLancavel,
 } from '@/src/components/financeiro/paginas/LancarParcelaPagina'
 
-// ⚠️ Ajuste o caminho se diferente no seu projeto:
 import { TabelaCustos } from '@/src/components/kanban/TabelaCustos'
+import { parseLista } from '@/src/lib/financeiro/parseLista'
 
 // ============================================================================
 // Tipos
@@ -44,6 +45,7 @@ type CategoriaCusto =
   | 'HONORARIOS_ESCRITORIO'
   | 'TAXAS_CONSULARES'
   | 'OUTROS'
+type CustoStatus = 'ATIVA' | 'RASCUNHO' | 'CANCELADA'
 
 interface ParcelaAPI {
   id: number
@@ -68,13 +70,19 @@ interface CustoAPI {
   fxEstimado: number | string
   fxRule: FxRule
   fxFixo?: number | string | null
+  fxData?: string | null
   nParcelas: number
   vencimento: string
   custoOperacional?: boolean
+  categoriaVinculada?: string | null
+  percentualVinculado?: number | null
+  formaPagamento?: string | null
+  status?: CustoStatus
+  cancelado?: boolean
   parcelas: ParcelaAPI[]
 }
 
-type Filter = 'todos' | 'pagos' | 'pendentes'
+type Filter = 'todos' | 'pagos' | 'pendentes' | 'rascunhos'
 
 export interface CustosProps {
   processoId: number
@@ -135,7 +143,12 @@ function isVencida(p: ParcelaAPI): boolean {
 type View =
   | { kind: 'lista' }
   | { kind: 'nova' }
+  | { kind: 'editar'; custo: CustoAPI }
   | { kind: 'lancar'; parcela: ParcelaLancavel; entidade: EntidadeLancavel }
+
+// Cast pra TS não reclamar de prop opcional `custoInicial` adicionada na v4.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const NovoCustoPaginaAny = NovoCustoPagina as any
 
 export function Custos({
   processoId,
@@ -148,6 +161,7 @@ export function Custos({
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<Filter>('todos')
+  const [excluindoId, setExcluindoId] = useState<number | null>(null)
 
   // ---- Load ----
   useEffect(() => {
@@ -171,7 +185,7 @@ export function Custos({
           return
         }
         const data = await res.json()
-        const lista: CustoAPI[] = data?.custos || data?.data || []
+        const lista = parseLista<CustoAPI>(data)
         if (!cancelado) setCustos(Array.isArray(lista) ? lista : [])
       } catch (err) {
         console.error('[Custos] erro:', err)
@@ -198,59 +212,95 @@ export function Custos({
       })
       if (!res.ok) return
       const data = await res.json()
-      const lista: CustoAPI[] = data?.custos || data?.data || []
+      const lista = parseLista<CustoAPI>(data)
       setCustos(Array.isArray(lista) ? lista : [])
     } catch (err) {
       console.error('[Custos] recarregar:', err)
     }
   }
 
-  // ---- KPIs ----
+  // ---- Excluir rascunho (soft delete: marca cancelado=true) ----
+  async function excluirRascunho(c: CustoAPI) {
+    if (!window.confirm(`Excluir o rascunho "${c.descricao}"?\n\nEsta ação não pode ser desfeita.`)) {
+      return
+    }
+    setExcluindoId(c.id)
+    try {
+      const res = await fetch(`/api/financeiro/custos/${c.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken') || ''}`,
+        },
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data?.error || `Falha ao excluir (HTTP ${res.status}).`)
+        return
+      }
+      await recarregar()
+      onUpdate?.()
+    } catch (err) {
+      console.error('[Custos] excluir:', err)
+      alert('Erro de conexão ao excluir.')
+    } finally {
+      setExcluindoId(null)
+    }
+  }
+
+  // ---- Separação por status (custos cancelados somem) ----
+  const custosVisiveis = useMemo(
+    () => custos.filter((c) => !c.cancelado),
+    [custos],
+  )
+
+  const custosAtivos = useMemo(
+    () => custosVisiveis.filter((c) => (c.status ?? 'ATIVA') === 'ATIVA'),
+    [custosVisiveis],
+  )
+  const custosRascunho = useMemo(
+    () => custosVisiveis.filter((c) => c.status === 'RASCUNHO'),
+    [custosVisiveis],
+  )
+
+  // ---- KPIs (sempre sobre ATIVOS, em BRL como denominador comum) ----
   const kpis = useMemo(() => {
-    let totalEur = 0
     let totalBrl = 0
-    let pagoEur = 0
     let pagoBrl = 0
-    let pendenteEur = 0
     let pendenteBrl = 0
-    let atrasadoEur = 0
+    let atrasadoBrl = 0
     let qtdAtrasadas = 0
-    custos.forEach((c) => {
+    custosAtivos.forEach((c) => {
       const cx = cambioEfetivo(c)
       c.parcelas?.forEach((p) => {
         const v = num(p.valor)
         const vBrl = num(p.valorBrl) || v * cx
-        totalEur += v
         totalBrl += vBrl
         if (p.status === 'PAGA' || p.status === 'RECEBIDA') {
-          pagoEur += v
           pagoBrl += num(p.valorBrl) || v * (num(p.cambioAplicado) || cx)
         } else if (p.status === 'PENDENTE') {
-          pendenteEur += v
           pendenteBrl += vBrl
           if (isVencida(p)) {
-            atrasadoEur += v
+            atrasadoBrl += vBrl
             qtdAtrasadas++
           }
         }
       })
     })
     return {
-      totalEur,
       totalBrl,
-      pagoEur,
       pagoBrl,
-      pendenteEur,
       pendenteBrl,
-      atrasadoEur,
+      atrasadoBrl,
       qtdAtrasadas,
     }
-  }, [custos])
+  }, [custosAtivos])
 
-  const custosFiltrados = useMemo(() => {
-    if (filtro === 'todos') return custos
+  // ---- Filtro aplicado ----
+  const custosExibidos = useMemo(() => {
+    if (filtro === 'rascunhos') return custosRascunho
+    if (filtro === 'todos') return custosAtivos
     if (filtro === 'pagos') {
-      return custos.filter((c) => {
+      return custosAtivos.filter((c) => {
         const tot = c.parcelas?.length || 0
         const pg = c.parcelas?.filter(
           (p) => p.status === 'PAGA' || p.status === 'RECEBIDA',
@@ -258,8 +308,10 @@ export function Custos({
         return tot > 0 && pg === tot
       })
     }
-    return custos.filter((c) => c.parcelas?.some((p) => p.status === 'PENDENTE'))
-  }, [custos, filtro])
+    return custosAtivos.filter((c) =>
+      c.parcelas?.some((p) => p.status === 'PENDENTE'),
+    )
+  }, [custosAtivos, custosRascunho, filtro])
 
   // ---- Render por view ----
   if (view.kind === 'nova') {
@@ -267,6 +319,22 @@ export function Custos({
       <NovoCustoPagina
         processoId={processoId}
         fxHoje={fxHoje}
+        onVoltar={() => setView({ kind: 'lista' })}
+        onCriado={() => {
+          setView({ kind: 'lista' })
+          recarregar()
+          onUpdate?.()
+        }}
+      />
+    )
+  }
+
+  if (view.kind === 'editar') {
+    return (
+      <NovoCustoPaginaAny
+        processoId={processoId}
+        fxHoje={fxHoje}
+        custoInicial={view.custo}
         onVoltar={() => setView({ kind: 'lista' })}
         onCriado={() => {
           setView({ kind: 'lista' })
@@ -327,26 +395,30 @@ export function Custos({
           </button>
         </div>
 
-        {/* KPIs */}
+        {/* KPIs (BRL como denominador comum entre moedas) */}
         <div className="grid-4">
           <div className="kpi">
             <div className="kpi-label">📉 Total Previsto</div>
-            <div className="kpi-value">{fmtMoeda(kpis.totalEur, 'EUR')}</div>
-            <div className="kpi-sub">{fmtBRL(kpis.totalBrl)}</div>
+            <div className="kpi-value">{fmtBRL(kpis.totalBrl)}</div>
+            <div className="kpi-sub">
+              {custosAtivos.length} {custosAtivos.length === 1 ? 'custo' : 'custos'}
+            </div>
           </div>
           <div className="kpi">
             <div className="kpi-label">✓ Pago</div>
-            <div className="kpi-value pos">{fmtMoeda(kpis.pagoEur, 'EUR')}</div>
-            <div className="kpi-sub pos">{fmtBRL(kpis.pagoBrl)}</div>
+            <div className="kpi-value pos">{fmtBRL(kpis.pagoBrl)}</div>
+            <div className="kpi-sub pos">já pago</div>
           </div>
           <div className="kpi">
             <div className="kpi-label">⏳ A Pagar</div>
-            <div className="kpi-value">{fmtMoeda(kpis.pendenteEur, 'EUR')}</div>
-            <div className="kpi-sub">{fmtBRL(kpis.pendenteBrl)}</div>
+            <div className="kpi-value">{fmtBRL(kpis.pendenteBrl)}</div>
+            <div className="kpi-sub">pendente</div>
           </div>
           <div className="kpi">
             <div className="kpi-label">⚠ Atrasado</div>
-            <div className="kpi-value neg">{fmtMoeda(kpis.atrasadoEur, 'EUR')}</div>
+            <div className="kpi-value neg">
+              {kpis.qtdAtrasadas} {kpis.qtdAtrasadas === 1 ? 'parc.' : 'parc.'}
+            </div>
             <div className="kpi-sub">
               {kpis.qtdAtrasadas} {kpis.qtdAtrasadas === 1 ? 'parcela' : 'parcelas'}
             </div>
@@ -360,7 +432,10 @@ export function Custos({
             className={`filter-tab ${filtro === 'todos' ? 'active' : ''}`}
             onClick={() => setFiltro('todos')}
           >
-            Todos
+            Todos{' '}
+            <span style={{ opacity: 0.6, marginLeft: 6 }}>
+              ({custosAtivos.length})
+            </span>
           </button>
           <button
             type="button"
@@ -376,6 +451,16 @@ export function Custos({
           >
             A pagar
           </button>
+          <button
+            type="button"
+            className={`filter-tab ${filtro === 'rascunhos' ? 'active' : ''}`}
+            onClick={() => setFiltro('rascunhos')}
+          >
+            📝 Rascunhos{' '}
+            <span style={{ opacity: 0.6, marginLeft: 6 }}>
+              ({custosRascunho.length})
+            </span>
+          </button>
         </div>
 
         {erro && (
@@ -388,12 +473,18 @@ export function Custos({
         <div className="table-card">
           {loading ? (
             <div className="empty-state">Carregando custos...</div>
-          ) : custosFiltrados.length === 0 && custos.length === 0 ? (
+          ) : custosExibidos.length === 0 &&
+            custosAtivos.length === 0 &&
+            custosRascunho.length === 0 ? (
             <div className="empty-state">
               Nenhum custo cadastrado. Clique em <strong>+ Novo Custo</strong> para começar.
             </div>
-          ) : custosFiltrados.length === 0 ? (
-            <div className="empty-state">Nenhum custo corresponde ao filtro.</div>
+          ) : custosExibidos.length === 0 ? (
+            <div className="empty-state">
+              {filtro === 'rascunhos'
+                ? 'Nenhum rascunho salvo.'
+                : 'Nenhum custo corresponde ao filtro.'}
+            </div>
           ) : (
             <table>
               <thead>
@@ -402,7 +493,7 @@ export function Custos({
                   <th>Descrição</th>
                   <th>Tipo / Categoria</th>
                   <th>Fornecedor</th>
-                  <th>Total (EUR)</th>
+                  <th>Total (orig.)</th>
                   <th>Total (BRL)</th>
                   <th>Câmbio</th>
                   <th>Parcelas</th>
@@ -411,10 +502,10 @@ export function Custos({
                 </tr>
               </thead>
               <tbody>
-                {custosFiltrados.map((c) => {
+                {custosExibidos.map((c) => {
                   const cx = cambioEfetivo(c)
-                  const totEur = num(c.valor)
-                  const totBrl = totEur * cx
+                  const totOrig = num(c.valor)
+                  const totBrl = totOrig * cx
                   let pgCount = 0
                   c.parcelas?.forEach((p) => {
                     if (p.status === 'PAGA' || p.status === 'RECEBIDA') pgCount++
@@ -422,9 +513,21 @@ export function Custos({
                   const totParc = c.parcelas?.length || 0
                   const isQuit = totParc > 0 && pgCount === totParc
                   const temAtraso = c.parcelas?.some(isVencida)
+                  const isRascunho = c.status === 'RASCUNHO'
+                  const sendoExcluido = excluindoId === c.id
 
                   let statusBadge: React.ReactNode
-                  if (isQuit) statusBadge = <span className="badge badge-recebida">Pago</span>
+                  if (isRascunho)
+                    statusBadge = (
+                      <span
+                        className="badge"
+                        style={{ background: '#f1f5f9', color: '#475569' }}
+                      >
+                        📝 Rascunho
+                      </span>
+                    )
+                  else if (isQuit)
+                    statusBadge = <span className="badge badge-recebida">Pago</span>
                   else if (temAtraso)
                     statusBadge = <span className="badge badge-atrasada">Atrasado</span>
                   else statusBadge = <span className="badge badge-pendente">A pagar</span>
@@ -441,8 +544,15 @@ export function Custos({
                   const proximaPendente = c.parcelas?.find((p) => p.status === 'PENDENTE')
 
                   return (
-                    <tr key={c.id}>
-                      <td>📋</td>
+                    <tr
+                      key={c.id}
+                      style={
+                        isRascunho || sendoExcluido
+                          ? { opacity: sendoExcluido ? 0.4 : 0.7 }
+                          : undefined
+                      }
+                    >
+                      <td>{isRascunho ? '📝' : '📋'}</td>
                       <td>
                         <strong>{c.descricao}</strong>
                         <span className="muted-xs">{c.codigo}</span>
@@ -452,7 +562,7 @@ export function Custos({
                         <span className="muted-xs">{CAT_LABEL[c.categoria]}</span>
                       </td>
                       <td>{c.fornecedor || <span className="muted">—</span>}</td>
-                      <td>{fmtMoeda(totEur, c.moeda)}</td>
+                      <td>{fmtMoeda(totOrig, c.moeda)}</td>
                       <td className="brl">
                         <strong>
                           {fmtBRL(totBrl)}
@@ -479,7 +589,27 @@ export function Custos({
                       </td>
                       <td>{statusBadge}</td>
                       <td>
-                        {proximaPendente ? (
+                        {isRascunho ? (
+                          <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
+                            <button
+                              type="button"
+                              className="btn-link-sm"
+                              onClick={() => setView({ kind: 'editar', custo: c })}
+                              disabled={sendoExcluido}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-link-sm"
+                              style={{ color: '#dc2626' }}
+                              onClick={() => excluirRascunho(c)}
+                              disabled={sendoExcluido}
+                            >
+                              {sendoExcluido ? 'Excluindo...' : 'Excluir'}
+                            </button>
+                          </div>
+                        ) : proximaPendente ? (
                           <button
                             type="button"
                             className="btn-link-sm"

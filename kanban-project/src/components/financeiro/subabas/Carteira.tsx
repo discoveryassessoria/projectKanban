@@ -22,6 +22,7 @@
 
 import '@/src/styles/financeiro-paginas.css'
 import { useEffect, useMemo, useState } from 'react'
+import { parseLista } from '@/src/lib/financeiro/parseLista'
 
 // ============================================================================
 // Tipos
@@ -269,12 +270,12 @@ export function Carteira({
         if (cancelado) return
         if (resR.ok) {
           const d = await resR.json()
-          const lst: ItemAPI[] = d?.receitas || d?.data || []
+          const lst = parseLista<ItemAPI>(d)
           if (!cancelado) setReceitas(Array.isArray(lst) ? lst : [])
         }
         if (resC.ok) {
           const d = await resC.json()
-          const lst: ItemAPI[] = d?.custos || d?.data || []
+          const lst = parseLista<ItemAPI>(d)
           if (!cancelado) setCustos(Array.isArray(lst) ? lst : [])
         }
       } catch (err) {

@@ -1,6 +1,7 @@
 // src/app/api/financeiro/receitas/[id]/route.ts
 // GET    /api/financeiro/receitas/[id]
-// PATCH  /api/financeiro/receitas/[id]
+// PATCH  /api/financeiro/receitas/[id]   regenera parcelas quando campos críticos mudam
+//                                        ou quando rascunho é promovido pra ativa
 // DELETE /api/financeiro/receitas/[id]
 
 import { NextRequest, NextResponse } from "next/server";
@@ -18,6 +19,48 @@ async function parseId(ctx: RouteContext): Promise<number | null> {
   return !id || isNaN(id) ? null : id;
 }
 
+// ============================================================
+// Helper: adiciona N meses a uma data, ajustando overflow
+// (ex.: 31/01 + 1 mês → 28/02 ou 29/02, não 03/03)
+// ============================================================
+function addMonths(d: Date, n: number): Date {
+  const out = new Date(d);
+  const targetDay = out.getDate();
+  out.setDate(1);
+  out.setMonth(out.getMonth() + n);
+  const ultimoDia = new Date(out.getFullYear(), out.getMonth() + 1, 0).getDate();
+  out.setDate(Math.min(targetDay, ultimoDia));
+  return out;
+}
+
+// ============================================================
+// Helper: gera array de parcelas pra Receita
+// ============================================================
+function gerarParcelas(opts: {
+  valor: number;
+  nParcelas: number;
+  dataInicio: Date;
+}): Array<{ numero: number; vencimento: Date; valor: number }> {
+  const { valor, nParcelas, dataInicio } = opts;
+  const valorCentavos = Math.round(valor * 100);
+  const baseCentavos = Math.floor(valorCentavos / nParcelas);
+  const restoCentavos = valorCentavos - baseCentavos * nParcelas;
+
+  return Array.from({ length: nParcelas }, (_, i) => {
+    const venc = addMonths(dataInicio, i);
+    const centavos =
+      i === nParcelas - 1 ? baseCentavos + restoCentavos : baseCentavos;
+    return {
+      numero: i + 1,
+      vencimento: venc,
+      valor: centavos / 100,
+    };
+  });
+}
+
+// ============================================================
+// GET
+// ============================================================
 export async function GET(_req: NextRequest, ctx: RouteContext) {
   try {
     const id = await parseId(ctx);
@@ -49,6 +92,19 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
   }
 }
 
+// ============================================================
+// PATCH — atualiza receita e regenera parcelas se necessário
+// ============================================================
+const CAMPOS_QUE_AFETAM_PARCELAS = [
+  "valor",
+  "nParcelas",
+  "data1",
+  "periodicidade",
+  "moeda",
+  "fxRule",
+  "fxFixo",
+] as const;
+
 export async function PATCH(req: NextRequest, ctx: RouteContext) {
   try {
     const id = await parseId(ctx);
@@ -67,7 +123,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
 
     const existente = await prisma.receita.findUnique({
       where: { id },
-      select: { id: true, descricao: true, cancelada: true },
+      include: { parcelas: true },
     });
     if (!existente) {
       return NextResponse.json(
@@ -94,21 +150,90 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       );
     }
 
-    const atualizada = await prisma.receita.update({
-      where: { id },
-      data,
-      include: {
-        parcelas: { orderBy: { numero: "asc" } },
-        requerentes: { orderBy: { idx: "asc" } },
-        eventos: { orderBy: { createdAt: "desc" } },
-      },
+    // Algum campo crítico (valor/parcelas/datas/câmbio) foi enviado?
+    const algumCampoCriticoMudou = CAMPOS_QUE_AFETAM_PARCELAS.some(
+      (k) => (data as Record<string, unknown>)[k] !== undefined
+    );
+
+    // 🆕 Está promovendo rascunho → ativa?
+    // Quando isso acontece, sempre regenera porque o rascunho NÃO tem parcelas
+    // (são geradas no momento da promoção).
+    const eraRascunho = existente.status === "RASCUNHO";
+    const novoStatus = data.status ?? existente.status;
+    const promovendoParaAtiva = eraRascunho && novoStatus === "ATIVA";
+
+    const regenerarParcelas = promovendoParaAtiva || algumCampoCriticoMudou;
+
+    if (regenerarParcelas) {
+      // Bloqueia se já existe parcela RECEBIDA/PAGA (não dá pra regenerar
+      // sem perder histórico). Rascunho não tem parcelas → passa direto.
+      const temParcelaProcessada = existente.parcelas.some(
+        (p) => p.status === "RECEBIDA" || p.status === "PAGA"
+      );
+      if (temParcelaProcessada) {
+        return NextResponse.json(
+          {
+            error:
+              "Não é possível alterar valor/parcelas/datas: existem parcelas já recebidas. Estorne ou cancele primeiro.",
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    // Valores efetivos (campo enviado OU original)
+    const valorEfetivo = data.valor ?? Number(existente.valor);
+    const nParcEfetivo = data.nParcelas ?? existente.nParcelas;
+    const dataInicioEfetiva = data.data1 ?? existente.data1;
+
+    // Transação: regenerar parcelas (se for o caso) + atualizar
+    const atualizada = await prisma.$transaction(async (tx) => {
+      if (regenerarParcelas) {
+        await tx.parcelaFinanceira.deleteMany({
+          where: { receitaId: id },
+        });
+        // Só cria parcelas se o valor for > 0 (rascunho sendo promovido
+        // sem ter preenchido valor não deveria gerar parcelas zeradas)
+        if (valorEfetivo > 0 && nParcEfetivo > 0) {
+          const novasParcelas = gerarParcelas({
+            valor: valorEfetivo,
+            nParcelas: nParcEfetivo,
+            dataInicio: dataInicioEfetiva,
+          });
+          await tx.parcelaFinanceira.createMany({
+            data: novasParcelas.map((p) => ({
+              receitaId: id,
+              numero: p.numero,
+              vencimento: p.vencimento,
+              valor: p.valor,
+              status: "PENDENTE",
+            })),
+          });
+        }
+      }
+
+      return await tx.receita.update({
+        where: { id },
+        data,
+        include: {
+          parcelas: { orderBy: { numero: "asc" } },
+          requerentes: { orderBy: { idx: "asc" } },
+          eventos: { orderBy: { createdAt: "desc" } },
+        },
+      });
     });
+
+    const eventoDesc = promovendoParaAtiva
+      ? `Rascunho promovido para ATIVA (campos: ${camposAlterados.join(", ")})${algumCampoCriticoMudou ? " — parcelas regeneradas" : " — parcelas geradas"}`
+      : `Receita editada (campos: ${camposAlterados.join(", ")})${
+          algumCampoCriticoMudou ? " — parcelas regeneradas" : ""
+        }`;
 
     await prisma.eventoFinanceiro.create({
       data: {
         receitaId: id,
         tipo: "EDICAO",
-        descricao: `Receita editada (campos: ${camposAlterados.join(", ")})`,
+        descricao: eventoDesc,
       },
     });
 
@@ -122,6 +247,9 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
   }
 }
 
+// ============================================================
+// DELETE — soft delete (marca cancelada=true)
+// ============================================================
 export async function DELETE(_req: NextRequest, ctx: RouteContext) {
   try {
     const id = await parseId(ctx);

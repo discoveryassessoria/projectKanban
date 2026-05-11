@@ -13,6 +13,7 @@
 
 import '@/src/styles/financeiro-paginas.css'
 import { useEffect, useMemo, useState } from 'react'
+import { parseLista } from '@/src/lib/financeiro/parseLista'
 
 // ============================================================================
 // Tipos
@@ -189,7 +190,7 @@ export function Documentos({
         if (cancelado) return
         if (res.ok) {
           const d = await res.json()
-          const lst: ReceitaAPI[] = d?.receitas || d?.data || []
+          const lst = parseLista<ReceitaAPI>(d)
           if (!cancelado) setReceitas(Array.isArray(lst) ? lst : [])
         }
       } catch (err) {

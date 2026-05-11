@@ -1,13 +1,23 @@
 // src/components/financeiro/subabas/Receitas.tsx
 //
-// 🆕 Fase 3 v2 — Receitas com view router interno (não usa mais modais).
+// 🆕 Fase 3 v2.2 — Receitas com view router interno (não usa mais modais).
 //
 // Views:
 //   - 'lista'   → KPIs + tabela de receitas (clone visual do #page-receitas)
-//   - 'nova'    → renderiza <NovaReceitaPagina />
+//   - 'nova'    → renderiza <NovaReceitaPagina /> (sem receitaInicial)
+//   - 'editar'  → renderiza <NovaReceitaPagina receitaInicial={...} />
 //   - 'lancar'  → renderiza <LancarParcelaPagina tipo="receita" />
 //
-// Endpoint: GET /api/financeiro/receitas?processoId=X
+// 🆕 v2.2 — Mudanças:
+//   - Header da coluna de total agora é "Total (orig.)" sempre (antes era
+//     "Total (EUR)" fixo, mas as receitas podem ser em BRL/USD/EUR).
+//   - Filtra receitas canceladas (cancelada=true) antes de qualquer outro
+//     filtro — quando o DELETE da rota marca cancelada, some da lista.
+//   - Linha de rascunho agora tem ações "Editar" e "Excluir".
+//
+// Endpoints:
+//   - GET    /api/financeiro/receitas?processoId=X
+//   - DELETE /api/financeiro/receitas/[id]   (soft delete: cancelada=true)
 
 'use client'
 
@@ -28,6 +38,7 @@ type Moeda = 'BRL' | 'EUR' | 'USD'
 type FxRule = 'FIXO' | 'VARIAVEL'
 type StatusParcela = 'PENDENTE' | 'RECEBIDA' | 'PAGA' | 'CANCELADA'
 type CategoriaReceita = 'HONORARIOS' | 'REEMBOLSO' | 'PASTA_DOCUMENTAL' | 'OUTROS'
+type ReceitaStatus = 'ATIVA' | 'RASCUNHO' | 'CANCELADA'
 
 interface ParcelaAPI {
   id: number
@@ -42,6 +53,8 @@ interface ParcelaAPI {
 
 interface ReceitaRequerenteAPI {
   id: number
+  idx?: number
+  requerenteId?: number | null
   percentual: number | string
   nome?: string
   requerente?: { id: number; nome: string }
@@ -57,13 +70,16 @@ interface ReceitaAPI {
   fxEstimado: number | string
   fxRule: FxRule
   fxFixo?: number | string | null
+  fxData?: string | null
   nParcelas: number
   data1: string
+  status?: ReceitaStatus
+  cancelada?: boolean
   parcelas: ParcelaAPI[]
   requerentes?: ReceitaRequerenteAPI[]
 }
 
-type Filter = 'todas' | 'recebidas' | 'pendentes'
+type Filter = 'todas' | 'recebidas' | 'pendentes' | 'rascunhos'
 
 export interface ReceitasProps {
   processoId: number
@@ -116,6 +132,13 @@ function isVencida(p: ParcelaAPI): boolean {
   return v.getTime() < hoje.getTime()
 }
 
+// 🆕 Parse defensivo: backend retorna array direto, mas suporta wrapper também
+function parseLista(data: unknown): ReceitaAPI[] {
+  if (Array.isArray(data)) return data as ReceitaAPI[]
+  const d = data as { receitas?: ReceitaAPI[]; data?: ReceitaAPI[] } | null
+  return d?.receitas || d?.data || []
+}
+
 // ============================================================================
 // Componente
 // ============================================================================
@@ -123,6 +146,7 @@ function isVencida(p: ParcelaAPI): boolean {
 type View =
   | { kind: 'lista' }
   | { kind: 'nova' }
+  | { kind: 'editar'; receita: ReceitaAPI }
   | { kind: 'lancar'; parcela: ParcelaLancavel; entidade: EntidadeLancavel }
 
 export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) {
@@ -131,6 +155,7 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<Filter>('todas')
+  const [excluindoId, setExcluindoId] = useState<number | null>(null)
 
   // ---- Load ----
   useEffect(() => {
@@ -154,8 +179,8 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
           return
         }
         const data = await res.json()
-        const lista: ReceitaAPI[] = data?.receitas || data?.data || []
-        if (!cancelado) setReceitas(Array.isArray(lista) ? lista : [])
+        const lista = parseLista(data)
+        if (!cancelado) setReceitas(lista)
       } catch (err) {
         console.error('[Receitas] erro:', err)
         if (!cancelado) {
@@ -181,14 +206,56 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
       })
       if (!res.ok) return
       const data = await res.json()
-      const lista: ReceitaAPI[] = data?.receitas || data?.data || []
-      setReceitas(Array.isArray(lista) ? lista : [])
+      setReceitas(parseLista(data))
     } catch (err) {
       console.error('[Receitas] recarregar:', err)
     }
   }
 
-  // ---- KPIs ----
+  // ---- Excluir rascunho (soft delete: marca cancelada=true) ----
+  async function excluirRascunho(r: ReceitaAPI) {
+    if (!window.confirm(`Excluir o rascunho "${r.descricao}"?\n\nEsta ação não pode ser desfeita.`)) {
+      return
+    }
+    setExcluindoId(r.id)
+    try {
+      const res = await fetch(`/api/financeiro/receitas/${r.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken') || ''}`,
+        },
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data?.error || `Falha ao excluir (HTTP ${res.status}).`)
+        return
+      }
+      await recarregar()
+      onUpdate?.()
+    } catch (err) {
+      console.error('[Receitas] excluir:', err)
+      alert('Erro de conexão ao excluir.')
+    } finally {
+      setExcluindoId(null)
+    }
+  }
+
+  // ---- Filtros: canceladas (cancelada=true) somem de tudo ----
+  const receitasVisiveis = useMemo(
+    () => receitas.filter((r) => !r.cancelada),
+    [receitas],
+  )
+
+  const receitasAtivas = useMemo(
+    () => receitasVisiveis.filter((r) => (r.status ?? 'ATIVA') === 'ATIVA'),
+    [receitasVisiveis],
+  )
+  const receitasRascunho = useMemo(
+    () => receitasVisiveis.filter((r) => r.status === 'RASCUNHO'),
+    [receitasVisiveis],
+  )
+
+  // ---- KPIs (sempre sobre ATIVAS) ----
   const kpis = useMemo(() => {
     let totalEur = 0
     let totalBrl = 0
@@ -198,7 +265,7 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
     let pendenteBrl = 0
     let atrasadoEur = 0
     let qtdAtrasadas = 0
-    receitas.forEach((r) => {
+    receitasAtivas.forEach((r) => {
       const cx = cambioEfetivo(r)
       r.parcelas?.forEach((p) => {
         const v = num(p.valor)
@@ -228,13 +295,14 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
       atrasadoEur,
       qtdAtrasadas,
     }
-  }, [receitas])
+  }, [receitasAtivas])
 
-  // ---- Filtro ----
-  const receitasFiltradas = useMemo(() => {
-    if (filtro === 'todas') return receitas
+  // ---- Filtro aplicado ----
+  const receitasExibidas = useMemo(() => {
+    if (filtro === 'rascunhos') return receitasRascunho
+    if (filtro === 'todas') return receitasAtivas
     if (filtro === 'recebidas') {
-      return receitas.filter((r) => {
+      return receitasAtivas.filter((r) => {
         const tot = r.parcelas?.length || 0
         const rec = r.parcelas?.filter(
           (p) => p.status === 'RECEBIDA' || p.status === 'PAGA',
@@ -242,10 +310,10 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
         return tot > 0 && rec === tot
       })
     }
-    return receitas.filter((r) =>
+    return receitasAtivas.filter((r) =>
       r.parcelas?.some((p) => p.status === 'PENDENTE'),
     )
-  }, [receitas, filtro])
+  }, [receitasAtivas, receitasRascunho, filtro])
 
   // ---- Render por view ----
   if (view.kind === 'nova') {
@@ -253,6 +321,22 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
       <NovaReceitaPagina
         processoId={processoId}
         fxHoje={fxHoje}
+        onVoltar={() => setView({ kind: 'lista' })}
+        onCriado={() => {
+          setView({ kind: 'lista' })
+          recarregar()
+          onUpdate?.()
+        }}
+      />
+    )
+  }
+
+  if (view.kind === 'editar') {
+    return (
+      <NovaReceitaPagina
+        processoId={processoId}
+        fxHoje={fxHoje}
+        receitaInicial={view.receita}
         onVoltar={() => setView({ kind: 'lista' })}
         onCriado={() => {
           setView({ kind: 'lista' })
@@ -296,26 +380,30 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
         </button>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs (BRL como denominador comum entre moedas) */}
       <div className="grid-4">
         <div className="kpi">
           <div className="kpi-label">📈 Total Previsto</div>
-          <div className="kpi-value">{fmtMoeda(kpis.totalEur, 'EUR')}</div>
-          <div className="kpi-sub">{fmtBRL(kpis.totalBrl)}</div>
+          <div className="kpi-value">{fmtBRL(kpis.totalBrl)}</div>
+          <div className="kpi-sub">
+            {receitasAtivas.length} {receitasAtivas.length === 1 ? 'receita' : 'receitas'}
+          </div>
         </div>
         <div className="kpi">
           <div className="kpi-label">✓ Recebido</div>
-          <div className="kpi-value pos">{fmtMoeda(kpis.recebidoEur, 'EUR')}</div>
-          <div className="kpi-sub pos">{fmtBRL(kpis.recebidoBrl)}</div>
+          <div className="kpi-value pos">{fmtBRL(kpis.recebidoBrl)}</div>
+          <div className="kpi-sub pos">em caixa</div>
         </div>
         <div className="kpi">
           <div className="kpi-label">⏳ Pendente</div>
-          <div className="kpi-value">{fmtMoeda(kpis.pendenteEur, 'EUR')}</div>
-          <div className="kpi-sub">{fmtBRL(kpis.pendenteBrl)}</div>
+          <div className="kpi-value">{fmtBRL(kpis.pendenteBrl)}</div>
+          <div className="kpi-sub">a receber</div>
         </div>
         <div className="kpi">
           <div className="kpi-label">⚠ Inadimplente</div>
-          <div className="kpi-value neg">{fmtMoeda(kpis.atrasadoEur, 'EUR')}</div>
+          <div className="kpi-value neg">
+            {kpis.qtdAtrasadas} {kpis.qtdAtrasadas === 1 ? 'parc.' : 'parc.'}
+          </div>
           <div className="kpi-sub">
             {kpis.qtdAtrasadas} {kpis.qtdAtrasadas === 1 ? 'parcela' : 'parcelas'}
           </div>
@@ -329,7 +417,10 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
           className={`filter-tab ${filtro === 'todas' ? 'active' : ''}`}
           onClick={() => setFiltro('todas')}
         >
-          Todas
+          Todas{' '}
+          <span style={{ opacity: 0.6, marginLeft: 6 }}>
+            ({receitasAtivas.length})
+          </span>
         </button>
         <button
           type="button"
@@ -345,6 +436,16 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
         >
           Pendentes
         </button>
+        <button
+          type="button"
+          className={`filter-tab ${filtro === 'rascunhos' ? 'active' : ''}`}
+          onClick={() => setFiltro('rascunhos')}
+        >
+          📝 Rascunhos{' '}
+          <span style={{ opacity: 0.6, marginLeft: 6 }}>
+            ({receitasRascunho.length})
+          </span>
+        </button>
       </div>
 
       {/* Erro / Loading / Lista */}
@@ -358,12 +459,18 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
       <div className="table-card">
         {loading ? (
           <div className="empty-state">Carregando receitas...</div>
-        ) : receitasFiltradas.length === 0 && receitas.length === 0 ? (
+        ) : receitasExibidas.length === 0 &&
+          receitasAtivas.length === 0 &&
+          receitasRascunho.length === 0 ? (
           <div className="empty-state">
             Nenhuma receita cadastrada. Clique em <strong>+ Nova Receita</strong> para começar.
           </div>
-        ) : receitasFiltradas.length === 0 ? (
-          <div className="empty-state">Nenhuma receita corresponde ao filtro.</div>
+        ) : receitasExibidas.length === 0 ? (
+          <div className="empty-state">
+            {filtro === 'rascunhos'
+              ? 'Nenhum rascunho salvo.'
+              : 'Nenhuma receita corresponde ao filtro.'}
+          </div>
         ) : (
           <table>
             <thead>
@@ -371,7 +478,7 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
                 <th style={{ width: 30 }}></th>
                 <th>Descrição</th>
                 <th>Tipo</th>
-                <th>Total (EUR)</th>
+                <th>Total (orig.)</th>
                 <th>Total (BRL)</th>
                 <th>Câmbio</th>
                 <th>Parcelas</th>
@@ -381,10 +488,10 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
               </tr>
             </thead>
             <tbody>
-              {receitasFiltradas.map((r) => {
+              {receitasExibidas.map((r) => {
                 const cx = cambioEfetivo(r)
-                const totEur = num(r.valor)
-                const totBrl = totEur * cx
+                const totOrig = num(r.valor)
+                const totBrl = totOrig * cx
                 let recCount = 0
                 r.parcelas?.forEach((p) => {
                   if (p.status === 'RECEBIDA' || p.status === 'PAGA') recCount++
@@ -393,9 +500,20 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
                 const pct = totParc > 0 ? (recCount / totParc) * 100 : 0
                 const isQuit = totParc > 0 && recCount === totParc
                 const temAtraso = r.parcelas?.some(isVencida)
+                const isRascunho = r.status === 'RASCUNHO'
+                const sendoExcluido = excluindoId === r.id
 
                 let statusBadge: React.ReactNode
-                if (isQuit)
+                if (isRascunho)
+                  statusBadge = (
+                    <span
+                      className="badge"
+                      style={{ background: '#f1f5f9', color: '#475569' }}
+                    >
+                      📝 Rascunho
+                    </span>
+                  )
+                else if (isQuit)
                   statusBadge = <span className="badge badge-recebida">Quitada</span>
                 else if (temAtraso)
                   statusBadge = <span className="badge badge-atrasada">Atrasada</span>
@@ -413,14 +531,21 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
                 const proximaPendente = r.parcelas?.find((p) => p.status === 'PENDENTE')
 
                 return (
-                  <tr key={r.id}>
-                    <td>📑</td>
+                  <tr
+                    key={r.id}
+                    style={
+                      isRascunho || sendoExcluido
+                        ? { opacity: sendoExcluido ? 0.4 : 0.7 }
+                        : undefined
+                    }
+                  >
+                    <td>{isRascunho ? '📝' : '📑'}</td>
                     <td>
                       <strong>{r.descricao}</strong>
                       <span className="muted-xs">{r.codigo}</span>
                     </td>
                     <td>{CATEGORIA_LABEL[r.categoria]}</td>
-                    <td>{fmtMoeda(totEur, r.moeda)}</td>
+                    <td>{fmtMoeda(totOrig, r.moeda)}</td>
                     <td className="brl">
                       <strong>
                         {fmtBRL(totBrl)}
@@ -468,7 +593,27 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
                     </td>
                     <td>{statusBadge}</td>
                     <td>
-                      {proximaPendente ? (
+                      {isRascunho ? (
+                        <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
+                          <button
+                            type="button"
+                            className="btn-link-sm"
+                            onClick={() => setView({ kind: 'editar', receita: r })}
+                            disabled={sendoExcluido}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-link-sm"
+                            style={{ color: '#dc2626' }}
+                            onClick={() => excluirRascunho(r)}
+                            disabled={sendoExcluido}
+                          >
+                            {sendoExcluido ? 'Excluindo...' : 'Excluir'}
+                          </button>
+                        </div>
+                      ) : proximaPendente ? (
                         <button
                           type="button"
                           className="btn-link-sm"

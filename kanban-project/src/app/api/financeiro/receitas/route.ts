@@ -1,6 +1,6 @@
 // src/app/api/financeiro/receitas/route.ts
-// GET  /api/financeiro/receitas?processoId=X  → lista receitas do processo
-// POST /api/financeiro/receitas               → cria receita (com parcelas + requerentes)
+// GET  /api/financeiro/receitas?processoId=X[&status=ATIVA] → lista receitas do processo
+// POST /api/financeiro/receitas                              → cria receita (com parcelas + requerentes, exceto rascunho)
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -23,8 +23,17 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Filtro opcional por status (?status=ATIVA|RASCUNHO|CANCELADA)
+    const statusStr = searchParams.get("status");
+    const statusValido = ["ATIVA", "RASCUNHO", "CANCELADA"];
+    const where: { processoId: number; status?: "ATIVA" | "RASCUNHO" | "CANCELADA" } =
+      { processoId };
+    if (statusStr && statusValido.includes(statusStr)) {
+      where.status = statusStr as "ATIVA" | "RASCUNHO" | "CANCELADA";
+    }
+
     const receitas = await prisma.receita.findMany({
-      where: { processoId },
+      where,
       orderBy: { createdAt: "desc" },
       include: {
         parcelas: { orderBy: { numero: "asc" } },
@@ -72,7 +81,12 @@ export async function POST(req: NextRequest) {
         ? Number((data.valor * data.fxFixo).toFixed(2))
         : null;
 
-    const parcelas = gerarParcelas(data.valor, data.nParcelas, data.data1);
+    // 🆕 Rascunho não gera parcelas — só são criadas quando promove pra ATIVA
+    // (via PATCH, que detecta a mudança e regenera com os valores efetivos)
+    const isRascunho = data.status === "RASCUNHO";
+    const parcelas = isRascunho
+      ? []
+      : gerarParcelas(data.valor, data.nParcelas, data.data1);
 
     const cambioReferencia = data.fxFixo ?? data.fxEstimado;
     const valorBrlReferencia = Number(
@@ -96,28 +110,37 @@ export async function POST(req: NextRequest) {
         data1: data.data1,
         periodicidade: data.periodicidade,
         observacoes: data.observacoes ?? null,
-        parcelas: {
-          create: parcelas.map((p) => ({
-            numero: p.numero,
-            vencimento: p.vencimento,
-            valor: p.valor,
-            status: "PENDENTE" as const,
-          })),
-        },
-        requerentes: {
-          create: data.requerentes.map((r) => ({
-            idx: r.idx,
-            nome: r.nome,
-            idade: r.idade ?? null,
-            statusFamiliar: r.statusFamiliar ?? null,
-            percentual: r.percentual,
-            requerenteId: r.requerenteId ?? null,
-          })),
-        },
+        status: data.status,
+        // Cria parcelas só se NÃO é rascunho
+        ...(parcelas.length > 0 && {
+          parcelas: {
+            create: parcelas.map((p) => ({
+              numero: p.numero,
+              vencimento: p.vencimento,
+              valor: p.valor,
+              status: "PENDENTE" as const,
+            })),
+          },
+        }),
+        // Requerentes podem vir vazios no rascunho — Prisma aceita array vazio
+        ...(data.requerentes.length > 0 && {
+          requerentes: {
+            create: data.requerentes.map((r) => ({
+              idx: r.idx,
+              nome: r.nome,
+              idade: r.idade ?? null,
+              statusFamiliar: r.statusFamiliar ?? null,
+              percentual: r.percentual,
+              requerenteId: r.requerenteId ?? null,
+            })),
+          },
+        }),
         eventos: {
           create: {
             tipo: "CRIACAO" as const,
-            descricao: `Receita criada: ${data.descricao}`,
+            descricao: isRascunho
+              ? `Rascunho criado: ${data.descricao}`
+              : `Receita criada: ${data.descricao}`,
             valor: data.valor,
             cambio: cambioReferencia,
             valorBrl: valorBrlReferencia,

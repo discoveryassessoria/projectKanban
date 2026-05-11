@@ -1,23 +1,17 @@
 // src/components/financeiro/paginas/NovaReceitaPagina.tsx
 //
-// 🆕 Fase 3 v2 — Clone FIEL da #page-nova-receita do html_final_marco.html.
+// 🆕 Fase 3 v4 — Clone FIEL da #page-nova-receita do html_final_marco.html.
 //
-// Diferenças vs. v1 (modal):
-//   - Agora é TELA interna (não modal). Usa breadcrumb + botão "← Voltar".
-//   - Visual idêntico ao HTML mestre — usa as classes do CSS unificado
-//     (`src/styles/financeiro-paginas.css`) e raiz `<div class="fpag-page">`.
-//   - Sidebar com formato "10 × 4 req. = 40" no número de parcelas.
-//   - Lógica do split entre requerentes idêntica à do HTML
-//     (redistribuição automática quando edita % ou valor de uma linha).
-//
-// Endpoints:
-//   - GET  /api/processos/:id        → carrega requerentes
-//   - POST /api/financeiro/receitas  → cria Receita + parcelas
-//
-// Backend (schema atual): parcelas são por PERÍODO (nParc parcelas no total).
-// Frontend (visual igual ao HTML): mostra split entre requerentes nas parcelas.
-// Quando salva, envia `requerentes[]` com percentuais — backend gera parcelas
-// consolidadas. A "expansão" por requerente fica derivada na UI.
+// Mudanças vs. v3:
+//   - Aceita prop `receitaInicial` (opcional). Quando presente, a tela vira
+//     "Editar Rascunho": preenche todos os campos com os dados do rascunho,
+//     muda o título/breadcrumb e troca o método do submit pra PATCH.
+//   - PATCH manda só campos simples (sem requerentes/processoId) porque o
+//     handler atual em /api/financeiro/receitas/[id] usa `prisma.receita.update`
+//     direto com o body. Pra suportar edição de requerentes seria preciso
+//     mexer no backend (EditarReceitaSchema + nested write na relação).
+//   - Continua aceitando moeda livre (EUR/BRL/USD) e botão de rascunho
+//     funcional do v3, e o fix v3.1 do BRL (fxFixo/fxData nunca null).
 
 'use client'
 
@@ -49,9 +43,32 @@ interface ReqState {
   percentual: number
 }
 
+// 🆕 Tipo da receita existente passada pra edição (estrutura permissiva)
+export interface ReceitaInicial {
+  id: number
+  categoria: string
+  descricao: string
+  moeda: Moeda
+  valor: number | string
+  fxEstimado: number | string
+  fxRule: 'FIXO' | 'VARIAVEL'
+  fxFixo?: number | string | null
+  fxData?: string | null
+  nParcelas: number
+  data1: string
+  status?: string
+  requerentes?: Array<{
+    idx?: number
+    requerenteId?: number | null
+    percentual: number | string
+    nome?: string
+  }>
+}
+
 export interface NovaReceitaPaginaProps {
   processoId: number
   fxHoje: number
+  receitaInicial?: ReceitaInicial | null
   onVoltar: () => void
   onCriado: (receita: unknown) => void
 }
@@ -64,6 +81,12 @@ const TIPO_TO_ENUM: Record<Tipo, string> = {
   'Honorários': 'HONORARIOS',
   'Reembolso': 'REEMBOLSO',
   'Outros': 'OUTROS',
+}
+const ENUM_TO_TIPO: Record<string, Tipo> = {
+  HONORARIOS: 'Honorários',
+  REEMBOLSO: 'Reembolso',
+  OUTROS: 'Outros',
+  PASTA_DOCUMENTAL: 'Outros', // fallback (Marco decidiu não usar)
 }
 
 function parseFloatBR(s: string): number {
@@ -108,6 +131,22 @@ function calcularIdade(dataNasc?: string | null): number | null {
   return idade
 }
 
+// Conversão segura: aceita number ou string ("123,45" ou "123.45")
+function toNumber(v: unknown): number {
+  if (v == null) return 0
+  if (typeof v === 'number') return isFinite(v) ? v : 0
+  const s = String(v).replace(',', '.')
+  const n = parseFloat(s)
+  return isFinite(n) ? n : 0
+}
+function toStringBR(v: number, decimals = 2): string {
+  return v.toFixed(decimals).replace('.', ',')
+}
+function dateOnly(iso?: string | null): string {
+  if (!iso) return todayISO()
+  return String(iso).slice(0, 10)
+}
+
 // ============================================================================
 // Componente
 // ============================================================================
@@ -115,31 +154,59 @@ function calcularIdade(dataNasc?: string | null): number | null {
 export function NovaReceitaPagina({
   processoId,
   fxHoje,
+  receitaInicial,
   onVoltar,
   onCriado,
 }: NovaReceitaPaginaProps) {
-  // ---- Form ----
-  const [tipo, setTipo] = useState<Tipo>('Honorários')
-  const [descricao, setDescricao] = useState('')
-  const [moeda] = useState<Moeda>('EUR') // disabled no HTML
-  const [valor, setValor] = useState('')
-  const [fxEst, setFxEst] = useState(fxHoje.toFixed(2).replace('.', ','))
-  const [fxRule, setFxRule] = useState<FxRule>('fixo')
-  const [fxFixo, setFxFixo] = useState(fxHoje.toFixed(2).replace('.', ','))
-  const [fxData, setFxData] = useState(todayISO())
-  const [forma, setForma] = useState<'Parcelado' | 'À vista'>('Parcelado')
-  const [nParc, setNParc] = useState('10')
-  const [data1, setData1] = useState(todayISO())
+  const isEdicao = !!receitaInicial
+  const ini = receitaInicial
+
+  // ---- Form (states inicializados com base em `ini` se for edição) ----
+  const [tipo, setTipo] = useState<Tipo>(() => {
+    if (!ini) return 'Honorários'
+    return ENUM_TO_TIPO[ini.categoria] || 'Honorários'
+  })
+  const [descricao, setDescricao] = useState(() => ini?.descricao || '')
+  const [moeda, setMoeda] = useState<Moeda>(() => ini?.moeda || 'EUR')
+  const [valor, setValor] = useState(() => {
+    if (!ini) return ''
+    const v = toNumber(ini.valor)
+    return v > 0 ? toStringBR(v) : ''
+  })
+  const [fxEst, setFxEst] = useState(() => {
+    const v = toNumber(ini?.fxEstimado) || fxHoje
+    return toStringBR(v)
+  })
+  const [fxRule, setFxRule] = useState<FxRule>(() => {
+    if (!ini) return 'fixo'
+    return ini.fxRule === 'VARIAVEL' ? 'variavel' : 'fixo'
+  })
+  const [fxFixo, setFxFixo] = useState(() => {
+    const v = toNumber(ini?.fxFixo) || toNumber(ini?.fxEstimado) || fxHoje
+    return toStringBR(v)
+  })
+  const [fxData, setFxData] = useState(() => dateOnly(ini?.fxData))
+  const [forma, setForma] = useState<'Parcelado' | 'À vista'>(() =>
+    ini && ini.nParcelas === 1 ? 'À vista' : 'Parcelado',
+  )
+  const [nParc, setNParc] = useState(() => String(ini?.nParcelas || 10))
+  const [data1, setData1] = useState(() => dateOnly(ini?.data1))
   const [requerentes, setRequerentes] = useState<ReqState[]>([])
-  const [divisao, setDivisao] = useState<Divisao>('igual')
+  const [divisao, setDivisao] = useState<Divisao>(() => {
+    // Se for edição com requerentes salvos, abrir em personalizada pra
+    // preservar o que estava no rascunho. Senão começa como igual.
+    if (ini?.requerentes && ini.requerentes.length > 0) return 'personalizada'
+    return 'igual'
+  })
 
   // ---- UI ----
   const [loadingReq, setLoadingReq] = useState(false)
   const [erroReq, setErroReq] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
+  const [salvandoRascunho, setSalvandoRascunho] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
-  // ---- Carregar requerentes ----
+  // ---- Carregar requerentes (com aplicação de percentuais do rascunho) ----
   useEffect(() => {
     let cancelado = false
     async function carregar() {
@@ -162,6 +229,7 @@ export function NovaReceitaPagina({
           setErroReq(`Falha ao carregar requerentes (HTTP ${res.status}).`)
         }
         if (!Array.isArray(lista)) lista = []
+
         const reqs: ReqState[] = lista.map((r, i) => {
           const idade = r.idade ?? calcularIdade(r.dataNascimento)
           const isAdulto = idade == null ? true : idade >= 18
@@ -175,13 +243,35 @@ export function NovaReceitaPagina({
             percentual: 0,
           }
         })
-        const adultos = reqs.filter((r) => r.participa).length
-        if (adultos > 0) {
-          const cada = 100 / adultos
+
+        // Se for edição com requerentes salvos: aplica percentuais do rascunho.
+        // Senão: divisão igual padrão entre adultos.
+        if (ini?.requerentes && ini.requerentes.length > 0) {
           reqs.forEach((r) => {
-            r.percentual = r.participa ? cada : 0
+            const match = ini.requerentes!.find(
+              (rr) =>
+                (rr.requerenteId != null && rr.requerenteId === r.requerenteId) ||
+                rr.idx === r.idx,
+            )
+            if (match) {
+              const pct = toNumber(match.percentual)
+              r.percentual = pct
+              r.participa = pct > 0 && r.isAdulto
+            } else {
+              r.participa = false
+              r.percentual = 0
+            }
           })
+        } else {
+          const adultos = reqs.filter((r) => r.participa).length
+          if (adultos > 0) {
+            const cada = 100 / adultos
+            reqs.forEach((r) => {
+              r.percentual = r.participa ? cada : 0
+            })
+          }
         }
+
         if (!cancelado) setRequerentes(reqs)
       } catch (err) {
         console.error('[NovaReceitaPagina] erro:', err)
@@ -197,7 +287,7 @@ export function NovaReceitaPagina({
     return () => {
       cancelado = true
     }
-  }, [processoId])
+  }, [processoId, ini])
 
   // ---- Toggles ----
   useEffect(() => {
@@ -253,7 +343,6 @@ export function NovaReceitaPagina({
     })
   }
 
-  // Quando user edita o % de um requerente: redistribui o restante entre os outros
   function onPctChange(idx: number, valStr: string) {
     if (divisao !== 'personalizada') return
     const v = parseFloatBR(valStr)
@@ -281,53 +370,79 @@ export function NovaReceitaPagina({
   }
 
   // ---- Submit ----
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(
+    e: React.FormEvent | React.MouseEvent,
+    asRascunho: boolean = false,
+  ) {
     e.preventDefault()
     setErro(null)
+
     if (!descricao.trim()) {
       setErro('Descrição obrigatória.')
       return
     }
-    if (valorNum <= 0) {
-      setErro('Valor deve ser maior que zero.')
-      return
-    }
+
     const participantes = requerentes.filter((r) => r.participa && r.percentual > 0)
-    if (participantes.length === 0) {
-      setErro('Marque ao menos 1 requerente com % maior que zero.')
-      return
-    }
-    if (!somaOk) {
-      setErro(`Soma dos percentuais deve ser 100%. Atual: ${somaPct.toFixed(2)}%.`)
-      return
+
+    if (!asRascunho) {
+      if (valorNum <= 0) {
+        setErro('Valor deve ser maior que zero.')
+        return
+      }
+      if (participantes.length === 0) {
+        setErro('Marque ao menos 1 requerente com % maior que zero.')
+        return
+      }
+      if (!somaOk) {
+        setErro(`Soma dos percentuais deve ser 100%. Atual: ${somaPct.toFixed(2)}%.`)
+        return
+      }
     }
 
-    setSalvando(true)
+    if (asRascunho) setSalvandoRascunho(true)
+    else setSalvando(true)
+
     try {
-      const body = {
-        processoId,
+      // Campos comuns aos dois fluxos (POST cria / PATCH edita)
+      const commonBody = {
         categoria: TIPO_TO_ENUM[tipo],
         descricao: descricao.trim(),
         moeda,
         valor: valorNum,
         fxEstimado: moeda === 'BRL' ? 1 : fxEstNum,
         fxRule: moeda === 'BRL' ? 'FIXO' : fxRule.toUpperCase(),
-        fxFixo: fxRule === 'fixo' && moeda !== 'BRL' ? fxFixoNum : null,
-        fxData: fxRule === 'fixo' && moeda !== 'BRL' ? fxData : null,
+        fxFixo: moeda === 'BRL' ? 1 : fxRule === 'fixo' ? fxFixoNum : 1,
+        fxData: moeda === 'BRL' ? data1 : fxRule === 'fixo' ? fxData : data1,
         nParcelas: nParcNum,
         data1,
         periodicidade: 'Mensal',
-        requerentes: participantes.map((r) => ({
-          idx: r.idx,
-          nome: r.nome,
-          idade: r.idade,
-          statusFamiliar: r.isAdulto ? 'Adulto' : 'Menor',
-          percentual: r.percentual,
-          requerenteId: r.requerenteId,
-        })),
+        status: asRascunho ? 'RASCUNHO' : 'ATIVA',
       }
-      const res = await fetch('/api/financeiro/receitas', {
-        method: 'POST',
+
+      // POST inclui processoId + requerentes; PATCH só campos simples
+      // (backend atual do PATCH não suporta nested write em requerentes).
+      const body = isEdicao
+        ? commonBody
+        : {
+            ...commonBody,
+            processoId,
+            requerentes: participantes.map((r) => ({
+              idx: r.idx,
+              nome: r.nome,
+              idade: r.idade,
+              statusFamiliar: r.isAdulto ? 'Adulto' : 'Menor',
+              percentual: r.percentual,
+              requerenteId: r.requerenteId,
+            })),
+          }
+
+      const url = isEdicao
+        ? `/api/financeiro/receitas/${ini!.id}`
+        : '/api/financeiro/receitas'
+      const method = isEdicao ? 'PATCH' : 'POST'
+
+      const res = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('authToken') || ''}`,
@@ -339,19 +454,30 @@ export function NovaReceitaPagina({
         const msg =
           data?.error ||
           data?.details?.issues?.[0]?.message ||
-          `Erro ${res.status}: falha ao criar receita.`
+          `Erro ${res.status}: falha ao ${asRascunho ? 'salvar rascunho' : isEdicao ? 'atualizar receita' : 'criar receita'}.`
         setErro(msg)
         return
       }
-      const novaReceita = await res.json()
-      onCriado(novaReceita)
+      const receitaResp = await res.json()
+      onCriado(receitaResp)
     } catch (err) {
       console.error('[NovaReceitaPagina] submit erro:', err)
       setErro('Erro de conexão. Tente novamente.')
     } finally {
       setSalvando(false)
+      setSalvandoRascunho(false)
     }
   }
+
+  const algumSalvando = salvando || salvandoRascunho
+
+  // Labels dinâmicos pra modo edição
+  const tituloPagina = isEdicao ? 'Editar Rascunho' : 'Nova Receita'
+  const subtituloPagina = isEdicao
+    ? 'Edite os dados do rascunho. Salve novamente como rascunho ou finalize como receita.'
+    : 'Cadastre uma nova receita para este processo'
+  const labelBtnPrincipal = isEdicao ? '✓ Salvar como Receita' : '✓ Criar Receita'
+  const labelBtnPrincipalSalvando = isEdicao ? 'Salvando...' : 'Criando...'
 
   // ---- Render ----
   return (
@@ -361,18 +487,28 @@ export function NovaReceitaPagina({
         <span className="breadcrumb-sep">›</span>
         <a onClick={onVoltar}>Receitas</a>
         <span className="breadcrumb-sep">›</span>
-        <span>Nova Receita</span>
+        <span>{tituloPagina}</span>
       </div>
 
       <div className="page-header">
         <div>
-          <h1 className="page-title">Nova Receita</h1>
-          <div className="page-subtitle">Cadastre uma nova receita para este processo</div>
+          <h1 className="page-title">{tituloPagina}</h1>
+          <div className="page-subtitle">{subtituloPagina}</div>
         </div>
         <button type="button" className="btn-outline" onClick={onVoltar}>
           ← Voltar para Receitas
         </button>
       </div>
+
+      {isEdicao && (
+        <div className="alert alert-info" style={{ marginBottom: 16 }}>
+          <i className="alert-icon">ⓘ</i>
+          <span>
+            <strong>Editando rascunho.</strong> Alterações nos percentuais individuais
+            dos requerentes ainda não são salvas via edição (apenas no cadastro inicial).
+          </span>
+        </div>
+      )}
 
       {erro && (
         <div className="alert alert-danger" style={{ marginBottom: 16 }}>
@@ -381,7 +517,7 @@ export function NovaReceitaPagina({
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={(e) => handleSubmit(e, false)}>
         <div className="detail-layout">
           <div>
             {/* === 1. Dados === */}
@@ -417,133 +553,147 @@ export function NovaReceitaPagina({
                   <label className="form-label">
                     Moeda base <i className="info-i" title="Moeda em que o valor é expresso">i</i>
                   </label>
-                  <select className="form-select" disabled value="EUR">
+                  <select
+                    className="form-select"
+                    value={moeda}
+                    onChange={(e) => setMoeda(e.target.value as Moeda)}
+                  >
                     <option value="EUR">EUR — Euro (€)</option>
+                    <option value="BRL">BRL — Real (R$)</option>
+                    <option value="USD">USD — Dólar (US$)</option>
                   </select>
                 </div>
                 <div className="form-field">
-                  <label className="form-label">Valor total em EUR</label>
+                  <label className="form-label">Valor total em {moeda}</label>
                   <input
                     className="form-input"
                     type="text"
                     value={valor}
                     onChange={(e) => setValor(e.target.value)}
-                    placeholder="€ 0,00"
+                    placeholder={`${moedaSimbolo(moeda)} 0,00`}
                   />
                 </div>
-                <div className="form-field">
-                  <label className="form-label">
-                    Câmbio estimado (EUR → BRL){' '}
-                    <i className="info-i" title="Câmbio de referência usado para projeção">i</i>
-                  </label>
-                  <input
-                    className="form-input"
-                    type="text"
-                    value={fxEst}
-                    onChange={(e) => setFxEst(e.target.value)}
-                  />
-                </div>
-                <div className="form-field">
-                  <label className="form-label">Valor estimado em BRL</label>
-                  <input
-                    className="form-input form-input-readonly"
-                    readOnly
-                    value={fmtBRL(valorBrlEst)}
-                  />
-                </div>
+                {moeda !== 'BRL' && (
+                  <>
+                    <div className="form-field">
+                      <label className="form-label">
+                        Câmbio estimado ({moeda} → BRL){' '}
+                        <i className="info-i" title="Câmbio de referência usado para projeção">i</i>
+                      </label>
+                      <input
+                        className="form-input"
+                        type="text"
+                        value={fxEst}
+                        onChange={(e) => setFxEst(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label className="form-label">Valor estimado em BRL</label>
+                      <input
+                        className="form-input form-input-readonly"
+                        readOnly
+                        value={fmtBRL(valorBrlEst)}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* === 2. Regra de Câmbio === */}
-            <div className="form-card">
-              <div className="form-card-title">
-                2. Regra de Câmbio{' '}
-                <i className="info-i" title="Define se o câmbio é fixado agora ou variável">i</i>
-              </div>
-              <div className="exchange-rule-cards">
-                <div
-                  className={`exchange-rule-card ${fxRule === 'fixo' ? 'selected' : ''}`}
-                  onClick={() => setFxRule('fixo')}
-                >
-                  <div className="exchange-rule-card-head">
-                    <div className="exchange-rule-radio" />
-                    <div className="exchange-rule-card-title">
-                      Câmbio fixo para todas as parcelas
-                    </div>
-                  </div>
-                  <div className="exchange-rule-card-desc">
-                    Você define o câmbio agora e todas as parcelas serão fixas em reais.
-                  </div>
-                  <div className="exchange-rule-body" onClick={(e) => e.stopPropagation()}>
-                    <div className="exchange-rule-body-grid">
-                      <div className="form-field">
-                        <label className="form-label">Câmbio fixado (EUR → BRL)</label>
-                        <input
-                          className="form-input"
-                          type="text"
-                          value={fxFixo}
-                          onChange={(e) => setFxFixo(e.target.value)}
-                        />
-                      </div>
-                      <div className="form-field">
-                        <label className="form-label">Data da fixação</label>
-                        <input
-                          className="form-input"
-                          type="date"
-                          value={fxData}
-                          onChange={(e) => setFxData(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <div className="fx-fixo-result">
-                      <div className="fx-fixo-result-icon">✓</div>
-                      <div>
-                        <div style={{ fontSize: 11, color: 'var(--fpag-gray-600)' }}>
-                          Valor total em BRL (fixo)
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 18,
-                            fontWeight: 700,
-                            color: 'var(--fpag-success-dark)',
-                          }}
-                        >
-                          {fmtBRL(valorBrlFixo)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+            {/* === 2. Regra de Câmbio (só faz sentido se moeda !== BRL) === */}
+            {moeda !== 'BRL' && (
+              <div className="form-card">
+                <div className="form-card-title">
+                  2. Regra de Câmbio{' '}
+                  <i className="info-i" title="Define se o câmbio é fixado agora ou variável">i</i>
                 </div>
+                <div className="exchange-rule-cards">
+                  <div
+                    className={`exchange-rule-card ${fxRule === 'fixo' ? 'selected' : ''}`}
+                    onClick={() => setFxRule('fixo')}
+                  >
+                    <div className="exchange-rule-card-head">
+                      <div className="exchange-rule-radio" />
+                      <div className="exchange-rule-card-title">
+                        Câmbio fixo para todas as parcelas
+                      </div>
+                    </div>
+                    <div className="exchange-rule-card-desc">
+                      Você define o câmbio agora e todas as parcelas serão fixas em reais.
+                    </div>
+                    <div className="exchange-rule-body" onClick={(e) => e.stopPropagation()}>
+                      <div className="exchange-rule-body-grid">
+                        <div className="form-field">
+                          <label className="form-label">Câmbio fixado ({moeda} → BRL)</label>
+                          <input
+                            className="form-input"
+                            type="text"
+                            value={fxFixo}
+                            onChange={(e) => setFxFixo(e.target.value)}
+                          />
+                        </div>
+                        <div className="form-field">
+                          <label className="form-label">Data da fixação</label>
+                          <input
+                            className="form-input"
+                            type="date"
+                            value={fxData}
+                            onChange={(e) => setFxData(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="fx-fixo-result">
+                        <div className="fx-fixo-result-icon">✓</div>
+                        <div>
+                          <div style={{ fontSize: 11, color: 'var(--fpag-gray-600)' }}>
+                            Valor total em BRL (fixo)
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 18,
+                              fontWeight: 700,
+                              color: 'var(--fpag-success-dark)',
+                            }}
+                          >
+                            {fmtBRL(valorBrlFixo)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-                <div
-                  className={`exchange-rule-card ${fxRule === 'variavel' ? 'selected' : ''}`}
-                  onClick={() => setFxRule('variavel')}
-                >
-                  <div className="exchange-rule-card-head">
-                    <div className="exchange-rule-radio" />
-                    <div className="exchange-rule-card-title">
-                      Câmbio variável por recebimento
+                  <div
+                    className={`exchange-rule-card ${fxRule === 'variavel' ? 'selected' : ''}`}
+                    onClick={() => setFxRule('variavel')}
+                  >
+                    <div className="exchange-rule-card-head">
+                      <div className="exchange-rule-radio" />
+                      <div className="exchange-rule-card-title">
+                        Câmbio variável por recebimento
+                      </div>
                     </div>
-                  </div>
-                  <div className="exchange-rule-card-desc">
-                    O câmbio será informado em cada recebimento (baixa).
-                  </div>
-                  <div className="exchange-rule-body">
-                    <div className="fx-var-info">
-                      <span>ⓘ</span>
-                      <span>
-                        O valor em reais será definido no momento de cada recebimento, conforme o
-                        câmbio do dia.
-                      </span>
+                    <div className="exchange-rule-card-desc">
+                      O câmbio será informado em cada recebimento (baixa).
+                    </div>
+                    <div className="exchange-rule-body">
+                      <div className="fx-var-info">
+                        <span>ⓘ</span>
+                        <span>
+                          O valor em reais será definido no momento de cada recebimento, conforme o
+                          câmbio do dia.
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* === 3. Condições === */}
             <div className="form-card">
-              <div className="form-card-title">3. Condições de Pagamento</div>
+              <div className="form-card-title">
+                {moeda === 'BRL' ? '2' : '3'}. Condições de Pagamento
+              </div>
               <div className="form-grid-4">
                 <div className="form-field">
                   <label className="form-label">Forma de pagamento</label>
@@ -592,7 +742,9 @@ export function NovaReceitaPagina({
 
             {/* === 4. Distribuição === */}
             <div className="form-card">
-              <div className="form-card-title">4. Distribuição entre Requerentes</div>
+              <div className="form-card-title">
+                {moeda === 'BRL' ? '3' : '4'}. Distribuição entre Requerentes
+              </div>
               <div className="division-cards">
                 <div
                   className={`division-card ${divisao === 'igual' ? 'selected' : ''}`}
@@ -758,15 +910,20 @@ export function NovaReceitaPagina({
 
             {/* === Actions === */}
             <div className="actions-bar">
-              <button type="button" className="btn-outline" disabled>
-                📝 Salvar como rascunho
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={(e) => handleSubmit(e, true)}
+                disabled={algumSalvando || !descricao.trim()}
+              >
+                {salvandoRascunho ? 'Salvando...' : '📝 Salvar como rascunho'}
               </button>
               <button
                 type="submit"
                 className="btn-primary"
-                disabled={salvando || !somaOk || valorNum <= 0 || !descricao.trim()}
+                disabled={algumSalvando || !somaOk || valorNum <= 0 || !descricao.trim()}
               >
-                {salvando ? 'Criando...' : '✓ Criar Receita'}
+                {salvando ? labelBtnPrincipalSalvando : labelBtnPrincipal}
               </button>
             </div>
           </div>
@@ -776,49 +933,51 @@ export function NovaReceitaPagina({
             <div className="sidebar-resumo">
               <div className="sidebar-resumo-title">Resumo da Receita</div>
 
-              <div className={`fx-rule-box ${fxRule === 'fixo' ? 'fixo' : 'variavel'}`}>
-                <div className="fx-rule-box-head">
-                  <div className="fx-rule-box-title">📑 Regra de câmbio</div>
-                  <span
-                    className={`badge ${fxRule === 'fixo' ? 'badge-fx-fixo' : 'badge-fx-var'}`}
-                  >
-                    {fxRule === 'fixo' ? 'CÂMBIO FIXO' : 'CÂMBIO VARIÁVEL'}
-                  </span>
+              {moeda !== 'BRL' && (
+                <div className={`fx-rule-box ${fxRule === 'fixo' ? 'fixo' : 'variavel'}`}>
+                  <div className="fx-rule-box-head">
+                    <div className="fx-rule-box-title">📑 Regra de câmbio</div>
+                    <span
+                      className={`badge ${fxRule === 'fixo' ? 'badge-fx-fixo' : 'badge-fx-var'}`}
+                    >
+                      {fxRule === 'fixo' ? 'CÂMBIO FIXO' : 'CÂMBIO VARIÁVEL'}
+                    </span>
+                  </div>
+                  <div className="fx-rule-box-info">
+                    {fxRule === 'fixo' ? (
+                      <>
+                        Câmbio fixado: {moedaSimbolo(moeda)}1 = {fmtBRL(fxFixoNum)}
+                        <br />
+                        Data da fixação: {fmtDate(fxData)}
+                      </>
+                    ) : (
+                      <>
+                        Câmbio estimado: {moedaSimbolo(moeda)}1 = {fmtBRL(fxEstNum)}
+                        <br />
+                        Valores reais a cada recebimento.
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="fx-rule-box-info">
-                  {fxRule === 'fixo' ? (
-                    <>
-                      Câmbio fixado: {moedaSimbolo(moeda)}1 = {fmtBRL(fxFixoNum)}
-                      <br />
-                      Data da fixação: {fmtDate(fxData)}
-                    </>
-                  ) : (
-                    <>
-                      Câmbio estimado: {moedaSimbolo(moeda)}1 = {fmtBRL(fxEstNum)}
-                      <br />
-                      Valores reais a cada recebimento.
-                    </>
-                  )}
-                </div>
-              </div>
+              )}
 
               <div className="resumo-row">
                 <span>Valor total ({moeda})</span>
                 <strong>{fmtMoeda(valorNum, moeda)}</strong>
               </div>
-              <div className="resumo-row">
-                <span>
-                  {moeda === 'BRL'
-                    ? 'Valor total (Real)'
-                    : fxRule === 'fixo'
+              {moeda !== 'BRL' && (
+                <div className="resumo-row">
+                  <span>
+                    {fxRule === 'fixo'
                       ? 'Valor total em BRL (fixo)'
                       : 'Valor total em BRL (estimado)'}
-                </span>
-                <strong className="brl">
-                  {fmtBRL(totalBrl)}
-                  {moeda !== 'BRL' && fxRule === 'variavel' ? ' (est.)' : ''}
-                </strong>
-              </div>
+                  </span>
+                  <strong className="brl">
+                    {fmtBRL(totalBrl)}
+                    {fxRule === 'variavel' ? ' (est.)' : ''}
+                  </strong>
+                </div>
+              )}
               <div className="resumo-row">
                 <span>Número de parcelas</span>
                 <strong>
@@ -830,13 +989,15 @@ export function NovaReceitaPagina({
                 <span>Valor por parcela ({moeda})</span>
                 <strong>{fmtMoeda(parcEurPorReq, moeda)}</strong>
               </div>
-              <div className="resumo-row">
-                <span>Valor por parcela (BRL)</span>
-                <strong className="brl">
-                  {fmtBRL(parcBrlPorReq)}
-                  {moeda !== 'BRL' && fxRule === 'variavel' ? ' (est.)' : ''}
-                </strong>
-              </div>
+              {moeda !== 'BRL' && (
+                <div className="resumo-row">
+                  <span>Valor por parcela (BRL)</span>
+                  <strong className="brl">
+                    {fmtBRL(parcBrlPorReq)}
+                    {fxRule === 'variavel' ? ' (est.)' : ''}
+                  </strong>
+                </div>
+              )}
               <div className="resumo-row">
                 <span>Requerentes</span>
                 <strong>{adultos} adulto{adultos === 1 ? '' : 's'}</strong>

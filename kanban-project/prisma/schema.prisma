@@ -179,6 +179,18 @@ enum NaturezaOutroCusto {
   REPASSAR // Despesa a pagar a terceiros (ex: Advogado, Cartório)
 }
 
+enum ReceitaStatus {
+  ATIVA
+  RASCUNHO
+  CANCELADA
+}
+
+enum CustoStatus {
+  ATIVA
+  RASCUNHO
+  CANCELADA
+}
+
 // ========================================
 // USUÁRIOS
 // ========================================
@@ -1768,6 +1780,7 @@ model Receita {
 
   // Estado
   cancelada Boolean @default(false)
+  status          ReceitaStatus  @default(ATIVA)
 
   // Observações
   observacoes String? @db.Text
@@ -1837,6 +1850,8 @@ model Custo {
   // Relacionamentos
   parcelas ParcelaFinanceira[]
   eventos  EventoFinanceiro[]
+
+  status      CustoStatus @default(ATIVA)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

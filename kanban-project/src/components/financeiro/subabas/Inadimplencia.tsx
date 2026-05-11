@@ -26,6 +26,7 @@
 
 import '@/src/styles/financeiro-paginas.css'
 import { useEffect, useMemo, useState } from 'react'
+import { parseLista } from '@/src/lib/financeiro/parseLista'
 
 // ============================================================================
 // Tipos
@@ -331,12 +332,12 @@ export function Inadimplencia({ processoId, fxHoje = 5.5 }: InadimplenciaProps) 
         if (cancelado) return
         if (resR.ok) {
           const d = await resR.json()
-          const lst: ReceitaAPI[] = d?.receitas || d?.data || []
+          const lst = parseLista<ReceitaAPI>(d)
           if (!cancelado) setReceitas(Array.isArray(lst) ? lst : [])
         }
         if (resC.ok) {
           const d = await resC.json()
-          const lst: CustoAPI[] = d?.custos || d?.data || []
+          const lst = parseLista<CustoAPI>(d)
           if (!cancelado) setCustos(Array.isArray(lst) ? lst : [])
         }
       } catch (err) {
