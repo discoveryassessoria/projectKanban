@@ -1,6 +1,6 @@
 // src/app/api/financeiro/custos/route.ts
-// GET  /api/financeiro/custos?processoId=X  → lista custos do processo
-// POST /api/financeiro/custos               → cria custo (com parcelas, exceto rascunho)
+// GET  /api/financeiro/custos?processoId=X[&status=ATIVA] → lista custos do processo
+// POST /api/financeiro/custos                              → cria custo (com parcelas, exceto rascunho)
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -10,6 +10,7 @@ import {
 } from "@/lib/financeiro/validacao";
 import { gerarCodigoCusto } from "@/lib/financeiro/codigos";
 import { gerarParcelas } from "@/lib/financeiro/parcelas";
+import { withRetry } from "@/lib/db-retry"; // 🆕
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,13 +24,24 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const custos = await prisma.custo.findMany({
-      where: { processoId },
-      orderBy: { createdAt: "desc" },
-      include: {
-        parcelas: { orderBy: { numero: "asc" } },
-      },
-    });
+    const statusStr = searchParams.get("status");
+    const statusValido = ["ATIVA", "RASCUNHO", "CANCELADA"];
+    const where: { processoId: number; status?: "ATIVA" | "RASCUNHO" | "CANCELADA" } =
+      { processoId };
+    if (statusStr && statusValido.includes(statusStr)) {
+      where.status = statusStr as "ATIVA" | "RASCUNHO" | "CANCELADA";
+    }
+
+    // 🆕 withRetry
+    const custos = await withRetry(() =>
+      prisma.custo.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          parcelas: { orderBy: { numero: "asc" } },
+        },
+      })
+    );
 
     return NextResponse.json(custos);
   } catch (err) {
@@ -53,10 +65,13 @@ export async function POST(req: NextRequest) {
     }
     const data = parse.data;
 
-    const processo = await prisma.processo.findUnique({
-      where: { id: data.processoId },
-      select: { id: true },
-    });
+    // 🆕 withRetry na primeira chamada
+    const processo = await withRetry(() =>
+      prisma.processo.findUnique({
+        where: { id: data.processoId },
+        select: { id: true },
+      })
+    );
     if (!processo) {
       return NextResponse.json(
         { error: `Processo ${data.processoId} não encontrado` },
@@ -71,8 +86,7 @@ export async function POST(req: NextRequest) {
         ? Number((data.valor * data.fxFixo).toFixed(2))
         : null;
 
-    // 🆕 Rascunho não gera parcelas — só são criadas quando promove pra ATIVA
-    // (via PATCH, que detecta a mudança e regenera com os valores efetivos)
+    // Rascunho não gera parcelas
     const isRascunho = data.status === "RASCUNHO";
     const parcelas = isRascunho
       ? []
@@ -103,11 +117,9 @@ export async function POST(req: NextRequest) {
         custoOperacional: data.custoOperacional,
         categoriaVinculada: data.categoriaVinculada ?? null,
         percentualVinculado: data.percentualVinculado ?? null,
-        formaPagamento: data.formaPagamento ?? null,
+        formaPagamento: data.formaPagamento,
         observacoes: data.observacoes ?? null,
-        // 🆕 status agora é persistido (era ignorado antes)
         status: data.status,
-        // Cria parcelas só se NÃO é rascunho
         ...(parcelas.length > 0 && {
           parcelas: {
             create: parcelas.map((p) => ({

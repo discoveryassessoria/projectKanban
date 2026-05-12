@@ -10,6 +10,7 @@ import {
 } from "@/lib/financeiro/validacao";
 import { gerarCodigoReceita } from "@/lib/financeiro/codigos";
 import { gerarParcelas } from "@/lib/financeiro/parcelas";
+import { withRetry } from "@/lib/db-retry"; // 🆕
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,7 +24,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Filtro opcional por status (?status=ATIVA|RASCUNHO|CANCELADA)
     const statusStr = searchParams.get("status");
     const statusValido = ["ATIVA", "RASCUNHO", "CANCELADA"];
     const where: { processoId: number; status?: "ATIVA" | "RASCUNHO" | "CANCELADA" } =
@@ -32,14 +32,17 @@ export async function GET(req: NextRequest) {
       where.status = statusStr as "ATIVA" | "RASCUNHO" | "CANCELADA";
     }
 
-    const receitas = await prisma.receita.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: {
-        parcelas: { orderBy: { numero: "asc" } },
-        requerentes: { orderBy: { idx: "asc" } },
-      },
-    });
+    // 🆕 withRetry: cobre cold start do Prisma Postgres
+    const receitas = await withRetry(() =>
+      prisma.receita.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          parcelas: { orderBy: { numero: "asc" } },
+          requerentes: { orderBy: { idx: "asc" } },
+        },
+      })
+    );
 
     return NextResponse.json(receitas);
   } catch (err) {
@@ -63,10 +66,13 @@ export async function POST(req: NextRequest) {
     }
     const data = parse.data;
 
-    const processo = await prisma.processo.findUnique({
-      where: { id: data.processoId },
-      select: { id: true },
-    });
+    // 🆕 withRetry só na primeira chamada Prisma — se passa, banco tá acordado
+    const processo = await withRetry(() =>
+      prisma.processo.findUnique({
+        where: { id: data.processoId },
+        select: { id: true },
+      })
+    );
     if (!processo) {
       return NextResponse.json(
         { error: `Processo ${data.processoId} não encontrado` },
@@ -81,8 +87,7 @@ export async function POST(req: NextRequest) {
         ? Number((data.valor * data.fxFixo).toFixed(2))
         : null;
 
-    // 🆕 Rascunho não gera parcelas — só são criadas quando promove pra ATIVA
-    // (via PATCH, que detecta a mudança e regenera com os valores efetivos)
+    // Rascunho não gera parcelas — só são criadas quando promove pra ATIVA
     const isRascunho = data.status === "RASCUNHO";
     const parcelas = isRascunho
       ? []
@@ -111,7 +116,6 @@ export async function POST(req: NextRequest) {
         periodicidade: data.periodicidade,
         observacoes: data.observacoes ?? null,
         status: data.status,
-        // Cria parcelas só se NÃO é rascunho
         ...(parcelas.length > 0 && {
           parcelas: {
             create: parcelas.map((p) => ({
@@ -122,7 +126,6 @@ export async function POST(req: NextRequest) {
             })),
           },
         }),
-        // Requerentes podem vir vazios no rascunho — Prisma aceita array vazio
         ...(data.requerentes.length > 0 && {
           requerentes: {
             create: data.requerentes.map((r) => ({

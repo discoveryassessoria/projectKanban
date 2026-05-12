@@ -71,13 +71,17 @@
   line-height: 1.5;
 }
 
-/* Reset suave dentro do escopo */
+/* Reset suave dentro do escopo (não toca em botões com classes Tailwind de bg/border) */
 .fpag-page * { box-sizing: border-box; }
 .fpag-page button {
   font-family: inherit;
   cursor: pointer;
-  border: none;
+}
+.fpag-page button:not([class*="bg-"]) {
   background: none;
+}
+.fpag-page button:not([class*="border-"]) {
+  border: none;
 }
 .fpag-page input, .fpag-page select, .fpag-page textarea {
   font-family: inherit;

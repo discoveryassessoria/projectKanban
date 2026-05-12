@@ -10,6 +10,7 @@ import {
   EditarReceitaSchema,
   formatZodError,
 } from "@/lib/financeiro/validacao";
+import { withRetry } from "@/lib/db-retry"; // 🆕
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -19,10 +20,6 @@ async function parseId(ctx: RouteContext): Promise<number | null> {
   return !id || isNaN(id) ? null : id;
 }
 
-// ============================================================
-// Helper: adiciona N meses a uma data, ajustando overflow
-// (ex.: 31/01 + 1 mês → 28/02 ou 29/02, não 03/03)
-// ============================================================
 function addMonths(d: Date, n: number): Date {
   const out = new Date(d);
   const targetDay = out.getDate();
@@ -33,9 +30,6 @@ function addMonths(d: Date, n: number): Date {
   return out;
 }
 
-// ============================================================
-// Helper: gera array de parcelas pra Receita
-// ============================================================
 function gerarParcelas(opts: {
   valor: number;
   nParcelas: number;
@@ -68,14 +62,17 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
       return NextResponse.json({ error: "id inválido" }, { status: 400 });
     }
 
-    const receita = await prisma.receita.findUnique({
-      where: { id },
-      include: {
-        parcelas: { orderBy: { numero: "asc" } },
-        requerentes: { orderBy: { idx: "asc" } },
-        eventos: { orderBy: { createdAt: "desc" } },
-      },
-    });
+    // 🆕 withRetry
+    const receita = await withRetry(() =>
+      prisma.receita.findUnique({
+        where: { id },
+        include: {
+          parcelas: { orderBy: { numero: "asc" } },
+          requerentes: { orderBy: { idx: "asc" } },
+          eventos: { orderBy: { createdAt: "desc" } },
+        },
+      })
+    );
     if (!receita) {
       return NextResponse.json(
         { error: "Receita não encontrada" },
@@ -121,10 +118,13 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       );
     }
 
-    const existente = await prisma.receita.findUnique({
-      where: { id },
-      include: { parcelas: true },
-    });
+    // 🆕 withRetry na primeira chamada
+    const existente = await withRetry(() =>
+      prisma.receita.findUnique({
+        where: { id },
+        include: { parcelas: true },
+      })
+    );
     if (!existente) {
       return NextResponse.json(
         { error: "Receita não encontrada" },
@@ -150,14 +150,10 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       );
     }
 
-    // Algum campo crítico (valor/parcelas/datas/câmbio) foi enviado?
     const algumCampoCriticoMudou = CAMPOS_QUE_AFETAM_PARCELAS.some(
       (k) => (data as Record<string, unknown>)[k] !== undefined
     );
 
-    // 🆕 Está promovendo rascunho → ativa?
-    // Quando isso acontece, sempre regenera porque o rascunho NÃO tem parcelas
-    // (são geradas no momento da promoção).
     const eraRascunho = existente.status === "RASCUNHO";
     const novoStatus = data.status ?? existente.status;
     const promovendoParaAtiva = eraRascunho && novoStatus === "ATIVA";
@@ -165,8 +161,6 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     const regenerarParcelas = promovendoParaAtiva || algumCampoCriticoMudou;
 
     if (regenerarParcelas) {
-      // Bloqueia se já existe parcela RECEBIDA/PAGA (não dá pra regenerar
-      // sem perder histórico). Rascunho não tem parcelas → passa direto.
       const temParcelaProcessada = existente.parcelas.some(
         (p) => p.status === "RECEBIDA" || p.status === "PAGA"
       );
@@ -181,19 +175,15 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       }
     }
 
-    // Valores efetivos (campo enviado OU original)
     const valorEfetivo = data.valor ?? Number(existente.valor);
     const nParcEfetivo = data.nParcelas ?? existente.nParcelas;
     const dataInicioEfetiva = data.data1 ?? existente.data1;
 
-    // Transação: regenerar parcelas (se for o caso) + atualizar
     const atualizada = await prisma.$transaction(async (tx) => {
       if (regenerarParcelas) {
         await tx.parcelaFinanceira.deleteMany({
           where: { receitaId: id },
         });
-        // Só cria parcelas se o valor for > 0 (rascunho sendo promovido
-        // sem ter preenchido valor não deveria gerar parcelas zeradas)
         if (valorEfetivo > 0 && nParcEfetivo > 0) {
           const novasParcelas = gerarParcelas({
             valor: valorEfetivo,
@@ -257,10 +247,13 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext) {
       return NextResponse.json({ error: "id inválido" }, { status: 400 });
     }
 
-    const existente = await prisma.receita.findUnique({
-      where: { id },
-      select: { id: true, descricao: true, cancelada: true },
-    });
+    // 🆕 withRetry na primeira chamada
+    const existente = await withRetry(() =>
+      prisma.receita.findUnique({
+        where: { id },
+        select: { id: true, descricao: true, cancelada: true },
+      })
+    );
     if (!existente) {
       return NextResponse.json(
         { error: "Receita não encontrada" },

@@ -10,6 +10,7 @@ import {
   EditarCustoSchema,
   formatZodError,
 } from "@/lib/financeiro/validacao";
+import { withRetry } from "@/lib/db-retry"; // 🆕
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -19,9 +20,6 @@ async function parseId(ctx: RouteContext): Promise<number | null> {
   return !id || isNaN(id) ? null : id;
 }
 
-// ============================================================
-// Helper: adiciona N meses a uma data, ajustando overflow
-// ============================================================
 function addMonths(d: Date, n: number): Date {
   const out = new Date(d);
   const targetDay = out.getDate();
@@ -32,9 +30,6 @@ function addMonths(d: Date, n: number): Date {
   return out;
 }
 
-// ============================================================
-// Helper: gera array de parcelas pra Custo
-// ============================================================
 function gerarParcelas(opts: {
   valor: number;
   nParcelas: number;
@@ -67,13 +62,16 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
       return NextResponse.json({ error: "id inválido" }, { status: 400 });
     }
 
-    const custo = await prisma.custo.findUnique({
-      where: { id },
-      include: {
-        parcelas: { orderBy: { numero: "asc" } },
-        eventos: { orderBy: { createdAt: "desc" } },
-      },
-    });
+    // 🆕 withRetry
+    const custo = await withRetry(() =>
+      prisma.custo.findUnique({
+        where: { id },
+        include: {
+          parcelas: { orderBy: { numero: "asc" } },
+          eventos: { orderBy: { createdAt: "desc" } },
+        },
+      })
+    );
     if (!custo) {
       return NextResponse.json(
         { error: "Custo não encontrado" },
@@ -91,7 +89,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
 }
 
 // ============================================================
-// PATCH — atualiza custo e regenera parcelas se necessário
+// PATCH
 // ============================================================
 const CAMPOS_QUE_AFETAM_PARCELAS = [
   "valor",
@@ -118,10 +116,13 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       );
     }
 
-    const existente = await prisma.custo.findUnique({
-      where: { id },
-      include: { parcelas: true },
-    });
+    // 🆕 withRetry na primeira chamada
+    const existente = await withRetry(() =>
+      prisma.custo.findUnique({
+        where: { id },
+        include: { parcelas: true },
+      })
+    );
     if (!existente) {
       return NextResponse.json(
         { error: "Custo não encontrado" },
@@ -147,13 +148,10 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       );
     }
 
-    // Algum campo crítico (valor/parcelas/datas/câmbio) foi enviado?
     const algumCampoCriticoMudou = CAMPOS_QUE_AFETAM_PARCELAS.some(
       (k) => (data as Record<string, unknown>)[k] !== undefined
     );
 
-    // 🆕 Está promovendo rascunho → ativo?
-    // Quando isso acontece, sempre regenera porque o rascunho NÃO tem parcelas.
     const eraRascunho = existente.status === "RASCUNHO";
     const novoStatus = data.status ?? existente.status;
     const promovendoParaAtivo = eraRascunho && novoStatus === "ATIVA";
@@ -175,18 +173,15 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       }
     }
 
-    // Valores efetivos (campo enviado OU original)
     const valorEfetivo = data.valor ?? Number(existente.valor);
     const nParcEfetivo = data.nParcelas ?? existente.nParcelas;
     const dataInicioEfetiva = data.vencimento ?? existente.vencimento;
 
-    // Transação: regenerar parcelas (se for o caso) + atualizar
     const atualizado = await prisma.$transaction(async (tx) => {
       if (regenerarParcelas) {
         await tx.parcelaFinanceira.deleteMany({
           where: { custoId: id },
         });
-        // Só cria parcelas se o valor for > 0
         if (valorEfetivo > 0 && nParcEfetivo > 0) {
           const novasParcelas = gerarParcelas({
             valor: valorEfetivo,
@@ -240,7 +235,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
 }
 
 // ============================================================
-// DELETE — soft delete (marca cancelado=true)
+// DELETE — soft delete
 // ============================================================
 export async function DELETE(_req: NextRequest, ctx: RouteContext) {
   try {
@@ -249,10 +244,13 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext) {
       return NextResponse.json({ error: "id inválido" }, { status: 400 });
     }
 
-    const existente = await prisma.custo.findUnique({
-      where: { id },
-      select: { id: true, descricao: true, cancelado: true },
-    });
+    // 🆕 withRetry
+    const existente = await withRetry(() =>
+      prisma.custo.findUnique({
+        where: { id },
+        select: { id: true, descricao: true, cancelado: true },
+      })
+    );
     if (!existente) {
       return NextResponse.json(
         { error: "Custo não encontrado" },
