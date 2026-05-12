@@ -6,7 +6,7 @@ import { extrairUsuarioKanban } from '@/lib/kanban-auth'
 
 export async function GET(request: NextRequest) {
   try {
-    const usuario = extrairUsuarioKanban(request)
+    const usuario = await extrairUsuarioKanban(request)
     if (!usuario) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
