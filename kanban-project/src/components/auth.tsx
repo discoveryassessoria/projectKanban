@@ -37,6 +37,14 @@ function limparAuth(): void {
     "authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
 }
 
+// 🆕 12/05/2026 — Detecta tokens em formato antigo (base64 simples) vs JWT.
+// JWT tem formato "header.payload.signature" (3 partes separadas por ponto).
+// Tokens antigos eram uma string base64 única sem pontos. Distinguir
+// permite limpar tokens velhos automaticamente após a migração de auth.
+function isJwtFormat(token: string): boolean {
+  return token.split(".").length === 3
+}
+
 export default function AuthComponent({
   onAuthSuccess,
   redirectTo = "/dashboard",
@@ -45,36 +53,46 @@ export default function AuthComponent({
   const [error, setError] = useState("")
   const router = useRouter()
 
-  // 🆕 07/05/2026 — redirect "já logado" sem causar loop.
+  // 🆕 12/05/2026 — Sequência de checagens no mount:
   //
-  // Antes este useEffect tinha [router, redirectTo] como dependência e
-  // chamava window.location.href = redirectTo se houvesse QUALQUER token
-  // no localStorage. Isso causava um loop visível na URL piscando:
+  //   1. Algum token está em formato antigo (base64 sem pontos)?
+  //      → Limpa tudo. Usuário pré-migração JWT precisa relogar.
+  //      Sem isso, ocorria race condition: useEffect chamava
+  //      router.replace('/dashboard') com cookie antigo, middleware
+  //      rejeitava, voltava pra /login, ciclo repetia enquanto usuário
+  //      tentava clicar em Entrar.
   //
-  //   1. Usuário abre /login com token velho no localStorage mas SEM
-  //      cookie válido (cookie expirou ou nunca existiu)
-  //   2. useEffect dispara → window.location.href = "/dashboard"
-  //   3. middleware.ts intercepta /dashboard, vê que não tem cookie,
-  //      redireciona pra /login
-  //   4. /login monta de novo, useEffect dispara de novo, repete
+  //   2. Tem AMBOS (localStorage + cookie)?
+  //      → Confia e redireciona pra dashboard. Middleware valida lá.
   //
-  // Correção: só redireciona pra /dashboard se houver token no
-  // localStorage E cookie correspondente. Se um existir sem o outro,
-  // limpa tudo e fica no /login. Roda apenas no mount.
+  //   3. Tem só UM deles?
+  //      → Estado inconsistente, limpa e fica no /login.
+  //
+  //   4. Nenhum?
+  //      → Fica no /login normalmente.
+  //
+  // Roda apenas no mount (deps vazias).
   useEffect(() => {
     const tokenLS = localStorage.getItem("authToken")
     const tokenCookie = lerCookie("authToken")
 
+    // 1. Token em formato antigo → limpa e fica no login
+    if (
+      (tokenLS && !isJwtFormat(tokenLS)) ||
+      (tokenCookie && !isJwtFormat(tokenCookie))
+    ) {
+      limparAuth()
+      return
+    }
+
+    // 2. Ambos presentes e em formato JWT → redireciona
     if (tokenLS && tokenCookie) {
-      // Ambos presentes: confia no middleware pra validar quando chegar
-      // em /dashboard. Usa router.replace pra navegação SPA (sem reload).
       router.replace(redirectTo)
     } else if (tokenLS || tokenCookie) {
-      // Só um deles: estado inconsistente, limpa tudo e fica no login.
-      // Isso quebra o ciclo do loop.
+      // 3. Só um → inconsistente, limpa
       limparAuth()
     }
-    // Se nenhum: fica no login normalmente, sem fazer nada.
+    // 4. Nenhum → não faz nada, fica no login
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // ← deps vazias: roda só uma vez no mount
 
@@ -110,9 +128,12 @@ export default function AuthComponent({
         if (onAuthSuccess) {
           onAuthSuccess()
         } else {
-          // 🆕 router.replace em vez de window.location.href:
-          // navegação SPA sem reload da página inteira.
-          router.replace(redirectTo)
+          // 🆕 12/05/2026 — Hard reload (window.location) em vez de
+          // router.replace. Garante que qualquer estado React antigo
+          // (token velho que sobrou de pré-migração JWT) seja descartado.
+          // Custo: um reload de página. Benefício: zero race condition
+          // entre estado React, localStorage, cookie e middleware.
+          window.location.href = redirectTo
         }
       } else {
         console.log("Erro no login:", data.error)
