@@ -1,6 +1,8 @@
+// src/app/api/auth/login/route.ts
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { compare } from "bcrypt"
+import { signAuthToken } from "@/lib/auth-jwt"
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,7 +12,10 @@ export async function POST(request: NextRequest) {
 
     if (!email || !senha) {
       console.log("❌ Email ou senha faltando")
-      return NextResponse.json({ error: "Email e senha são obrigatórios" }, { status: 400 })
+      return NextResponse.json(
+        { error: "Email e senha são obrigatórios" },
+        { status: 400 }
+      )
     }
 
     // Buscar usuário no banco de dados
@@ -21,7 +26,10 @@ export async function POST(request: NextRequest) {
 
     if (!usuario) {
       console.log("❌ Usuário não encontrado")
-      return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 })
+      return NextResponse.json(
+        { error: "Credenciais inválidas" },
+        { status: 401 }
+      )
     }
 
     console.log("✅ Usuário encontrado:", usuario.email)
@@ -32,22 +40,24 @@ export async function POST(request: NextRequest) {
 
     if (!senhaCorreta) {
       console.log("❌ Senha incorreta")
-      return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 })
+      return NextResponse.json(
+        { error: "Credenciais inválidas" },
+        { status: 401 }
+      )
     }
 
     console.log("✅ Senha correta!")
 
-    // Gerar token simples (apenas para demonstração)
-    const token = btoa(
-      JSON.stringify({
-        userId: usuario.id,
-        email: usuario.email,
-        tipo: usuario.tipo,
-        exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 dias
-      }),
-    )
+    // 🆕 JWT real assinado com HS256 (jose), expira em 7 dias.
+    // Antes era btoa(JSON.stringify(...)) — só encoding, sem assinatura,
+    // então qualquer um podia forjar token com qualquer userId.
+    const token = await signAuthToken({
+      userId: usuario.id,
+      email: usuario.email,
+      tipo: usuario.tipo,
+    })
 
-    console.log("🎫 Token gerado com sucesso")
+    console.log("🎫 Token JWT gerado com sucesso")
 
     // Retornar dados do usuário (sem a senha)
     const { senha: _, ...usuarioSemSenha } = usuario
@@ -60,6 +70,9 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error("❌ Erro no login:", error)
-    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+    return NextResponse.json(
+      { error: "Erro interno do servidor" },
+      { status: 500 }
+    )
   }
 }

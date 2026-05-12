@@ -4,7 +4,12 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { extrairUsuarioKanban } from '@/lib/kanban-auth'
-import { calcularPermissoes, temPermissao, type PermissaoChave, type MapaPermissoes } from './permissoes'
+import {
+  calcularPermissoes,
+  temPermissao,
+  type PermissaoChave,
+  type MapaPermissoes,
+} from './permissoes'
 
 interface UsuarioComPermissoes {
   userId: number
@@ -21,7 +26,8 @@ interface UsuarioComPermissoes {
 export async function extrairUsuarioComPermissoes(
   request: Request
 ): Promise<UsuarioComPermissoes | null> {
-  const usuario = extrairUsuarioKanban(request)
+  // 🆕 await: extrairUsuarioKanban virou async (JWT é async)
+  const usuario = await extrairUsuarioKanban(request)
   if (!usuario) return null
 
   // Admin sempre tem tudo — nem precisa buscar perfil
@@ -62,7 +68,11 @@ export async function extrairUsuarioComPermissoes(
     nome: usuarioDB.nome,
     email: usuarioDB.email,
     tipo: usuarioDB.tipo,
-    permissoes: calcularPermissoes(usuarioDB.tipo, perfilPermissoes, permissoesCustom),
+    permissoes: calcularPermissoes(
+      usuarioDB.tipo,
+      perfilPermissoes,
+      permissoesCustom
+    ),
   }
 }
 
@@ -70,14 +80,14 @@ export async function extrairUsuarioComPermissoes(
  * Verifica se o usuário tem a permissão necessária.
  * Retorna NextResponse com erro 403 se não tiver.
  * Retorna null se tiver permissão (pode prosseguir).
- * 
+ *
  * Uso nas rotas:
- * 
+ *
  * ```ts
  * export async function DELETE(request: Request) {
  *   const erro = await verificarPermissao(request, 'tarefas.excluir')
  *   if (erro) return erro
- *   
+ *
  *   // ... lógica normal
  * }
  * ```
@@ -89,10 +99,7 @@ export async function verificarPermissao(
   const usuario = await extrairUsuarioComPermissoes(request)
 
   if (!usuario) {
-    return NextResponse.json(
-      { error: 'Não autorizado' },
-      { status: 401 }
-    )
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 
   if (!temPermissao(usuario.permissoes, permissao)) {
@@ -115,17 +122,19 @@ export async function verificarPermissoes(
   const usuario = await extrairUsuarioComPermissoes(request)
 
   if (!usuario) {
-    return NextResponse.json(
-      { error: 'Não autorizado' },
-      { status: 401 }
-    )
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 
-  const semPermissao = permissoes.filter(p => !temPermissao(usuario.permissoes, p))
+  const semPermissao = permissoes.filter(
+    (p) => !temPermissao(usuario.permissoes, p)
+  )
 
   if (semPermissao.length > 0) {
     return NextResponse.json(
-      { error: 'Sem permissão para esta ação', permissoesFaltando: semPermissao },
+      {
+        error: 'Sem permissão para esta ação',
+        permissoesFaltando: semPermissao,
+      },
       { status: 403 }
     )
   }
