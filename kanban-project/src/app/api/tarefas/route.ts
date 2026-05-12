@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     // 🔒 FILTRO OBRIGATÓRIO POR USUÁRIO
     // Se o usuário NÃO for admin, só vê as próprias tarefas
     // =====================================================
-    const usuario = extrairUsuarioKanban(request)
+    const usuario = await extrairUsuarioKanban(request)
     
     if (usuario && usuario.tipo !== 'admin') {
       // Usuário comum: FORÇAR filtro por responsavelId
