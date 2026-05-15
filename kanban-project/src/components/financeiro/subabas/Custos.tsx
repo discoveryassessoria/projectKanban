@@ -30,6 +30,7 @@ import {
 
 import { TabelaCustos } from '@/src/components/kanban/TabelaCustos'
 import { parseLista } from '@/src/lib/financeiro/parseLista'
+import { SeletorTemplate } from '@/src/components/financeiro/SeletorTemplate'
 
 // ============================================================================
 // Tipos
@@ -162,6 +163,7 @@ export function Custos({
   const [erro, setErro] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<Filter>('todos')
   const [excluindoId, setExcluindoId] = useState<number | null>(null)
+  const [templateAberto, setTemplateAberto] = useState(false)
 
   // ---- Load ----
   useEffect(() => {
@@ -364,6 +366,17 @@ export function Custos({
   // ---- View 'lista' ----
   return (
     <div className="fpag-page">
+      {templateAberto && (
+        <SeletorTemplate
+          processoId={processoId}
+          fxHoje={fxHoje}
+          onFechar={() => setTemplateAberto(false)}
+          onAplicado={() => {
+            recarregar()
+            onUpdate?.()
+          }}
+        />
+      )}
       {/* === Section 1: Pasta Documental === */}
       <section style={{ marginBottom: 32 }}>
         <div className="page-header">
@@ -386,13 +399,22 @@ export function Custos({
               Serviços, impostos, despesas e demais saídas operacionais do processo
             </div>
           </div>
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => setView({ kind: 'nova' })}
-          >
-            + Novo Custo
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              className="btn-outline"
+              onClick={() => setTemplateAberto(true)}
+            >
+              ⚡ Template
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setView({ kind: 'nova' })}
+            >
+              + Novo Custo
+            </button>
+          </div>
         </div>
 
         {/* KPIs (BRL como denominador comum entre moedas) */}

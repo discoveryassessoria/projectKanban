@@ -29,6 +29,7 @@ import {
   type ParcelaLancavel,
   type EntidadeLancavel,
 } from '@/src/components/financeiro/paginas/LancarParcelaPagina'
+import { SeletorTemplate } from '@/src/components/financeiro/SeletorTemplate'
 
 // ============================================================================
 // Tipos
@@ -156,6 +157,7 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
   const [erro, setErro] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<Filter>('todas')
   const [excluindoId, setExcluindoId] = useState<number | null>(null)
+  const [templateAberto, setTemplateAberto] = useState(false)
 
   // ---- Load ----
   useEffect(() => {
@@ -366,18 +368,38 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
   // ---- View 'lista' ----
   return (
     <div className="fpag-page">
+      {templateAberto && (
+        <SeletorTemplate
+          processoId={processoId}
+          fxHoje={fxHoje}
+          onFechar={() => setTemplateAberto(false)}
+          onAplicado={() => {
+            recarregar()
+            onUpdate?.()
+          }}
+        />
+      )}
       <div className="page-header">
         <div>
           <h1 className="page-title">Receitas</h1>
           <div className="page-subtitle">Honorários e demais entradas do processo</div>
         </div>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => setView({ kind: 'nova' })}
-        >
-          + Nova Receita
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            className="btn-outline"
+            onClick={() => setTemplateAberto(true)}
+          >
+            ⚡ Template
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => setView({ kind: 'nova' })}
+          >
+            + Nova Receita
+          </button>
+        </div>
       </div>
 
       {/* KPIs (BRL como denominador comum entre moedas) */}
