@@ -71,16 +71,26 @@
   line-height: 1.5;
 }
 
-/* Reset suave dentro do escopo (não toca em botões com classes Tailwind de bg/border) */
+/* Reset suave dentro do escopo.
+ *
+ * 🆕 14/05/2026 — O reset agora ignora QUALQUER botão que tenha uma classe
+ * de componente conhecida (btn-*) OU classes utilitárias Tailwind (bg-/border-).
+ * Botões "crus" (sem classe nenhuma) continuam zerados.
+ *
+ * Motivo: a versão antiga só protegia [class*="bg-"], mas .btn-primary e
+ * .btn-outline não têm "bg-" no nome — o reset zerava o fundo deles e só o
+ * :hover reaplicava a cor (botão invisível em repouso). Esta abordagem
+ * cobre todos os botões de componente de uma vez, sem precisar listar cada um.
+ */
 .fpag-page * { box-sizing: border-box; }
 .fpag-page button {
   font-family: inherit;
   cursor: pointer;
 }
-.fpag-page button:not([class*="bg-"]) {
+.fpag-page button:not([class*="btn-"]):not([class*="bg-"]) {
   background: none;
 }
-.fpag-page button:not([class*="border-"]) {
+.fpag-page button:not([class*="btn-"]):not([class*="border-"]) {
   border: none;
 }
 .fpag-page input, .fpag-page select, .fpag-page textarea {
