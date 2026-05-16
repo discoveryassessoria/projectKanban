@@ -30,6 +30,7 @@ import {
   type EntidadeLancavel,
 } from '@/src/components/financeiro/paginas/LancarParcelaPagina'
 import { SeletorTemplate } from '@/src/components/financeiro/SeletorTemplate'
+import { DetalhesReceitaPagina } from '@/src/components/financeiro/paginas/DetalhesReceitaPagina'
 
 // ============================================================================
 // Tipos
@@ -149,6 +150,7 @@ type View =
   | { kind: 'nova' }
   | { kind: 'editar'; receita: ReceitaAPI }
   | { kind: 'lancar'; parcela: ParcelaLancavel; entidade: EntidadeLancavel }
+  | { kind: 'detalhes'; receita: ReceitaAPI }
 
 export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) {
   const [view, setView] = useState<View>({ kind: 'lista' })
@@ -341,6 +343,25 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
         receitaInicial={view.receita}
         onVoltar={() => setView({ kind: 'lista' })}
         onCriado={() => {
+          setView({ kind: 'lista' })
+          recarregar()
+          onUpdate?.()
+        }}
+      />
+    )
+  }
+
+  if (view.kind === 'detalhes') {
+    return (
+      <DetalhesReceitaPagina
+        receita={view.receita}
+        fxHoje={fxHoje}
+        onVoltar={() => setView({ kind: 'lista' })}
+        onEditar={(r) => setView({ kind: 'editar', receita: r })}
+        onLancarParcela={(parcela, entidade) =>
+          setView({ kind: 'lancar', parcela, entidade })
+        }
+        onExcluido={() => {
           setView({ kind: 'lista' })
           recarregar()
           onUpdate?.()
@@ -635,35 +656,25 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
                             {sendoExcluido ? 'Excluindo...' : 'Excluir'}
                           </button>
                         </div>
-                      ) : proximaPendente ? (
-                        <button
-                          type="button"
-                          className="btn-link-sm"
-                          onClick={() =>
-                            setView({
-                              kind: 'lancar',
-                              parcela: {
-                                id: proximaPendente.id,
-                                numero: proximaPendente.numero,
-                                valor: num(proximaPendente.valor),
-                                vencimento: proximaPendente.vencimento,
-                              },
-                              entidade: {
-                                tipo: 'receita',
-                                descricao: r.descricao,
-                                moeda: r.moeda,
-                                fxRule: r.fxRule,
-                                fxFixo: r.fxFixo != null ? num(r.fxFixo) : null,
-                                fxEstimado: num(r.fxEstimado) || 1,
-                                totalParcelas: r.nParcelas,
-                              },
-                            })
-                          }
-                        >
-                          Lançar
-                        </button>
                       ) : (
-                        <span className="muted">—</span>
+                        <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
+                          <button
+                            type="button"
+                            className="btn-link-sm"
+                            disabled
+                            title="Em desenvolvimento"
+                            style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                          >
+                            Fatura
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-link-sm"
+                            onClick={() => setView({ kind: 'detalhes', receita: r })}
+                          >
+                            Ver
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>

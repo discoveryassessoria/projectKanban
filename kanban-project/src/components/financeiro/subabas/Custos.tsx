@@ -31,6 +31,7 @@ import {
 import { TabelaCustos } from '@/src/components/kanban/TabelaCustos'
 import { parseLista } from '@/src/lib/financeiro/parseLista'
 import { SeletorTemplate } from '@/src/components/financeiro/SeletorTemplate'
+import { DetalhesCustoPagina } from '@/src/components/financeiro/paginas/DetalhesCustoPagina'
 
 // ============================================================================
 // Tipos
@@ -76,7 +77,7 @@ interface CustoAPI {
   vencimento: string
   custoOperacional?: boolean
   categoriaVinculada?: string | null
-  percentualVinculado?: number | null
+  percentualVinculado?: number | string | null
   formaPagamento?: string | null
   status?: CustoStatus
   cancelado?: boolean
@@ -146,6 +147,7 @@ type View =
   | { kind: 'nova' }
   | { kind: 'editar'; custo: CustoAPI }
   | { kind: 'lancar'; parcela: ParcelaLancavel; entidade: EntidadeLancavel }
+  | { kind: 'detalhes'; custo: CustoAPI }
 
 // Cast pra TS não reclamar de prop opcional `custoInicial` adicionada na v4.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -339,6 +341,25 @@ export function Custos({
         custoInicial={view.custo}
         onVoltar={() => setView({ kind: 'lista' })}
         onCriado={() => {
+          setView({ kind: 'lista' })
+          recarregar()
+          onUpdate?.()
+        }}
+      />
+    )
+  }
+
+  if (view.kind === 'detalhes') {
+    return (
+      <DetalhesCustoPagina
+        custo={view.custo}
+        fxHoje={fxHoje}
+        onVoltar={() => setView({ kind: 'lista' })}
+        onEditar={(c) => setView({ kind: 'editar', custo: c })}
+        onLancarParcela={(parcela, entidade) =>
+          setView({ kind: 'lancar', parcela, entidade })
+        }
+        onExcluido={() => {
           setView({ kind: 'lista' })
           recarregar()
           onUpdate?.()
@@ -631,37 +652,26 @@ export function Custos({
                               {sendoExcluido ? 'Excluindo...' : 'Excluir'}
                             </button>
                           </div>
-                        ) : proximaPendente ? (
+) : (
+                        <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
                           <button
                             type="button"
                             className="btn-link-sm"
-                            onClick={() =>
-                              setView({
-                                kind: 'lancar',
-                                parcela: {
-                                  id: proximaPendente.id,
-                                  numero: proximaPendente.numero,
-                                  valor: num(proximaPendente.valor),
-                                  vencimento: proximaPendente.vencimento,
-                                },
-                                entidade: {
-                                  tipo: 'custo',
-                                  descricao: c.descricao,
-                                  fornecedor: c.fornecedor,
-                                  moeda: c.moeda,
-                                  fxRule: c.fxRule,
-                                  fxFixo: c.fxFixo != null ? num(c.fxFixo) : null,
-                                  fxEstimado: num(c.fxEstimado) || 1,
-                                  totalParcelas: c.nParcelas,
-                                },
-                              })
-                            }
+                            disabled
+                            title="Em desenvolvimento"
+                            style={{ opacity: 0.5, cursor: 'not-allowed' }}
                           >
-                            Lançar
+                            Comprovante
                           </button>
-                        ) : (
-                          <span className="muted">—</span>
-                        )}
+                          <button
+                            type="button"
+                            className="btn-link-sm"
+                            onClick={() => setView({ kind: 'detalhes', custo: c })}
+                          >
+                            Ver
+                          </button>
+                        </div>
+                      )}
                       </td>
                     </tr>
                   )
