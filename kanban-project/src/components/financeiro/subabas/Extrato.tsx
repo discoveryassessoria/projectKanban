@@ -18,6 +18,7 @@
 import '@/src/styles/financeiro-paginas.css'
 import { useEffect, useMemo, useState } from 'react'
 import { parseLista } from '@/src/lib/financeiro/parseLista'
+import { apenasAtivos } from '@/src/lib/financeiro/filtros'
 
 // ============================================================================
 // Tipos
@@ -51,6 +52,9 @@ interface ItemAPI {
   fxRule: FxRule
   fxFixo?: number | string | null
   parcelas: ParcelaAPI[]
+  cancelada?: boolean
+  cancelado?: boolean
+  status?: 'ATIVA' | 'RASCUNHO' | 'CANCELADA'
 }
 
 export interface ExtratoProps {
@@ -179,7 +183,7 @@ export function Extrato({ processoId, fxHoje = 5.5 }: ExtratoProps) {
   // ---- Movimentações (clone EXATO de renderExtrato do HTML) ----
   const movs: MovimentacaoEx[] = useMemo(() => {
     const out: MovimentacaoEx[] = []
-    for (const r of receitas) {
+    for (const r of apenasAtivos(receitas)) {
       for (const p of r.parcelas) {
         if (p.status !== 'RECEBIDA' && p.status !== 'PAGA') continue
         const valorEur = num(p.valor)
@@ -203,7 +207,7 @@ export function Extrato({ processoId, fxHoje = 5.5 }: ExtratoProps) {
         })
       }
     }
-    for (const c of custos) {
+    for (const c of apenasAtivos(custos)) {
       for (const p of c.parcelas) {
         if (p.status !== 'PAGA' && p.status !== 'RECEBIDA') continue
         const valorEur = num(p.valor)

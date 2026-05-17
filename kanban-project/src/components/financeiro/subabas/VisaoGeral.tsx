@@ -19,6 +19,7 @@
 import '@/src/styles/financeiro-paginas.css'
 import { useEffect, useMemo, useState } from 'react'
 import { parseLista } from '@/src/lib/financeiro/parseLista'
+import { apenasAtivos } from '@/src/lib/financeiro/filtros'
 
 // ============================================================================
 // Tipos
@@ -50,6 +51,9 @@ interface ItemAPI {
   fxRule: FxRule
   fxFixo?: number | string | null
   parcelas: ParcelaAPI[]
+  cancelada?: boolean
+  cancelado?: boolean
+  status?: 'ATIVA' | 'RASCUNHO' | 'CANCELADA'
 }
 
 export interface VisaoGeralProps {
@@ -292,7 +296,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5 }: VisaoGeralProps) {
       rec: { totalBrl: 0, recebidoBrl: 0, pendenteBrl: 0 },
       cus: { totalBrl: 0, recebidoBrl: 0, pendenteBrl: 0 },
     }
-    for (const r of receitas) {
+    for (const r of apenasAtivos(receitas)) {
       for (const p of r.parcelas) {
         const v = parcToBrl(r, p, fxHoje)
         o.rec.totalBrl += v
@@ -300,7 +304,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5 }: VisaoGeralProps) {
         else o.rec.pendenteBrl += v
       }
     }
-    for (const c of custos) {
+    for (const c of apenasAtivos(custos)) {
       for (const p of c.parcelas) {
         const v = parcToBrl(c, p, fxHoje)
         o.cus.totalBrl += v
@@ -354,7 +358,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5 }: VisaoGeralProps) {
     const today = todayISO()
     let totalInadBrl = 0
     let inadCount = 0
-    for (const r of receitas) {
+    for (const r of apenasAtivos(receitas)) {
       for (const p of r.parcelas) {
         const venc = (p.vencimento || '').slice(0, 10)
         if (p.status === 'PENDENTE' && venc && venc < today) {
@@ -378,7 +382,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5 }: VisaoGeralProps) {
       label: string
       valBrl: number
     }> = []
-    for (const r of receitas) {
+    for (const r of apenasAtivos(receitas)) {
       for (const p of r.parcelas) {
         if (p.status === 'RECEBIDA' || p.status === 'PAGA') continue
         const venc = (p.vencimento || '').slice(0, 10)
@@ -392,7 +396,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5 }: VisaoGeralProps) {
         }
       }
     }
-    for (const c of custos) {
+    for (const c of apenasAtivos(custos)) {
       for (const p of c.parcelas) {
         if (p.status === 'PAGA' || p.status === 'RECEBIDA') continue
         const venc = (p.vencimento || '').slice(0, 10)

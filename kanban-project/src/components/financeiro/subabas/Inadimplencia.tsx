@@ -27,6 +27,7 @@
 import '@/src/styles/financeiro-paginas.css'
 import { useEffect, useMemo, useState } from 'react'
 import { parseLista } from '@/src/lib/financeiro/parseLista'
+import { apenasAtivos } from '@/src/lib/financeiro/filtros'
 
 // ============================================================================
 // Tipos
@@ -74,6 +75,8 @@ interface ReceitaAPI {
   nParcelas: number
   parcelas: ParcelaAPI[]
   requerentes?: ReceitaRequerenteAPI[]
+  cancelada?: boolean
+  status?: 'ATIVA' | 'RASCUNHO' | 'CANCELADA'
 }
 
 interface ParcelaAPIComCusto extends ParcelaAPI {}
@@ -86,6 +89,8 @@ interface CustoAPI {
   fxFixo?: number | string | null
   moeda: Moeda
   dataPagamento?: string | null
+  cancelado?: boolean
+  status?: 'ATIVA' | 'RASCUNHO' | 'CANCELADA'
 }
 
 export interface InadimplenciaProps {
@@ -364,7 +369,7 @@ export function Inadimplencia({ processoId, fxHoje = 5.5 }: InadimplenciaProps) 
   const lista: InadItem[] = useMemo(() => {
     const today = todayISO()
     const out: InadItem[] = []
-    for (const r of receitas) {
+    for (const r of apenasAtivos(receitas)) {
       const fx =
         r.moeda === 'BRL'
           ? 1
@@ -455,7 +460,7 @@ export function Inadimplencia({ processoId, fxHoje = 5.5 }: InadimplenciaProps) 
     const in7iso = in7.toISOString().slice(0, 10)
     let aVencer = 0
     let aVencerCount = 0
-    for (const r of receitas) {
+    for (const r of apenasAtivos(receitas)) {
       const fx =
         r.moeda === 'BRL'
           ? 1
@@ -475,7 +480,7 @@ export function Inadimplencia({ processoId, fxHoje = 5.5 }: InadimplenciaProps) 
     // Recebido este mês (parcelas pagas com dataPagamento >= primeiro dia do mês)
     const monthStart = today.substring(0, 8) + '01'
     let recMes = 0
-    for (const r of receitas) {
+    for (const r of apenasAtivos(receitas)) {
       for (const p of r.parcelas) {
         if (p.status !== 'RECEBIDA' && p.status !== 'PAGA') continue
         const dp = (p.dataPagamento || '').slice(0, 10)
