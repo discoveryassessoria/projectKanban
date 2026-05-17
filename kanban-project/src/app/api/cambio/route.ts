@@ -1,71 +1,61 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server"
 
-const FALLBACK = {
-  eur: 5.5, usd: 5.4,
-  eurVar: 0, usdVar: 0,
-  eurPct: 0, usdPct: 0,
-  eurHist: [] as number[],
-  usdHist: [] as number[],
+const HEADERS = {
+  "User-Agent": "Mozilla/5.0 (compatible; DiscoveryAssessoria/1.0)",
+  "Accept": "application/json",
 }
 
-interface AwesomeLast {
-  bid: string
-  varBid: string
-  pctChange: string
-  create_date: string
-}
-interface AwesomeDaily {
-  bid: string
-  timestamp: string
+async function safeFetch<T>(url: string, revalidate: number, label: string): Promise<T | null> {
+  try {
+    const res = await fetch(url, { headers: HEADERS, next: { revalidate } })
+    if (!res.ok) {
+      console.error(`[api/cambio] ${label} retornou ${res.status} ${res.statusText}`)
+      return null
+    }
+    return await res.json()
+  } catch (err) {
+    console.error(`[api/cambio] ${label} falhou:`, err)
+    return null
+  }
 }
 
 export async function GET() {
-  try {
-    const [resLast, resEurHist, resUsdHist] = await Promise.all([
-      fetch('https://economia.awesomeapi.com.br/last/USD-BRL,EUR-BRL', {
-        next: { revalidate: 900 }, // 15 min
-      }),
-      fetch('https://economia.awesomeapi.com.br/json/daily/EUR-BRL/30', {
-        next: { revalidate: 3600 }, // 1 hora (histórico muda menos)
-      }),
-      fetch('https://economia.awesomeapi.com.br/json/daily/USD-BRL/30', {
-        next: { revalidate: 3600 },
-      }),
-    ])
+  const [last, usdData, eurData] = await Promise.all([
+    safeFetch<any>("https://economia.awesomeapi.com.br/last/USD-BRL,EUR-BRL", 900, "last"),
+    safeFetch<any[]>("https://economia.awesomeapi.com.br/json/daily/USD-BRL/30", 3600, "usdHist"),
+    safeFetch<any[]>("https://economia.awesomeapi.com.br/json/daily/EUR-BRL/30", 3600, "eurHist"),
+  ])
 
-    if (!resLast.ok) throw new Error(`HTTP ${resLast.status}`)
-    const last: { USDBRL: AwesomeLast; EURBRL: AwesomeLast } = await resLast.json()
-
-    // Histórico: AwesomeAPI retorna do mais recente pro mais antigo, invertemos
-    let eurHist: number[] = []
-    let usdHist: number[] = []
-    if (resEurHist.ok) {
-      const data: AwesomeDaily[] = await resEurHist.json()
-      eurHist = data.map((d) => parseFloat(d.bid)).reverse()
-    }
-    if (resUsdHist.ok) {
-      const data: AwesomeDaily[] = await resUsdHist.json()
-      usdHist = data.map((d) => parseFloat(d.bid)).reverse()
-    }
-
+  // Se nenhum dos três funcionou, devolve fallback
+  if (!last && !usdData && !eurData) {
+    console.error("[api/cambio] Todos os fetches falharam, devolvendo fallback")
     return NextResponse.json({
-      eur: parseFloat(last.EURBRL.bid),
-      usd: parseFloat(last.USDBRL.bid),
-      eurVar: parseFloat(last.EURBRL.varBid),
-      usdVar: parseFloat(last.USDBRL.varBid),
-      eurPct: parseFloat(last.EURBRL.pctChange),
-      usdPct: parseFloat(last.USDBRL.pctChange),
-      eurHist,
-      usdHist,
-      atualizadoEm: last.USDBRL.create_date,
-      fonte: 'AwesomeAPI',
-    })
-  } catch (err) {
-    console.error('[cambio] erro, usando fallback:', err)
-    return NextResponse.json({
-      ...FALLBACK,
+      eur: 5.5, usd: 5.4,
+      eurVar: 0, usdVar: 0, eurPct: 0, usdPct: 0,
+      eurHist: [], usdHist: [],
       atualizadoEm: null,
-      fonte: 'fallback',
+      fonte: "fallback",
     })
   }
+
+  const usd = last?.USDBRL ? parseFloat(last.USDBRL.bid) : 5.4
+  const eur = last?.EURBRL ? parseFloat(last.EURBRL.bid) : 5.5
+  const usdVar = last?.USDBRL ? parseFloat(last.USDBRL.varBid) : 0
+  const eurVar = last?.EURBRL ? parseFloat(last.EURBRL.varBid) : 0
+  const usdPct = last?.USDBRL ? parseFloat(last.USDBRL.pctChange) : 0
+  const eurPct = last?.EURBRL ? parseFloat(last.EURBRL.pctChange) : 0
+
+  const usdHist = Array.isArray(usdData) ? usdData.map((d) => parseFloat(d.bid)).reverse() : []
+  const eurHist = Array.isArray(eurData) ? eurData.map((d) => parseFloat(d.bid)).reverse() : []
+
+  const atualizadoEm = last?.USDBRL?.create_date || new Date().toISOString()
+
+  return NextResponse.json({
+    eur, usd,
+    eurVar, usdVar,
+    eurPct, usdPct,
+    eurHist, usdHist,
+    atualizadoEm,
+    fonte: "AwesomeAPI",
+  })
 }
