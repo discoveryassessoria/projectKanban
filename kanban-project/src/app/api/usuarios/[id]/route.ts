@@ -3,33 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { hash } from "bcrypt"
 import { UserType } from "@/src/utils/userTypes"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
-
-// Função auxiliar para verificar se o usuário é admin
-function verifyAdmin(request: NextRequest): { isAdmin: boolean; userId?: number; tipo?: string } {
-  try {
-    const authHeader = request.headers.get("authorization")
-    const token = authHeader?.replace("Bearer ", "")
-
-    if (!token) {
-      return { isAdmin: false }
-    }
-
-    const decoded = JSON.parse(atob(token))
-    
-    // Verificar se o token não expirou
-    if (decoded.exp && Date.now() > decoded.exp) {
-      return { isAdmin: false }
-    }
-
-    return {
-      isAdmin: decoded.tipo === "admin",
-      userId: decoded.userId,
-      tipo: decoded.tipo,
-    }
-  } catch (error) {
-    return { isAdmin: false }
-  }
-}
+import { verifyAuth } from "@/src/lib/verify-auth"
 
 // PUT - Atualizar usuário
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -37,7 +11,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const erro = await verificarPermissao(request, 'usuarios.editar')
     if (erro) return erro
 
-    const { isAdmin, userId: requesterId } = verifyAdmin(request)
+    const { isAdmin, userId: requesterId } = verifyAuth(request)
 
     const { id: idParam } = await params
     const userId = parseInt(idParam)
@@ -115,7 +89,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const erro = await verificarPermissao(request, 'usuarios.excluir')
     if (erro) return erro
 
-    const { isAdmin, userId: requesterId, tipo: requesterTipo } = verifyAdmin(request)
+    const { isAdmin, userId: requesterId, tipo: requesterTipo } = verifyAuth(request)
 
     const { id: idParam } = await params
     const userId = parseInt(idParam)

@@ -1,32 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
-
-// Função auxiliar para verificar autenticação
-function verifyAuth(request: NextRequest): { isAuthenticated: boolean; isAdmin: boolean } {
-  try {
-    const authHeader = request.headers.get("authorization")
-    const token = authHeader?.replace("Bearer ", "")
-
-    if (!token) {
-      return { isAuthenticated: false, isAdmin: false }
-    }
-
-    const decoded = JSON.parse(atob(token))
-    
-    // Verificar se o token não expirou
-    if (decoded.exp && Date.now() > decoded.exp) {
-      return { isAuthenticated: false, isAdmin: false }
-    }
-
-    return {
-      isAuthenticated: true,
-      isAdmin: decoded.tipo === "admin",
-    }
-  } catch (error) {
-    return { isAuthenticated: false, isAdmin: false }
-  }
-}
+import { verifyAuth } from "@/src/lib/verify-auth"
 
 export async function GET(request: NextRequest) {
   try {
