@@ -226,14 +226,3 @@
   background-color: rgba(220, 38, 38, 0.1);
   border-color: rgba(220, 38, 38, 0.2);
 }
-
-/* Melhorias para dark mode */
-@media (prefers-color-scheme: dark) {
-  .kanban-scroll::-webkit-scrollbar-thumb {
-    background-color: rgb(71 85 105);
-  }
-  
-  .kanban-scroll::-webkit-scrollbar-thumb:hover {
-    background-color: rgb(100 116 139);
-  }
-}
