@@ -26,6 +26,7 @@ import { Inadimplencia } from '@/src/components/financeiro/subabas/Inadimplencia
 import { Documentos } from '@/src/components/financeiro/subabas/Documentos'
 import { Timeline } from '@/src/components/financeiro/subabas/Timeline'
 import { Carteira } from '@/src/components/financeiro/subabas/Carteira'
+import { CotacaoCard } from '@/src/components/financeiro/CotacaoCard'
 
 // ============================================================================
 // Tipos
@@ -68,20 +69,39 @@ export function ProcessoFinanceiro({
   const [aba, setAba] = useState<Aba>('visao-geral')
 
   // Cotações de hoje — placeholders até existir endpoint real
-  const [fxEur, setFxEur] = useState<number>(5.5) // EUR → BRL
-  const [fxUsd, setFxUsd] = useState<number>(5.4) // USD → BRL
+  const [cambio, setCambio] = useState({
+    eur: 5.5,
+    usd: 5.4,
+    eurVar: 0,
+    usdVar: 0,
+    eurPct: 0,
+    usdPct: 0,
+    eurHist: [] as number[],
+    usdHist: [] as number[],
+    atualizadoEm: null as string | null,
+  })
 
-  // 🔌 Quando existir o endpoint de cotação, descomente:
-  //
-  // useEffect(() => {
-  //   fetch('/api/cambio')
-  //     .then((r) => r.json())
-  //     .then((d) => {
-  //       if (d?.eur) setFxEur(Number(d.eur))
-  //       if (d?.usd) setFxUsd(Number(d.usd))
-  //     })
-  //     .catch(() => { /* mantém defaults */ })
-  // }, [])
+  useEffect(() => {
+    let cancelado = false
+    fetch('/api/cambio')
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelado) return
+        setCambio({
+          eur: Number(d.eur) || 5.5,
+          usd: Number(d.usd) || 5.4,
+          eurVar: Number(d.eurVar) || 0,
+          usdVar: Number(d.usdVar) || 0,
+          eurPct: Number(d.eurPct) || 0,
+          usdPct: Number(d.usdPct) || 0,
+          eurHist: Array.isArray(d.eurHist) ? d.eurHist : [],
+          usdHist: Array.isArray(d.usdHist) ? d.usdHist : [],
+          atualizadoEm: d.atualizadoEm ?? null,
+        })
+      })
+      .catch((err) => console.error('[cambio] erro:', err))
+    return () => { cancelado = true }
+  }, [])
 
   return (
     <div
@@ -136,14 +156,26 @@ export function ProcessoFinanceiro({
 
         {/* Espaçador que empurra os indicadores e atalhos pra direita */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div className="fpag-fx-indicator" style={{ marginLeft: 0 }}>
-            <span className="fpag-fx-indicator-dot" />
-            <span>$1 = {fmtBRL(fxUsd)} (hoje)</span>
-          </div>
-          <div className="fpag-fx-indicator" style={{ marginLeft: 0 }}>
-            <span className="fpag-fx-indicator-dot" />
-            <span>€1 = {fmtBRL(fxEur)} (hoje)</span>
-          </div>
+          <CotacaoCard
+            simbolo="$"
+            codigo="USD"
+            nome="Dólar americano"
+            valor={cambio.usd}
+            variacao={cambio.usdVar}
+            variacaoPct={cambio.usdPct}
+            historico={cambio.usdHist}
+            atualizadoEm={cambio.atualizadoEm}
+          />
+          <CotacaoCard
+            simbolo="€"
+            codigo="EUR"
+            nome="Euro"
+            valor={cambio.eur}
+            variacao={cambio.eurVar}
+            variacaoPct={cambio.eurPct}
+            historico={cambio.eurHist}
+            atualizadoEm={cambio.atualizadoEm}
+          />
         </div>
 
         <FinTab
@@ -185,7 +217,7 @@ export function ProcessoFinanceiro({
             processoId={processoId}
             nomeFamilia={nomeFamilia}
             onUpdate={onUpdate}
-            fxHoje={fxEur}
+            fxHoje={cambio.eur}
           />
         )}
         {aba === 'custos' && (
@@ -193,30 +225,30 @@ export function ProcessoFinanceiro({
             processoId={processoId}
             nomeFamilia={nomeFamilia}
             onUpdate={onUpdate}
-            fxHoje={fxEur}
+            fxHoje={cambio.eur}
           />
         )}
-        {aba === 'extrato' && <Extrato processoId={processoId} fxHoje={fxEur} />}
+        {aba === 'extrato' && <Extrato processoId={processoId} fxHoje={cambio.eur} />}
 
         {aba === 'inadimplencia' && (
           <Inadimplencia
             processoId={processoId}
             nomeFamilia={nomeFamilia}
-            fxHoje={fxEur}
+            fxHoje={cambio.eur}
           />
         )}
         {aba === 'documentos' && (
           <Documentos
             processoId={processoId}
             codigoProcesso={codigoProcesso}
-            fxHoje={fxEur}
+            fxHoje={cambio.eur}
           />
         )}
         {aba === 'timeline' && (
-          <Timeline processoId={processoId} fxHoje={fxEur} />
+          <Timeline processoId={processoId} fxHoje={cambio.eur} />
         )}
         {aba === 'carteira' && (
-          <Carteira processoId={processoId} fxHoje={fxEur} fxUsdHoje={fxUsd} />
+          <Carteira processoId={processoId} fxHoje={cambio.eur} fxUsdHoje={cambio.usd} />
         )}
       </div>
     </div>
