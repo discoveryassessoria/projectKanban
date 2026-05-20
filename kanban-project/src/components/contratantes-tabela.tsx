@@ -33,7 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useUploadThing } from "@/src/lib/uploadthing"
+import { uploadFiles, type UploadedFile } from "@/src/lib/storage"
 import { PDFThumbnail } from "./pdf-thumbnail"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import { Upload, CheckCircle2, XCircle, FileImage, Shield, Home, CreditCard as CreditCardIcon, Car } from "lucide-react"
@@ -413,7 +413,7 @@ export function ContratanteModal({
   const [activeTab, setActiveTab] = useState<"dados" | "endereco" | "observacoes" | "acesso">("dados")
   const [mounted, setMounted] = useState(false)
   const [buscandoCep, setBuscandoCep] = useState(false)
-  const uploadingCategoriaRef = useRef<string | null>(null)  // ✅ AQUI
+  const [isUploading, setIsUploading] = useState(false)  // ← R2: controla estado de upload manualmente
   
   const [documentosObrigatorios, setDocumentosObrigatorios] = useState<Record<string, Anexo | null>>({
   RG: null,
@@ -497,48 +497,55 @@ export function ContratanteModal({
     }
   }
 
+  // ⬇️ R2: upload de documento obrigatório (RG, CNH, Comprovante)
   const handleDocumentoUpload = async (categoria: string, file: File) => {
-  if (!editingId) return
-  
-  try {
-    uploadingCategoriaRef.current = categoria
-    const uploadResult = await startUpload([file])
-    uploadingCategoriaRef.current = null
-    
-    if (uploadResult && uploadResult.length > 0) {
-      const uploaded = uploadResult[0]
-      
-      // Salvar no banco com categoria
-      const response = await fetch("/api/anexos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nome: uploaded.name,
-          nomeArquivo: uploaded.name,
-          urlArquivo: uploaded.url,
-          tamanho: uploaded.size,
-          mimeType: uploaded.type,
-          tipoCliente: editingTipo,
-          contratanteId: editingTipo === "contratante" ? editingId : undefined,
-          requerenteId: editingTipo === "requerente" ? editingId : undefined,
-          categoria: categoria,
-        }),
+    if (!editingId) return
+
+    setIsUploading(true)
+    setUploadProgress(0)
+    try {
+      const uploadResult = await uploadFiles([file], {
+        prefix: "contratantes",
+        onProgress: (_f, p) => setUploadProgress(p),
       })
-      
-      if (response.ok) {
+
+      if (uploadResult && uploadResult.length > 0) {
+        const uploaded = uploadResult[0]
+
+        // Salvar no banco com categoria
+        const response = await fetch("/api/anexos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nome: uploaded.name,
+            nomeArquivo: uploaded.name,
+            urlArquivo: uploaded.url,
+            tamanho: uploaded.size,
+            mimeType: uploaded.type,
+            tipoCliente: editingTipo,
+            contratanteId: editingTipo === "contratante" ? editingId : undefined,
+            requerenteId: editingTipo === "requerente" ? editingId : undefined,
+            categoria: categoria,
+          }),
+        })
+
+        if (response.ok) {
           const data = await response.json()
           setDocumentosObrigatorios(prev => ({
             ...prev,
             [categoria]: data.anexo,
           }))
-          setAnexosExistentes(prev => [...prev, data.anexo])  // ← ADICIONAR
+          setAnexosExistentes(prev => [...prev, data.anexo])
+        }
       }
+    } catch (error) {
+      console.error(`Erro ao enviar ${categoria}:`, error)
+      alert(`Erro ao enviar documento: ${(error as Error).message}`)
+    } finally {
+      setIsUploading(false)
+      setUploadProgress(0)
     }
-  } catch (error) {
-    console.error(`Erro ao enviar ${categoria}:`, error)
-    alert(`Erro ao enviar documento: ${(error as Error).message}`)
   }
-}
 
 const removerDocumentoObrigatorio = async (categoria: string) => {
   const anexo = documentosObrigatorios[categoria]
@@ -564,15 +571,29 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
   setAnexosExistentes(prev => prev.filter(a => a.id !== anexo.id))
 }
 
-  const { startUpload, isUploading } = useUploadThing("anexoUploader", {
-    onUploadProgress: (progress) => {
-      setUploadProgress(progress)
-    },
-    onClientUploadComplete: async (res) => {
-      // Se é upload de documento obrigatório, handleDocumentoUpload já cuida
-      if (uploadingCategoriaRef.current) return
-      if (res && editingId) {
-        for (const file of res) {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const novosArquivos = Array.from(e.target.files)
+      setArquivos(prev => [...prev, ...novosArquivos])
+    }
+  }
+
+  // ⬇️ R2: upload de anexos genéricos (vários arquivos de uma vez)
+  const handleUpload = async () => {
+    if (arquivos.length === 0) return
+
+    setIsUploading(true)
+    setUploadProgress(0)
+
+    try {
+      const uploaded = await uploadFiles(arquivos, {
+        prefix: "contratantes",
+        onProgress: (_f, p) => setUploadProgress(p),
+      })
+
+      if (editingId) {
+        // Cliente já salvo: persiste cada anexo via API
+        for (const file of uploaded) {
           try {
             const response = await fetch("/api/anexos", {
               method: "POST",
@@ -588,7 +609,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                 requerenteId: editingTipo === "requerente" ? editingId : undefined,
               }),
             })
-            
+
             if (response.ok) {
               const data = await response.json()
               setAnexosExistentes(prev => [...prev, data.anexo])
@@ -597,38 +618,26 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
             console.error("Erro ao salvar anexo:", error)
           }
         }
-        setArquivos([])
-        setUploadProgress(0)
-      } else if (res && !editingId) {
-        const novosAnexos = res.map(file => ({
+      } else {
+        // Cliente ainda não salvo: mantém em memória (Anexo "fake" só pra UI)
+        const novosAnexos = uploaded.map(file => ({
           id: Date.now() + Math.random(),
           nome: file.name,
           nomeArquivo: file.name,
           urlArquivo: file.url,
           tamanho: file.size,
           mimeType: file.type,
-        }))
-        setAnexosExistentes(prev => [...prev, ...novosAnexos] as Anexo[])
-        setArquivos([])
-        setUploadProgress(0)
+        })) as Anexo[]
+        setAnexosExistentes(prev => [...prev, ...novosAnexos])
       }
-    },
-    onUploadError: (error) => {
+
+      setArquivos([])
+    } catch (error: any) {
       alert(`Erro no upload: ${error.message}`)
+    } finally {
+      setIsUploading(false)
       setUploadProgress(0)
-    },
-  })
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const novosArquivos = Array.from(e.target.files)
-      setArquivos(prev => [...prev, ...novosArquivos])
     }
-  }
-
-  const handleUpload = async () => {
-    if (arquivos.length === 0) return
-    await startUpload(arquivos)
   }
 
   const removerArquivo = (index: number) => {

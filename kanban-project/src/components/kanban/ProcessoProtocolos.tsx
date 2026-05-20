@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DatePickerField } from "@/components/ui/date-picker-field"
-import { useUploadThing } from "@/src/lib/uploadthing"
+import { uploadFiles } from "@/src/lib/storage"
 import {
   Plus,
   FileText,
@@ -118,54 +118,6 @@ export function ProcessoProtocolos({
     dataProtocolo: "",
     numeroProtocolo: "",
     observacoes: ""
-  })
-
-  // Hook de upload
-  const { startUpload, isUploading } = useUploadThing("anexoUploader", {
-    onUploadProgress: (progress) => {
-      setUploadProgress(progress)
-    },
-    onClientUploadComplete: async (res) => {
-      if (res && uploadingProtocoloId) {
-        // Salvar cada arquivo no banco
-        for (const file of res) {
-          try {
-            await fetch(`/api/protocolos/${uploadingProtocoloId}/anexos`, {
-              method: "POST",
-              headers: { 
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`
-              },
-              body: JSON.stringify({
-                nome: file.name,
-                nomeArquivo: file.name,
-                urlArquivo: file.url,
-                tamanho: file.size,
-                mimeType: file.type || null
-              })
-            })
-          } catch (error) {
-            console.error("Erro ao salvar anexo:", error)
-          }
-        }
-        
-        // Limpar arquivos pendentes desse protocolo
-        setArquivosPendentes(prev => {
-          const novo = { ...prev }
-          delete novo[uploadingProtocoloId]
-          return novo
-        })
-        
-        setUploadingProtocoloId(null)
-        setUploadProgress(0)
-        fetchProtocolos()
-      }
-    },
-    onUploadError: (error) => {
-      alert(`Erro no upload: ${error.message}`)
-      setUploadingProtocoloId(null)
-      setUploadProgress(0)
-    },
   })
 
   // Buscar protocolos
@@ -347,13 +299,55 @@ export function ProcessoProtocolos({
     }))
   }
 
-  // Fazer upload
+  // ⬇️ R2: Fazer upload (envia pro R2 e salva metadata na API)
   const handleUpload = async (protocoloId: number) => {
     const arquivos = arquivosPendentes[protocoloId]
     if (!arquivos || arquivos.length === 0) return
-    
+
     setUploadingProtocoloId(protocoloId)
-    await startUpload(arquivos)
+    setUploadProgress(0)
+
+    try {
+      const uploaded = await uploadFiles(arquivos, {
+        prefix: "processos/protocolos",
+        onProgress: (_f, p) => setUploadProgress(p),
+      })
+
+      for (const file of uploaded) {
+        try {
+          await fetch(`/api/protocolos/${protocoloId}/anexos`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+            },
+            body: JSON.stringify({
+              nome: file.name,
+              nomeArquivo: file.name,
+              urlArquivo: file.url,
+              tamanho: file.size,
+              mimeType: file.type || null,
+            }),
+          })
+        } catch (error) {
+          console.error("Erro ao salvar anexo:", error)
+        }
+      }
+
+      // Limpar arquivos pendentes desse protocolo
+      setArquivosPendentes(prev => {
+        const novo = { ...prev }
+        delete novo[protocoloId]
+        return novo
+      })
+
+      fetchProtocolos()
+    } catch (error: any) {
+      alert(`Erro no upload: ${error.message}`)
+    } finally {
+      setUploadingProtocoloId(null)
+      setUploadProgress(0)
+    }
   }
 
   // Obter nome da pessoa do protocolo
@@ -764,7 +758,7 @@ export function ProcessoProtocolos({
                           <button
                             type="button"
                             onClick={() => handleUpload(protocolo.id)}
-                            disabled={isUploading}
+                            disabled={uploadingProtocoloId !== null}
                             className="mt-2 w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors"
                           >
                             {isUploadingThis ? (

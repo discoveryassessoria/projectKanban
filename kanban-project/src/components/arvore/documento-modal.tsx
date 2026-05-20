@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { X, FileText, Upload, File, Trash2, Eye, Loader2 } from "lucide-react"
-import { useUploadThing } from "@/src/lib/uploadthing"
+import { uploadFiles } from "@/src/lib/storage"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 
@@ -56,7 +56,7 @@ interface DocumentoModalProps {
   processoId?: number
 }
 
-// ✅ ATUALIZADO: Componente de Upload com barra de progresso
+// ✅ R2: Componente de Upload com barra de progresso — agora via Cloudflare R2
 function FileUploadZone({
   onFileUploaded,
   label,
@@ -70,35 +70,28 @@ function FileUploadZone({
   const [uploadProgress, setUploadProgress] = useState(0)
   const [dragActive, setDragActive] = useState(false)
 
-  const { startUpload } = useUploadThing("anexoUploader", {
-    onClientUploadComplete: (res) => {
-      if (res && res[0]) {
-        // ✅ ATUALIZADO: Usar ufsUrl (nova API) com fallback para url
-        const fileUrl = (res[0] as any).ufsUrl || res[0].url
-        onFileUploaded({
-          url: fileUrl,
-          name: res[0].name
-        })
-      }
-      setIsUploading(false)
-      setUploadProgress(0)
-    },
-    onUploadError: (error) => {
-      alert(`Erro no upload: ${error.message}`)
-      setIsUploading(false)
-      setUploadProgress(0)
-    },
-    onUploadProgress: (progress) => {
-      setUploadProgress(progress)
-    },
-  })
-
-  const handleFiles = useCallback((files: FileList | null) => {
+  const handleFiles = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return
     setIsUploading(true)
     setUploadProgress(0)
-    startUpload(Array.from(files))
-  }, [startUpload])
+    try {
+      const uploaded = await uploadFiles(Array.from(files), {
+        prefix: "documentos",
+        onProgress: (_f, p) => setUploadProgress(p),
+      })
+      if (uploaded && uploaded[0]) {
+        onFileUploaded({
+          url: uploaded[0].url,
+          name: uploaded[0].name,
+        })
+      }
+    } catch (error: any) {
+      alert(`Erro no upload: ${error.message}`)
+    } finally {
+      setIsUploading(false)
+      setUploadProgress(0)
+    }
+  }, [onFileUploaded])
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()

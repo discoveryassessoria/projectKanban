@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DatePickerField } from "@/components/ui/date-picker-field"
-import { useUploadThing } from "@/src/lib/uploadthing"
+import { uploadFiles } from "@/src/lib/storage"
 import {
   Plus,
   FileText,
@@ -120,47 +120,6 @@ export function ProcessoInformacoes({
     dataDistribuicao: "",
     numeroRuoloGenerale: "",
     observacoes: ""
-  })
-
-  // Hook de upload
-  const { startUpload, isUploading } = useUploadThing("anexoUploader", {
-    onUploadProgress: (progress) => {
-      setUploadProgress(progress)
-    },
-    onClientUploadComplete: async (res) => {
-      if (res && informacao) {
-        for (const file of res) {
-          try {
-            await fetch(`/api/informacoes-italia/${informacao.id}/anexos`, {
-              method: "POST",
-              headers: { 
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`
-              },
-              body: JSON.stringify({
-                nome: file.name,
-                nomeArquivo: file.name,
-                urlArquivo: file.url,
-                tamanho: file.size,
-                mimeType: file.type || null
-              })
-            })
-          } catch (error) {
-            console.error("Erro ao salvar anexo:", error)
-          }
-        }
-        
-        setArquivosPendentes([])
-        setUploading(false)
-        setUploadProgress(0)
-        fetchInformacao()
-      }
-    },
-    onUploadError: (error) => {
-      alert(`Erro no upload: ${error.message}`)
-      setUploading(false)
-      setUploadProgress(0)
-    },
   })
 
   // Buscar informação
@@ -318,11 +277,48 @@ export function ProcessoInformacoes({
     setArquivosPendentes(prev => prev.filter((_, i) => i !== index))
   }
 
-  // Fazer upload
+  // ⬇️ R2: Fazer upload (envia pro R2 e salva metadata na API)
   const handleUpload = async () => {
-    if (arquivosPendentes.length === 0) return
+    if (arquivosPendentes.length === 0 || !informacao) return
+
     setUploading(true)
-    await startUpload(arquivosPendentes)
+    setUploadProgress(0)
+
+    try {
+      const uploaded = await uploadFiles(arquivosPendentes, {
+        prefix: "processos/informacoes",
+        onProgress: (_f, p) => setUploadProgress(p),
+      })
+
+      for (const file of uploaded) {
+        try {
+          await fetch(`/api/informacoes-italia/${informacao.id}/anexos`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+            },
+            body: JSON.stringify({
+              nome: file.name,
+              nomeArquivo: file.name,
+              urlArquivo: file.url,
+              tamanho: file.size,
+              mimeType: file.type || null,
+            }),
+          })
+        } catch (error) {
+          console.error("Erro ao salvar anexo:", error)
+        }
+      }
+
+      setArquivosPendentes([])
+      fetchInformacao()
+    } catch (error: any) {
+      alert(`Erro no upload: ${error.message}`)
+    } finally {
+      setUploading(false)
+      setUploadProgress(0)
+    }
   }
 
   const anexos = informacao?.anexos || []
@@ -663,7 +659,7 @@ export function ProcessoInformacoes({
                       <button
                         type="button"
                         onClick={handleUpload}
-                        disabled={isUploading}
+                        disabled={uploading}
                         className="mt-2 w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors"
                       >
                         {uploading ? (
