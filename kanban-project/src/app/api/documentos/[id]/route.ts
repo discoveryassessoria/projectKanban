@@ -121,6 +121,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
               select: { id: true, nome: true, sobrenome: true }
             },
           }
+        },
+        responsavel: {                                          // ← NOVO
+          select: { id: true, nome: true, email: true }         // ← NOVO
         }
       },
     })
@@ -234,6 +237,30 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     // Observações
     if (body.observacoes !== undefined) dataToUpdate.observacoes = body.observacoes
+
+    // ============================================================
+    // ✅ NOVO: Campos de operação (Central Operacional)
+    // ============================================================
+    if (body.responsavelId !== undefined) {
+      dataToUpdate.responsavel = body.responsavelId
+        ? { connect: { id: body.responsavelId } }
+        : { disconnect: true }
+    }
+    if (body.dataPrazoOperacao !== undefined) {
+      dataToUpdate.dataPrazoOperacao = body.dataPrazoOperacao
+        ? new Date(body.dataPrazoOperacao)
+        : null
+    }
+    if (body.dataInicioOperacao !== undefined) {
+      dataToUpdate.dataInicioOperacao = body.dataInicioOperacao
+        ? new Date(body.dataInicioOperacao)
+        : null
+    }
+    if (body.motivoBloqueio !== undefined) {
+      dataToUpdate.motivoBloqueio = body.motivoBloqueio?.trim() || null
+    }
+    // Marca movimentação sempre que algo é editado
+    dataToUpdate.ultimaMovimentacao = new Date()
 
     const documentoAtualizado = await prisma.documento.update({
       where: { id },

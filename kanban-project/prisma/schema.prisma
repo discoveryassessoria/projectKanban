@@ -1,15 +1,3 @@
-// Schema atualizado - Processo (cards Kanban) e Tarefa (afazeres) separados
-// Contratante e Requerente com campos expandidos
-// ✅ ATUALIZAÇÃO: Campos de cidadania + modelo Documento
-// ✅ ATUALIZAÇÃO: Subtarefas com auto-relacionamento
-// ✅ ATUALIZAÇÃO: Protocolo para processos da Espanha
-// ✅ ATUALIZAÇÃO: TipoServico e CustoPessoa para tabela de custos
-// ✅ ATUALIZAÇÃO: Campo país e estado expandido para endereços internacionais
-// ✅ ATUALIZAÇÃO: Campos passaporte e crnm em Contratante e Requerente
-// ✅ ATUALIZAÇÃO: Campos requerente e numeroLinhagem em Pessoa
-// ✅ ATUALIZAÇÃO: CustoPessoa com tipoRegistro para custos por documento
-// ✅ ATUALIZAÇÃO: BlogPost para posts da landing page
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -20,9 +8,1105 @@ datasource db {
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
-// ========================================
-// ENUMS
-// ========================================
+model Usuario {
+  id                 Int                @id @default(autoincrement())
+  nome               String             @db.VarChar(100)
+  email              String             @unique @db.VarChar(100)
+  senha              String             @db.VarChar(255)
+  tipo               String             @db.VarChar(20)
+  perfilId           Int?
+  permissoesCustom   Json?
+  eventosFinanceiros EventoFinanceiro[] @relation("EventoFinanceiroUsuario")
+  logs               LogAuditoria[]
+  mensagens          Mensagem[]
+  recibosEmitidos    Recibo[]           @relation("ReciboEmitente")
+  tarefas            Tarefa[]
+  historicoTarefas   TarefaHistorico[]
+  perfil             Perfil?            @relation(fields: [perfilId], references: [id])
+
+  documentosResponsavel Documento[] @relation("DocumentoResponsavel")
+
+  @@index([perfilId])
+}
+
+model Pessoa {
+  id                 Int           @id @default(autoincrement())
+  nome               String        @db.VarChar(50)
+  sobrenome          String?       @db.VarChar(40)
+  sexo               String?       @db.VarChar(10)
+  data_nasc          DateTime?
+  data_obito         DateTime?
+  local_nasc         String?       @db.VarChar(100)
+  estado_nasc        String?       @db.VarChar(50)
+  pais_nasc          String?       @db.VarChar(50)
+  vivo               Boolean       @default(true)
+  batizado           String?       @db.VarChar(50)
+  data_batismo       DateTime?
+  local_batismo      String?       @db.VarChar(100)
+  igreja_batismo     String?       @db.VarChar(150)
+  profissao          String?       @db.VarChar(100)
+  nacionalidade      String?       @db.VarChar(50)
+  cidadanias_outras  String?       @db.VarChar(200)
+  naturalizado       Boolean       @default(false)
+  data_naturalizacao DateTime?
+  pais_naturalizacao String?       @db.VarChar(50)
+  data_emigracao     DateTime?
+  local_emigracao    String?       @db.VarChar(100)
+  porto_embarque     String?       @db.VarChar(100)
+  data_chegada       DateTime?
+  porto_chegada      String?       @db.VarChar(100)
+  pais_destino       String?       @db.VarChar(50)
+  navio              String?       @db.VarChar(100)
+  comentario         String?
+  x                  Int?
+  y                  Int?
+  arvoreId           Int
+  paiId              Int?
+  maeId              Int?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  numeroLinhagem     Int?
+  requerente         String?       @default("nao")
+  ordemCusto         Int?          @default(0)
+  arvorePrincipal    Arvore?       @relation("ArvorePrincipal")
+  custos             CustoPessoa[]
+  documentos         Documento[]
+  arvore             Arvore        @relation("PessoasNaArvore", fields: [arvoreId], references: [id], onDelete: Cascade)
+  mae                Pessoa?       @relation("FilhosMae", fields: [maeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  filhosComoMae      Pessoa[]      @relation("FilhosMae")
+  pai                Pessoa?       @relation("FilhosPai", fields: [paiId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  filhosComoPai      Pessoa[]      @relation("FilhosPai")
+  unioesComoPessoa1  Uniao[]       @relation("Pessoa1")
+  unioesComoPessoa2  Uniao[]       @relation("Pessoa2")
+
+  @@index([arvoreId])
+  @@index([pais_nasc])
+  @@index([maeId])
+  @@index([paiId])
+}
+
+model Uniao {
+  id              Int       @id @default(autoincrement())
+  data_inicio     DateTime?
+  data_fim        DateTime?
+  tipo            String?   @db.VarChar(30)
+  local           String?   @db.VarChar(100)
+  estado          String?   @db.VarChar(50)
+  pais            String?   @db.VarChar(50)
+  cartorio        String?   @db.VarChar(200)
+  livro           String?   @db.VarChar(20)
+  folha           String?   @db.VarChar(20)
+  termo           String?   @db.VarChar(30)
+  numero_registro String?   @db.VarChar(50)
+  data_registro   DateTime?
+  observacoes     String?
+  pessoa1Id       Int
+  pessoa2Id       Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  pessoa1         Pessoa    @relation("Pessoa1", fields: [pessoa1Id], references: [id], onDelete: Cascade)
+  pessoa2         Pessoa    @relation("Pessoa2", fields: [pessoa2Id], references: [id], onDelete: Cascade)
+
+  @@index([pessoa1Id])
+  @@index([pessoa2Id])
+}
+
+model Arvore {
+  id                Int        @id @default(autoincrement())
+  nome              String     @db.VarChar(50)
+  descricao         String?    @db.VarChar(200)
+  commentPosX       Float?     @default(0)
+  commentPosY       Float?     @default(0)
+  pessoaPrincipalId Int?       @unique
+  posicoesNodes     Json?
+  pessoaPrincipal   Pessoa?    @relation("ArvorePrincipal", fields: [pessoaPrincipalId], references: [id], onUpdate: NoAction)
+  pessoas           Pessoa[]   @relation("PessoasNaArvore")
+  processos         Processo[]
+}
+
+model Documento {
+  id                    Int             @id @default(autoincrement())
+  pessoaId              Int
+  tipo                  TipoDocumento
+  status                StatusDocumento @default(PENDENTE)
+  descricao             String?         @db.VarChar(200)
+  cartorio              String?         @db.VarChar(200)
+  livro                 String?         @db.VarChar(20)
+  folha                 String?         @db.VarChar(20)
+  termo                 String?         @db.VarChar(30)
+  numero_registro       String?         @db.VarChar(50)
+  data_registro         DateTime?
+  cidade_registro       String?         @db.VarChar(100)
+  estado_registro       String?         @db.VarChar(50)
+  pais_registro         String?         @db.VarChar(50)
+  numero                String?         @db.VarChar(50)
+  orgao_emissor         String?         @db.VarChar(50)
+  data_emissao          DateTime?
+  data_validade         DateTime?
+  arquivo_url           String?
+  arquivo_nome          String?         @db.VarChar(200)
+  arquivo_tamanho       Int?
+  arquivo_mime_type     String?         @db.VarChar(100)
+  traduzido             Boolean         @default(false)
+  tradutor              String?         @db.VarChar(150)
+  data_traducao         DateTime?
+  arquivo_traducao_url  String?
+  arquivo_traducao_nome String?         @db.VarChar(200)
+  apostilado            Boolean         @default(false)
+  numero_apostila       String?         @db.VarChar(50)
+  data_apostila         DateTime?
+  arquivo_apostila_url  String?
+  observacoes           String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  data_evento           DateTime?
+  pessoa                Pessoa          @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+
+  // ============================================================
+  // ✅ NOVO: CAMPOS DE OPERAÇÃO (Central Operacional)
+  // ============================================================
+  responsavelId         Int?
+  responsavel           Usuario?        @relation("DocumentoResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+  dataInicioOperacao    DateTime?
+  dataPrazoOperacao     DateTime?
+  ultimaMovimentacao    DateTime?
+  motivoBloqueio        String?         @db.VarChar(300)
+  // ============================================================
+
+  @@index([pessoaId])
+  @@index([tipo])
+  @@index([status])
+  @@index([responsavelId])
+  @@index([dataPrazoOperacao])
+  @@index([ultimaMovimentacao])
+}
+
+model Status {
+  id        Int        @id @default(autoincrement())
+  nome      String     @db.VarChar(50)
+  ordem     Int        @default(0)
+  pais      Pais
+  processos Processo[]
+  tarefas   Tarefa[]
+
+  @@unique([nome, pais])
+  @@index([pais])
+}
+
+model Processo {
+  id                Int                   @id @default(autoincrement())
+  nome              String                @db.VarChar(100)
+  descricao         String?               @db.VarChar(500)
+  observacoes       String?
+  pais              Pais
+  statusId          Int
+  arvoreId          Int?
+  dataInicio        DateTime              @default(now())
+  previsaoTermino   DateTime?
+  dataConclusao     DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  percentualImposto Decimal               @default(12.00) @db.Decimal(5, 2)
+  anexos            AnexoProcesso[]
+  counterRecibo     CounterRecibo?
+  custos            Custo[]
+  custosPessoa      CustoPessoa[]
+  eventos           Evento[]
+  faturas           Fatura[]
+  informacaoItalia  InformacaoItalia?
+  mensagens         Mensagem[]
+  outrosCustos      OutroCusto[]
+  arvore            Arvore?               @relation(fields: [arvoreId], references: [id])
+  status            Status                @relation(fields: [statusId], references: [id], onDelete: Cascade)
+  contratantes      ProcessoContratante[]
+  requerentes       ProcessoRequerente[]
+  protocolos        Protocolo[]
+  receitas          Receita[]
+  recibos           Recibo[]
+  tarefas           Tarefa[]
+  tiposServico      TipoServico[]
+
+  @@index([pais])
+  @@index([statusId])
+  @@index([arvoreId])
+}
+
+model ProcessoContratante {
+  processoId    Int
+  contratanteId Int
+  contratante   Contratante @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
+  processo      Processo    @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  @@id([processoId, contratanteId])
+}
+
+model Tarefa {
+  id                  Int               @id @default(autoincrement())
+  titulo              String            @db.VarChar(200)
+  descricao           String?
+  processoId          Int?
+  statusId            Int?
+  pais                Pais?
+  responsavelId       Int?
+  concluida           Boolean           @default(false)
+  prioridade          PrioridadeTarefa  @default(MEDIA)
+  dataPrazo           DateTime?
+  dataConclusao       DateTime?
+  tarefaPaiId         Int?
+  ordem               Int               @default(0)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  dataInicio          DateTime?
+  observacoes         String?
+  tipoSubtarefa       String?           @db.VarChar(20)
+  prazoCobranca       Int?              @default(5)
+  motivoConclusao     String?           @db.VarChar(50)
+  quantidadeCobrancas Int               @default(0)
+  statusTarefa        StatusTarefa      @default(NAO_INICIADA)
+  ultimaCobranca      DateTime?
+  processo            Processo?         @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  responsavel         Usuario?          @relation(fields: [responsavelId], references: [id])
+  status              Status?           @relation(fields: [statusId], references: [id])
+  tarefaPai           Tarefa?           @relation("Subtarefas", fields: [tarefaPaiId], references: [id], onDelete: Cascade)
+  subtarefas          Tarefa[]          @relation("Subtarefas")
+  historico           TarefaHistorico[]
+
+  @@index([processoId])
+  @@index([responsavelId])
+  @@index([concluida])
+  @@index([statusTarefa])
+  @@index([tarefaPaiId])
+  @@index([statusId])
+  @@index([pais])
+  @@index([dataPrazo])
+}
+
+model TarefaHistorico {
+  id        Int      @id @default(autoincrement())
+  tarefaId  Int
+  usuarioId Int?
+  acao      String   @db.VarChar(50)
+  descricao String   @db.VarChar(500)
+  dados     Json?
+  createdAt DateTime @default(now())
+  tarefa    Tarefa   @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@index([tarefaId])
+  @@index([usuarioId])
+  @@index([createdAt])
+}
+
+model ProcessoRequerente {
+  processoId   Int
+  requerenteId Int
+  processo     Processo   @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  requerente   Requerente @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+
+  @@id([processoId, requerenteId])
+}
+
+model Contratante {
+  id             Int                   @id @default(autoincrement())
+  nome           String                @db.VarChar(100)
+  cpf            String?               @db.VarChar(14)
+  rg             String?               @db.VarChar(20)
+  dataNascimento DateTime?
+  sexo           String?               @db.VarChar(20)
+  estadoCivil    String?               @db.VarChar(20)
+  nacionalidade  String?               @db.VarChar(50)
+  telefone       String?               @db.VarChar(20)
+  email          String?               @db.VarChar(100)
+  endereco       String?               @db.VarChar(200)
+  numero         String?               @db.VarChar(20)
+  complemento    String?               @db.VarChar(100)
+  bairro         String?               @db.VarChar(100)
+  cidade         String?               @db.VarChar(100)
+  estado         String?               @db.VarChar(50)
+  cep            String?               @db.VarChar(15)
+  observacoes    String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  pais           String?               @default("Brasil") @db.VarChar(50)
+  crnm           String?               @db.VarChar(20)
+  passaporte     String?               @db.VarChar(20)
+  anexos         AnexoContratante[]
+  clienteAuth    ClienteAuth[]
+  processos      ProcessoContratante[]
+  protocolos     Protocolo[]
+  recibosPagos   Recibo[]              @relation("ReciboContratante")
+}
+
+model Requerente {
+  id                   Int                     @id @default(autoincrement())
+  nome                 String                  @db.VarChar(100)
+  cpf                  String?                 @db.VarChar(14)
+  rg                   String?                 @db.VarChar(20)
+  dataNascimento       DateTime?
+  sexo                 String?                 @db.VarChar(20)
+  estadoCivil          String?                 @db.VarChar(20)
+  nacionalidade        String?                 @db.VarChar(50)
+  telefone             String?                 @db.VarChar(20)
+  email                String?                 @db.VarChar(100)
+  endereco             String?                 @db.VarChar(200)
+  numero               String?                 @db.VarChar(20)
+  complemento          String?                 @db.VarChar(100)
+  bairro               String?                 @db.VarChar(100)
+  cidade               String?                 @db.VarChar(100)
+  estado               String?                 @db.VarChar(50)
+  cep                  String?                 @db.VarChar(15)
+  observacoes          String?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  pais                 String?                 @default("Brasil") @db.VarChar(50)
+  crnm                 String?                 @db.VarChar(20)
+  passaporte           String?                 @db.VarChar(20)
+  anexos               AnexoRequerente[]
+  clienteAuth          ClienteAuth[]
+  faturas              FaturaDestinatario[]
+  pagamentosRecebidos  PagamentoDestinatario[]
+  processos            ProcessoRequerente[]
+  protocolos           Protocolo[]
+  receitaParticipacoes ReceitaRequerente[]     @relation("ReceitaRequerentes")
+  recibosPagos         Recibo[]                @relation("ReciboRequerente")
+}
+
+model Protocolo {
+  id              Int              @id @default(autoincrement())
+  processoId      Int
+  contratanteId   Int?
+  requerenteId    Int?
+  consulado       Consulado
+  consuladoOutro  String?          @db.VarChar(200)
+  dataProtocolo   DateTime?
+  numeroProtocolo String?          @db.VarChar(100)
+  observacoes     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  anexos          AnexoProtocolo[]
+  contratante     Contratante?     @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
+  processo        Processo         @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  requerente      Requerente?      @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+
+  @@index([processoId])
+  @@index([contratanteId])
+  @@index([requerenteId])
+}
+
+model InformacaoItalia {
+  id                  Int                     @id @default(autoincrement())
+  processoId          Int                     @unique
+  tribunal            Tribunal
+  dataProtocolo       DateTime?
+  dataDistribuicao    DateTime?
+  numeroRuoloGenerale String?                 @db.VarChar(100)
+  observacoes         String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  anexos              AnexoInformacaoItalia[]
+  processo            Processo                @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  @@index([processoId])
+}
+
+model AnexoInformacaoItalia {
+  id                 Int              @id @default(autoincrement())
+  nome               String           @db.VarChar(200)
+  tipo               String?          @db.VarChar(50)
+  nomeArquivo        String           @db.VarChar(300)
+  urlArquivo         String
+  tamanho            Int?
+  mimeType           String?          @db.VarChar(100)
+  informacaoItaliaId Int
+  createdAt          DateTime         @default(now())
+  informacaoItalia   InformacaoItalia @relation(fields: [informacaoItaliaId], references: [id], onDelete: Cascade)
+
+  @@index([informacaoItaliaId])
+}
+
+model AnexoProcesso {
+  id          Int      @id @default(autoincrement())
+  nome        String   @db.VarChar(200)
+  tipo        String   @db.VarChar(50)
+  nomeArquivo String   @db.VarChar(300)
+  urlArquivo  String
+  tamanho     Int?
+  mimeType    String?  @db.VarChar(100)
+  processoId  Int
+  createdAt   DateTime @default(now())
+  processo    Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  @@index([processoId])
+}
+
+model AnexoContratante {
+  id            Int         @id @default(autoincrement())
+  nome          String      @db.VarChar(200)
+  tipo          String?     @db.VarChar(50)
+  nomeArquivo   String      @db.VarChar(300)
+  urlArquivo    String
+  tamanho       Int?
+  mimeType      String?     @db.VarChar(100)
+  contratanteId Int
+  createdAt     DateTime    @default(now())
+  categoria     String?
+  contratante   Contratante @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
+
+  @@index([contratanteId])
+}
+
+model AnexoRequerente {
+  id           Int        @id @default(autoincrement())
+  nome         String     @db.VarChar(200)
+  tipo         String?    @db.VarChar(50)
+  nomeArquivo  String     @db.VarChar(300)
+  urlArquivo   String
+  tamanho      Int?
+  mimeType     String?    @db.VarChar(100)
+  requerenteId Int
+  createdAt    DateTime   @default(now())
+  categoria    String?
+  requerente   Requerente @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+
+  @@index([requerenteId])
+}
+
+model AnexoProtocolo {
+  id          Int       @id @default(autoincrement())
+  nome        String    @db.VarChar(200)
+  tipo        String?   @db.VarChar(50)
+  nomeArquivo String    @db.VarChar(300)
+  urlArquivo  String
+  tamanho     Int?
+  mimeType    String?   @db.VarChar(100)
+  protocoloId Int
+  createdAt   DateTime  @default(now())
+  protocolo   Protocolo @relation(fields: [protocoloId], references: [id], onDelete: Cascade)
+
+  @@index([protocoloId])
+}
+
+model LogAuditoria {
+  id         Int      @id @default(autoincrement())
+  acao       String   @db.VarChar(50)
+  entidade   String   @db.VarChar(50)
+  entidadeId Int?
+  descricao  String
+  detalhes   Json?
+  usuarioId  Int?
+  criadoEm   DateTime @default(now())
+  usuario    Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@index([entidade])
+  @@index([usuarioId])
+  @@index([criadoEm])
+}
+
+model Fatura {
+  id              Int                  @id @default(autoincrement())
+  processoId      Int
+  descricao       String               @db.VarChar(200)
+  valor           Decimal              @db.Decimal(10, 2)
+  status          StatusFatura         @default(PENDENTE)
+  dataEmissao     DateTime             @default(now())
+  dataVencimento  DateTime?
+  observacoes     String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  moeda           Moeda                @default(BRL)
+  valorOriginal   Decimal?             @db.Decimal(10, 2)
+  cambio          Decimal?             @db.Decimal(10, 4)
+  metodoPagamento FormaPagamento?
+  parcelas        Int                  @default(1)
+  valorParcela    Decimal?             @db.Decimal(10, 2)
+  processo        Processo             @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  destinatarios   FaturaDestinatario[]
+  pagamentos      PagamentoFatura[]
+  parcelasBoleto  Parcela[]            @relation("ParcelasBoleto")
+
+  @@index([processoId])
+  @@index([status])
+  @@index([dataVencimento])
+}
+
+model PagamentoFatura {
+  id              Int                     @id @default(autoincrement())
+  faturaId        Int
+  valor           Decimal                 @db.Decimal(10, 2)
+  data            DateTime                @default(now())
+  formaPagamento  FormaPagamento?
+  comprovanteUrl  String?
+  comprovanteNome String?                 @db.VarChar(200)
+  observacao      String?
+  createdAt       DateTime                @default(now())
+  cambio          Decimal?                @db.Decimal(10, 4)
+  valorOriginal   Decimal?                @db.Decimal(10, 2)
+  estornado       Boolean                 @default(false)
+  estornadoEm     DateTime?
+  estornoMotivo   String?                 @db.VarChar(200)
+  destinatarios   PagamentoDestinatario[]
+  fatura          Fatura                  @relation(fields: [faturaId], references: [id], onDelete: Cascade)
+  recibos         Recibo[]                @relation("ReciboPagamento")
+
+  @@index([faturaId])
+}
+
+model PagamentoDestinatario {
+  id           Int             @id @default(autoincrement())
+  pagamentoId  Int
+  requerenteId Int
+  createdAt    DateTime        @default(now())
+  pagamento    PagamentoFatura @relation(fields: [pagamentoId], references: [id], onDelete: Cascade)
+  requerente   Requerente      @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+
+  @@unique([pagamentoId, requerenteId])
+  @@index([pagamentoId])
+  @@index([requerenteId])
+}
+
+model TipoServico {
+  id         Int           @id @default(autoincrement())
+  processoId Int
+  nome       String        @db.VarChar(100)
+  ordem      Int           @default(0)
+  createdAt  DateTime      @default(now())
+  custos     CustoPessoa[]
+  processo   Processo      @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  @@index([processoId])
+}
+
+model CustoPessoa {
+  id            Int         @id @default(autoincrement())
+  processoId    Int
+  pessoaId      Int
+  tipoServicoId Int
+  valor         Decimal     @default(0) @db.Decimal(10, 2)
+  observacao    String?     @db.VarChar(200)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  tipoRegistro  String?     @db.VarChar(20)
+  pessoa        Pessoa      @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  processo      Processo    @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  tipoServico   TipoServico @relation(fields: [tipoServicoId], references: [id], onDelete: Cascade)
+
+  @@unique([processoId, pessoaId, tipoServicoId, tipoRegistro])
+  @@index([processoId])
+  @@index([pessoaId])
+  @@index([tipoServicoId])
+}
+
+model CategoriaFinanceira {
+  id             Int                   @id @default(autoincrement())
+  nome           String                @db.VarChar(100)
+  tipo           TipoTransacao
+  cor            String?               @db.VarChar(7)
+  icone          String?               @db.VarChar(50)
+  descricao      String?               @db.VarChar(200)
+  categoriaPaiId Int?
+  ativo          Boolean               @default(true)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  categoriaPai   CategoriaFinanceira?  @relation("Subcategorias", fields: [categoriaPaiId], references: [id])
+  subcategorias  CategoriaFinanceira[] @relation("Subcategorias")
+  contasPagar    ContaPagar[]
+  transacoes     Transacao[]
+
+  @@index([tipo])
+  @@index([categoriaPaiId])
+}
+
+model ContaBancaria {
+  id           Int          @id @default(autoincrement())
+  nome         String       @db.VarChar(100)
+  banco        String?      @db.VarChar(100)
+  agencia      String?      @db.VarChar(20)
+  conta        String?      @db.VarChar(30)
+  tipoConta    String?      @db.VarChar(30)
+  chavePix     String?      @db.VarChar(100)
+  tipoChavePix String?      @db.VarChar(20)
+  saldoInicial Decimal      @default(0) @db.Decimal(12, 2)
+  saldoAtual   Decimal      @default(0) @db.Decimal(12, 2)
+  cor          String?      @db.VarChar(7)
+  ativo        Boolean      @default(true)
+  principal    Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  contasPagar  ContaPagar[]
+  transacoes   Transacao[]
+
+  @@index([ativo])
+}
+
+model Fornecedor {
+  id                 Int          @id @default(autoincrement())
+  nome               String       @db.VarChar(150)
+  nomeFantasia       String?      @db.VarChar(150)
+  tipo               String       @db.VarChar(20)
+  cpfCnpj            String?      @db.VarChar(20)
+  inscricaoEstadual  String?      @db.VarChar(20)
+  inscricaoMunicipal String?      @db.VarChar(20)
+  telefone           String?      @db.VarChar(20)
+  celular            String?      @db.VarChar(20)
+  email              String?      @db.VarChar(100)
+  website            String?      @db.VarChar(200)
+  cep                String?      @db.VarChar(10)
+  endereco           String?      @db.VarChar(200)
+  numero             String?      @db.VarChar(20)
+  complemento        String?      @db.VarChar(100)
+  bairro             String?      @db.VarChar(100)
+  cidade             String?      @db.VarChar(100)
+  estado             String?      @db.VarChar(2)
+  banco              String?      @db.VarChar(100)
+  agencia            String?      @db.VarChar(20)
+  conta              String?      @db.VarChar(30)
+  tipoConta          String?      @db.VarChar(20)
+  chavePix           String?      @db.VarChar(100)
+  tipoChavePix       String?      @db.VarChar(20)
+  observacoes        String?
+  ativo              Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  contasPagar        ContaPagar[]
+
+  @@index([nome])
+  @@index([cpfCnpj])
+  @@index([ativo])
+}
+
+model ContaPagar {
+  id              Int                  @id @default(autoincrement())
+  descricao       String               @db.VarChar(200)
+  observacoes     String?
+  fornecedorId    Int?
+  categoriaId     Int?
+  valor           Decimal              @db.Decimal(12, 2)
+  valorPago       Decimal?             @db.Decimal(12, 2)
+  desconto        Decimal?             @default(0) @db.Decimal(12, 2)
+  juros           Decimal?             @default(0) @db.Decimal(12, 2)
+  multa           Decimal?             @default(0) @db.Decimal(12, 2)
+  dataEmissao     DateTime             @default(now())
+  dataVencimento  DateTime
+  dataPagamento   DateTime?
+  dataCompetencia DateTime?
+  status          StatusContaPagar     @default(PENDENTE)
+  formaPagamento  FormaPagamento?
+  contaBancariaId Int?
+  numeroDocumento String?              @db.VarChar(50)
+  tipoDocumento   String?              @db.VarChar(50)
+  comprovanteUrl  String?
+  comprovanteNome String?              @db.VarChar(200)
+  recorrencia     RecorrenciaTipo      @default(UNICA)
+  contaPaiId      Int?
+  numeroParcela   Int?
+  totalParcelas   Int?
+  processoId      Int?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  categoria       CategoriaFinanceira? @relation(fields: [categoriaId], references: [id])
+  contaBancaria   ContaBancaria?       @relation(fields: [contaBancariaId], references: [id])
+  fornecedor      Fornecedor?          @relation(fields: [fornecedorId], references: [id])
+  transacoes      Transacao[]
+
+  @@index([fornecedorId])
+  @@index([categoriaId])
+  @@index([status])
+  @@index([dataVencimento])
+  @@index([processoId])
+  @@index([contaBancariaId])
+}
+
+model Transacao {
+  id              Int                  @id @default(autoincrement())
+  tipo            TipoTransacao
+  descricao       String               @db.VarChar(200)
+  observacoes     String?
+  valor           Decimal              @db.Decimal(12, 2)
+  data            DateTime             @default(now())
+  dataCompetencia DateTime?
+  contaBancariaId Int
+  categoriaId     Int?
+  faturaId        Int?
+  contaPagarId    Int?
+  processoId      Int?
+  conciliado      Boolean              @default(false)
+  dataConciliacao DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  categoria       CategoriaFinanceira? @relation(fields: [categoriaId], references: [id])
+  contaBancaria   ContaBancaria        @relation(fields: [contaBancariaId], references: [id])
+  contaPagar      ContaPagar?          @relation(fields: [contaPagarId], references: [id])
+
+  @@index([tipo])
+  @@index([contaBancariaId])
+  @@index([categoriaId])
+  @@index([data])
+  @@index([faturaId])
+  @@index([contaPagarId])
+  @@index([processoId])
+}
+
+model CentroCusto {
+  id        Int      @id @default(autoincrement())
+  nome      String   @db.VarChar(100)
+  descricao String?  @db.VarChar(200)
+  cor       String?  @db.VarChar(7)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ativo])
+}
+
+model Evento {
+  id           Int        @id @default(autoincrement())
+  processoId   Int?
+  titulo       String     @db.VarChar(200)
+  descricao    String?
+  tipo         TipoEvento @default(OUTRO)
+  dataInicio   DateTime
+  dataFim      DateTime?
+  diaInteiro   Boolean    @default(false)
+  local        String?    @db.VarChar(200)
+  lembreteDias Int?
+  cor          String?    @db.VarChar(7)
+  observacoes  String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  processo     Processo?  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  @@index([processoId])
+  @@index([dataInicio])
+  @@index([tipo])
+}
+
+model BlogPost {
+  id              Int        @id @default(autoincrement())
+  titulo          String     @db.VarChar(200)
+  slug            String     @unique @db.VarChar(220)
+  resumo          String     @db.VarChar(500)
+  conteudo        String?
+  imagemUrl       String?
+  imagemAlt       String?    @db.VarChar(200)
+  categoria       String     @db.VarChar(100)
+  tempoLeitura    Int        @default(5)
+  status          StatusPost @default(RASCUNHO)
+  destaque        Boolean    @default(false)
+  dataPublicacao  DateTime?
+  metaTitle       String?    @db.VarChar(70)
+  metaDescription String?    @db.VarChar(160)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([status])
+  @@index([dataPublicacao])
+  @@index([categoria])
+  @@index([destaque])
+}
+
+model FaturaDestinatario {
+  id           Int        @id @default(autoincrement())
+  faturaId     Int
+  requerenteId Int
+  createdAt    DateTime   @default(now())
+  fatura       Fatura     @relation(fields: [faturaId], references: [id], onDelete: Cascade)
+  requerente   Requerente @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+
+  @@unique([faturaId, requerenteId])
+  @@index([faturaId])
+  @@index([requerenteId])
+}
+
+model Parcela {
+  id             Int       @id @default(autoincrement())
+  faturaId       Int
+  numero         Int
+  valor          Decimal   @db.Decimal(10, 2)
+  dataVencimento DateTime
+  pago           Boolean   @default(false)
+  dataPagamento  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  fatura         Fatura    @relation("ParcelasBoleto", fields: [faturaId], references: [id], onDelete: Cascade)
+
+  @@unique([faturaId, numero])
+  @@index([faturaId])
+  @@index([dataVencimento])
+  @@index([pago])
+}
+
+model ClienteAuth {
+  id               Int          @id @default(autoincrement())
+  email            String       @unique @db.VarChar(100)
+  senhaHash        String       @db.VarChar(255)
+  contratanteId    Int?
+  requerenteId     Int?
+  ativo            Boolean      @default(true)
+  primeiroAcesso   Boolean      @default(true)
+  ultimoLogin      DateTime?
+  resetToken       String?      @db.VarChar(255)
+  resetTokenExpira DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  contratante      Contratante? @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
+  requerente       Requerente?  @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+  mensagens        Mensagem[]
+
+  @@index([contratanteId])
+  @@index([requerenteId])
+}
+
+model Mensagem {
+  id              Int          @id @default(autoincrement())
+  processoId      Int
+  conteudo        String
+  usuarioId       Int?
+  clienteAuthId   Int?
+  lidoPeloCliente Boolean      @default(false)
+  lidoPelaEquipe  Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  apagada         Boolean      @default(false)
+  editadoEm       DateTime?
+  clienteAuth     ClienteAuth? @relation(fields: [clienteAuthId], references: [id])
+  processo        Processo     @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  usuario         Usuario?     @relation(fields: [usuarioId], references: [id])
+
+  @@index([processoId])
+  @@index([clienteAuthId])
+  @@index([usuarioId])
+  @@index([createdAt])
+}
+
+model Perfil {
+  id         Int       @id @default(autoincrement())
+  nome       String    @unique @db.VarChar(50)
+  descricao  String?   @db.VarChar(200)
+  permissoes Json
+  sistema    Boolean   @default(false)
+  cor        String?   @db.VarChar(7)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  usuarios   Usuario[]
+}
+
+model Recibo {
+  id                   Int               @id @default(autoincrement())
+  processoId           Int
+  numero               String            @unique @db.VarChar(20)
+  data                 DateTime          @default(now())
+  valorTotal           Decimal           @db.Decimal(12, 2)
+  descricao            String
+  pagadorRequerenteId  Int?
+  pagadorContratanteId Int?
+  pagadorNome          String?           @db.VarChar(200)
+  pdfUrl               String?
+  pdfNome              String?           @db.VarChar(200)
+  emitidoPorId         Int?
+  createdAt            DateTime          @default(now())
+  emitidoPor           Usuario?          @relation("ReciboEmitente", fields: [emitidoPorId], references: [id])
+  pagadorContratante   Contratante?      @relation("ReciboContratante", fields: [pagadorContratanteId], references: [id])
+  pagadorRequerente    Requerente?       @relation("ReciboRequerente", fields: [pagadorRequerenteId], references: [id])
+  processo             Processo          @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  pagamentos           PagamentoFatura[] @relation("ReciboPagamento")
+
+  @@index([processoId])
+  @@index([numero])
+  @@index([pagadorRequerenteId])
+  @@index([pagadorContratanteId])
+  @@index([emitidoPorId])
+}
+
+model CounterRecibo {
+  processoId    Int      @id
+  proximoNumero Int      @default(1)
+  atualizadoEm  DateTime @updatedAt
+  processo      Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+}
+
+model OutroCusto {
+  id         Int                   @id @default(autoincrement())
+  processoId Int
+  natureza   NaturezaOutroCusto
+  tipo       String                @db.VarChar(100)
+  descricao  String                @db.VarChar(200)
+  fornecedor String?               @db.VarChar(150)
+  valor      Decimal               @db.Decimal(12, 2)
+  moeda      Moeda                 @default(BRL)
+  cambio     Decimal?              @db.Decimal(10, 4)
+  vencimento DateTime?
+  interno    Boolean               @default(false)
+  repassado  Boolean               @default(false)
+  pago       Boolean               @default(false)
+  observacao String?
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+  processo   Processo              @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  pagamentos PagamentoOutroCusto[]
+
+  @@index([processoId])
+  @@index([natureza])
+  @@index([vencimento])
+}
+
+model PagamentoOutroCusto {
+  id              Int             @id @default(autoincrement())
+  outroCustoId    Int
+  valor           Decimal         @db.Decimal(12, 2)
+  data            DateTime        @default(now())
+  forma           FormaPagamento?
+  pagadorTipo     String?         @db.VarChar(20)
+  pagadorId       Int?
+  pagadorNome     String?         @db.VarChar(200)
+  comprovanteUrl  String?
+  comprovanteNome String?         @db.VarChar(200)
+  observacao      String?
+  estornado       Boolean         @default(false)
+  estornadoEm     DateTime?
+  estornoMotivo   String?         @db.VarChar(200)
+  createdAt       DateTime        @default(now())
+  outroCusto      OutroCusto      @relation(fields: [outroCustoId], references: [id], onDelete: Cascade)
+
+  @@index([outroCustoId])
+}
+
+model Receita {
+  id            Int                 @id @default(autoincrement())
+  codigo        String              @unique @db.VarChar(20)
+  processoId    Int
+  categoria     CategoriaReceita    @default(OUTROS)
+  descricao     String              @db.VarChar(300)
+  moeda         Moeda               @default(EUR)
+  valor         Decimal             @db.Decimal(12, 2)
+  fxEstimado    Decimal             @db.Decimal(10, 4)
+  fxRule        FxRule              @default(VARIAVEL)
+  fxFixo        Decimal?            @db.Decimal(10, 4)
+  fxData        DateTime?
+  valorBrlFixo  Decimal?            @db.Decimal(12, 2)
+  nParcelas     Int                 @default(1)
+  data1         DateTime
+  periodicidade String              @default("Mensal") @db.VarChar(20)
+  cancelada     Boolean             @default(false)
+  observacoes   String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  status        ReceitaStatus       @default(ATIVA)
+  eventos       EventoFinanceiro[]
+  parcelas      ParcelaFinanceira[]
+  processo      Processo            @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  requerentes   ReceitaRequerente[]
+
+  @@index([processoId])
+  @@index([categoria])
+  @@index([cancelada])
+  @@index([codigo])
+}
+
+model Custo {
+  id                  Int                 @id @default(autoincrement())
+  codigo              String              @unique @db.VarChar(20)
+  processoId          Int
+  tipo                TipoCusto           @default(SERVICO)
+  categoria           CategoriaCusto      @default(OUTROS)
+  descricao           String              @db.VarChar(300)
+  fornecedor          String?             @db.VarChar(200)
+  moeda               Moeda               @default(EUR)
+  valor               Decimal             @db.Decimal(12, 2)
+  fxEstimado          Decimal             @db.Decimal(10, 4)
+  fxRule              FxRule              @default(VARIAVEL)
+  fxFixo              Decimal?            @db.Decimal(10, 4)
+  fxData              DateTime?
+  valorBrlFixo        Decimal?            @db.Decimal(12, 2)
+  nParcelas           Int                 @default(1)
+  vencimento          DateTime
+  custoOperacional    Boolean             @default(false)
+  categoriaVinculada  CategoriaReceita?
+  percentualVinculado Decimal?            @db.Decimal(5, 2)
+  formaPagamento      FormaPagamento?
+  cancelado           Boolean             @default(false)
+  observacoes         String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  status              CustoStatus         @default(ATIVA)
+  processo            Processo            @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  eventos             EventoFinanceiro[]
+  parcelas            ParcelaFinanceira[]
+
+  @@index([processoId])
+  @@index([tipo])
+  @@index([categoria])
+  @@index([cancelado])
+  @@index([codigo])
+}
+
+model ParcelaFinanceira {
+  id              Int             @id @default(autoincrement())
+  receitaId       Int?
+  custoId         Int?
+  numero          Int
+  vencimento      DateTime
+  valor           Decimal         @db.Decimal(12, 2)
+  status          StatusParcela   @default(PENDENTE)
+  cambioAplicado  Decimal?        @db.Decimal(10, 4)
+  valorBrl        Decimal?        @db.Decimal(12, 2)
+  dataPagamento   DateTime?
+  formaPagamento  FormaPagamento?
+  banco           String?         @db.VarChar(100)
+  comprovanteUrl  String?
+  comprovanteNome String?         @db.VarChar(200)
+  observacoes     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  custo           Custo?          @relation(fields: [custoId], references: [id], onDelete: Cascade)
+  receita         Receita?        @relation(fields: [receitaId], references: [id], onDelete: Cascade)
+
+  @@unique([receitaId, numero])
+  @@unique([custoId, numero])
+  @@index([receitaId])
+  @@index([custoId])
+  @@index([status])
+  @@index([vencimento])
+}
+
+model ReceitaRequerente {
+  id             Int         @id @default(autoincrement())
+  receitaId      Int
+  requerenteId   Int?
+  idx            Int
+  nome           String      @db.VarChar(200)
+  idade          Int?
+  statusFamiliar String?     @db.VarChar(20)
+  percentual     Decimal     @default(100.00) @db.Decimal(5, 2)
+  createdAt      DateTime    @default(now())
+  receita        Receita     @relation(fields: [receitaId], references: [id], onDelete: Cascade)
+  requerente     Requerente? @relation("ReceitaRequerentes", fields: [requerenteId], references: [id])
+
+  @@unique([receitaId, idx])
+  @@index([receitaId])
+  @@index([requerenteId])
+}
+
+model EventoFinanceiro {
+  id        Int                  @id @default(autoincrement())
+  receitaId Int?
+  custoId   Int?
+  usuarioId Int?
+  tipo      TipoEventoFinanceiro
+  descricao String               @db.VarChar(500)
+  valor     Decimal?             @db.Decimal(12, 2)
+  cambio    Decimal?             @db.Decimal(10, 4)
+  valorBrl  Decimal?             @db.Decimal(12, 2)
+  dados     Json?
+  createdAt DateTime             @default(now())
+  custo     Custo?               @relation(fields: [custoId], references: [id], onDelete: Cascade)
+  receita   Receita?             @relation(fields: [receitaId], references: [id], onDelete: Cascade)
+  usuario   Usuario?             @relation("EventoFinanceiroUsuario", fields: [usuarioId], references: [id])
+
+  @@index([receitaId])
+  @@index([custoId])
+  @@index([usuarioId])
+  @@index([createdAt])
+}
+
 enum Pais {
   PORTUGAL
   ESPANHA
@@ -46,7 +1130,6 @@ enum PrioridadeTarefa {
   URGENTE
 }
 
-// ✅ NOVO: Consulados da Espanha no Brasil
 enum Consulado {
   SAO_PAULO
   PORTO_ALEGRE
@@ -85,9 +1168,7 @@ enum Tribunal {
   VENEZIA
 }
 
-// ✅ NOVO: Tipos de documento para cidadania
 enum TipoDocumento {
-  // Certidões
   CERTIDAO_NASCIMENTO
   CERTIDAO_NASCIMENTO_INTEIRO_TEOR
   CERTIDAO_CASAMENTO
@@ -95,43 +1176,30 @@ enum TipoDocumento {
   CERTIDAO_OBITO
   CERTIDAO_OBITO_INTEIRO_TEOR
   CERTIDAO_BATISMO
-
-  // Documentos específicos de cidadania
-  CNN // Certidão Negativa de Naturalização
+  CNN
   CARTA_NATURALIZACAO
-
-  // Documentos de identidade BR
   RG
   CPF
   CNH
   PASSAPORTE_BRASILEIRO
   TITULO_ELEITOR
   RESERVISTA
-
-  // Documentos estrangeiros
   PASSAPORTE_ESTRANGEIRO
   CERTIDAO_CIDADANIA_ESTRANGEIRA
-
-  // Comprovantes
   COMPROVANTE_RESIDENCIA
-
-  // Tradução e apostilamento
   TRADUCAO_JURAMENTADA
   APOSTILA_HAIA
-
-  // Outros
   FOTO_3X4
   PROCURACAO
   ARVORE_GENEALOGICA_DOC
   OUTRO
 }
 
-// ✅ NOVO: Status do documento no processo
 enum StatusDocumento {
   PENDENTE
+  SOLICITAR
   SOLICITADO
   EM_BUSCA
-  SOLICITAR
   RECEBIDO
   EM_ANALISE
   RETIFICANDO
@@ -144,9 +1212,6 @@ enum StatusDocumento {
   NAO_ENCONTRADO
 }
 
-// ========================================
-// ENUM TIPO EVENTO
-// ========================================
 enum TipoEvento {
   CONSULADO
   CARTORIO
@@ -157,26 +1222,21 @@ enum TipoEvento {
   OUTRO
 }
 
-// ========================================
-// ✅ NOVO: STATUS DO POST DO BLOG
-// ========================================
 enum StatusPost {
   RASCUNHO
   PUBLICADO
   ARQUIVADO
 }
 
-// ✅ NOVO: Enum de Moeda
 enum Moeda {
   BRL
   EUR
   USD
 }
 
-// ✅ NOVO: Natureza de Outro Custo
 enum NaturezaOutroCusto {
-  COBRAR // Receita (ex: Honorários Discovery)
-  REPASSAR // Despesa a pagar a terceiros (ex: Advogado, Cartório)
+  COBRAR
+  REPASSAR
 }
 
 enum ReceitaStatus {
@@ -191,721 +1251,6 @@ enum CustoStatus {
   CANCELADA
 }
 
-// ========================================
-// USUÁRIOS
-// ========================================
-model Usuario {
-  id    Int    @id @default(autoincrement())
-  nome  String @db.VarChar(100)
-  email String @unique @db.VarChar(100)
-  senha String @db.VarChar(255)
-  tipo  String @db.VarChar(20)
-
-  perfilId         Int?
-  perfil           Perfil? @relation(fields: [perfilId], references: [id], onDelete: SetNull)
-  permissoesCustom Json?
-
-  // Tarefas atribuídas ao usuário
-  tarefas Tarefa[]
-
-  // Logs de auditoria
-  logs LogAuditoria[]
-
-  mensagens Mensagem[]
-
-  // ✅ NOVO: Histórico de ações em tarefas
-  historicoTarefas TarefaHistorico[]
-
-  // Reforma financeira — Fase 1
-  eventosFinanceiros EventoFinanceiro[] @relation("EventoFinanceiroUsuario")
-
-  recibosEmitidos Recibo[] @relation("ReciboEmitente")
-
-  @@index([perfilId])
-}
-
-// ========================================
-// ÁRVORE GENEALÓGICA - PESSOA
-// ========================================
-model Pessoa {
-  id         Int       @id @default(autoincrement())
-  nome       String    @db.VarChar(50)
-  sobrenome  String?   @db.VarChar(40)
-  sexo       String?   @db.VarChar(10)
-  data_nasc  DateTime?
-  data_obito DateTime?
-
-  // Local de nascimento (✅ EXPANDIDO)
-  local_nasc  String? @db.VarChar(100) // Cidade (aumentado de 30 para 100)
-  estado_nasc String? @db.VarChar(50) // ✅ NOVO: Estado/Província  
-  pais_nasc   String? @db.VarChar(50) // ✅ NOVO: País - IMPORTANTE para cidadania
-
-  // ✅ NOVO: Status vital explícito
-  vivo Boolean @default(true)
-
-  // Batismo (✅ EXPANDIDO)
-  batizado       String?   @db.VarChar(50) // Aumentado de 10 para 50
-  data_batismo   DateTime? // ✅ NOVO
-  local_batismo  String?   @db.VarChar(100) // ✅ NOVO: Cidade do batismo
-  igreja_batismo String?   @db.VarChar(150) // ✅ NOVO: Nome da igreja/paróquia
-
-  // ✅ NOVO: Profissão
-  profissao String? @db.VarChar(100)
-
-  // ✅ NOVO: Nacionalidade e Cidadania
-  nacionalidade     String? @db.VarChar(50) // Nacionalidade principal
-  cidadanias_outras String? @db.VarChar(200) // Outras cidadanias (separadas por vírgula)
-
-  // ✅ NOVO: Naturalização (pode impedir cidadania por descendência)
-  naturalizado       Boolean   @default(false)
-  data_naturalizacao DateTime?
-  pais_naturalizacao String?   @db.VarChar(50)
-
-  // ✅ NOVO: Emigração/Imigração (importante para rastrear linhagem)
-  data_emigracao  DateTime?
-  local_emigracao String?   @db.VarChar(100) // Cidade de onde emigrou
-  porto_embarque  String?   @db.VarChar(100)
-  data_chegada    DateTime?
-  porto_chegada   String?   @db.VarChar(100)
-  pais_destino    String?   @db.VarChar(50)
-  navio           String?   @db.VarChar(100)
-
-  // Notas
-  comentario String? @db.Text
-
-  // ✅ NOVO: Requerente e Linhagem
-  requerente     String? @default("nao") // "nao" | "maior" | "menor"
-  numeroLinhagem Int? // Posição na linhagem (1, 2, 3...)
-
-  // Posição no canvas (React Flow)
-  x Int?
-  y Int?
-
-  // Relacionamentos existentes
-  arvoreId Int
-  arvore   Arvore @relation("PessoasNaArvore", fields: [arvoreId], references: [id], onDelete: Cascade)
-
-  paiId Int?
-  pai   Pessoa? @relation("FilhosPai", fields: [paiId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  maeId Int?
-  mae   Pessoa? @relation("FilhosMae", fields: [maeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  filhosComoPai Pessoa[] @relation("FilhosPai")
-  filhosComoMae Pessoa[] @relation("FilhosMae")
-
-  unioesComoPessoa1 Uniao[] @relation("Pessoa1")
-  unioesComoPessoa2 Uniao[] @relation("Pessoa2")
-
-  arvorePrincipal Arvore? @relation("ArvorePrincipal")
-
-  // ✅ NOVO: Relacionamento com documentos
-  documentos Documento[]
-
-  // ✅ NOVO: Custos vinculados à pessoa
-  custos CustoPessoa[]
-
-  // ✅ NOVO: Ordem de exibição na tabela de custos (dentro do mesmo numeroLinhagem)
-  ordemCusto Int? @default(0)
-
-  // ✅ NOVO: Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([arvoreId])
-  @@index([pais_nasc])
-}
-
-// ========================================
-// ÁRVORE GENEALÓGICA - UNIÃO/CASAMENTO
-// ========================================
-model Uniao {
-  id          Int       @id @default(autoincrement())
-  data_inicio DateTime?
-  data_fim    DateTime?
-  tipo        String?   @db.VarChar(30) // Aumentado de 10 para 30
-
-  // Local do casamento (✅ EXPANDIDO)
-  local  String? @db.VarChar(100) // Cidade
-  estado String? @db.VarChar(50) // ✅ NOVO: Estado/Província
-  pais   String? @db.VarChar(50) // ✅ NOVO: País
-
-  // ✅ NOVO: Dados da certidão de casamento
-  cartorio        String?   @db.VarChar(200)
-  livro           String?   @db.VarChar(20)
-  folha           String?   @db.VarChar(20)
-  termo           String?   @db.VarChar(30)
-  numero_registro String?   @db.VarChar(50)
-  data_registro   DateTime?
-
-  // ✅ NOVO: Observações
-  observacoes String? @db.Text
-
-  pessoa1Id Int
-  pessoa1   Pessoa @relation("Pessoa1", fields: [pessoa1Id], references: [id], onDelete: Cascade)
-
-  pessoa2Id Int
-  pessoa2   Pessoa @relation("Pessoa2", fields: [pessoa2Id], references: [id], onDelete: Cascade)
-
-  // ✅ NOVO: Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([pessoa1Id])
-  @@index([pessoa2Id])
-}
-
-// ========================================
-// ÁRVORE GENEALÓGICA - ÁRVORE
-// ========================================
-model Arvore {
-  id        Int     @id @default(autoincrement())
-  nome      String  @db.VarChar(50)
-  descricao String? @db.VarChar(200)
-
-  commentPosX Float? @default(0)
-  commentPosY Float? @default(0)
-
-  posicoesNodes Json?
-
-  pessoaPrincipalId Int?    @unique
-  pessoaPrincipal   Pessoa? @relation("ArvorePrincipal", fields: [pessoaPrincipalId], references: [id], onDelete: SetNull, onUpdate: NoAction)
-
-  pessoas   Pessoa[]   @relation("PessoasNaArvore")
-  processos Processo[]
-}
-
-// ========================================
-// ✅ NOVO: DOCUMENTO (certidões, RG, passaporte, etc)
-// ========================================
-model Documento {
-  id Int @id @default(autoincrement())
-
-  // Pessoa vinculada
-  pessoaId Int
-  pessoa   Pessoa @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
-
-  // Tipo e status
-  tipo      TipoDocumento
-  status    StatusDocumento @default(PENDENTE)
-  descricao String?         @db.VarChar(200)
-
-  // Dados do registro (para certidões)
-  cartorio        String?   @db.VarChar(200)
-  livro           String?   @db.VarChar(20)
-  folha           String?   @db.VarChar(20)
-  termo           String?   @db.VarChar(30)
-  numero_registro String?   @db.VarChar(50)
-  data_registro   DateTime?
-  data_evento     DateTime?
-  cidade_registro String?   @db.VarChar(100)
-  estado_registro String?   @db.VarChar(50)
-  pais_registro   String?   @db.VarChar(50)
-
-  // Para documentos de identidade
-  numero        String?   @db.VarChar(50)
-  orgao_emissor String?   @db.VarChar(50)
-  data_emissao  DateTime?
-  data_validade DateTime?
-
-  // Arquivo digitalizado
-  arquivo_url       String? @db.Text
-  arquivo_nome      String? @db.VarChar(200)
-  arquivo_tamanho   Int?
-  arquivo_mime_type String? @db.VarChar(100)
-
-  // Tradução
-  traduzido             Boolean   @default(false)
-  tradutor              String?   @db.VarChar(150)
-  data_traducao         DateTime?
-  arquivo_traducao_url  String?   @db.Text
-  arquivo_traducao_nome String?   @db.VarChar(200)
-
-  // Apostilamento (Convenção de Haia)
-  apostilado           Boolean   @default(false)
-  numero_apostila      String?   @db.VarChar(50)
-  data_apostila        DateTime?
-  arquivo_apostila_url String?   @db.Text
-
-  // Observações
-  observacoes String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([pessoaId])
-  @@index([tipo])
-  @@index([status])
-}
-
-// ========================================
-// STATUS - ETAPAS DAS TAREFAS
-// ========================================
-model Status {
-  id    Int    @id @default(autoincrement())
-  nome  String @db.VarChar(50)
-  ordem Int    @default(0)
-
-  pais Pais
-
-  processos Processo[]
-
-  // ✅ NOVO: Tarefas vinculadas ao status
-  tarefas Tarefa[]
-
-  @@unique([nome, pais])
-  @@index([pais])
-}
-
-// ========================================
-// PROCESSO - CARD DO KANBAN (FAMÍLIA)
-// Representa uma família no processo de cidadania
-// ========================================
-model Processo {
-  id          Int      @id @default(autoincrement())
-  nome        String   @db.VarChar(100)
-  descricao   String?  @db.VarChar(500)
-  observacoes String?  @db.Text
-  faturas     Fatura[]
-
-  pais Pais
-
-  statusId Int
-  status   Status @relation(fields: [statusId], references: [id], onDelete: Cascade)
-
-  contratantes ProcessoContratante[]
-
-  arvoreId Int?
-  arvore   Arvore? @relation(fields: [arvoreId], references: [id], onDelete: SetNull)
-
-  dataInicio      DateTime  @default(now())
-  previsaoTermino DateTime?
-  dataConclusao   DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  requerentes ProcessoRequerente[]
-  tarefas     Tarefa[]
-  anexos      AnexoProcesso[]
-
-  // ✅ NOVO: Protocolos (apenas para Espanha)
-  protocolos       Protocolo[]
-  informacaoItalia InformacaoItalia?
-
-  // ✅ NOVO: Tipos de serviço e custos por pessoa
-  tiposServico TipoServico[]
-  custosPessoa CustoPessoa[]
-
-  // ✅ NOVO: Eventos do processo
-  eventos Evento[]
-
-  mensagens Mensagem[]
-
-  recibos       Recibo[]
-  counterRecibo CounterRecibo?
-
-  // ✅ NOVO: Outros custos e receitas manuais (advogado, cartório, honorários, etc.)
-  outrosCustos OutroCusto[]
-
-  // Reforma financeira — Fase 1
-  percentualImposto Decimal   @default(12.00) @db.Decimal(5, 2)
-  receitas          Receita[]
-  custos            Custo[]
-
-  @@index([pais])
-  @@index([statusId])
-}
-
-// ========================================
-// RELACIONAMENTO PROCESSO <-> CONTRATANTE
-// ========================================
-model ProcessoContratante {
-  processoId    Int
-  contratanteId Int
-  processo      Processo    @relation(fields: [processoId], references: [id], onDelete: Cascade)
-  contratante   Contratante @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
-
-  @@id([processoId, contratanteId])
-}
-
-// ========================================
-// TAREFA - AFAZERES (COM SUPORTE A SUBTAREFAS)
-// ========================================
-model Tarefa {
-  id        Int     @id @default(autoincrement())
-  titulo    String  @db.VarChar(200)
-  descricao String? @db.Text
-
-  // ✅ Vínculo opcional com processo (tarefa pode existir independente)
-  processoId Int?
-  processo   Processo? @relation(fields: [processoId], references: [id], onDelete: Cascade)
-
-  // ✅ Vínculo com status do Kanban
-  statusId Int?
-  status   Status? @relation(fields: [statusId], references: [id], onDelete: SetNull)
-
-  // ✅ País da tarefa (para tarefas independentes)
-  pais Pais?
-
-  responsavelId Int?
-  responsavel   Usuario? @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
-
-  // ✅ ATUALIZADO: Status de fluxo da tarefa (substitui 'concluida')
-  statusTarefa StatusTarefa     @default(NAO_INICIADA)
-  concluida    Boolean          @default(false) // Mantido para compatibilidade
-  prioridade   PrioridadeTarefa @default(MEDIA)
-
-  // Datas
-  dataPrazo     DateTime?
-  dataConclusao DateTime?
-  dataInicio    DateTime? // Quando a tarefa foi iniciada
-
-  // ✅ NOVO: Sistema de cobrança
-  quantidadeCobrancas Int       @default(0) // Quantas vezes foi cobrado
-  ultimaCobranca      DateTime? // Data da última cobrança
-  prazoCobranca       Int?      @default(5) // Dias para próxima cobrança
-
-  // ✅ NOVO: Observações e anotações
-  observacoes     String? @db.Text
-  motivoConclusao String? @db.VarChar(50) // "recebido", "nao_possui", etc
-
-  // Auto-relacionamento para subtarefas
-  tarefaPaiId Int?
-  tarefaPai   Tarefa?  @relation("Subtarefas", fields: [tarefaPaiId], references: [id], onDelete: Cascade)
-  subtarefas  Tarefa[] @relation("Subtarefas")
-
-  // Organização
-  ordem         Int     @default(0)
-  tipoSubtarefa String? @db.VarChar(20) // NORMAL, COBRANCA
-
-  // ✅ NOVO: Histórico de ações
-  historico TarefaHistorico[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([processoId])
-  @@index([responsavelId])
-  @@index([concluida])
-  @@index([statusTarefa])
-  @@index([tarefaPaiId])
-  @@index([statusId])
-  @@index([pais])
-  @@index([dataPrazo])
-}
-
-model TarefaHistorico {
-  id Int @id @default(autoincrement())
-
-  // Vínculo com tarefa
-  tarefaId Int
-  tarefa   Tarefa @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
-
-  // Quem fez a ação
-  usuarioId Int?
-  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
-
-  // Ação realizada
-  acao      String @db.VarChar(50) // CRIADA, INICIADA, COBRADA, AGUARDANDO_CLIENTE, CONCLUIDA, etc
-  descricao String @db.VarChar(500) // Texto descritivo: "Taciana iniciou a tarefa"
-
-  // Dados adicionais (JSON para flexibilidade)
-  dados Json? // { statusAnterior: "X", statusNovo: "Y", observacao: "..." }
-
-  createdAt DateTime @default(now())
-
-  @@index([tarefaId])
-  @@index([usuarioId])
-  @@index([createdAt])
-}
-
-// ========================================
-// RELACIONAMENTO PROCESSO <-> REQUERENTE
-// ========================================
-model ProcessoRequerente {
-  processoId   Int
-  requerenteId Int
-  processo     Processo   @relation(fields: [processoId], references: [id], onDelete: Cascade)
-  requerente   Requerente @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
-
-  @@id([processoId, requerenteId])
-}
-
-// ========================================
-// CONTRATANTE - CLIENTE QUE CONTRATA
-// ✅ ATUALIZAÇÃO: Campo país + estado expandido para endereços internacionais
-// ========================================
-model Contratante {
-  id             Int       @id @default(autoincrement())
-  nome           String    @db.VarChar(100)
-  cpf            String?   @db.VarChar(14)
-  rg             String?   @db.VarChar(20)
-  passaporte     String?   @db.VarChar(20) // ✅ NOVO
-  crnm           String?   @db.VarChar(20) // ✅ NOVO: Carteira de Registro Nacional Migratório
-  dataNascimento DateTime?
-  sexo           String?   @db.VarChar(20)
-  estadoCivil    String?   @db.VarChar(20)
-  nacionalidade  String?   @db.VarChar(50)
-  telefone       String?   @db.VarChar(20)
-  email          String?   @db.VarChar(100)
-
-  // ✅ ATUALIZAÇÃO: Endereço com suporte internacional
-  pais        String? @default("Brasil") @db.VarChar(50) // ✅ NOVO
-  endereco    String? @db.VarChar(200)
-  numero      String? @db.VarChar(20)
-  complemento String? @db.VarChar(100)
-  bairro      String? @db.VarChar(100)
-  cidade      String? @db.VarChar(100)
-  estado      String? @db.VarChar(50) // ✅ EXPANDIDO: de 2 para 50 (aceita estados/províncias internacionais)
-  cep         String? @db.VarChar(15) // ✅ EXPANDIDO: de 10 para 15 (aceita códigos postais internacionais)
-
-  observacoes String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  processos ProcessoContratante[]
-  anexos    AnexoContratante[]
-
-  // ✅ NOVO: Protocolos vinculados
-  protocolos  Protocolo[]
-  clienteAuth ClienteAuth[]
-
-  recibosPagos Recibo[] @relation("ReciboContratante")
-}
-
-// ========================================
-// REQUERENTE - QUEM VAI RECEBER CIDADANIA
-// ✅ ATUALIZAÇÃO: Campo país + estado expandido para endereços internacionais
-// ========================================
-model Requerente {
-  id             Int       @id @default(autoincrement())
-  nome           String    @db.VarChar(100)
-  cpf            String?   @db.VarChar(14)
-  rg             String?   @db.VarChar(20)
-  passaporte     String?   @db.VarChar(20) // ✅ NOVO
-  crnm           String?   @db.VarChar(20) // ✅ NOVO: Carteira de Registro Nacional Migratório
-  dataNascimento DateTime?
-  sexo           String?   @db.VarChar(20)
-  estadoCivil    String?   @db.VarChar(20)
-  nacionalidade  String?   @db.VarChar(50)
-  telefone       String?   @db.VarChar(20)
-  email          String?   @db.VarChar(100)
-
-  // ✅ ATUALIZAÇÃO: Endereço com suporte internacional
-  pais        String? @default("Brasil") @db.VarChar(50) // ✅ NOVO
-  endereco    String? @db.VarChar(200)
-  numero      String? @db.VarChar(20)
-  complemento String? @db.VarChar(100)
-  bairro      String? @db.VarChar(100)
-  cidade      String? @db.VarChar(100)
-  estado      String? @db.VarChar(50) // ✅ EXPANDIDO: de 2 para 50 (aceita estados/províncias internacionais)
-  cep         String? @db.VarChar(15) // ✅ EXPANDIDO: de 10 para 15 (aceita códigos postais internacionais)
-
-  observacoes String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  processos ProcessoRequerente[]
-  anexos    AnexoRequerente[]
-  faturas   FaturaDestinatario[]
-
-  // ✅ NOVO: Protocolos vinculados
-  protocolos          Protocolo[]
-  pagamentosRecebidos PagamentoDestinatario[]
-  clienteAuth         ClienteAuth[]
-
-  // Reforma financeira — Fase 1
-  receitaParticipacoes ReceitaRequerente[] @relation("ReceitaRequerentes")
-
-  recibosPagos Recibo[] @relation("ReciboRequerente")
-}
-
-// ========================================
-// ✅ NOVO: PROTOCOLO - APENAS PARA ESPANHA
-// ========================================
-model Protocolo {
-  id Int @id @default(autoincrement())
-
-  // Vínculo com processo
-  processoId Int
-  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
-
-  // Pessoa vinculada (pode ser contratante OU requerente)
-  contratanteId Int?
-  contratante   Contratante? @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
-
-  requerenteId Int?
-  requerente   Requerente? @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
-
-  // Dados do protocolo
-  consulado      Consulado
-  consuladoOutro String?   @db.VarChar(200) // Se consulado = OUTROS
-
-  dataProtocolo   DateTime?
-  numeroProtocolo String?   @db.VarChar(100)
-
-  observacoes String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // ✅ NOVO: Anexos do protocolo
-  anexos AnexoProtocolo[]
-
-  @@index([processoId])
-  @@index([contratanteId])
-  @@index([requerenteId])
-}
-
-model InformacaoItalia {
-  id Int @id @default(autoincrement())
-
-  // Vínculo com processo (1 processo = 1 informação)
-  processoId Int      @unique
-  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
-
-  // Dados do tribunal
-  tribunal Tribunal
-
-  // Datas
-  dataProtocolo    DateTime?
-  dataDistribuicao DateTime?
-
-  // Número do processo
-  numeroRuoloGenerale String? @db.VarChar(100)
-
-  // Observações
-  observacoes String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Anexos
-  anexos AnexoInformacaoItalia[]
-
-  @@index([processoId])
-}
-
-model AnexoInformacaoItalia {
-  id          Int     @id @default(autoincrement())
-  nome        String  @db.VarChar(200)
-  tipo        String? @db.VarChar(50)
-  nomeArquivo String  @db.VarChar(300)
-  urlArquivo  String  @db.Text
-  tamanho     Int?
-  mimeType    String? @db.VarChar(100)
-
-  informacaoItaliaId Int
-  informacaoItalia   InformacaoItalia @relation(fields: [informacaoItaliaId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@index([informacaoItaliaId])
-}
-
-// ========================================
-// ANEXOS
-// ========================================
-model AnexoProcesso {
-  id          Int     @id @default(autoincrement())
-  nome        String  @db.VarChar(200)
-  tipo        String  @db.VarChar(50)
-  nomeArquivo String  @db.VarChar(300)
-  urlArquivo  String  @db.Text
-  tamanho     Int?
-  mimeType    String? @db.VarChar(100)
-
-  processoId Int
-  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@index([processoId])
-}
-
-model AnexoContratante {
-  id          Int     @id @default(autoincrement())
-  nome        String  @db.VarChar(200)
-  tipo        String? @db.VarChar(50)
-  nomeArquivo String  @db.VarChar(300)
-  urlArquivo  String  @db.Text
-  tamanho     Int?
-  mimeType    String? @db.VarChar(100)
-  categoria   String?
-
-  contratanteId Int
-  contratante   Contratante @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@index([contratanteId])
-}
-
-model AnexoRequerente {
-  id          Int     @id @default(autoincrement())
-  nome        String  @db.VarChar(200)
-  tipo        String? @db.VarChar(50)
-  nomeArquivo String  @db.VarChar(300)
-  urlArquivo  String  @db.Text
-  tamanho     Int?
-  mimeType    String? @db.VarChar(100)
-  categoria   String?
-
-  requerenteId Int
-  requerente   Requerente @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@index([requerenteId])
-}
-
-// ========================================
-// ANEXO DE PROTOCOLO
-// ========================================
-model AnexoProtocolo {
-  id          Int     @id @default(autoincrement())
-  nome        String  @db.VarChar(200)
-  tipo        String? @db.VarChar(50)
-  nomeArquivo String  @db.VarChar(300)
-  urlArquivo  String  @db.Text
-  tamanho     Int?
-  mimeType    String? @db.VarChar(100)
-
-  protocoloId Int
-  protocolo   Protocolo @relation(fields: [protocoloId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@index([protocoloId])
-}
-
-// ========================================
-// LOG DE AUDITORIA
-// ========================================
-model LogAuditoria {
-  id         Int    @id @default(autoincrement())
-  acao       String @db.VarChar(50)
-  entidade   String @db.VarChar(50)
-  entidadeId Int?
-  descricao  String @db.Text
-  detalhes   Json?
-
-  usuarioId Int?
-  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
-
-  criadoEm DateTime @default(now())
-
-  @@index([entidade])
-  @@index([usuarioId])
-  @@index([criadoEm])
-}
-
-// ========================================
-// FATURA - COBRANÇA POR PROCESSO
-// ========================================
 enum StatusFatura {
   PENDENTE
   PAGO
@@ -923,164 +1268,6 @@ enum FormaPagamento {
   CHEQUE
   OUTRO
 }
-
-model Fatura {
-  id Int @id @default(autoincrement())
-
-  // Vínculo com processo
-  processoId Int
-  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
-
-  // Dados da fatura
-  descricao String       @db.VarChar(200)
-  valor     Decimal      @db.Decimal(10, 2)
-  status    StatusFatura @default(PENDENTE)
-
-  // Datas
-  dataEmissao    DateTime  @default(now())
-  dataVencimento DateTime?
-
-  // Observações
-  observacoes String? @db.Text
-
-  moeda           Moeda           @default(BRL)
-  valorOriginal   Decimal?        @db.Decimal(10, 2)
-  cambio          Decimal?        @db.Decimal(10, 4)
-  metodoPagamento FormaPagamento?
-  parcelas        Int             @default(1)
-  valorParcela    Decimal?        @db.Decimal(10, 2)
-
-  // ✅ NOVO: Pagamentos vinculados (histórico completo)
-  pagamentos PagamentoFatura[]
-
-  destinatarios FaturaDestinatario[]
-
-  parcelasBoleto Parcela[] @relation("ParcelasBoleto")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([processoId])
-  @@index([status])
-  @@index([dataVencimento])
-}
-
-model PagamentoFatura {
-  id Int @id @default(autoincrement())
-
-  // Vínculo com fatura
-  faturaId Int
-  fatura   Fatura @relation(fields: [faturaId], references: [id], onDelete: Cascade)
-
-  // Dados do pagamento
-  valor          Decimal         @db.Decimal(10, 2)
-  data           DateTime        @default(now())
-  formaPagamento FormaPagamento?
-
-  // Para moedas estrangeiras
-  valorOriginal Decimal? @db.Decimal(10, 2)
-  cambio        Decimal? @db.Decimal(10, 4)
-
-  // Comprovante
-  comprovanteUrl  String? @db.Text
-  comprovanteNome String? @db.VarChar(200)
-
-  // Observação
-  observacao String? @db.Text
-
-  // Destinatários do pagamento
-  destinatarios PagamentoDestinatario[]
-
-  estornado     Boolean   @default(false)
-  estornadoEm   DateTime?
-  estornoMotivo String?   @db.VarChar(200)
-  recibos       Recibo[]  @relation("ReciboPagamento")
-
-  createdAt DateTime @default(now())
-
-  @@index([faturaId])
-}
-
-model PagamentoDestinatario {
-  id Int @id @default(autoincrement())
-
-  pagamentoId Int
-  pagamento   PagamentoFatura @relation(fields: [pagamentoId], references: [id], onDelete: Cascade)
-
-  requerenteId Int
-  requerente   Requerente @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@unique([pagamentoId, requerenteId])
-  @@index([pagamentoId])
-  @@index([requerenteId])
-}
-
-// ========================================
-// TIPO DE SERVIÇO - COLUNAS DE CUSTO POR PROCESSO
-// ========================================
-model TipoServico {
-  id Int @id @default(autoincrement())
-
-  // Vínculo com processo
-  processoId Int
-  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
-
-  // Dados do tipo de serviço
-  nome  String @db.VarChar(100) // Ex: "Certidão Inteiro Teor", "Tradução", etc.
-  ordem Int    @default(0) // Ordem de exibição na tabela
-
-  createdAt DateTime @default(now())
-
-  // Custos vinculados
-  custos CustoPessoa[]
-
-  @@index([processoId])
-}
-
-// ========================================
-// CUSTO POR PESSOA/DOCUMENTO - VALORES DA PLANILHA
-// ✅ ATUALIZADO: Agora suporta custos por documento (tipoRegistro)
-// ========================================
-model CustoPessoa {
-  id Int @id @default(autoincrement())
-
-  // Vínculos
-  processoId Int
-  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
-
-  pessoaId Int
-  pessoa   Pessoa @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
-
-  tipoServicoId Int
-  tipoServico   TipoServico @relation(fields: [tipoServicoId], references: [id], onDelete: Cascade)
-
-  // ✅ NOVO: Tipo de registro (Nascimento, Casamento, Óbito)
-  // Permite custos diferentes para cada documento da mesma pessoa
-  tipoRegistro String? @db.VarChar(20)
-
-  // Valor
-  valor      Decimal @default(0) @db.Decimal(10, 2)
-  observacao String? @db.VarChar(200)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Constraint único: uma pessoa só pode ter um valor por tipo de serviço E tipo de registro no processo
-  @@unique([processoId, pessoaId, tipoServicoId, tipoRegistro])
-  @@index([processoId])
-  @@index([pessoaId])
-  @@index([tipoServicoId])
-}
-
-// ========================================
-// MÓDULO FINANCEIRO COMPLETO
-// ========================================
-
-// ========================================
-// ENUMS FINANCEIROS
-// ========================================
 
 enum TipoTransacao {
   ENTRADA
@@ -1104,603 +1291,6 @@ enum RecorrenciaTipo {
   ANUAL
 }
 
-// ========================================
-// CATEGORIA FINANCEIRA
-// ========================================
-model CategoriaFinanceira {
-  id        Int           @id @default(autoincrement())
-  nome      String        @db.VarChar(100)
-  tipo      TipoTransacao // ENTRADA ou SAIDA
-  cor       String?       @db.VarChar(7) // Hex color para gráficos
-  icone     String?       @db.VarChar(50)
-  descricao String?       @db.VarChar(200)
-
-  // Categoria pai (para subcategorias)
-  categoriaPaiId Int?
-  categoriaPai   CategoriaFinanceira?  @relation("Subcategorias", fields: [categoriaPaiId], references: [id], onDelete: SetNull)
-  subcategorias  CategoriaFinanceira[] @relation("Subcategorias")
-
-  ativo Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relacionamentos
-  contasPagar ContaPagar[]
-  transacoes  Transacao[]
-
-  @@index([tipo])
-}
-
-// ========================================
-// CONTA BANCÁRIA
-// ========================================
-model ContaBancaria {
-  id        Int     @id @default(autoincrement())
-  nome      String  @db.VarChar(100) // Ex: "Conta Principal", "Caixa"
-  banco     String? @db.VarChar(100)
-  agencia   String? @db.VarChar(20)
-  conta     String? @db.VarChar(30)
-  tipoConta String? @db.VarChar(30) // Corrente, Poupança, Caixa
-
-  // Chaves Pix
-  chavePix     String? @db.VarChar(100)
-  tipoChavePix String? @db.VarChar(20) // CPF, CNPJ, Email, Telefone, Aleatoria
-
-  saldoInicial Decimal @default(0) @db.Decimal(12, 2)
-  saldoAtual   Decimal @default(0) @db.Decimal(12, 2)
-
-  cor       String? @db.VarChar(7) // Para identificação visual
-  ativo     Boolean @default(true)
-  principal Boolean @default(false) // Conta principal
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relacionamentos
-  transacoes  Transacao[]
-  contasPagar ContaPagar[]
-
-  @@index([ativo])
-}
-
-// ========================================
-// FORNECEDOR
-// ========================================
-model Fornecedor {
-  id Int @id @default(autoincrement())
-
-  // Dados básicos
-  nome         String  @db.VarChar(150)
-  nomeFantasia String? @db.VarChar(150)
-  tipo         String  @db.VarChar(20) // PF ou PJ
-
-  // Documentos
-  cpfCnpj            String? @db.VarChar(20)
-  inscricaoEstadual  String? @db.VarChar(20)
-  inscricaoMunicipal String? @db.VarChar(20)
-
-  // Contato
-  telefone String? @db.VarChar(20)
-  celular  String? @db.VarChar(20)
-  email    String? @db.VarChar(100)
-  website  String? @db.VarChar(200)
-
-  // Endereço
-  cep         String? @db.VarChar(10)
-  endereco    String? @db.VarChar(200)
-  numero      String? @db.VarChar(20)
-  complemento String? @db.VarChar(100)
-  bairro      String? @db.VarChar(100)
-  cidade      String? @db.VarChar(100)
-  estado      String? @db.VarChar(2)
-
-  // Dados bancários do fornecedor (para pagamentos)
-  banco        String? @db.VarChar(100)
-  agencia      String? @db.VarChar(20)
-  conta        String? @db.VarChar(30)
-  tipoConta    String? @db.VarChar(20)
-  chavePix     String? @db.VarChar(100)
-  tipoChavePix String? @db.VarChar(20)
-
-  observacoes String? @db.Text
-  ativo       Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relacionamentos
-  contasPagar ContaPagar[]
-
-  @@index([nome])
-  @@index([cpfCnpj])
-  @@index([ativo])
-}
-
-// ========================================
-// CONTA A PAGAR
-// ========================================
-model ContaPagar {
-  id Int @id @default(autoincrement())
-
-  // Descrição
-  descricao   String  @db.VarChar(200)
-  observacoes String? @db.Text
-
-  // Fornecedor (opcional - pode ser despesa sem fornecedor)
-  fornecedorId Int?
-  fornecedor   Fornecedor? @relation(fields: [fornecedorId], references: [id], onDelete: SetNull)
-
-  // Categoria
-  categoriaId Int?
-  categoria   CategoriaFinanceira? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
-
-  // Valores
-  valor     Decimal  @db.Decimal(12, 2)
-  valorPago Decimal? @db.Decimal(12, 2)
-  desconto  Decimal? @default(0) @db.Decimal(12, 2)
-  juros     Decimal? @default(0) @db.Decimal(12, 2)
-  multa     Decimal? @default(0) @db.Decimal(12, 2)
-
-  // Datas
-  dataEmissao     DateTime  @default(now())
-  dataVencimento  DateTime
-  dataPagamento   DateTime?
-  dataCompetencia DateTime? // Mês de competência contábil
-
-  // Status
-  status StatusContaPagar @default(PENDENTE)
-
-  // Pagamento
-  formaPagamento  FormaPagamento?
-  contaBancariaId Int?
-  contaBancaria   ContaBancaria?  @relation(fields: [contaBancariaId], references: [id], onDelete: SetNull)
-
-  // Documento fiscal
-  numeroDocumento String? @db.VarChar(50)
-  tipoDocumento   String? @db.VarChar(50) // NF, Boleto, Recibo, etc
-
-  // Comprovante
-  comprovanteUrl  String? @db.Text
-  comprovanteNome String? @db.VarChar(200)
-
-  // Recorrência
-  recorrencia   RecorrenciaTipo @default(UNICA)
-  contaPaiId    Int? // Se for parcela de uma conta parcelada
-  numeroParcela Int?
-  totalParcelas Int?
-
-  // Vínculo com processo (opcional)
-  processoId Int?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Transação gerada quando pago
-  transacoes Transacao[]
-
-  @@index([fornecedorId])
-  @@index([categoriaId])
-  @@index([status])
-  @@index([dataVencimento])
-  @@index([processoId])
-}
-
-// ========================================
-// TRANSAÇÃO (FLUXO DE CAIXA)
-// ========================================
-model Transacao {
-  id Int @id @default(autoincrement())
-
-  // Tipo e descrição
-  tipo        TipoTransacao
-  descricao   String        @db.VarChar(200)
-  observacoes String?       @db.Text
-
-  // Valores
-  valor Decimal @db.Decimal(12, 2)
-
-  // Data
-  data            DateTime  @default(now())
-  dataCompetencia DateTime? // Mês de competência
-
-  // Conta bancária
-  contaBancariaId Int
-  contaBancaria   ContaBancaria @relation(fields: [contaBancariaId], references: [id], onDelete: Restrict)
-
-  // Categoria
-  categoriaId Int?
-  categoria   CategoriaFinanceira? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
-
-  // Origem da transação (qual entidade gerou)
-  // Pode ser uma fatura paga (entrada) ou conta paga (saída)
-  faturaId     Int?
-  contaPagarId Int?
-  contaPagar   ContaPagar? @relation(fields: [contaPagarId], references: [id], onDelete: SetNull)
-
-  // Vínculo com processo
-  processoId Int?
-
-  // Conciliação bancária
-  conciliado      Boolean   @default(false)
-  dataConciliacao DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([tipo])
-  @@index([contaBancariaId])
-  @@index([categoriaId])
-  @@index([data])
-  @@index([faturaId])
-  @@index([contaPagarId])
-  @@index([processoId])
-}
-
-// ========================================
-// CENTRO DE CUSTO (OPCIONAL - PARA ANÁLISE)
-// ========================================
-model CentroCusto {
-  id        Int     @id @default(autoincrement())
-  nome      String  @db.VarChar(100)
-  descricao String? @db.VarChar(200)
-  cor       String? @db.VarChar(7)
-  ativo     Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([ativo])
-}
-
-// ========================================
-// EVENTO - COMPROMISSOS DO PROCESSO
-// ========================================
-model Evento {
-  id Int @id @default(autoincrement())
-
-  // Vínculo com processo (opcional para eventos gerais)
-  processoId Int?
-  processo   Processo? @relation(fields: [processoId], references: [id], onDelete: Cascade)
-
-  // Dados do evento
-  titulo    String     @db.VarChar(200)
-  descricao String?    @db.Text
-  tipo      TipoEvento @default(OUTRO)
-
-  // Data e hora
-  dataInicio DateTime
-  dataFim    DateTime?
-  diaInteiro Boolean   @default(false)
-
-  // Local
-  local String? @db.VarChar(200)
-
-  // Lembrete (dias antes)
-  lembreteDias Int?
-
-  // Cor para o calendário (hex)
-  cor String? @db.VarChar(7)
-
-  // Observações
-  observacoes String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([processoId])
-  @@index([dataInicio])
-  @@index([tipo])
-}
-
-// ========================================
-// ✅ NOVO: BLOG - POSTS PARA LANDING PAGE
-// ========================================
-model BlogPost {
-  id Int @id @default(autoincrement())
-
-  // Conteúdo
-  titulo   String  @db.VarChar(200)
-  slug     String  @unique @db.VarChar(220)
-  resumo   String  @db.VarChar(500)
-  conteudo String? @db.Text
-
-  // Imagem de capa
-  imagemUrl String? @db.Text
-  imagemAlt String? @db.VarChar(200)
-
-  // Categorização
-  categoria String @db.VarChar(100)
-
-  // Meta
-  tempoLeitura Int        @default(5)
-  status       StatusPost @default(RASCUNHO)
-  destaque     Boolean    @default(false)
-
-  // Datas
-  dataPublicacao DateTime?
-
-  // SEO
-  metaTitle       String? @db.VarChar(70)
-  metaDescription String? @db.VarChar(160)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([status])
-  @@index([dataPublicacao])
-  @@index([categoria])
-  @@index([destaque])
-}
-
-model FaturaDestinatario {
-  id           Int        @id @default(autoincrement())
-  faturaId     Int
-  fatura       Fatura     @relation(fields: [faturaId], references: [id], onDelete: Cascade)
-  requerenteId Int
-  requerente   Requerente @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
-  createdAt    DateTime   @default(now())
-
-  @@unique([faturaId, requerenteId])
-  @@index([faturaId])
-  @@index([requerenteId])
-}
-
-// ========================================
-// PARCELA DE BOLETO
-// ========================================
-model Parcela {
-  id Int @id @default(autoincrement())
-
-  // Vínculo com fatura
-  faturaId Int
-  fatura   Fatura @relation("ParcelasBoleto", fields: [faturaId], references: [id], onDelete: Cascade)
-
-  // Dados da parcela
-  numero         Int // 1, 2, 3...
-  valor          Decimal  @db.Decimal(10, 2)
-  dataVencimento DateTime
-
-  // Status
-  pago          Boolean   @default(false)
-  dataPagamento DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([faturaId, numero])
-  @@index([faturaId])
-  @@index([dataVencimento])
-  @@index([pago])
-}
-
-model ClienteAuth {
-  id Int @id @default(autoincrement())
-
-  // Login
-  email     String @unique @db.VarChar(100)
-  senhaHash String @db.VarChar(255)
-
-  // Vínculo flexível: pode ser contratante OU requerente
-  contratanteId Int?
-  contratante   Contratante? @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
-
-  requerenteId Int?
-  requerente   Requerente? @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
-
-  // Controle
-  ativo          Boolean   @default(true)
-  primeiroAcesso Boolean   @default(true) // Forçar troca de senha no 1º login
-  ultimoLogin    DateTime?
-
-  // Token de reset de senha
-  resetToken       String?   @db.VarChar(255)
-  resetTokenExpira DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  mensagens Mensagem[]
-
-  @@index([contratanteId])
-  @@index([requerenteId])
-}
-
-// ========================================
-// MENSAGEM - CHAT ENTRE CLIENTE E EQUIPE
-// ========================================
-model Mensagem {
-  id        Int       @id @default(autoincrement())
-  editadoEm DateTime?
-  apagada   Boolean   @default(false)
-
-  // Vínculo com processo
-  processoId Int
-  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
-
-  // Conteúdo
-  conteudo String @db.Text
-
-  // Remetente (um dos dois será preenchido)
-  usuarioId Int? // Equipe (admin/funcionário)
-  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
-
-  clienteAuthId Int? // Cliente (contratante/requerente)
-  clienteAuth   ClienteAuth? @relation(fields: [clienteAuthId], references: [id], onDelete: SetNull)
-
-  // Controle de leitura
-  lidoPeloCliente Boolean @default(false)
-  lidoPelaEquipe  Boolean @default(false)
-
-  createdAt DateTime @default(now())
-
-  @@index([processoId])
-  @@index([clienteAuthId])
-  @@index([usuarioId])
-  @@index([createdAt])
-}
-
-model Perfil {
-  id        Int     @id @default(autoincrement())
-  nome      String  @unique @db.VarChar(50) // "Administrador", "Gerente", "Assistente", "Estagiário"
-  descricao String? @db.VarChar(200)
-
-  // Permissões padrão do perfil (JSON com todas as permissões)
-  permissoes Json // { "tarefas.ver": true, "tarefas.criar": false, ... }
-
-  // Se é perfil padrão do sistema (não pode ser excluído)
-  sistema Boolean @default(false)
-
-  cor String? @db.VarChar(7) // Cor para identificação visual
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  usuarios Usuario[]
-}
-
-// ========================================
-// RECIBO - Recibos de pagamento numerados
-// ========================================
-model Recibo {
-  id Int @id @default(autoincrement())
-
-  // Vínculo com processo
-  processoId Int
-  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
-
-  // Numeração sequencial RCB-XXXX
-  numero String @unique @db.VarChar(20)
-
-  // Dados do recibo
-  data       DateTime @default(now())
-  valorTotal Decimal  @db.Decimal(12, 2)
-  descricao  String   @db.Text
-
-  // Pagador (um dos dois)
-  pagadorRequerenteId  Int?
-  pagadorRequerente    Requerente?  @relation("ReciboRequerente", fields: [pagadorRequerenteId], references: [id], onDelete: SetNull)
-  pagadorContratanteId Int?
-  pagadorContratante   Contratante? @relation("ReciboContratante", fields: [pagadorContratanteId], references: [id], onDelete: SetNull)
-  pagadorNome          String?      @db.VarChar(200)
-
-  // Pagamentos que compõem este recibo (M:N)
-  pagamentos PagamentoFatura[] @relation("ReciboPagamento")
-
-  // PDF gerado
-  pdfUrl  String? @db.Text
-  pdfNome String? @db.VarChar(200)
-
-  // Auditoria
-  emitidoPorId Int?
-  emitidoPor   Usuario? @relation("ReciboEmitente", fields: [emitidoPorId], references: [id], onDelete: SetNull)
-
-  createdAt DateTime @default(now())
-
-  @@index([processoId])
-  @@index([numero])
-  @@index([pagadorRequerenteId])
-  @@index([pagadorContratanteId])
-}
-
-// ========================================
-// COUNTER RECIBO - Contador sequencial por processo
-// ========================================
-model CounterRecibo {
-  processoId    Int      @id
-  processo      Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
-  proximoNumero Int      @default(1)
-  atualizadoEm  DateTime @updatedAt
-}
-
-// ========================================
-// ✅ NOVO: OUTRO CUSTO - Lançamentos manuais de custos/receitas do processo
-// (Honorários Discovery, Advogado Itália, Cartório, Consulado, Taxas, etc.)
-// ========================================
-model OutroCusto {
-  id Int @id @default(autoincrement())
-
-  // Vínculo com processo
-  processoId Int
-  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
-
-  // Natureza: COBRAR (receita) ou REPASSAR (despesa a pagar)
-  natureza NaturezaOutroCusto
-
-  // Classificação
-  tipo       String  @db.VarChar(100) // "Honorários Discovery", "Advogado", "Cartório", etc.
-  descricao  String  @db.VarChar(200)
-  fornecedor String? @db.VarChar(150)
-
-  // Valor e moeda
-  valor  Decimal  @db.Decimal(12, 2)
-  moeda  Moeda    @default(BRL)
-  cambio Decimal? @db.Decimal(10, 4)
-
-  // Datas
-  vencimento DateTime?
-
-  // Flags
-  interno   Boolean @default(false) // Custo interno (não repassado ao cliente)
-  repassado Boolean @default(false) // Já foi repassado ao cliente
-  pago      Boolean @default(false) // Marcação manual de "pago"
-
-  // Observações
-  observacao String? @db.Text
-
-  // Pagamentos parciais
-  pagamentos PagamentoOutroCusto[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([processoId])
-  @@index([natureza])
-  @@index([vencimento])
-}
-
-// ========================================
-// ✅ NOVO: PAGAMENTO DE OUTRO CUSTO - Histórico de pagamentos parciais
-// ========================================
-model PagamentoOutroCusto {
-  id Int @id @default(autoincrement())
-
-  // Vínculo
-  outroCustoId Int
-  outroCusto   OutroCusto @relation(fields: [outroCustoId], references: [id], onDelete: Cascade)
-
-  // Dados do pagamento
-  valor Decimal         @db.Decimal(12, 2)
-  data  DateTime        @default(now())
-  forma FormaPagamento?
-
-  // Quem pagou (opcional - pode ser requerente, contratante ou texto livre)
-  pagadorTipo String? @db.VarChar(20) // "REQUERENTE" | "CONTRATANTE" | "OUTRO"
-  pagadorId   Int?
-  pagadorNome String? @db.VarChar(200)
-
-  // Comprovante
-  comprovanteUrl  String? @db.Text
-  comprovanteNome String? @db.VarChar(200)
-
-  // Observação
-  observacao String? @db.Text
-
-  // Estorno
-  estornado     Boolean   @default(false)
-  estornadoEm   DateTime?
-  estornoMotivo String?   @db.VarChar(200)
-
-  createdAt DateTime @default(now())
-
-  @@index([outroCustoId])
-}
-
-// ============================================================
-// 1. ENUMS NOVOS
-// ============================================================
-// Reaproveitar enums existentes: Moeda (BRL/EUR/USD), FormaPagamento
-
 enum FxRule {
   FIXO
   VARIAVEL
@@ -1708,8 +1298,8 @@ enum FxRule {
 
 enum StatusParcela {
   PENDENTE
-  RECEBIDA // usado em parcelas de Receita
-  PAGA // usado em parcelas de Custo
+  RECEBIDA
+  PAGA
   CANCELADA
 }
 
@@ -1745,233 +1335,4 @@ enum TipoEventoFinanceiro {
   EDICAO_PAGAMENTO
   ESTORNO_RECEBIMENTO
   ESTORNO_PAGAMENTO
-}
-
-// ============================================================
-// 2. RECEITA — lançamento de receita (REC-XXXXXX)
-// ============================================================
-model Receita {
-  id     Int    @id @default(autoincrement())
-  codigo String @unique @db.VarChar(20) // "REC-XXXXXX"
-
-  // Vínculo com processo
-  processoId Int
-  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
-
-  // Classificação
-  categoria CategoriaReceita @default(OUTROS)
-  descricao String           @db.VarChar(300)
-
-  // Valor e moeda (moeda primária do novo modelo é EUR, mas aceita BRL/USD)
-  moeda Moeda   @default(EUR)
-  valor Decimal @db.Decimal(12, 2)
-
-  // Câmbio
-  fxEstimado   Decimal   @db.Decimal(10, 4)
-  fxRule       FxRule    @default(VARIAVEL)
-  fxFixo       Decimal?  @db.Decimal(10, 4)
-  fxData       DateTime?
-  valorBrlFixo Decimal?  @db.Decimal(12, 2)
-
-  // Parcelamento
-  nParcelas     Int      @default(1)
-  data1         DateTime
-  periodicidade String   @default("Mensal") @db.VarChar(20)
-
-  // Estado
-  cancelada Boolean @default(false)
-  status          ReceitaStatus  @default(ATIVA)
-
-  // Observações
-  observacoes String? @db.Text
-
-  // Relacionamentos
-  parcelas    ParcelaFinanceira[]
-  requerentes ReceitaRequerente[]
-  eventos     EventoFinanceiro[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([processoId])
-  @@index([categoria])
-  @@index([cancelada])
-  @@index([codigo])
-}
-
-// ============================================================
-// 3. CUSTO — lançamento de custo (CUS-XXXXXX)
-// ============================================================
-model Custo {
-  id     Int    @id @default(autoincrement())
-  codigo String @unique @db.VarChar(20) // "CUS-XXXXXX"
-
-  // Vínculo com processo
-  processoId Int
-  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
-
-  // Classificação
-  tipo       TipoCusto      @default(SERVICO)
-  categoria  CategoriaCusto @default(OUTROS)
-  descricao  String         @db.VarChar(300)
-  fornecedor String?        @db.VarChar(200)
-
-  // Valor e moeda
-  moeda Moeda   @default(EUR)
-  valor Decimal @db.Decimal(12, 2)
-
-  // Câmbio
-  fxEstimado   Decimal   @db.Decimal(10, 4)
-  fxRule       FxRule    @default(VARIAVEL)
-  fxFixo       Decimal?  @db.Decimal(10, 4)
-  fxData       DateTime?
-  valorBrlFixo Decimal?  @db.Decimal(12, 2)
-
-  // Parcelamento
-  nParcelas  Int      @default(1)
-  vencimento DateTime
-
-  // Custo vinculado a categoria de receita (lógica do HTML)
-  // Ex: "Imposto 12% sobre Honorários" → custoOperacional=true,
-  //     categoriaVinculada=HONORARIOS, percentualVinculado=12
-  custoOperacional    Boolean           @default(false)
-  categoriaVinculada  CategoriaReceita?
-  percentualVinculado Decimal?          @db.Decimal(5, 2)
-
-  // Forma de pagamento default
-  formaPagamento FormaPagamento?
-
-  // Estado
-  cancelado Boolean @default(false)
-
-  // Observações
-  observacoes String? @db.Text
-
-  // Relacionamentos
-  parcelas ParcelaFinanceira[]
-  eventos  EventoFinanceiro[]
-
-  status      CustoStatus @default(ATIVA)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([processoId])
-  @@index([tipo])
-  @@index([categoria])
-  @@index([cancelado])
-  @@index([codigo])
-}
-
-// ============================================================
-// 4. PARCELA FINANCEIRA — parcela de Receita OU Custo
-// ============================================================
-// Tabela única. Exatamente um de receitaId/custoId é preenchido.
-// (Validação garantida na camada de aplicação — Prisma não tem
-// CHECK constraint nativo no datasource postgres pelo schema.)
-model ParcelaFinanceira {
-  id Int @id @default(autoincrement())
-
-  // Vínculo (exatamente um dos dois)
-  receitaId Int?
-  receita   Receita? @relation(fields: [receitaId], references: [id], onDelete: Cascade)
-  custoId   Int?
-  custo     Custo?   @relation(fields: [custoId], references: [id], onDelete: Cascade)
-
-  // Dados da parcela
-  numero     Int // 1, 2, 3...
-  vencimento DateTime
-  valor      Decimal  @db.Decimal(12, 2) // na moeda do pai
-
-  // Status
-  status StatusParcela @default(PENDENTE)
-
-  // Preenchidos quando paga/recebida
-  cambioAplicado Decimal?        @db.Decimal(10, 4)
-  valorBrl       Decimal?        @db.Decimal(12, 2)
-  dataPagamento  DateTime?
-  formaPagamento FormaPagamento?
-  banco          String?         @db.VarChar(100)
-
-  // Comprovante
-  comprovanteUrl  String? @db.Text
-  comprovanteNome String? @db.VarChar(200)
-
-  // Observações
-  observacoes String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([receitaId, numero])
-  @@unique([custoId, numero])
-  @@index([receitaId])
-  @@index([custoId])
-  @@index([status])
-  @@index([vencimento])
-}
-
-// ============================================================
-// 5. RECEITA REQUERENTE — distribuição da Receita por participante
-// ============================================================
-// Snapshot com FK opcional pra Requerente real do schema (que pode
-// ou não estar cadastrado no momento da criação da Receita).
-model ReceitaRequerente {
-  id Int @id @default(autoincrement())
-
-  receitaId Int
-  receita   Receita @relation(fields: [receitaId], references: [id], onDelete: Cascade)
-
-  // FK opcional pro Requerente real do schema
-  requerenteId Int?
-  requerente   Requerente? @relation("ReceitaRequerentes", fields: [requerenteId], references: [id], onDelete: SetNull)
-
-  // Snapshot dos dados (mesmo formato do HTML: requerentes:[{idx,nome,idade,status,percentual}])
-  idx            Int // posição na lista (0, 1, 2...)
-  nome           String  @db.VarChar(200)
-  idade          Int?
-  statusFamiliar String? @db.VarChar(20) // "Adulto" | "Menor"
-  percentual     Decimal @default(100.00) @db.Decimal(5, 2) // 0-100, soma=100 dentro da Receita
-
-  createdAt DateTime @default(now())
-
-  @@unique([receitaId, idx])
-  @@index([receitaId])
-  @@index([requerenteId])
-}
-
-// ============================================================
-// 6. EVENTO FINANCEIRO — histórico (substitui array `historico`)
-// ============================================================
-model EventoFinanceiro {
-  id Int @id @default(autoincrement())
-
-  // Vínculo (exatamente um dos dois)
-  receitaId Int?
-  receita   Receita? @relation(fields: [receitaId], references: [id], onDelete: Cascade)
-  custoId   Int?
-  custo     Custo?   @relation(fields: [custoId], references: [id], onDelete: Cascade)
-
-  // Quem fez
-  usuarioId Int?
-  usuario   Usuario? @relation("EventoFinanceiroUsuario", fields: [usuarioId], references: [id], onDelete: SetNull)
-
-  // Tipo e descrição
-  tipo      TipoEventoFinanceiro
-  descricao String               @db.VarChar(500)
-
-  // Valores envolvidos (espelho do `Movimento` do HTML)
-  valor    Decimal? @db.Decimal(12, 2)
-  cambio   Decimal? @db.Decimal(10, 4)
-  valorBrl Decimal? @db.Decimal(12, 2)
-
-  // Dados extras (parcela afetada, valores antes/depois de edição, etc)
-  dados Json?
-
-  createdAt DateTime @default(now())
-
-  @@index([receitaId])
-  @@index([custoId])
-  @@index([usuarioId])
-  @@index([createdAt])
 }

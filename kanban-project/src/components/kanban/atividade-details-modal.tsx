@@ -8,7 +8,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { MapTooltip } from "../ui/map-tooltip"
 import { ArvoreGenealogicaView } from "../arvore"
-import { ProcessoTarefas } from "./ProcessoTarefas"
+// ⚠ ALTERAÇÃO: ProcessoTarefas sai do Geral e vai migrar para Central Operacional (aba a criar)
+// import { ProcessoTarefas } from "./ProcessoTarefas"
+import { ProcessoEstatisticas } from "./ProcessoEstatisticas"
+import { ProcessoCentralOperacional } from "./ProcessoCentralOperacional"
 import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoInformacoes } from "./ProcessoInformacoes"
 import { ProcessoHistorico } from "./ProcessoHistorico"
@@ -92,7 +95,7 @@ export function ProcessoDetailsModal({
 }: ProcessoDetailsModalProps) {
   // ✅ ATUALIZADO: Adicionado "informacoes" como possível aba
   const { pode } = usePermissoes()
-  const [activeTab, setActiveTab] = useState<"geral" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos">("geral")
+  const [activeTab, setActiveTab] = useState<"geral" | "central" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos">("geral")
   const [etapas, setEtapas] = useState<Status[]>([])
   const [statusIdAtual, setStatusIdAtual] = useState(processo?.statusId)
   const [mudouEtapa, setMudouEtapa] = useState(false)
@@ -255,7 +258,9 @@ export function ProcessoDetailsModal({
 
   useEffect(() => {
     if (isOpen && initialTab && !initialParamsProcessed) {
-      if (initialTab === "arvore") {
+      if (initialTab === "central") {
+        setActiveTab("central")
+      } else if (initialTab === "arvore") {
         setActiveTab("arvore")
       } else if (initialTab === "geral") {
         setActiveTab("geral")
@@ -488,6 +493,7 @@ export function ProcessoDetailsModal({
 
   const tabs = [
     { id: "geral", label: "Geral" },
+    { id: "central", label: "Central Operacional" }, 
     ...(pode('arvore.ver') ? [{ id: "arvore", label: "Árvore Genealógica" }] : []),
     ...(isItalia && pode('processos.ver_paginas') ? [{ id: "informacoes", label: "Informações" }] : []),
     ...(isEspanha && pode('processos.ver_paginas') ? [{ id: "protocolos", label: "Protocolos" }] : []),
@@ -967,21 +973,23 @@ export function ProcessoDetailsModal({
                 )}
               </div>
 
-              {/* ========== COLUNA DIREITA - TAREFAS (COMPONENTE) ========== */}
+              {/* ========== COLUNA DIREITA - ESTATÍSTICAS + ALERTAS ========== */}
+              {/* ⚠ ALTERAÇÃO: substituído <ProcessoTarefas> por <ProcessoEstatisticas>.
+                  As tarefas vão migrar para a futura aba "Central Operacional". */}
               <div className="overflow-hidden min-h-0">
-              <ProcessoTarefas 
-                processoId={processo.id}
-                pais={paisConfig.label}
-                onUpdate={onSave}
-                pessoas={[
-                  ...requerentesSelecionados.map(r => ({ id: r.id, nome: r.nome, tipo: 'REQUERENTE' as const })),
-                  ...contratantesSelecionados.map(c => ({ id: c.id, nome: c.nome, tipo: 'CONTRATANTE' as const }))
-                ]}
-                tarefaPaiId={initialTarefaPaiId}
-                atividadeId={initialAtividadeId}
-              />
+                <ProcessoEstatisticas
+                  processo={processo}
+                  onNavigate={(tab) => {
+                    if (tab === 'arvore') setActiveTab('arvore')
+                    // 'central' e 'documentos' ainda não têm aba — botões ficam desabilitados
+                  }}
+                />
               </div>
             </div>
+          )}
+
+          {activeTab === "central" && (
+            <ProcessoCentralOperacional processo={processo} />
           )}
 
           {activeTab === "arvore" && (
