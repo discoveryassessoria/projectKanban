@@ -247,8 +247,7 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
         <Button
           variant="outline"
           size="sm"
-          disabled
-          title="Aba ainda não implementada"
+          onClick={() => onNavigate?.('documentos')}
         >
           → Documentos
         </Button>

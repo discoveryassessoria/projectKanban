@@ -12,6 +12,7 @@ import { ArvoreGenealogicaView } from "../arvore"
 // import { ProcessoTarefas } from "./ProcessoTarefas"
 import { ProcessoEstatisticas } from "./ProcessoEstatisticas"
 import { ProcessoCentralOperacional } from "./ProcessoCentralOperacional"
+import { ProcessoDocumentos } from "./ProcessoDocumentos"
 import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoInformacoes } from "./ProcessoInformacoes"
 import { ProcessoHistorico } from "./ProcessoHistorico"
@@ -95,7 +96,7 @@ export function ProcessoDetailsModal({
 }: ProcessoDetailsModalProps) {
   // ✅ ATUALIZADO: Adicionado "informacoes" como possível aba
   const { pode } = usePermissoes()
-  const [activeTab, setActiveTab] = useState<"geral" | "central" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos">("geral")
+  const [activeTab, setActiveTab] = useState<"geral" | "central" | "documentos" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos">("geral")
   const [etapas, setEtapas] = useState<Status[]>([])
   const [statusIdAtual, setStatusIdAtual] = useState(processo?.statusId)
   const [mudouEtapa, setMudouEtapa] = useState(false)
@@ -258,7 +259,9 @@ export function ProcessoDetailsModal({
 
   useEffect(() => {
     if (isOpen && initialTab && !initialParamsProcessed) {
-      if (initialTab === "central") {
+      if (initialTab === "documentos") {
+        setActiveTab("documentos")
+      } else if (initialTab === "central") {
         setActiveTab("central")
       } else if (initialTab === "arvore") {
         setActiveTab("arvore")
@@ -493,12 +496,13 @@ export function ProcessoDetailsModal({
 
   const tabs = [
     { id: "geral", label: "Geral" },
-    { id: "central", label: "Central Operacional" }, 
+    { id: "central", label: "Central Operacional" },
     ...(pode('arvore.ver') ? [{ id: "arvore", label: "Árvore Genealógica" }] : []),
     ...(isItalia && pode('processos.ver_paginas') ? [{ id: "informacoes", label: "Informações" }] : []),
     ...(isEspanha && pode('processos.ver_paginas') ? [{ id: "protocolos", label: "Protocolos" }] : []),
-    ...(pode('financeiro.ver') ? [{ id: "faturas", label: "Financeiro" }] : []),  // ← label "Faturas" → "Financeiro"
-    ...(pode('eventos.ver') ? [{ id: "eventos", label: "Eventos" }] : []),        // (linha do V2 removida)
+    ...(pode('financeiro.ver') ? [{ id: "faturas", label: "Financeiro" }] : []),
+    { id: "documentos", label: "Documentos" },           // ← NOVO
+    ...(pode('eventos.ver') ? [{ id: "eventos", label: "Eventos" }] : []),
     { id: "historico", label: "Histórico" },
   ]
 
@@ -981,7 +985,8 @@ export function ProcessoDetailsModal({
                   processo={processo}
                   onNavigate={(tab) => {
                     if (tab === 'arvore') setActiveTab('arvore')
-                    // 'central' e 'documentos' ainda não têm aba — botões ficam desabilitados
+                    if (tab === 'central') setActiveTab('central')
+                    if (tab === 'documentos') setActiveTab('documentos')   // ← NOVO
                   }}
                 />
               </div>
@@ -990,6 +995,10 @@ export function ProcessoDetailsModal({
 
           {activeTab === "central" && (
             <ProcessoCentralOperacional processo={processo} />
+          )}
+
+          {activeTab === "documentos" && (
+            <ProcessoDocumentos processo={processo} />
           )}
 
           {activeTab === "arvore" && (
