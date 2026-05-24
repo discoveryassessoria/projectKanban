@@ -8,6 +8,8 @@ import { X, Loader2, AlertTriangle } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { WorkflowTab } from "./workflow/WorkflowTab"
 import { InitOperationModal } from "./InitOperationModal"
+import { WorkflowControls } from "./WorkflowControls"
+import { TabOperationCockpit } from "./TabOperationCockpit"
 
 // ============================================================
 // LABELS (mantidos no componente porque o GET retorna o documento cru)
@@ -209,6 +211,7 @@ export function DocumentoOperationalDrawer({
   const [activeTab, setActiveTab] = useState<TabId>("operation")
   const [salvando, setSalvando] = useState(false)
   const [initModalOpen, setInitModalOpen] = useState(false)
+  const [workflow, setWorkflow] = useState<any | null>(null)
 
   const carregar = useCallback(async () => {
     if (!documentoId) return
@@ -221,6 +224,21 @@ export function DocumentoOperationalDrawer({
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: Documento = await res.json()
       setDoc(data)
+
+      // Carrega o workflow em paralelo
+      try {
+        const wfRes = await fetch(`/api/documentos/${documentoId}/workflow`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+        })
+        if (wfRes.ok) {
+          const json = await wfRes.json()
+          setWorkflow(json.workflow ?? null)
+        } else {
+          setWorkflow(null)
+        }
+      } catch {
+        setWorkflow(null)
+      }
     } catch (e) {
       console.warn("[DocumentoOperationalDrawer] falha:", e)
       setErro("Erro ao carregar documento.")
@@ -412,6 +430,13 @@ export function DocumentoOperationalDrawer({
               )}
             </div>
 
+            {/* CONTROLES DO WORKFLOW (barra de progresso + botões pausar/cancelar/invalidar) */}
+            <WorkflowControls
+              documentoId={documentoId}
+              workflow={workflow}
+              onChange={() => { carregar(); onSave?.() }}
+            />
+
             {/* TABS */}
             <div
               className="flex-shrink-0 flex overflow-x-auto px-6 border-b border-white/10"
@@ -442,13 +467,15 @@ export function DocumentoOperationalDrawer({
             {/* BODY */}
             <div className="flex-1 overflow-y-auto px-6 py-5" style={{ background: "#0f1419" }}>
               {activeTab === "operation" && (
-                <TabOperation
-                  doc={doc}
-                  usuarios={usuarios}
-                  salvando={salvando}
-                  onSave={putDoc}
-                  podeEditar={pode("arvore.editar_documento")}
-                  onOpenInitModal={() => setInitModalOpen(true)}
+                <TabOperationCockpit
+                  doc={doc as any}
+                  workflow={workflow}
+                  documentoId={documentoId}
+                  onAbrirIniciar={() => setInitModalOpen(true)}
+                  onTrocarAba={(tab) => setActiveTab(tab as TabId)}
+                  onAbrirCentralDaEtapa={() => {
+                    setActiveTab("workflow")
+                  }}
                 />
               )}
               {activeTab === "registry" && <TabRegistry doc={doc} tipoLabel={tipoLabel} />}
