@@ -23,6 +23,8 @@ model Usuario {
   tarefas            Tarefa[]
   historicoTarefas   TarefaHistorico[]
   perfil             Perfil?            @relation(fields: [perfilId], references: [id])
+  workflowStepsAssigned   WorkflowStep[] @relation("WorkflowStepAssignee")
+  workflowStepsCompleted  WorkflowStep[] @relation("WorkflowStepCompletedBy")
 
   documentosResponsavel Documento[] @relation("DocumentoResponsavel")
 
@@ -150,6 +152,7 @@ model Documento {
   traduzido             Boolean         @default(false)
   tradutor              String?         @db.VarChar(150)
   data_traducao         DateTime?
+  workflow      Workflow?
   arquivo_traducao_url  String?
   arquivo_traducao_nome String?         @db.VarChar(200)
   apostilado            Boolean         @default(false)
@@ -1107,6 +1110,73 @@ model EventoFinanceiro {
   @@index([createdAt])
 }
 
+// ============================================================
+// WORKFLOW (sidebar preta — aba Workflow)
+// ============================================================
+model Workflow {
+  id            Int       @id @default(autoincrement())
+  documentoId   Int       @unique
+  documento     Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+
+  templateCode  String    @default("DOCUMENT_WORKFLOW") @db.VarChar(60)
+  templateName  String    @default("Workflow Documental") @db.VarChar(120)
+  status        String    @default("em_andamento") @db.VarChar(30)
+  progress      Int       @default(0)
+  prioridade    String    @default("normal") @db.VarChar(20)
+
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  cancelledAt   DateTime?
+
+  steps         WorkflowStep[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([documentoId])
+  @@index([status])
+}
+
+model WorkflowStep {
+  id              Int       @id @default(autoincrement())
+  workflowId      Int
+  workflow        Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  ordem           Int
+  stepKey         String    @db.VarChar(60)
+  title           String    @db.VarChar(200)
+  description     String?   @db.Text
+  status          String    @default("nao_iniciada") @db.VarChar(30)
+  weight          Int       @default(0)
+
+  ownerKey        String?   @db.VarChar(60)
+  assigneeId      Int?
+  assignee        Usuario?  @relation("WorkflowStepAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  startedAt       DateTime?
+  dueAt           DateTime?
+  completedAt     DateTime?
+  completedById   Int?
+  completedBy     Usuario?  @relation("WorkflowStepCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+
+  motivoBloqueio  String?   @db.VarChar(300)
+  notes           String?   @db.Text
+  slaDays         Int       @default(1)
+
+  trackingCode      String? @db.VarChar(120)
+  externalProtocol  String? @db.VarChar(120)
+  requestChannel    String? @db.VarChar(60)
+  reviewResult      String? @db.VarChar(60)
+  validationResult  String? @db.VarChar(60)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([assigneeId])
+}
+
 enum Pais {
   PORTUGAL
   ESPANHA
@@ -1210,6 +1280,7 @@ enum StatusDocumento {
   ENTREGUE
   INVALIDO
   NAO_ENCONTRADO
+  CANCELADO
 }
 
 enum TipoEvento {

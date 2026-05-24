@@ -6,6 +6,8 @@ import { useState, useEffect, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { X, Loader2, AlertTriangle } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { WorkflowTab } from "./workflow/WorkflowTab"
+import { InitOperationModal } from "./InitOperationModal"
 
 // ============================================================
 // LABELS (mantidos no componente porque o GET retorna o documento cru)
@@ -206,6 +208,7 @@ export function DocumentoOperationalDrawer({
   const [erro, setErro] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>("operation")
   const [salvando, setSalvando] = useState(false)
+  const [initModalOpen, setInitModalOpen] = useState(false)
 
   const carregar = useCallback(async () => {
     if (!documentoId) return
@@ -445,15 +448,18 @@ export function DocumentoOperationalDrawer({
                   salvando={salvando}
                   onSave={putDoc}
                   podeEditar={pode("arvore.editar_documento")}
+                  onOpenInitModal={() => setInitModalOpen(true)}
                 />
               )}
               {activeTab === "registry" && <TabRegistry doc={doc} tipoLabel={tipoLabel} />}
               {activeTab === "history" && <TabHistory doc={doc} />}
               {activeTab === "workflow" && (
-                <Placeholder
-                  titulo="Workflow"
-                  descricao="Esta aba mostra os passos da operação (Localizar → Solicitar → Cobrar → Receber → Traduzir → Apostilar), cada um com responsável, prazo e status."
-                  pendencia="Requer modelo Workflow + WorkflowStep no schema."
+                <WorkflowTab
+                  documentoId={doc.id}
+                  onChange={() => {
+                    onSave?.()
+                    carregar()
+                  }}
                 />
               )}
               {activeTab === "divergences" && (
@@ -506,6 +512,16 @@ export function DocumentoOperationalDrawer({
                 />
               )}
             </div>
+            <InitOperationModal
+              documentoId={documentoId}
+              isOpen={initModalOpen}
+              onClose={() => setInitModalOpen(false)}
+              onSuccess={() => {
+                setInitModalOpen(false)
+                carregar()
+                onSave?.()
+              }}
+            />
           </>
         )}
       </div>
@@ -520,13 +536,14 @@ export function DocumentoOperationalDrawer({
 // ABA: OPERAÇÃO
 // ============================================================
 function TabOperation({
-  doc, usuarios, salvando, onSave, podeEditar,
+  doc, usuarios, salvando, onSave, podeEditar, onOpenInitModal,
 }: {
   doc: Documento
   usuarios: Usuario[]
   salvando: boolean
   onSave: (p: Record<string, any>) => Promise<void>
   podeEditar: boolean
+  onOpenInitModal: () => void
 }) {
   const [responsavelId, setResponsavelId] = useState<string>(doc.responsavelId?.toString() || "")
   const [dataPrazoOperacao, setDataPrazoOperacao] = useState<string>(
@@ -548,10 +565,6 @@ function TabOperation({
     })
   }
 
-  const handleIniciar = () => {
-    onSave({ dataInicioOperacao: new Date().toISOString() })
-  }
-
   const inputDarkCls =
     "w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30"
 
@@ -564,7 +577,7 @@ function TabOperation({
         </div>
         {!doc.dataInicioOperacao && podeEditar && (
           <button
-            onClick={handleIniciar}
+            onClick={onOpenInitModal}
             disabled={salvando}
             className="w-full mt-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-semibold rounded-md"
           >

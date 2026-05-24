@@ -22,6 +22,7 @@ import {
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import type { ProcessoWithStatus, Processo } from "@/src/types/kanban"
 import { DocumentoOperationalDrawer } from "./DocumentoOperationalDrawer"
+import { InitOperationModal } from "./InitOperationModal"
 
 // ============================================================
 // TIPOS (espelho do endpoint)
@@ -151,6 +152,7 @@ export function ProcessoCentralOperacional({
   const [sortBy, setSortBy] = useState<SortBy>("priority")
   const [matrixOpen, setMatrixOpen] = useState(false)
   const [drawerDocId, setDrawerDocId] = useState<number | null>(null)
+  const [initModalDocId, setInitModalDocId] = useState<number | null>(null)
 
   // Recupera userId do localStorage (mesmo padrão do TarefaDetailModal)
   const getUserId = (): number | null => {
@@ -560,7 +562,13 @@ export function ProcessoCentralOperacional({
               return (
                 <div
                   key={row.docId}
-                  onClick={() => setDrawerDocId(row.docId)}
+                  onClick={() => {
+                    if (row.status === "PENDENTE") {
+                      setInitModalDocId(row.docId)
+                    } else {
+                      setDrawerDocId(row.docId)
+                    }
+                  }}
                   className={`grid items-center gap-2.5 px-3 min-h-[52px] text-xs border-b border-gray-100 cursor-pointer transition-colors ${rowBg}`}
                   style={{
                     gridTemplateColumns:
@@ -644,13 +652,17 @@ export function ProcessoCentralOperacional({
                   {/* Ação */}
                   <div className="flex justify-end">
                     <button
-                     onClick={(e) => {
+                      onClick={(e) => {
                         e.stopPropagation()
-                        setDrawerDocId(row.docId)
-                    }}
+                        if (row.status === "PENDENTE") {
+                          setInitModalDocId(row.docId)
+                        } else {
+                          setDrawerDocId(row.docId)
+                        }
+                      }}
                       className="h-7 px-2.5 text-[10.5px] font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-md transition-colors whitespace-nowrap"
                     >
-                      ▸ Abrir Central
+                      {row.status === "PENDENTE" ? "▸ Iniciar operação" : "▸ Abrir Central"}
                     </button>
                   </div>
                 </div>
@@ -672,6 +684,17 @@ export function ProcessoCentralOperacional({
           isOpen={drawerDocId !== null}                               
           onClose={() => setDrawerDocId(null)}                   
           onSave={() => carregar(true)}               
+        />
+
+        {/* ============== MODAL DE INICIAR OPERAÇÃO ============== */}
+        <InitOperationModal
+          documentoId={initModalDocId}
+          isOpen={initModalDocId !== null}
+          onClose={() => setInitModalDocId(null)}
+          onSuccess={() => {
+            setInitModalDocId(null)
+            carregar(true)  // recarrega a tabela
+          }}
         />
 
       </div>
