@@ -1,7 +1,10 @@
+// src/app/api/pessoas/[id]/route.ts
+
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { reconcileDocsForPessoa } from "@/src/lib/document-generator"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -67,7 +70,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const body = await request.json()
 
     const dataToUpdate: Prisma.PessoaUpdateInput = {}
-    
+
     // Campos existentes
     if (body.nome !== undefined) dataToUpdate.nome = body.nome
     if (body.sobrenome !== undefined) dataToUpdate.sobrenome = body.sobrenome
@@ -83,7 +86,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       dataToUpdate.mae = body.maeId ? { connect: { id: Number(body.maeId) } } : { disconnect: true }
     if (body.x !== undefined) dataToUpdate.x = body.x
     if (body.y !== undefined) dataToUpdate.y = body.y
-    
+
     // Campos expandidos
     if (body.estado_nasc !== undefined) dataToUpdate.estado_nasc = body.estado_nasc
     if (body.pais_nasc !== undefined) dataToUpdate.pais_nasc = body.pais_nasc
@@ -104,10 +107,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.porto_chegada !== undefined) dataToUpdate.porto_chegada = body.porto_chegada
     if (body.pais_destino !== undefined) dataToUpdate.pais_destino = body.pais_destino
     if (body.navio !== undefined) dataToUpdate.navio = body.navio
-    
+
     // Requerente e Linhagem
     if (body.requerente !== undefined) dataToUpdate.requerente = body.requerente
     if (body.numeroLinhagem !== undefined) dataToUpdate.numeroLinhagem = body.numeroLinhagem ? parseInt(body.numeroLinhagem) : null
+
+    // ✅ NOVO (rodada 3): flag de casado pra engine
+    if (body.casado !== undefined) dataToUpdate.casado = body.casado === true
+
+    // Detecta se mudou algo que afeta a engine
+    const triggerReconcile =
+      body.casado !== undefined || body.vivo !== undefined
 
     const pessoaAtualizada = await prisma.pessoa.update({
       where: { id },
@@ -120,7 +130,39 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       },
     })
 
-    return NextResponse.json(pessoaAtualizada)
+    // ============================================================
+    // ✅ NOVO (rodada 3): AUTO-GERAÇÃO DE DOCUMENTOS
+    // ============================================================
+    // Se mudou `casado` ou `vivo`, roda a engine pra criar docs faltantes.
+    // É idempotente — nunca apaga e nunca duplica.
+    if (triggerReconcile) {
+      try {
+        const result = await reconcileDocsForPessoa(id, prisma)
+        console.log("[PUT /api/pessoas/[id]] auto-gen docs:", {
+          pessoaId: id,
+          createdCount: result.createdCount,
+          rules: result.createdRules,
+        })
+      } catch (genError) {
+        console.error("[PUT /api/pessoas/[id]] falha na auto-geração:", genError)
+        // não derruba a request — pessoa já está atualizada
+      }
+    }
+
+    // Recarrega pra retornar com os docs novos (se houve geração)
+    const pessoaFinal = triggerReconcile
+      ? await prisma.pessoa.findUnique({
+          where: { id },
+          include: {
+            pai: true,
+            mae: true,
+            arvore: true,
+            documentos: { orderBy: { createdAt: 'desc' } },
+          },
+        })
+      : pessoaAtualizada
+
+    return NextResponse.json(pessoaFinal)
   } catch (error) {
     console.error("Erro ao atualizar pessoa:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
@@ -131,7 +173,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const erro = await verificarPermissao(request, 'arvore.excluir')
     if (erro) return erro
-    
+
     const { id: idParam } = await params
 
     if (!idParam) {

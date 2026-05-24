@@ -1,5 +1,8 @@
+// src/app/api/pessoas/route.ts
+
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { reconcileDocsForPessoa } from "@/src/lib/document-generator"
 
 // GET - Listar pessoas (com filtros opcionais)
 export async function GET(request: NextRequest) {
@@ -29,7 +32,6 @@ export async function GET(request: NextRequest) {
         },
         filhosComoPai: true,
         filhosComoMae: true,
-        // ✅ NOVO: Incluir documentos
         documentos: {
           orderBy: { createdAt: 'desc' }
         },
@@ -49,12 +51,12 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    const { 
+    const {
       // Campos existentes
-      nome, 
-      sobrenome, 
-      sexo, 
-      data_nasc, 
+      nome,
+      sobrenome,
+      sexo,
+      data_nasc,
       local_nasc,
       data_obito,
       batizado,
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
       y,
       filhoId,
       tipoPai,
-      
+
       // ✅ NOVOS CAMPOS
       estado_nasc,
       pais_nasc,
@@ -87,10 +89,13 @@ export async function POST(request: NextRequest) {
       porto_chegada,
       pais_destino,
       navio,
-      
+
       // ✅ NOVO: Requerente e Linhagem
       requerente,
       numeroLinhagem,
+
+      // ✅ NOVO (rodada 3): flag de casamento pra engine
+      casado,
     } = body
 
     if (!nome) {
@@ -127,7 +132,7 @@ export async function POST(request: NextRequest) {
         maeId: maeId || null,
         x: x || null,
         y: y || null,
-        
+
         // ✅ NOVOS CAMPOS
         estado_nasc: estado_nasc || null,
         pais_nasc: pais_nasc || null,
@@ -148,10 +153,13 @@ export async function POST(request: NextRequest) {
         porto_chegada: porto_chegada || null,
         pais_destino: pais_destino || null,
         navio: navio || null,
-        
-        // ✅ NOVO: Requerente e Linhagem
+
+        // ✅ Requerente e Linhagem
         requerente: requerente || 'nao',
         numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null,
+
+        // ✅ NOVO (rodada 3): flag de casado
+        casado: casado === true,
       },
       include: {
         pai: true,
@@ -170,7 +178,7 @@ export async function POST(request: NextRequest) {
       } else if (tipoPai === 'mae') {
         updateData.maeId = pessoa.id
       }
-      
+
       await prisma.pessoa.update({
         where: { id: filhoId },
         data: updateData
@@ -181,7 +189,7 @@ export async function POST(request: NextRequest) {
     const countPessoas = await prisma.pessoa.count({
       where: { arvoreId }
     })
-    
+
     if (countPessoas === 1 && !arvore.pessoaPrincipalId) {
       await prisma.arvore.update({
         where: { id: arvoreId },
@@ -189,7 +197,36 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    return NextResponse.json(pessoa, { status: 201 })
+    // ============================================================
+    // ✅ NOVO (rodada 3): AUTO-GERAÇÃO DE DOCUMENTOS
+    // ============================================================
+    // Roda a engine pra criar os 3 docs canônicos baseado em casado/vivo.
+    // Se falhar, a pessoa já foi criada — só logamos e seguimos.
+    try {
+      const result = await reconcileDocsForPessoa(pessoa.id, prisma)
+      console.log("[POST /api/pessoas] auto-gen docs:", {
+        pessoaId: pessoa.id,
+        createdCount: result.createdCount,
+        rules: result.createdRules,
+      })
+    } catch (genError) {
+      console.error("[POST /api/pessoas] falha na auto-geração:", genError)
+      // não derruba a request — pessoa está criada
+    }
+
+    // Recarrega a pessoa COM os docs gerados
+    const pessoaFinal = await prisma.pessoa.findUnique({
+      where: { id: pessoa.id },
+      include: {
+        pai: true,
+        mae: true,
+        filhosComoPai: true,
+        filhosComoMae: true,
+        documentos: { orderBy: { createdAt: 'desc' } },
+      }
+    })
+
+    return NextResponse.json(pessoaFinal, { status: 201 })
   } catch (error) {
     console.error("Erro ao criar pessoa:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })

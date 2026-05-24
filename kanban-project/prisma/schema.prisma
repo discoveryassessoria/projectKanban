@@ -80,6 +80,8 @@ model Pessoa {
   filhosComoPai      Pessoa[]      @relation("FilhosPai")
   unioesComoPessoa1  Uniao[]       @relation("Pessoa1")
   unioesComoPessoa2  Uniao[]       @relation("Pessoa2")
+  documentacao       Boolean       @default(true)
+  casado             Boolean       @default(false)
 
   @@index([arvoreId])
   @@index([pais_nasc])
@@ -176,12 +178,17 @@ model Documento {
   motivoBloqueio        String?         @db.VarChar(300)
   // ============================================================
 
+  origem                String          @default("manual") @db.VarChar(20)
+  ruleCode              String?         @db.VarChar(20)
+
   @@index([pessoaId])
   @@index([tipo])
   @@index([status])
   @@index([responsavelId])
   @@index([dataPrazoOperacao])
   @@index([ultimaMovimentacao])
+  @@index([origem])
+  @@index([ruleCode])
 }
 
 model Status {
