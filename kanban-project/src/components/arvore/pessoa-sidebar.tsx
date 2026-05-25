@@ -843,7 +843,7 @@ export function PessoaSidebar({
                   <DocumentoCard 
                     key={doc.id} 
                     documento={doc} 
-                    onClick={() => onEditDocumento?.(doc)}
+                    onClick={onEditDocumento ? () => onEditDocumento(doc) : undefined}
                     onDelete={pode('arvore.excluir_documento') ? () => onDeleteDocumento?.(doc) : undefined}
                   />
                 ))}
@@ -857,8 +857,8 @@ export function PessoaSidebar({
               </div>
             )}
             
-            {pode('arvore.criar_documento') && <button 
-              onClick={() => onAddDocumento?.(pessoa.id)}
+            {pode('arvore.criar_documento') && onAddDocumento && <button 
+              onClick={() => onAddDocumento(pessoa.id)}
               className="w-full mt-4 flex items-center justify-center gap-2 p-3 bg-teal-50 text-teal-700 rounded-lg hover:bg-teal-100 transition-colors"
             >
               <Plus className="w-4 h-4" />

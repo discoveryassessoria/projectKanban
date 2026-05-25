@@ -10,7 +10,6 @@ import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
 import { ReactFlowTree, ReactFlowTreeRef } from "./react-flow-tree"
 import { TreeOnboarding } from "./tree-onboarding"
-import { DocumentoModal } from "./documento-modal"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import {
   Plus,
@@ -41,6 +40,7 @@ interface ArvoreGenealogicaViewProps {
   pessoaIdParaFocar?: number
   sidebarTabParaFocar?: string
   nomeFamilia?: string  // ✅ NOVA PROP
+  paisProcesso?: "PORTUGAL" | "ESPANHA" | "ALEMANHA" | "ITALIA"
 }
 
 type ViewMode = 'paisagem' | 'retrato'
@@ -58,7 +58,8 @@ export function ArvoreGenealogicaView({
   onArvoreCreated,
   pessoaIdParaFocar,
   sidebarTabParaFocar,
-  nomeFamilia  // ✅ NOVA PROP
+  nomeFamilia,  // ✅ NOVA PROP
+  paisProcesso
 }: ArvoreGenealogicaViewProps) {
   const { pode } = usePermissoes()
   const [viewMode, setViewMode] = useState<ViewMode>('paisagem')
@@ -86,11 +87,6 @@ export function ArvoreGenealogicaView({
 
   const [showEditPersonModal, setShowEditPersonModal] = useState(false)
   const [editingPerson, setEditingPerson] = useState<PessoaArvore | null>(null)
-
-  const [showDocumentoModal, setShowDocumentoModal] = useState(false)
-  const [documentoPessoaId, setDocumentoPessoaId] = useState<number | null>(null)
-  const [documentoPessoaNome, setDocumentoPessoaNome] = useState('')
-  const [editingDocumento, setEditingDocumento] = useState<DocumentoArvore | null>(null)
 
   const [pessoaFocada, setPessoaFocada] = useState(false)
   const [sidebarTabInicial, setSidebarTabInicial] = useState<string | undefined>(undefined)
@@ -279,22 +275,6 @@ export function ArvoreGenealogicaView({
       setIsExporting(false)
     }
   }, [pessoas, pessoaPrincipal, nomeFamilia])
-
-  const handleAddDocumento = (pessoaId: number) => {
-    const pessoa = pessoas.find(p => p.id === pessoaId)
-    setDocumentoPessoaId(pessoaId)
-    setDocumentoPessoaNome(pessoa ? `${pessoa.nome} ${pessoa.sobrenome || ''}`.trim() : '')
-    setEditingDocumento(null)
-    setShowDocumentoModal(true)
-  }
-
-  const handleEditDocumento = (documento: DocumentoArvore) => {
-    const pessoa = pessoas.find(p => p.id === documento.pessoaId)
-    setDocumentoPessoaId(documento.pessoaId || null)
-    setDocumentoPessoaNome(pessoa ? `${pessoa.nome} ${pessoa.sobrenome || ''}`.trim() : '')
-    setEditingDocumento(documento)
-    setShowDocumentoModal(true)
-  }
 
   const handleDeleteDocumento = async (documento: DocumentoArvore) => {
     try {
@@ -626,7 +606,11 @@ export function ArvoreGenealogicaView({
   if (showOnboarding && arvoreId) {
     return (
       <div ref={containerRef} className="h-full">
-        <TreeOnboarding arvoreId={arvoreId} onComplete={handleOnboardingComplete} />
+        <TreeOnboarding 
+          arvoreId={arvoreId} 
+          paisProcesso={paisProcesso}
+          onComplete={handleOnboardingComplete} 
+        />
       </div>
     )
   }
@@ -773,8 +757,8 @@ export function ArvoreGenealogicaView({
         onAddPai={pode('arvore.criar') ? handleAddPai : undefined}
         onAddMae={pode('arvore.criar') ? handleAddMae : undefined}
         onAddConjuge={pode('arvore.criar') ? handleAddConjugeById : undefined}
-        onAddDocumento={pode('arvore.criar_documento') ? handleAddDocumento : undefined}
-        onEditDocumento={handleEditDocumento}
+        onAddDocumento={undefined}
+        onEditDocumento={undefined}
         onDeleteDocumento={pode('arvore.excluir_documento') ? handleDeleteDocumento : undefined}
         onSelectPerson={handleSelectPersonFromSidebar}
         initialTab={sidebarTabInicial}
@@ -835,29 +819,6 @@ export function ArvoreGenealogicaView({
             await fetchArvore()
             setShowEditPersonModal(false)
             setEditingPerson(null)
-          }}
-        />
-      )}
-
-      {/* Modal Documento */}
-      {showDocumentoModal && documentoPessoaId && (
-        <DocumentoModal
-          pessoaId={documentoPessoaId}
-          pessoaNome={documentoPessoaNome}
-          documento={editingDocumento}
-          processoId={processoId}
-          onClose={() => {
-            setShowDocumentoModal(false)
-            setDocumentoPessoaId(null)
-            setDocumentoPessoaNome('')
-            setEditingDocumento(null)
-          }}
-          onSuccess={async () => {
-            await fetchArvore()
-            setShowDocumentoModal(false)
-            setDocumentoPessoaId(null)
-            setDocumentoPessoaNome('')
-            setEditingDocumento(null)
           }}
         />
       )}

@@ -145,6 +145,9 @@ interface DocumentoOperationalDrawerProps {
   isOpen: boolean
   onClose: () => void
   onSave?: () => void
+  /** Se passado, mostra um botão "← {backLabel}" no topo do header e chama onBack ao clicar */
+  onBack?: () => void
+  backLabel?: string
 }
 
 type TabId =
@@ -202,6 +205,8 @@ export function DocumentoOperationalDrawer({
   isOpen,
   onClose,
   onSave,
+  onBack,
+  backLabel,
 }: DocumentoOperationalDrawerProps) {
   const { pode } = usePermissoes()
   const [doc, setDoc] = useState<Documento | null>(null)
@@ -367,9 +372,19 @@ export function DocumentoOperationalDrawer({
               style={{ background: "linear-gradient(180deg,#181d24 0%,#11151b 100%)" }}
             >
               <div className="flex items-center justify-between mb-3.5">
-                <div className="text-[10px] uppercase font-semibold tracking-wider text-white/50">
-                  Central Operacional · {nomeCompleto(doc.pessoa)}
-                </div>
+                {onBack ? (
+                  <button
+                    onClick={onBack}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/70 hover:text-white transition-colors -ml-1 px-1 py-0.5 rounded hover:bg-white/5"
+                  >
+                    <span className="text-[14px] leading-none">←</span>
+                    {backLabel || nomeCompleto(doc.pessoa)}
+                  </button>
+                ) : (
+                  <div className="text-[10px] uppercase font-semibold tracking-wider text-white/50">
+                    Central Operacional · {nomeCompleto(doc.pessoa)}
+                  </div>
+                )}
                 <button
                   onClick={onClose}
                   className="w-[30px] h-[30px] rounded-md bg-white/5 hover:bg-white/15 flex items-center justify-center text-white"

@@ -18,6 +18,7 @@ import {
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import type { ProcessoWithStatus, Processo } from "@/src/types/kanban"
 import { DocumentoOperationalDrawer } from "./DocumentoOperationalDrawer"
+import { PessoaOperacionalDrawer } from "./PessoaOperacionalDrawer"
 
 // ============================================================
 // TIPOS (espelho do endpoint)
@@ -124,6 +125,8 @@ export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
   const [currentFilter, setCurrentFilter] = useState<FilterId>("all")
   const [denseMode, setDenseMode] = useState(false)
   const [drawerDocId, setDrawerDocId] = useState<number | null>(null)
+  const [drawerPessoaId, setDrawerPessoaId] = useState<number | null>(null)
+  const [voltarParaPessoa, setVoltarParaPessoa] = useState<{ id: number; nome: string } | null>(null)
 
   const carregar = useCallback(
     async (modoSilencioso = false) => {
@@ -444,7 +447,10 @@ export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
                   key={row.pessoaId}
                   row={row}
                   gridCols={gridCols}
-                  onAbrirDoc={(docId) => setDrawerDocId(docId)}
+                  onAbrirPessoa={(pessoaId, pessoaNome) => {
+                    setDrawerPessoaId(pessoaId)
+                    setVoltarParaPessoa({ id: pessoaId, nome: pessoaNome })
+                  }}
                 />
               ))}
             </>
@@ -464,7 +470,10 @@ export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
                   key={row.pessoaId}
                   row={row}
                   gridCols={gridCols}
-                  onAbrirDoc={(docId) => setDrawerDocId(docId)}
+                  onAbrirPessoa={(pessoaId, pessoaNome) => {
+                    setDrawerPessoaId(pessoaId)
+                    setVoltarParaPessoa({ id: pessoaId, nome: pessoaNome })
+                  }}
                 />
               ))}
             </>
@@ -484,19 +493,51 @@ export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
                   key={row.pessoaId}
                   row={row}
                   gridCols={gridCols}
-                  onAbrirDoc={(docId) => setDrawerDocId(docId)}
+                  onAbrirPessoa={(pessoaId, pessoaNome) => {
+                    setDrawerPessoaId(pessoaId)
+                    setVoltarParaPessoa({ id: pessoaId, nome: pessoaNome })
+                  }}
                 />
               ))}
             </>
           )}
         </div>
 
-        {/* ============== DRAWER ============== */}
+        {/* ============== DRAWER DA PESSOA (camada externa) ============== */}
+        <PessoaOperacionalDrawer
+          pessoaId={drawerPessoaId}
+          isOpen={drawerPessoaId !== null}
+          onClose={() => {
+            setDrawerPessoaId(null)
+            setVoltarParaPessoa(null)
+          }}
+          onClickDoc={(docId) => {
+            // Esconde a sidebar da pessoa e abre a do documento (com breadcrumb pra voltar)
+            setDrawerPessoaId(null)
+            setDrawerDocId(docId)
+          }}
+        />
+
+        {/* ============== DRAWER DO DOCUMENTO (camada interna) ============== */}
         <DocumentoOperationalDrawer
           documentoId={drawerDocId}
           isOpen={drawerDocId !== null}
-          onClose={() => setDrawerDocId(null)}
+          onClose={() => {
+            setDrawerDocId(null)
+            setVoltarParaPessoa(null)
+          }}
           onSave={() => carregar(true)}
+          onBack={
+            voltarParaPessoa
+              ? () => {
+                  // Volta pra sidebar da pessoa
+                  const p = voltarParaPessoa
+                  setDrawerDocId(null)
+                  setDrawerPessoaId(p.id)
+                }
+              : undefined
+          }
+          backLabel={voltarParaPessoa?.nome}
         />
 
       </div>
@@ -588,11 +629,11 @@ function GroupHeader({
 function PersonRowComponent({
   row,
   gridCols,
-  onAbrirDoc,
+  onAbrirPessoa,
 }: {
   row: PersonRow
   gridCols: string
-  onAbrirDoc: (docId: number) => void
+  onAbrirPessoa: (pessoaId: number, pessoaNome: string) => void
 }) {
   // Cor de fundo da linha
   const rowCls = (() => {
@@ -631,10 +672,9 @@ function PersonRowComponent({
       : "bg-slate-100 text-slate-700"
     : "bg-gray-100 text-gray-500"
 
-  // Abre o primeiro doc da pessoa que está em operação (ou o primeiro qualquer)
+  // Abre a sidebar da pessoa (não vai mais direto pro doc)
   const handleAbrir = () => {
-    const docEmOp = row.docs.find((d) => !d.isRecebido) || row.docs[0]
-    if (docEmOp) onAbrirDoc(docEmOp.id)
+    onAbrirPessoa(row.pessoaId, row.nome)
   }
 
   const docStateColorMap: Record<string, string> = {
