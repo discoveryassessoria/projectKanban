@@ -1,5 +1,7 @@
 // src/app/api/documentos/[id]/route.ts
 // ✅ ATUALIZADO: Automação para EM_BUSCA (cria tarefa de busca) e SOLICITAR (cria subtarefa dentro da busca)
+// ✅ FIX (rodada 10): whitelist do PUT inclui os 12 campos da rodada 6 (editor registral) +
+//    rodada 9 (solicitar certidão). Sem isso, esses campos eram silenciosamente ignorados.
 
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
@@ -123,8 +125,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             },
           }
         },
-        responsavel: {                                          // ← NOVO
-          select: { id: true, nome: true, email: true }         // ← NOVO
+        responsavel: {
+          select: { id: true, nome: true, email: true }
         }
       },
     })
@@ -206,7 +208,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.termo !== undefined) dataToUpdate.termo = body.termo
     if (body.numero_registro !== undefined) dataToUpdate.numero_registro = body.numero_registro
     if (body.data_registro !== undefined) dataToUpdate.data_registro = body.data_registro ? new Date(body.data_registro) : null
-    if (body.data_evento !== undefined) dataToUpdate.data_evento = body.data_evento ? new Date(body.data_evento) : null    // ← adicionar
+    if (body.data_evento !== undefined) dataToUpdate.data_evento = body.data_evento ? new Date(body.data_evento) : null
     if (body.cidade_registro !== undefined) dataToUpdate.cidade_registro = body.cidade_registro
     if (body.estado_registro !== undefined) dataToUpdate.estado_registro = body.estado_registro
     if (body.pais_registro !== undefined) dataToUpdate.pais_registro = body.pais_registro
@@ -240,7 +242,44 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.observacoes !== undefined) dataToUpdate.observacoes = body.observacoes
 
     // ============================================================
-    // ✅ NOVO: Campos de operação (Central Operacional)
+    // ✅ NOVO (rodada 6): Editor Registral — 11 campos canônicos
+    // ============================================================
+    // Identificação literal (como aparece na certidão)
+    if (body.nome_registrado !== undefined) dataToUpdate.nome_registrado = body.nome_registrado
+    if (body.pai_registrado !== undefined) dataToUpdate.pai_registrado = body.pai_registrado
+    if (body.mae_registrada !== undefined) dataToUpdate.mae_registrada = body.mae_registrada
+    if (body.conjuge_registrado !== undefined) dataToUpdate.conjuge_registrado = body.conjuge_registrado
+
+    // Localidade extra
+    if (body.comune !== undefined) dataToUpdate.comune = body.comune
+
+    // Referência registral extra
+    if (body.matricula !== undefined) dataToUpdate.matricula = body.matricula
+    if (body.crc !== undefined) dataToUpdate.crc = body.crc
+    if (body.protocolo !== undefined) dataToUpdate.protocolo = body.protocolo
+
+    // Rastreamento da solicitação ao cartório
+    if (body.nro_pedido !== undefined) dataToUpdate.nro_pedido = body.nro_pedido
+    if (body.canal_solicitacao !== undefined) dataToUpdate.canal_solicitacao = body.canal_solicitacao
+    if (body.link_acompanhamento !== undefined) dataToUpdate.link_acompanhamento = body.link_acompanhamento
+    if (body.localizacao_fisica !== undefined) dataToUpdate.localizacao_fisica = body.localizacao_fisica
+
+    // ============================================================
+    // ✅ NOVO (rodada 12): Dados literais do documento (Etapa 5 Conferir)
+    // ============================================================
+    if (body.data_evento_documento !== undefined) {
+      dataToUpdate.data_evento_documento = body.data_evento_documento
+        ? new Date(body.data_evento_documento)
+        : null
+    }
+    if (body.data_registro_documento !== undefined) {
+      dataToUpdate.data_registro_documento = body.data_registro_documento
+        ? new Date(body.data_registro_documento)
+        : null
+    }
+
+    // ============================================================
+    // ✅ Campos de operação (Central Operacional)
     // ============================================================
     if (body.responsavelId !== undefined) {
       dataToUpdate.responsavel = body.responsavelId
@@ -287,7 +326,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    // ✅ NOVO: recalcula fase do processo após qualquer mudança no documento
+    // ✅ recalcula fase do processo após qualquer mudança no documento
     await recalculateByDocumentoId(prisma, Number(id))
 
     return NextResponse.json(documentoAtualizado)
@@ -347,7 +386,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (processoId) {
       const tipoLabel = getTipoDocumentoLabel(documento.tipo)
       const nomePessoa = `${documento.pessoa.nome} ${documento.pessoa.sobrenome || ""}`.trim()
-      
+
       // Buscar tarefa de busca
       const tarefaBusca = await prisma.tarefa.findFirst({
         where: {
@@ -404,7 +443,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const erro = await verificarPermissao(request, 'arvore.editar_documento')
     if (erro) return erro
-    
+
     const { id: idParam } = await params
     const id = Number.parseInt(idParam)
 
@@ -469,7 +508,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       await criarTarefasDocumento(body.status, documentoAtual.tipo, nomePessoa, processoId)
     }
 
-    // ✅ NOVO: recalcula fase do processo também no PATCH
+    // ✅ recalcula fase do processo também no PATCH
     await recalculateByDocumentoId(prisma, Number(id))
 
     return NextResponse.json(documentoAtualizado)

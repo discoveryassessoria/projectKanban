@@ -173,6 +173,9 @@ model Documento {
   mae_registrada      String?   @db.VarChar(200)
   conjuge_registrado  String?   @db.VarChar(200)
 
+  data_evento_documento     DateTime?
+  data_registro_documento   DateTime?
+
   // Localidade extra
   comune              String?   @db.VarChar(100)
 
@@ -1202,6 +1205,14 @@ model WorkflowStep {
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  documentMedium     String?     @db.VarChar(20)
+  physicalLocation   String?     @db.VarChar(200)
+
+  reviewChecklist    Json?
+  stepObservation    String?     @db.Text
+
+  legalOpinion       String?     @db.Text
 
   @@index([workflowId])
   @@index([status])

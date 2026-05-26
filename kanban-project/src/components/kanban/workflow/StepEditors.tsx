@@ -14,7 +14,7 @@
 
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { createPortal } from "react-dom"
 import {
   X,
@@ -32,7 +32,10 @@ import {
   Scale,
   XCircle,
   AlertCircle,
+  Trash2,
+  ExternalLink,
 } from "lucide-react"
+import { uploadFiles } from "@/src/lib/storage"
 
 // ============================================================
 // TIPOS COMPARTILHADOS
@@ -839,27 +842,15 @@ export function EditorSolicitarCertidao({
               <div className="space-y-3 mb-5">
                 {/* Anexo */}
                 {canalConfig.requires.attachment && (
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <label className="text-[10px] uppercase font-semibold tracking-wider text-white/55">
-                        📎 {canalConfig.requires.attachmentLabel}
-                      </label>
-                      <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                        obrigatório
-                      </span>
-                    </div>
-                    <input
-                      type="text"
-                      value={form.attachmentUrl}
-                      onChange={(e) => setForm({ ...form, attachmentUrl: e.target.value })}
-                      placeholder="Cole o link do PDF/imagem (Google Drive / Dropbox por enquanto)"
-                      disabled={readOnly}
-                      className={form.attachmentUrl.trim() ? inputCls : inputClsInvalid}
-                    />
-                    <div className="text-[10px] text-white/40 mt-1 italic">
-                      Upload direto na interface vem na próxima rodada — por enquanto cole a URL.
-                    </div>
-                  </div>
+                  <FileUploadField
+                    label={`📎 ${canalConfig.requires.attachmentLabel}`}
+                    required
+                    invalid={!form.attachmentUrl.trim()}
+                    value={form.attachmentUrl}
+                    onChange={(url) => setForm({ ...form, attachmentUrl: url })}
+                    disabled={readOnly}
+                    prefix={`documentos/${documentoId}/solicitacao`}
+                  />
                 )}
 
                 {/* Protocolo */}
@@ -1036,6 +1027,116 @@ function ResumoCard({
 // ETAPA 3: AGUARDAR RETORNO DO CARTÓRIO
 // ============================================================
 
+// ============================================================
+// ETAPA 3: AGUARDAR RETORNO DO CARTÓRIO
+// ============================================================
+//
+// Estrutura inspirada no HTML de referência do Marco:
+//   - Resumo da solicitação (read-only, dados recuperados da Etapa 2)
+//   - Histórico de contatos (follow-ups) com cartório
+//   - Formulário inline pra adicionar novo contato
+//   - Código de rastreio (correios/sedex/motoboy)
+//
+// Os follow-ups são salvos em step.notes em formato linha-por-linha:
+//   [2026-05-26 14:30] LIGACAO: Maria atendeu, pediu 7 dias úteis
+//   [2026-06-02 09:15] WHATSAPP: Confirmaram que documento foi assinado
+//
+// Isso evita migração de schema agora. Quando criarmos WorkflowStepComment
+// numa rodada futura, dá pra migrar os existentes via parsing simples.
+
+type FollowupKind = "LIGACAO" | "EMAIL" | "WHATSAPP" | "CARTORIO" | "CORREIOS" | "OUTRO"
+
+interface Followup {
+  iso: string
+  date: string
+  time: string
+  kind: FollowupKind
+  description: string
+}
+
+const FOLLOWUP_KINDS: {
+  value: FollowupKind
+  label: string
+  icon: string
+  pillClass: string
+}[] = [
+  { value: "LIGACAO", label: "Ligação", icon: "📞", pillClass: "bg-indigo-500/20 text-indigo-200 border-indigo-500/30" },
+  { value: "EMAIL", label: "E-mail", icon: "📧", pillClass: "bg-blue-500/20 text-blue-200 border-blue-500/30" },
+  { value: "WHATSAPP", label: "WhatsApp", icon: "💬", pillClass: "bg-emerald-500/20 text-emerald-200 border-emerald-500/30" },
+  { value: "CARTORIO", label: "Cartório presencial", icon: "🏛", pillClass: "bg-amber-500/20 text-amber-200 border-amber-500/30" },
+  { value: "CORREIOS", label: "Correios", icon: "📬", pillClass: "bg-rose-500/20 text-rose-200 border-rose-500/30" },
+  { value: "OUTRO", label: "Outro", icon: "🔔", pillClass: "bg-white/10 text-white/80 border-white/20" },
+]
+
+function getFollowupMeta(kind: FollowupKind) {
+  return FOLLOWUP_KINDS.find((k) => k.value === kind) || FOLLOWUP_KINDS[5]
+}
+
+function parseFollowups(notes: string): Followup[] {
+  if (!notes) return []
+  const lines = notes.split("\n").map((l) => l.trim()).filter(Boolean)
+  const out: Followup[] = []
+  const re = /^\[(\d{4}-\d{2}-\d{2})(?:\s+(\d{2}:\d{2}))?\]\s+([A-Z_]+):\s*(.*)$/
+  const validKinds: FollowupKind[] = ["LIGACAO", "EMAIL", "WHATSAPP", "CARTORIO", "CORREIOS", "OUTRO"]
+  for (const line of lines) {
+    const m = line.match(re)
+    if (m) {
+      const [, date, time = "00:00", kindStr, desc] = m
+      const kind = validKinds.includes(kindStr as FollowupKind) ? (kindStr as FollowupKind) : "OUTRO"
+      out.push({
+        iso: `${date}T${time}:00`,
+        date,
+        time,
+        kind,
+        description: desc.trim(),
+      })
+    }
+  }
+  // Mais recente primeiro
+  out.sort((a, b) => b.iso.localeCompare(a.iso))
+  return out
+}
+
+function formatFollowupLine(date: string, kind: FollowupKind, desc: string): string {
+  const time = new Date().toTimeString().slice(0, 5) // HH:mm local
+  return `[${date} ${time}] ${kind}: ${desc.trim()}`
+}
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+interface SolicitacaoSummary {
+  atendente: string | null
+  canal: string | null
+  protocolo: string | null
+  link: string | null
+  observacao: string | null
+  sentAt: string | null
+  custoPago: number | null
+  formaPagamento: string | null
+  cartorio: string | null
+}
+
+const CANAL_LABEL: Record<string, string> = {
+  crc: "🌐 CRC Nacional",
+  ecartorio: "💻 E-cartório",
+  email: "📧 E-mail",
+  whatsapp: "💬 WhatsApp",
+  balcao: "🏛 Balcão",
+  comune_italiana: "🇮🇹 Comune italiana",
+  correios: "📬 Correios",
+  consulado: "🏛 Consulado",
+}
+
+const PAGAMENTO_LABEL: Record<string, string> = {
+  pix: "Pix",
+  boleto: "Boleto",
+  debito: "Débito",
+  dinheiro: "Dinheiro",
+  cortesia: "Cortesia",
+}
+
 export function EditorAguardarRetorno({
   documentoId,
   stepId,
@@ -1046,8 +1147,15 @@ export function EditorAguardarRetorno({
 }: StepEditorBaseProps) {
   const [trackingCode, setTrackingCode] = useState("")
   const [notes, setNotes] = useState("")
+  const [solicit, setSolicit] = useState<SolicitacaoSummary | null>(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  // Form pra adicionar follow-up
+  const [newDate, setNewDate] = useState<string>(todayIso())
+  const [newKind, setNewKind] = useState<FollowupKind>("LIGACAO")
+  const [newDesc, setNewDesc] = useState("")
+  const [addingFollowup, setAddingFollowup] = useState(false)
 
   const readOnly = stepStatus === "concluida"
 
@@ -1055,17 +1163,47 @@ export function EditorAguardarRetorno({
     if (!documentoId || !stepId || !isOpen) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/documentos/${documentoId}/workflow`, {
-        headers: authHeader(),
-      })
-      if (res.ok) {
-        const d = await res.json()
-        const step = d.workflow?.steps?.find((s: { id: number }) => s.id === stepId)
-        if (step) {
-          setTrackingCode(step.trackingCode || "")
-          setNotes(step.notes || "")
-        }
+      const [resWf, resDoc] = await Promise.all([
+        fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
+        fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
+      ])
+
+      let currentStep: Record<string, unknown> | null = null
+      let prevStep: Record<string, unknown> | null = null
+      if (resWf.ok) {
+        const d = await resWf.json()
+        const steps = d.workflow?.steps || []
+        currentStep = steps.find((s: { id: number }) => s.id === stepId) || null
+        prevStep = steps.find((s: { stepKey: string }) => s.stepKey === "solicitar_certidao") || null
       }
+      if (currentStep) {
+        setTrackingCode((currentStep.trackingCode as string) || "")
+        setNotes((currentStep.notes as string) || "")
+      }
+
+      let doc: Record<string, unknown> = {}
+      if (resDoc.ok) doc = await resDoc.json()
+
+      setSolicit({
+        atendente: (prevStep?.externalEntityName as string) || null,
+        cartorio: (doc.cartorio as string) || null,
+        canal:
+          (doc.canal_solicitacao as string) ||
+          (prevStep?.requestChannel as string) ||
+          null,
+        protocolo:
+          (doc.protocolo as string) ||
+          (prevStep?.externalProtocol as string) ||
+          null,
+        link: (doc.link_acompanhamento as string) || null,
+        observacao: (doc.observacoes as string) || null,
+        sentAt:
+          (prevStep?.completedAt as string) ||
+          (prevStep?.startedAt as string) ||
+          null,
+        custoPago: (prevStep?.costPaid as number) ?? null,
+        formaPagamento: (prevStep?.paymentMethod as string) || null,
+      })
     } catch (e) {
       console.warn("[EditorAguardarRetorno]", e)
     } finally {
@@ -1076,6 +1214,33 @@ export function EditorAguardarRetorno({
   useEffect(() => {
     if (isOpen) carregar()
   }, [isOpen, carregar])
+
+  const followups = parseFollowups(notes)
+
+  const handleAddFollowup = async () => {
+    if (readOnly) return
+    if (!newDesc.trim()) {
+      alert("Descreva o contato antes de adicionar.")
+      return
+    }
+    setAddingFollowup(true)
+    try {
+      const line = formatFollowupLine(newDate, newKind, newDesc)
+      const newNotes = notes ? `${notes}\n${line}` : line
+      const ok = await patchStep(documentoId, stepId, { notes: newNotes })
+      if (!ok) throw new Error("PATCH falhou")
+      setNotes(newNotes)
+      setNewDesc("")
+      setNewKind("LIGACAO")
+      setNewDate(todayIso())
+      onSaved?.()
+    } catch (e) {
+      console.error("[EditorAguardarRetorno] addFollowup:", e)
+      alert("Erro ao adicionar contato. Veja o console.")
+    } finally {
+      setAddingFollowup(false)
+    }
+  }
 
   const handleSalvar = async (concluir: boolean) => {
     if (readOnly) return
@@ -1101,12 +1266,44 @@ export function EditorAguardarRetorno({
     }
   }
 
+  const fmtDateTime = (iso: string | null) => {
+    if (!iso) return "—"
+    try {
+      const d = new Date(iso)
+      return d.toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    } catch {
+      return iso
+    }
+  }
+
+  const fmtRelative = (iso: string) => {
+    try {
+      const d = new Date(iso)
+      const diffMs = Date.now() - d.getTime()
+      const diffH = Math.floor(diffMs / (1000 * 60 * 60))
+      const diffD = Math.floor(diffH / 24)
+      if (diffD === 0 && diffH === 0) return "agora há pouco"
+      if (diffD === 0) return `há ${diffH}h`
+      if (diffD === 1) return "ontem"
+      if (diffD < 7) return `há ${diffD} dias`
+      return d.toLocaleDateString("pt-BR")
+    } catch {
+      return iso
+    }
+  }
+
   return (
     <EditorShell
       isOpen={isOpen}
       onClose={onClose}
       title="Aguardar retorno do cartório"
-      subtitle="Registre código de rastreio e histórico de follow-ups feitos com o cartório."
+      subtitle="Acompanhe a solicitação e registre os contatos feitos com o cartório enquanto espera o retorno."
       footer={
         <div className="flex items-center justify-end gap-3">
           <button
@@ -1126,7 +1323,7 @@ export function EditorAguardarRetorno({
           <button
             onClick={() => handleSalvar(true)}
             disabled={saving || readOnly}
-            className="px-5 py-2 text-[12.5px] font-semibold bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-md inline-flex items-center gap-2"
+            className="px-5 py-2 text-[12.5px] font-semibold bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
             Confirmar retorno · concluir etapa
@@ -1141,45 +1338,218 @@ export function EditorAguardarRetorno({
           <Loader2 className="w-5 h-5 animate-spin text-white/50" />
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/10">
-            <div className="text-[12px] font-semibold text-amber-300 mb-1 flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5" />
-              Etapa de aguardo
+        <div className="space-y-5">
+          {/* ═══════════════════════════════════════════════════════
+              1. RESUMO DA SOLICITAÇÃO (read-only, vem da Etapa 2)
+             ═══════════════════════════════════════════════════════ */}
+          {solicit && (
+            <div className="rounded-lg border border-indigo-500/30 bg-gradient-to-br from-indigo-500/10 to-blue-500/5 overflow-hidden">
+              <div className="px-3.5 py-2 bg-indigo-500/15 border-b border-indigo-500/20 flex items-center gap-2">
+                <Send className="w-3.5 h-3.5 text-indigo-200" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-100">
+                  Resumo da solicitação
+                </span>
+              </div>
+              <div className="p-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5 text-[12px]">
+                <SummaryField label="Cartório" value={solicit.cartorio} />
+                <SummaryField
+                  label="Canal"
+                  value={
+                    solicit.canal
+                      ? CANAL_LABEL[solicit.canal] || solicit.canal
+                      : null
+                  }
+                />
+                <SummaryField label="Atendente" value={solicit.atendente} />
+                <SummaryField label="Protocolo" value={solicit.protocolo} mono />
+                <SummaryField label="Enviado em" value={fmtDateTime(solicit.sentAt)} />
+                <SummaryField
+                  label="Custo pago"
+                  value={
+                    solicit.custoPago != null
+                      ? `R$ ${solicit.custoPago.toFixed(2).replace(".", ",")}${
+                          solicit.formaPagamento
+                            ? ` · ${PAGAMENTO_LABEL[solicit.formaPagamento] || solicit.formaPagamento}`
+                            : ""
+                        }`
+                      : null
+                  }
+                />
+                {solicit.link && (
+                  <div className="col-span-2">
+                    <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+                      Link de acompanhamento
+                    </div>
+                    <a
+                      href={solicit.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[12px] text-blue-300 hover:text-blue-200 hover:underline inline-flex items-center gap-1 break-all"
+                    >
+                      {solicit.link}
+                      <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                    </a>
+                  </div>
+                )}
+                {solicit.observacao && (
+                  <div className="col-span-2">
+                    <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+                      Observação da solicitação
+                    </div>
+                    <div className="text-[12px] text-white/80 italic">
+                      &ldquo;{solicit.observacao}&rdquo;
+                    </div>
+                  </div>
+                )}
+              </div>
+              {!solicit.canal && !solicit.protocolo && !solicit.atendente && (
+                <div className="px-3.5 py-2 border-t border-indigo-500/20 text-[11px] text-amber-200 bg-amber-500/5 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                  Solicitação ainda não preenchida na Etapa 2. Reabra a etapa anterior para preencher.
+                </div>
+              )}
             </div>
-            <div className="text-[11px] text-white/75 leading-relaxed">
-              Esta etapa não tem evidência obrigatória — você pode salvar e voltar depois.
-              Conclua aqui só quando confirmar que o cartório respondeu (na próxima etapa, faça o upload).
+          )}
+
+          {/* ═══════════════════════════════════════════════════════
+              2. HISTÓRICO DE CONTATOS (timeline de follow-ups)
+             ═══════════════════════════════════════════════════════ */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 flex items-center gap-1.5">
+                <MessageCircle className="w-3.5 h-3.5" />
+                Histórico de contatos
+                {followups.length > 0 && (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-white/10 text-white/70">
+                    {followups.length}
+                  </span>
+                )}
+              </div>
             </div>
+
+            {followups.length === 0 ? (
+              <div className="px-3 py-4 rounded-md bg-white/5 border border-dashed border-white/15 text-center">
+                <div className="text-[11.5px] text-white/55 italic">
+                  Nenhum contato registrado ainda.
+                </div>
+                <div className="text-[10.5px] text-white/40 mt-0.5">
+                  Use o formulário abaixo para registrar ligações, e-mails ou visitas.
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {followups.map((f, i) => {
+                  const meta = getFollowupMeta(f.kind)
+                  return (
+                    <div
+                      key={`${f.iso}-${i}`}
+                      className="rounded-md border border-white/10 bg-white/5 p-2.5"
+                    >
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span
+                          className={`text-[10.5px] font-semibold px-2 py-0.5 rounded border ${meta.pillClass} inline-flex items-center gap-1`}
+                        >
+                          <span>{meta.icon}</span>
+                          <span>{meta.label}</span>
+                        </span>
+                        <span className="text-[10.5px] text-white/60 font-mono">
+                          {f.date.split("-").reverse().join("/")} · {f.time}
+                        </span>
+                        <span className="text-[10px] text-white/40">
+                          ({fmtRelative(f.iso)})
+                        </span>
+                      </div>
+                      <div className="text-[12.5px] text-white/85 leading-snug whitespace-pre-wrap">
+                        {f.description}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
+          {/* ═══════════════════════════════════════════════════════
+              3. ADICIONAR NOVO CONTATO
+             ═══════════════════════════════════════════════════════ */}
+          {!readOnly && (
+            <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3.5">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-200 mb-2.5 flex items-center gap-1.5">
+                <span>+</span>
+                <span>Adicionar contato</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-2.5">
+                <div>
+                  <Label>Data</Label>
+                  <input
+                    type="date"
+                    value={newDate}
+                    onChange={(e) => setNewDate(e.target.value)}
+                    max={todayIso()}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <Label>Tipo de contato</Label>
+                  <select
+                    value={newKind}
+                    onChange={(e) => setNewKind(e.target.value as FollowupKind)}
+                    className={inputCls}
+                  >
+                    {FOLLOWUP_KINDS.map((k) => (
+                      <option key={k.value} value={k.value}>
+                        {k.icon} {k.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="mb-2.5">
+                <Label>Descrição do contato</Label>
+                <textarea
+                  rows={2}
+                  value={newDesc}
+                  onChange={(e) => setNewDesc(e.target.value)}
+                  placeholder="Ex: Maria atendeu, pediu 7 dias úteis. Vai retornar até sexta."
+                  className={`${inputCls} resize-none`}
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={handleAddFollowup}
+                  disabled={addingFollowup || !newDesc.trim()}
+                  className="px-3.5 py-1.5 text-[11.5px] font-semibold bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-1.5"
+                >
+                  {addingFollowup ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <span>+</span>
+                  )}
+                  Adicionar contato
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════
+              4. CÓDIGO DE RASTREIO (correios/sedex/motoboy)
+             ═══════════════════════════════════════════════════════ */}
           <div>
-            <Label>Código de rastreio (correios, sedex, motoboy)</Label>
+            <Label>Código de rastreio (Correios, Sedex, motoboy)</Label>
             <input
               type="text"
               value={trackingCode}
               onChange={(e) => setTrackingCode(e.target.value)}
               placeholder="ex: BR123456789BR"
               disabled={readOnly}
-              className={inputCls}
+              className={`${inputCls} font-mono`}
             />
-          </div>
-
-          <div>
-            <Label>Notas de follow-up</Label>
-            <textarea
-              rows={6}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder={
-                "Registre aqui os contatos feitos com o cartório:\n\n" +
-                "26/05 - Ligação atendida por Maria. Pediu 7 dias úteis.\n" +
-                "02/06 - WhatsApp confirmou que o documento foi assinado e está aguardando postagem.\n" +
-                "..."
-              }
-              disabled={readOnly}
-              className={`${inputCls} resize-none`}
-            />
+            <div className="text-[10.5px] text-white/40 mt-1 italic">
+              Opcional. Use só quando a entrega é por transportadora física.
+            </div>
           </div>
         </div>
       )}
@@ -1187,9 +1557,72 @@ export function EditorAguardarRetorno({
   )
 }
 
+function SummaryField({
+  label,
+  value,
+  mono,
+}: {
+  label: string
+  value: string | null | undefined
+  mono?: boolean
+}) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+        {label}
+      </div>
+      <div
+        className={`text-[12px] ${mono ? "font-mono" : ""} ${
+          value ? "text-white/90" : "text-white/30 italic"
+        }`}
+      >
+        {value || "—"}
+      </div>
+    </div>
+  )
+}
+
 // ============================================================
 // ETAPA 4: RECEBER CERTIDÃO
 // ============================================================
+
+// ============================================================
+// ETAPA 4: RECEBER CERTIDÃO (upload + tipo de mídia)
+// ============================================================
+//
+// Inspirado no openReceiveCertificateModal do HTML do Marco:
+//   - Upload obrigatório do PDF/imagem (já implementado via FileUploadField)
+//   - Tipo de mídia: Físico (papel) / Digital (eletrônico) / Ambos
+//   - Localização física: aparece SÓ se mídia = Físico ou Ambos
+//   - Observação do recebimento
+
+type DocumentMedium = "fisico" | "digital" | "ambos"
+
+const MEDIUM_OPTIONS: {
+  value: DocumentMedium
+  icon: string
+  label: string
+  desc: string
+}[] = [
+  {
+    value: "fisico",
+    icon: "📄",
+    label: "Físico (papel original)",
+    desc: "Recebido por correio ou balcão · precisa ser guardado e digitalizado",
+  },
+  {
+    value: "digital",
+    icon: "💻",
+    label: "Digital (PDF eletrônico)",
+    desc: "Certidão eletrônica com assinatura digital · não há papel",
+  },
+  {
+    value: "ambos",
+    icon: "📄💻",
+    label: "Ambos",
+    desc: "Recebido em papel + também há versão eletrônica",
+  },
+]
 
 export function EditorReceberCertidao({
   documentoId,
@@ -1201,6 +1634,10 @@ export function EditorReceberCertidao({
 }: StepEditorBaseProps) {
   const [arquivoUrl, setArquivoUrl] = useState("")
   const [arquivoNome, setArquivoNome] = useState("")
+  const [arquivoTamanho, setArquivoTamanho] = useState<number | null>(null)
+  const [arquivoMime, setArquivoMime] = useState<string | null>(null)
+  const [medium, setMedium] = useState<DocumentMedium | null>(null)
+  const [physicalLocation, setPhysicalLocation] = useState("")
   const [observacao, setObservacao] = useState("")
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -1208,47 +1645,76 @@ export function EditorReceberCertidao({
   const readOnly = stepStatus === "concluida"
 
   const carregar = useCallback(async () => {
-    if (!documentoId || !isOpen) return
+    if (!documentoId || !stepId || !isOpen) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/documentos/${documentoId}`, { headers: authHeader() })
-      if (res.ok) {
-        const d = await res.json()
+      const [resDoc, resWf] = await Promise.all([
+        fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
+        fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
+      ])
+      if (resDoc.ok) {
+        const d = await resDoc.json()
         setArquivoUrl(d.arquivo_url || "")
         setArquivoNome(d.arquivo_nome || "")
+        setArquivoTamanho(d.arquivo_tamanho ?? null)
+        setArquivoMime(d.arquivo_mime_type ?? null)
+        setPhysicalLocation(d.localizacao_fisica || "")
+      }
+      if (resWf.ok) {
+        const d = await resWf.json()
+        const step = d.workflow?.steps?.find((s: { id: number }) => s.id === stepId)
+        if (step) {
+          setMedium((step.documentMedium as DocumentMedium) || null)
+          if (step.physicalLocation) setPhysicalLocation(step.physicalLocation)
+          if (step.stepObservation) setObservacao(step.stepObservation)
+        }
       }
     } catch (e) {
       console.warn("[EditorReceberCertidao]", e)
     } finally {
       setLoading(false)
     }
-  }, [documentoId, isOpen])
+  }, [documentoId, stepId, isOpen])
 
   useEffect(() => {
     if (isOpen) carregar()
   }, [isOpen, carregar])
 
-  const podeConcluir = arquivoUrl.trim().length > 0
+  const showPhysicalLocation = medium === "fisico" || medium === "ambos"
+  const podeConcluir =
+    arquivoUrl.trim().length > 0 &&
+    medium !== null
 
   const handleSalvar = async () => {
     if (readOnly) return
-    if (!podeConcluir) {
-      alert("Cole o link do arquivo recebido antes de concluir.")
+    if (!arquivoUrl.trim()) {
+      alert("Anexe o arquivo recebido antes de concluir.")
+      return
+    }
+    if (!medium) {
+      alert("Marque se o documento é físico, digital ou ambos.")
       return
     }
     setSaving(true)
     try {
+      // 1. Persiste no documento
       const okDoc = await putDocumento(documentoId, {
         arquivo_url: arquivoUrl.trim(),
         arquivo_nome: arquivoNome.trim() || "certidao.pdf",
+        arquivo_tamanho: arquivoTamanho,
+        arquivo_mime_type: arquivoMime,
+        localizacao_fisica: showPhysicalLocation ? (physicalLocation.trim() || null) : null,
         status: "RECEBIDO",
       })
       if (!okDoc) throw new Error("PUT doc falhou")
 
+      // 2. Persiste no step + conclui
       const okStep = await patchStep(documentoId, stepId, {
         status: "concluida",
         completedById: getUserId(),
-        notes: observacao.trim() || null,
+        documentMedium: medium,
+        physicalLocation: showPhysicalLocation ? (physicalLocation.trim() || null) : null,
+        stepObservation: observacao.trim() || null,
       })
       if (!okStep) console.warn("[EditorReceberCertidao] step não concluiu")
 
@@ -1267,7 +1733,7 @@ export function EditorReceberCertidao({
       isOpen={isOpen}
       onClose={onClose}
       title="Receber certidão"
-      subtitle="Anexe o arquivo (PDF) recebido do cartório."
+      subtitle="Anexe o arquivo recebido do cartório e marque se é físico, digital ou ambos."
       footer={
         <div className="flex items-center justify-end gap-3">
           <button
@@ -1283,7 +1749,7 @@ export function EditorReceberCertidao({
             className="px-5 py-2 text-[12.5px] font-semibold bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-            Marcar como recebido · concluir etapa
+            Confirmar recebimento · concluir etapa
           </button>
         </div>
       }
@@ -1295,49 +1761,128 @@ export function EditorReceberCertidao({
           <Loader2 className="w-5 h-5 animate-spin text-white/50" />
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/10">
-            <div className="text-[12px] font-semibold text-amber-300 mb-1 flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              Upload via interface — próxima rodada
-            </div>
-            <div className="text-[11px] text-white/75 leading-relaxed">
-              Por enquanto, faça o upload do PDF no Google Drive / Dropbox e cole o link
-              abaixo. Em uma próxima rodada vou plugar upload direto na interface.
-            </div>
-          </div>
-
+        <div className="space-y-5">
+          {/* ═══════════════════════════════════════════════════════
+              1. ANEXO DA CERTIDÃO
+             ═══════════════════════════════════════════════════════ */}
           <div>
-            <Label required>Link do arquivo</Label>
-            <input
-              type="text"
+            <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-2">
+              1. Anexo da certidão
+            </div>
+            <FileUploadField
+              label="Arquivo da certidão"
+              required
+              invalid={!arquivoUrl.trim()}
               value={arquivoUrl}
-              onChange={(e) => setArquivoUrl(e.target.value)}
-              placeholder="https://drive.google.com/..."
+              onChange={(url, meta) => {
+                setArquivoUrl(url)
+                if (meta) {
+                  setArquivoNome(meta.name)
+                  setArquivoTamanho(meta.size)
+                  setArquivoMime(meta.type)
+                } else if (!url) {
+                  setArquivoNome("")
+                  setArquivoTamanho(null)
+                  setArquivoMime(null)
+                }
+              }}
               disabled={readOnly}
-              className={arquivoUrl.trim() ? inputCls : inputClsInvalid}
+              prefix={`documentos/${documentoId}/certidao`}
             />
           </div>
 
+          {/* ═══════════════════════════════════════════════════════
+              2. TIPO DE MÍDIA (obrigatório)
+             ═══════════════════════════════════════════════════════ */}
           <div>
-            <Label>Nome do arquivo</Label>
-            <input
-              type="text"
-              value={arquivoNome}
-              onChange={(e) => setArquivoNome(e.target.value)}
-              placeholder="ex: nasc-raphael-alba.pdf"
-              disabled={readOnly}
-              className={inputCls}
-            />
+            <div className="flex items-center gap-1.5 mb-2">
+              <div className="text-[10px] uppercase font-bold tracking-wider text-white/45">
+                2. Tipo de mídia
+              </div>
+              <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                obrigatório
+              </span>
+            </div>
+            <div className="text-[11px] text-white/55 mb-2 leading-snug">
+              Marque se a certidão recebida é física (papel original) ou digital (arquivo eletrônico com assinatura).
+            </div>
+            <div className="grid gap-2">
+              {MEDIUM_OPTIONS.map((opt) => {
+                const ativo = medium === opt.value
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => !readOnly && setMedium(opt.value)}
+                    disabled={readOnly}
+                    className={`text-left px-3.5 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
+                      ativo
+                        ? "border-emerald-500/60 bg-emerald-500/10 ring-1 ring-emerald-500/30"
+                        : "border-white/10 bg-white/5 hover:bg-white/10"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                          ativo
+                            ? "border-emerald-400 bg-emerald-500"
+                            : "border-white/30 bg-transparent"
+                        }`}
+                      >
+                        {ativo && (
+                          <div className="w-2 h-2 rounded-full bg-white" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div
+                          className={`text-[12.5px] font-semibold flex items-center gap-1.5 ${
+                            ativo ? "text-emerald-100" : "text-white/85"
+                          }`}
+                        >
+                          <span>{opt.icon}</span>
+                          <span>{opt.label}</span>
+                        </div>
+                        <div className="text-[10.5px] text-white/55 mt-0.5 leading-snug">
+                          {opt.desc}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
+          {/* ═══════════════════════════════════════════════════════
+              3. LOCALIZAÇÃO FÍSICA (condicional)
+             ═══════════════════════════════════════════════════════ */}
+          {showPhysicalLocation && (
+            <div className="p-3 rounded-lg border border-amber-500/25 bg-amber-500/5">
+              <Label>📍 Localização física do papel</Label>
+              <input
+                type="text"
+                value={physicalLocation}
+                onChange={(e) => setPhysicalLocation(e.target.value)}
+                placeholder="ex: Pasta 23 · Arquivo Discovery · prateleira 4"
+                disabled={readOnly}
+                className={inputCls}
+              />
+              <div className="text-[10.5px] text-white/55 mt-1.5 italic leading-snug">
+                Onde o documento físico está guardado fisicamente no escritório? Essencial pra recuperação futura.
+              </div>
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════
+              4. OBSERVAÇÃO
+             ═══════════════════════════════════════════════════════ */}
           <div>
-            <Label>Observações do recebimento</Label>
+            <Label>Observação do recebimento</Label>
             <textarea
               rows={3}
               value={observacao}
               onChange={(e) => setObservacao(e.target.value)}
-              placeholder="Recebido por correios em 28/05/2026, sem avarias."
+              placeholder="Recebido por correios em 28/05/2026, sem avarias..."
               disabled={readOnly}
               className={`${inputCls} resize-none`}
             />
@@ -1349,10 +1894,23 @@ export function EditorReceberCertidao({
 }
 
 // ============================================================
-// ETAPA 5: CONFERIR CERTIDÃO (checklist operacional)
+// ETAPA 5: CONFERIR CERTIDÃO (dados literais + checklist + resultado)
 // ============================================================
+//
+// Inspirado no openReviewCertificateModal do HTML do Marco:
+//   1. Dados literais: nome do titular, pai, mãe, cônjuge, datas
+//      "exatamente como aparecem na certidão" (vs o que está na árvore)
+//   2. Hint de referência: mostra os nomes da árvore pro operador comparar
+//   3. Checklist operacional: legibilidade, integridade, dados mínimos,
+//      apostila Haia (se exigida), tradução juramentada (se exigida)
+//   4. Resultado: Aprovado / Divergente / Nova via
+//   5. Observação livre
+//
+// Os dados literais ficam no Documento (campos nome_registrado, pai_registrado,
+// mae_registrada, conjuge_registrado, data_evento_documento, data_registro_documento).
+// O checklist + observação ficam no WorkflowStep (reviewChecklist, stepObservation).
 
-interface ChecklistState {
+interface ReviewChecklist {
   legivel: boolean
   integro: boolean
   dados_minimos: boolean
@@ -1360,35 +1918,55 @@ interface ChecklistState {
   traducao_ok: boolean
 }
 
-type ConferirResultado = "aprovado" | "reprovado" | "requer_retificacao"
-
-const CHECKLIST_ITEMS: Array<{ id: keyof ChecklistState; label: string; descricao: string }> = [
+const CHECKLIST_ITEMS: Array<{
+  id: keyof ReviewChecklist
+  label: string
+  desc: string
+}> = [
   {
     id: "legivel",
-    label: "Documento legível",
-    descricao: "Texto claro, sem manchas, riscos ou áreas borradas.",
+    label: "Legibilidade",
+    desc: "Texto claro, sem rasuras, manchas ou áreas borradas.",
   },
   {
     id: "integro",
-    label: "Arquivo íntegro",
-    descricao: "PDF abre normalmente, sem corrupção. Todas as páginas presentes.",
+    label: "Integridade do documento",
+    desc: "Sem páginas faltando, sem cortes. PDF abre sem corrupção.",
   },
   {
     id: "dados_minimos",
-    label: "Dados registrais mínimos presentes",
-    descricao: "Nome, data do evento, cartório e referência (livro/folha/termo) visíveis.",
+    label: "Dados mínimos presentes",
+    desc: "Nome, data, cartório, livro/folha/termo visíveis.",
   },
   {
     id: "apostila_ok",
     label: "Apostila de Haia (se exigida)",
-    descricao: "Caso o destino exija apostila, ela está presente e legível. Marque também quando NÃO for exigida.",
+    desc: "Caso o destino exija apostila, ela está presente e legível. Marque também se NÃO for exigida.",
   },
   {
     id: "traducao_ok",
-    label: "Tradução (se exigida)",
-    descricao: "Caso o destino exija tradução juramentada, ela está presente. Marque também quando NÃO for exigida.",
+    label: "Tradução juramentada (se exigida)",
+    desc: "Caso o destino exija tradução, ela está presente. Marque também se NÃO for exigida.",
   },
 ]
+
+type ConferirResultado = "aprovado" | "divergente" | "nova_via"
+
+interface PessoaSummary {
+  nome: string | null
+  sobrenome: string | null
+  pai: { nome: string | null; sobrenome: string | null } | null
+  mae: { nome: string | null; sobrenome: string | null } | null
+}
+
+const isCasamento = (tipo: string | null | undefined): boolean => {
+  return !!tipo && tipo.includes("CASAMENTO")
+}
+
+function fullName(p: { nome: string | null; sobrenome: string | null } | null): string {
+  if (!p) return ""
+  return `${p.nome || ""} ${p.sobrenome || ""}`.trim()
+}
 
 export function EditorConferirCertidao({
   documentoId,
@@ -1398,80 +1976,145 @@ export function EditorConferirCertidao({
   onClose,
   onSaved,
 }: StepEditorBaseProps) {
-  const [checklist, setChecklist] = useState<ChecklistState>({
-    legivel: false,
-    integro: false,
-    dados_minimos: false,
+  // Dados literais (do documento)
+  const [nomeRegistrado, setNomeRegistrado] = useState("")
+  const [paiRegistrado, setPaiRegistrado] = useState("")
+  const [maeRegistrada, setMaeRegistrada] = useState("")
+  const [conjugeRegistrado, setConjugeRegistrado] = useState("")
+  const [dataEventoDoc, setDataEventoDoc] = useState("")
+  const [dataRegistroDoc, setDataRegistroDoc] = useState("")
+
+  // Contexto
+  const [docTipo, setDocTipo] = useState<string | null>(null)
+  const [arquivoUrl, setArquivoUrl] = useState<string | null>(null)
+  const [arquivoNome, setArquivoNome] = useState<string | null>(null)
+  const [pessoa, setPessoa] = useState<PessoaSummary | null>(null)
+
+  // Checklist + resultado
+  const [checklist, setChecklist] = useState<ReviewChecklist>({
+    legivel: true,
+    integro: true,
+    dados_minimos: true,
     apostila_ok: false,
     traducao_ok: false,
   })
   const [resultado, setResultado] = useState<ConferirResultado | null>(null)
-  const [justificativa, setJustificativa] = useState("")
+  const [observacao, setObservacao] = useState("")
+
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const readOnly = stepStatus === "concluida"
 
-  // Reset ao abrir
-  useEffect(() => {
-    if (isOpen) {
-      setChecklist({
-        legivel: false,
-        integro: false,
-        dados_minimos: false,
-        apostila_ok: false,
-        traducao_ok: false,
-      })
-      setResultado(null)
-      setJustificativa("")
+  const carregar = useCallback(async () => {
+    if (!documentoId || !stepId || !isOpen) return
+    setLoading(true)
+    try {
+      const [resDoc, resWf] = await Promise.all([
+        fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
+        fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
+      ])
+
+      if (resDoc.ok) {
+        const d = await resDoc.json()
+        setDocTipo(d.tipo || null)
+        setArquivoUrl(d.arquivo_url || null)
+        setArquivoNome(d.arquivo_nome || null)
+        setNomeRegistrado(d.nome_registrado || "")
+        setPaiRegistrado(d.pai_registrado || "")
+        setMaeRegistrada(d.mae_registrada || "")
+        setConjugeRegistrado(d.conjuge_registrado || "")
+        setDataEventoDoc(
+          d.data_evento_documento ? d.data_evento_documento.slice(0, 10) : "",
+        )
+        setDataRegistroDoc(
+          d.data_registro_documento ? d.data_registro_documento.slice(0, 10) : "",
+        )
+        if (d.pessoa) {
+          setPessoa({
+            nome: d.pessoa.nome || null,
+            sobrenome: d.pessoa.sobrenome || null,
+            pai: d.pessoa.pai
+              ? { nome: d.pessoa.pai.nome, sobrenome: d.pessoa.pai.sobrenome }
+              : null,
+            mae: d.pessoa.mae
+              ? { nome: d.pessoa.mae.nome, sobrenome: d.pessoa.mae.sobrenome }
+              : null,
+          })
+        }
+      }
+      if (resWf.ok) {
+        const d = await resWf.json()
+        const step = d.workflow?.steps?.find((s: { id: number }) => s.id === stepId)
+        if (step) {
+          if (step.reviewChecklist) {
+            setChecklist({
+              legivel: !!step.reviewChecklist.legivel,
+              integro: !!step.reviewChecklist.integro,
+              dados_minimos: !!step.reviewChecklist.dados_minimos,
+              apostila_ok: !!step.reviewChecklist.apostila_ok,
+              traducao_ok: !!step.reviewChecklist.traducao_ok,
+            })
+          }
+          if (step.reviewResult) {
+            setResultado(step.reviewResult as ConferirResultado)
+          }
+          if (step.stepObservation) {
+            setObservacao(step.stepObservation)
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[EditorConferirCertidao]", e)
+    } finally {
+      setLoading(false)
     }
-  }, [isOpen])
+  }, [documentoId, stepId, isOpen])
 
-  const todosChecks = Object.values(checklist).every(Boolean)
-  const algumCheckFalhou = !todosChecks
-
-  // Auto-resultado baseado nos checks (mas usuário pode override)
   useEffect(() => {
-    if (resultado !== null) return // não sobrescreve escolha manual
-    if (todosChecks) setResultado("aprovado")
-  }, [todosChecks, resultado])
+    if (isOpen) carregar()
+  }, [isOpen, carregar])
 
-  const precisaJustificativa =
-    resultado === "reprovado" || resultado === "requer_retificacao"
-  const podeConcluir =
-    resultado !== null && (!precisaJustificativa || justificativa.trim().length > 0)
+  const ehCasamento = isCasamento(docTipo)
+  const podeConcluir = nomeRegistrado.trim().length > 0 && resultado !== null
 
   const handleSalvar = async () => {
     if (readOnly) return
-    if (!podeConcluir) {
-      alert("Escolha o resultado da conferência (e justifique, se for reprovação/retificação).")
+    if (!nomeRegistrado.trim()) {
+      alert("O nome do titular como aparece no documento é obrigatório.")
       return
     }
+    if (!resultado) {
+      alert("Escolha o resultado da conferência.")
+      return
+    }
+
     setSaving(true)
     try {
-      // Status do doc conforme resultado
+      // 1. Persiste dados literais no documento + status
       let docStatus: string | null = null
       if (resultado === "aprovado") docStatus = "RECEBIDO"
-      else if (resultado === "reprovado") docStatus = "INVALIDO"
-      else if (resultado === "requer_retificacao") docStatus = "RETIFICANDO"
+      else if (resultado === "divergente") docStatus = "RETIFICANDO"
+      else if (resultado === "nova_via") docStatus = "SOLICITAR"
 
-      if (docStatus) {
-        await putDocumento(documentoId, { status: docStatus })
-      }
+      const okDoc = await putDocumento(documentoId, {
+        nome_registrado: nomeRegistrado.trim() || null,
+        pai_registrado: paiRegistrado.trim() || null,
+        mae_registrada: maeRegistrada.trim() || null,
+        conjuge_registrado: ehCasamento ? (conjugeRegistrado.trim() || null) : null,
+        data_evento_documento: dataEventoDoc || null,
+        data_registro_documento: dataRegistroDoc || null,
+        ...(docStatus ? { status: docStatus } : {}),
+      })
+      if (!okDoc) throw new Error("PUT doc falhou")
 
-      // Serializa o checklist nas notes pra rastreabilidade
-      const checklistTxt = CHECKLIST_ITEMS.map(
-        (item) => `${checklist[item.id] ? "✓" : "✗"} ${item.label}`,
-      ).join("\n")
-      const fullNotes =
-        `[Conferência] ${resultado.toUpperCase()}\n\n` +
-        checklistTxt +
-        (justificativa.trim() ? `\n\nJustificativa:\n${justificativa.trim()}` : "")
-
+      // 2. Persiste checklist + resultado no step + conclui
       const okStep = await patchStep(documentoId, stepId, {
         status: "concluida",
         completedById: getUserId(),
         reviewResult: resultado,
-        notes: fullNotes,
+        reviewChecklist: checklist,
+        stepObservation: observacao.trim() || null,
       })
       if (!okStep) console.warn("[EditorConferirCertidao] step não concluiu")
 
@@ -1485,12 +2128,20 @@ export function EditorConferirCertidao({
     }
   }
 
+  const treeRef = pessoa ? (
+    <>
+      <span className="font-semibold text-white/90">{fullName(pessoa)}</span>
+      {pessoa.pai && <span> · pai: <span className="text-white/80">{fullName(pessoa.pai)}</span></span>}
+      {pessoa.mae && <span> · mãe: <span className="text-white/80">{fullName(pessoa.mae)}</span></span>}
+    </>
+  ) : null
+
   return (
     <EditorShell
       isOpen={isOpen}
       onClose={onClose}
       title="Conferir certidão"
-      subtitle="Inspeção operacional. Não é decisão jurídica — apenas checagem de integridade e dados mínimos."
+      subtitle="Capture os dados literais do documento e marque o resultado da inspeção operacional."
       footer={
         <div className="flex items-center justify-end gap-3">
           <button
@@ -1506,10 +2157,10 @@ export function EditorConferirCertidao({
             className={`px-5 py-2 text-[12.5px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2 ${
               resultado === "aprovado"
                 ? "bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-900"
-                : resultado === "reprovado"
-                ? "bg-red-500 hover:bg-red-600 disabled:bg-red-900"
-                : resultado === "requer_retificacao"
+                : resultado === "divergente"
                 ? "bg-amber-500 hover:bg-amber-600 disabled:bg-amber-900"
+                : resultado === "nova_via"
+                ? "bg-rose-500 hover:bg-rose-600 disabled:bg-rose-900"
                 : "bg-slate-500 disabled:bg-slate-700"
             }`}
           >
@@ -1521,102 +2172,239 @@ export function EditorConferirCertidao({
     >
       <ReadOnlyBanner stepStatus={stepStatus} />
 
-      <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-2">
-        1. Checklist operacional
-      </div>
-      <div className="space-y-2 mb-5">
-        {CHECKLIST_ITEMS.map((item) => {
-          const isChecked = checklist[item.id]
-          return (
-            <button
-              key={item.id}
-              onClick={() =>
-                !readOnly && setChecklist({ ...checklist, [item.id]: !isChecked })
-              }
-              disabled={readOnly}
-              className={`w-full text-left px-3 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
-                isChecked
-                  ? "border-emerald-500/40 bg-emerald-500/10"
-                  : "border-white/10 bg-white/5 hover:bg-white/10"
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div
-                  className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                    isChecked
-                      ? "border-emerald-400 bg-emerald-500"
-                      : "border-white/30 bg-transparent"
-                  }`}
-                >
-                  {isChecked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className={`text-[12.5px] font-semibold ${isChecked ? "text-emerald-200" : "text-white/80"}`}>
-                    {item.label}
-                  </div>
-                  <div className="text-[10.5px] text-white/55 mt-0.5 leading-snug">
-                    {item.descricao}
-                  </div>
-                </div>
-              </div>
-            </button>
-          )
-        })}
-      </div>
-
-      <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-2">
-        2. Resultado da conferência
-      </div>
-
-      {algumCheckFalhou && (
-        <div className="mb-3 p-2.5 rounded-md border border-amber-500/30 bg-amber-500/10 text-[11px] text-amber-200">
-          Nem todos os itens foram marcados. Você pode aprovar mesmo assim se for legítimo,
-          mas considere se vale a pena reprovar ou pedir retificação.
+      {loading ? (
+        <div className="py-12 flex justify-center">
+          <Loader2 className="w-5 h-5 animate-spin text-white/50" />
         </div>
-      )}
+      ) : (
+        <div className="space-y-5">
+          {/* Anexo da certidão (link) */}
+          {arquivoUrl && (
+            <div className="px-3 py-2 rounded-md border border-blue-500/25 bg-blue-500/5 flex items-center gap-2">
+              <FileCheck className="w-3.5 h-3.5 text-blue-300 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] text-white/70">Anexo recebido</div>
+                <a
+                  href={arquivoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[12px] text-blue-300 hover:text-blue-200 hover:underline inline-flex items-center gap-1"
+                >
+                  {arquivoNome || "Abrir arquivo"}
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              </div>
+            </div>
+          )}
 
-      <div className="grid grid-cols-3 gap-2 mb-3">
-        <ResultadoBtn
-          ativo={resultado === "aprovado"}
-          onClick={() => !readOnly && setResultado("aprovado")}
-          cor="emerald"
-          icon={<Check className="w-4 h-4" />}
-          label="Aprovar"
-          desc="doc fica como Recebido"
-        />
-        <ResultadoBtn
-          ativo={resultado === "requer_retificacao"}
-          onClick={() => !readOnly && setResultado("requer_retificacao")}
-          cor="amber"
-          icon={<AlertTriangle className="w-4 h-4" />}
-          label="Pedir retificação"
-          desc="doc vira Retificando"
-        />
-        <ResultadoBtn
-          ativo={resultado === "reprovado"}
-          onClick={() => !readOnly && setResultado("reprovado")}
-          cor="red"
-          icon={<XCircle className="w-4 h-4" />}
-          label="Reprovar"
-          desc="doc vira Inválido"
-        />
-      </div>
+          {/* ═══════════════════════════════════════════════════════
+              1. DADOS LITERAIS DO DOCUMENTO
+             ═══════════════════════════════════════════════════════ */}
+          <div>
+            <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-1.5">
+              1. Dados literais do documento
+            </div>
+            <div className="text-[11px] text-white/55 leading-snug mb-2">
+              Digite <strong>EXATAMENTE</strong> como aparece na certidão. Divergências
+              de nomes com a árvore vão ser detectadas e tratadas no fluxo de validação jurídica.
+            </div>
 
-      {precisaJustificativa && (
-        <div>
-          <Label required>Justificativa</Label>
-          <textarea
-            rows={3}
-            value={justificativa}
-            onChange={(e) => setJustificativa(e.target.value)}
-            placeholder={
-              resultado === "reprovado"
-                ? "Por que esse documento não serve? (ex: nome com erro grave, livro/folha ilegíveis...)"
-                : "O que precisa ser retificado? (ex: data de nascimento divergente da árvore, sobrenome materno errado...)"
-            }
-            disabled={readOnly}
-            className={`${justificativa.trim() ? inputCls : inputClsInvalid} resize-none`}
-          />
+            {/* Hint árvore */}
+            {treeRef && (
+              <div className="px-3 py-2 rounded-md bg-indigo-500/8 border border-indigo-500/20 mb-3">
+                <div className="text-[10px] uppercase font-semibold tracking-wider text-indigo-300 mb-1">
+                  Nomes na árvore (referência)
+                </div>
+                <div className="text-[11.5px] text-white/75 leading-snug">{treeRef}</div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <Label required>Nome do titular (como aparece no documento)</Label>
+                <input
+                  type="text"
+                  value={nomeRegistrado}
+                  onChange={(e) => setNomeRegistrado(e.target.value)}
+                  placeholder={fullName(pessoa) || "Ex: João Silva da Costa"}
+                  disabled={readOnly}
+                  className={nomeRegistrado.trim() ? inputCls : inputClsInvalid}
+                />
+              </div>
+
+              <div>
+                <Label>Pai (como aparece no documento)</Label>
+                <input
+                  type="text"
+                  value={paiRegistrado}
+                  onChange={(e) => setPaiRegistrado(e.target.value)}
+                  placeholder={fullName(pessoa?.pai ?? null) || "—"}
+                  disabled={readOnly}
+                  className={inputCls}
+                />
+              </div>
+
+              <div>
+                <Label>Mãe (como aparece no documento)</Label>
+                <input
+                  type="text"
+                  value={maeRegistrada}
+                  onChange={(e) => setMaeRegistrada(e.target.value)}
+                  placeholder={fullName(pessoa?.mae ?? null) || "—"}
+                  disabled={readOnly}
+                  className={inputCls}
+                />
+              </div>
+
+              {ehCasamento && (
+                <div className="col-span-2">
+                  <Label>Cônjuge (como aparece no documento)</Label>
+                  <input
+                    type="text"
+                    value={conjugeRegistrado}
+                    onChange={(e) => setConjugeRegistrado(e.target.value)}
+                    placeholder="Nome do cônjuge na certidão de casamento"
+                    disabled={readOnly}
+                    className={inputCls}
+                  />
+                </div>
+              )}
+
+              <div>
+                <Label>Data do evento (do documento)</Label>
+                <input
+                  type="date"
+                  value={dataEventoDoc}
+                  onChange={(e) => setDataEventoDoc(e.target.value)}
+                  disabled={readOnly}
+                  className={inputCls}
+                />
+              </div>
+
+              <div>
+                <Label>Data do registro (do documento)</Label>
+                <input
+                  type="date"
+                  value={dataRegistroDoc}
+                  onChange={(e) => setDataRegistroDoc(e.target.value)}
+                  disabled={readOnly}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ═══════════════════════════════════════════════════════
+              2. CHECKLIST OPERACIONAL
+             ═══════════════════════════════════════════════════════ */}
+          <div>
+            <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-1.5">
+              2. Checklist de inspeção
+            </div>
+            <div className="text-[11px] text-white/55 leading-snug mb-2">
+              Marque cada item conforme a inspeção do documento.
+            </div>
+            <div className="space-y-2">
+              {CHECKLIST_ITEMS.map((item) => {
+                const isChecked = checklist[item.id]
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() =>
+                      !readOnly && setChecklist({ ...checklist, [item.id]: !isChecked })
+                    }
+                    disabled={readOnly}
+                    className={`w-full text-left px-3 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
+                      isChecked
+                        ? "border-emerald-500/40 bg-emerald-500/10"
+                        : "border-white/10 bg-white/5 hover:bg-white/10"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                          isChecked
+                            ? "border-emerald-400 bg-emerald-500"
+                            : "border-white/30 bg-transparent"
+                        }`}
+                      >
+                        {isChecked && (
+                          <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div
+                          className={`text-[12.5px] font-semibold ${
+                            isChecked ? "text-emerald-100" : "text-white/85"
+                          }`}
+                        >
+                          {item.label}
+                        </div>
+                        <div className="text-[10.5px] text-white/55 mt-0.5 leading-snug">
+                          {item.desc}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* ═══════════════════════════════════════════════════════
+              3. RESULTADO DA CONFERÊNCIA
+             ═══════════════════════════════════════════════════════ */}
+          <div>
+            <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-1.5">
+              3. Resultado da conferência
+            </div>
+            <div className="text-[11px] text-white/55 leading-snug mb-2">
+              Se aprovado, o documento segue para validação jurídica final. Se divergente
+              ou nova via, o fluxo é redirecionado conforme a decisão.
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <ResultadoBtn
+                ativo={resultado === "aprovado"}
+                onClick={() => !readOnly && setResultado("aprovado")}
+                cor="emerald"
+                icon={<Check className="w-4 h-4" />}
+                label="Aprovar"
+                desc="libera para Validar"
+              />
+              <ResultadoBtn
+                ativo={resultado === "divergente"}
+                onClick={() => !readOnly && setResultado("divergente")}
+                cor="amber"
+                icon={<AlertTriangle className="w-4 h-4" />}
+                label="Divergente"
+                desc="vai para Retificação"
+              />
+              <ResultadoBtn
+                ativo={resultado === "nova_via"}
+                onClick={() => !readOnly && setResultado("nova_via")}
+                cor="red"
+                icon={<XCircle className="w-4 h-4" />}
+                label="Nova via"
+                desc="pede novo ao cartório"
+              />
+            </div>
+          </div>
+
+          {/* ═══════════════════════════════════════════════════════
+              4. OBSERVAÇÃO
+             ═══════════════════════════════════════════════════════ */}
+          <div>
+            <Label>Observação da conferência</Label>
+            <textarea
+              rows={3}
+              value={observacao}
+              onChange={(e) => setObservacao(e.target.value)}
+              placeholder="Anotações da inspeção, ressalvas, divergências menores observadas..."
+              disabled={readOnly}
+              className={`${inputCls} resize-none`}
+            />
+          </div>
         </div>
       )}
     </EditorShell>
@@ -1671,8 +2459,58 @@ function ResultadoBtn({
 // ============================================================
 // ETAPA 6: VALIDAR CERTIDÃO (decisão jurídica final)
 // ============================================================
+//
+// Inspirado no openValidateCertificateModal do HTML do Marco:
+//   1. Banner Contexto: documento + resultado da conferência + observação anterior
+//   2. Decisão: Aprovado / Aprovado com ressalvas / Nova via / Rejeitado
+//   3. Parecer jurídico (obrigatório quando decisão ≠ Aprovado puro)
+//   4. Efeito no status do Documento (RECEBIDO / SOLICITAR / INVALIDO)
 
-type ValidarResultado = "validado" | "invalido" | "divergente"
+type ValidarDecisao = "aprovado" | "aprovado_ressalvas" | "nova_via" | "rejeitado"
+
+const DECISAO_OPTIONS: {
+  value: ValidarDecisao
+  icon: React.ReactNode
+  label: string
+  desc: string
+  cor: "emerald" | "blue" | "amber" | "red"
+}[] = [
+  {
+    value: "aprovado",
+    icon: <Check className="w-4 h-4" />,
+    label: "Aprovado",
+    desc: "Documento serve · status RECEBIDO · workflow finaliza",
+    cor: "emerald",
+  },
+  {
+    value: "aprovado_ressalvas",
+    icon: <AlertCircle className="w-4 h-4" />,
+    label: "Aprovado com ressalvas",
+    desc: "Usável mas com observações · status RECEBIDO · divergências ficam registradas",
+    cor: "blue",
+  },
+  {
+    value: "nova_via",
+    icon: <Send className="w-4 h-4" />,
+    label: "Solicitar nova via",
+    desc: "Pedir novo documento ao cartório · status SOLICITAR · workflow volta",
+    cor: "amber",
+  },
+  {
+    value: "rejeitado",
+    icon: <XCircle className="w-4 h-4" />,
+    label: "Rejeitado · retificação",
+    desc: "Documento inadequado · status INVALIDO · workflow pausa pra análise",
+    cor: "red",
+  },
+]
+
+interface ConferenciaSnapshot {
+  resultado: string | null
+  observacao: string | null
+  completedBy: string | null
+  completedAt: string | null
+}
 
 export function EditorValidarCertidao({
   documentoId,
@@ -1682,46 +2520,119 @@ export function EditorValidarCertidao({
   onClose,
   onSaved,
 }: StepEditorBaseProps) {
-  const [resultado, setResultado] = useState<ValidarResultado | null>(null)
+  const [decisao, setDecisao] = useState<ValidarDecisao | null>(null)
   const [parecer, setParecer] = useState("")
+  const [docTipo, setDocTipo] = useState<string | null>(null)
+  const [arquivoUrl, setArquivoUrl] = useState<string | null>(null)
+  const [arquivoNome, setArquivoNome] = useState<string | null>(null)
+  const [conferencia, setConferencia] = useState<ConferenciaSnapshot | null>(null)
+  const [pessoaNome, setPessoaNome] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const readOnly = stepStatus === "concluida"
 
-  useEffect(() => {
-    if (isOpen) {
-      setResultado(null)
-      setParecer("")
-    }
-  }, [isOpen])
+  const carregar = useCallback(async () => {
+    if (!documentoId || !stepId || !isOpen) return
+    setLoading(true)
+    try {
+      const [resDoc, resWf] = await Promise.all([
+        fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
+        fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
+      ])
 
-  const podeConcluir = resultado !== null && parecer.trim().length > 0
+      if (resDoc.ok) {
+        const d = await resDoc.json()
+        setDocTipo(d.tipo || null)
+        setArquivoUrl(d.arquivo_url || null)
+        setArquivoNome(d.arquivo_nome || null)
+        if (d.pessoa) {
+          setPessoaNome(
+            `${d.pessoa.nome || ""} ${d.pessoa.sobrenome || ""}`.trim() || null,
+          )
+        }
+      }
+
+      if (resWf.ok) {
+        const d = await resWf.json()
+        const steps = d.workflow?.steps || []
+
+        // Recupera o step atual (validar)
+        const current = steps.find((s: { id: number }) => s.id === stepId)
+        if (current) {
+          if (current.validationResult) {
+            setDecisao(current.validationResult as ValidarDecisao)
+          }
+          if (current.legalOpinion) {
+            setParecer(current.legalOpinion)
+          }
+        }
+
+        // Recupera o step anterior (conferir) pra exibir como contexto
+        const conf = steps.find(
+          (s: { stepKey: string }) => s.stepKey === "conferir_certidao",
+        )
+        if (conf) {
+          setConferencia({
+            resultado: conf.reviewResult || null,
+            observacao: conf.stepObservation || null,
+            completedBy: conf.completedBy?.nome || null,
+            completedAt: conf.completedAt || null,
+          })
+        }
+      }
+    } catch (e) {
+      console.warn("[EditorValidarCertidao]", e)
+    } finally {
+      setLoading(false)
+    }
+  }, [documentoId, stepId, isOpen])
+
+  useEffect(() => {
+    if (isOpen) carregar()
+  }, [isOpen, carregar])
+
+  // Pré-seleção: se conferência aprovou, sugere aprovado puro; se divergente, sugere rejeitado
+  useEffect(() => {
+    if (decisao || !conferencia?.resultado || loading) return
+    if (conferencia.resultado === "aprovado") setDecisao("aprovado")
+    else if (conferencia.resultado === "divergente") setDecisao("rejeitado")
+    else if (conferencia.resultado === "nova_via") setDecisao("nova_via")
+  }, [conferencia, decisao, loading])
+
+  const precisaParecer = decisao !== null && decisao !== "aprovado"
+  const podeConcluir =
+    decisao !== null && (!precisaParecer || parecer.trim().length >= 5)
 
   const handleSalvar = async () => {
     if (readOnly) return
-    if (!podeConcluir) {
-      alert("Escolha a decisão jurídica e registre um parecer antes de concluir.")
+    if (!decisao) {
+      alert("Escolha a decisão jurídica.")
       return
     }
+    if (precisaParecer && parecer.trim().length < 5) {
+      alert("Parecer jurídico obrigatório quando a decisão não é 'Aprovado puro'.")
+      return
+    }
+
     setSaving(true)
     try {
-      // Status do doc conforme decisão final
+      // 1. Atualiza status do documento conforme a decisão
       let docStatus: string | null = null
-      if (resultado === "validado") docStatus = "RECEBIDO"
-      else if (resultado === "invalido") docStatus = "INVALIDO"
-      else if (resultado === "divergente") docStatus = "RETIFICANDO"
+      if (decisao === "aprovado" || decisao === "aprovado_ressalvas") docStatus = "RECEBIDO"
+      else if (decisao === "nova_via") docStatus = "SOLICITAR"
+      else if (decisao === "rejeitado") docStatus = "INVALIDO"
 
       if (docStatus) {
         await putDocumento(documentoId, { status: docStatus })
       }
 
-      const fullNotes = `[Validação jurídica] ${resultado.toUpperCase()}\n\n${parecer.trim()}`
-
+      // 2. Persiste decisão + parecer no step + conclui
       const okStep = await patchStep(documentoId, stepId, {
         status: "concluida",
         completedById: getUserId(),
-        validationResult: resultado,
-        notes: fullNotes,
+        validationResult: decisao,
+        legalOpinion: parecer.trim() || null,
       })
       if (!okStep) console.warn("[EditorValidarCertidao] step não concluiu")
 
@@ -1735,13 +2646,37 @@ export function EditorValidarCertidao({
     }
   }
 
+  const fmtDateTime = (iso: string | null) => {
+    if (!iso) return "—"
+    try {
+      const d = new Date(iso)
+      return d.toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    } catch {
+      return iso
+    }
+  }
+
+  const conferenciaLabel = (r: string | null) => {
+    if (!r) return "—"
+    if (r === "aprovado") return "✓ Aprovado pela equipe"
+    if (r === "divergente") return "⚠ Divergente"
+    if (r === "nova_via") return "↻ Nova via solicitada"
+    return r
+  }
+
   return (
     <EditorShell
       isOpen={isOpen}
       onClose={onClose}
       title="Validar certidão"
-      subtitle="Decisão jurídica final. Esta é a última etapa do workflow — ao concluir, o ciclo fecha."
-      headerGradient="linear-gradient(135deg,#312e81 0%,#1e1b4b 100%)"
+      subtitle="Decisão jurídica final. Ao confirmar, o documento muda de status e o workflow finaliza."
+      headerGradient="linear-gradient(135deg,#7c2d12 0%,#451a03 100%)"
       footer={
         <div className="flex items-center justify-end gap-3">
           <button
@@ -1755,84 +2690,442 @@ export function EditorValidarCertidao({
             onClick={handleSalvar}
             disabled={saving || readOnly || !podeConcluir}
             className={`px-5 py-2 text-[12.5px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2 ${
-              resultado === "validado"
+              decisao === "aprovado"
                 ? "bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-900"
-                : resultado === "divergente"
+                : decisao === "aprovado_ressalvas"
+                ? "bg-blue-500 hover:bg-blue-600 disabled:bg-blue-900"
+                : decisao === "nova_via"
                 ? "bg-amber-500 hover:bg-amber-600 disabled:bg-amber-900"
-                : resultado === "invalido"
+                : decisao === "rejeitado"
                 ? "bg-red-500 hover:bg-red-600 disabled:bg-red-900"
                 : "bg-slate-500 disabled:bg-slate-700"
             }`}
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Scale className="w-3.5 h-3.5" />}
-            Registrar decisão · fechar workflow
+            Confirmar decisão · finalizar etapa
           </button>
         </div>
       }
     >
       <ReadOnlyBanner stepStatus={stepStatus} />
 
-      <div className="p-3 rounded-lg border border-indigo-500/30 bg-indigo-500/10 mb-5">
-        <div className="text-[12px] font-semibold text-indigo-300 mb-1 flex items-center gap-1.5">
-          <Scale className="w-3.5 h-3.5" />
-          Decisão jurídica
+      {loading ? (
+        <div className="py-12 flex justify-center">
+          <Loader2 className="w-5 h-5 animate-spin text-white/50" />
         </div>
-        <div className="text-[11px] text-white/75 leading-relaxed">
-          A conferência operacional já foi feita na etapa anterior. Aqui é a decisão final
-          sobre se o documento serve juridicamente para o processo de cidadania.
+      ) : (
+        <div className="space-y-5">
+          {/* ═══════════════════════════════════════════════════════
+              1. CONTEXTO DA DECISÃO (read-only)
+             ═══════════════════════════════════════════════════════ */}
+          <div className="rounded-lg border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-orange-500/5 overflow-hidden">
+            <div className="px-3.5 py-2 bg-amber-500/15 border-b border-amber-500/20 flex items-center gap-2">
+              <Scale className="w-3.5 h-3.5 text-amber-200" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-100">
+                Contexto da decisão
+              </span>
+            </div>
+            <div className="p-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5 text-[12px]">
+              <div>
+                <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+                  Documento
+                </div>
+                <div className="text-[12px] text-white/90 font-medium">
+                  {docTipo || "—"}
+                </div>
+                {pessoaNome && (
+                  <div className="text-[10.5px] text-white/55 mt-0.5">{pessoaNome}</div>
+                )}
+              </div>
+              <div>
+                <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+                  Anexo
+                </div>
+                {arquivoUrl ? (
+                  <a
+                    href={arquivoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[12px] text-blue-300 hover:text-blue-200 hover:underline inline-flex items-center gap-1 truncate"
+                  >
+                    📎 {arquivoNome || "Abrir"}
+                    <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
+                  </a>
+                ) : (
+                  <div className="text-[12px] text-white/30 italic">Sem anexo</div>
+                )}
+              </div>
+              <div className="col-span-2">
+                <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+                  Resultado da conferência operacional
+                </div>
+                <div className="text-[12.5px] text-white/90 font-medium">
+                  {conferenciaLabel(conferencia?.resultado ?? null)}
+                </div>
+                {conferencia?.completedBy && (
+                  <div className="text-[10.5px] text-white/55 mt-0.5">
+                    Por <strong className="text-white/75">{conferencia.completedBy}</strong>
+                    {conferencia.completedAt && (
+                      <span> em {fmtDateTime(conferencia.completedAt)}</span>
+                    )}
+                  </div>
+                )}
+                {conferencia?.observacao && (
+                  <div className="mt-1.5 px-2.5 py-1.5 rounded bg-black/20 text-[11px] text-white/75 italic leading-snug">
+                    &ldquo;{conferencia.observacao}&rdquo;
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ═══════════════════════════════════════════════════════
+              2. DECISÃO JURÍDICA
+             ═══════════════════════════════════════════════════════ */}
+          <div>
+            <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-2">
+              1. Decisão
+            </div>
+            <div className="space-y-2">
+              {DECISAO_OPTIONS.map((opt) => {
+                const ativo = decisao === opt.value
+                const colorMap = {
+                  emerald: ativo ? "border-emerald-500/60 bg-emerald-500/10 ring-1 ring-emerald-500/30" : "",
+                  blue: ativo ? "border-blue-500/60 bg-blue-500/10 ring-1 ring-blue-500/30" : "",
+                  amber: ativo ? "border-amber-500/60 bg-amber-500/10 ring-1 ring-amber-500/30" : "",
+                  red: ativo ? "border-red-500/60 bg-red-500/10 ring-1 ring-red-500/30" : "",
+                }
+                const iconColorMap = {
+                  emerald: ativo ? "text-emerald-300" : "text-white/60",
+                  blue: ativo ? "text-blue-300" : "text-white/60",
+                  amber: ativo ? "text-amber-300" : "text-white/60",
+                  red: ativo ? "text-red-300" : "text-white/60",
+                }
+                const textColorMap = {
+                  emerald: ativo ? "text-emerald-100" : "text-white/85",
+                  blue: ativo ? "text-blue-100" : "text-white/85",
+                  amber: ativo ? "text-amber-100" : "text-white/85",
+                  red: ativo ? "text-red-100" : "text-white/85",
+                }
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => !readOnly && setDecisao(opt.value)}
+                    disabled={readOnly}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
+                      ativo
+                        ? colorMap[opt.cor]
+                        : "border-white/10 bg-white/5 hover:bg-white/10"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                          ativo
+                            ? `border-${opt.cor}-400 bg-${opt.cor}-500`
+                            : "border-white/30 bg-transparent"
+                        }`}
+                      >
+                        {ativo && <div className="w-2 h-2 rounded-full bg-white" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-[12.5px] font-semibold flex items-center gap-1.5 ${textColorMap[opt.cor]}`}>
+                          <span className={iconColorMap[opt.cor]}>{opt.icon}</span>
+                          <span>{opt.label}</span>
+                        </div>
+                        <div className="text-[10.5px] text-white/55 mt-0.5 leading-snug">
+                          {opt.desc}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* ═══════════════════════════════════════════════════════
+              3. PARECER JURÍDICO
+             ═══════════════════════════════════════════════════════ */}
+          <div>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Label>
+                Parecer jurídico
+              </Label>
+              {precisaParecer && (
+                <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                  obrigatório
+                </span>
+              )}
+              {!precisaParecer && decisao && (
+                <span className="text-[10px] text-white/45 italic">opcional</span>
+              )}
+            </div>
+            <textarea
+              rows={5}
+              value={parecer}
+              onChange={(e) => setParecer(e.target.value)}
+              placeholder={
+                decisao === "aprovado"
+                  ? "Documento atende aos requisitos. Sem ressalvas."
+                  : decisao === "aprovado_ressalvas"
+                  ? "Documento usável, com a seguinte ressalva: ..."
+                  : decisao === "nova_via"
+                  ? "Solicitar nova via porque ... [motivo, divergência específica, etc.]"
+                  : decisao === "rejeitado"
+                  ? "Documento rejeitado porque ... [referências legais, motivo material, etc.]"
+                  : "Fundamentação da decisão · referências legais · ressalvas"
+              }
+              disabled={readOnly}
+              className={`${
+                precisaParecer && parecer.trim().length < 5 ? inputClsInvalid : inputCls
+              } resize-none`}
+            />
+            {precisaParecer && parecer.trim().length > 0 && parecer.trim().length < 5 && (
+              <div className="text-[10.5px] text-amber-200 mt-1 italic">
+                Parecer muito curto. Mínimo 5 caracteres.
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-
-      <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-2">
-        1. Decisão
-      </div>
-      <div className="grid grid-cols-3 gap-2 mb-5">
-        <ResultadoBtn
-          ativo={resultado === "validado"}
-          onClick={() => !readOnly && setResultado("validado")}
-          cor="emerald"
-          icon={<Check className="w-4 h-4" />}
-          label="Validar"
-          desc="serve para o processo"
-        />
-        <ResultadoBtn
-          ativo={resultado === "divergente"}
-          onClick={() => !readOnly && setResultado("divergente")}
-          cor="amber"
-          icon={<AlertTriangle className="w-4 h-4" />}
-          label="Divergente"
-          desc="precisa retificação"
-        />
-        <ResultadoBtn
-          ativo={resultado === "invalido"}
-          onClick={() => !readOnly && setResultado("invalido")}
-          cor="red"
-          icon={<XCircle className="w-4 h-4" />}
-          label="Inválido"
-          desc="não serve"
-        />
-      </div>
-
-      <div>
-        <Label required>Parecer jurídico</Label>
-        <textarea
-          rows={6}
-          value={parecer}
-          onChange={(e) => setParecer(e.target.value)}
-          placeholder={
-            resultado === "validado"
-              ? "Documento atende aos requisitos para transmissão de cidadania. Sem ressalvas..."
-              : resultado === "divergente"
-              ? "Nome materno consta como 'Maria Aparecida' no doc e 'Maria Ap. Silva' na árvore. Necessária retificação extrajudicial..."
-              : resultado === "invalido"
-              ? "Documento apresenta erros materiais que comprometem sua validade. Recomenda-se nova busca por inteiro teor..."
-              : "Registre seu parecer técnico-jurídico sobre o documento."
-          }
-          disabled={readOnly}
-          className={`${parecer.trim() ? inputCls : inputClsInvalid} resize-none`}
-        />
-      </div>
+      )}
     </EditorShell>
+  )
+}
+
+// ============================================================
+// FILE UPLOAD FIELD — upload real para CloudFlare R2 via presigned URL
+// ============================================================
+//
+// Usa o helper uploadFiles de @/lib/storage que orquestra:
+//   1. Pede presigned URL pro endpoint /api/storage/presign
+//   2. Faz PUT direto no R2 (com progresso via XHR)
+//   3. Retorna { url, key, name, size, type }
+//
+// Limites do endpoint (já enforced server-side):
+//   - 64MB por arquivo
+//   - Tipos: PNG, JPG, GIF, WEBP, PDF, DOC, DOCX, XLS, XLSX
+
+interface FileUploadFieldProps {
+  label: string
+  required?: boolean
+  invalid?: boolean
+  value: string
+  onChange: (
+    url: string,
+    meta?: { name: string; size: number; type: string; key: string } | null,
+  ) => void
+  disabled?: boolean
+  /** Pasta lógica no bucket. Ex: "documentos/123/solicitacao" */
+  prefix?: string
+}
+
+const ACCEPT_ATTR =
+  "image/png,image/jpeg,image/jpg,image/gif,image/webp," +
+  "application/pdf," +
+  "application/msword," +
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document," +
+  "application/vnd.ms-excel," +
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+function formatBytes(bytes: number | null): string {
+  if (bytes == null || bytes < 0) return ""
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+function fileNameFromUrl(url: string): string {
+  try {
+    const u = new URL(url)
+    const last = u.pathname.split("/").pop() || ""
+    // o key tem prefixo "timestamp-uuid-nome.ext" — extrai só o nome
+    const parts = last.split("-")
+    if (parts.length >= 3 && /^\d+$/.test(parts[0])) {
+      return parts.slice(2).join("-")
+    }
+    return last
+  } catch {
+    return url
+  }
+}
+
+function FileUploadField({
+  label,
+  required,
+  invalid,
+  value,
+  onChange,
+  disabled,
+  prefix,
+}: FileUploadFieldProps) {
+  const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [fileName, setFileName] = useState<string | null>(null)
+  const [fileSize, setFileSize] = useState<number | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Quando recebe um valor já salvo (sem nome local), tenta extrair do URL
+  const displayName =
+    fileName || (value ? fileNameFromUrl(value) : null)
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    setProgress(0)
+    setFileName(file.name)
+    setFileSize(file.size)
+
+    try {
+      const result = await uploadFiles([file], {
+        prefix,
+        onProgress: (_, p) => setProgress(p),
+      })
+      const uploaded = result[0]
+      if (uploaded) {
+        onChange(uploaded.url, {
+          name: uploaded.name,
+          size: uploaded.size,
+          type: uploaded.type,
+          key: uploaded.key,
+        })
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro no upload"
+      alert(`Erro ao enviar arquivo: ${msg}`)
+      setFileName(null)
+      setFileSize(null)
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
+  const handleRemove = () => {
+    onChange("", null)
+    setFileName(null)
+    setFileSize(null)
+    setProgress(0)
+  }
+
+  const openPicker = () => {
+    if (disabled || uploading) return
+    fileInputRef.current?.click()
+  }
+
+  return (
+    <div>
+      {/* Label */}
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <label className="text-[10px] uppercase font-semibold tracking-wider text-white/55">
+          {label}
+        </label>
+        {required && (
+          <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+            obrigatório
+          </span>
+        )}
+      </div>
+
+      {/* Input file escondido */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        onChange={handleFile}
+        accept={ACCEPT_ATTR}
+        className="hidden"
+        disabled={disabled || uploading}
+      />
+
+      {/* Estados */}
+      {uploading ? (
+        // 1. SUBINDO
+        <div className="px-3 py-2.5 bg-white/5 border border-blue-500/40 rounded-md">
+          <div className="flex items-center gap-2.5 mb-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-300 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-[12px] text-white truncate">{fileName}</div>
+              <div className="text-[10px] text-white/55">
+                Enviando... {progress}% · {formatBytes(fileSize)}
+              </div>
+            </div>
+          </div>
+          <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      ) : value ? (
+        // 2. ARQUIVO CARREGADO
+        <div className="px-3 py-2.5 bg-emerald-500/5 border border-emerald-500/30 rounded-md">
+          <div className="flex items-center gap-2.5">
+            <FileCheck className="w-4 h-4 text-emerald-300 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-[12px] text-white truncate font-medium">
+                {displayName || "Arquivo enviado"}
+              </div>
+              <div className="text-[10px] text-white/55 flex items-center gap-2">
+                {fileSize != null && <span>{formatBytes(fileSize)}</span>}
+                <a
+                  href={value}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-300 hover:text-blue-200 hover:underline inline-flex items-center gap-0.5"
+                >
+                  Abrir <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              </div>
+            </div>
+            {!disabled && (
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={openPicker}
+                  className="text-[10.5px] font-semibold px-2 py-1 bg-white/10 hover:bg-white/15 rounded text-white"
+                >
+                  Trocar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRemove}
+                  className="text-[10.5px] font-semibold px-2 py-1 bg-red-500/15 hover:bg-red-500/25 rounded text-red-200 inline-flex items-center gap-1"
+                  title="Remover anexo"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        // 3. VAZIO — botão de seleção
+        <button
+          type="button"
+          onClick={openPicker}
+          disabled={disabled}
+          className={`w-full px-3 py-3.5 bg-white/5 border border-dashed rounded-md text-left hover:bg-white/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+            invalid ? "border-amber-500/40" : "border-white/15"
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            <Upload className={`w-4 h-4 ${invalid ? "text-amber-300" : "text-white/60"}`} />
+            <div className="flex-1">
+              <div className="text-[12px] text-white/85 font-medium">
+                Selecionar arquivo
+              </div>
+              <div className="text-[10px] text-white/45 mt-0.5">
+                PNG, JPG, PDF, DOC, XLS · máx 64MB
+              </div>
+            </div>
+          </div>
+        </button>
+      )}
+    </div>
   )
 }
 

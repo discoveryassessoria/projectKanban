@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import type { Prisma } from "@prisma/client"
 
 // ============================================================
 // PATCH — atualiza um step (status/assignee/dueAt/notes/bloqueio/etc.)
@@ -61,6 +62,18 @@ interface PatchBody {
   reviewResult?: string | null
   validationResult?: string | null
   completedById?: number | null
+
+  // Rodada 9 — Solicitar certidão (cartório/atendente + cobrança)
+  externalEntityName?: string | null
+  costPaid?: number | null
+  paymentMethod?: string | null
+
+  // Rodada 12 — Receber + Conferir + Validar
+  documentMedium?: string | null
+  physicalLocation?: string | null
+  reviewChecklist?: Record<string, boolean> | null
+  stepObservation?: string | null
+  legalOpinion?: string | null
 }
 
 export async function PATCH(
@@ -97,7 +110,7 @@ export async function PATCH(
     }
 
     const now = new Date()
-    const updateData: Record<string, unknown> = {}
+    const updateData: Prisma.WorkflowStepUpdateInput = {}
 
     // ============================================================
     // SNAPSHOTS DO ESTADO ATUAL (antes do update)
@@ -119,7 +132,11 @@ export async function PATCH(
     const liberarProximo = vaiSerConcluida && !eraConcluida
 
     // -- Campos simples (whitelist)
-    if (body.assigneeId !== undefined) updateData.assigneeId = body.assigneeId
+    if (body.assigneeId !== undefined) {
+      updateData.assignee = body.assigneeId
+        ? { connect: { id: body.assigneeId } }
+        : { disconnect: true }
+    }
     if (body.dueAt !== undefined) updateData.dueAt = body.dueAt ? new Date(body.dueAt) : null
     if (body.notes !== undefined) updateData.notes = body.notes
     if (body.motivoBloqueio !== undefined) updateData.motivoBloqueio = body.motivoBloqueio
@@ -128,6 +145,28 @@ export async function PATCH(
     if (body.requestChannel !== undefined) updateData.requestChannel = body.requestChannel
     if (body.reviewResult !== undefined) updateData.reviewResult = body.reviewResult
     if (body.validationResult !== undefined) updateData.validationResult = body.validationResult
+
+    // ============================================================
+    // ✅ Rodada 9 — Solicitar certidão (cartório/atendente + cobrança)
+    // ============================================================
+    if (body.externalEntityName !== undefined) updateData.externalEntityName = body.externalEntityName
+    if (body.costPaid !== undefined) updateData.costPaid = body.costPaid
+    if (body.paymentMethod !== undefined) updateData.paymentMethod = body.paymentMethod
+
+    // ============================================================
+    // ✅ NOVO (rodada 12) — Receber + Conferir + Validar
+    // ============================================================
+    if (body.documentMedium !== undefined) updateData.documentMedium = body.documentMedium
+    if (body.physicalLocation !== undefined) updateData.physicalLocation = body.physicalLocation
+    if (body.reviewChecklist !== undefined) {
+      // Prisma JSON field aceita objeto direto OU Prisma.JsonNull pra clear
+      updateData.reviewChecklist =
+        body.reviewChecklist === null
+          ? null as unknown as Prisma.InputJsonValue
+          : (body.reviewChecklist as Prisma.InputJsonValue)
+    }
+    if (body.stepObservation !== undefined) updateData.stepObservation = body.stepObservation
+    if (body.legalOpinion !== undefined) updateData.legalOpinion = body.legalOpinion
 
     // ============================================================
     // LÓGICA DE TRANSIÇÃO DE STATUS
@@ -153,15 +192,15 @@ export async function PATCH(
       // CONCLUSÃO (primeira vez): marca completedAt + completedById
       if (vaiSerConcluida && !eraConcluida) {
         updateData.completedAt = now
-        if (body.completedById !== undefined) {
-          updateData.completedById = body.completedById
+        if (body.completedById !== undefined && body.completedById !== null) {
+          updateData.completedBy = { connect: { id: body.completedById } }
         }
       }
 
       // REABERTURA: limpa completedAt e completedById
       if (vaiSerReaberta) {
         updateData.completedAt = null
-        updateData.completedById = null
+        updateData.completedBy = { disconnect: true }
         // startedAt original é preservado (não foi reiniciada — só re-aberta)
       }
     }
