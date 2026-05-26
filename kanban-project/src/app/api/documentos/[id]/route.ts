@@ -5,6 +5,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma, TipoDocumento, StatusDocumento } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { recalculateByDocumentoId } from "@/src/lib/process-stage/recalculate"
 
 // Helper para obter label do tipo de documento
 function getTipoDocumentoLabel(tipo: string): string {
@@ -286,6 +287,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    // ✅ NOVO: recalcula fase do processo após qualquer mudança no documento
+    await recalculateByDocumentoId(prisma, Number(id))
+
     return NextResponse.json(documentoAtualizado)
   } catch (error) {
     console.error("Erro ao atualizar documento:", error)
@@ -464,6 +468,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const nomePessoa = `${documentoAtual.pessoa.nome} ${documentoAtual.pessoa.sobrenome || ""}`.trim()
       await criarTarefasDocumento(body.status, documentoAtual.tipo, nomePessoa, processoId)
     }
+
+    // ✅ NOVO: recalcula fase do processo também no PATCH
+    await recalculateByDocumentoId(prisma, Number(id))
 
     return NextResponse.json(documentoAtualizado)
   } catch (error) {

@@ -8,9 +8,9 @@ import {
   Play,
   Loader2,
   ChevronRight,
-  AlertTriangle,
   Lock,
 } from "lucide-react"
+import { CentralDaEtapaDrawer } from "./CentralDaEtapaDrawer"
 
 // ============================================================
 // TIPOS
@@ -134,7 +134,9 @@ export function WorkflowTab({ documentoId, onChange }: WorkflowTabProps) {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
-  const [stepEditing, setStepEditing] = useState<number | null>(null)
+
+  // ✅ NOVO: stepId aberto na Central da Etapa (drawer empilhado)
+  const [centralStepId, setCentralStepId] = useState<number | null>(null)
 
   // -- Carrega o workflow
   const carregar = useCallback(async () => {
@@ -181,30 +183,6 @@ export function WorkflowTab({ documentoId, onChange }: WorkflowTabProps) {
       alert("Erro ao iniciar operação.")
     } finally {
       setCreating(false)
-    }
-  }
-
-  // -- Atualiza um step
-  const patchStep = async (stepId: number, body: Record<string, unknown>) => {
-    try {
-      const res = await fetch(
-        `/api/documentos/${documentoId}/workflow/steps/${stepId}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-          },
-          body: JSON.stringify(body),
-        }
-      )
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json()
-      setWorkflow(json.workflow)
-      onChange?.()
-    } catch (e) {
-      console.warn("[WorkflowTab] patch step:", e)
-      alert("Erro ao atualizar etapa.")
     }
   }
 
@@ -293,12 +271,22 @@ export function WorkflowTab({ documentoId, onChange }: WorkflowTabProps) {
           <StepCard
             key={step.id}
             step={step}
-            editing={stepEditing === step.id}
-            onToggleEdit={() => setStepEditing(stepEditing === step.id ? null : step.id)}
-            onPatch={(body) => patchStep(step.id, body)}
+            onOpenCentral={() => setCentralStepId(step.id)}
           />
         ))}
       </div>
+
+      {/* ============== CENTRAL DA ETAPA (drawer empilhado) ============== */}
+      <CentralDaEtapaDrawer
+        documentoId={documentoId}
+        stepId={centralStepId}
+        isOpen={centralStepId !== null}
+        onClose={() => setCentralStepId(null)}
+        onUpdate={() => {
+          carregar()
+          onChange?.()
+        }}
+      />
 
     </div>
   )
@@ -306,18 +294,15 @@ export function WorkflowTab({ documentoId, onChange }: WorkflowTabProps) {
 
 // ============================================================
 // STEP CARD — 3 modos: DONE / ACTIVE / FUTURE
+// (Editor inline removido — toda interação vai pra Central da Etapa)
 // ============================================================
 
 function StepCard({
   step,
-  editing,
-  onToggleEdit,
-  onPatch,
+  onOpenCentral,
 }: {
   step: WorkflowStep
-  editing: boolean
-  onToggleEdit: () => void
-  onPatch: (body: Record<string, unknown>) => void
+  onOpenCentral: () => void
 }) {
   const isDone = step.status === "concluida"
   const isActive =
@@ -334,7 +319,7 @@ function StepCard({
     const completedByName = step.completedBy?.nome || ownerName(step.ownerKey)
     return (
       <div
-        onClick={onToggleEdit}
+        onClick={onOpenCentral}
         className="bg-emerald-950/30 border border-emerald-900/60 rounded-md px-3 py-2 flex items-center gap-3 cursor-pointer hover:bg-emerald-950/50 transition-colors"
       >
         <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
@@ -441,7 +426,7 @@ function StepCard({
           )}
 
           {/* Notas */}
-          {step.notes && !editing && (
+          {step.notes && (
             <div className="mt-2 px-2 py-1.5 bg-slate-800/50 rounded text-[11px] text-slate-300 italic">
               {step.notes}
             </div>
@@ -449,208 +434,13 @@ function StepCard({
         </div>
 
         <button
-          onClick={onToggleEdit}
+          onClick={onOpenCentral}
           className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors whitespace-nowrap"
         >
           Central da Etapa →
         </button>
       </div>
 
-      {/* Editor inline (Central da Etapa simplificada) */}
-      {editing && <StepEditor step={step} onPatch={onPatch} onClose={onToggleEdit} />}
-
-    </div>
-  )
-}
-
-// ============================================================
-// EDITOR INLINE (Central da Etapa simplificada)
-// ============================================================
-
-function StepEditor({
-  step,
-  onPatch,
-  onClose,
-}: {
-  step: WorkflowStep
-  onPatch: (body: Record<string, unknown>) => void
-  onClose: () => void
-}) {
-  const [dueAt, setDueAt] = useState(step.dueAt ? step.dueAt.slice(0, 10) : "")
-  const [notes, setNotes] = useState(step.notes || "")
-  const [motivoBloqueio, setMotivoBloqueio] = useState(step.motivoBloqueio || "")
-  const [trackingCode, setTrackingCode] = useState(step.trackingCode || "")
-  const [externalProtocol, setExternalProtocol] = useState(step.externalProtocol || "")
-  const [saving, setSaving] = useState<string | null>(null)
-
-  const isBlocked = step.status === "bloqueada" && step.motivoBloqueio !== null
-
-  const salvar = async () => {
-    setSaving("salvando")
-    await onPatch({
-      dueAt: dueAt || null,
-      notes,
-      motivoBloqueio: motivoBloqueio || null,
-      trackingCode: trackingCode || null,
-      externalProtocol: externalProtocol || null,
-    })
-    setSaving(null)
-  }
-
-  const concluir = async () => {
-    if (!confirm(`Concluir a etapa "${step.title}"?\nIsso libera a próxima etapa automaticamente.`)) return
-    setSaving("concluindo")
-    await onPatch({ status: "concluida", notes })
-    setSaving(null)
-    onClose()
-  }
-
-  const bloquear = async () => {
-    if (!motivoBloqueio.trim()) {
-      alert("Informe um motivo de bloqueio antes.")
-      return
-    }
-    setSaving("bloqueando")
-    await onPatch({ status: "bloqueada", motivoBloqueio })
-    setSaving(null)
-  }
-
-  const desbloquear = async () => {
-    setSaving("desbloqueando")
-    await onPatch({ status: "em_andamento", motivoBloqueio: null })
-    setSaving(null)
-    setMotivoBloqueio("")
-  }
-
-  const aguardarTerceiro = async () => {
-    setSaving("aguardando")
-    await onPatch({ status: "aguardando_terceiro" })
-    setSaving(null)
-  }
-
-  return (
-    <div className="px-3 pb-3 pt-2 border-t border-slate-800 bg-slate-950/40 space-y-3">
-
-      <div className="grid grid-cols-2 gap-3">
-        {/* Prazo */}
-        <div>
-          <label className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Prazo (SLA)</label>
-          <input
-            type="date"
-            value={dueAt}
-            onChange={(e) => setDueAt(e.target.value)}
-            className="mt-1 w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-[12px] text-white"
-          />
-        </div>
-
-        {/* Protocolo externo / código rastreio */}
-        {step.stepKey === "solicitar_certidao" && (
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Protocolo do cartório</label>
-            <input
-              type="text"
-              value={externalProtocol}
-              onChange={(e) => setExternalProtocol(e.target.value)}
-              placeholder="ex: 2026-1234"
-              className="mt-1 w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-[12px] text-white placeholder-slate-600"
-            />
-          </div>
-        )}
-
-        {step.stepKey === "aguardar_retorno" && (
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Código de rastreio</label>
-            <input
-              type="text"
-              value={trackingCode}
-              onChange={(e) => setTrackingCode(e.target.value)}
-              placeholder="ex: BR123456789BR"
-              className="mt-1 w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-[12px] text-white placeholder-slate-600"
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Notas livres */}
-      <div>
-        <label className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Observações desta etapa</label>
-        <textarea
-          rows={2}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notas livres da equipe sobre esta etapa…"
-          className="mt-1 w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-[12px] text-white placeholder-slate-600 resize-none"
-        />
-      </div>
-
-      {/* Bloqueio */}
-      <div>
-        <label className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
-          Motivo de bloqueio {isBlocked && <span className="text-red-400">(bloqueada)</span>}
-        </label>
-        <input
-          type="text"
-          value={motivoBloqueio}
-          onChange={(e) => setMotivoBloqueio(e.target.value)}
-          placeholder="ex: aguardando cliente confirmar dados"
-          className="mt-1 w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-[12px] text-white placeholder-slate-600"
-        />
-      </div>
-
-      {/* Ações */}
-      <div className="flex items-center gap-2 flex-wrap pt-1">
-        <button
-          onClick={salvar}
-          disabled={!!saving}
-          className="px-2.5 py-1.5 text-[11px] font-semibold bg-slate-700 hover:bg-slate-600 text-white rounded disabled:opacity-50"
-        >
-          {saving === "salvando" ? "Salvando…" : "Salvar"}
-        </button>
-
-        <button
-          onClick={concluir}
-          disabled={!!saving || step.status === "bloqueada"}
-          className="px-2.5 py-1.5 text-[11px] font-semibold bg-emerald-500 hover:bg-emerald-600 text-white rounded inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Check className="w-3 h-3" /> {saving === "concluindo" ? "Concluindo…" : "Concluir etapa"}
-        </button>
-
-        {step.status !== "aguardando_terceiro" && step.status !== "bloqueada" && (
-          <button
-            onClick={aguardarTerceiro}
-            disabled={!!saving}
-            className="px-2.5 py-1.5 text-[11px] font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded disabled:opacity-50"
-          >
-            ⏸ Aguardar terceiro
-          </button>
-        )}
-
-        {isBlocked ? (
-          <button
-            onClick={desbloquear}
-            disabled={!!saving}
-            className="px-2.5 py-1.5 text-[11px] font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded inline-flex items-center gap-1 disabled:opacity-50"
-          >
-            {saving === "desbloqueando" ? "Desbloqueando…" : "Desbloquear"}
-          </button>
-        ) : (
-          <button
-            onClick={bloquear}
-            disabled={!!saving || !motivoBloqueio.trim()}
-            className="px-2.5 py-1.5 text-[11px] font-semibold bg-red-600 hover:bg-red-700 text-white rounded inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <AlertTriangle className="w-3 h-3" /> Bloquear
-          </button>
-        )}
-
-        <button
-          onClick={onClose}
-          disabled={!!saving}
-          className="ml-auto px-2 py-1.5 text-[11px] text-slate-400 hover:text-white rounded disabled:opacity-50"
-        >
-          Fechar
-        </button>
-      </div>
     </div>
   )
 }

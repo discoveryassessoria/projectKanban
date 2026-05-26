@@ -3,6 +3,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { reconcileDocsForPessoa } from "@/src/lib/document-generator"
+import { recalculateByPessoaId } from "@/src/lib/process-stage/recalculate"
 
 // GET - Listar pessoas (com filtros opcionais)
 export async function GET(request: NextRequest) {
@@ -225,6 +226,11 @@ export async function POST(request: NextRequest) {
         documentos: { orderBy: { createdAt: 'desc' } },
       }
     })
+
+    // ✅ NOVO: recalcula fase do processo após criar pessoa + docs
+    if (pessoaFinal) {
+      await recalculateByPessoaId(prisma, pessoaFinal.id)
+    }
 
     return NextResponse.json(pessoaFinal, { status: 201 })
   } catch (error) {

@@ -167,6 +167,26 @@ model Documento {
   data_evento           DateTime?
   pessoa                Pessoa          @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
 
+  // Identificação literal (como aparece na certidão)
+  nome_registrado     String?   @db.VarChar(200)
+  pai_registrado      String?   @db.VarChar(200)
+  mae_registrada      String?   @db.VarChar(200)
+  conjuge_registrado  String?   @db.VarChar(200)
+
+  // Localidade extra
+  comune              String?   @db.VarChar(100)
+
+  // Referência registral extra
+  matricula           String?   @db.VarChar(50)
+  crc                 String?   @db.VarChar(50)
+  protocolo           String?   @db.VarChar(50)
+
+  // Rastreamento da solicitação
+  nro_pedido          String?   @db.VarChar(50)
+  canal_solicitacao   String?   @db.VarChar(50)
+  link_acompanhamento String?   @db.VarChar(500)
+  localizacao_fisica  String?   @db.VarChar(200)
+
   // ============================================================
   // ✅ NOVO: CAMPOS DE OPERAÇÃO (Central Operacional)
   // ============================================================
@@ -1175,6 +1195,10 @@ model WorkflowStep {
   requestChannel    String? @db.VarChar(60)
   reviewResult      String? @db.VarChar(60)
   validationResult  String? @db.VarChar(60)
+
+  externalEntityName  String?  @db.VarChar(200)
+  costPaid            Decimal? @db.Decimal(10, 2)
+  paymentMethod       String?  @db.VarChar(30)
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

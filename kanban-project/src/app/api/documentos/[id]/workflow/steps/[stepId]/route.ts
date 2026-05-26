@@ -6,13 +6,28 @@ import { prisma } from "@/lib/prisma"
 // ============================================================
 // PATCH — atualiza um step (status/assignee/dueAt/notes/bloqueio/etc.)
 //
-// Comportamento especial:
-//  - quando status muda pra "concluida": seta completedAt + completedById,
-//    libera o próximo step (status='em_andamento', startedAt, dueAt) e
-//    recalcula progress do workflow; se for o último, marca workflow como
-//    concluído.
-//  - quando status muda pra "em_andamento" e startedAt ainda nulo: seta
-//    startedAt e dueAt com base no slaDays.
+// Comportamento canônico:
+//
+//  CONCLUSÃO (status -> "concluida", saindo de OUTRO estado):
+//    - seta completedAt + completedById
+//    - libera o PRÓXIMO step bloqueado (status='em_andamento', startedAt, dueAt)
+//    - recalcula progress do workflow
+//    - se for o último: marca workflow como concluído
+//
+//  RE-CONCLUSÃO (status -> "concluida", saindo de "concluida"):
+//    - no-op (não libera próximo, não toca em completedAt)
+//    - protege contra duplo PATCH quando o usuário re-abre o Editor Registral
+//      de uma etapa já concluída
+//
+//  REABERTURA (status -> "em_andamento", saindo de "concluida"):
+//    - limpa completedAt + completedById
+//    - se houver step posterior em "em_andamento" ou "aguardando_terceiro":
+//      retrocede ele pra "bloqueada" (limpa startedAt + dueAt)
+//    - recalcula progress
+//    - workflow volta a "em_andamento" se estava "concluido"
+//
+//  INÍCIO (status -> "em_andamento", saindo de "nao_iniciada" ou "bloqueada"):
+//    - se startedAt ainda nulo: seta startedAt e dueAt com base no slaDays
 // ============================================================
 
 type StatusStep =
@@ -84,6 +99,25 @@ export async function PATCH(
     const now = new Date()
     const updateData: Record<string, unknown> = {}
 
+    // ============================================================
+    // SNAPSHOTS DO ESTADO ATUAL (antes do update)
+    // ============================================================
+    const statusAnterior = step.status as StatusStep
+    const eraConcluida = statusAnterior === "concluida"
+    const vaiSerConcluida = body.status === "concluida"
+    const vaiSerReaberta = eraConcluida && body.status === "em_andamento"
+
+    // ============================================================
+    // GATES — proteção contra ações inconsistentes
+    // ============================================================
+
+    // Gate 1: re-conclusão é NO-OP no que toca a workflow
+    // (apenas campos auxiliares como notes/dueAt/etc são salvos)
+    const isReConclusao = vaiSerConcluida && eraConcluida
+
+    // Gate 2: liberar próximo step só na PRIMEIRA conclusão
+    const liberarProximo = vaiSerConcluida && !eraConcluida
+
     // -- Campos simples (whitelist)
     if (body.assigneeId !== undefined) updateData.assigneeId = body.assigneeId
     if (body.dueAt !== undefined) updateData.dueAt = body.dueAt ? new Date(body.dueAt) : null
@@ -95,35 +129,56 @@ export async function PATCH(
     if (body.reviewResult !== undefined) updateData.reviewResult = body.reviewResult
     if (body.validationResult !== undefined) updateData.validationResult = body.validationResult
 
-    // -- Lógica de transição de status
-    let liberarProximo = false
+    // ============================================================
+    // LÓGICA DE TRANSIÇÃO DE STATUS
+    // ============================================================
     if (body.status !== undefined) {
-      updateData.status = body.status
+      // Re-conclusão: NÃO sobrescreve status, NÃO mexe em completedAt
+      if (!isReConclusao) {
+        updateData.status = body.status
+      }
 
-      if (body.status === "em_andamento" && !step.startedAt) {
+      // INÍCIO: marca startedAt + dueAt se for primeira vez ativando
+      if (
+        body.status === "em_andamento" &&
+        !step.startedAt &&
+        !vaiSerReaberta
+      ) {
         updateData.startedAt = now
         if (!step.dueAt) {
           updateData.dueAt = new Date(now.getTime() + step.slaDays * 86400000)
         }
       }
-      if (body.status === "concluida") {
+
+      // CONCLUSÃO (primeira vez): marca completedAt + completedById
+      if (vaiSerConcluida && !eraConcluida) {
         updateData.completedAt = now
         if (body.completedById !== undefined) {
           updateData.completedById = body.completedById
         }
-        liberarProximo = true
+      }
+
+      // REABERTURA: limpa completedAt e completedById
+      if (vaiSerReaberta) {
+        updateData.completedAt = null
+        updateData.completedById = null
+        // startedAt original é preservado (não foi reiniciada — só re-aberta)
       }
     }
 
-    // -- Aplica a atualização
+    // -- Aplica a atualização no step
     await prisma.workflowStep.update({
       where: { id: stepIdNum },
       data: updateData,
     })
 
-    // -- Se concluiu, libera o próximo step bloqueado e atualiza progresso
+    // ============================================================
+    // EFEITOS COLATERAIS — só quando faz sentido
+    // ============================================================
+
+    // CONCLUSÃO PRIMEIRA VEZ: libera próximo + recalcula
     if (liberarProximo) {
-      // Próximo step bloqueado (menor ordem ainda bloqueada)
+      // Próximo step bloqueado SEM motivoBloqueio formal (preserva bloqueios manuais)
       const proximo = await prisma.workflowStep.findFirst({
         where: {
           workflowId: step.workflowId,
@@ -145,27 +200,28 @@ export async function PATCH(
         })
       }
 
-      // Recalcula o progresso do workflow
-      const allSteps = await prisma.workflowStep.findMany({
-        where: { workflowId: step.workflowId },
-        select: { weight: true, status: true },
-      })
-      const totalWeight = allSteps.reduce((acc, s) => acc + s.weight, 0)
-      const doneWeight = allSteps
-        .filter((s) => s.status === "concluida")
-        .reduce((acc, s) => acc + s.weight, 0)
-      const progress = totalWeight > 0 ? Math.round((doneWeight / totalWeight) * 100) : 0
+      await recalcularProgressoWorkflow(step.workflowId, now)
+    }
 
-      const todosConcluidos = allSteps.every((s) => s.status === "concluida" || s.status === "cancelada")
-
-      await prisma.workflow.update({
-        where: { id: step.workflowId },
+    // REABERTURA: retrocede TODOS os próximos steps ativos + recalcula
+    // (usa updateMany para auto-corrigir estados quebrados — múltiplas
+    //  etapas ativas simultaneamente — sem mexer em concluídas posteriores)
+    if (vaiSerReaberta) {
+      await prisma.workflowStep.updateMany({
+        where: {
+          workflowId: step.workflowId,
+          status: { in: ["em_andamento", "aguardando_terceiro", "atrasada"] },
+          ordem: { gt: step.ordem },
+        },
         data: {
-          progress,
-          status: todosConcluidos ? "concluido" : "em_andamento",
-          completedAt: todosConcluidos ? now : null,
+          status: "bloqueada",
+          startedAt: null,
+          dueAt: null,
+          motivoBloqueio: null,
         },
       })
+
+      await recalcularProgressoWorkflow(step.workflowId, now)
     }
 
     // -- Marca movimento no documento
@@ -196,4 +252,33 @@ export async function PATCH(
       { status: 500 }
     )
   }
+}
+
+// ============================================================
+// HELPER: recalcula progress + status do workflow
+// ============================================================
+async function recalcularProgressoWorkflow(workflowId: number, now: Date) {
+  const allSteps = await prisma.workflowStep.findMany({
+    where: { workflowId },
+    select: { weight: true, status: true },
+  })
+
+  const totalWeight = allSteps.reduce((acc, s) => acc + s.weight, 0)
+  const doneWeight = allSteps
+    .filter((s) => s.status === "concluida")
+    .reduce((acc, s) => acc + s.weight, 0)
+  const progress = totalWeight > 0 ? Math.round((doneWeight / totalWeight) * 100) : 0
+
+  const todosConcluidos = allSteps.every(
+    (s) => s.status === "concluida" || s.status === "cancelada"
+  )
+
+  await prisma.workflow.update({
+    where: { id: workflowId },
+    data: {
+      progress,
+      status: todosConcluidos ? "concluido" : "em_andamento",
+      completedAt: todosConcluidos ? now : null,
+    },
+  })
 }

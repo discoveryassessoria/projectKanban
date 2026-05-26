@@ -21,6 +21,8 @@ import { ProcessoFinanceiro } from "./ProcessoFinanceiro"
 import { ContratanteModal, initialFormData } from "../contratantes-tabela"
 import { ProcessoEventos } from "./ProcessoEventos"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+// ✅ NOVO: header de progresso da fase do processo
+import { PhaseProgressHeader } from "@/src/components/processo/PhaseProgressHeader"
 import { 
   X, 
   Phone, 
@@ -100,7 +102,10 @@ export function ProcessoDetailsModal({
   const [etapas, setEtapas] = useState<Status[]>([])
   const [statusIdAtual, setStatusIdAtual] = useState(processo?.statusId)
   const [mudouEtapa, setMudouEtapa] = useState(false)
-  
+
+  // ✅ NOVO: força refetch do PhaseProgressHeader quando algo muda
+  const [phaseRefreshKey, setPhaseRefreshKey] = useState(0)
+
   // Modo edição
   const [isEditing, setIsEditing] = useState(false)
   const [nomeEditado, setNomeEditado] = useState(processo?.nome || "")
@@ -307,6 +312,12 @@ export function ProcessoDetailsModal({
     setArvoreIdLocal(processo?.arvoreId || null)
   }, [processo])
 
+  // ✅ NOVO: re-fetch da fase quando troca de aba
+  // (o usuário pode ter mexido em docs / pessoas em outra aba)
+  useEffect(() => {
+    setPhaseRefreshKey((k) => k + 1)
+  }, [activeTab])
+
   useEffect(() => {
     if (isOpen && contratantesProp.length === 0) {
       fetch('/api/contratantes')
@@ -395,6 +406,7 @@ export function ProcessoDetailsModal({
       
       if (response.ok) {
         setIsEditing(false)
+        setPhaseRefreshKey((k) => k + 1)  // ✅ NOVO: refresh fase após salvar
         onSave?.()
       } else {
         alert('Erro ao salvar alterações')
@@ -528,6 +540,15 @@ export function ProcessoDetailsModal({
               <h1 className="text-xl font-semibold text-gray-900">{processo.nome}</h1>
               <span className="text-sm text-gray-500">{paisConfig.label}</span>
             </div>
+
+            {/* ✅ NOVO: barrinha de progresso da fase do processo */}
+            <div className="border-l border-gray-200 pl-4 ml-2 hidden lg:block min-w-[260px]">
+              <PhaseProgressHeader
+                processoId={processo.id}
+                refreshKey={phaseRefreshKey}
+                variant="light"
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -578,6 +599,7 @@ export function ProcessoDetailsModal({
                       if (response.ok) {
                         setStatusIdAtual(etapa.id)
                         setMudouEtapa(true)
+                        setPhaseRefreshKey((k) => k + 1)  // ✅ NOVO: refresh fase
                         onSave?.()
                       } else {
                         alert('Erro ao mover processo')
