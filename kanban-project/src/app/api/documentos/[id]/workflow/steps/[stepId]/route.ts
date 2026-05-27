@@ -215,9 +215,27 @@ export async function PATCH(
     // EFEITOS COLATERAIS — só quando faz sentido
     // ============================================================
 
-    // CONCLUSÃO PRIMEIRA VEZ: libera próximo + recalcula
+    // CONCLUSÃO PRIMEIRA VEZ: lock-step + libera próximo
     if (liberarProximo) {
-      // Próximo step bloqueado SEM motivoBloqueio formal (preserva bloqueios manuais)
+      // ============================================================
+      // ✅ LOCK-STEP — documentos do mesmo processo andam juntos
+      // ============================================================
+      // Regra: ao concluir a etapa N de um doc, o próximo step (N+1)
+      // só é liberado se TODOS os outros docs do mesmo processo
+      // também já concluíram a etapa N.
+      //
+      // Se algum doc irmão ainda não concluiu N → o próximo step
+      // do doc atual fica BLOQUEADO com motivo "aguardando irmãos".
+      //
+      // Quando o último doc irmão concluir N → essa rota é chamada
+      // por ele e libera N+1 em TODOS os docs do processo de uma vez.
+      //
+      // Docs ignorados na conta:
+      //   - status CANCELADO ou INVALIDO (não fazem parte do lote)
+      //   - sem workflow criado (ainda não iniciaram operação)
+      // ============================================================
+
+      // 1. Próximo step DESTE doc (potencial liberação/bloqueio)
       const proximo = await prisma.workflowStep.findFirst({
         where: {
           workflowId: step.workflowId,
@@ -229,14 +247,106 @@ export async function PATCH(
       })
 
       if (proximo) {
-        await prisma.workflowStep.update({
-          where: { id: proximo.id },
-          data: {
-            status: "em_andamento",
-            startedAt: now,
-            dueAt: new Date(now.getTime() + proximo.slaDays * 86400000),
+        // 2. Achar processo(s) deste doc (via doc → pessoa → arvore → processos)
+        const docComProcesso = await prisma.documento.findUnique({
+          where: { id: documentoId },
+          select: {
+            pessoa: {
+              select: {
+                arvore: {
+                  select: { processos: { select: { id: true } } },
+                },
+              },
+            },
           },
         })
+
+        const processoIds = docComProcesso?.pessoa?.arvore?.processos.map(p => p.id) ?? []
+
+        // 3. Buscar docs irmãos ATIVOS com workflow + step da mesma ordem N
+        const docsIrmaos = await prisma.documento.findMany({
+          where: {
+            id: { not: documentoId },
+            pessoa: {
+              arvore: { processos: { some: { id: { in: processoIds } } } },
+            },
+            status: { notIn: ["CANCELADO", "INVALIDO"] },
+            workflow: { isNot: null },
+          },
+          select: {
+            id: true,
+            workflow: {
+              select: {
+                steps: {
+                  where: { ordem: step.ordem },
+                  select: { status: true },
+                },
+              },
+            },
+          },
+        })
+
+        // 4. Todos os irmãos concluíram a etapa N?
+        const todosConcluiramOrdemN = docsIrmaos.every(d => {
+          const stepN = d.workflow?.steps[0]
+          return stepN?.status === "concluida"
+        })
+
+        // Prefixo do motivo gerado pelo lock-step (usado pra distinguir
+        // de bloqueios manuais do usuário e poder limpar depois)
+        const LOCK_STEP_PREFIX = "Aguardando outros documentos do processo"
+
+        if (todosConcluiramOrdemN) {
+          // ✅ TODOS concluíram → libera N+1 em TODOS (eu + irmãos travados)
+
+          // 4a. Libera meu próximo
+          await prisma.workflowStep.update({
+            where: { id: proximo.id },
+            data: {
+              status: "em_andamento",
+              startedAt: now,
+              dueAt: new Date(now.getTime() + proximo.slaDays * 86400000),
+            },
+          })
+
+          // 4b. Libera próximo step dos irmãos que estavam travados pelo lock-step
+          //     OU bloqueados sem motivo (não tinham chegado ainda)
+          //     Preserva bloqueios manuais do usuário (motivo customizado)
+          const proximosIrmaos = await prisma.workflowStep.findMany({
+            where: {
+              workflow: { documentoId: { in: docsIrmaos.map(d => d.id) } },
+              ordem: proximo.ordem,
+              status: "bloqueada",
+              OR: [
+                { motivoBloqueio: null },
+                { motivoBloqueio: { startsWith: LOCK_STEP_PREFIX } },
+              ],
+            },
+          })
+
+          await Promise.all(
+            proximosIrmaos.map(p =>
+              prisma.workflowStep.update({
+                where: { id: p.id },
+                data: {
+                  status: "em_andamento",
+                  startedAt: now,
+                  dueAt: new Date(now.getTime() + p.slaDays * 86400000),
+                  motivoBloqueio: null,
+                },
+              })
+            )
+          )
+        } else {
+          // ⏸ Falta irmão → meu próximo fica BLOQUEADO com motivo
+          await prisma.workflowStep.update({
+            where: { id: proximo.id },
+            data: {
+              status: "bloqueada",
+              motivoBloqueio: `${LOCK_STEP_PREFIX} concluírem a etapa ${step.ordem} (${step.title})`,
+            },
+          })
+        }
       }
 
       await recalcularProgressoWorkflow(step.workflowId, now)
