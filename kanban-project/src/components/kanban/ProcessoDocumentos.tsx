@@ -674,7 +674,16 @@ function PersonRowComponent({
 
   // Abre a sidebar da pessoa (não vai mais direto pro doc)
   const handleAbrir = () => {
+    if (row.docs.length === 0) return
     onAbrirPessoa(row.pessoaId, row.nome)
+  }
+
+  // ✅ NOVO: handler de keyboard pra acessibilidade
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault()
+      handleAbrir()
+    }
   }
 
   const docStateColorMap: Record<string, string> = {
@@ -697,10 +706,21 @@ function PersonRowComponent({
     other: "bg-gray-400",
   }
 
+  const hasDocs = row.docs.length > 0
+
   return (
     <div
-      className={`grid items-center gap-2.5 px-3 py-2.5 text-xs border-b border-gray-100 hover:bg-slate-50/70 transition-colors ${rowCls}`}
-      style={{ gridTemplateColumns: gridCols }}
+      // ✅ NOVO: linha inteira clicável
+      onClick={handleAbrir}
+      onKeyDown={handleKeyDown}
+      role={hasDocs ? "button" : undefined}
+      tabIndex={hasDocs ? 0 : -1}
+      aria-label={hasDocs ? `Abrir documentos de ${row.nome}` : undefined}
+      className={`grid items-center gap-2.5 px-3 py-2.5 text-xs border-b border-gray-100 transition-colors ${rowCls} ${
+        hasDocs
+          ? "cursor-pointer hover:bg-slate-100/80 focus:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-inset"
+          : "cursor-default hover:bg-slate-50/70"
+      }`}
     >
       {/* Col 1: Geração */}
       <div className="text-center">
@@ -851,11 +871,17 @@ function PersonRowComponent({
         )}
       </div>
 
-      {/* Col 9: Ação */}
+      {/* Col 9: Ação — botão mantido por affordance, mas linha inteira também clica */}
       <div className="flex justify-end">
         <button
-          onClick={handleAbrir}
-          disabled={row.docs.length === 0}
+          onClick={(e) => {
+            // ✅ NOVO: evita disparar o click do <div> pai duas vezes
+            e.stopPropagation()
+            handleAbrir()
+          }}
+          disabled={!hasDocs}
+          tabIndex={-1}
+          aria-hidden="true"
           className="h-7 px-2.5 text-[10.5px] font-semibold text-white bg-slate-900 hover:bg-slate-800 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed rounded-md transition-colors whitespace-nowrap"
         >
           Abrir →
