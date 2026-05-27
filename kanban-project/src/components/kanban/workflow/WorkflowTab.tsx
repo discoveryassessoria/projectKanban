@@ -75,6 +75,8 @@ interface WorkflowTabProps {
 // HELPERS
 // ============================================================
 
+const LOCK_STEP_PREFIX = "Aguardando outros documentos do processo"
+
 const OWNERS_MAP: Record<string, string> = {
   equipe_documental: "Equipe Documental",
   daniela_brait: "Daniela Brait",
@@ -267,13 +269,27 @@ export function WorkflowTab({ documentoId, onChange }: WorkflowTabProps) {
 
       {/* ============== LISTA DE STEPS ============== */}
       <div className="space-y-2">
-        {workflow.steps.map((step) => (
-          <StepCard
-            key={step.id}
-            step={step}
-            onOpenCentral={() => setCentralStepId(step.id)}
-          />
-        ))}
+        {workflow.steps
+          .filter((step) => {
+            // ✅ Mostra: concluídas + em execução + bloqueadas COM motivo
+            //    (cobre lock-step "aguardando irmãos" e bloqueio manual)
+            // ❌ Esconde: bloqueadas sem motivo (= ainda não chegou a vez)
+            //    e não_iniciada
+            const isDone = step.status === "concluida"
+            const isActive =
+              step.status === "em_andamento" ||
+              step.status === "aguardando_terceiro" ||
+              step.status === "atrasada" ||
+              (step.status === "bloqueada" && step.motivoBloqueio !== null)
+            return isDone || isActive
+          })
+          .map((step) => (
+            <StepCard
+              key={step.id}
+              step={step}
+              onOpenCentral={() => setCentralStepId(step.id)}
+            />
+          ))}
       </div>
 
       {/* ============== CENTRAL DA ETAPA (drawer empilhado) ============== */}
@@ -361,28 +377,57 @@ function StepCard({
   }
 
   // ============================================================
-  // MODO ACTIVE — expandido
+  // MODO ACTIVE — expandido (3 sub-modos visuais)
   // ============================================================
   const sla = fmtSla(step.dueAt)
-  const statusBadgeCls =
-    step.status === "bloqueada"
-      ? "bg-red-900/60 text-red-200 border-red-800"
-      : step.status === "aguardando_terceiro"
-      ? "bg-amber-900/60 text-amber-200 border-amber-800"
-      : step.status === "atrasada"
-      ? "bg-orange-900/60 text-orange-200 border-orange-800"
-      : "bg-blue-900/60 text-blue-200 border-blue-800"
+  const isBloqueada = step.status === "bloqueada"
+  const isLockStepWait =
+    isBloqueada && step.motivoBloqueio?.startsWith(LOCK_STEP_PREFIX)
+  const isBloqueioManual = isBloqueada && !isLockStepWait
+
+  // Cor da borda do card
+  const cardBorderCls = isLockStepWait
+    ? "border-amber-900/60"
+    : isBloqueioManual
+    ? "border-red-900/60"
+    : "border-blue-900/60"
+
+  // Círculo com ícone
+  const circleCls = isLockStepWait
+    ? "bg-amber-500/80"
+    : isBloqueioManual
+    ? "bg-red-500/80"
+    : "bg-blue-500"
+
+  // Badge de status (texto e cor)
+  const statusBadgeCls = isLockStepWait
+    ? "bg-amber-900/60 text-amber-200 border-amber-800"
+    : isBloqueioManual
+    ? "bg-red-900/60 text-red-200 border-red-800"
+    : step.status === "aguardando_terceiro"
+    ? "bg-amber-900/60 text-amber-200 border-amber-800"
+    : step.status === "atrasada"
+    ? "bg-orange-900/60 text-orange-200 border-orange-800"
+    : "bg-blue-900/60 text-blue-200 border-blue-800"
+
+  const statusLabel = isLockStepWait
+    ? "Aguardando docs"
+    : STATUS_LABEL[step.status]
 
   const responsibleName = step.assignee?.nome || ownerName(step.ownerKey)
   const dotColor = ownerColor(step.ownerKey)
 
   return (
-    <div className="bg-slate-900/60 border border-blue-900/60 rounded-md overflow-hidden">
+    <div className={`bg-slate-900/60 border ${cardBorderCls} rounded-md overflow-hidden`}>
 
       {/* Cabeçalho do step ativo */}
       <div className="px-3 py-3 flex items-start gap-3">
-        <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-          <Play className="w-3 h-3 text-white fill-white ml-0.5" />
+        <div className={`w-6 h-6 rounded-full ${circleCls} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+          {isBloqueada ? (
+            <Lock className="w-3 h-3 text-white" />
+          ) : (
+            <Play className="w-3 h-3 text-white fill-white ml-0.5" />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -390,36 +435,51 @@ function StepCard({
               {step.ordem}. {step.title}
             </div>
             <span className={`text-[9.5px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border ${statusBadgeCls}`}>
-              {STATUS_LABEL[step.status]}
+              {statusLabel}
             </span>
           </div>
           {step.description && (
             <div className="text-[11px] text-slate-400 mt-1">{step.description}</div>
           )}
 
-          {/* Meta compacta: responsável · SLA · prazo */}
-          <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-300 mt-2">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: dotColor }} />
-              {responsibleName}
-            </span>
-            <span className="text-slate-600">·</span>
-            <span className="inline-flex items-center gap-1">
-              <span className="text-slate-500">SLA</span>
-              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${sla.cls}`}>
-                {sla.label}
+          {/* Meta compacta — esconde se for lock-step wait (responsável/SLA não fazem sentido) */}
+          {!isLockStepWait && (
+            <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-300 mt-2">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: dotColor }} />
+                {responsibleName}
               </span>
-            </span>
-            {step.dueAt && (
-              <>
-                <span className="text-slate-600">·</span>
-                <span className="font-mono text-[10.5px] text-slate-400">{fmtDateTime(step.dueAt)}</span>
-              </>
-            )}
-          </div>
+              <span className="text-slate-600">·</span>
+              <span className="inline-flex items-center gap-1">
+                <span className="text-slate-500">SLA</span>
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${sla.cls}`}>
+                  {sla.label}
+                </span>
+              </span>
+              {step.dueAt && (
+                <>
+                  <span className="text-slate-600">·</span>
+                  <span className="font-mono text-[10.5px] text-slate-400">{fmtDateTime(step.dueAt)}</span>
+                </>
+              )}
+            </div>
+          )}
 
-          {/* Banner de bloqueio formal */}
-          {step.status === "bloqueada" && step.motivoBloqueio && (
+          {/* Banner LOCK-STEP — amigável, âmbar */}
+          {isLockStepWait && (
+            <div className="mt-2 px-2.5 py-2 bg-amber-950/40 border border-amber-900/50 rounded text-[11.5px] text-amber-200 flex items-start gap-2">
+              <Lock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-400" />
+              <div>
+                <strong className="font-semibold">Aguardando outros documentos chegarem nesta etapa.</strong>
+                <div className="text-[10.5px] text-amber-400/80 mt-0.5">
+                  Libera automaticamente quando todos os documentos do processo concluírem a etapa anterior.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Banner BLOQUEIO MANUAL — vermelho, como antes */}
+          {isBloqueioManual && step.motivoBloqueio && (
             <div className="mt-2 px-2 py-1.5 bg-red-950/50 border border-red-900 rounded text-[11px] text-red-200">
               Bloqueado: <strong>{step.motivoBloqueio}</strong>
             </div>
@@ -433,12 +493,15 @@ function StepCard({
           )}
         </div>
 
-        <button
-          onClick={onOpenCentral}
-          className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors whitespace-nowrap"
-        >
-          Central da Etapa →
-        </button>
+        {/* Botão Central da Etapa — esconde no lock-step wait (não há ação útil) */}
+        {!isLockStepWait && (
+          <button
+            onClick={onOpenCentral}
+            className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors whitespace-nowrap"
+          >
+            Central da Etapa →
+          </button>
+        )}
       </div>
 
     </div>
