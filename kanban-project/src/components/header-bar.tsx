@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import type { ProcessoWithStatus } from "@/src/types/kanban"
 import { parseLocalDate, formatDateBR, getToday, isToday, isPast, isWithinDays } from "@/src/lib/date-utils"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import useSWR from 'swr'
 
 // Mapeamento de bandeiras por país
 const BANDEIRAS_PAIS: Record<string, string> = {
@@ -42,13 +43,9 @@ interface TarefaNotificacao {
   id: number
   titulo: string
   dataPrazo: string | null
-  concluida: boolean
-  createdAt: string
   processoId: number | null
   processoNome: string
   pais: string | null
-  responsavelId: number | null
-  responsavelEmail: string | null
 }
 
 export function HeaderBar({ 
@@ -71,18 +68,41 @@ export function HeaderBar({
     processos: ProcessoWithStatus[]
   }>({ processos: [] })
 
-  const [notificacoes, setNotificacoes] = useState<{
-    vencidas: TarefaNotificacao[]
-    hoje: TarefaNotificacao[]
-    proximos3Dias: TarefaNotificacao[]
-    novas: TarefaNotificacao[]
-  }>({ vencidas: [], hoje: [], proximos3Dias: [], novas: [] })
-  const [totalNotificacoes, setTotalNotificacoes] = useState(0)
-
   const { pode } = usePermissoes()
 
   const router = useRouter()
   const notificacoesRef = useRef<HTMLDivElement>(null)
+
+  // Fetcher autenticado para o SWR
+  const notificacoesFetcher = async (url: string) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
+    if (!token) throw new Error('Sem token')
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return res.json()
+  }
+
+  // Notificações via endpoint dedicado (filtros server-side, payload ~5kB)
+  const { data: notificacoesData } = useSWR(
+    '/api/notificacoes',
+    notificacoesFetcher,
+    {
+      refreshInterval: 30000,
+      revalidateOnFocus: false,
+      dedupingInterval: 10000,
+      errorRetryCount: 2
+    }
+  )
+
+  const notificacoes = {
+    vencidas: (notificacoesData?.vencidas || []) as TarefaNotificacao[],
+    hoje: (notificacoesData?.hoje || []) as TarefaNotificacao[],
+    proximos3Dias: (notificacoesData?.proximos3Dias || []) as TarefaNotificacao[],
+    novas: (notificacoesData?.novas || []) as TarefaNotificacao[]
+  }
+  const totalNotificacoes = notificacoesData?.total || 0
 
   // useEffect para fechar ao clicar fora
   useEffect(() => {
@@ -96,82 +116,6 @@ export function HeaderBar({
     }
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showNotifications])
-
-  // Buscar notificações diretamente da API
-  const fetchNotificacoes = useCallback(async () => {
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
-      const response = await fetch('/api/tarefas?excluirEstruturais=true', {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      })
-      if (!response.ok) return
-
-      const data = await response.json()
-      const tarefas = data.tarefas || []
-      if (!Array.isArray(tarefas)) return
-
-      const vencidas: TarefaNotificacao[] = []
-      const hojeList: TarefaNotificacao[] = []
-      const proximos3Dias: TarefaNotificacao[] = []
-      const novas: TarefaNotificacao[] = []
-
-      const umDiaAtras = new Date()
-      umDiaAtras.setDate(umDiaAtras.getDate() - 1)
-
-      tarefas.forEach((t: any) => {
-        const tarefa: TarefaNotificacao = {
-          id: t.id,
-          titulo: t.titulo || 'Sem título',
-          dataPrazo: t.dataPrazo || null,
-          concluida: t.concluida || false,
-          createdAt: t.createdAt,
-          processoId: t.processoId || t.processo?.id || null,
-          processoNome: t.processo?.nome || 'Sem processo',
-          pais: t.pais || t.processo?.pais || null,
-          responsavelId: t.responsavelId || t.responsavel?.id || null,
-          responsavelEmail: t.responsavel?.email || null
-        }
-
-        // Filtrar por responsável
-        const semResponsavel = !tarefa.responsavelId
-        const souResponsavel = userEmail && tarefa.responsavelEmail === userEmail
-        
-        if (!semResponsavel && !souResponsavel) {
-          return
-        }
-
-        // ✅ CORRIGIDO: Usar funções de comparação de data corretas
-        if (!tarefa.concluida && tarefa.dataPrazo) {
-          if (isPast(tarefa.dataPrazo)) {
-            vencidas.push(tarefa)
-          } else if (isToday(tarefa.dataPrazo)) {
-            hojeList.push(tarefa)
-          } else if (isWithinDays(tarefa.dataPrazo, 3)) {
-            proximos3Dias.push(tarefa)
-          }
-        }
-
-        // Tarefas novas (criadas nas últimas 24h e não concluídas)
-        if (tarefa.createdAt && !tarefa.concluida) {
-          const criacao = new Date(tarefa.createdAt)
-          if (criacao >= umDiaAtras) {
-            novas.push(tarefa)
-          }
-        }
-      })
-
-      setNotificacoes({
-        vencidas,
-        hoje: hojeList,
-        proximos3Dias,
-        novas
-      })
-
-      setTotalNotificacoes(vencidas.length + hojeList.length + proximos3Dias.length + novas.length)
-    } catch (error) {
-      console.error('Erro ao buscar notificações:', error)
-    }
-  }, [userEmail])
 
   useEffect(() => {
     const updateDateTime = () => {
@@ -194,12 +138,6 @@ export function HeaderBar({
     const interval = setInterval(updateDateTime, 1000)
     return () => clearInterval(interval)
   }, [])
-
-  useEffect(() => {
-    fetchNotificacoes()
-    const interval = setInterval(fetchNotificacoes, 30000)
-    return () => clearInterval(interval)
-  }, [fetchNotificacoes])
 
   const getInitials = (name: string) => {
     return name
