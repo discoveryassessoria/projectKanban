@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
+import { recalcularFaseDoProcesso } from "@/src/lib/process-stage/recalcular-fase"
 
 // ============================================================
 // PATCH — atualiza um step (status/assignee/dueAt/notes/bloqueio/etc.)
@@ -271,11 +272,12 @@ export async function PATCH(
               arvore: { processos: { some: { id: { in: processoIds } } } },
             },
             status: { notIn: ["CANCELADO", "INVALIDO"] },
-            workflow: { isNot: null },
+            workflows: { some: { status: { notIn: ["arquivado", "cancelado"] } } },
           },
           select: {
             id: true,
-            workflow: {
+            workflows: {
+              where: { status: { notIn: ["arquivado", "cancelado"] } },
               select: {
                 steps: {
                   where: { ordem: step.ordem },
@@ -288,7 +290,7 @@ export async function PATCH(
 
         // 4. Todos os irmãos concluíram a etapa N?
         const todosConcluiramOrdemN = docsIrmaos.every(d => {
-          const stepN = d.workflow?.steps[0]
+          const stepN = d.workflows[0]?.steps[0]
           return stepN?.status === "concluida"
         })
 
@@ -314,7 +316,10 @@ export async function PATCH(
           //     Preserva bloqueios manuais do usuário (motivo customizado)
           const proximosIrmaos = await prisma.workflowStep.findMany({
             where: {
-              workflow: { documentoId: { in: docsIrmaos.map(d => d.id) } },
+              workflow: {
+                documentoId: { in: docsIrmaos.map(d => d.id) },
+                status: { notIn: ["arquivado", "cancelado"] },
+              },
               ordem: proximo.ordem,
               status: "bloqueada",
               OR: [
@@ -373,6 +378,24 @@ export async function PATCH(
       await recalcularProgressoWorkflow(step.workflowId, now)
     }
 
+    // ============================================================
+    // ✅ GANCHO DE AVANÇO DE FASE (Parte 2)
+    // Só faz sentido quando uma etapa foi concluída (liberarProximo).
+    // Se a conclusão fechou o workflow da fase, o motor avança o card.
+    // Idempotente e seguro: se nada mudou, não faz nada.
+    // ============================================================
+    if (liberarProximo) {
+      try {
+        const r = await recalcularFaseDoProcesso(documentoId)
+        if (r.mudou) {
+          console.log(`[avanço de fase] doc ${documentoId}: ${r.faseAnterior} → ${r.faseNova}`)
+        }
+      } catch (e) {
+        // Não derruba a conclusão do step se o avanço falhar — só loga.
+        console.error("[avanço de fase] erro ao recalcular:", e)
+      }
+    }
+
     // -- Marca movimento no documento
     await prisma.documento.update({
       where: { id: documentoId },
@@ -380,8 +403,9 @@ export async function PATCH(
     })
 
     // -- Retorna o workflow completo atualizado
-    const workflow = await prisma.workflow.findUnique({
-      where: { documentoId },
+    const workflow = await prisma.workflow.findFirst({
+      where: { documentoId, status: { notIn: ["arquivado", "cancelado"] } },
+      orderBy: { createdAt: "desc" },
       include: {
         steps: {
           orderBy: { ordem: "asc" },

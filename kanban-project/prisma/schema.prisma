@@ -82,6 +82,7 @@ model Pessoa {
   unioesComoPessoa2  Uniao[]       @relation("Pessoa2")
   documentacao       Boolean       @default(true)
   casado             Boolean       @default(false)
+  linhaReta          Boolean       @default(true)
 
   @@index([arvoreId])
   @@index([pais_nasc])
@@ -154,7 +155,7 @@ model Documento {
   traduzido             Boolean         @default(false)
   tradutor              String?         @db.VarChar(150)
   data_traducao         DateTime?
-  workflow      Workflow?
+  workflows     Workflow[]
   arquivo_traducao_url  String?
   arquivo_traducao_nome String?         @db.VarChar(200)
   apostilado            Boolean         @default(false)
@@ -1147,7 +1148,7 @@ model EventoFinanceiro {
 // ============================================================
 model Workflow {
   id            Int       @id @default(autoincrement())
-  documentoId   Int       @unique
+  documentoId   Int
   documento     Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
 
   faseCode      FaseCode?

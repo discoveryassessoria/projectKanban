@@ -29,8 +29,9 @@ export async function GET(
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
 
-    const workflow = await prisma.workflow.findUnique({
-      where: { documentoId },
+    const workflow = await prisma.workflow.findFirst({
+      where: { documentoId, status: { notIn: ["arquivado", "cancelado"] } },
+      orderBy: { createdAt: "desc" },
       include: {
         steps: {
           orderBy: { ordem: "asc" },
@@ -105,8 +106,8 @@ export async function POST(
     }
 
     // ── Já existe workflow? (1 por documento por vez) ────────────────────
-    const existing = await prisma.workflow.findUnique({
-      where: { documentoId },
+    const existing = await prisma.workflow.findFirst({
+      where: { documentoId, status: { notIn: ["arquivado", "cancelado"] } },
       select: { id: true },
     })
     if (existing) {
@@ -288,8 +289,9 @@ export async function PATCH(
       )
     }
 
-    const workflow = await prisma.workflow.findUnique({
-      where: { documentoId },
+    const workflow = await prisma.workflow.findFirst({
+      where: { documentoId, status: { notIn: ["arquivado", "cancelado"] } },
+      orderBy: { createdAt: "desc" },
       select: { id: true, status: true },
     })
     if (!workflow) {
@@ -341,8 +343,9 @@ export async function PATCH(
       })
     }
 
-    const updated = await prisma.workflow.findUnique({
-      where: { documentoId },
+    const updated = await prisma.workflow.findFirst({
+      where: { documentoId, status: { notIn: ["arquivado", "cancelado"] } },
+      orderBy: { createdAt: "desc" },
       include: {
         steps: {
           orderBy: { ordem: "asc" },
