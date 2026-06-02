@@ -191,6 +191,13 @@ export async function recalcularFaseDoProcesso(
         },
       })
     }
+  }, {
+    // O padrão do Prisma é 5s, que estoura quando o banco da nuvem está
+    // lento (vários creates/updates dentro de uma transação somam o tempo).
+    // Damos mais fôlego: até 30s pra transação rodar, e até 10s esperando
+    // uma conexão livre antes de começar. Evita "Transaction already closed".
+    timeout: 30000,
+    maxWait: 10000,
   })
 
   return { mudou: true, faseAnterior: faseAtual, faseNova: proximaFase, motivo: "Avançou de fase" }

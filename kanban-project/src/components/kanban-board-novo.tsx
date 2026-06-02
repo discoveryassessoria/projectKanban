@@ -222,6 +222,7 @@ export function KanbanBoard({
     setModalInitialSidebarTab(undefined)
     setModalInitialTarefaPaiId(undefined)
     setModalInitialAtividadeId(undefined)
+    onRefresh()
   }
 
   // ✅ CORREÇÃO: Drag handlers atualizados para IDs prefixados

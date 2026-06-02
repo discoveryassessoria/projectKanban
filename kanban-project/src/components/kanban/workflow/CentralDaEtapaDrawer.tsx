@@ -376,6 +376,25 @@ export function CentralDaEtapaDrawer({
   const step = workflow?.steps.find((s) => s.id === stepId) || null
   const totalSteps = workflow?.steps.length || 0
 
+  // ✅ Se o drawer está aberto, já terminou de carregar, tem um workflow
+  // carregado, mas o stepId que deveríamos mostrar NÃO está mais nele —
+  // significa que a etapa foi concluída e o avanço de fase arquivou este
+  // workflow (criando outro da próxima fase). Em vez de ficar numa tela
+  // preta tentando mostrar um step que sumiu, fechamos o drawer.
+  // (O onClose leva de volta ao WorkflowTab, que já recarregou a fase nova,
+  // e o refresh sobe até o Kanban.)
+  useEffect(() => {
+    if (!isOpen) return
+    if (loading) return            // ainda carregando — não decide nada
+    if (!workflow) return          // sem workflow carregado ainda
+    if (stepId === null) return    // nada pra mostrar mesmo
+    const aindaExiste = workflow.steps.some((s) => s.id === stepId)
+    if (!aindaExiste) {
+      // o step sumiu (fase avançou) → fecha o drawer
+      onClose()
+    }
+  }, [isOpen, loading, workflow, stepId, onClose])
+
   // -- Render
   if (!isOpen) return null
 
