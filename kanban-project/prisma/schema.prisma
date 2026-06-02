@@ -219,11 +219,13 @@ model Status {
   nome      String     @db.VarChar(50)
   ordem     Int        @default(0)
   pais      Pais
+  faseCode  FaseCode?
   processos Processo[]
   tarefas   Tarefa[]
 
   @@unique([nome, pais])
   @@index([pais])
+  @@index([faseCode])
 }
 
 model Processo {
@@ -1148,6 +1150,8 @@ model Workflow {
   documentoId   Int       @unique
   documento     Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
 
+  faseCode      FaseCode?
+
   templateCode  String    @default("DOCUMENT_WORKFLOW") @db.VarChar(60)
   templateName  String    @default("Workflow Documental") @db.VarChar(120)
   status        String    @default("em_andamento") @db.VarChar(30)
@@ -1165,6 +1169,7 @@ model Workflow {
 
   @@index([documentoId])
   @@index([status])
+  @@index([faseCode])
 }
 
 model WorkflowStep {
@@ -1448,4 +1453,17 @@ enum TipoEventoFinanceiro {
   EDICAO_PAGAMENTO
   ESTORNO_RECEBIMENTO
   ESTORNO_PAGAMENTO
+}
+
+enum FaseCode {
+  GENEALOGIA
+  EMISSAO_DOCUMENTAL
+  ANALISE_DOCUMENTAL
+  RETIFICACAO_REGISTROS
+  EMISSAO_DOCUMENTAL_RETIFICADA
+  TRADUCAO_JURAMENTADA
+  APOSTILAMENTO
+  AGUARDANDO_PROTOCOLO
+  PROTOCOLADO
+  FINALIZADO
 }
