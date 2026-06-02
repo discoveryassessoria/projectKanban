@@ -89,6 +89,7 @@ export interface Status {
   nome: string
   ordem?: number
   pais?: Pais
+  faseCode?: string | null
   _count?: {
     processos: number
   }

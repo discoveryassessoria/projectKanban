@@ -23,6 +23,7 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 import type { ProcessoWithStatus, Processo } from "@/src/types/kanban"
 import { DocumentoOperationalDrawer } from "./DocumentoOperationalDrawer"
 import { InitOperationModal } from "./InitOperationModal"
+import { WorkflowMacroTrilha, MacroSidebar, PROCESS_PHASES } from "./WorkflowMacroTrilha"
 
 // ============================================================
 // TIPOS (espelho do endpoint)
@@ -236,6 +237,16 @@ export function ProcessoCentralOperacional({
 
   if (!data) return null
 
+  const faseAtualNome = processo.status?.nome || "Genealogia"
+  const idxAtual = PROCESS_PHASES.indexOf(faseAtualNome as any)
+  const fasesConcluidas = idxAtual > 0 ? PROCESS_PHASES.slice(0, idxAtual) : []
+  const progressoPorFase: Record<string, number> = {}
+  PROCESS_PHASES.forEach((ph, i) => {
+    if (i < idxAtual) progressoPorFase[ph] = 100
+    else if (i === idxAtual) progressoPorFase[ph] = data.matrix?.percentage ?? 0
+    else progressoPorFase[ph] = 0
+  })
+
   const { matrix, cards, queue, queueTitle, schemaCapabilities } = data
 
   // Lista de cards (mesma ordem do mockup HTML)
@@ -315,6 +326,17 @@ export function ProcessoCentralOperacional({
   return (
     <div className="h-full overflow-y-auto bg-gray-50/30">
       <div className="px-6 py-5">
+
+        {/* ===== TRILHA DE FASES (topo, largura cheia) ===== */}
+        <WorkflowMacroTrilha
+          currentPhase={faseAtualNome}
+          completedPhases={fasesConcluidas}
+          phaseProgress={progressoPorFase}
+        />
+
+        {/* ===== GRID: conteúdo atual + sidebar ===== */}
+        <div className="grid gap-4 items-start" style={{ gridTemplateColumns: "minmax(0,1fr) 290px" }}>
+          <div className="min-w-0">
 
         {/* ============== HEADER ============== */}
         <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
@@ -696,7 +718,15 @@ export function ProcessoCentralOperacional({
             carregar(true)  // recarrega a tabela
           }}
         />
+        </div>  {/* fecha a coluna esquerda (min-w-0) */}
 
+        {/* ===== SIDEBAR (coluna direita) ===== */}
+        <MacroSidebar
+          currentPhase={faseAtualNome}
+          completedPhases={fasesConcluidas}
+          phaseProgress={progressoPorFase}
+        />
+        </div>  {/* fecha o grid */}
       </div>
     </div>
   )
