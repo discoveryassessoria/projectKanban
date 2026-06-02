@@ -1,35 +1,18 @@
 // src/app/api/documentos/[id]/workflow/route.ts
 //
-// SUBSTITUI o arquivo atual. Mantém GET e POST exatamente como na v2,
-// e adiciona PATCH para pausar/retomar/cancelar/invalidar a operação.
+// ETAPA 3 · PARTE 1 — POST reescrito para o modelo WORKFLOW-POR-FASE.
+//
+// Antes: criava sempre um template fixo de 6 etapas (Genealogia+Emissão juntas)
+//        e usava tipoOperacao para escolher onde começar.
+// Agora: descobre a FASE ATUAL do processo (Status.faseCode da coluna do kanban)
+//        e cria o workflow só daquela fase, lendo o catálogo de fases.
+//
+// GET e PATCH ficam IGUAIS (não mexi neles). Só o POST mudou.
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { StatusDocumento } from "@prisma/client"
-
-// ============================================================
-// TEMPLATE FIXO — 6 STEPS DO WORKFLOW DOCUMENTAL
-// ============================================================
-
-const DEFAULT_STEPS = [
-  { ordem: 1, stepKey: "buscar_documento",  title: "Buscar documento",                description: "Localizar o ato no cartório e preencher os dados registrais completos.",  weight: 20, ownerKey: "equipe_documental", slaDays: 5 },
-  { ordem: 2, stepKey: "solicitar_certidao", title: "Solicitar certidão",              description: "Enviar requerimento ao cartório e registrar protocolo retornado.",         weight: 25, ownerKey: "daniela_brait",      slaDays: 3 },
-  { ordem: 3, stepKey: "aguardar_retorno",   title: "Aguardar retorno do cartório",    description: "Aguardar resposta do cartório · follow-ups manuais e automáticos disponíveis.", weight: 10, ownerKey: "daniela_brait",  slaDays: 15 },
-  { ordem: 4, stepKey: "receber_certidao",   title: "Receber certidão",                description: "Upload do PDF da certidão recebida.",                                     weight: 18, ownerKey: "daniela_brait",      slaDays: 2 },
-  { ordem: 5, stepKey: "conferir_certidao",  title: "Conferir certidão",               description: "Inspeção operacional: legibilidade, integridade, dados mínimos, apostila, tradução.", weight: 15, ownerKey: "daniela_brait", slaDays: 2 },
-  { ordem: 6, stepKey: "validar_certidao",   title: "Validar certidão",                description: "Decisão jurídica final · marca documento como Recebido.",                 weight: 12, ownerKey: "marco_rovatti",     slaDays: 1 },
-]
-
-const FIRST_ACTIVE_ORDEM: Record<string, number> = {
-  buscar: 1, solicitar: 2, receber: 4,
-}
-
-const DOC_STATUS_BY_TIPO: Record<string, StatusDocumento> = {
-  buscar: "EM_BUSCA",
-  solicitar: "SOLICITAR",
-  receber: "RECEBIDO",
-  desnecessario: "CANCELADO",
-}
+import { getFase, isFaseReady } from "@/src/lib/process-stage/fases-catalog"
 
 // ============================================================
 // GET — sem alterações
@@ -68,11 +51,13 @@ export async function GET(
 }
 
 // ============================================================
-// POST — sem alterações em relação à v2
+// POST — cria o workflow da FASE ATUAL do processo
 // ============================================================
 
 interface InitBody {
-  tipoOperacao: "buscar" | "solicitar" | "receber" | "desnecessario"
+  // Mantido por compatibilidade com a UI atual, mas agora SÓ "desnecessario"
+  // tem efeito especial. Os demais valores são ignorados: a fase manda.
+  tipoOperacao?: "buscar" | "solicitar" | "receber" | "desnecessario"
   responsavelId?: number | null
   dataPrazoInicial?: string | null
   prioridade?: "normal" | "urgente" | "critica"
@@ -91,14 +76,11 @@ export async function POST(
     }
 
     const body = (await request.json()) as InitBody
-    const tipo = body.tipoOperacao
-    if (!tipo || !["buscar", "solicitar", "receber", "desnecessario"].includes(tipo)) {
-      return NextResponse.json(
-        { error: "tipoOperacao inválido. Use: buscar | solicitar | receber | desnecessario" },
-        { status: 400 }
-      )
-    }
+    const now = new Date()
+    const prioridade = body.prioridade || "normal"
+    const obs = (body.observacaoInicial || "").trim()
 
+    // ── Documento existe? ────────────────────────────────────────────────
     const documento = await prisma.documento.findUnique({
       where: { id: documentoId },
       select: { id: true, status: true },
@@ -107,59 +89,118 @@ export async function POST(
       return NextResponse.json({ error: "Documento não encontrado" }, { status: 404 })
     }
 
-    const existing = await prisma.workflow.findUnique({
-      where: { documentoId },
-      select: { id: true },
-    })
-    if (existing && tipo !== "desnecessario") {
-      return NextResponse.json({ error: "Workflow já existe para este documento" }, { status: 409 })
-    }
-
-    const now = new Date()
-    const prioridade = body.prioridade || "normal"
-    const obs = (body.observacaoInicial || "").trim()
-
-    if (tipo === "desnecessario") {
+    // ── Caso especial: marcar como desnecessário (não cria workflow) ─────
+    if (body.tipoOperacao === "desnecessario") {
       await prisma.documento.update({
         where: { id: documentoId },
         data: {
           status: "CANCELADO",
           ultimaMovimentacao: now,
-          motivoBloqueio: obs ? `Marcado como desnecessário: ${obs}` : "Marcado como desnecessário",
+          motivoBloqueio: obs
+            ? `Marcado como desnecessário: ${obs}`
+            : "Marcado como desnecessário",
         },
       })
       return NextResponse.json({ workflow: null, status: "CANCELADO" }, { status: 200 })
     }
 
-    const firstActiveOrdem = FIRST_ACTIVE_ORDEM[tipo]
-    const firstActiveTemplate = DEFAULT_STEPS.find((s) => s.ordem === firstActiveOrdem)!
-    const dueAtFromBody = body.dataPrazoInicial ? new Date(body.dataPrazoInicial) : null
-    const dueAtCalc = new Date(now.getTime() + firstActiveTemplate.slaDays * 86400000)
-    const dueAt = dueAtFromBody ?? dueAtCalc
+    // ── Já existe workflow? (1 por documento por vez) ────────────────────
+    const existing = await prisma.workflow.findUnique({
+      where: { documentoId },
+      select: { id: true },
+    })
+    if (existing) {
+      return NextResponse.json(
+        { error: "Workflow já existe para este documento" },
+        { status: 409 }
+      )
+    }
 
-    const notasIniciais: string[] = []
-    if (obs) notasIniciais.push(obs)
-    if (tipo === "solicitar") {
-      notasIniciais.unshift("Operação iniciada como Solicitar — busca formal foi pulada.")
+    // ── Descobrir a FASE ATUAL do processo ───────────────────────────────
+    // Caminho: documento → pessoa → arvore → processos → status → faseCode
+    const docComProcesso = await prisma.documento.findUnique({
+      where: { id: documentoId },
+      select: {
+        pessoa: {
+          select: {
+            arvore: {
+              select: {
+                processos: {
+                  select: { id: true, status: { select: { faseCode: true, nome: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    const processos = docComProcesso?.pessoa?.arvore?.processos ?? []
+    if (processos.length === 0) {
+      return NextResponse.json(
+        { error: "Documento não está ligado a nenhum processo (via árvore). Não dá pra saber a fase." },
+        { status: 422 }
+      )
     }
-    if (tipo === "receber") {
-      notasIniciais.unshift("Operação iniciada como Recebimento — etapas de busca/solicitação/aguardo foram puladas.")
+
+    // Por enquanto assumimos 1 processo por árvore (caso comum). Se houver
+    // mais de um, usamos o primeiro e avisamos no log — tratamos multi-processo
+    // numa rodada futura, quando aparecer de verdade.
+    if (processos.length > 1) {
+      console.warn(
+        `[POST workflow] documento ${documentoId}: árvore tem ${processos.length} processos. Usando o primeiro (${processos[0].id}).`
+      )
     }
-    const notes = notasIniciais.join("\n\n") || null
+    const processo = processos[0]
+    const faseCode = processo.status?.faseCode
+
+    // ── Proteção: a coluna do processo precisa ter faseCode preenchido ───
+    if (!faseCode) {
+      return NextResponse.json(
+        {
+          error:
+            `A coluna do kanban deste processo (status "${processo.status?.nome ?? "?"}") ainda não tem faseCode definido. ` +
+            `Rode o backfill de faseCode antes de iniciar workflows.`,
+        },
+        { status: 422 }
+      )
+    }
+
+    // ── Proteção: a fase precisa estar especificada no catálogo ──────────
+    if (!isFaseReady(faseCode)) {
+      return NextResponse.json(
+        {
+          error:
+            `A fase "${faseCode}" ainda não tem etapas definidas no catálogo (pendingSpec). ` +
+            `Só Genealogia e Emissão estão prontas nesta versão.`,
+        },
+        { status: 422 }
+      )
+    }
+
+    // ── Monta os steps da fase atual a partir do catálogo ────────────────
+    const fase = getFase(faseCode)
+    const steps = fase.steps // já em ordem
+
+    const firstStep = steps[0]
+    const dueAtFromBody = body.dataPrazoInicial ? new Date(body.dataPrazoInicial) : null
+    const dueAt = dueAtFromBody ?? new Date(now.getTime() + firstStep.slaDays * 86400000)
+
+    const notes = obs || null
 
     const workflow = await prisma.workflow.create({
       data: {
         documentoId,
-        templateCode: "DOCUMENT_WORKFLOW",
-        templateName: "Workflow Documental",
+        faseCode, // ← registra de qual fase este workflow nasceu (Etapa 1)
+        templateCode: `FASE_${faseCode}`,
+        templateName: `Workflow · ${fase.label}`,
         status: "em_andamento",
         progress: 0,
         prioridade,
         startedAt: now,
         steps: {
-          create: DEFAULT_STEPS.map((s) => {
-            const isActive = s.ordem === firstActiveOrdem
-            const isSkipped = s.ordem < firstActiveOrdem
+          create: steps.map((s, i) => {
+            const isActive = i === 0 // só a primeira etapa começa ativa
             return {
               ordem: s.ordem,
               stepKey: s.stepKey,
@@ -168,12 +209,11 @@ export async function POST(
               weight: s.weight,
               ownerKey: s.ownerKey,
               slaDays: s.slaDays,
-              status: isActive ? "em_andamento" : isSkipped ? "concluida" : "bloqueada",
-              startedAt: isActive || isSkipped ? now : null,
-              completedAt: isSkipped ? now : null,
+              status: isActive ? "em_andamento" : "bloqueada",
+              startedAt: isActive ? now : null,
               dueAt: isActive ? dueAt : null,
               assigneeId: isActive ? body.responsavelId ?? null : null,
-              notes: isActive ? notes : isSkipped ? "Pulada na criação do workflow." : null,
+              notes: isActive ? notes : null,
             }
           }),
         },
@@ -189,22 +229,17 @@ export async function POST(
       },
     })
 
-    const totalWeight = DEFAULT_STEPS.reduce((acc, s) => acc + s.weight, 0)
-    const doneWeight = DEFAULT_STEPS
-      .filter((s) => s.ordem < firstActiveOrdem)
-      .reduce((acc, s) => acc + s.weight, 0)
-    const progress = Math.round((doneWeight / totalWeight) * 100)
-
-    await prisma.workflow.update({
-      where: { id: workflow.id },
-      data: { progress },
-    })
-    workflow.progress = progress
+    // ── Atualiza o documento (status operacional + responsável + prazo) ──
+    // O status do documento na fase inicial depende da fase. Na Genealogia,
+    // a busca está em andamento → EM_BUSCA. Nas demais, deixamos um status
+    // coerente com a primeira etapa; por ora só Genealogia e Emissão existem.
+    const docStatusInicial: StatusDocumento =
+      faseCode === "GENEALOGIA" ? "EM_BUSCA" : "SOLICITAR"
 
     await prisma.documento.update({
       where: { id: documentoId },
       data: {
-        status: DOC_STATUS_BY_TIPO[tipo],
+        status: docStatusInicial,
         dataInicioOperacao: now,
         ultimaMovimentacao: now,
         responsavelId: body.responsavelId ?? undefined,
@@ -222,13 +257,14 @@ export async function POST(
 
 // ============================================================
 // PATCH — controles da operação: pausar / retomar / cancelar / invalidar
+// (IGUAL à versão atual — não foi alterado)
 // ============================================================
 
 type WorkflowAction = "pausar" | "retomar" | "cancelar" | "invalidar"
 
 interface PatchBody {
   action: WorkflowAction
-  observacao?: string  // opcional, motivo da ação
+  observacao?: string
 }
 
 export async function PATCH(
@@ -263,58 +299,26 @@ export async function PATCH(
     const now = new Date()
     const obs = (body.observacao || "").trim()
 
-    // ============================================================
-    // LÓGICA POR AÇÃO
-    // ============================================================
     if (action === "pausar") {
       if (workflow.status !== "em_andamento") {
-        return NextResponse.json(
-          { error: "Só é possível pausar workflows em andamento" },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: "Só é possível pausar workflows em andamento" }, { status: 400 })
       }
-      await prisma.workflow.update({
-        where: { id: workflow.id },
-        data: { status: "pausado" },
-      })
+      await prisma.workflow.update({ where: { id: workflow.id }, data: { status: "pausado" } })
       await prisma.documento.update({
         where: { id: documentoId },
-        data: {
-          ultimaMovimentacao: now,
-          motivoBloqueio: obs ? `Operação pausada: ${obs}` : "Operação pausada",
-        },
+        data: { ultimaMovimentacao: now, motivoBloqueio: obs ? `Operação pausada: ${obs}` : "Operação pausada" },
       })
-    }
-
-    else if (action === "retomar") {
+    } else if (action === "retomar") {
       if (workflow.status !== "pausado") {
-        return NextResponse.json(
-          { error: "Só é possível retomar workflows pausados" },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: "Só é possível retomar workflows pausados" }, { status: 400 })
       }
-      await prisma.workflow.update({
-        where: { id: workflow.id },
-        data: { status: "em_andamento" },
-      })
+      await prisma.workflow.update({ where: { id: workflow.id }, data: { status: "em_andamento" } })
       await prisma.documento.update({
         where: { id: documentoId },
-        data: {
-          ultimaMovimentacao: now,
-          motivoBloqueio: null,
-        },
+        data: { ultimaMovimentacao: now, motivoBloqueio: null },
       })
-    }
-
-    else if (action === "cancelar") {
-      // Cancela o workflow inteiro — doc volta a PENDENTE
-      await prisma.workflow.update({
-        where: { id: workflow.id },
-        data: {
-          status: "cancelado",
-          cancelledAt: now,
-        },
-      })
+    } else if (action === "cancelar") {
+      await prisma.workflow.update({ where: { id: workflow.id }, data: { status: "cancelado", cancelledAt: now } })
       await prisma.documento.update({
         where: { id: documentoId },
         data: {
@@ -325,17 +329,8 @@ export async function PATCH(
           motivoBloqueio: obs ? `Operação cancelada: ${obs}` : "Operação cancelada",
         },
       })
-    }
-
-    else if (action === "invalidar") {
-      // Invalidação jurídica — doc fica como INVALIDO
-      await prisma.workflow.update({
-        where: { id: workflow.id },
-        data: {
-          status: "cancelado",
-          cancelledAt: now,
-        },
-      })
+    } else if (action === "invalidar") {
+      await prisma.workflow.update({ where: { id: workflow.id }, data: { status: "cancelado", cancelledAt: now } })
       await prisma.documento.update({
         where: { id: documentoId },
         data: {
@@ -346,7 +341,6 @@ export async function PATCH(
       })
     }
 
-    // Retorna workflow atualizado
     const updated = await prisma.workflow.findUnique({
       where: { documentoId },
       include: {
