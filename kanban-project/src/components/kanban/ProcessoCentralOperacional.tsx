@@ -3,45 +3,17 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import {
-  RefreshCw,
-  Loader2,
-  Circle,
-  Clock,
-  AlertTriangle,
-  FileText,
-  Lock,
-  Bell,
-  Moon,
-  User as UserIcon,
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
-  Inbox,
-} from "lucide-react"
+import { RefreshCw, Loader2 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import type { ProcessoWithStatus, Processo } from "@/src/types/kanban"
 import { DocumentoOperationalDrawer } from "./DocumentoOperationalDrawer"
 import { InitOperationModal } from "./InitOperationModal"
 import { WorkflowMacroTrilha, MacroSidebar, PROCESS_PHASES } from "./WorkflowMacroTrilha"
+import { PainelDaFase, type FasePersonRow, type FaseStep, type FaseKpi } from "./PainelDaFase"
 
 // ============================================================
 // TIPOS (espelho do endpoint)
 // ============================================================
-
-type QueueId =
-  | "all"
-  | "pending"
-  | "overdue"
-  | "critical"
-  | "waiting"
-  | "blocked"
-  | "no-owner"
-  | "followup"
-  | "stale"
-  | "me"
-
-type SortBy = "priority" | "sla" | "lineage"
 
 interface MatrixByPerson {
   pessoaId: number
@@ -115,25 +87,139 @@ interface ProcessoCentralOperacionalProps {
 }
 
 // ============================================================
-// HELPERS DE UI
+// Mapeia o data da rota central-operacional -> props do PainelDaFase
 // ============================================================
 
-const docIconChar = (tipo: string): string => {
-  if (tipo.startsWith("CERTIDAO")) return "📜"
-  if (tipo === "PASSAPORTE_BRASILEIRO" || tipo === "PASSAPORTE_ESTRANGEIRO") return "🛂"
-  if (tipo === "RG" || tipo === "CPF" || tipo === "CNH") return "🆔"
-  if (tipo === "TRADUCAO_JURAMENTADA") return "🌐"
-  if (tipo === "APOSTILA_HAIA") return "🏛️"
-  if (tipo === "PROCURACAO") return "✍️"
-  return "📄"
+function statusParaCls(statusLabel: string): string {
+  const s = statusLabel.toLowerCase()
+  if (s.includes("recebid") || s.includes("entregue") || s.includes("validad")) return "recebido"
+  if (s.includes("solicit")) return "solicitado"
+  if (s.includes("busca")) return "em_busca"
+  if (s.includes("invál") || s.includes("inval") || s.includes("não enc") || s.includes("nao enc")) return "bloqueado"
+  if (s.includes("pendente")) return "pendente"
+  return "pendente"
 }
 
-const formatPrazo = (dias: number | null): { text: string; cls: string } => {
-  if (dias === null) return { text: "—", cls: "text-gray-400" }
-  if (dias < -5) return { text: `${Math.abs(dias)}d crit`, cls: "bg-red-600 text-white px-1.5 py-0.5 rounded animate-pulse inline-block" }
-  if (dias < 0) return { text: `${Math.abs(dias)}d atr`, cls: "text-red-600 font-semibold" }
-  if (dias < 1) return { text: "hoje", cls: "text-amber-700 font-semibold" }
-  return { text: `${dias}d`, cls: "text-gray-600" }
+function abreviar(tipo: string): string {
+  if (tipo.includes("NASCIMENTO")) return "Nasc."
+  if (tipo.includes("CASAMENTO")) return "Cas."
+  if (tipo.includes("OBITO")) return "Óbito"
+  return "Doc."
+}
+
+function mapearPainel(data: CentralOpData, faseNome: string) {
+  const queue = data.queue
+  const matrix = data.matrix
+
+  // --- 7 contadores (derivados do status genérico) ---
+  const total = matrix.total
+  const validados = matrix.completed
+  const solicitados = queue.filter((q) => /solicit/i.test(q.status)).length
+  const aguardando = queue.filter((q) => /busca/i.test(q.status)).length
+  const recebidos = validados
+  const conferidos = 0
+  const divergentes = queue.filter((q) => /invál|inval|não enc|nao enc/i.test(q.status)).length
+
+  const kpis: FaseKpi[] = [
+    { label: "Obrigatórios", value: total },
+    { label: "Validados", value: validados, tone: "ok" },
+    { label: "Solicitados", value: solicitados, tone: "busca" },
+    { label: "Aguardando", value: aguardando, tone: "busca" },
+    { label: "Recebidos", value: recebidos },
+    { label: "Conferidos", value: conferidos },
+    { label: "Divergentes", value: divergentes, tone: "late" },
+  ]
+
+  // --- 5 etapas (inferidas do estado geral) ---
+  const algumSolicitado = solicitados > 0 || recebidos > 0
+  const algumRecebido = recebidos > 0
+  const stepDefs = [
+    { title: "Solicitar certidão", done: algumSolicitado },
+    { title: "Aguardar retorno", done: algumRecebido },
+    { title: "Receber certidão", done: algumRecebido },
+    { title: "Conferir certidão", done: false },
+    { title: "Validar certidão", done: validados >= total && total > 0 },
+  ]
+  let achouAtiva = false
+  const steps: FaseStep[] = stepDefs.map((s) => {
+    if (s.done) return { title: s.title, status: "concluida" as const }
+    if (!achouAtiva) { achouAtiva = true; return { title: s.title, status: "em_andamento" as const } }
+    return { title: s.title, status: "bloqueada" as const }
+  })
+
+  // --- tabela por pessoa ---
+  const porPessoa = new Map<string, FasePersonRow>()
+  const ord = (g: number) => (g === 99 ? 100 : g)
+
+  for (const q of queue) {
+    const key = q.pessoaNome
+    if (!porPessoa.has(key)) {
+      const iniciais = q.pessoaNome.split(/\s+/).map((x) => x[0]).slice(0, 2).join("").toUpperCase()
+      const isLinha = q.generation !== 99
+      porPessoa.set(key, {
+        pessoaId: q.docId,
+        nome: q.pessoaNome,
+        iniciais,
+        papel: isLinha ? "Linha reta" : "Apoio",
+        geracao: isLinha ? `G${q.generation}` : "—",
+        isLinha,
+        transmissao: isLinha
+          ? { state: "OK", label: "OK", sub: "Transmissão comprovada" }
+          : { state: "FORA", label: "Fora da linha", sub: "Sem impacto na transmissão" },
+        docsResumo: [],
+        validados: 0,
+        total: 0,
+        responsavel: q.responsavelNome,
+        proximaAcao: q.noOwner
+          ? { txt: "Solicitar certidão", cls: "crit", semResp: true }
+          : { txt: q.proximoPasso === "normal" ? "Solicitar certidão" : (q.proximoPasso || "—") },
+        docs: [],
+      })
+    }
+    const row = porPessoa.get(key)!
+    const cls = statusParaCls(q.status)
+    row.docsResumo.push({ abbr: abreviar(q.docType), statusLabel: q.status, statusCls: cls })
+    row.total += 1
+    if (cls === "recebido") row.validados += 1
+    row.docs.push({
+      id: q.docId,
+      tipoLabel: q.docTypeLabel,
+      subtitulo: "Inteiro teor",
+      statusLabel: q.status.toUpperCase(),
+      statusCls: cls,
+      responsavel: q.responsavelNome,
+      sla: q.diasParaPrazo != null ? `${q.diasParaPrazo} dias` : null,
+      proximaAcao: q.proximoPasso === "normal" ? "Solicitar certidão" : q.proximoPasso,
+      emissaoConcluida: cls === "recebido",
+    })
+  }
+
+  const todas = Array.from(porPessoa.values())
+  const linhaPrincipal = todas
+    .filter((p) => p.isLinha)
+    .sort((a, b) => ord(parseInt(a.geracao.replace("G", "")) || 99) - ord(parseInt(b.geracao.replace("G", "")) || 99))
+  const foraDaLinha = todas.filter((p) => !p.isLinha)
+
+  const pct = matrix.percentage
+  const progressoTexto =
+    validados >= total && total > 0
+      ? `Emissão documental concluída — todos os documentos validados.`
+      : `Solicite, receba, confira e valide cada certidão. Falta${total - validados === 1 ? "" : "m"} ${total - validados} documento${total - validados === 1 ? "" : "s"} para concluir a ${faseNome}.`
+
+  return { kpis, steps, linhaPrincipal, foraDaLinha, pct, validados, total, progressoTexto }
+}
+
+const FASE_META: Record<string, { sub: string; tabs: string[] }> = {
+  "Genealogia": { sub: "Crie a árvore, defina a linha reta e localize os documentos obrigatórios.", tabs: ["Resumo", "Árvore", "Linha reta", "Documentos gerados", "Busca documental", "Histórico"] },
+  "Emissão documental": { sub: "Solicite, receba, confira e valide as certidões nos cartórios.", tabs: ["Resumo", "Documentos", "Solicitações", "Recebimentos", "Validações", "Histórico"] },
+  "Análise Documental": { sub: "Compare a árvore com os documentos, avalie divergências e decida o caminho.", tabs: ["Resumo", "Divergências", "Documentos comparados", "IA & Revisão", "Decisões", "Pareceres", "Histórico"] },
+  "Retificação de registros": { sub: "Execute a retificação judicial ou administrativa dos registros divergentes.", tabs: ["Resumo", "Pacotes de retificação", "Judicial / Administrativo", "Anexos", "Decisões", "Histórico"] },
+  "Emissão documental retificada": { sub: "Emita novamente apenas os documentos impactados pela retificação.", tabs: ["Resumo", "Averbações", "Certidões retificadas", "Solicitações", "Validações", "Histórico"] },
+  "Tradução juramentada": { sub: "Traduza a pasta documental por tradutor juramentado e valide as traduções.", tabs: ["Resumo", "Documentos", "Traduções", "Validações", "IA & Revisão", "Decisões", "Histórico"] },
+  "Apostilamento": { sub: "Apostile (Haia) os documentos finais e valide a pasta apostilada.", tabs: ["Resumo", "Pasta de apostilamento", "Documentos apostilados", "Conferência", "Validações", "Histórico"] },
+  "Aguardando protocolo": { sub: "Reúna o dossiê final e protocole o pedido no órgão de destino.", tabs: ["Resumo", "Pasta final", "Previsão", "Movimentações", "Protocolo", "Histórico"] },
+  "Protocolado": { sub: "Acompanhe o pedido protocolado e registre a decisão do órgão.", tabs: ["Resumo", "Dados do protocolo", "Exigências", "Movimentações", "Decisões", "Histórico"] },
+  "Finalizado": { sub: "Confirme o reconhecimento, entregue ao cliente e arquive o processo.", tabs: ["Resumo", "Resultado final", "Entregáveis", "Auditoria", "Arquivos finais", "Histórico"] },
 }
 
 // ============================================================
@@ -149,13 +235,9 @@ export function ProcessoCentralOperacional({
   const [refreshing, setRefreshing] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
-  const [queueFilter, setQueueFilter] = useState<QueueId>("all")
-  const [sortBy, setSortBy] = useState<SortBy>("priority")
-  const [matrixOpen, setMatrixOpen] = useState(false)
   const [drawerDocId, setDrawerDocId] = useState<number | null>(null)
   const [initModalDocId, setInitModalDocId] = useState<number | null>(null)
 
-  // Recupera userId do localStorage (mesmo padrão do TarefaDetailModal)
   const getUserId = (): number | null => {
     try {
       const stored = localStorage.getItem("user")
@@ -175,10 +257,7 @@ export function ProcessoCentralOperacional({
 
       try {
         const userId = getUserId()
-        const params = new URLSearchParams({
-          queue: queueFilter,
-          sort: sortBy,
-        })
+        const params = new URLSearchParams({ queue: "all", sort: "priority" })
         if (userId) params.set("userId", String(userId))
 
         const res = await fetch(
@@ -191,9 +270,7 @@ export function ProcessoCentralOperacional({
         )
 
         if (res.status === 404) {
-          setErro(
-            "Endpoint /api/processos/[id]/central-operacional ainda não existe."
-          )
+          setErro("Endpoint /api/processos/[id]/central-operacional ainda não existe.")
           return
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -208,7 +285,7 @@ export function ProcessoCentralOperacional({
         setRefreshing(false)
       }
     },
-    [processo.id, queueFilter, sortBy]
+    [processo.id]
   )
 
   useEffect(() => {
@@ -237,8 +314,9 @@ export function ProcessoCentralOperacional({
 
   if (!data) return null
 
+  // ====== CÁLCULOS (ordem importa: declarar ANTES de usar) ======
   const faseAtualNome = processo.status?.nome || "Genealogia"
-  const idxAtual = PROCESS_PHASES.indexOf(faseAtualNome as any)
+  const idxAtual = PROCESS_PHASES.indexOf(faseAtualNome as (typeof PROCESS_PHASES)[number])
   const fasesConcluidas = idxAtual > 0 ? PROCESS_PHASES.slice(0, idxAtual) : []
   const progressoPorFase: Record<string, number> = {}
   PROCESS_PHASES.forEach((ph, i) => {
@@ -247,81 +325,8 @@ export function ProcessoCentralOperacional({
     else progressoPorFase[ph] = 0
   })
 
-  const { matrix, cards, queue, queueTitle, schemaCapabilities } = data
-
-  // Lista de cards (mesma ordem do mockup HTML)
-  const cardList: Array<{
-    id: QueueId
-    label: string
-    icon: React.ReactNode
-    val: number
-    hint: string
-    cls?: "alert" | "warn" | ""
-    desabilitado?: boolean
-  }> = [
-    { id: "all", label: "Em operação", icon: <FileText className="w-3 h-3" />, val: cards.all, hint: "documentos ativos" },
-    { id: "pending", label: "Pendentes", icon: <Circle className="w-3 h-3" />, val: cards.pending, hint: "sem operação", cls: cards.pending ? "warn" : "" },
-    {
-      id: "overdue",
-      label: "Atrasados",
-      icon: <Clock className="w-3 h-3" />,
-      val: cards.overdue,
-      hint: schemaCapabilities.hasPrazoOperacao ? "SLA vencido" : "(precisa migration)",
-      cls: cards.overdue ? "warn" : "",
-      desabilitado: !schemaCapabilities.hasPrazoOperacao,
-    },
-    {
-      id: "critical",
-      label: "Críticos",
-      icon: <AlertTriangle className="w-3 h-3" />,
-      val: cards.critical,
-      hint: schemaCapabilities.hasPrazoOperacao ? ">5d de atraso" : "(precisa migration)",
-      cls: cards.critical ? "alert" : "",
-      desabilitado: !schemaCapabilities.hasPrazoOperacao,
-    },
-    { id: "waiting", label: "Aguardando cartório", icon: <Inbox className="w-3 h-3" />, val: cards.waiting, hint: "aguarda terceiro" },
-    {
-      id: "blocked",
-      label: "Bloqueados",
-      icon: <Lock className="w-3 h-3" />,
-      val: cards.blocked,
-      hint: schemaCapabilities.hasMotivoBloqueio ? "com motivo formal" : "(precisa migration)",
-      cls: cards.blocked ? "warn" : "",
-      desabilitado: !schemaCapabilities.hasMotivoBloqueio,
-    },
-    {
-      id: "no-owner",
-      label: "Sem responsável",
-      icon: <AlertCircle className="w-3 h-3" />,
-      val: cards.noOwner,
-      hint: schemaCapabilities.hasResponsavel ? "precisa atribuição" : "(precisa migration)",
-      cls: cards.noOwner ? "alert" : "",
-      desabilitado: !schemaCapabilities.hasResponsavel,
-    },
-    {
-      id: "followup",
-      label: "Follow-ups hoje",
-      icon: <Bell className="w-3 h-3" />,
-      val: cards.followup,
-      hint: "(modelo futuro)",
-      desabilitado: true,
-    },
-    {
-      id: "stale",
-      label: "Sem movimento",
-      icon: <Moon className="w-3 h-3" />,
-      val: cards.stale,
-      hint: "≥3d parado",
-    },
-    {
-      id: "me",
-      label: "Minhas",
-      icon: <UserIcon className="w-3 h-3" />,
-      val: 0, // este card precisa do count específico via userId; deixei zero por enquanto
-      hint: schemaCapabilities.hasResponsavel ? "atribuídas a mim" : "(precisa migration)",
-      desabilitado: !schemaCapabilities.hasResponsavel,
-    },
-  ]
+  const painel = mapearPainel(data, faseAtualNome)
+  const meta = FASE_META[faseAtualNome] || { sub: "", tabs: ["Resumo"] }
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50/30">
@@ -334,11 +339,7 @@ export function ProcessoCentralOperacional({
           phaseProgress={progressoPorFase}
         />
 
-        {/* ===== GRID: conteúdo atual + sidebar ===== */}
-        <div className="grid gap-4 items-start" style={{ gridTemplateColumns: "minmax(0,1fr) 290px" }}>
-          <div className="min-w-0">
-
-        {/* ============== HEADER ============== */}
+        {/* ===== Header da Central + Atualizar ===== */}
         <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
           <div>
             <h3 className="text-lg font-bold text-gray-900 tracking-tight">Central Operacional</h3>
@@ -356,377 +357,49 @@ export function ProcessoCentralOperacional({
           </button>
         </div>
 
-        {/* ============== MATRIZ DE COMPLETUDE ============== */}
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-xl p-5 mb-4 shadow-sm">
-          <div className="grid grid-cols-[1.4fr_2fr_auto] gap-6 items-center max-md:grid-cols-1">
-            {/* Esquerda — % */}
-            <div>
-              <div className="text-3xl font-bold tracking-tight mb-2">{matrix.percentage}%</div>
-              <div className="h-1.5 bg-white/15 rounded-full overflow-hidden mb-2">
-                <div
-                  className="h-full bg-emerald-400 transition-all duration-500"
-                  style={{ width: `${matrix.percentage}%` }}
-                />
-              </div>
-              <div className="text-[11px] text-white/70">
-                Linhagem · {matrix.completed} de {matrix.total} documentos validados
-              </div>
-            </div>
+        {/* ===== GRID: painel da fase + sidebar ===== */}
+        <div className="grid gap-4 items-start" style={{ gridTemplateColumns: "minmax(0,1fr) 290px" }}>
+          <div className="min-w-0">
+            <PainelDaFase
+              faseNome={faseAtualNome}
+              faseSub={meta.sub}
+              faseTabs={meta.tabs}
+              steps={painel.steps}
+              kpis={painel.kpis}
+              progressoPct={painel.pct}
+              progressoConcluidos={painel.validados}
+              progressoTotal={painel.total}
+              progressoTexto={painel.progressoTexto}
+              linhaPrincipal={painel.linhaPrincipal}
+              foraDaLinha={painel.foraDaLinha}
+              onAbrirOperacao={(docId) => setDrawerDocId(docId)}
+            />
 
-            {/* Centro — stats */}
-            <div className="flex items-center gap-8 max-md:gap-4">
-              <div>
-                <div className="text-2xl font-bold">{matrix.directPeopleCount}</div>
-                <div className="text-[10px] uppercase tracking-wider text-white/60">Pessoas linha direta</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold">{matrix.missingCount}</div>
-                <div className="text-[10px] uppercase tracking-wider text-white/60">Documentos faltantes</div>
-              </div>
-              <div>
-                <div className={`text-2xl font-bold ${matrix.nameVariationsCount ? "text-red-300" : ""}`}>
-                  {matrix.nameVariationsCount}
-                </div>
-                <div className="text-[10px] uppercase tracking-wider text-white/60">Variações nominais</div>
-              </div>
-            </div>
+            <DocumentoOperationalDrawer
+              documentoId={drawerDocId}
+              isOpen={drawerDocId !== null}
+              onClose={() => setDrawerDocId(null)}
+              onSave={() => carregar(true)}
+            />
 
-            {/* Direita — expand */}
-            <button
-              onClick={() => setMatrixOpen(!matrixOpen)}
-              className="px-3 py-1.5 text-xs text-white/80 hover:text-white bg-white/10 hover:bg-white/15 rounded-lg transition-colors inline-flex items-center gap-1.5"
-            >
-              {matrixOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              detalhes
-            </button>
+            <InitOperationModal
+              documentoId={initModalDocId}
+              isOpen={initModalDocId !== null}
+              onClose={() => setInitModalDocId(null)}
+              onSuccess={() => {
+                setInitModalDocId(null)
+                carregar(true)
+              }}
+            />
           </div>
 
-          {/* Detalhes expandidos */}
-          {matrixOpen && (
-            <div className="mt-4 pt-4 border-t border-white/10 space-y-4">
-              {/* Por pessoa */}
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-white/60 mb-2">
-                  Por pessoa da linha direta
-                </div>
-                <div className="space-y-1.5">
-                  {matrix.byPerson.map((p) => (
-                    <div key={p.pessoaId} className="grid grid-cols-[40px_1fr_120px_50px] gap-2 items-center text-xs">
-                      <span className="font-mono text-white/50">G{p.generation}</span>
-                      <span className="text-white/90 truncate">{p.nome}</span>
-                      <div className="h-1.5 bg-white/15 rounded-full overflow-hidden">
-                        <div
-                          className="h-full transition-all duration-500"
-                          style={{
-                            width: `${p.percentage}%`,
-                            background: p.percentage === 100 ? "#10b981" : p.percentage >= 50 ? "#f59e0b" : "#dc2626",
-                          }}
-                        />
-                      </div>
-                      <span className="font-mono text-right text-white/70">
-                        {p.completed}/{p.total}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Faltantes */}
-              {matrix.missing.length > 0 && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-white/60 mb-2">
-                    Documentos faltantes ({matrix.missingCount})
-                  </div>
-                  <div className="space-y-1 max-h-48 overflow-y-auto">
-                    {matrix.missing.slice(0, 12).map((m) => (
-                      <button
-                        key={m.docId}
-                        onClick={() => setDrawerDocId(m.docId)}
-                        className="w-full text-left grid grid-cols-[36px_1.4fr_1.6fr_100px] gap-3 px-2 py-1.5 text-xs rounded hover:bg-white/5 transition-colors"
-                      >
-                        <span className="font-mono text-white/50">G{m.generation}</span>
-                        <span className="text-white/85 truncate">{m.pessoaNome}</span>
-                        <span className="text-white/70 truncate">{m.docType}</span>
-                        <span className="text-white/50 text-right">{m.status}</span>
-                      </button>
-                    ))}
-                    {matrix.missing.length > 12 && (
-                      <div className="text-[10px] text-white/40 text-center pt-1">
-                        + {matrix.missing.length - 12} outros
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          {/* ===== SIDEBAR (coluna direita) ===== */}
+          <MacroSidebar
+            currentPhase={faseAtualNome}
+            completedPhases={fasesConcluidas}
+            phaseProgress={progressoPorFase}
+          />
         </div>
-
-        {/* ============== DASHBOARD DE CARDS ============== */}
-        <div className="grid gap-2 mb-5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))" }}>
-          {cardList.map((c) => {
-            const active = queueFilter === c.id
-            const baseCls =
-              "relative overflow-hidden bg-white border rounded-lg px-3.5 py-3 text-left transition-all"
-            const stateCls = active
-              ? "border-slate-900 shadow-[0_0_0_2px_rgb(15_23_42)] bg-gradient-to-b from-slate-50 to-white"
-              : "border-gray-200 hover:border-gray-300 hover:-translate-y-px hover:shadow-md cursor-pointer"
-            const disabledCls = c.desabilitado ? "opacity-40 cursor-not-allowed" : ""
-
-            return (
-              <button
-                key={c.id}
-                onClick={() => !c.desabilitado && setQueueFilter(c.id)}
-                disabled={c.desabilitado}
-                className={`${baseCls} ${stateCls} ${disabledCls}`}
-                title={c.desabilitado ? "Requer migration do schema" : ""}
-              >
-                {/* Faixa colorida no topo */}
-                {c.cls === "alert" && (
-                  <span className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-red-600 to-orange-500" />
-                )}
-                {c.cls === "warn" && (
-                  <span className="absolute inset-x-0 top-0 h-[3px] bg-amber-500" />
-                )}
-
-                <div className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                  {c.icon}
-                  {c.label}
-                </div>
-                <div
-                  className={`text-[22px] font-bold leading-tight tracking-tight tabular-nums ${
-                    c.cls === "alert" ? "text-red-600" : c.cls === "warn" ? "text-amber-700" : "text-gray-900"
-                  }`}
-                >
-                  {c.val}
-                </div>
-                <div className="text-[10px] text-gray-400 mt-0.5">{c.hint}</div>
-              </button>
-            )
-          })}
-        </div>
-
-        {/* ============== HEADER DA LISTA + SORT ============== */}
-        <div className="flex items-center justify-between px-1 py-2 mb-2">
-          <div>
-            <strong className="text-sm font-bold text-gray-900 tracking-tight">{queueTitle}</strong>
-            <span className="inline-flex items-center justify-center bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-[11px] font-bold ml-2">
-              {queue.length}
-            </span>
-          </div>
-          <div className="flex gap-1.5">
-            {([
-              { key: "priority", label: "⚠ Prioridade" },
-              { key: "sla", label: "⏱ SLA" },
-              { key: "lineage", label: "↓ Linhagem" },
-            ] as const).map((opt) => (
-              <button
-                key={opt.key}
-                onClick={() => setSortBy(opt.key)}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                  sortBy === opt.key
-                    ? "bg-slate-900 text-white"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* ============== TABELA ============== */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          {/* Header */}
-          <div
-            className="grid items-center gap-2.5 px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gradient-to-b from-gray-50 to-slate-50 border-b border-gray-200"
-            style={{
-              gridTemplateColumns:
-                "18px minmax(170px,1.4fr) minmax(140px,1.2fr) minmax(140px,1fr) minmax(110px,.9fr) 90px 110px minmax(140px,1.2fr) 110px",
-            }}
-          >
-            <div />
-            <div>Tarefa</div>
-            <div>Documento</div>
-            <div>Pessoa</div>
-            <div>Responsável</div>
-            <div>Prazo</div>
-            <div>Estado</div>
-            <div>Próximo passo</div>
-            <div />
-          </div>
-
-          {/* Body */}
-          {queue.length === 0 ? (
-            <div className="py-16 text-center text-gray-400">
-              <div className="text-3xl mb-2">✓</div>
-              <p className="text-sm">Fila vazia. Nada precisa de atenção agora.</p>
-            </div>
-          ) : (
-            queue.map((row) => {
-              const prazo = formatPrazo(row.diasParaPrazo)
-              const rowBg = row.isCritical
-                ? "bg-gradient-to-r from-red-50 to-white hover:from-red-100"
-                : row.isOverdue
-                ? "bg-gradient-to-r from-amber-50 to-white"
-                : row.isBlocked
-                ? "bg-gradient-to-r from-amber-100/40 to-white"
-                : row.noOwner
-                ? "bg-gradient-to-r from-red-50 to-white"
-                : "hover:bg-slate-50/70"
-
-              const prioCor = row.isCritical || row.noOwner
-                ? "bg-red-500"
-                : row.isOverdue || row.isBlocked
-                ? "bg-amber-500"
-                : "bg-gray-300"
-
-              return (
-                <div
-                  key={row.docId}
-                  onClick={() => {
-                    if (row.status === "PENDENTE") {
-                      setInitModalDocId(row.docId)
-                    } else {
-                      setDrawerDocId(row.docId)
-                    }
-                  }}
-                  className={`grid items-center gap-2.5 px-3 min-h-[52px] text-xs border-b border-gray-100 cursor-pointer transition-colors ${rowBg}`}
-                  style={{
-                    gridTemplateColumns:
-                      "18px minmax(170px,1.4fr) minmax(140px,1.2fr) minmax(140px,1fr) minmax(110px,.9fr) 90px 110px minmax(140px,1.2fr) 110px",
-                  }}
-                >
-                  {/* Prio dot */}
-                  <div className="flex items-center justify-center">
-                    <div className={`w-2 h-2 rounded-full ${prioCor}`} />
-                  </div>
-
-                  {/* Tarefa */}
-                  <div className="flex flex-col gap-0.5 overflow-hidden">
-                    <div className="font-bold text-[12.5px] text-gray-900 truncate">
-                      {row.docTypeLabel}
-                    </div>
-                    <div className="text-[10px] text-gray-400 font-mono">
-                      {row.status}
-                    </div>
-                  </div>
-
-                  {/* Documento */}
-                  <div className="flex items-center gap-1.5 text-[11.5px] text-gray-600 overflow-hidden">
-                    <span className="flex-shrink-0 text-sm opacity-80">{docIconChar(row.docType)}</span>
-                    <span className="truncate">{row.docTypeLabel}</span>
-                  </div>
-
-                  {/* Pessoa */}
-                  <div className="text-[11.5px] text-gray-600 truncate" title={row.pessoaNome}>
-                    {row.pessoaNome}
-                  </div>
-
-                  {/* Responsável */}
-                  <div className="text-[11.5px] truncate">
-                    {row.responsavelNome ? (
-                      <span className="text-gray-700">{row.responsavelNome}</span>
-                    ) : (
-                      <span className="text-red-600 text-[10px] font-semibold">⚠ Sem resp.</span>
-                    )}
-                  </div>
-
-                  {/* Prazo */}
-                  <div className={`font-mono text-[10.5px] font-bold ${prazo.cls}`}>
-                    {prazo.text}
-                  </div>
-
-                  {/* Estado */}
-                  <div>
-                    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-700">
-                      {row.status}
-                    </span>
-                  </div>
-
-                  {/* Próximo passo */}
-                  <div className="text-[11px] truncate">
-                    {row.isCritical && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white animate-pulse">
-                        crítico
-                      </span>
-                    )}
-                    {!row.isCritical && row.isOverdue && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800">
-                        atrasado
-                      </span>
-                    )}
-                    {!row.isCritical && !row.isOverdue && row.isBlocked && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800">
-                        {row.motivoBloqueio}
-                      </span>
-                    )}
-                    {!row.isCritical && !row.isOverdue && !row.isBlocked && row.noOwner && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-800">
-                        sem resp.
-                      </span>
-                    )}
-                    {!row.isCritical && !row.isOverdue && !row.isBlocked && !row.noOwner && (
-                      <span className="text-gray-400">{row.proximoPasso}</span>
-                    )}
-                  </div>
-
-                  {/* Ação */}
-                  <div className="flex justify-end">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        if (row.status === "PENDENTE") {
-                          setInitModalDocId(row.docId)
-                        } else {
-                          setDrawerDocId(row.docId)
-                        }
-                      }}
-                      className="h-7 px-2.5 text-[10.5px] font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-md transition-colors whitespace-nowrap"
-                    >
-                      {row.status === "PENDENTE" ? "▸ Iniciar operação" : "▸ Abrir Central"}
-                    </button>
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </div>
-
-        {/* ============== AVISO sobre migration pendente ============== */}
-        {!schemaCapabilities.hasResponsavel && (
-          <div className="mt-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800">
-            ⚠ Alguns cards estão desabilitados porque dependem de campos novos em <code className="font-mono">Documento</code>.
-            Aplique a migration descrita em <code className="font-mono">schema-mudancas-central-operacional.md</code> e atualize o flag <code className="font-mono">schemaCapabilities</code> no endpoint.
-          </div>
-        )}
-
-        <DocumentoOperationalDrawer                                   
-          documentoId={drawerDocId}                                   
-          isOpen={drawerDocId !== null}                               
-          onClose={() => setDrawerDocId(null)}                   
-          onSave={() => carregar(true)}               
-        />
-
-        {/* ============== MODAL DE INICIAR OPERAÇÃO ============== */}
-        <InitOperationModal
-          documentoId={initModalDocId}
-          isOpen={initModalDocId !== null}
-          onClose={() => setInitModalDocId(null)}
-          onSuccess={() => {
-            setInitModalDocId(null)
-            carregar(true)  // recarrega a tabela
-          }}
-        />
-        </div>  {/* fecha a coluna esquerda (min-w-0) */}
-
-        {/* ===== SIDEBAR (coluna direita) ===== */}
-        <MacroSidebar
-          currentPhase={faseAtualNome}
-          completedPhases={fasesConcluidas}
-          phaseProgress={progressoPorFase}
-        />
-        </div>  {/* fecha o grid */}
       </div>
     </div>
   )
