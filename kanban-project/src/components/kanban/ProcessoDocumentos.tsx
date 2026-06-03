@@ -6,7 +6,6 @@ import { useState, useEffect, useCallback } from "react"
 import { Loader2 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import type { ProcessoWithStatus, Processo } from "@/src/types/kanban"
-import { DocumentoOperationalDrawer } from "./DocumentoOperationalDrawer"
 import { PessoaOperacionalDrawer } from "./PessoaOperacionalDrawer"
 import {
   ProcessoDocumentosBiblioteca,
@@ -14,6 +13,10 @@ import {
   type BibDocItem,
   type BibKpis,
 } from "./ProcessoDocumentosBiblioteca"
+import {
+  DocumentoBibliotecaDrawer,
+  type DocumentoBibliotecaContext,
+} from "./DocumentoBibliotecaDrawer"
 
 // ============================================================
 // TIPOS (espelho do endpoint)
@@ -92,6 +95,15 @@ function certStatusFromDoc(
   return "pendente"
 }
 
+// nome completo p/ o cabecalho do drawer, a partir do tipo CURTO que aparece
+// na tabela (o backend nao manda o tipo completo nesse endpoint).
+const NOME_COMPLETO: Record<string, string> = {
+  "Nasc.": "Certidão de Nascimento",
+  "Cas.": "Certidão de Casamento",
+  "Óbito": "Certidão de Óbito",
+  "Ób.": "Certidão de Óbito",
+}
+
 function mapearBiblioteca(data: ProcessoDocumentosData) {
   const toGroup = (row: PersonRow): BibPersonGroup => {
     const docs: BibDocItem[] = row.docs.map((d) => {
@@ -100,11 +112,12 @@ function mapearBiblioteca(data: ProcessoDocumentosData) {
         certSt === "validada" ? "pronta_protocolo" : "pendente"
       return {
         id: d.id,
-        documentType: d.tipoShort,
+        documentType: NOME_COMPLETO[d.tipoShort] ?? d.tipoShort,
+        documentTypeFull: NOME_COMPLETO[d.tipoShort] ?? d.tipoShort,
         documentFormat: "Inteiro teor",
         personName: row.nome,
         certificate: { status: certSt },
-        retifiedCertificate: { status: "nao_aplica" }, // backend ainda não separa
+        retifiedCertificate: { status: "nao_aplica" }, // backend ainda nao separa
         translation: { status: "nao_aplica" },         // idem
         apostille: { status: "nao_aplica" },            // idem
         finalStatus,
@@ -156,7 +169,6 @@ export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
 
   const [drawerDocId, setDrawerDocId] = useState<number | null>(null)
   const [drawerPessoaId, setDrawerPessoaId] = useState<number | null>(null)
-  const [voltarParaPessoa, setVoltarParaPessoa] = useState<{ id: number; nome: string } | null>(null)
 
   const carregar = useCallback(
     async (modoSilencioso = false) => {
@@ -218,6 +230,20 @@ export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
 
   const bib = mapearBiblioteca(data)
 
+  // Localiza o documento selecionado (e o contexto da pessoa) para o drawer claro.
+  let drawerDoc: BibDocItem | null = null
+  let drawerCtx: DocumentoBibliotecaContext | undefined
+  if (drawerDocId !== null) {
+    for (const g of [...bib.linhaPrincipal, ...bib.foraDaLinha]) {
+      const found = g.documents.find((d) => d.id === drawerDocId)
+      if (found) {
+        drawerDoc = found
+        drawerCtx = { lineage: g.lineage, role: g.role, generation: g.generation }
+        break
+      }
+    }
+  }
+
   return (
     <>
       <ProcessoDocumentosBiblioteca
@@ -227,39 +253,23 @@ export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
         onAbrirDetalhes={(docId) => setDrawerDocId(docId)}
       />
 
-      {/* Drawer da pessoa */}
+      {/* Drawer da pessoa (Central Operacional) */}
       <PessoaOperacionalDrawer
         pessoaId={drawerPessoaId}
         isOpen={drawerPessoaId !== null}
-        onClose={() => {
-          setDrawerPessoaId(null)
-          setVoltarParaPessoa(null)
-        }}
+        onClose={() => setDrawerPessoaId(null)}
         onClickDoc={(docId) => {
           setDrawerPessoaId(null)
           setDrawerDocId(docId)
         }}
       />
 
-      {/* Drawer do documento */}
-      <DocumentoOperationalDrawer
-        documentoId={drawerDocId}
+      {/* Drawer CLARO do documento (biblioteca — somente leitura) */}
+      <DocumentoBibliotecaDrawer
+        item={drawerDoc}
+        context={drawerCtx}
         isOpen={drawerDocId !== null}
-        onClose={() => {
-          setDrawerDocId(null)
-          setVoltarParaPessoa(null)
-        }}
-        onSave={() => carregar(true)}
-        onBack={
-          voltarParaPessoa
-            ? () => {
-                const p = voltarParaPessoa
-                setDrawerDocId(null)
-                setDrawerPessoaId(p.id)
-              }
-            : undefined
-        }
-        backLabel={voltarParaPessoa?.nome}
+        onClose={() => setDrawerDocId(null)}
       />
     </>
   )
