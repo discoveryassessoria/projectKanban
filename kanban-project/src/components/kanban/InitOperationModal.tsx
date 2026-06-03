@@ -7,8 +7,6 @@ import { createPortal } from "react-dom"
 import {
   X,
   Search,
-  Send,
-  Inbox,
   Ban,
   AlertTriangle,
   Loader2,
@@ -199,9 +197,7 @@ export function InitOperationModal({
 
   if (!isOpen) return null
 
-  // -- Computa quais opções estão disponíveis com base no estado do doc
-  const hasRegistralData = !!(doc?.cartorio && (doc?.livro || doc?.folha || doc?.termo))
-
+  // -- Opções disponíveis (apenas Buscar e Desnecessário)
   const opcoes: Array<{
     key: TipoOperacao
     label: string
@@ -218,25 +214,6 @@ export function InitOperationModal({
       icon: <Search className="w-5 h-5" />,
       iconBg: "bg-amber-100",
       iconColor: "text-amber-700",
-    },
-    {
-      key: "solicitar",
-      label: "Solicitar certidão",
-      desc: hasRegistralData
-        ? "Dados registrais já conhecidos — solicitar direto ao cartório."
-        : "⚠ Sem dados registrais: a busca será automaticamente marcada como pulada com justificativa.",
-      icon: <Send className="w-5 h-5" />,
-      iconBg: "bg-blue-100",
-      iconColor: "text-blue-700",
-      warning: !hasRegistralData,
-    },
-    {
-      key: "receber",
-      label: "Registrar recebimento",
-      desc: "Já possuo a certidão fisicamente. Anexar e ir direto para conferência.",
-      icon: <Inbox className="w-5 h-5" />,
-      iconBg: "bg-pink-100",
-      iconColor: "text-pink-700",
     },
     {
       key: "desnecessario",

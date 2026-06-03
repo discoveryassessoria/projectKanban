@@ -363,7 +363,9 @@ export async function GET(
         break
       case "all":
       default:
-        filtered = docs.filter(isAtivo)
+        // inclui PENDENTE: num processo novo os docs ainda não foram solicitados,
+        // mas precisam aparecer pro operador começar.
+        filtered = docs.filter((d) => isAtivo(d) || isPendente(d))
         queueTitle = "Todas as tarefas ativas"
         break
     }
