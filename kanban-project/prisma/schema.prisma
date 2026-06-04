@@ -254,6 +254,7 @@ model Processo {
   outrosCustos      OutroCusto[]
   arvore            Arvore?               @relation(fields: [arvoreId], references: [id])
   status            Status                @relation(fields: [statusId], references: [id], onDelete: Cascade)
+  analise           AnaliseDocumental?
   contratantes      ProcessoContratante[]
   requerentes       ProcessoRequerente[]
   protocolos        Protocolo[]
@@ -1223,6 +1224,82 @@ model WorkflowStep {
   @@index([workflowId])
   @@index([status])
   @@index([assigneeId])
+}
+
+// ============================================================
+// ANÁLISE DOCUMENTAL (fase de PROCESSO — compara árvore × documentos)
+// ============================================================
+model AnaliseDocumental {
+  id                   Int       @id @default(autoincrement())
+  processoId           Int       @unique
+  processo             Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  // "pendente" | "em_andamento" | "concluida"
+  status               String    @default("pendente") @db.VarChar(20)
+  // "comparacao_ia" | "revisao_humana" | "decisao_juridica"
+  currentStep          String    @default("comparacao_ia") @db.VarChar(30)
+
+  // KPIs da tela
+  totalDocumentos      Int       @default(0)
+  documentosAnalisados Int       @default(0)
+  camposComparados     Int       @default(0)
+  resumoIA             String?   @db.Text
+
+  // null (ainda não) | "com_retificacao" | "sem_retificacao"
+  decisaoJuridica      String?   @db.VarChar(20)
+  requerRetificacao    Boolean   @default(false)
+
+  startedAt            DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  divergencias         Divergencia[]
+
+  @@index([processoId])
+  @@index([status])
+}
+
+model Divergencia {
+  id                  Int               @id @default(autoincrement())
+  analiseId           Int
+  analise             AnaliseDocumental @relation(fields: [analiseId], references: [id], onDelete: Cascade)
+
+  // Snapshots (auto-contido — não quebra se a pessoa/doc mudar depois)
+  pessoaId            Int?
+  pessoaNome          String    @db.VarChar(200)
+  geracao             Int?
+  linhaReta           Boolean   @default(true)
+  documentoId         Int?
+  documentoTitulo     String    @db.VarChar(200)
+  dataDocumento       String?   @db.VarChar(20)
+
+  // O que divergiu
+  campo               String    @db.VarChar(60)   // "pai", "sobrenome", "cidade_nascimento"...
+  campoLabel          String    @db.VarChar(120)  // "Nome do pai"
+  valorArvore         String?   @db.VarChar(300)
+  valorDocumento      String?   @db.VarChar(300)
+
+  // Classificação da comparação
+  tipo                String    @db.VarChar(40)   // "nome" | "filiacao" | "localidade"...
+  severidade          String    @db.VarChar(10)   // "baixa" | "media" | "critica"
+  sugestaoIA          String?   @db.VarChar(300)
+  motivoIA            String?   @db.Text
+  impacto             String?   @db.VarChar(300)
+  requerRetificacaoIA Boolean   @default(false)
+
+  // Decisão humana: "pendente" | "aceita" | "ressalva" | "ignorada" | "retificacao" | "apoio_solicitado"
+  status              String    @default("pendente") @db.VarChar(20)
+  decididoPorId       Int?
+  decididoEm          DateTime?
+  notas               String?   @db.Text
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([analiseId])
+  @@index([status])
+  @@index([severidade])
 }
 
 enum Pais {
