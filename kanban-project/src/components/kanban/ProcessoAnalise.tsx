@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Loader2, Sparkles, CheckCircle2, AlertTriangle, ArrowRight } from "lucide-react"
+import { Loader2, Sparkles, CheckCircle2, AlertTriangle, ArrowRight, Check } from "lucide-react"
 
 interface Divergencia {
   id: number
@@ -129,7 +129,18 @@ export function ProcessoAnalise({ processoId, onConcluido }: Props) {
   const divs = analise?.divergencias ?? []
   const pend = divs.filter((d) => d.status === "pendente" || d.status === "apoio_solicitado").length
   const crit = divs.filter((d) => d.severidade === "critica" && (d.status === "pendente" || d.status === "retificacao")).length
+  const ress = divs.filter((d) => d.status === "ressalva").length
+  const aprov = divs.filter((d) => d.status === "aceita" || d.status === "ignorada").length
   const podeConcluir = !!analise && pend === 0 && analise.status !== "concluida"
+
+  // Barra de etapas do processo de análise (reflete o currentStep)
+  const etapas: Array<{ label: string; st: "concluida" | "em_andamento" | "pendente" }> = [
+    { label: "Documentos recebidos", st: analise ? "concluida" : "em_andamento" },
+    { label: "Comparação IA", st: analise ? "concluida" : "pendente" },
+    { label: "Revisão humana", st: !analise ? "pendente" : pend > 0 ? "em_andamento" : "concluida" },
+    { label: "Decisão jurídica", st: analise?.status === "concluida" ? "concluida" : analise && pend === 0 ? "em_andamento" : "pendente" },
+    { label: "Análise concluída", st: analise?.status === "concluida" ? "concluida" : "pendente" },
+  ]
 
   if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
 
@@ -141,11 +152,48 @@ export function ProcessoAnalise({ processoId, onConcluido }: Props) {
       </div>
 
       {analise && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <Stat label="Documentos" value={analise.documentosAnalisados} />
-          <Stat label="Campos comparados" value={analise.camposComparados} />
-          <Stat label="Divergências" value={divs.length} />
-          <Stat label="Críticas abertas" value={crit} danger={crit > 0} />
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            <Stat label="Documentos" value={analise.documentosAnalisados} />
+            <Stat label="Campos comparados" value={analise.camposComparados} />
+            <Stat label="Divergências" value={divs.length} />
+            <Stat label="Críticas abertas" value={crit} danger={crit > 0} />
+            <Stat label="Ressalvas" value={ress} />
+            <Stat label="Aprovados" value={aprov} />
+          </div>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+            {analise.status === "concluida" ? "Análise concluída" : "Em análise"}
+          </span>
+        </div>
+      )}
+
+      {analise && (
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="flex items-start">
+            {etapas.map((e, i) => (
+              <div key={e.label} className={`flex items-start ${i < etapas.length - 1 ? "flex-1" : ""}`}>
+                <div className="flex flex-col items-center text-center w-[88px] shrink-0">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                    e.st === "concluida" ? "bg-green-500 text-white"
+                    : e.st === "em_andamento" ? "bg-indigo-600 text-white"
+                    : "bg-gray-200 text-gray-500"}`}>
+                    {e.st === "concluida" ? <Check className="w-4 h-4" /> : i + 1}
+                  </div>
+                  <div className="mt-1.5 text-[11px] font-medium text-gray-700 leading-tight">{e.label}</div>
+                  <div className={`text-[10px] ${
+                    e.st === "concluida" ? "text-green-600"
+                    : e.st === "em_andamento" ? "text-indigo-600"
+                    : "text-gray-400"}`}>
+                    {e.st === "concluida" ? "Concluído" : e.st === "em_andamento" ? "Em andamento" : "Pendente"}
+                  </div>
+                </div>
+                {i < etapas.length - 1 && (
+                  <div className={`flex-1 h-0.5 mt-3.5 ${e.st === "concluida" ? "bg-green-400" : "bg-gray-200"}`} />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
