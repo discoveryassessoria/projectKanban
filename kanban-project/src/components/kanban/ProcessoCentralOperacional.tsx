@@ -10,6 +10,7 @@ import { DocumentoOperationalDrawer } from "./DocumentoOperationalDrawer"
 import { InitOperationModal } from "./InitOperationModal"
 import { WorkflowMacroTrilha, MacroSidebar, PROCESS_PHASES } from "./WorkflowMacroTrilha"
 import { PainelDaFase, type FasePersonRow, type FaseStep, type FaseKpi } from "./PainelDaFase"
+import { ProcessoAnalise } from "./ProcessoAnalise"
 
 // ============================================================
 // TIPOS (espelho do endpoint)
@@ -329,6 +330,11 @@ export function ProcessoCentralOperacional({
   const painel = mapearPainel(data, faseAtualNome)
   const meta = FASE_META[faseAtualNome] || { sub: "", tabs: ["Resumo"] }
 
+  // Detecta a fase de Análise Documental (tolerante a acento/caixa)
+  const ehAnalise = faseAtualNome
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .includes("analise documental")
+
   return (
     <div className="h-full overflow-y-auto bg-gray-50/30">
       <div className="px-6 py-5">
@@ -340,6 +346,11 @@ export function ProcessoCentralOperacional({
           phaseProgress={progressoPorFase}
         />
 
+        {ehAnalise ? (
+          /* ===== PAINEL DE ANÁLISE DOCUMENTAL ===== */
+          <ProcessoAnalise processoId={processo.id} onConcluido={() => carregar(true)} />
+        ) : (
+        <>
         {/* ===== Header da Central + Atualizar ===== */}
         <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
           <div>
@@ -401,6 +412,8 @@ export function ProcessoCentralOperacional({
             phaseProgress={progressoPorFase}
           />
         </div>
+        </>
+        )}
       </div>
     </div>
   )
