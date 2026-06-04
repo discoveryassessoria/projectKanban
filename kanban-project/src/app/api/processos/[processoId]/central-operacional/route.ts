@@ -73,6 +73,7 @@ interface QueueRow {
   noOwner: boolean
   proximoPasso: string | null
   generation: number
+  isLinhaReta: boolean
 }
 
 interface CentralOperacionalResponse {
@@ -186,6 +187,7 @@ export async function GET(
             sobrenome: true,
             numeroLinhagem: true,
             requerente: true,
+            linhaReta: true,
           },
         })
       : []
@@ -195,7 +197,7 @@ export async function GET(
 
     const pessoasIds = pessoas.map((p) => p.id)
     const pessoasMap = new Map(pessoas.map((p) => [p.id, p]))
-    const pessoasNaLinha = pessoas.filter((p) => p.numeroLinhagem != null)
+    const pessoasNaLinha = pessoas.filter((p) => p.linhaReta)
 
     const generationOf = (pessoaId: number): number => {
       const p = pessoasMap.get(pessoaId)
@@ -429,6 +431,7 @@ export async function GET(
         noOwner: isNoOwner(d),
         proximoPasso,
         generation: generationOf(d.pessoaId),
+        isLinhaReta: pessoa?.linhaReta ?? false,
       }
     })
 
@@ -449,7 +452,7 @@ export async function GET(
     }
 
     const matrixByPerson = Array.from(byPersonAgg.entries())
-      .filter(([pid]) => pessoasMap.get(pid)?.numeroLinhagem != null)
+      .filter(([pid]) => pessoasMap.get(pid)?.linhaReta)
       .map(([pid, v]) => {
         const p = pessoasMap.get(pid)!
         return {
@@ -468,7 +471,7 @@ export async function GET(
 
     const missing = docs
       .filter((d) => !STATUS_VALIDADOS.includes(d.status))
-      .filter((d) => pessoasMap.get(d.pessoaId)?.numeroLinhagem != null)
+      .filter((d) => pessoasMap.get(d.pessoaId)?.linhaReta)
       .slice(0, 50)
       .map((d) => {
         const pessoa = pessoasMap.get(d.pessoaId)!

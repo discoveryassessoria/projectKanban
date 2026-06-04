@@ -94,6 +94,8 @@ export async function POST(request: NextRequest) {
       // ✅ NOVO: Requerente e Linhagem
       requerente,
       numeroLinhagem,
+      linhaReta,
+      documentacao,
 
       // ✅ NOVO (rodada 3): flag de casamento pra engine
       casado,
@@ -158,6 +160,8 @@ export async function POST(request: NextRequest) {
         // ✅ Requerente e Linhagem
         requerente: requerente || 'nao',
         numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null,
+        linhaReta: linhaReta ?? true,
+        documentacao: documentacao ?? true,
 
         // ✅ NOVO (rodada 3): flag de casado
         casado: casado === true,
@@ -203,16 +207,18 @@ export async function POST(request: NextRequest) {
     // ============================================================
     // Roda a engine pra criar os 3 docs canônicos baseado em casado/vivo.
     // Se falhar, a pessoa já foi criada — só logamos e seguimos.
-    try {
-      const result = await reconcileDocsForPessoa(pessoa.id, prisma)
-      console.log("[POST /api/pessoas] auto-gen docs:", {
-        pessoaId: pessoa.id,
-        createdCount: result.createdCount,
-        rules: result.createdRules,
-      })
-    } catch (genError) {
-      console.error("[POST /api/pessoas] falha na auto-geração:", genError)
-      // não derruba a request — pessoa está criada
+    if (pessoa.documentacao !== false) {
+      try {
+        const result = await reconcileDocsForPessoa(pessoa.id, prisma)
+        console.log("[POST /api/pessoas] auto-gen docs:", {
+          pessoaId: pessoa.id,
+          createdCount: result.createdCount,
+          rules: result.createdRules,
+        })
+      } catch (genError) {
+        console.error("[POST /api/pessoas] falha na auto-geração:", genError)
+        // não derruba a request — pessoa está criada
+      }
     }
 
     // Recarrega a pessoa COM os docs gerados

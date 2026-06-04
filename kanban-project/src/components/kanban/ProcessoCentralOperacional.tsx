@@ -72,6 +72,7 @@ interface CentralOpData {
     noOwner: boolean
     proximoPasso: string | null
     generation: number
+    isLinhaReta: boolean
   }>
   queueTitle: string
   schemaCapabilities: {
@@ -155,7 +156,7 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
     const key = q.pessoaNome
     if (!porPessoa.has(key)) {
       const iniciais = q.pessoaNome.split(/\s+/).map((x) => x[0]).slice(0, 2).join("").toUpperCase()
-      const isLinha = q.generation !== 99
+      const isLinha = q.isLinhaReta
       porPessoa.set(key, {
         pessoaId: q.docId,
         nome: q.pessoaNome,

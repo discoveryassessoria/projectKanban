@@ -868,6 +868,8 @@ function AddPersonModal({
   // ✅ NOVOS CAMPOS
   const [requerente, setRequerente] = useState<string>('nao')
   const [numeroLinhagem, setNumeroLinhagem] = useState<string>('')
+  const [isLinhaReta, setIsLinhaReta] = useState<boolean>(type !== 'conjuge')
+  const [precisaDocumentacao, setPrecisaDocumentacao] = useState<boolean>(true)
 
   // Classes padrão
   const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm h-[42px]"
@@ -904,7 +906,9 @@ function AddPersonModal({
         local_emigracao: isFalecido && localObito ? localObito.trim() : null,
         comentario: comentario.trim() || null,
         requerente: requerente || 'nao',  // ✅ NOVO
-        numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null,  // ✅ NOVO
+        numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null,  // ✅ pasta documental (todos)
+        linhaReta: isLinhaReta,  // ✅ Central Operacional / Documentos
+        documentacao: precisaDocumentacao,  // ✅ gera documentos ou não
         arvoreId
       }
 
@@ -990,228 +994,157 @@ function AddPersonModal({
         <div className="px-6 py-4 border-b sticky top-0 bg-white">
           <h2 className="text-xl font-semibold text-gray-900">{titles[type || 'pessoa']}</h2>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-3">
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-              <input
-                type="text"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                className={inputClass}
-                required
-                autoFocus
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sobrenome</label>
-              <input
-                type="text"
-                value={sobrenome}
-                onChange={(e) => setSobrenome(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
-              <select
-                value={sexo}
-                onChange={(e) => setSexo(e.target.value)}
-                className={selectClass}
-                style={selectStyle}
-              >
-                <option value="">Selecione...</option>
-                <option value="Masculino">Masculino</option>
-                <option value="Feminino">Feminino</option>
-              </select>
-            </div>
-          </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
 
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
-              <DatePickerField
-                value={dataNasc}
-                onChange={(value) => setDataNasc(value)}
-              />
+          {/* ===== Identificação ===== */}
+          <section>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Identificação</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+                <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} className={inputClass} required autoFocus />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sobrenome</label>
+                <input type="text" value={sobrenome} onChange={(e) => setSobrenome(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
+                <select value={sexo} onChange={(e) => setSexo(e.target.value)} className={selectClass} style={selectStyle}>
+                  <option value="">Selecione...</option>
+                  <option value="Masculino">Masculino</option>
+                  <option value="Feminino">Feminino</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
-              <input
-                type="text"
-                value={localNasc}
-                onChange={(e) => setLocalNasc(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">País de Nascimento</label>
-              <input
-                type="text"
-                value={paisNasc}
-                onChange={(e) => setPaisNasc(e.target.value)}
-                placeholder="Ex: Brasil, Itália..."
-                className={inputClass}
-              />
-            </div>
-          </div>
+          </section>
 
-          <div className="grid grid-cols-3 gap-3 items-end">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
-              <input
-                type="text"
-                value={nacionalidade}
-                onChange={(e) => setNacionalidade(e.target.value)}
-                placeholder="Ex: Brasileiro..."
-                className={inputClass}
-              />
+          {/* ===== Nascimento ===== */}
+          <section className="border-t border-gray-100 pt-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Nascimento</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
+                <DatePickerField value={dataNasc} onChange={(value) => setDataNasc(value)} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
+                <input type="text" value={localNasc} onChange={(e) => setLocalNasc(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">País de Nascimento</label>
+                <input type="text" value={paisNasc} onChange={(e) => setPaisNasc(e.target.value)} placeholder="Ex: Brasil, Itália..." className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
+                <input type="text" value={nacionalidade} onChange={(e) => setNacionalidade(e.target.value)} placeholder="Ex: Brasileiro..." className={inputClass} />
+              </div>
             </div>
-            {type !== 'conjuge' && (
-              <div className="flex items-center h-[42px]">
+          </section>
+
+          {/* ===== Situação ===== */}
+          <section className="border-t border-gray-100 pt-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Situação</h3>
+            <div className="flex flex-wrap items-center gap-6">
+              {type !== 'conjuge' && (
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isCasado}
-                    onChange={(e) => setIsCasado(e.target.checked)}
-                    className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
-                  />
+                  <input type="checkbox" checked={isCasado} onChange={(e) => setIsCasado(e.target.checked)} className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
                   <span className="text-sm font-medium text-gray-700">Pessoa casada</span>
                 </label>
-              </div>
-            )}
-            <div className="flex items-center h-[42px]">
+              )}
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isFalecido}
-                  onChange={(e) => setIsFalecido(e.target.checked)}
-                  className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
-                />
+                <input type="checkbox" checked={isFalecido} onChange={(e) => setIsFalecido(e.target.checked)} className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
                 <span className="text-sm font-medium text-gray-700">Pessoa falecida</span>
               </label>
             </div>
-          </div>
 
-          {(isCasado || type === 'conjuge') && (
-            <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
-              <h3 className="text-sm font-medium text-purple-800 mb-2">Dados do Casamento</h3>
-              <div className="grid grid-cols-3 gap-3">
-                {type !== 'conjuge' && (
+            {(isCasado || type === 'conjuge') && (
+              <div className="bg-purple-50 rounded-lg p-3 border border-purple-200 mt-3">
+                <h4 className="text-sm font-medium text-purple-800 mb-2">Dados do Casamento</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  {type !== 'conjuge' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cônjuge</label>
+                      <select value={conjugeId} onChange={(e) => setConjugeId(e.target.value)} className={selectClass} style={selectStyle}>
+                        <option value="">Selecione...</option>
+                        {pessoasDisponiveis.map(p => (
+                          <option key={p.id} value={p.id}>{p.nome} {p.sobrenome || ''}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cônjuge</label>
-                    <select
-                      value={conjugeId}
-                      onChange={(e) => setConjugeId(e.target.value)}
-                      className={selectClass}
-                      style={selectStyle}
-                    >
-                      <option value="">Selecione...</option>
-                      {pessoasDisponiveis.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.nome} {p.sobrenome || ''}
-                        </option>
-                      ))}
-                    </select>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Data do Casamento</label>
+                    <DatePickerField value={dataCasamento} onChange={(value) => setDataCasamento(value)} />
                   </div>
-                )}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Data do Casamento</label>
-                  <DatePickerField
-                    value={dataCasamento}
-                    onChange={(value) => setDataCasamento(value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Local do Casamento</label>
-                  <input
-                    type="text"
-                    value={localCasamento}
-                    onChange={(e) => setLocalCasamento(e.target.value)}
-                    placeholder="Cidade, País"
-                    className={inputClass}
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Local do Casamento</label>
+                    <input type="text" value={localCasamento} onChange={(e) => setLocalCasamento(e.target.value)} placeholder="Cidade, País" className={inputClass} />
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {isFalecido && (
-            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Dados do Falecimento</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Data de Falecimento</label>
-                  <DatePickerField
-                    value={dataObito}
-                    onChange={(value) => setDataObito(value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Local de Falecimento</label>
-                  <input
-                    type="text"
-                    value={localObito}
-                    onChange={(e) => setLocalObito(e.target.value)}
-                    placeholder="Cidade, País"
-                    className={inputClass}
-                  />
+            {isFalecido && (
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 mt-3">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Dados do Falecimento</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Data de Falecimento</label>
+                    <DatePickerField value={dataObito} onChange={(value) => setDataObito(value)} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Local de Falecimento</label>
+                    <input type="text" value={localObito} onChange={(e) => setLocalObito(e.target.value)} placeholder="Cidade, País" className={inputClass} />
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </section>
 
-          {/* ✅ NOVOS CAMPOS: Requerente e Número de Linhagem */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Requerente</label>
-              <select
-                value={requerente}
-                onChange={(e) => setRequerente(e.target.value)}
-                className={selectClass}
-                style={selectStyle}
-              >
-                <option value="nao">Não</option>
-                <option value="maior">Sim - Maior de idade</option>
-                <option value="menor">Sim - Menor de idade</option>
-              </select>
+          {/* ===== Classificação no processo ===== */}
+          <section className="border-t border-gray-100 pt-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Classificação no processo</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Requerente</label>
+                <select value={requerente} onChange={(e) => setRequerente(e.target.value)} className={selectClass} style={selectStyle}>
+                  <option value="nao">Não</option>
+                  <option value="maior">Sim - Maior de idade</option>
+                  <option value="menor">Sim - Menor de idade</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nº Linhagem</label>
+                <input type="number" min="1" value={numeroLinhagem} onChange={(e) => setNumeroLinhagem(e.target.value)} placeholder="Ex: 1, 2, 3..." className={inputClass} />
+                <span className="block text-xs text-gray-400 mt-1">Ordena a pasta documental — vale pra todas as pessoas.</span>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nº Linhagem</label>
-              <input
-                type="number"
-                min="1"
-                value={numeroLinhagem}
-                onChange={(e) => setNumeroLinhagem(e.target.value)}
-                placeholder="Ex: 1, 2, 3..."
-                className={inputClass}
-              />
-            </div>
-          </div>
+            <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 p-3 mt-3">
+              <input type="checkbox" checked={isLinhaReta} onChange={(e) => setIsLinhaReta(e.target.checked)} className="w-5 h-5 mt-0.5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+              <span>
+                <span className="block text-sm font-medium text-gray-700">Pertence à linha reta de transmissão</span>
+                <span className="block text-xs text-gray-400">Define se a pessoa entra na Linha principal ou em Cônjuges/Apoio na Central Operacional.</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 p-3 mt-3">
+              <input type="checkbox" checked={precisaDocumentacao} onChange={(e) => setPrecisaDocumentacao(e.target.checked)} className="w-5 h-5 mt-0.5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+              <span>
+                <span className="block text-sm font-medium text-gray-700">Precisa de documentação</span>
+                <span className="block text-xs text-gray-400">Se desligado, o sistema não gera os documentos desta pessoa e ela não entra na Central Operacional / workflow.</span>
+              </span>
+            </label>
+          </section>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
-            <textarea
-              value={comentario}
-              onChange={(e) => setComentario(e.target.value)}
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
-            />
-          </div>
+          {/* ===== Observações ===== */}
+          <section className="border-t border-gray-100 pt-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Observações</h3>
+            <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none text-sm" />
+          </section>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !nome.trim()}
-              className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50"
-            >
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">Cancelar</button>
+            <button type="submit" disabled={saving || !nome.trim()} className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50">
               {saving ? 'Salvando...' : 'Adicionar'}
             </button>
           </div>
@@ -1260,6 +1193,8 @@ function EditPersonModal({
   const [saving, setSaving] = useState(false)
   const [requerente, setRequerente] = useState((pessoa as any).requerente || 'nao')
   const [numeroLinhagem, setNumeroLinhagem] = useState((pessoa as any).numeroLinhagem?.toString() || '')
+  const [isLinhaReta, setIsLinhaReta] = useState<boolean>((pessoa as any).linhaReta ?? true)
+  const [precisaDocumentacao, setPrecisaDocumentacao] = useState<boolean>((pessoa as any).documentacao ?? true)
 
   // Classes padrão
   const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm h-[42px]"
@@ -1295,7 +1230,9 @@ function EditPersonModal({
           local_emigracao: isFalecido && localObito ? localObito.trim() : null,
           comentario: comentario.trim() || null,
           requerente: requerente || 'nao',
-          numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null
+          numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null,
+          linhaReta: isLinhaReta,
+          documentacao: precisaDocumentacao
         })
       })
 
@@ -1369,229 +1306,153 @@ function EditPersonModal({
         <div className="px-6 py-4 border-b sticky top-0 bg-white">
           <h2 className="text-xl font-semibold text-gray-900">Editar Pessoa</h2>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Nome, Sobrenome, Sexo */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-              <input
-                type="text"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                className={inputClass}
-                required
-                autoFocus
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sobrenome</label>
-              <input
-                type="text"
-                value={sobrenome}
-                onChange={(e) => setSobrenome(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
-              <select
-                value={sexo}
-                onChange={(e) => setSexo(e.target.value)}
-                className={selectClass}
-                style={selectStyle}
-              >
-                <option value="">Selecione...</option>
-                <option value="Masculino">Masculino</option>
-                <option value="Feminino">Feminino</option>
-              </select>
-            </div>
-          </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
 
-          {/* Data Nasc, Cidade Nasc, País Nasc */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
-              <DatePickerField
-                value={dataNasc}
-                onChange={(value) => setDataNasc(value)}
-              />
+          {/* ===== Identificação ===== */}
+          <section>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Identificação</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+                <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} className={inputClass} required autoFocus />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sobrenome</label>
+                <input type="text" value={sobrenome} onChange={(e) => setSobrenome(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
+                <select value={sexo} onChange={(e) => setSexo(e.target.value)} className={selectClass} style={selectStyle}>
+                  <option value="">Selecione...</option>
+                  <option value="Masculino">Masculino</option>
+                  <option value="Feminino">Feminino</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
-              <input
-                type="text"
-                value={localNasc}
-                onChange={(e) => setLocalNasc(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">País de Nascimento</label>
-              <input
-                type="text"
-                value={paisNasc}
-                onChange={(e) => setPaisNasc(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-          </div>
+          </section>
 
-          {/* Nacionalidade, Casada, Falecida */}
-          <div className="grid grid-cols-3 gap-4 items-end">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
-              <input
-                type="text"
-                value={nacionalidade}
-                onChange={(e) => setNacionalidade(e.target.value)}
-                className={inputClass}
-              />
+          {/* ===== Nascimento ===== */}
+          <section className="border-t border-gray-100 pt-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Nascimento</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
+                <DatePickerField value={dataNasc} onChange={(value) => setDataNasc(value)} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
+                <input type="text" value={localNasc} onChange={(e) => setLocalNasc(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">País de Nascimento</label>
+                <input type="text" value={paisNasc} onChange={(e) => setPaisNasc(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
+                <input type="text" value={nacionalidade} onChange={(e) => setNacionalidade(e.target.value)} className={inputClass} />
+              </div>
             </div>
-            <div className="flex items-center h-[42px]">
+          </section>
+
+          {/* ===== Situação ===== */}
+          <section className="border-t border-gray-100 pt-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Situação</h3>
+            <div className="flex flex-wrap items-center gap-6">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isCasado}
-                  onChange={(e) => setIsCasado(e.target.checked)}
-                  className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
-                />
+                <input type="checkbox" checked={isCasado} onChange={(e) => setIsCasado(e.target.checked)} className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
                 <span className="text-sm font-medium text-gray-700">Pessoa casada</span>
               </label>
-            </div>
-            <div className="flex items-center h-[42px]">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isFalecido}
-                  onChange={(e) => setIsFalecido(e.target.checked)}
-                  className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
-                />
+                <input type="checkbox" checked={isFalecido} onChange={(e) => setIsFalecido(e.target.checked)} className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
                 <span className="text-sm font-medium text-gray-700">Pessoa falecida</span>
               </label>
             </div>
-          </div>
 
-          {/* Dados do Casamento */}
-          {isCasado && (
-            <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-              <h3 className="text-sm font-medium text-purple-800 mb-3">Dados do Casamento</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Cônjuge</label>
-                  <select
-                    value={conjugeId}
-                    onChange={(e) => setConjugeId(e.target.value)}
-                    className={selectClass}
-                    style={selectStyle}
-                  >
-                    <option value="">Selecione...</option>
-                    {pessoasDisponiveis.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.nome} {p.sobrenome || ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Data do Casamento</label>
-                  <DatePickerField
-                    value={dataCasamento}
-                    onChange={(value) => setDataCasamento(value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Local do Casamento</label>
-                  <input
-                    type="text"
-                    value={localCasamento}
-                    onChange={(e) => setLocalCasamento(e.target.value)}
-                    placeholder="Cidade - Estado"
-                    className={inputClass}
-                  />
+            {isCasado && (
+              <div className="bg-purple-50 rounded-lg p-3 border border-purple-200 mt-3">
+                <h4 className="text-sm font-medium text-purple-800 mb-2">Dados do Casamento</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cônjuge</label>
+                    <select value={conjugeId} onChange={(e) => setConjugeId(e.target.value)} className={selectClass} style={selectStyle}>
+                      <option value="">Selecione...</option>
+                      {pessoasDisponiveis.map(p => (
+                        <option key={p.id} value={p.id}>{p.nome} {p.sobrenome || ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Data do Casamento</label>
+                    <DatePickerField value={dataCasamento} onChange={(value) => setDataCasamento(value)} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Local do Casamento</label>
+                    <input type="text" value={localCasamento} onChange={(e) => setLocalCasamento(e.target.value)} placeholder="Cidade - Estado" className={inputClass} />
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Dados do Falecimento */}
-          {isFalecido && (
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Dados do Falecimento</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Data de Falecimento</label>
-                  <DatePickerField
-                    value={dataObito}
-                    onChange={(value) => setDataObito(value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Local de Falecimento</label>
-                  <input
-                    type="text"
-                    value={localObito}
-                    onChange={(e) => setLocalObito(e.target.value)}
-                    placeholder="Cidade - Estado"
-                    className={inputClass}
-                  />
+            {isFalecido && (
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 mt-3">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Dados do Falecimento</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Data de Falecimento</label>
+                    <DatePickerField value={dataObito} onChange={(value) => setDataObito(value)} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Local de Falecimento</label>
+                    <input type="text" value={localObito} onChange={(e) => setLocalObito(e.target.value)} placeholder="Cidade - Estado" className={inputClass} />
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </section>
 
-          {/* Requerente e Linhagem */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Requerente</label>
-              <select
-                value={requerente}
-                onChange={(e) => setRequerente(e.target.value)}
-                className={selectClass}
-                style={selectStyle}
-              >
-                <option value="nao">Não</option>
-                <option value="maior">Sim - Maior de idade</option>
-                <option value="menor">Sim - Menor de idade</option>
-              </select>
+          {/* ===== Classificação no processo ===== */}
+          <section className="border-t border-gray-100 pt-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Classificação no processo</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Requerente</label>
+                <select value={requerente} onChange={(e) => setRequerente(e.target.value)} className={selectClass} style={selectStyle}>
+                  <option value="nao">Não</option>
+                  <option value="maior">Sim - Maior de idade</option>
+                  <option value="menor">Sim - Menor de idade</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nº Linhagem</label>
+                <input type="number" min="1" value={numeroLinhagem} onChange={(e) => setNumeroLinhagem(e.target.value)} placeholder="Ex: 1, 2, 3..." className={inputClass} />
+                <span className="block text-xs text-gray-400 mt-1">Ordena a pasta documental — vale pra todas as pessoas.</span>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nº Linhagem</label>
-              <input
-                type="number"
-                min="1"
-                value={numeroLinhagem}
-                onChange={(e) => setNumeroLinhagem(e.target.value)}
-                placeholder="Ex: 1, 2, 3..."
-                className={inputClass}
-              />
-            </div>
-          </div>
+            <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 p-3 mt-3">
+              <input type="checkbox" checked={isLinhaReta} onChange={(e) => setIsLinhaReta(e.target.checked)} className="w-5 h-5 mt-0.5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+              <span>
+                <span className="block text-sm font-medium text-gray-700">Pertence à linha reta de transmissão</span>
+                <span className="block text-xs text-gray-400">Define se a pessoa entra na Linha principal ou em Cônjuges/Apoio na Central Operacional.</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 p-3 mt-3">
+              <input type="checkbox" checked={precisaDocumentacao} onChange={(e) => setPrecisaDocumentacao(e.target.checked)} className="w-5 h-5 mt-0.5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+              <span>
+                <span className="block text-sm font-medium text-gray-700">Precisa de documentação</span>
+                <span className="block text-xs text-gray-400">Se desligado, o sistema não gera os documentos desta pessoa e ela não entra na Central Operacional / workflow.</span>
+              </span>
+            </label>
+          </section>
 
-          {/* Observações */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
-            <textarea
-              value={comentario}
-              onChange={(e) => setComentario(e.target.value)}
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none text-sm"
-            />
-          </div>
+          {/* ===== Observações ===== */}
+          <section className="border-t border-gray-100 pt-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Observações</h3>
+            <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none text-sm" />
+          </section>
 
-          {/* Botões */}
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !nome.trim()}
-              className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50"
-            >
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">Cancelar</button>
+            <button type="submit" disabled={saving || !nome.trim()} className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50">
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>

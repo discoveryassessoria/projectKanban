@@ -112,13 +112,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Requerente e Linhagem
     if (body.requerente !== undefined) dataToUpdate.requerente = body.requerente
     if (body.numeroLinhagem !== undefined) dataToUpdate.numeroLinhagem = body.numeroLinhagem ? parseInt(body.numeroLinhagem) : null
+    if (body.linhaReta !== undefined) dataToUpdate.linhaReta = body.linhaReta === true
+    if (body.documentacao !== undefined) dataToUpdate.documentacao = body.documentacao === true
 
     // ✅ NOVO (rodada 3): flag de casado pra engine
     if (body.casado !== undefined) dataToUpdate.casado = body.casado === true
 
     // Detecta se mudou algo que afeta a engine
     const triggerReconcile =
-      body.casado !== undefined || body.vivo !== undefined
+      body.casado !== undefined || body.vivo !== undefined || body.documentacao !== undefined
 
     const pessoaAtualizada = await prisma.pessoa.update({
       where: { id },
@@ -136,7 +138,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // ============================================================
     // Se mudou `casado` ou `vivo`, roda a engine pra criar docs faltantes.
     // É idempotente — nunca apaga e nunca duplica.
-    if (triggerReconcile) {
+    if (triggerReconcile && pessoaAtualizada.documentacao !== false) {
       try {
         const result = await reconcileDocsForPessoa(id, prisma)
         console.log("[PUT /api/pessoas/[id]] auto-gen docs:", {

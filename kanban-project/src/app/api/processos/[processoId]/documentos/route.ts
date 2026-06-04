@@ -183,6 +183,7 @@ export async function GET(
             sobrenome: true,
             numeroLinhagem: true,
             requerente: true,
+            linhaReta: true,
           },
         })
       : []
@@ -218,13 +219,13 @@ export async function GET(
     const buildRow = (p: typeof pessoas[number]): PersonRow => {
       const nome = `${p.nome}${p.sobrenome ? " " + p.sobrenome : ""}`
       const docs = docsByPessoa.get(p.id) ?? []
-      const isDirectLine = p.numeroLinhagem != null
+      const isDirectLine = p.linhaReta
       const geracao = isDirectLine ? p.numeroLinhagem : null
 
       // Papel
         let papel = "—"
         if (geracao === 0) papel = "Requerente"
-        else if (isDirectLine) papel = `Geração ${geracao}`
+        else if (isDirectLine) papel = geracao != null ? `Geração ${geracao}` : "Linha reta"
         else papel = "Cônjuge"  // sem numeroLinhagem → assumimos que é cônjuge
 
       // Documentos compactos
