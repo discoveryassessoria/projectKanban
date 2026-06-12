@@ -36,6 +36,7 @@ import {
   ExternalLink,
 } from "lucide-react"
 import { uploadFiles } from "@/src/lib/storage"
+import { celebrar } from "@/src/lib/confetti"
 
 // ============================================================
 // TIPOS COMPARTILHADOS
@@ -593,6 +594,11 @@ export function EditorSolicitarCertidao({
       alert("Falta preencher:\n• " + errosValidacao.join("\n• "))
       return
     }
+
+    // ⚡ fecha o modal e comemora NA HORA; o salvamento roda em 2º plano
+    onClose()
+    void celebrar()
+
     setSaving(true)
     try {
       // PUT no doc
@@ -621,10 +627,10 @@ export function EditorSolicitarCertidao({
       if (!okStep) console.warn("[EditorSolicitarCertidao] step não concluiu")
 
       onSaved?.()
-      onClose()
     } catch (e) {
       console.error("[EditorSolicitarCertidao] salvar:", e)
-      alert("Erro ao salvar. Veja o console.")
+      alert("A etapa foi marcada, mas houve erro ao salvar no servidor. Atualize a página e confira. (console)")
+      onSaved?.()
     } finally {
       setSaving(false)
     }
@@ -1244,6 +1250,11 @@ export function EditorAguardarRetorno({
 
   const handleSalvar = async (concluir: boolean) => {
     if (readOnly) return
+
+    // ⚡ fecha na hora; comemora só quando CONCLUI a etapa
+    onClose()
+    if (concluir) void celebrar()
+
     setSaving(true)
     try {
       const body: Record<string, unknown> = {
@@ -1257,10 +1268,10 @@ export function EditorAguardarRetorno({
       const ok = await patchStep(documentoId, stepId, body)
       if (!ok) throw new Error("PATCH falhou")
       onSaved?.()
-      onClose()
     } catch (e) {
       console.error("[EditorAguardarRetorno] salvar:", e)
-      alert("Erro ao salvar. Veja o console.")
+      alert("Houve erro ao salvar no servidor. Atualize a página e confira. (console)")
+      onSaved?.()
     } finally {
       setSaving(false)
     }
@@ -1695,6 +1706,10 @@ export function EditorReceberCertidao({
       alert("Marque se o documento é físico, digital ou ambos.")
       return
     }
+    // ⚡ fecha o modal e comemora NA HORA; salva em 2º plano
+    onClose()
+    void celebrar()
+
     setSaving(true)
     try {
       // 1. Persiste no documento
@@ -1719,10 +1734,10 @@ export function EditorReceberCertidao({
       if (!okStep) console.warn("[EditorReceberCertidao] step não concluiu")
 
       onSaved?.()
-      onClose()
     } catch (e) {
       console.error("[EditorReceberCertidao] salvar:", e)
-      alert("Erro ao salvar. Veja o console.")
+      alert("A etapa foi marcada, mas houve erro ao salvar no servidor. Atualize a página e confira. (console)")
+      onSaved?.()
     } finally {
       setSaving(false)
     }
@@ -2089,6 +2104,10 @@ export function EditorConferirCertidao({
       return
     }
 
+    // ⚡ fecha o modal e comemora NA HORA; salva em 2º plano
+    onClose()
+    void celebrar()
+
     setSaving(true)
     try {
       // 1. Persiste dados literais no documento + status
@@ -2119,10 +2138,10 @@ export function EditorConferirCertidao({
       if (!okStep) console.warn("[EditorConferirCertidao] step não concluiu")
 
       onSaved?.()
-      onClose()
     } catch (e) {
       console.error("[EditorConferirCertidao] salvar:", e)
-      alert("Erro ao salvar. Veja o console.")
+      alert("A etapa foi marcada, mas houve erro ao salvar no servidor. Atualize a página e confira. (console)")
+      onSaved?.()
     } finally {
       setSaving(false)
     }
@@ -2615,6 +2634,10 @@ export function EditorValidarCertidao({
       return
     }
 
+    // ⚡ fecha o modal e comemora NA HORA; salva em 2º plano
+    onClose()
+    void celebrar()
+
     setSaving(true)
     try {
       // 1. Atualiza status do documento conforme a decisão
@@ -2637,10 +2660,10 @@ export function EditorValidarCertidao({
       if (!okStep) console.warn("[EditorValidarCertidao] step não concluiu")
 
       onSaved?.()
-      onClose()
     } catch (e) {
       console.error("[EditorValidarCertidao] salvar:", e)
-      alert("Erro ao salvar. Veja o console.")
+      alert("A etapa foi marcada, mas houve erro ao salvar no servidor. Atualize a página e confira. (console)")
+      onSaved?.()
     } finally {
       setSaving(false)
     }

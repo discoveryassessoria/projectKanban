@@ -6,6 +6,12 @@
  *
  * Portado de computePhaseProgress() do HTML do Marco.
  *
+ * A FASE do card é o `faseCode` da coluna (fonte da verdade, igual ao
+ * resto do sistema). O header reflete ESSE faseCode — o derive pelos
+ * status dos documentos só entra como FALLBACK quando o processo ainda
+ * não tem faseCode definido. (Antes o header re-derivava sempre, o que
+ * mostrava "Análise" mesmo com o card já em Emissão Retificada.)
+ *
  * Critérios por fase (espelha STATUS_POS_* da derive-stage):
  *   GENEALOGIA           → 100% sempre (não há docs pra contar)
  *   BUSCA_DOCUMENTAL     → status em SOLICITAR+ (ou terminal)
@@ -75,10 +81,41 @@ const CRITERIA: Record<ProcessStage, Criteria> = {
   PROTOCOLADO: () => true,
 }
 
+/**
+ * Mapa FaseCode (enum do Status, define a coluna/fase do card) →
+ * ProcessStage (vocabulário interno do progresso). Note que o FaseCode
+ * não tem BUSCA_DOCUMENTAL (a coluna é EMISSAO_DOCUMENTAL) nem distingue
+ * FINALIZADO no progresso (tratado como terminal = PROTOCOLADO).
+ */
+export const FASECODE_TO_STAGE: Record<string, ProcessStage> = {
+  GENEALOGIA: "GENEALOGIA",
+  EMISSAO_DOCUMENTAL: "EMISSAO_DOCUMENTAL",
+  ANALISE_DOCUMENTAL: "ANALISE_DOCUMENTAL",
+  RETIFICACAO_REGISTROS: "RETIFICACAO_JUDICIAL",
+  EMISSAO_DOCUMENTAL_RETIFICADA: "EMISSAO_DOCUMENTAL_RETIFICADA",
+  TRADUCAO_JURAMENTADA: "TRADUCAO",
+  APOSTILAMENTO: "APOSTILAMENTO",
+  AGUARDANDO_PROTOCOLO: "AGUARDANDO_PROTOCOLO",
+  PROTOCOLADO: "PROTOCOLADO",
+  FINALIZADO: "PROTOCOLADO",
+}
+
+export function stageFromFaseCode(faseCode?: string | null): ProcessStage | null {
+  if (!faseCode) return null
+  return FASECODE_TO_STAGE[faseCode] ?? null
+}
+
+/**
+ * @param documentos    docs (linha reta) pra contar o progresso
+ * @param stageOverride fase REAL do card (do faseCode). Quando informado,
+ *                      manda — o derive pelos docs vira só fallback.
+ */
 export function computePhaseProgress(
   documentos: DocForStage[],
+  stageOverride?: ProcessStage | null,
 ): PhaseProgress {
   const derived = deriveProcessStage(documentos)
+  const stage = stageOverride ?? derived.stage
   const required = documentos.filter(
     (d) => d.required !== false && d.status !== "CANCELADO",
   )
@@ -86,25 +123,25 @@ export function computePhaseProgress(
 
   if (total === 0) {
     return {
-      stage: derived.stage,
-      label: STAGE_LABELS[derived.stage],
+      stage,
+      label: STAGE_LABELS[stage],
       done: 0,
       total: 0,
       percent: 0,
-      reason: derived.reason,
+      reason: stageOverride ? "Sem documentos obrigatórios nesta fase" : derived.reason,
     }
   }
 
-  const fn = CRITERIA[derived.stage]
+  const fn = CRITERIA[stage]
   const done = required.filter((d) => fn(d.status)).length
   const percent = Math.round((done / total) * 100)
 
   return {
-    stage: derived.stage,
-    label: STAGE_LABELS[derived.stage],
+    stage,
+    label: STAGE_LABELS[stage],
     done,
     total,
     percent,
-    reason: derived.reason,
+    reason: stageOverride ? `${done} de ${total} doc(s) prontos nesta fase` : derived.reason,
   }
 }

@@ -178,24 +178,44 @@ export async function GET(
       return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
     }
 
-    const pessoas = processo.arvoreId
-      ? await prisma.pessoa.findMany({
-          where: { arvoreId: processo.arvoreId },
-          select: {
-            id: true,
-            nome: true,
-            sobrenome: true,
-            numeroLinhagem: true,
-            requerente: true,
-            linhaReta: true,
-          },
-        })
-      : []
+    // pessoas e documentos não dependem um do outro (ambos só precisam do
+    // arvoreId) → busca os dois EM PARALELO, economizando um round-trip ao banco.
+    const [pessoas, docsRaw] = await Promise.all([
+      processo.arvoreId
+        ? prisma.pessoa.findMany({
+            where: { arvoreId: processo.arvoreId },
+            select: {
+              id: true,
+              nome: true,
+              sobrenome: true,
+              numeroLinhagem: true,
+              requerente: true,
+              linhaReta: true,
+            },
+          })
+        : [],
+      processo.arvoreId
+        ? prisma.documento.findMany({
+            where: { pessoa: { arvoreId: processo.arvoreId } },
+            select: {
+              id: true,
+              pessoaId: true,
+              tipo: true,
+              status: true,
+              updatedAt: true,
+              responsavelId: true,
+              responsavel: { select: { nome: true } },
+              dataPrazoOperacao: true,
+              motivoBloqueio: true,
+              ultimaMovimentacao: true,
+            },
+          })
+        : [],
+    ])
 
     const nomeCompleto = (p: { nome: string; sobrenome: string | null }) =>
       `${p.nome}${p.sobrenome ? " " + p.sobrenome : ""}`
 
-    const pessoasIds = pessoas.map((p) => p.id)
     const pessoasMap = new Map(pessoas.map((p) => [p.id, p]))
     const pessoasNaLinha = pessoas.filter((p) => p.linhaReta)
 
@@ -222,24 +242,7 @@ export async function GET(
     //
     //   E mude todos os campos de `schemaCapabilities` para true.
     // ============================================================
-    const docsRaw =
-    pessoasIds.length > 0
-    ? await prisma.documento.findMany({
-        where: { pessoaId: { in: pessoasIds } },
-        select: {
-          id: true,
-          pessoaId: true,
-          tipo: true,
-          status: true,
-          updatedAt: true,
-          responsavelId: true,
-          responsavel: { select: { nome: true } },
-          dataPrazoOperacao: true,
-          motivoBloqueio: true,
-          ultimaMovimentacao: true,
-        },
-      })
-    : []
+    // (docsRaw já foi carregado em paralelo com pessoas, lá no passo 1)
 
     // Atualize estas flags quando a migration rodar
     const schemaCapabilities = {

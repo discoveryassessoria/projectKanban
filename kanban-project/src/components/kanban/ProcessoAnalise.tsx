@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Loader2, Sparkles, CheckCircle2, AlertTriangle, ArrowRight, Check } from "lucide-react"
+import { Loader2, Sparkles, CheckCircle2, AlertTriangle, ArrowRight, Check, X } from "lucide-react"
 
 interface Divergencia {
   id: number
@@ -17,6 +17,9 @@ interface Divergencia {
   valorDocumento: string | null
   severidade: string
   sugestaoIA: string | null
+  motivoIA?: string | null
+  impacto?: string | null
+  notas?: string | null
   status: string
 }
 
@@ -32,7 +35,7 @@ interface Analise {
 
 interface Props {
   processoId: number
-  onConcluido?: () => void // chamado quando a análise conclui (pra atualizar o kanban)
+  onConcluido?: () => void
 }
 
 const DECISOES: Array<[string, string]> = [
@@ -64,6 +67,7 @@ export function ProcessoAnalise({ processoId, onConcluido }: Props) {
   const [concluding, setConcluding] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [resultado, setResultado] = useState<string | null>(null)
+  const [drawerDiv, setDrawerDiv] = useState<Divergencia | null>(null)
 
   const carregar = useCallback(async () => {
     setLoading(true)
@@ -94,13 +98,13 @@ export function ProcessoAnalise({ processoId, onConcluido }: Props) {
     }
   }
 
-  const decidir = async (divId: number, decisao: string) => {
-    setAnalise((prev) => prev ? { ...prev, divergencias: prev.divergencias.map((d) => d.id === divId ? { ...d, status: decisao } : d) } : prev)
+  const decidir = async (divId: number, decisao: string, notas?: string) => {
+    setAnalise((prev) => prev ? { ...prev, divergencias: prev.divergencias.map((d) => d.id === divId ? { ...d, status: decisao, ...(notas !== undefined ? { notas } : {}) } : d) } : prev)
     try {
       const res = await fetch(`/api/processos/${processoId}/analise/divergencias/${divId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ decisao }),
+        body: JSON.stringify({ decisao, ...(notas !== undefined ? { notas } : {}) }),
       })
       const data = await res.json()
       if (res.ok && data.analise) setAnalise(data.analise)
@@ -133,7 +137,6 @@ export function ProcessoAnalise({ processoId, onConcluido }: Props) {
   const aprov = divs.filter((d) => d.status === "aceita" || d.status === "ignorada").length
   const podeConcluir = !!analise && pend === 0 && analise.status !== "concluida"
 
-  // Barra de etapas do processo de análise (reflete o currentStep)
   const etapas: Array<{ label: string; st: "concluida" | "em_andamento" | "pendente" }> = [
     { label: "Documentos recebidos", st: analise ? "concluida" : "em_andamento" },
     { label: "Comparação IA", st: analise ? "concluida" : "pendente" },
@@ -228,6 +231,7 @@ export function ProcessoAnalise({ processoId, onConcluido }: Props) {
                   {["Pessoa","Documento","Campo","Valor na árvore","Valor no documento","Gravidade","Sugestão IA","Decisão"].map((h) => (
                     <th key={h} className="text-left font-semibold px-3 py-2 whitespace-nowrap">{h}</th>
                   ))}
+                  <th className="px-3 py-2" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -249,6 +253,9 @@ export function ProcessoAnalise({ processoId, onConcluido }: Props) {
                       <select value={d.status} onChange={(e) => decidir(d.id, e.target.value)} className={`text-xs border rounded-md px-2 py-1.5 bg-white focus:outline-none ${d.status === "retificacao" ? "border-red-300 text-red-700" : d.status === "aceita" ? "border-green-300 text-green-700" : d.status === "pendente" ? "border-gray-200 text-gray-600" : "border-amber-300 text-amber-700"}`}>
                         {DECISOES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <button onClick={() => setDrawerDiv(d)} className="text-gray-400 hover:text-indigo-600 p-1" title="Ver detalhes"><ArrowRight className="w-4 h-4" /></button>
                     </td>
                   </tr>
                 ))}
@@ -274,6 +281,15 @@ export function ProcessoAnalise({ processoId, onConcluido }: Props) {
       {analise?.status === "concluida" && (
         <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Análise concluída {analise.decisaoJuridica === "com_retificacao" ? "com retificação" : "sem retificação"}.</div>
       )}
+
+      {drawerDiv && (
+        <DivergenciaDrawer
+          div={drawerDiv}
+          readOnly={analise?.status === "concluida"}
+          onClose={() => setDrawerDiv(null)}
+          onSalvar={async (decisao, notas) => { await decidir(drawerDiv.id, decisao, notas); setDrawerDiv(null) }}
+        />
+      )}
     </div>
   )
 }
@@ -283,6 +299,91 @@ function Stat({ label, value, danger }: { label: string; value: number; danger?:
     <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
       <div className={`text-xl font-bold ${danger ? "text-red-600" : "text-gray-900"}`}>{value}</div>
       <div className="text-[11px] text-gray-500">{label}</div>
+    </div>
+  )
+}
+
+function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
+  div: Divergencia
+  readOnly: boolean
+  onClose: () => void
+  onSalvar: (decisao: string, notas: string) => Promise<void>
+}) {
+  const [decisao, setDecisao] = useState(div.status)
+  const [notas, setNotas] = useState(div.notas || "")
+  const [salvando, setSalvando] = useState(false)
+
+  const salvar = async () => {
+    setSalvando(true)
+    try { await onSalvar(decisao, notas) } finally { setSalvando(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-white h-full shadow-xl overflow-y-auto flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <div className="text-sm font-bold text-gray-900">Detalhe da divergência</div>
+            <div className="text-xs text-gray-500">{div.documentoTitulo}</div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1"><X className="w-5 h-5" /></button>
+        </div>
+
+        <div className="p-5 space-y-4 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 text-xs font-bold flex items-center justify-center">{ini(div.pessoaNome)}</span>
+            <div>
+              <div className="font-semibold text-gray-900 text-sm">{div.pessoaNome}</div>
+              <div className="text-[11px] text-gray-500">{div.geracao != null ? `G${div.geracao}` : "—"} · {div.linhaReta ? "Linha reta" : "Apoio"}</div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 divide-y divide-gray-100 text-sm">
+            <div className="flex justify-between px-3 py-2"><span className="text-gray-500">Campo</span><span className="font-medium text-gray-900">{div.campoLabel}</span></div>
+            <div className="flex justify-between px-3 py-2"><span className="text-gray-500">Valor na árvore</span><span className="font-medium text-gray-900">{div.valorArvore || "—"}</span></div>
+            <div className="flex justify-between px-3 py-2"><span className="text-gray-500">Valor no documento</span><span className="font-medium text-gray-900">{div.valorDocumento || "—"}</span></div>
+            <div className="flex justify-between px-3 py-2 items-center"><span className="text-gray-500">Gravidade</span>
+              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${SEV_STYLE[div.severidade] || "bg-gray-100 text-gray-700"}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${SEV_DOT[div.severidade] || "bg-gray-400"}`} />{SEV_LABEL[div.severidade] || div.severidade}
+              </span>
+            </div>
+          </div>
+
+          {(div.sugestaoIA || div.motivoIA || div.impacto) && (
+            <div className="rounded-lg bg-indigo-50 border border-indigo-100 p-3 text-sm">
+              <div className="text-xs font-semibold text-indigo-700 mb-1">Sugestão da IA</div>
+              {div.sugestaoIA && <div className="text-gray-700">{div.sugestaoIA}</div>}
+              {div.motivoIA && <div className="text-gray-600 text-xs mt-1">{div.motivoIA}</div>}
+              {div.impacto && <div className="text-gray-600 text-xs mt-1">Impacto: {div.impacto}</div>}
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-semibold text-gray-700">Decisão</label>
+            <select value={decisao} onChange={(e) => setDecisao(e.target.value)} disabled={readOnly}
+              className="mt-1 w-full text-sm border border-gray-200 rounded-md px-2 py-2 bg-white disabled:bg-gray-50 disabled:text-gray-500">
+              {DECISOES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-700">Notas</label>
+            <textarea value={notas} onChange={(e) => setNotas(e.target.value)} disabled={readOnly} rows={4}
+              placeholder="Registre o motivo da decisão."
+              className="mt-1 w-full text-sm border border-gray-200 rounded-md px-3 py-2 disabled:bg-gray-50" />
+          </div>
+        </div>
+
+        {!readOnly && (
+          <div className="bg-white border-t border-gray-100 px-5 py-3 flex justify-end gap-2">
+            <button onClick={onClose} className="px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md">Cancelar</button>
+            <button onClick={salvar} disabled={salvando} className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md inline-flex items-center gap-2 disabled:opacity-50">
+              {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Salvar decisão
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

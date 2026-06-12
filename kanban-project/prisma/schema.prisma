@@ -205,6 +205,12 @@ model Documento {
   origem                String          @default("manual") @db.VarChar(20)
   ruleCode              String?         @db.VarChar(20)
 
+  // --- Análise Documental v2 (AD2) ---
+  structuredData  Json?                              // dados estruturados por tipo (birth/marriage/death)
+  dataStatus      String    @default("not_filled")   // not_filled | ai_extracted | manual_filled | reviewed
+  analysisStatus  String    @default("not_ready")    // not_ready | ready
+  registral       Json?                              // dados registrais revisados (verdade canônica)
+
   @@index([pessoaId])
   @@index([tipo])
   @@index([status])
@@ -262,6 +268,11 @@ model Processo {
   recibos           Recibo[]
   tarefas           Tarefa[]
   tiposServico      TipoServico[]
+  pastaTraducao   PastaTraducao?
+  pastaApostilamento PastaApostilamento?
+  fasesFinais FaseFinal[]
+  retificacaoPacotes RetificacaoPacote[]
+  emissoesRetificadas EmissaoRetificada[]
 
   @@index([pais])
   @@index([statusId])
@@ -1300,6 +1311,168 @@ model Divergencia {
   @@index([analiseId])
   @@index([status])
   @@index([severidade])
+}
+
+model PastaTraducao {
+  id              Int       @id @default(autoincrement())
+  processoId      Int       @unique
+  processo        Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  status          String    @default("em_andamento")   // em_andamento | concluida
+  currentStep     String    @default("montar_pasta_traducao")
+  sourceLanguage  String    @default("Português")
+  targetLanguage  String    @default("Italiano")
+  translatorName  String?
+  translatorEmail String?
+  cost            String?
+  expectedDate    DateTime?
+  sentAt          DateTime?
+  receivedAt      DateTime?
+  validatedAt     DateTime?
+  validatedById   Int?      // snapshot, sem FK (mesmo padrão da Análise)
+  workflow        Json?     // 6 passos TR_STEPS: [{id,title,status,doneAt}]
+  documentos      PastaTraducaoDocumento[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model PastaTraducaoDocumento {
+  id                 Int            @id @default(autoincrement())
+  pastaTraducaoId    Int
+  pastaTraducao      PastaTraducao  @relation(fields: [pastaTraducaoId], references: [id], onDelete: Cascade)
+  documentoId        Int            // snapshot, sem FK
+  pessoaNome         String         @default("")
+  documentoTitulo    String         @default("")
+  origem             String         @default("")
+  status             String         @default("pendente")  // pendente|incluido_na_pasta|enviado|traducao_recebida|conferido|validado|correcao_solicitada|bloqueado
+  translatedFile     String?
+  conferenceResult   String?
+  validationDecision String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([pastaTraducaoId])
+}
+
+model PastaApostilamento {
+  id                 Int       @id @default(autoincrement())
+  processoId         Int       @unique
+  processo           Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  status             String    @default("em_andamento")   // em_andamento | concluida
+  currentStep        String    @default("montar_pasta_apostilamento")
+  destinationCountry String?
+  apostilleType      String?
+  authorityName      String?
+  attendant          String?
+  cost               String?
+  trackingCode       String?
+  expectedDate       DateTime?
+  sentAt             DateTime?
+  receivedAt         DateTime?
+  validatedAt        DateTime?
+  validatedById      Int?
+  workflow           Json?     // 6 passos AP_STEPS
+  documentos         PastaApostilamentoDocumento[]
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model PastaApostilamentoDocumento {
+  id                   Int                 @id @default(autoincrement())
+  pastaApostilamentoId Int
+  pastaApostilamento   PastaApostilamento  @relation(fields: [pastaApostilamentoId], references: [id], onDelete: Cascade)
+  documentoId          Int                 // snapshot, sem FK
+  pessoaNome           String              @default("")
+  documentoTitulo      String              @default("")
+  origem               String              @default("")
+  status               String              @default("pendente")  // pendente|incluido_na_pasta|enviado|apostila_recebida|conferido|validado|correcao_solicitada|bloqueado
+  apostilledFile       String?
+  apostilleNumber      String?
+  apostilleDate        String?   // "dd/mm/aaaa" (por documento)
+  issuingAuthority     String?
+  conferenceResult     String?
+  validationDecision   String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@index([pastaApostilamentoId])
+}
+
+model FaseFinal {
+  id          Int      @id @default(autoincrement())
+  processoId  Int
+  processo    Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  faseKey     String   // waitingProtocol | protocolado | finalizado
+  status      String   @default("em_andamento") // em_andamento | concluida
+  currentStep String
+  workflow    Json?    // etapas da fase (3 passos)
+  data        Json?    // { fnNum, fnData, fnOrgao, fnCanal, fnF1, lastDecision, ... }
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([processoId, faseKey])
+}
+
+model RetificacaoPacote {
+  id            Int      @id @default(autoincrement())
+  processoId    Int
+  processo      Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  num           String   // PR-001
+  tipo          String   // judicial | administrativa
+  status        String   @default("em_preparacao") // em_preparacao|protocolado|em_exigencia|decisao_recebida|validado|bloqueado
+  currentStep   String   @default("definir_estrategia")
+  motivo        String?
+  prioridade    String?  @default("Média")
+  proxAcao      String?
+  // Judicial
+  processoNum   String?
+  tribunal      String?
+  vara          String?
+  comarca       String?
+  advogado      String?
+  oab           String?
+  statusProc    String?
+  // Administrativa
+  cartorio      String?
+  canal         String?
+  protocolo     String?
+  dataProtocolo String?
+  atendente     String?
+  prazo         String?
+  statusAdm     String?
+  // Variáveis (Json)
+  workflow      Json?    // 6 passos RET_STEPS
+  divergenceIds Json?    // divergências vinculadas (snapshot)
+  affectedDocIds Json?   // documentos afetados (snapshot)
+  movements     Json?    // [{data,tipo,desc,resp,prox}]
+  attachments   Json?    // [{nome,cat,data,por,obs}]
+  validacao     Json?    // {ressalva, obs, ...}
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([processoId])
+}
+
+model EmissaoRetificada {
+  id                Int      @id @default(autoincrement())
+  processoId        Int
+  processo          Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  documentoId       Int      // snapshot, sem FK forte (igual Divergencia)
+  pessoaNome        String
+  pessoaGen         String?
+  pessoaPapel       String?
+  documentoTitulo   String
+  correcaoCampo     String?
+  correcaoOld       String?
+  correcaoNovo      String?
+  status            String   @default("pendente_averbacao")
+  nextAction        String   @default("Enviar pedido de averbação ao cartório")
+  workflow          Json     // 6 etapas RE_STEPS + blocos averbacao/solicitation/receipt/conference/validation
+  retifiedValidated Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([processoId, documentoId])
+  @@index([processoId])
 }
 
 enum Pais {

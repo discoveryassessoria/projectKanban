@@ -1,24 +1,11 @@
 // src/lib/process-stage/fases-catalog.ts
 //
-// CATÁLOGO DE FASES — fonte única da verdade sobre quais etapas cada fase
-// do processo cria no workflow do documento, e a ordem das fases.
-//
-// Modelo: WORKFLOW POR FASE (decisão travada com o Marco).
-//   - Em cada fase, o documento tem UM workflow com as etapas DAQUELA fase.
-//   - A fase do CARD (processo) é sempre a fase do documento da linha reta
-//     mais ATRASADO (a "regra do mínimo" / passageiro mais lento).
-//   - Quando o documento mais lento avança, o card avança; o trabalho já
-//     feito nos outros documentos fica arquivado, nunca apagado.
-//
-// Este arquivo é só DADOS + tipos. Não toca no banco.
+// CATÁLOGO DE FASES — fonte única da verdade sobre as etapas de cada fase
+// e a ordem do fluxo. Só DADOS + tipos. Não toca no banco.
 
 import type { FaseCode } from "@prisma/client"
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tipos
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Um step do workflow de uma fase. Mesmo shape que a rota POST usa. */
+/** Step do workflow POR-DOCUMENTO (Genealogia, Emissão). */
 export interface FaseStep {
   ordem: number
   stepKey: string
@@ -29,63 +16,39 @@ export interface FaseStep {
   slaDays: number
 }
 
-/** A definição completa de uma fase. */
+/** Step do checklist POR-PROCESSO (fases que avançam manualmente). */
+export interface ProcessFaseStep {
+  stepKey: string
+  title: string
+  description: string
+}
+
 export interface FaseDef {
-  /** Código estável da fase (= enum FaseCode + = Status.faseCode da coluna). */
   code: FaseCode
-  /**
-   * Ordem da fase no fluxo (0 = primeira). Usada para COMPARAR fases:
-   * a fase do card é a de MENOR ordem entre os documentos da linha reta.
-   * É independente da `Status.ordem` da coluna no kanban (que tem buracos);
-   * esta ordem é a lógica do fluxo, não a posição visual.
-   */
   ordem: number
-  /** Rótulo amigável (logs/UI). */
   label: string
-  /** Os steps que o workflow desta fase cria, em ordem. */
+  /** "documento" = workflow por doc (gate automático). "processo" = checklist + avanço manual. */
+  kind: "documento" | "processo"
   steps: FaseStep[]
-  /**
-   * Próxima fase no fluxo normal (avanço linear).
-   * `null` = fase terminal, ou fase com desvio condicional (Análise).
-   */
+  /** Checklist quando kind === "processo". */
+  processSteps?: ProcessFaseStep[]
   next: FaseCode | null
-  /**
-   * `true` quando esta fase ainda NÃO foi totalmente especificada.
-   * O motor não cria workflow para fases assim.
-   */
   pendingSpec?: boolean
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Catálogo
-// ─────────────────────────────────────────────────────────────────────────────
-
 export const FASES: Record<FaseCode, FaseDef> = {
-  // ── GENEALOGIA (ordem 0) ────────────────────────────────────────────────
   GENEALOGIA: {
-    code: "GENEALOGIA",
-    ordem: 0,
-    label: "Genealogia",
+    code: "GENEALOGIA", ordem: 0, label: "Genealogia", kind: "documento",
     next: "EMISSAO_DOCUMENTAL",
     steps: [
-      {
-        ordem: 1,
-        stepKey: "buscar_documento",
-        title: "Buscar documento",
-        description:
-          "Localizar o ato no cartório e preencher os dados registrais completos.",
-        weight: 100,
-        ownerKey: "equipe_documental",
-        slaDays: 5,
-      },
+      { ordem: 1, stepKey: "buscar_documento", title: "Buscar documento",
+        description: "Localizar o ato no cartório e preencher os dados registrais completos.",
+        weight: 100, ownerKey: "equipe_documental", slaDays: 5 },
     ],
   },
 
-  // ── EMISSÃO DOCUMENTAL (ordem 1) ────────────────────────────────────────
   EMISSAO_DOCUMENTAL: {
-    code: "EMISSAO_DOCUMENTAL",
-    ordem: 1,
-    label: "Emissão documental",
+    code: "EMISSAO_DOCUMENTAL", ordem: 1, label: "Emissão documental", kind: "documento",
     next: "ANALISE_DOCUMENTAL",
     steps: [
       { ordem: 1, stepKey: "solicitar_certidao", title: "Solicitar certidão",
@@ -106,68 +69,106 @@ export const FASES: Record<FaseCode, FaseDef> = {
     ],
   },
 
-  // ── FASES AINDA NÃO ESPECIFICADAS (ordens 2..9) ─────────────────────────
+  // ANÁLISE — por-processo, mas com painel PRÓPRIO (ProcessoAnalise). Não usa processSteps.
   ANALISE_DOCUMENTAL: {
-    code: "ANALISE_DOCUMENTAL", ordem: 2, label: "Análise Documental",
-    next: null, steps: [], pendingSpec: true,
+    code: "ANALISE_DOCUMENTAL", ordem: 2, label: "Análise Documental", kind: "processo",
+    next: null, steps: [],
   },
+
   RETIFICACAO_REGISTROS: {
-    code: "RETIFICACAO_REGISTROS", ordem: 3, label: "Retificação de registros",
-    next: "EMISSAO_DOCUMENTAL_RETIFICADA", steps: [], pendingSpec: true,
+    code: "RETIFICACAO_REGISTROS", ordem: 3, label: "Retificação de registros", kind: "processo",
+    next: "EMISSAO_DOCUMENTAL_RETIFICADA", steps: [],
+    processSteps: [
+      { stepKey: "definir_estrategia", title: "Definir estratégia", description: "Definir a via (judicial ou administrativa) e a estratégia da retificação." },
+      { stepKey: "montar_dossie", title: "Montar dossiê", description: "Reunir os documentos e provas do pedido de retificação." },
+      { stepKey: "protocolar", title: "Protocolar retificação", description: "Dar entrada do pedido de retificação no órgão competente." },
+      { stepKey: "acompanhar", title: "Acompanhar andamento", description: "Registrar movimentações e exigências até a decisão." },
+      { stepKey: "receber_decisao", title: "Receber decisão / averbação", description: "Registrar a decisão ou averbação recebida." },
+      { stepKey: "validar_registros", title: "Validar registros corrigidos", description: "Confirmar que os registros foram corrigidos." },
+    ],
   },
+
   EMISSAO_DOCUMENTAL_RETIFICADA: {
-    code: "EMISSAO_DOCUMENTAL_RETIFICADA", ordem: 4, label: "Emissão documental retificada",
-    next: "TRADUCAO_JURAMENTADA", steps: [], pendingSpec: true,
+    code: "EMISSAO_DOCUMENTAL_RETIFICADA", ordem: 4, label: "Emissão documental retificada", kind: "processo",
+    next: "TRADUCAO_JURAMENTADA", steps: [],
+    processSteps: [
+      { stepKey: "enviar_pedido_averbacao", title: "Enviar pedido de averbação ao cartório", description: "Enviar ao cartório a decisão/mandado para lançar a averbação no registro." },
+      { stepKey: "solicitar_certidao_retificada", title: "Solicitar certidão retificada", description: "Pedir a nova certidão já com a correção averbada." },
+      { stepKey: "aguardar_retorno_cartorio_retificado", title: "Aguardar retorno do cartório", description: "Aguardar o retorno do cartório." },
+      { stepKey: "receber_certidao_retificada", title: "Receber certidão retificada", description: "Upload da certidão retificada recebida." },
+      { stepKey: "conferir_certidao_retificada", title: "Conferir certidão retificada", description: "Verificar se a correção foi aplicada corretamente." },
+      { stepKey: "validar_certidao_retificada", title: "Validar certidão retificada", description: "Validação jurídica da certidão retificada." },
+    ],
   },
+
   TRADUCAO_JURAMENTADA: {
-    code: "TRADUCAO_JURAMENTADA", ordem: 5, label: "Tradução juramentada",
-    next: "APOSTILAMENTO", steps: [], pendingSpec: true,
+    code: "TRADUCAO_JURAMENTADA", ordem: 5, label: "Tradução juramentada", kind: "processo",
+    next: "APOSTILAMENTO", steps: [],
+    processSteps: [
+      { stepKey: "montar_pasta_traducao", title: "Montar pasta de tradução", description: "Reunir os documentos que vão para tradução numa pasta única." },
+      { stepKey: "enviar_tradutor_juramentado", title: "Enviar ao tradutor juramentado", description: "Encaminhar a pasta ao tradutor juramentado." },
+      { stepKey: "aguardar_retorno_tradutor", title: "Aguardar retorno do tradutor", description: "Acompanhar o prazo e o retorno do tradutor." },
+      { stepKey: "receber_traducoes", title: "Receber traduções", description: "Upload das traduções recebidas." },
+      { stepKey: "conferir_traducoes", title: "Conferir traduções", description: "Verificar fidelidade e completude das traduções." },
+      { stepKey: "validar_pasta_traduzida", title: "Validar pasta traduzida", description: "Validação jurídica da pasta traduzida." },
+    ],
   },
+
   APOSTILAMENTO: {
-    code: "APOSTILAMENTO", ordem: 6, label: "Apostilamento",
-    next: "AGUARDANDO_PROTOCOLO", steps: [], pendingSpec: true,
+    code: "APOSTILAMENTO", ordem: 6, label: "Apostilamento", kind: "processo",
+    next: "AGUARDANDO_PROTOCOLO", steps: [],
+    processSteps: [
+      { stepKey: "montar_pasta_apostilamento", title: "Montar pasta de apostilamento", description: "Reunir os documentos finais numa pasta para apostila." },
+      { stepKey: "enviar_para_apostilamento", title: "Enviar para apostilamento", description: "Encaminhar para apostila de Haia." },
+      { stepKey: "aguardar_retorno_apostilamento", title: "Aguardar retorno", description: "Acompanhar o prazo e o retorno." },
+      { stepKey: "receber_documentos_apostilados", title: "Receber documentos apostilados", description: "Upload dos documentos apostilados." },
+      { stepKey: "conferir_apostilas", title: "Conferir apostilas", description: "Verificar as apostilas e a legibilidade." },
+      { stepKey: "validar_pasta_apostilada", title: "Validar pasta apostilada", description: "Validação final da pasta apostilada." },
+    ],
   },
+
   AGUARDANDO_PROTOCOLO: {
-    code: "AGUARDANDO_PROTOCOLO", ordem: 7, label: "Aguardando protocolo",
-    next: "PROTOCOLADO", steps: [], pendingSpec: true,
+    code: "AGUARDANDO_PROTOCOLO", ordem: 7, label: "Aguardando protocolo", kind: "processo",
+    next: "PROTOCOLADO", steps: [],
+    processSteps: [
+      { stepKey: "montar_dossie_final", title: "Montar dossiê final", description: "Reúna todos os documentos apostilados e traduzidos em um dossiê único." },
+      { stepKey: "agendar_protocolo", title: "Agendar protocolo", description: "Defina o órgão de destino, a data e o canal de protocolo." },
+      { stepKey: "protocolar_pedido", title: "Protocolar pedido", description: "Registre o protocolo do pedido no órgão (número/recibo)." },
+    ],
   },
+
   PROTOCOLADO: {
-    code: "PROTOCOLADO", ordem: 8, label: "Protocolado",
-    next: "FINALIZADO", steps: [], pendingSpec: true,
+    code: "PROTOCOLADO", ordem: 8, label: "Protocolado", kind: "processo",
+    next: "FINALIZADO", steps: [],
+    processSteps: [
+      { stepKey: "registrar_protocolo", title: "Registrar nº do protocolo", description: "Confirme o número/recibo e a data de entrada no órgão." },
+      { stepKey: "acompanhar_andamento", title: "Acompanhar andamento", description: "Registre exigências, contatos e movimentações junto ao órgão." },
+      { stepKey: "receber_decisao", title: "Receber decisão", description: "Registre o resultado: deferido, exigência ou indeferido." },
+    ],
   },
+
   FINALIZADO: {
-    code: "FINALIZADO", ordem: 9, label: "Finalizado",
-    next: null, steps: [], pendingSpec: true,
+    code: "FINALIZADO", ordem: 9, label: "Finalizado", kind: "processo",
+    next: null, steps: [],
+    processSteps: [
+      { stepKey: "confirmar_deferimento", title: "Confirmar deferimento", description: "Confirme o reconhecimento da cidadania / deferimento do pedido." },
+      { stepKey: "entregar_documentacao", title: "Entregar documentação ao cliente", description: "Registre a entrega da documentação final ao requerente." },
+      { stepKey: "encerrar_processo", title: "Encerrar e arquivar", description: "Encerre o processo e arquive toda a documentação." },
+    ],
   },
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-export function getFase(code: FaseCode): FaseDef {
-  return FASES[code]
-}
-
-export function getStepsForFase(code: FaseCode): FaseStep[] {
-  return FASES[code].steps
-}
-
-export function getNextFase(code: FaseCode): FaseCode | null {
-  return FASES[code].next
-}
-
+// ── Helpers ──────────────────────────────────────────────────────────────
+export function getFase(code: FaseCode): FaseDef { return FASES[code] }
+export function getStepsForFase(code: FaseCode): FaseStep[] { return FASES[code].steps }
+export function getProcessSteps(code: FaseCode): ProcessFaseStep[] { return FASES[code].processSteps ?? [] }
+export function getNextFase(code: FaseCode): FaseCode | null { return FASES[code].next }
+export function isProcessoFase(code: FaseCode): boolean { return FASES[code].kind === "processo" }
 export function isFaseReady(code: FaseCode): boolean {
   const f = FASES[code]
   return !f.pendingSpec && f.steps.length > 0
 }
-
-/** Ordem numérica de uma fase (pra comparar/achar o mínimo). */
-export function getOrdemFase(code: FaseCode): number {
-  return FASES[code].ordem
-}
-
-/** Dada uma ordem numérica, retorna o FaseCode correspondente (ou null). */
+export function getOrdemFase(code: FaseCode): number { return FASES[code].ordem }
 export function getFaseByOrdem(ordem: number): FaseCode | null {
   const found = Object.values(FASES).find((f) => f.ordem === ordem)
   return found ? found.code : null

@@ -11,6 +11,13 @@ import { InitOperationModal } from "./InitOperationModal"
 import { WorkflowMacroTrilha, MacroSidebar, PROCESS_PHASES } from "./WorkflowMacroTrilha"
 import { PainelDaFase, type FasePersonRow, type FaseStep, type FaseKpi } from "./PainelDaFase"
 import { ProcessoAnalise } from "./ProcessoAnalise"
+import { ProcessoTraducao } from "./ProcessoTraducao"
+import { ProcessoFaseGenerica } from "./ProcessoFaseGenerica"
+import { ProcessoApostilamento } from "./ProcessoApostilamento"
+import { ProcessoFaseFinal } from "./ProcessoFaseFinal"
+import { ProcessoRetificacao } from "./ProcessoRetificacao"
+import { ProcessoEmissaoRetificada } from "./ProcessoEmissaoRetificada"
+import type { FaseCode } from "@prisma/client"
 
 // ============================================================
 // TIPOS (espelho do endpoint)
@@ -290,6 +297,22 @@ export function ProcessoCentralOperacional({
     [processo.id]
   )
 
+  // Otimista: marca o doc recém-mexido como "Atualizando…" na fila enquanto
+  // a Central recarrega em 2º plano — evita a sensação de "concluí e nada mudou".
+  const marcarAtualizando = useCallback((docId: number | null) => {
+    if (docId == null) return
+    setData((prev) =>
+      prev
+        ? {
+            ...prev,
+            queue: prev.queue.map((q) =>
+              q.docId === docId ? { ...q, proximoPasso: "Atualizando…" } : q,
+            ),
+          }
+        : prev,
+    )
+  }, [])
+
   useEffect(() => {
     carregar()
   }, [carregar])
@@ -335,6 +358,33 @@ export function ProcessoCentralOperacional({
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
     .includes("analise documental")
 
+  const ehTraducao = faseAtualNome
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .includes("traducao juramentada")
+
+  const ehApostilamento = faseAtualNome
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .includes("apostilamento")
+
+  const ehFaseFinal = ["aguardando protocolo", "protocolado", "finalizado"].some((nome) =>
+    faseAtualNome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(nome)
+  )
+
+  // Fases por-processo (checklist + avançar). Mapeia nome → faseCode (tolerante a acento/caixa).
+  const FASE_CODE_POR_NOME: Record<string, FaseCode> = {
+    "retificacao de registros": "RETIFICACAO_REGISTROS",
+    "emissao documental retificada": "EMISSAO_DOCUMENTAL_RETIFICADA",
+    "traducao juramentada": "TRADUCAO_JURAMENTADA",
+    "apostilamento": "APOSTILAMENTO",
+    "aguardando protocolo": "AGUARDANDO_PROTOCOLO",
+    "protocolado": "PROTOCOLADO",
+    "finalizado": "FINALIZADO",
+  }
+  const faseNorm = faseAtualNome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
+  const faseCodeGenerica: FaseCode | undefined = FASE_CODE_POR_NOME[faseNorm]
+  const ehRetificacao = faseNorm.includes("retificacao de registros")
+  const ehEmissaoRetificada = faseNorm.includes("emissao documental retificada")
+
   return (
     <div className="h-full overflow-y-auto bg-gray-50/30">
       <div className="px-6 py-5">
@@ -347,8 +397,19 @@ export function ProcessoCentralOperacional({
         />
 
         {ehAnalise ? (
-          /* ===== PAINEL DE ANÁLISE DOCUMENTAL ===== */
           <ProcessoAnalise processoId={processo.id} onConcluido={() => carregar(true)} />
+        ) : ehTraducao ? (
+          <ProcessoTraducao processoId={processo.id} onConcluido={() => carregar(true)} />
+        ) : ehApostilamento ? (
+          <ProcessoApostilamento processoId={processo.id} onConcluido={() => carregar(true)} />
+        ) : ehRetificacao ? (
+          <ProcessoRetificacao processoId={processo.id} onConcluido={() => carregar(true)} />
+        ) : ehEmissaoRetificada ? (
+          <ProcessoEmissaoRetificada processoId={processo.id} onConcluido={() => carregar(true)} />
+        ) : ehFaseFinal ? (
+          <ProcessoFaseFinal processoId={processo.id} onConcluido={() => carregar(true)} />
+        ) : faseCodeGenerica ? (
+          <ProcessoFaseGenerica processoId={processo.id} faseCode={faseCodeGenerica} onConcluido={() => carregar(true)} />
         ) : (
         <>
         {/* ===== Header da Central + Atualizar ===== */}
@@ -391,7 +452,10 @@ export function ProcessoCentralOperacional({
               documentoId={drawerDocId}
               isOpen={drawerDocId !== null}
               onClose={() => setDrawerDocId(null)}
-              onSave={() => carregar(true)}
+              onSave={() => {
+                marcarAtualizando(drawerDocId)
+                carregar(true)
+              }}
             />
 
             <InitOperationModal
