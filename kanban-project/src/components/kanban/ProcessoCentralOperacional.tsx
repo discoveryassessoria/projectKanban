@@ -212,7 +212,7 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
   const pct = matrix.percentage
   const progressoTexto =
     validados >= total && total > 0
-      ? `Emissão documental concluída — todos os documentos validados.`
+      ? `${faseNome} concluída — todos os documentos validados.`
       : `Solicite, receba, confira e valide cada certidão. Falta${total - validados === 1 ? "" : "m"} ${total - validados} documento${total - validados === 1 ? "" : "s"} para concluir a ${faseNome}.`
 
   return { kpis, steps, linhaPrincipal, foraDaLinha, pct, validados, total, progressoTexto }

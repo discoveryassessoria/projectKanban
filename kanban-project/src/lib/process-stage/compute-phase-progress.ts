@@ -64,11 +64,16 @@ const POS_TRADUCAO = new Set<StatusDocumento>([
 const POS_APOSTILAMENTO = new Set<StatusDocumento>([
   "APOSTILADO", "ENTREGUE",
 ])
+// "validado" no gathering = doc recebido/entregue (espelha STATUS_VALIDADOS
+// da rota central-operacional, pra Genealogia bater com o corpo)
+const POS_VALIDADO = new Set<StatusDocumento>([
+  "RECEBIDO", "ENTREGUE", "APOSTILADO", "TRADUZIDO",
+])
 
 type Criteria = (status: StatusDocumento) => boolean
 
 const CRITERIA: Record<ProcessStage, Criteria> = {
-  GENEALOGIA: () => true,
+  GENEALOGIA: (s) => POS_VALIDADO.has(s),
   BUSCA_DOCUMENTAL: (s) => STATUS_TERMINAL.has(s) || POS_BUSCA.has(s),
   EMISSAO_DOCUMENTAL: (s) => STATUS_TERMINAL.has(s) || POS_EMISSAO.has(s),
   ANALISE_DOCUMENTAL: (s) => STATUS_TERMINAL.has(s) || POS_ANALISE.has(s),

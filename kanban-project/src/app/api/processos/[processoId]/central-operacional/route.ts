@@ -469,8 +469,11 @@ export async function GET(
       })
       .sort((a, b) => a.generation - b.generation)
 
-    const totalDocs = docs.length
-    const validados = docs.filter((d) => STATUS_VALIDADOS.includes(d.status)).length
+    // só a linha reta conta pro progresso da fase (igual ao header e ao gate);
+    // docs de apoio seguem na fila operacional, mas não entram no % da fase
+    const linhaRetaDocs = docs.filter((d) => pessoasMap.get(d.pessoaId)?.linhaReta)
+    const totalDocs = linhaRetaDocs.length
+    const validados = linhaRetaDocs.filter((d) => STATUS_VALIDADOS.includes(d.status)).length
 
     const missing = docs
       .filter((d) => !STATUS_VALIDADOS.includes(d.status))
