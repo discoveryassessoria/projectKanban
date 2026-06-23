@@ -101,7 +101,6 @@ export function ProcessoDetailsModal({
   const [activeTab, setActiveTab] = useState<"geral" | "central" | "documentos" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos">("geral")
   const [etapas, setEtapas] = useState<Status[]>([])
   const [statusIdAtual, setStatusIdAtual] = useState(processo?.statusId)
-  const [mudouEtapa, setMudouEtapa] = useState(false)
 
   // ✅ NOVO: força refetch do PhaseProgressHeader quando algo muda
   const [phaseRefreshKey, setPhaseRefreshKey] = useState(0)
@@ -347,9 +346,6 @@ export function ProcessoDetailsModal({
   }, [])
 
   const handleClose = () => {
-    if (mudouEtapa) {
-      onSave?.()
-    }
     setIsEditing(false)
     setActiveTab("geral")
     onClose()
@@ -585,12 +581,16 @@ export function ProcessoDetailsModal({
                 <button
                   key={etapa.id}
                   onClick={async () => {
-                    if (!pode('processos.editar_status')) return
                     if (etapa.id === statusIdAtual) return
+                    // 🔒 Mover de fase na mão exige permissão.
+                    if (!pode('processos.editar_status')) {
+                      alert("As fases avançam automaticamente conforme os documentos são validados. Você não tem permissão para mover o processo de fase manualmente.")
+                      return
+                    }
                     try {
                       const response = await fetch(`/api/processos/${processo.id}`, {
                         method: 'PUT',
-                        headers: { 
+                        headers: {
                           'Content-Type': 'application/json',
                           'Authorization': `Bearer ${localStorage.getItem("authToken")}`
                         },
@@ -598,15 +598,15 @@ export function ProcessoDetailsModal({
                       })
                       if (response.ok) {
                         setStatusIdAtual(etapa.id)
-                        setMudouEtapa(true)
-                        setPhaseRefreshKey((k) => k + 1)  // ✅ NOVO: refresh fase
+                        setPhaseRefreshKey((k) => k + 1)
                         onSave?.()
                       } else {
-                        alert('Erro ao mover processo')
+                        const data = await response.json().catch(() => ({}))
+                        alert(data.error || 'Não foi possível mover o processo.')
                       }
                     } catch (error) {
                       console.error('Erro ao mover processo:', error)
-                      alert('Erro ao mover processo')
+                      alert('Não foi possível mover o processo.')
                     }
                   }}
                   className={`

@@ -124,6 +124,14 @@ export async function PUT(
       )
     }
 
+    // 🔒 Mudança de fase manual exige a permissão específica (default: só admin).
+    // O motor automático mexe no statusId direto no servidor e NÃO passa por aqui,
+    // então isto não atrapalha o avanço automático.
+    if (statusId && statusId !== processoExistente.statusId) {
+      const erroStatus = await verificarPermissao(request, 'processos.editar_status')
+      if (erroStatus) return erroStatus
+    }
+
     // Se statusId foi fornecido, verificar se pertence ao mesmo país
     let statusNovo = null
     if (statusId && statusId !== processoExistente.statusId) {

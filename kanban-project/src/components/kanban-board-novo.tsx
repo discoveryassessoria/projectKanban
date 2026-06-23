@@ -243,31 +243,21 @@ export function KanbanBoard({
   // ✅ CORREÇÃO: handleDragEnd atualizado para IDs prefixados
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
-    
+
     setActiveProcesso(null)
     setIsDragging(false)
-    if (!pode('processos.editar_status')) return
-
     if (!over) return
 
-    // Extrair ID numérico do card arrastado
     const activeId = extractId(active.id)
-    
     const processo = localProcessos.find((p) => p.id === activeId)
     if (!processo) return
 
     let targetStatusId: number | null = null
-
-    // Primeiro, tentar pegar do data (mais confiável)
     if (over.data.current?.statusId) {
       targetStatusId = over.data.current.statusId
-    } 
-    // Se soltou sobre uma coluna
-    else if (isColumnId(over.id)) {
+    } else if (isColumnId(over.id)) {
       targetStatusId = extractId(over.id)
-    }
-    // Se soltou sobre outro card
-    else if (isCardId(over.id)) {
+    } else if (isCardId(over.id)) {
       const overProcessoId = extractId(over.id)
       const overProcesso = localProcessos.find((p) => p.id === overProcessoId)
       if (overProcesso) {
@@ -275,26 +265,30 @@ export function KanbanBoard({
       }
     }
 
-    // Se não conseguiu determinar o status ou é o mesmo, não faz nada
+    // Mesmo status ou indefinido: não faz nada
     if (!targetStatusId || processo.statusId === targetStatusId) return
 
+    // 🔒 Mover de fase na mão exige permissão. Sem ela: avisa e o card volta.
+    if (!pode('processos.editar_status')) {
+      alert("As fases avançam automaticamente conforme os documentos são validados. Você não tem permissão para mover o processo de fase manualmente.")
+      return
+    }
+
+    // Com permissão: move de verdade (atualização otimista + PUT)
     const previousProcessos = [...localProcessos]
-    
-    // Atualização otimista
-    setLocalProcessos(prev => 
+    setLocalProcessos(prev =>
       prev.map(p => p.id === activeId ? { ...p, statusId: targetStatusId! } : p)
     )
 
     try {
       const response = await fetch(`/api/processos/${activeId}`, {
         method: "PUT",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem("authToken")}`
         },
         body: JSON.stringify({ statusId: targetStatusId }),
       })
-
       if (!response.ok) throw new Error("Erro ao mover processo")
     } catch (error) {
       console.error("Error updating processo status:", error)
