@@ -127,7 +127,7 @@ export function WorkflowMacroTrilha({
   })()
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl px-5 py-4 mb-4">
+    <div className="bg-white border border-gray-200 rounded-2xl px-5 py-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-3.5">
         <div>
@@ -260,7 +260,57 @@ function LegendItem({ cls, children }: { cls: string; children: React.ReactNode 
 }
 
 // ============================================================
+// COMPONENTE: RESUMO DO PROCESSO (caixinha de contadores)
+// Extraído do MacroSidebar para poder ficar ao lado da trilha no topo.
+// Usa a MESMA matemática de caminho/status do mockup.
+// ============================================================
+
+export function ResumoDoProcesso({
+  currentPhase,
+  completedPhases = [],
+  phaseProgress = {},
+  needsRectification = null,
+}: WorkflowMacroProps) {
+  const path = getActivePath(needsRectification)
+
+  const progressOf = (title: PhaseName): number => {
+    if (completedPhases.includes(title)) return 100
+    if (!path.includes(title)) return 0
+    return phaseProgress[title] ?? 0
+  }
+
+  const overall = Math.round(
+    path.reduce((acc, ph) => acc + progressOf(ph), 0) / (path.length || 1)
+  )
+  const concluidas = completedPhases.length
+  const futuras = path.filter(
+    (p) => getPhaseStatus(p, currentPhase, completedPhases, path) === "futura"
+  ).length
+  const puladas = PROCESS_PHASES.filter(
+    (p) => getPhaseStatus(p, currentPhase, completedPhases, path) === "pulada"
+  ).length
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl p-4 h-full flex flex-col">
+      <h3 className="text-[13.5px] font-extrabold text-gray-900 mb-3">Resumo do processo</h3>
+      <StatRow label="Caminho ativo" value={`${path.length} fases`} />
+      <StatRow label="Fases concluídas" value={String(concluidas)} />
+      <StatRow label="Fase atual" value={currentPhase} />
+      <StatRow label="Fases futuras" value={String(futuras)} />
+      <StatRow label="Fases puladas" value={String(puladas)} />
+      <div className="flex justify-between items-center text-[12.5px] pt-2.5 mt-auto border-t-2 border-gray-200">
+        <span className="text-gray-500">Progresso geral</span>
+        <b className="text-blue-600 text-[15px]">{overall}%</b>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
 // COMPONENTE: RESUMO LATERAL (coluna direita)
+// ⚠ NÃO é mais montado na Central Operacional (24/jun) — o "Resumo do processo"
+// foi pro topo (ResumoDoProcesso) e o "Resumo por fase" saiu por ser redundante
+// com a trilha. Mantido aqui caso seja necessário reaproveitar.
 // ============================================================
 
 export function MacroSidebar({
