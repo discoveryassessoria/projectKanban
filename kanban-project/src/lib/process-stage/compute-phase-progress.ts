@@ -25,6 +25,8 @@
  */
 
 import type { StatusDocumento } from "@prisma/client"
+import { getOrdemFase } from "./fases-catalog"
+import type { FaseCode } from "@prisma/client"
 import {
   deriveProcessStage,
   STAGE_LABELS,
@@ -118,6 +120,7 @@ export function stageFromFaseCode(faseCode?: string | null): ProcessStage | null
 export function computePhaseProgress(
   documentos: DocForStage[],
   stageOverride?: ProcessStage | null,
+  faseCode?: string | null,
 ): PhaseProgress {
   const derived = deriveProcessStage(documentos)
   const stage = stageOverride ?? derived.stage
@@ -125,6 +128,27 @@ export function computePhaseProgress(
     (d) => d.required !== false && d.status !== "CANCELADO",
   )
   const total = required.length
+
+  // Régua oficial (mesma do motor recalcular-fase.ts e da Central):
+  // um doc concluiu a fase atual se tem workflow de fase POSTERIOR (já
+  // passou) OU workflow da fase atual com status concluido/arquivado.
+  // Vale só quando temos faseCode + workflows no doc; senão usa o critério
+  // antigo por status (fallback).
+  const ordemAtual = faseCode ? getOrdemFase(faseCode as FaseCode) : -1
+  const concluiuFasePorWorkflow = (d: DocForStage): boolean | null => {
+    const wfs = (d as any).workflows as
+      | Array<{ faseCode: string | null; status: string }>
+      | undefined
+    if (!faseCode || !wfs) return null // sem dados → cai no critério antigo
+    if (wfs.length === 0) return false
+    return wfs.some((wf) => {
+      if (!wf.faseCode) return false
+      const ordemWf = getOrdemFase(wf.faseCode as FaseCode)
+      if (ordemWf > ordemAtual) return true
+      if (ordemWf < ordemAtual) return false
+      return wf.status === "concluido" || wf.status === "arquivado"
+    })
+  }
 
   if (total === 0) {
     return {
@@ -138,7 +162,11 @@ export function computePhaseProgress(
   }
 
   const fn = CRITERIA[stage]
-  const done = required.filter((d) => fn(d.status)).length
+  const done = required.filter((d) => {
+    const porWf = concluiuFasePorWorkflow(d)
+    // se temos workflow, ele manda; senão usa o critério de status da fase
+    return porWf !== null ? porWf : fn(d.status)
+  }).length
   const percent = Math.round((done / total) * 100)
 
   return {

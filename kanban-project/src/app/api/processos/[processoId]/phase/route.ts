@@ -43,7 +43,11 @@ export async function GET(
           pessoas: {
             include: {
               documentos: {
-                select: { id: true, status: true },
+                select: {
+                  id: true,
+                  status: true,
+                  workflows: { select: { faseCode: true, status: true } },
+                },
               },
             },
           },
@@ -59,10 +63,16 @@ export async function GET(
   // só a linha reta conta pro gate da fase (igual ao resto do sistema)
   const docs = (processo.arvore?.pessoas ?? [])
     .filter((p) => p.linhaReta)
-    .flatMap((p) => p.documentos.map((d) => ({ id: d.id, status: d.status })))
+    .flatMap((p) =>
+      p.documentos.map((d) => ({
+        id: d.id,
+        status: d.status,
+        workflows: d.workflows,
+      })),
+    )
 
   const stageOverride = stageFromFaseCode(processo.status?.faseCode)
-  const progress = computePhaseProgress(docs, stageOverride)
+  const progress = computePhaseProgress(docs, stageOverride, processo.status?.faseCode ?? null)
 
   return NextResponse.json(progress)
 }

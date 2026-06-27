@@ -36,7 +36,7 @@ const RETIF_PHASES: PhaseName[] = [
   "Emissão documental retificada",
 ]
 
-type PhaseStatus = "concluida" | "atual" | "futura" | "pulada" | "bloqueada"
+type PhaseStatus = "concluida" | "atual" | "futura" | "pulada" | "bloqueada" | "condicional"
 
 export interface WorkflowMacroProps {
   /** Fase atual do processo (nome exato, ex: "Emissão documental") */
@@ -78,9 +78,19 @@ function getPhaseStatus(
   title: PhaseName,
   currentPhase: string,
   completedPhases: string[],
-  path: PhaseName[]
+  path: PhaseName[],
+  needsRectification: boolean | null | undefined
 ): PhaseStatus {
-  if (!path.includes(title)) return "pulada"
+  if (!path.includes(title)) {
+    // Fase fora do caminho ativo. Se é condicional E a Análise ainda NÃO
+    // decidiu (null), ela é "condicional" (pode entrar). Só vira "pulada"
+    // quando a decisão foi tomada e ela ficou de fora.
+    const ehCondicional = RETIF_PHASES.includes(title)
+    if (ehCondicional && (needsRectification === null || needsRectification === undefined)) {
+      return "condicional"
+    }
+    return "pulada"
+  }
   if (completedPhases.includes(title)) return "concluida"
   if (title === currentPhase) return "atual"
   const ci = path.indexOf(currentPhase as PhaseName)
@@ -111,7 +121,6 @@ export function WorkflowMacroTrilha({
   onSelectPhase,
 }: WorkflowMacroProps) {
   const path = getActivePath(needsRectification)
-  const sel = selectedPhase || currentPhase
 
   const progressOf = (title: PhaseName): number => {
     if (completedPhases.includes(title)) return 100
@@ -146,15 +155,15 @@ export function WorkflowMacroTrilha({
       {/* Timeline */}
       <div className="flex gap-0 overflow-x-auto pb-1">
         {PROCESS_PHASES.map((title, i) => {
-          const st = getPhaseStatus(title, currentPhase, completedPhases, path)
+          const st = getPhaseStatus(title, currentPhase, completedPhases, path, needsRectification)
           const prog = progressOf(title)
-          const isSel = title === sel
           const conditional = RETIF_PHASES.includes(title)
 
           const dotCls =
             st === "concluida" ? "bg-green-600 text-white"
             : st === "atual" ? "bg-blue-600 text-white"
             : st === "pulada" ? "bg-slate-200 text-slate-400"
+            : st === "condicional" ? "bg-violet-100 text-violet-500"
             : st === "bloqueada" ? "bg-amber-100 text-amber-700"
             : "border-2 border-gray-200 bg-white text-gray-400"
 
@@ -162,16 +171,17 @@ export function WorkflowMacroTrilha({
             st === "concluida" ? "bg-green-100 text-green-700"
             : st === "atual" ? "bg-blue-100 text-blue-700 border border-blue-300"
             : st === "pulada" ? "bg-slate-100 text-slate-500"
+            : st === "condicional" ? "bg-violet-100 text-violet-600"
             : st === "bloqueada" ? "bg-amber-100 text-amber-700"
             : "bg-gray-50 text-gray-400"
           const badgeTxt =
-            isSel && st !== "atual" ? "Visualizando"
-            : st === "concluida" ? "Concluída"
+            st === "concluida" ? "Concluída"
             : st === "atual" ? "Atual"
             : st === "pulada" ? "Pulada"
+            : st === "condicional" ? "Condicional"
             : st === "bloqueada" ? "Bloqueada"
             : "Futura"
-          const badgeFinalCls = isSel && st !== "atual" ? "bg-blue-50 text-blue-600 border border-blue-200" : badgeCls
+          const badgeFinalCls = badgeCls
 
           const barColor =
             st === "concluida" ? "#16a34a"
@@ -185,29 +195,28 @@ export function WorkflowMacroTrilha({
 
           // conector pra próxima fase
           const nextDone = i < PROCESS_PHASES.length - 1
-            ? (getPhaseStatus(PROCESS_PHASES[i + 1], currentPhase, completedPhases, path) === "concluida" || st === "concluida")
+            ? (getPhaseStatus(PROCESS_PHASES[i + 1], currentPhase, completedPhases, path, needsRectification) === "concluida" || st === "concluida")
             : false
 
           return (
             <div
               key={title}
-              className={`flex-1 min-w-[92px] ${isSel ? "rounded-[10px]" : ""}`}
-              style={isSel ? { background: "#eff6ff", boxShadow: "inset 0 0 0 1.5px #2563eb" } : undefined}
+              className="flex-1 min-w-[92px] relative z-10"
             >
               <button
                 onClick={() => onSelectPhase?.(title)}
-                className="flex flex-col items-center gap-1 w-full bg-transparent border-none py-1.5 px-1 rounded-[10px] cursor-pointer hover:bg-gray-50 transition-colors"
+                className="flex flex-col items-center gap-1 w-full bg-transparent border-none py-1.5 px-1 rounded-[10px] cursor-default"
               >
                 {/* dot + conector */}
                 <div className="flex items-center w-full justify-center relative">
-                  <span className={`w-7 h-7 rounded-full grid place-items-center text-xs font-bold flex-none z-10 ${dotCls}`}>
+                  <span className={`w-7 h-7 rounded-full grid place-items-center text-xs font-bold flex-none relative z-30 ${dotCls}`}>
                     {st === "concluida" ? <Check className="w-3.5 h-3.5" strokeWidth={3} />
                       : st === "atual" ? <b>{i + 1}</b>
                       : st === "pulada" ? "⤳" : ""}
                   </span>
                   {i < PROCESS_PHASES.length - 1 && (
                     <div
-                      className="absolute left-1/2 w-full h-0.5 top-1/2 -translate-y-1/2 z-0"
+                      className="absolute left-1/2 w-full h-0.5 top-1/2 -translate-y-1/2 z-20"
                       style={{ background: nextDone ? "#16a34a" : "#e5e7eb" }}
                     />
                   )}
@@ -232,10 +241,6 @@ export function WorkflowMacroTrilha({
                 <div className="w-4/5 h-1 bg-gray-200 rounded-full overflow-hidden">
                   <div className="h-full rounded-full" style={{ width: `${prog}%`, background: barColor }} />
                 </div>
-
-                {conditional && (
-                  <span className="text-[8.5px] text-violet-600 font-semibold uppercase tracking-wide">condicional</span>
-                )}
               </button>
             </div>
           )
@@ -244,11 +249,10 @@ export function WorkflowMacroTrilha({
 
       {/* Legenda */}
       <div className="flex flex-wrap gap-3.5 pt-3 mt-2.5 border-t border-gray-200 text-[11px] text-gray-500">
-        <LegendItem cls="bg-green-600 text-white"><Check className="w-2 h-2" strokeWidth={3} /></LegendItem>
-        <span className="flex items-center gap-1.5">Concluída</span>
+        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-green-600 text-white grid place-items-center"><Check className="w-2 h-2" strokeWidth={3} /></span>Concluída</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-blue-600" />Atual (fase real)</span>
-        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full border-[3px] border-blue-600 bg-blue-50" />Visualizando</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full border-2 border-gray-200 bg-white" />Futura</span>
+        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-violet-100 text-violet-500 grid place-items-center text-[8px]">?</span>Condicional</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-slate-200 text-slate-400 grid place-items-center text-[8px]">⤳</span>Pulada</span>
       </div>
     </div>
@@ -284,10 +288,10 @@ export function ResumoDoProcesso({
   )
   const concluidas = completedPhases.length
   const futuras = path.filter(
-    (p) => getPhaseStatus(p, currentPhase, completedPhases, path) === "futura"
+    (p) => getPhaseStatus(p, currentPhase, completedPhases, path, needsRectification) === "futura"
   ).length
   const puladas = PROCESS_PHASES.filter(
-    (p) => getPhaseStatus(p, currentPhase, completedPhases, path) === "pulada"
+    (p) => getPhaseStatus(p, currentPhase, completedPhases, path, needsRectification) === "pulada"
   ).length
 
   return (
@@ -335,10 +339,10 @@ export function MacroSidebar({
   )
   const concluidas = completedPhases.length
   const futuras = path.filter(
-    (p) => getPhaseStatus(p, currentPhase, completedPhases, path) === "futura"
+    (p) => getPhaseStatus(p, currentPhase, completedPhases, path, needsRectification) === "futura"
   ).length
   const puladas = PROCESS_PHASES.filter(
-    (p) => getPhaseStatus(p, currentPhase, completedPhases, path) === "pulada"
+    (p) => getPhaseStatus(p, currentPhase, completedPhases, path, needsRectification) === "pulada"
   ).length
 
   return (
@@ -362,7 +366,7 @@ export function MacroSidebar({
         <h3 className="text-[13.5px] font-extrabold text-gray-900 mb-3">Resumo por fase</h3>
         <div className="flex flex-col gap-0.5">
           {PROCESS_PHASES.map((title, i) => {
-            const st = getPhaseStatus(title, currentPhase, completedPhases, path)
+            const st = getPhaseStatus(title, currentPhase, completedPhases, path, needsRectification)
             const prog = progressOf(title)
             const icCls =
               st === "concluida" ? "bg-green-600 text-white"
