@@ -2,6 +2,8 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { getOrdemFase } from "@/src/lib/process-stage/fases-catalog"
+import type { FaseCode } from "@prisma/client"
 
 // ============================================================
 // TIPOS DE RESPOSTA
@@ -62,6 +64,7 @@ interface QueueRow {
   docType: string
   docTypeLabel: string
   status: string
+  statusRaw: string
   responsavelNome: string | null
   prazo: string | null
   diasParaPrazo: number | null
@@ -171,16 +174,18 @@ export async function GET(
     // ============================================================
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { id: true, arvoreId: true },
+      select: { id: true, arvoreId: true, status: { select: { faseCode: true } } },
     })
 
     if (!processo) {
       return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
     }
 
+    const faseAtualCode = processo.status?.faseCode ?? null
+
     // pessoas e documentos não dependem um do outro (ambos só precisam do
     // arvoreId) → busca os dois EM PARALELO, economizando um round-trip ao banco.
-    const [pessoas, docsRaw] = await Promise.all([
+    const [pessoas, docsRaw, workflowsRaw] = await Promise.all([
       processo.arvoreId
         ? prisma.pessoa.findMany({
             where: { arvoreId: processo.arvoreId },
@@ -208,6 +213,24 @@ export async function GET(
               dataPrazoOperacao: true,
               motivoBloqueio: true,
               ultimaMovimentacao: true,
+              workflows: { select: { faseCode: true, status: true } },
+            },
+          })
+        : [],
+      processo.arvoreId
+        ? prisma.workflow.findMany({
+            where: { documento: { pessoa: { arvoreId: processo.arvoreId } } },
+            select: {
+              documentoId: true,
+              steps: {
+                select: {
+                  ordem: true,
+                  status: true,
+                  assigneeId: true,
+                  assignee: { select: { nome: true } },
+                },
+                orderBy: { ordem: "asc" },
+              },
             },
           })
         : [],
@@ -224,32 +247,32 @@ export async function GET(
       return p?.numeroLinhagem ?? 99
     }
 
-    // ============================================================
-    // 2) Carrega documentos
-    // ============================================================
-    //
-    // ⚠ DEPOIS DE APLICAR a migration descrita em
-    //   schema-mudancas-central-operacional.md, troque o select por:
-    //
-    //   {
-    //     id: true, pessoaId: true, tipo: true, status: true, updatedAt: true,
-    //     responsavelId: true,
-    //     responsavel: { select: { nome: true } },
-    //     dataPrazoOperacao: true,
-    //     motivoBloqueio: true,
-    //     ultimaMovimentacao: true,
-    //   }
-    //
-    //   E mude todos os campos de `schemaCapabilities` para true.
-    // ============================================================
-    // (docsRaw já foi carregado em paralelo com pessoas, lá no passo 1)
+    // docId -> responsável da ETAPA ativa (fallback quando o doc não tem
+    // responsável próprio). Regra robusta (não depende da grafia exata do status):
+    //   1º etapa "em execução" (status contém "execu"), com assignee;
+    //   senão 1ª etapa não concluída com assignee;
+    //   senão 1ª etapa qualquer com assignee.
+    const stepOwnerByDoc = new Map<number, { id: number; nome: string }>()
+    for (const wf of workflowsRaw as any[]) {
+      const comResp = wf.steps.filter((s: any) => s.assigneeId && s.assignee?.nome)
+      if (comResp.length === 0) continue
+      const emExec = comResp.find((s: any) => /execu/i.test(s.status))
+      const naoConcluida = comResp.find((s: any) => !/conclu|finaliz/i.test(s.status))
+      const escolhida = emExec ?? naoConcluida ?? comResp[0]
+      if (escolhida && !stepOwnerByDoc.has(wf.documentoId)) {
+        stepOwnerByDoc.set(wf.documentoId, { id: escolhida.assigneeId, nome: escolhida.assignee.nome })
+      }
+    }
 
-    // Atualize estas flags quando a migration rodar
+    // ============================================================
+    // 2) Documentos
+    // ============================================================
+
     const schemaCapabilities = {
-    hasResponsavel: true,
-    hasPrazoOperacao: true,
-    hasMotivoBloqueio: true,
-    hasUltimaMovimentacao: true,
+      hasResponsavel: true,
+      hasPrazoOperacao: true,
+      hasMotivoBloqueio: true,
+      hasUltimaMovimentacao: true,
     }
 
     interface DocFull {
@@ -263,20 +286,26 @@ export async function GET(
       dataPrazoOperacao?: Date | null
       motivoBloqueio?: string | null
       ultimaMovimentacao?: Date | null
+      workflows?: Array<{ faseCode: string | null; status: string }>
     }
 
-    const docs: DocFull[] = docsRaw.map((d: any) => ({
-    id: d.id,
-    pessoaId: d.pessoaId,
-    tipo: d.tipo,
-    status: d.status,
-    updatedAt: d.updatedAt,
-    responsavelId: d.responsavelId,
-    responsavelNome: d.responsavel?.nome ?? null,
-    dataPrazoOperacao: d.dataPrazoOperacao,
-    motivoBloqueio: d.motivoBloqueio,
-    ultimaMovimentacao: d.ultimaMovimentacao,
-    }))
+    const docs: DocFull[] = docsRaw.map((d: any) => {
+      const stepOwner = stepOwnerByDoc.get(d.id) ?? null
+      return {
+        id: d.id,
+        pessoaId: d.pessoaId,
+        tipo: d.tipo,
+        status: d.status,
+        updatedAt: d.updatedAt,
+        // doc tem prioridade; se não tiver, cai pro responsável da etapa ativa
+        responsavelId: d.responsavelId ?? stepOwner?.id ?? null,
+        responsavelNome: d.responsavel?.nome ?? stepOwner?.nome ?? null,
+        dataPrazoOperacao: d.dataPrazoOperacao,
+        motivoBloqueio: d.motivoBloqueio,
+        ultimaMovimentacao: d.ultimaMovimentacao,
+        workflows: d.workflows,
+      }
+    })
 
     // ============================================================
     // 3) Classificadores
@@ -422,6 +451,7 @@ export async function GET(
         docType: d.tipo,
         docTypeLabel: TIPO_LABELS[d.tipo] || d.tipo,
         status: STATUS_LABELS[d.status] || d.status,
+        statusRaw: d.status,
         responsavelNome: d.responsavelNome ?? null,
         prazo: d.dataPrazoOperacao?.toISOString() ?? null,
         diasParaPrazo: dias,
@@ -473,7 +503,26 @@ export async function GET(
     // docs de apoio seguem na fila operacional, mas não entram no % da fase
     const linhaRetaDocs = docs.filter((d) => pessoasMap.get(d.pessoaId)?.linhaReta)
     const totalDocs = linhaRetaDocs.length
-    const validados = linhaRetaDocs.filter((d) => STATUS_VALIDADOS.includes(d.status)).length
+
+    // "concluiu a fase atual" = MESMA régua do motor (recalcular-fase.ts):
+    // tem um workflow da fase atual com status concluido/arquivado, OU um
+    // workflow de fase posterior (já passou). Sem faseCode (fallback), cai
+    // pro critério antigo de status validado.
+    const ordemAtual = faseAtualCode ? getOrdemFase(faseAtualCode) : -1
+    const concluiuFaseAtual = (d: DocFull): boolean => {
+      if (!faseAtualCode) return STATUS_VALIDADOS.includes(d.status)
+      const wfs = d.workflows
+      if (!wfs || wfs.length === 0) return false
+      return wfs.some((wf) => {
+        if (!wf.faseCode) return false
+        const ordemWf = getOrdemFase(wf.faseCode as FaseCode)
+        if (ordemWf > ordemAtual) return true
+        if (ordemWf < ordemAtual) return false
+        return wf.status === "concluido" || wf.status === "arquivado"
+      })
+    }
+
+    const validados = linhaRetaDocs.filter(concluiuFaseAtual).length
 
     const missing = docs
       .filter((d) => !STATUS_VALIDADOS.includes(d.status))

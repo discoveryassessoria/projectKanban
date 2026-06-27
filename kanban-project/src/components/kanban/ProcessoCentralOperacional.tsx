@@ -69,6 +69,7 @@ interface CentralOpData {
     docType: string
     docTypeLabel: string
     status: string
+    statusRaw: string
     responsavelNome: string | null
     prazo: string | null
     diasParaPrazo: number | null
@@ -123,11 +124,11 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
   // --- 7 contadores (derivados do status genérico) ---
   const total = matrix.total
   const validados = matrix.completed
-  const solicitados = queue.filter((q) => /solicit/i.test(q.status)).length
-  const aguardando = queue.filter((q) => /busca/i.test(q.status)).length
+  const solicitados = queue.filter((q) => q.statusRaw === "SOLICITADO").length
+  const aguardando = queue.filter((q) => q.statusRaw === "EM_BUSCA").length
   const recebidos = validados
   const conferidos = 0
-  const divergentes = queue.filter((q) => /invál|inval|não enc|nao enc/i.test(q.status)).length
+  const divergentes = queue.filter((q) => ["INVALIDO", "NAO_ENCONTRADO"].includes(q.statusRaw)).length
 
   const kpis: FaseKpi[] = [
     { label: "Obrigatórios", value: total },
