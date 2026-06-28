@@ -42,6 +42,22 @@ const DreTab = dynamic(() => import("@/src/components/financeiroComponents/DreTa
   ssr: false,
   loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
 })
+const CcTab = dynamic(() => import("@/src/components/financeiroComponents/CcTab"), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+})
+const ComissoesTab = dynamic(() => import("@/src/components/financeiroComponents/ComissoesTab"), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+})
+const ImpostosTab = dynamic(() => import("@/src/components/financeiroComponents/ImpostosTab"), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+})
+const AuditoriaTab = dynamic(() => import("@/src/components/financeiroComponents/AuditoriaTab"), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+})
 
 // ============================================================
 // ABAS
@@ -223,6 +239,14 @@ export default function FinanceiroPage() {
             <FluxoTab />
           ) : tab === "dre" ? (
             <DreTab />
+          ) : tab === "cc" ? (
+            <CcTab />
+          ) : tab === "comissoes" ? (
+            <ComissoesTab />
+          ) : tab === "impostos" ? (
+            <ImpostosTab />
+          ) : tab === "auditoria" ? (
+            <AuditoriaTab />
           ) : (
             <EmConstrucao tab={tab} />
           )}
