@@ -30,6 +30,18 @@ const ReceberTab = dynamic(() => import("@/src/components/financeiroComponents/R
   ssr: false,
   loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
 })
+const PagarTab = dynamic(() => import("@/src/components/financeiroComponents/PagarTab"), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+})
+const FluxoTab = dynamic(() => import("@/src/components/financeiroComponents/FluxoTab"), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+})
+const DreTab = dynamic(() => import("@/src/components/financeiroComponents/DreTab"), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+})
 
 // ============================================================
 // ABAS
@@ -205,6 +217,12 @@ export default function FinanceiroPage() {
             <TesourariaTab />
           ) : tab === "receber" ? (
             <ReceberTab />
+          ) : tab === "pagar" ? (
+            <PagarTab />
+          ) : tab === "fluxo" ? (
+            <FluxoTab />
+          ) : tab === "dre" ? (
+            <DreTab />
           ) : (
             <EmConstrucao tab={tab} />
           )}
