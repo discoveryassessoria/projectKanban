@@ -6,6 +6,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import {
   Menu,
   MessageCircle,
+  Settings2,
 } from "lucide-react"
 
 import { HouseIcon } from "@/src/components/icons/house-icon"
@@ -18,6 +19,7 @@ import { useSidebarContext } from "@/src/contexts/sidebar-context"
 import { CalendarIcon } from "@/src/components/icons/calendar-icon"
 import { DollarIcon } from "@/src/components/icons/dollar-icon"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { ManagementIcon } from "@/src/components/icons/management-icon"
 
 const menuItems = [
   {
@@ -86,9 +88,9 @@ const adminMenuItems = [
     permissao: "financeiro.ver",
   },
   {
-    title: "Gerenciar Usuários",
+    title: "Gerenciamento",
     url: "/administrator",
-    icon: ShieldIcon,
+    icon: ManagementIcon,
     textOffset: "",
     iconOffset: "",
     permissao: "usuarios.gerenciar",
