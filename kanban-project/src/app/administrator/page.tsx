@@ -117,6 +117,8 @@ const BancosTab = dynamic(() => import("@/src/components/gerenciamentoComponents
 const FornecedoresTab = dynamic(() => import("@/src/components/gerenciamentoComponents/FornecedoresTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CambioTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CambioTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ImpostosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ImpostosTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const PlanoContasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PlanoContasTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const CarteirasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CarteirasTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
@@ -136,8 +138,8 @@ const TELAS: Record<string, React.ComponentType> = {
   methods: cat("fin_methods"),
   banks: BancosTab,
   accounts: ContasTab,
-  wallets: cat("fin_wallets"),
-  coa: cat("fin_coa"),
+  wallets: CarteirasTab,
+  coa: PlanoContasTab,
   categories: CategoriasTab,
   costcenters: CentrosCustoTab,
   taxes: ImpostosTab,

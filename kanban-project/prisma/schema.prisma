@@ -683,6 +683,8 @@ model ContaBancaria {
   contasPagar  ContaPagar[]
   transacoes   Transacao[]
 
+  carteiras    CarteiraRecebimento[]
+
   // --- novos campos para bater com o mockup ---
   moeda              Moeda    @default(BRL)
   iban               String?
@@ -1525,6 +1527,33 @@ model Imposto {
   ativo        Boolean   @default(true)
   criadoEm     DateTime  @default(now())
   atualizadoEm DateTime  @updatedAt
+}
+
+model PlanoConta {
+  id           Int      @id @default(autoincrement())
+  codigo       String   @db.VarChar(20)
+  nome         String   @db.VarChar(150)
+  tipo         String?  @db.VarChar(20)   // asset/liability/revenue/expense/cost/tax/transfer/equity
+  natureza     String?  @db.VarChar(10)   // debit / credit
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+model CarteiraRecebimento {
+  id              Int            @id @default(autoincrement())
+  nome            String         @db.VarChar(100)
+  tipo            String?        @db.VarChar(30)   // bank_account/pix/card_gateway/boleto/cash/international_transfer/wallet/payment_link
+  contaBancariaId Int?
+  contaBancaria   ContaBancaria? @relation(fields: [contaBancariaId], references: [id])
+  moeda           Moeda          @default(BRL)
+  diasLiquidacao  Int?           @default(0)
+  isDefault       Boolean        @default(false)
+  ativo           Boolean        @default(true)
+  criadoEm        DateTime       @default(now())
+  atualizadoEm    DateTime       @updatedAt
+
+  @@index([contaBancariaId])
 }
 
 enum Pais {
