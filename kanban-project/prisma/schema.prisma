@@ -683,6 +683,15 @@ model ContaBancaria {
   contasPagar  ContaPagar[]
   transacoes   Transacao[]
 
+  // --- novos campos para bater com o mockup ---
+  moeda              Moeda    @default(BRL)
+  iban               String?
+  swift              String?
+  isDefaultReceiving Boolean  @default(false)
+  isDefaultPayment   Boolean  @default(false)
+  bankId             Int?
+  bank               Banco?   @relation(fields: [bankId], references: [id])
+
   @@index([ativo])
 }
 
@@ -716,6 +725,10 @@ model Fornecedor {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
   contasPagar        ContaPagar[]
+
+  // --- novos campos para bater com o mockup ---
+  pais        String?  @db.VarChar(50)
+  moedaPadrao Moeda    @default(BRL)
 
   @@index([nome])
   @@index([cpfCnpj])
@@ -1473,6 +1486,19 @@ model EmissaoRetificada {
 
   @@unique([processoId, documentoId])
   @@index([processoId])
+}
+
+model Banco {
+  id           Int             @id @default(autoincrement())
+  codigo       String?         // ex.: "341"
+  nome         String          // obrigatório
+  sigla        String?
+  pais         String?
+  website      String?
+  ativo        Boolean         @default(true)
+  criadoEm     DateTime        @default(now())
+  atualizadoEm DateTime        @updatedAt
+  contas       ContaBancaria[]
 }
 
 enum Pais {

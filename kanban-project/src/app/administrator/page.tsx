@@ -60,7 +60,7 @@ const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
   ]},
   { grupo: "Cadastros do Motor", itens: [
     ["rolecat", "Papéis e Responsáveis"], ["permprofiles", "Usuários e Permissões"],
-    ["suppliers", "Fornecedores"], ["products", "Produtos e Serviços"],
+    ["products", "Produtos e Serviços"],
     ["pricingtable", "Tabela de Valores"], ["doctypes", "Tipos de Documento"],
     ["docmatrix", "Matriz Documental"], ["organs", "Órgãos de Protocolo"],
     ["sla", "SLAs e Prazos"], ["templates", "Modelos de Documento"],
@@ -112,6 +112,14 @@ const CatalogTab = dynamic(() => import("@/src/components/gerenciamentoComponent
 
 const CentrosCustoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CentrosCustoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
+const CategoriasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CategoriasTab"), { ssr: false, loading: () => <CarregandoTela /> })
+
+const ContasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ContasTab"), { ssr: false, loading: () => <CarregandoTela /> })
+
+const BancosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/BancosTab"), { ssr: false, loading: () => <CarregandoTela /> })
+
+const FornecedoresTab = dynamic(() => import("@/src/components/gerenciamentoComponents/FornecedoresTab"), { ssr: false, loading: () => <CarregandoTela /> })
+
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
 
@@ -128,17 +136,17 @@ const TELAS: Record<string, React.ComponentType> = {
   currencies: cat("fin_currencies"),
   fx: cat("fin_fx"),
   methods: cat("fin_methods"),
-  banks: cat("fin_banks"),
-  accounts: cat("fin_accounts"),
+  banks: BancosTab,
+  accounts: ContasTab,
   wallets: cat("fin_wallets"),
   coa: cat("fin_coa"),
-  categories: cat("fin_cats"),
+  categories: CategoriasTab,
   costcenters: CentrosCustoTab,
   taxes: cat("fin_taxes"),
   fees: cat("fin_fees"),
   organs: cat("op_organs"),
   prottypes: cat("op_prottypes"),
-  suppliers: cat("fin_suppliers"),
+  suppliers: FornecedoresTab,
   departments: cat("acc_departments"),
   countrycatalog: cat("op_country_catalog"),
 
