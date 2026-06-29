@@ -110,6 +110,8 @@ const CatalogTab = dynamic(() => import("@/src/components/gerenciamentoComponent
   ssr: false, loading: () => <CarregandoTela />,
 })
 
+const CentrosCustoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CentrosCustoTab"), { ssr: false, loading: () => <CarregandoTela /> })
+
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
 
@@ -131,7 +133,7 @@ const TELAS: Record<string, React.ComponentType> = {
   wallets: cat("fin_wallets"),
   coa: cat("fin_coa"),
   categories: cat("fin_cats"),
-  costcenters: cat("fin_cc"),
+  costcenters: CentrosCustoTab,
   taxes: cat("fin_taxes"),
   fees: cat("fin_fees"),
   organs: cat("op_organs"),
