@@ -2,11 +2,8 @@
 // PUT    - Atualizar perfil (bloqueia perfis do sistema)
 // DELETE - Excluir perfil (bloqueia sistema e perfis em uso)
 //
-// Segue o MESMO padrão do src/app/api/perfis/route.ts:
-//   - guard verificarPermissao(request, 'usuarios.gerenciar')
-//   - body { nome, descricao, cor, permissoes }
-//   - validação das chaves contra PERMISSOES
-//   - resposta { perfil }
+// ✅ Next 15: params é Promise → await params (corrige o build do Vercel).
+// Resto idêntico: guard verificarPermissao, validação de chaves, etc.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -16,13 +13,14 @@ import { PERMISSOES } from '@/src/lib/permissoes'
 // PUT - Atualizar perfil
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
 
-    const id = Number(params.id)
+    const { id: idParam } = await params
+    const id = Number(idParam)
     if (!id || Number.isNaN(id)) {
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
     }
@@ -86,13 +84,14 @@ export async function PUT(
 // DELETE - Excluir perfil
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
 
-    const id = Number(params.id)
+    const { id: idParam } = await params
+    const id = Number(idParam)
     if (!id || Number.isNaN(id)) {
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
     }
