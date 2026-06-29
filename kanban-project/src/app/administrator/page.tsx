@@ -111,14 +111,12 @@ const CatalogTab = dynamic(() => import("@/src/components/gerenciamentoComponent
 })
 
 const CentrosCustoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CentrosCustoTab"), { ssr: false, loading: () => <CarregandoTela /> })
-
 const CategoriasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CategoriasTab"), { ssr: false, loading: () => <CarregandoTela /> })
-
 const ContasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ContasTab"), { ssr: false, loading: () => <CarregandoTela /> })
-
 const BancosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/BancosTab"), { ssr: false, loading: () => <CarregandoTela /> })
-
 const FornecedoresTab = dynamic(() => import("@/src/components/gerenciamentoComponents/FornecedoresTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const CambioTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CambioTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const ImpostosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ImpostosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
@@ -134,7 +132,7 @@ const TELAS: Record<string, React.ComponentType> = {
   docrules: cat("op_docrules"),
   certtypes: cat("op_certtypes"),
   currencies: cat("fin_currencies"),
-  fx: cat("fin_fx"),
+  fx: CambioTab,
   methods: cat("fin_methods"),
   banks: BancosTab,
   accounts: ContasTab,
@@ -142,7 +140,7 @@ const TELAS: Record<string, React.ComponentType> = {
   coa: cat("fin_coa"),
   categories: CategoriasTab,
   costcenters: CentrosCustoTab,
-  taxes: cat("fin_taxes"),
+  taxes: ImpostosTab,
   fees: cat("fin_fees"),
   organs: cat("op_organs"),
   prottypes: cat("op_prottypes"),

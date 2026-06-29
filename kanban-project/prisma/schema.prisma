@@ -1501,6 +1501,32 @@ model Banco {
   contas       ContaBancaria[]
 }
 
+model CotacaoCambio {
+  id           Int      @id @default(autoincrement())
+  moedaDe      Moeda    // De
+  moedaPara    Moeda    // Para
+  taxa         Decimal  @db.Decimal(14, 6)
+  data         DateTime?
+  fonte        String?  @db.VarChar(100)
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+model Imposto {
+  id           Int       @id @default(autoincrement())
+  codigo       String?   @db.VarChar(20)
+  nome         String    @db.VarChar(100)
+  tipo         String?   @db.VarChar(20)   // municipal/federal/state/international/service_tax/withholding/other
+  modoCalculo  String?   @db.VarChar(20)   // percentage / fixed
+  percentual   Decimal?  @db.Decimal(7, 4)
+  valorFixo    Decimal?  @db.Decimal(12, 2)
+  aplicaA      String?   @db.VarChar(20)   // revenue / cost / service
+  ativo        Boolean   @default(true)
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+}
+
 enum Pais {
   PORTUGAL
   ESPANHA
