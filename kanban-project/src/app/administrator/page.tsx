@@ -1,11 +1,8 @@
 // ESTE ARQUIVO SUBSTITUI: src/app/administrator/page.tsx
 //
-// GERENCIAMENTO GERAL — casca com menu lateral (10 grupos, ~40 telas).
-// Cada item do menu carrega um componente de src/components/gerenciamentoComponents/.
-// Nesta Fatia 1, só "overview" (Painel Geral) está ligado; o resto mostra um
-// placeholder "em breve". Cada fatia seguinte preenche um item no mapa TELAS.
-//
-// Preserva o sistema real de permissões: usePermissoes() + guarda usuarios.gerenciar.
+// GERENCIAMENTO GERAL — casca com menu lateral (11 grupos), fiel ao mockup Operacional v4.
+// Inclui grupo Cadastros do Motor, Financeiro completo e Saúde do Sistema completo.
+// Todas as telas montadas (scaffold). Próximo passo: ligar dados/CRUD (wiring).
 
 "use client"
 
@@ -16,15 +13,59 @@ import { HeaderBar } from "@/src/components/header-bar"
 import { Search, Loader2, Settings2 } from "lucide-react"
 import dynamic from "next/dynamic"
 
+// Lote 1 — 12 telas bespoke
+import {
+  TeamsTab, FinAutomationsTab, OpAutomationsTab, ProductsTab, ProtocolsTab,
+  SLATab, TemplatesTab, NotificationsTab, AuditTab, ImportExportTab,
+  BackupTab, SettingsTab,
+} from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds"
+
+// Lote 2 — Centro do Processo + Diagnóstico Executivo
+import {
+  ProcTypesTab, MacroKanbanTab, HealthTab,
+} from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds2"
+
+// Lote 3 — Centro do Processo (fases)
+import {
+  PhaseIWFTab, PhaseModesTab,
+} from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds3"
+
+// Lote 4 — Financeiro + Disparo por Fase + Diagnóstico
+import {
+  FinCatalogTab, HonorariumsTab, PricingRulesTab, PhaseMapTab, DiagnosticsTab,
+} from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds4"
+
+// Lote 5 — Bibliotecas de modelos (Centro do Processo)
+import {
+  IWTemplatesTab, IMTemplatesTab, AMTemplatesTab,
+} from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds5"
+
+// Lote 6 — Cadastros do Motor + Saúde do Sistema (telas que faltavam)
+import {
+  ExecMatrixTab, SystemHealthTab, PricingTableTab, RoleCatalogTab,
+  PermProfilesTab, DocMatrixTab, ConfigVersionsTab, ConfigDiagnosisTab,
+} from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds6"
+
 // ============================================================
-// MENU — 10 grupos, ~40 itens (fiel ao mockup Operacional)
+// MENU — 11 grupos (fiel ao mockup Operacional v4)
 // ============================================================
 const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
   { grupo: "Painel", itens: [["overview", "Painel Geral"]] },
   { grupo: "Centro do Processo", itens: [
     ["proctypes", "Processos de Nacionalidade"], ["macrokanban", "Workflow Macro / Kanban"],
-    ["phaseiwf", "Workflows Internos das Fases"], ["phasemodes", "Modos Internos das Fases"],
-    ["opauto", "Automações por Fase"], ["phasemap", "Regras de Disparo por Fase"],
+    ["iwtemplates", "Modelos de Workflow Interno"], ["phaseiwf", "Workflows Internos das Fases"],
+    ["imtemplates", "Modelos Internos de Fase"], ["phasemodes", "Modos Internos das Fases"],
+    ["amtemplates", "Modelos de Automação"], ["opauto", "Automações por Fase"],
+    ["phasemap", "Regras de Disparo por Fase"],
+  ]},
+  { grupo: "Cadastros do Motor", itens: [
+    ["rolecat", "Papéis e Responsáveis"], ["permprofiles", "Usuários e Permissões"],
+    ["suppliers", "Fornecedores"], ["products", "Produtos e Serviços"],
+    ["pricingtable", "Tabela de Valores"], ["doctypes", "Tipos de Documento"],
+    ["docmatrix", "Matriz Documental"], ["organs", "Órgãos de Protocolo"],
+    ["sla", "SLAs e Prazos"], ["templates", "Modelos de Documento"],
+    ["notifications", "Notificações"], ["cfgversions", "Versionamento e Publicação"],
+    ["cfgdiagnosis", "Diagnóstico de Configuração"],
   ]},
   { grupo: "Documentos", itens: [
     ["doctypes", "Tipos de Documento"], ["docrules", "Matriz Documental"], ["certtypes", "Tipos de Certidão"],
@@ -33,8 +74,9 @@ const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
     ["honorariums", "Honorários"], ["products", "Produtos e Serviços"], ["catalog", "Catálogo Financeiro"],
     ["pricing", "Regras de Preço"], ["finauto", "Regras de Disparo Financeiro"],
     ["currencies", "Moedas"], ["fx", "Câmbio"], ["methods", "Formas de Pagamento"],
-    ["banks", "Bancos"], ["accounts", "Contas"], ["categories", "Categorias"],
-    ["costcenters", "Centros de Custo"], ["taxes", "Impostos e Taxas"], ["fees", "Taxas de Pagamento"],
+    ["banks", "Bancos"], ["accounts", "Contas"], ["wallets", "Carteiras"], ["coa", "Plano de Contas"],
+    ["categories", "Categorias"], ["costcenters", "Centros de Custo"],
+    ["taxes", "Impostos e Taxas"], ["fees", "Taxas de Pagamento"],
   ]},
   { grupo: "Protocolo e Órgãos", itens: [
     ["organs", "Órgãos"], ["protocols", "Regras de Protocolo"], ["prottypes", "Tipos de Protocolo"],
@@ -47,33 +89,108 @@ const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
     ["departments", "Departamentos"], ["audit", "Logs / Auditoria"],
   ]},
   { grupo: "Saúde do Sistema", itens: [
-    ["health", "Diagnóstico Executivo"], ["settings", "Configurações"],
-    ["impexp", "Importação / Exportação"], ["backup", "Backup"], ["diagnostics", "Diagnóstico"],
+    ["mgmthealth", "Diagnóstico Executivo"], ["execmatrix", "Painel Executivo"],
+    ["syshealth", "Taxonomia / Saúde"], ["countrycatalog", "Catálogo Técnico de Países"],
+    ["settings", "Configurações"], ["impexp", "Importação / Exportação"],
+    ["backup", "Backup"], ["diagnostics", "Diagnóstico"],
   ]},
 ]
 
 // ============================================================
-// MAPA DE TELAS — cada fatia adiciona um componente aqui.
-// (Fatia 1: só overview. Próximas: users, roles, etc.)
+// MAPA DE TELAS
 // ============================================================
 const OverviewTab = dynamic(() => import("@/src/components/gerenciamentoComponents/OverviewTab"), {
   ssr: false, loading: () => <CarregandoTela />,
 })
-
 const UsersTab = dynamic(() => import("@/src/components/gerenciamentoComponents/UsersTab"), {
   ssr: false, loading: () => <CarregandoTela />,
 })
+const RolesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RolesTab"), { ssr: false })
+const CatalogTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogTab"), {
+  ssr: false, loading: () => <CarregandoTela />,
+})
+
+// cada catálogo do menu aponta pro CatalogTab com a chave do mockup
+const cat = (k: string) => () => <CatalogTab catalogKey={k} />
 
 const TELAS: Record<string, React.ComponentType> = {
+  // reais
   overview: OverviewTab,
   users: UsersTab,
+  roles: RolesTab,
+
+  // catálogos (genérico CatalogTab)
+  doctypes: cat("op_doctypes"),
+  docrules: cat("op_docrules"),
+  certtypes: cat("op_certtypes"),
+  currencies: cat("fin_currencies"),
+  fx: cat("fin_fx"),
+  methods: cat("fin_methods"),
+  banks: cat("fin_banks"),
+  accounts: cat("fin_accounts"),
+  wallets: cat("fin_wallets"),
+  coa: cat("fin_coa"),
+  categories: cat("fin_cats"),
+  costcenters: cat("fin_cc"),
+  taxes: cat("fin_taxes"),
+  fees: cat("fin_fees"),
+  organs: cat("op_organs"),
+  prottypes: cat("op_prottypes"),
+  suppliers: cat("fin_suppliers"),
+  departments: cat("acc_departments"),
+  countrycatalog: cat("op_country_catalog"),
+
+  // bespoke (lote 1)
+  teams: TeamsTab,
+  finauto: FinAutomationsTab,
+  opauto: OpAutomationsTab,
+  products: ProductsTab,
+  protocols: ProtocolsTab,
+  sla: SLATab,
+  templates: TemplatesTab,
+  notifications: NotificationsTab,
+  audit: AuditTab,
+  impexp: ImportExportTab,
+  backup: BackupTab,
+  settings: SettingsTab,
+
+  // bespoke (lote 2)
+  proctypes: ProcTypesTab,
+  macrokanban: MacroKanbanTab,
+  mgmthealth: HealthTab,
+
+  // bespoke (lote 3)
+  phaseiwf: PhaseIWFTab,
+  phasemodes: PhaseModesTab,
+
+  // bespoke (lote 4)
+  catalog: FinCatalogTab,
+  honorariums: HonorariumsTab,
+  pricing: PricingRulesTab,
+  phasemap: PhaseMapTab,
+  diagnostics: DiagnosticsTab,
+
+  // bespoke (lote 5) — bibliotecas de modelos
+  iwtemplates: IWTemplatesTab,
+  imtemplates: IMTemplatesTab,
+  amtemplates: AMTemplatesTab,
+
+  // bespoke (lote 6) — Cadastros do Motor + Saúde
+  rolecat: RoleCatalogTab,
+  permprofiles: PermProfilesTab,
+  pricingtable: PricingTableTab,
+  docmatrix: DocMatrixTab,
+  cfgversions: ConfigVersionsTab,
+  cfgdiagnosis: ConfigDiagnosisTab,
+  execmatrix: ExecMatrixTab,
+  syshealth: SystemHealthTab,
 }
 
 function CarregandoTela() {
   return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
 }
 
-// placeholder elegante pros itens ainda não portados
+// fallback de segurança (não deve mais aparecer — todas as telas estão registradas)
 function EmBreve({ titulo }: { titulo: string }) {
   return (
     <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-10 text-center">
