@@ -60,7 +60,6 @@ const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
   ]},
   { grupo: "Cadastros do Motor", itens: [
     ["rolecat", "Papéis e Responsáveis"], ["permprofiles", "Usuários e Permissões"],
-    ["products", "Produtos e Serviços"],
     ["pricingtable", "Tabela de Valores"], ["doctypes", "Tipos de Documento"],
     ["docmatrix", "Matriz Documental"], ["organs", "Órgãos de Protocolo"],
     ["sla", "SLAs e Prazos"], ["templates", "Modelos de Documento"],
@@ -72,6 +71,7 @@ const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
   ]},
   { grupo: "Financeiro", itens: [
     ["honorariums", "Honorários"], ["products", "Produtos e Serviços"], ["catalog", "Catálogo Financeiro"],
+    ["paycond", "Condições de Pagamento"], ["commrules", "Regras de Comissão"], ["discrules", "Regras de Desconto"],
     ["pricing", "Regras de Preço"], ["finauto", "Regras de Disparo Financeiro"],
     ["currencies", "Moedas"], ["fx", "Câmbio"], ["methods", "Formas de Pagamento"],
     ["banks", "Bancos"], ["accounts", "Contas"], ["wallets", "Carteiras"], ["coa", "Plano de Contas"],
@@ -119,6 +119,13 @@ const CambioTab = dynamic(() => import("@/src/components/gerenciamentoComponents
 const ImpostosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ImpostosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PlanoContasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PlanoContasTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CarteirasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CarteirasTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const ProdutosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ProdutosTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const HonorariosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/HonorariosTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const TabelaValoresTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TabelaValoresTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const CondicoesPagamentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CondicoesPagamentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const RegrasComissaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasComissaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const RegrasDescontoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasDescontoTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const ProdutosServicosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ProdutosServicosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
@@ -154,7 +161,6 @@ const TELAS: Record<string, React.ComponentType> = {
   teams: TeamsTab,
   finauto: FinAutomationsTab,
   opauto: OpAutomationsTab,
-  products: ProductsTab,
   protocols: ProtocolsTab,
   sla: SLATab,
   templates: TemplatesTab,
@@ -174,8 +180,12 @@ const TELAS: Record<string, React.ComponentType> = {
   phasemodes: PhaseModesTab,
 
   // bespoke (lote 4)
-  catalog: FinCatalogTab,
-  honorariums: HonorariumsTab,
+  catalog: ProdutosTab,
+  products: ProdutosServicosTab,
+  honorariums: HonorariosTab,
+  paycond: CondicoesPagamentoTab,
+  commrules: RegrasComissaoTab,
+  discrules: RegrasDescontoTab,
   pricing: PricingRulesTab,
   phasemap: PhaseMapTab,
   diagnostics: DiagnosticsTab,
@@ -188,7 +198,7 @@ const TELAS: Record<string, React.ComponentType> = {
   // bespoke (lote 6) — Cadastros do Motor + Saúde
   rolecat: RoleCatalogTab,
   permprofiles: PermProfilesTab,
-  pricingtable: PricingTableTab,
+  pricingtable: TabelaValoresTab,
   docmatrix: DocMatrixTab,
   cfgversions: ConfigVersionsTab,
   cfgdiagnosis: ConfigDiagnosisTab,
@@ -221,7 +231,6 @@ export default function GerenciamentoPage() {
   const [tab, setTab] = useState("overview")
   const [busca, setBusca] = useState("")
   const [user, setUser] = useState<UserData>({ nome: "Usuário" })
-  const [projetos, setProjetos] = useState<any[]>([])
   const [processos, setProcessos] = useState<any[]>([])
   const [arvores, setArvores] = useState<any[]>([])
 
@@ -231,8 +240,7 @@ export default function GerenciamentoPage() {
 
   const fetchHeaderData = useCallback(async () => {
     try {
-      const [p, pr, a] = await Promise.all([fetch("/api/projetos"), fetch("/api/processos"), fetch("/api/arvore")])
-      if (p.ok) setProjetos((await p.json()).projetos || [])
+      const [pr, a] = await Promise.all([fetch("/api/processos"), fetch("/api/arvore")])
       if (pr.ok) setProcessos((await pr.json()).processos || [])
       if (a.ok) { const ad = await a.json(); setArvores(Array.isArray(ad) ? ad : []) }
     } catch { /* silencioso */ }
@@ -280,7 +288,7 @@ export default function GerenciamentoPage() {
         title="Gerenciamento Geral"
         subtitle="Cadastros, regras, valores, automações, permissões e configurações"
         userName={user.nome} userRole={user.tipo || "Usuário"} userEmail={user.email || ""}
-        projetos={projetos} processos={processos} arvores={arvores} onLogout={handleLogout}
+        projetos={[]} processos={processos} arvores={arvores} onLogout={handleLogout}
       />
 
       <div className="min-h-screen relative">

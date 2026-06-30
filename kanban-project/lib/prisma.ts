@@ -1,11 +1,9 @@
 import { PrismaClient } from "@prisma/client"
 
-const globalForPrisma = globalThis as { prisma?: PrismaClient }
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient }
 
 const prismaClientSingleton = () => {
-  return new PrismaClient({
-    log: ["warn", "error"],
-  })
+  return new PrismaClient({ log: ["warn", "error"] })
 }
 
 export const prisma = globalForPrisma.prisma ?? prismaClientSingleton()

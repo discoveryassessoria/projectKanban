@@ -659,6 +659,7 @@ model CategoriaFinanceira {
   subcategorias  CategoriaFinanceira[] @relation("Subcategorias")
   contasPagar    ContaPagar[]
   transacoes     Transacao[]
+  produtosFinanceiros ProdutoFinanceiro[]
 
   @@index([tipo])
   @@index([categoriaPaiId])
@@ -727,6 +728,7 @@ model Fornecedor {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
   contasPagar        ContaPagar[]
+  tabelasValor TabelaValor[]
 
   // --- novos campos para bater com o mockup ---
   pais        String?  @db.VarChar(50)
@@ -1538,6 +1540,7 @@ model PlanoConta {
   ativo        Boolean  @default(true)
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
+  produtosFinanceiros ProdutoFinanceiro[]
 }
 
 model CarteiraRecebimento {
@@ -1552,8 +1555,133 @@ model CarteiraRecebimento {
   ativo           Boolean        @default(true)
   criadoEm        DateTime       @default(now())
   atualizadoEm    DateTime       @updatedAt
+  condicoesPagamento CondicaoPagamento[]
 
   @@index([contaBancariaId])
+}
+
+model ProdutoFinanceiro {
+  id                Int                  @id @default(autoincrement())
+  codigo            String               @db.VarChar(30)
+  nome              String               @db.VarChar(200)
+  especie           String?              @db.VarChar(20)   // kind
+  tipoFinanceiro    String?              @db.VarChar(20)   // financialType
+  categoriaId       Int?
+  categoria         CategoriaFinanceira? @relation(fields: [categoriaId], references: [id])
+  planoContaId      Int?
+  planoConta        PlanoConta?          @relation(fields: [planoContaId], references: [id])
+  moedaPadrao       Moeda                @default(BRL)
+  valorPadrao       Decimal?             @db.Decimal(12, 2)
+  aplicaA           String?              @db.VarChar(20)   // appliesTo
+  cobravelDoCliente Boolean              @default(false)
+  ativo             Boolean              @default(true)
+  criadoEm          DateTime             @default(now())
+  atualizadoEm      DateTime             @updatedAt
+  naturezaFinanceira String?  @default("revenue") @db.VarChar(20)
+  custoInterno       Boolean  @default(false)
+  repasse            Boolean  @default(false)
+  reembolsavel       Boolean  @default(false)
+  servicos ServicoProduto[] @relation("ServicoProdutoItens")
+
+  @@index([categoriaId])
+  @@index([planoContaId])
+}
+
+// ── Tabela de Valores (fin_values) ──
+model TabelaValor {
+  id               Int         @id @default(autoincrement())
+  name             String      @db.VarChar(200)
+  // soltos por ora (viram FK quando o motor/serviços existirem)
+  processoTipoId   String?     @db.VarChar(60)
+  faseKey          String?     @db.VarChar(60)
+  produtoServicoId String?     @db.VarChar(60)
+  // FK real
+  fornecedorId     Int?
+  fornecedor       Fornecedor? @relation(fields: [fornecedorId], references: [id])
+  moeda            Moeda       @default(EUR)
+  valor            Decimal     @default(0) @db.Decimal(12, 2)
+  modoCalculo      String      @default("fixed") @db.VarChar(20)
+  condicao         String?     @db.VarChar(200)
+  vigenciaInicio   String?     @db.VarChar(10)
+  vigenciaFim      String?     @db.VarChar(10)
+  arquivado        Boolean     @default(false)
+  criadoEm         DateTime    @default(now())
+  atualizadoEm     DateTime    @updatedAt
+
+  @@index([fornecedorId])
+}
+
+// ── Condições de Pagamento (fin_paycond) ──
+model CondicaoPagamento {
+  id             Int                  @id @default(autoincrement())
+  name           String               @db.VarChar(200)
+  moeda          Moeda                @default(BRL)
+  formaPagamento FormaPagamento?
+  carteiraId     Int?
+  carteira       CarteiraRecebimento? @relation(fields: [carteiraId], references: [id])
+  temEntrada     Boolean              @default(false)
+  percentEntrada Decimal?             @db.Decimal(5, 2)
+  parcelas       Int                  @default(1)
+  diaVencimento  Int?
+  aplicarTaxas   Boolean              @default(false)
+  ativo          Boolean              @default(true)
+  criadoEm       DateTime             @default(now())
+  atualizadoEm   DateTime             @updatedAt
+
+  @@index([carteiraId])
+}
+
+// ── Honorários (fin_honorariums) ──
+model Honorario {
+  id              Int      @id @default(autoincrement())
+  code            String   @db.VarChar(40)
+  name            String   @db.VarChar(200)
+  tipo            String   @default("main") @db.VarChar(30)
+  servico         String?  @db.VarChar(200)   // vira FK p/ Serviços quando existir
+  moeda           Moeda    @default(EUR)
+  valorPadrao     Decimal? @db.Decimal(12, 2)
+  momentoCobranca String   @default("contract_signed") @db.VarChar(30)
+  ativo           Boolean  @default(true)
+  criadoEm        DateTime @default(now())
+  atualizadoEm    DateTime @updatedAt
+}
+
+// ── Regras de Comissão (fin_comm) ──
+model RegraComissao {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(200)
+  papel        String?  @db.VarChar(120)   // vira FK p/ Papéis quando existir
+  modoCalculo  String   @default("percentage") @db.VarChar(20)
+  percent      Decimal? @db.Decimal(5, 2)
+  valorFixo    Decimal? @db.Decimal(12, 2)
+  momento      String   @default("first_payment_received") @db.VarChar(30)
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+// ── Regras de Desconto (fin_disc) ──
+model RegraDesconto {
+  id                     Int      @id @default(autoincrement())
+  name                   String   @db.VarChar(200)
+  maxPercentSemAprovacao Decimal? @db.Decimal(5, 2)
+  maxValorSemAprovacao   Decimal? @db.Decimal(12, 2)
+  exigeAprovacaoAcima    Boolean  @default(true)
+  ativo                  Boolean  @default(true)
+  criadoEm               DateTime @default(now())
+  atualizadoEm           DateTime @updatedAt
+}
+
+model ServicoProduto {
+  id               Int                 @id @default(autoincrement())
+  code             String              @unique @db.VarChar(40)
+  name             String              @db.VarChar(200)
+  category         String?             @db.VarChar(80)
+  nationality      String              @default("all") @db.VarChar(40)
+  ativo            Boolean             @default(true)
+  itensFinanceiros ProdutoFinanceiro[] @relation("ServicoProdutoItens")
+  criadoEm         DateTime            @default(now())
+  atualizadoEm     DateTime            @updatedAt
 }
 
 enum Pais {
