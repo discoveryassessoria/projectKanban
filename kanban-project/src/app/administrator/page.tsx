@@ -126,6 +126,10 @@ const CondicoesPagamentoTab = dynamic(() => import("@/src/components/gerenciamen
 const RegrasComissaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasComissaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RegrasDescontoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasDescontoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ProdutosServicosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ProdutosServicosTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const MoedasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MoedasTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const FormasPagamentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/FormasPagamentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const TaxasPagamentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TaxasPagamentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const TipoProcessoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TipoProcessoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
@@ -140,9 +144,9 @@ const TELAS: Record<string, React.ComponentType> = {
   doctypes: cat("op_doctypes"),
   docrules: cat("op_docrules"),
   certtypes: cat("op_certtypes"),
-  currencies: cat("fin_currencies"),
+  currencies: MoedasTab,
   fx: CambioTab,
-  methods: cat("fin_methods"),
+  methods: FormasPagamentoTab,
   banks: BancosTab,
   accounts: ContasTab,
   wallets: CarteirasTab,
@@ -150,7 +154,7 @@ const TELAS: Record<string, React.ComponentType> = {
   categories: CategoriasTab,
   costcenters: CentrosCustoTab,
   taxes: ImpostosTab,
-  fees: cat("fin_fees"),
+  fees: TaxasPagamentoTab,
   organs: cat("op_organs"),
   prottypes: cat("op_prottypes"),
   suppliers: FornecedoresTab,
@@ -171,7 +175,7 @@ const TELAS: Record<string, React.ComponentType> = {
   settings: SettingsTab,
 
   // bespoke (lote 2)
-  proctypes: ProcTypesTab,
+  proctypes: TipoProcessoTab,
   macrokanban: MacroKanbanTab,
   mgmthealth: HealthTab,
 

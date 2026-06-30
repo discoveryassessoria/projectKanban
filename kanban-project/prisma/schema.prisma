@@ -1684,6 +1684,96 @@ model ServicoProduto {
   atualizadoEm     DateTime            @updatedAt
 }
 
+model MoedaCadastro {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.VarChar(10)
+  name         String?  @db.VarChar(100)
+  symbol       String?  @db.VarChar(10)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+model FormaPagamentoCadastro {
+  id              Int      @id @default(autoincrement())
+  code            String?  @db.VarChar(40)
+  name            String   @db.VarChar(200)
+  type            String?  @db.VarChar(30)
+  moeda           String?  @db.VarChar(10)   // code da MoedaCadastro (BRL/EUR/...)
+  permiteParcelas Boolean  @default(false)
+  maxParcelas     Int?
+  criadoEm        DateTime @default(now())
+  atualizadoEm    DateTime @updatedAt
+}
+
+model TaxaPagamento {
+  id                  Int      @id @default(autoincrement())
+  code                String?  @db.VarChar(40)
+  name                String   @db.VarChar(200)
+  formaPagamentoId    Int?     // ref. solta -> FormaPagamentoCadastro
+  moeda               String?  @db.VarChar(10)   // code -> MoedaCadastro
+  feeType             String?  @db.VarChar(30)
+  feePercent          Decimal? @db.Decimal(7, 4)
+  fixedFee            Decimal? @db.Decimal(12, 2)
+  anticipationEnabled Boolean  @default(false)
+  anticipationPercent Decimal? @db.Decimal(7, 4)
+  installmentsFrom    Int?
+  installmentsTo      Int?
+  criadoEm            DateTime @default(now())
+  atualizadoEm        DateTime @updatedAt
+}
+
+// ============================================================
+// MOTOR — Fase 1A: Tipos de Processo (Processos de Nacionalidade)
+// ============================================================
+model TipoProcessoNacionalidade {
+  id               Int      @id @default(autoincrement())
+  code             String   @unique @db.VarChar(40)
+  name             String   @db.VarChar(200)
+  countryKey       String   @db.VarChar(40)
+  countryLabel     String   @db.VarChar(80)
+  nationalityKey   String   @db.VarChar(40)
+  nationalityLabel String   @db.VarChar(80)
+  modalityKey      String   @db.VarChar(40)
+  modalityLabel    String   @db.VarChar(80)
+  processFamily    String   @default("cidadania")    @db.VarChar(40)
+  serviceNature    String   @default("main_process") @db.VarChar(40)
+  ativo            Boolean  @default(true)
+  arquivado        Boolean  @default(false)
+  criadoEm         DateTime @default(now())
+  atualizadoEm     DateTime @updatedAt
+  @@index([countryKey])
+  @@index([modalityKey])
+}
+
+model CatalogoPais {
+  id               Int      @id @default(autoincrement())
+  countryKey       String   @unique @db.VarChar(40)
+  countryLabel     String   @db.VarChar(80)
+  nationalityKey   String   @db.VarChar(40)
+  nationalityLabel String   @db.VarChar(80)
+  flag             String?  @db.VarChar(10)
+  language         String?  @db.VarChar(10)
+  defaultCurrency  String   @default("EUR") @db.VarChar(10)
+  codePrefix       String?  @db.VarChar(10)
+  ativo            Boolean  @default(true)
+  criadoEm         DateTime @default(now())
+  atualizadoEm     DateTime @updatedAt
+}
+
+model ModalidadePais {
+  id            Int      @id @default(autoincrement())
+  countryKey    String   @db.VarChar(40)
+  modalityKey   String   @db.VarChar(40)
+  modalityLabel String   @db.VarChar(80)
+  codeSuffix    String?  @db.VarChar(20)
+  ordem         Int      @default(0)
+  ativo         Boolean  @default(true)
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+  @@unique([countryKey, modalityKey])
+  @@index([countryKey])
+}
+
 enum Pais {
   PORTUGAL
   ESPANHA
