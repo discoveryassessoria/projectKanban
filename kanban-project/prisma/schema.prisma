@@ -1741,6 +1741,7 @@ model TipoProcessoNacionalidade {
   arquivado        Boolean  @default(false)
   criadoEm         DateTime @default(now())
   atualizadoEm     DateTime @updatedAt
+  macroWorkflow MacroWorkflow?
   @@index([countryKey])
   @@index([modalityKey])
 }
@@ -1772,6 +1773,134 @@ model ModalidadePais {
   atualizadoEm  DateTime @updatedAt
   @@unique([countryKey, modalityKey])
   @@index([countryKey])
+}
+
+// Catálogo das fases (building blocks do workflow)
+model CatalogoFase {
+  id                Int      @id @default(autoincrement())
+  phaseKey          String   @unique @db.VarChar(60)
+  label             String   @db.VarChar(120)
+  ordemPadrao       Int      @default(0)
+  requiredPadrao    Boolean  @default(true)
+  conditionalPadrao Boolean  @default(false)
+  slaDiasPadrao     Int      @default(30)
+  ativo             Boolean  @default(true)
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+}
+
+// Workflow Macro — 1:1 com o tipo de processo
+model MacroWorkflow {
+  id             Int      @id @default(autoincrement())
+  tipoProcessoId Int      @unique
+  tipoProcesso   TipoProcessoNacionalidade @relation(fields: [tipoProcessoId], references: [id], onDelete: Cascade)
+  name           String   @db.VarChar(200)
+  ativo          Boolean  @default(true)
+  criadoEm       DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
+  fases          FaseMacro[]
+}
+
+// Fases do workflow (a coluna variável)
+model FaseMacro {
+  id              Int      @id @default(autoincrement())
+  macroWorkflowId Int
+  macroWorkflow   MacroWorkflow @relation(fields: [macroWorkflowId], references: [id], onDelete: Cascade)
+  phaseKey        String   @db.VarChar(60)
+  label           String   @db.VarChar(120)
+  ordem           Int      @default(0)
+  required        Boolean  @default(true)
+  conditional     Boolean  @default(false)
+  entryRule       String   @default("previous_phase_completed") @db.VarChar(40)
+  exitRule        String?  @db.VarChar(120)
+  slaDays         Int      @default(30)
+  showInKanban    Boolean  @default(true)
+  criadoEm        DateTime @default(now())
+  atualizadoEm    DateTime @updatedAt
+  @@unique([macroWorkflowId, phaseKey])
+  @@index([macroWorkflowId])
+}
+
+model ModeloInternoFase {
+  id                Int      @id @default(autoincrement())
+  name              String   @db.VarChar(200)
+  modeKey           String   @db.VarChar(60)
+  category          String?  @db.VarChar(40)   // = phaseKey "principal" (retificacao/protocolado/traducao/apostilamento...) — âncora do @@unique
+  recommendedPhases Json?                       // ← NOVO: lista de phaseKeys recomendadas (CatalogoFase)
+  description       String?  @db.Text
+  conditionOfUse    String?  @db.Text
+  operationalImpact String?  @db.Text
+  documentalImpact  String?  @db.Text
+  financialImpact   String?  @db.Text
+  protocolImpact    String?  @db.Text
+  isSystemTemplate  Boolean  @default(false)
+  usedByCount       Int      @default(0)        // ← NOVO: quantas fases usam (bloqueia Excluir quando > 0)
+  arquivado         Boolean  @default(false)
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  @@unique([category, modeKey])
+  @@index([category])
+}
+
+model ModeloWorkflowInterno {
+  id                Int      @id @default(autoincrement())
+  templateKey       String   @unique @db.VarChar(80)   // âncora do seed, ex: iw_tpl_genealogy_default
+  name              String   @db.VarChar(200)
+  description       String?  @db.Text
+  category          String?  @db.VarChar(40)            // = phaseKey "principal"
+  recommendedPhases Json?                                // lista de phaseKeys (CatalogoFase)
+  isSystemTemplate  Boolean  @default(false)
+  usedByCount       Int      @default(0)                 // quantas fases usam (bloqueia Excluir quando > 0)
+  arquivado         Boolean  @default(false)
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  passos            PassoWorkflowInterno[]
+
+  @@index([category])
+}
+
+model PassoWorkflowInterno {
+  id                     Int      @id @default(autoincrement())
+  modeloId               Int
+  modelo                 ModeloWorkflowInterno @relation(fields: [modeloId], references: [id], onDelete: Cascade)
+  ordem                  Int
+  name                   String   @db.VarChar(200)
+  description            String?  @db.Text
+  generatesTask          Boolean  @default(true)         // "Gera tarefa"
+  required               Boolean  @default(true)         // "Obrigatório"
+  defaultResponsibleRole String?  @db.VarChar(80)        // "Responsável padrão"
+  defaultPriority        String   @default("medium") @db.VarChar(20)  // low | medium | high
+  defaultSlaDays         Int      @default(3)
+  completionCondition    String?  @db.Text
+  checklist              Json?                            // lista de strings (um item por linha)
+
+  @@index([modeloId])
+}
+
+model ModeloAutomacao {
+  id                 Int      @id @default(autoincrement())
+  templateKey        String   @unique @db.VarChar(80)
+  name               String   @db.VarChar(200)
+  description        String?  @db.Text
+  type               String   @default("task") @db.VarChar(30)   // task | financial | document | event | protocol | phase_transition | alert
+  category           String?  @db.VarChar(40)                     // = phaseKey "principal"
+  recommendedPhases  Json?                                         // lista de phaseKeys
+  scope              String   @default("phase") @db.VarChar(40)    // phase | person_document | ...
+  trigger            String?  @db.VarChar(60)                      // quando acontece
+  action             String?  @db.VarChar(80)                      // o que o sistema faz
+  conditions         Json?                                         // [{ field, operator, value }] (não editável na UI)
+  defaultParams      Json?                                         // { responsibleRole, priority, slaDays, checklist, financialType? }
+  idempotencyPattern String   @default("processId+phaseKey") @db.VarChar(120)
+  isSystemTemplate   Boolean  @default(false)
+  usedByCount        Int      @default(0)                          // bloqueia Excluir quando > 0
+  arquivado          Boolean  @default(false)
+  criadoEm           DateTime @default(now())
+  atualizadoEm       DateTime @updatedAt
+
+  @@index([category])
+  @@index([type])
 }
 
 enum Pais {

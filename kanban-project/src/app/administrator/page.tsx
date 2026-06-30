@@ -22,7 +22,7 @@ import {
 
 // Lote 2 — Centro do Processo + Diagnóstico Executivo
 import {
-  ProcTypesTab, MacroKanbanTab, HealthTab,
+  ProcTypesTab, HealthTab,
 } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds2"
 
 // Lote 3 — Centro do Processo (fases)
@@ -37,7 +37,7 @@ import {
 
 // Lote 5 — Bibliotecas de modelos (Centro do Processo)
 import {
-  IWTemplatesTab, IMTemplatesTab, AMTemplatesTab,
+  IMTemplatesTab, AMTemplatesTab,
 } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds5"
 
 // Lote 6 — Cadastros do Motor + Saúde do Sistema (telas que faltavam)
@@ -130,6 +130,10 @@ const MoedasTab = dynamic(() => import("@/src/components/gerenciamentoComponents
 const FormasPagamentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/FormasPagamentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const TaxasPagamentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TaxasPagamentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const TipoProcessoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TipoProcessoTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const MacroKanbanTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MacroKanbanTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const ModelosInternosFaseTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosInternosFaseTab"), { ssr: false, loading: () => <CarregandoTela /> });
+const ModelosWorkflowInternoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosWorkflowInternoTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const ModelosAutomacaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosAutomacaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
@@ -195,9 +199,9 @@ const TELAS: Record<string, React.ComponentType> = {
   diagnostics: DiagnosticsTab,
 
   // bespoke (lote 5) — bibliotecas de modelos
-  iwtemplates: IWTemplatesTab,
-  imtemplates: IMTemplatesTab,
-  amtemplates: AMTemplatesTab,
+  iwtemplates: ModelosWorkflowInternoTab,
+  imtemplates: ModelosInternosFaseTab,
+  amtemplates: ModelosAutomacaoTab,
 
   // bespoke (lote 6) — Cadastros do Motor + Saúde
   rolecat: RoleCatalogTab,
