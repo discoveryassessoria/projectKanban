@@ -134,6 +134,8 @@ const MacroKanbanTab = dynamic(() => import("@/src/components/gerenciamentoCompo
 const ModelosInternosFaseTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosInternosFaseTab"), { ssr: false, loading: () => <CarregandoTela /> });
 const ModelosWorkflowInternoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosWorkflowInternoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ModelosAutomacaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosAutomacaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const ModosInternosFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModosInternosFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const PhaseWorkflowsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseWorkflowsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
@@ -184,8 +186,8 @@ const TELAS: Record<string, React.ComponentType> = {
   mgmthealth: HealthTab,
 
   // bespoke (lote 3)
-  phaseiwf: PhaseIWFTab,
-  phasemodes: PhaseModesTab,
+  phaseiwf: PhaseWorkflowsFasesTab,
+  phasemodes: ModosInternosFasesTab,
 
   // bespoke (lote 4)
   catalog: ProdutosTab,

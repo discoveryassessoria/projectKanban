@@ -1903,6 +1903,69 @@ model ModeloAutomacao {
   @@index([type])
 }
 
+model PhaseInternalMode {
+  id                Int      @id @default(autoincrement())
+  modeUid           String   @unique @db.VarChar(140)   // {tipoProcessoId|'all'}::{phaseKey}::{key}
+  templateId        Int?                                 // → ModeloInternoFase (solto; null = ad-hoc/seed)
+  tipoProcessoId    Int?                                 // → TipoProcessoNacionalidade (solto; null = todos os processos)
+  phaseKey          String   @db.VarChar(40)
+  key               String   @db.VarChar(60)            // chave do modo (slug, único dentro de processo+fase)
+  label             String   @db.VarChar(200)
+  description       String?  @db.Text
+  condition         String?  @db.Text                   // condição de uso (vem de conditionOfUse do modelo)
+  impactOperational String?  @db.Text
+  impactDocument    String?  @db.Text
+  impactFinancial   String?  @db.Text
+  impactProtocol    String?  @db.Text
+  active            Boolean  @default(true)
+  arquivado         Boolean  @default(false)
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  @@index([phaseKey])
+  @@index([tipoProcessoId])
+}
+
+model PhaseInternalWorkflow {
+  id             Int      @id @default(autoincrement())
+  // {tipoProcessoId|'all'}::{phaseKey} para o workflow PRIMÁRIO de uma fase.
+  // (âncora de unicidade — 1 workflow por processo+fase; null = global/todos)
+  wfUid          String   @unique @db.VarChar(140)
+  templateId     Int?     // → ModeloWorkflowInterno (solto; null = ad-hoc/seed)
+  tipoProcessoId Int?     // → TipoProcessoNacionalidade (solto; null = TODOS os processos)
+  phaseKey       String   @db.VarChar(60)
+  name           String   @db.VarChar(200)
+  active         Boolean  @default(true)
+  arquivado      Boolean  @default(false)
+  criadoEm       DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
+
+  passos         PhaseInternalWorkflowStep[]
+
+  @@index([phaseKey])
+  @@index([tipoProcessoId])
+}
+
+model PhaseInternalWorkflowStep {
+  id             Int      @id @default(autoincrement())
+  workflowId     Int
+  workflow       PhaseInternalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  key            String   @db.VarChar(80)   // slug (único dentro do workflow — controlado na UI)
+  label          String   @db.VarChar(200)
+  description    String?  @db.Text
+  ordem          Int      @default(0)
+  createsTask    Boolean  @default(true)    // "Gera tarefa"
+  required       Boolean  @default(true)    // "Obrigatório"
+  owner          String?  @db.VarChar(120)  // "Responsável padrão"
+  priority       String   @default("medium") @db.VarChar(20)  // low | medium | high
+  slaDays        Int      @default(0)
+  completionRule String?  @db.Text          // "Condição de conclusão"
+  checklist      Json?
+
+  // TRAVA: cada chave só existe UMA vez por workflow (impede duplicação silenciosa)
+  @@unique([workflowId, key])
+}
+
 enum Pais {
   PORTUGAL
   ESPANHA
