@@ -2019,6 +2019,67 @@ model PhaseTriggerRule {
   @@index([itemCode])
 }
 
+model Departamento {
+  id           Int      @id @default(autoincrement())
+  code         String?  @db.VarChar(40)
+  name         String   @db.VarChar(200)
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+// Órgãos de Protocolo (op_organs) — consulados, comunes, tribunais, cartórios...
+model OrgaoProtocolo {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(200)
+  type         String?  @db.VarChar(30)   // consulado|comune|tribunal|conservatoria|cartorio|ministerio|prefeitura|tradutor|apostilamento|outro
+  country      String?  @db.VarChar(60)
+  state        String?  @db.VarChar(60)
+  city         String?  @db.VarChar(100)
+  queueRule    String?  @db.VarChar(200)  // regra de fila
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([type])
+}
+
+// Tipos de Documento (op_doctypes) — tipos documentais usados nos processos
+model TipoDocumentoCadastro {
+  id           Int      @id @default(autoincrement())
+  code         String?  @db.VarChar(40)
+  name         String   @db.VarChar(200)
+  category     String?  @db.VarChar(30)   // civil_registry|identity|judicial|consular|translation|apostille|other
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+// Matriz Documental (documentRequirementMatrix) — quais documentos são
+// exigidos por processo, fase, alvo e regra de geração. Por processo.
+model MatrizDocumental {
+  id                    Int      @id @default(autoincrement())
+  tipoProcessoId        Int      // → TipoProcessoNacionalidade (solto)
+  phaseKey              String?  @db.VarChar(60)   // null = qualquer fase
+  documentTypeCode      String   @db.VarChar(40)   // → TipoDocumentoCadastro.code (solto)
+  target                String   @default("direct_line_person") @db.VarChar(40)
+  generationRule        String   @default("all_direct_line") @db.VarChar(40)
+  required              Boolean  @default(true)
+  conditional           Boolean  @default(false)
+  condition             String?  @db.Text
+  createsTask           Boolean  @default(true)
+  createsCost           Boolean  @default(false)
+  createsRevenue        Boolean  @default(false)
+  blocksPhaseCompletion Boolean  @default(false)
+  usedByCount           Int      @default(0)
+  arquivado             Boolean  @default(false)
+  criadoEm              DateTime @default(now())
+  atualizadoEm          DateTime @updatedAt
+
+  @@index([tipoProcessoId])
+  @@index([phaseKey])
+}
+
 enum Pais {
   PORTUGAL
   ESPANHA

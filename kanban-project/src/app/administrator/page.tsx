@@ -138,6 +138,11 @@ const ModosInternosFasesTab = dynamic(() => import("@/src/components/gerenciamen
 const PhaseWorkflowsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseWorkflowsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PhaseAutomationsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseAutomationsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PhaseTriggerRulesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseTriggerRulesTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const DepartamentosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DepartamentosTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const TiposDocumentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TiposDocumentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const OrgaosProtocoloTab = dynamic(() => import("@/src/components/gerenciamentoComponents/OrgaosProtocoloTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const MatrizDocumentalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MatrizDocumentalTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const LogAuditoriaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/LogAuditoriaTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
@@ -149,7 +154,7 @@ const TELAS: Record<string, React.ComponentType> = {
   roles: RolesTab,
 
   // catálogos (genérico CatalogTab)
-  doctypes: cat("op_doctypes"),
+  doctypes: TiposDocumentoTab,
   docrules: cat("op_docrules"),
   certtypes: cat("op_certtypes"),
   currencies: MoedasTab,
@@ -163,10 +168,10 @@ const TELAS: Record<string, React.ComponentType> = {
   costcenters: CentrosCustoTab,
   taxes: ImpostosTab,
   fees: TaxasPagamentoTab,
-  organs: cat("op_organs"),
+  organs: OrgaosProtocoloTab,
   prottypes: cat("op_prottypes"),
   suppliers: FornecedoresTab,
-  departments: cat("acc_departments"),
+  departments: DepartamentosTab,
   countrycatalog: cat("op_country_catalog"),
 
   // bespoke (lote 1)
@@ -177,7 +182,7 @@ const TELAS: Record<string, React.ComponentType> = {
   sla: SLATab,
   templates: TemplatesTab,
   notifications: NotificationsTab,
-  audit: AuditTab,
+  audit: LogAuditoriaTab,
   impexp: ImportExportTab,
   backup: BackupTab,
   settings: SettingsTab,
@@ -211,7 +216,7 @@ const TELAS: Record<string, React.ComponentType> = {
   rolecat: RoleCatalogTab,
   permprofiles: PermProfilesTab,
   pricingtable: TabelaValoresTab,
-  docmatrix: DocMatrixTab,
+  docmatrix: MatrizDocumentalTab,
   cfgversions: ConfigVersionsTab,
   cfgdiagnosis: ConfigDiagnosisTab,
   execmatrix: ExecMatrixTab,
