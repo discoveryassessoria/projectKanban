@@ -1998,6 +1998,27 @@ model PhaseAutomationRule {
   @@index([kind])
 }
 
+model PhaseTriggerRule {
+  id                       Int      @id @default(autoincrement())
+  itemCode                 String   @db.VarChar(60)   // → ProdutoFinanceiro.codigo (solto)
+  financialItemId          Int?     // → ProdutoFinanceiro.id (solto)
+  name                     String   @db.VarChar(200)  // "<item> · <fase>" (calculado)
+  phaseKey                 String   @db.VarChar(60)
+  phaseEvent               String   @default("entered") @db.VarChar(20)   // entered | completed | reopened | blocked
+  entryType                String   @default("revenue") @db.VarChar(20)   // revenue | cost
+  automatic                Boolean  @default(true)     // Sim | Não (só sugestão)
+  requiresContractSigned   Boolean  @default(false)
+  requiresProposalApproved Boolean  @default(false)
+  allowRepeat              Boolean  @default(false)
+  active                   Boolean  @default(true)
+  arquivado                Boolean  @default(false)
+  criadoEm                 DateTime @default(now())
+  atualizadoEm             DateTime @updatedAt
+
+  @@index([phaseKey])
+  @@index([itemCode])
+}
+
 enum Pais {
   PORTUGAL
   ESPANHA

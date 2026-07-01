@@ -137,6 +137,7 @@ const ModelosAutomacaoTab = dynamic(() => import("@/src/components/gerenciamento
 const ModosInternosFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModosInternosFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PhaseWorkflowsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseWorkflowsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PhaseAutomationsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseAutomationsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const PhaseTriggerRulesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseTriggerRulesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
@@ -198,7 +199,7 @@ const TELAS: Record<string, React.ComponentType> = {
   commrules: RegrasComissaoTab,
   discrules: RegrasDescontoTab,
   pricing: PricingRulesTab,
-  phasemap: PhaseMapTab,
+  phasemap: PhaseTriggerRulesTab,
   diagnostics: DiagnosticsTab,
 
   // bespoke (lote 5) — bibliotecas de modelos
