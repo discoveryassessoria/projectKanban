@@ -12,8 +12,9 @@ interface Artefato {
   id: number; phaseKey: string; event: string; ruleKind: string; ruleSource: string
   targetTable: string; targetId: number | null; status: string; descricao: string; criadoEm: string
 }
+interface CreatedItem { kind: string; targetTable: string; targetId: number; name: string; amount?: number; currency?: string; condicional?: boolean }
 interface RunResult {
-  created: { name: string; tarefaId: number }[]
+  created: CreatedItem[]
   skipped: { name: string; reason: string }[]
   errors: string[]
   totalCriado: number
@@ -35,6 +36,11 @@ function fmtData(iso: string) {
   try { return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) }
   catch { return iso }
 }
+function money(v: number, ccy: string) {
+  try { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: ccy || "EUR" }).format(v) }
+  catch { return `${ccy} ${v.toFixed(2)}` }
+}
+const TABLE_LABEL: Record<string, string> = { Tarefa: "Tarefa", Receita: "Receita", Custo: "Custo" }
 
 // ============================================================
 // Componente
@@ -106,7 +112,7 @@ export default function ExecutorMotorTab() {
     try {
       const res = await fetch("/api/gerenciamento/executor-motor", { method: "POST", headers: authHeaders(), body: JSON.stringify({ action: "run", processoId: procId, phaseKey, event }) })
       const j = await res.json().catch(() => ({}))
-      if (res.ok) { setResult(j); showFlash(`${j.totalCriado} tarefa(s) criada(s).`); listarArtefatos(procId) }
+      if (res.ok) { setResult(j); showFlash(`${j.totalCriado} item(ns) criado(s).`); listarArtefatos(procId) }
       else setErro(j.error || "Erro ao executar.")
     } finally { setRunning(false) }
   }
@@ -128,7 +134,7 @@ export default function ExecutorMotorTab() {
 
       <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Executor do Motor</h2>
-        <p className="mt-1 text-sm text-white/60">Roda as automações de uma fase e <b className="text-amber-300/90">cria os artefatos de verdade</b> no processo. Nesta versão o motor cria <b>tarefas</b>; os demais tipos entram nos próximos passos.</p>
+        <p className="mt-1 text-sm text-white/60">Roda as automações de uma fase e <b className="text-amber-300/90">cria os artefatos de verdade</b> no processo: <b>tarefas</b> e <b>lançamentos financeiros</b> (receitas/custos). Tudo dá pra desfazer.</p>
 
         <div className="mt-4">
           <label className={labelCls}>Processo (do operacional)</label>
@@ -182,7 +188,7 @@ export default function ExecutorMotorTab() {
               <button disabled={running || !phaseKey} onClick={() => setConfirming(true)} className="mt-4 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-50">Executar automações da fase</button>
             ) : (
               <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4">
-                <div className="text-sm text-amber-100">Isso vai <b>criar tarefas reais</b> no processo <b>{proc.nome}</b>. Pode desfazer depois. Confirma?</div>
+                <div className="text-sm text-amber-100">Isso vai <b>criar tarefas e lançamentos reais</b> no processo <b>{proc.nome}</b>. Pode desfazer depois. Confirma?</div>
                 <div className="mt-3 flex gap-2">
                   <button disabled={running} onClick={executar} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-50">{running ? "Executando…" : "Sim, executar"}</button>
                   <button disabled={running} onClick={() => setConfirming(false)} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/70 hover:bg-white/5">Cancelar</button>
@@ -198,8 +204,15 @@ export default function ExecutorMotorTab() {
       {/* resultado da última execução */}
       {result && (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-          <div className="mb-2 text-sm text-white/80"><b>{result.totalCriado}</b> tarefa(s) criada(s){result.skipped.length > 0 && <> · {result.skipped.length} pulada(s)</>}{result.errors.length > 0 && <> · <span className="text-red-300">{result.errors.length} erro(s)</span></>}.</div>
-          {result.created.map((c, i) => <div key={i} className="text-sm text-green-300">+ {c.name} <span className="text-white/40">(tarefa #{c.tarefaId})</span></div>)}
+          <div className="mb-2 text-sm text-white/80"><b>{result.totalCriado}</b> item(ns) criado(s){result.skipped.length > 0 && <> · {result.skipped.length} pulado(s)</>}{result.errors.length > 0 && <> · <span className="text-red-300">{result.errors.length} erro(s)</span></>}.</div>
+          {result.created.map((c, i) => (
+            <div key={i} className="flex flex-wrap items-center gap-1.5 text-sm text-green-300">
+              <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">{TABLE_LABEL[c.targetTable] || c.targetTable}</span>
+              <span>+ {c.name}</span>
+              {c.amount != null && <span className="text-white/50">— {money(c.amount, c.currency || "EUR")}</span>}
+              {c.condicional && <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] text-sky-300" title="Era condicional (ex.: exige contrato). Confira e desfaça se não se aplica.">condicional</span>}
+            </div>
+          ))}
           {result.skipped.map((s, i) => <div key={i} className="text-sm text-white/50">• {s.name} — {s.reason}</div>)}
           {result.errors.map((e, i) => <div key={i} className="text-sm text-red-300">⚠ {e}</div>)}
         </div>
