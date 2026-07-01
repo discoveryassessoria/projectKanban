@@ -1966,6 +1966,38 @@ model PhaseInternalWorkflowStep {
   @@unique([workflowId, key])
 }
 
+model PhaseAutomationRule {
+  id                 Int      @id @default(autoincrement())
+  templateId         Int?     // → ModeloAutomacao (solto; null = regra ad-hoc)
+  tipoProcessoId     Int      // → TipoProcessoNacionalidade (solto) — regra pertence a um processo
+  phaseKey           String   @db.VarChar(60)
+  name               String   @db.VarChar(200)
+  description        String?  @db.Text
+  kind               String   @db.VarChar(30)   // task | financial | document | event | protocol | phase_advance | alert
+  scope              String   @default("phase") @db.VarChar(40)
+  trigger            String   @default("phase_entered") @db.VarChar(60)
+  action             String?  @db.VarChar(80)
+  conditions         Json?    // [{ field, op, value }]
+  params             Json?    // blob específico do tipo (owner/priority/slaDays/checklist, amount/currency, targetPhaseKey, ...)
+  financialType      String?  @db.VarChar(20)   // atalho p/ card/consulta (kind=financial)
+  idempotencyPattern String   @default("processId+phaseKey") @db.VarChar(120)
+  idempotent         Boolean  @default(true)
+  active             Boolean  @default(true)
+  arquivado          Boolean  @default(false)
+
+  // --- execução (Fase 4 — guardado, fica zerado por ora) ---
+  runCount           Int       @default(0)
+  lastRunAt          DateTime?
+  lastError          String?   @db.Text
+
+  criadoEm           DateTime @default(now())
+  atualizadoEm       DateTime @updatedAt
+
+  @@index([tipoProcessoId])
+  @@index([phaseKey])
+  @@index([kind])
+}
+
 enum Pais {
   PORTUGAL
   ESPANHA
