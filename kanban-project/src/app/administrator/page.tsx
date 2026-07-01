@@ -57,6 +57,7 @@ const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
     ["imtemplates", "Modelos Internos de Fase"], ["phasemodes", "Modos Internos das Fases"],
     ["amtemplates", "Modelos de Automação"], ["opauto", "Automações por Fase"],
     ["phasemap", "Regras de Disparo por Fase"],
+    ["simfase", "Simulação de Fase"],
   ]},
   { grupo: "Cadastros do Motor", itens: [
     ["rolecat", "Papéis e Responsáveis"], ["permprofiles", "Usuários e Permissões"],
@@ -143,6 +144,7 @@ const TiposDocumentoTab = dynamic(() => import("@/src/components/gerenciamentoCo
 const OrgaosProtocoloTab = dynamic(() => import("@/src/components/gerenciamentoComponents/OrgaosProtocoloTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const MatrizDocumentalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MatrizDocumentalTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const LogAuditoriaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/LogAuditoriaTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const SimulacaoFaseTab = dynamic(() => import("@/src/components/gerenciamentoComponents/SimulacaoFaseTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
@@ -205,6 +207,7 @@ const TELAS: Record<string, React.ComponentType> = {
   discrules: RegrasDescontoTab,
   pricing: PricingRulesTab,
   phasemap: PhaseTriggerRulesTab,
+  simfase: SimulacaoFaseTab,
   diagnostics: DiagnosticsTab,
 
   // bespoke (lote 5) — bibliotecas de modelos
