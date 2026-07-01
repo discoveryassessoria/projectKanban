@@ -274,9 +274,14 @@ model Processo {
   retificacaoPacotes RetificacaoPacote[]
   emissoesRetificadas EmissaoRetificada[]
 
+  tipoProcessoMotorId Int?
+  tipoProcessoMotor   TipoProcessoNacionalidade? @relation("ProcessoTipoMotor", fields: [tipoProcessoMotorId], references: [id], onDelete: SetNull)
+  motorArtefatos      MotorArtefato[]            @relation("ProcessoMotorArtefatos")
+
   @@index([pais])
   @@index([statusId])
   @@index([arvoreId])
+  @@index([tipoProcessoMotorId])
 }
 
 model ProcessoContratante {
@@ -1742,6 +1747,7 @@ model TipoProcessoNacionalidade {
   criadoEm         DateTime @default(now())
   atualizadoEm     DateTime @updatedAt
   macroWorkflow MacroWorkflow?
+  processosVinculados Processo[] @relation("ProcessoTipoMotor")
   @@index([countryKey])
   @@index([modalityKey])
 }
@@ -2077,6 +2083,30 @@ model MatrizDocumental {
   atualizadoEm          DateTime @updatedAt
 
   @@index([tipoProcessoId])
+  @@index([phaseKey])
+}
+
+model MotorArtefato {
+  id             Int       @id @default(autoincrement())
+  processoId     Int
+  processo       Processo  @relation("ProcessoMotorArtefatos", fields: [processoId], references: [id], onDelete: Cascade)
+  tipoProcessoId Int       // snapshot do tipo do motor usado
+  phaseKey       String    @db.VarChar(60)
+  event          String    @default("entered") @db.VarChar(20)   // entered | completed | reopened | blocked
+  ruleKind       String    @db.VarChar(30)   // task | financial | document | event | protocol | alert | phase_advance
+  ruleSource     String    @db.VarChar(20)   // automation | trigger
+  ruleId         Int?      // id da regra (solto, snapshot)
+  automaticKey   String    @unique @db.VarChar(200)   // chave de idempotência
+  targetTable    String    @db.VarChar(40)   // Tarefa | Custo | Receita | Evento | Protocolo
+  targetId       Int?      // id do registro criado (para desfazer)
+  status         String    @default("active") @db.VarChar(20)   // active | undone
+  descricao      String    @db.VarChar(300)
+  detalhes       Json?
+  criadoEm       DateTime  @default(now())
+  undoneEm       DateTime?
+
+  @@index([processoId])
+  @@index([status])
   @@index([phaseKey])
 }
 
