@@ -40,7 +40,7 @@ function money(v: number, ccy: string) {
   try { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: ccy || "EUR" }).format(v) }
   catch { return `${ccy} ${v.toFixed(2)}` }
 }
-const TABLE_LABEL: Record<string, string> = { Tarefa: "Tarefa", Receita: "Receita", Custo: "Custo" }
+const TABLE_LABEL: Record<string, string> = { Tarefa: "Tarefa", Receita: "Receita", Custo: "Custo", Evento: "Evento", Protocolo: "Protocolo" }
 
 // ============================================================
 // Componente
@@ -134,7 +134,7 @@ export default function ExecutorMotorTab() {
 
       <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Executor do Motor</h2>
-        <p className="mt-1 text-sm text-white/60">Roda as automações de uma fase e <b className="text-amber-300/90">cria os artefatos de verdade</b> no processo: <b>tarefas</b> e <b>lançamentos financeiros</b> (receitas/custos). Tudo dá pra desfazer.</p>
+        <p className="mt-1 text-sm text-white/60">Roda as automações de uma fase e <b className="text-amber-300/90">cria os artefatos de verdade</b> no processo: <b>tarefas</b>, <b>lançamentos financeiros</b>, <b>eventos</b> e <b>protocolos</b>. Tudo dá pra desfazer.</p>
 
         <div className="mt-4">
           <label className={labelCls}>Processo (do operacional)</label>

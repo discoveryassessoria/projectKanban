@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import {
   Prisma, PrioridadeTarefa,
   CategoriaReceita, CategoriaCusto, TipoCusto, Moeda, FxRule, ReceitaStatus, CustoStatus,
+  TipoEvento, Consulado,
 } from '@prisma/client'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { gerarCodigoReceita, gerarCodigoCusto } from '@/lib/financeiro/codigos'
@@ -99,7 +100,26 @@ async function criarCusto(pid: number, descricao: string, valor: number, moeda: 
   return c.id
 }
 
-// ---- GET: bootstrap ----
+// cria Evento (agenda) real
+function toTipoEvento(s: string | null): TipoEvento {
+  const up = (s || '').toUpperCase()
+  const ok: TipoEvento[] = ['CONSULADO', 'CARTORIO', 'REUNIAO', 'PRAZO', 'AUDIENCIA', 'ENTREGA_DOCUMENTO', 'OUTRO']
+  return (ok as string[]).includes(up) ? (up as TipoEvento) : 'OUTRO'
+}
+async function criarEvento(pid: number, titulo: string, descricao: string | null, dataInicio: Date, tipo: TipoEvento): Promise<number> {
+  const ev = await prisma.evento.create({
+    data: { processoId: pid, titulo: titulo.slice(0, 200), descricao: descricao || null, tipo, dataInicio, observacoes: 'Criado pelo motor' },
+  })
+  return ev.id
+}
+
+// cria Protocolo real (consulado = OUTROS por padrão; operador ajusta depois)
+async function criarProtocolo(pid: number, nome: string): Promise<number> {
+  const p = await prisma.protocolo.create({
+    data: { processoId: pid, consulado: 'OUTROS' as Consulado, observacoes: `Criado pelo motor: ${nome}` },
+  })
+  return p.id
+}
 export async function GET(request: NextRequest) {
   const erro = await verificarPermissao(request, 'usuarios.gerenciar')
   if (erro) return erro
@@ -154,6 +174,8 @@ export async function POST(request: NextRequest) {
             if (art.targetTable === 'Tarefa') await tx.tarefa.delete({ where: { id: art.targetId } })
             else if (art.targetTable === 'Receita') await tx.receita.delete({ where: { id: art.targetId } })
             else if (art.targetTable === 'Custo') await tx.custo.delete({ where: { id: art.targetId } })
+            else if (art.targetTable === 'Evento') await tx.evento.delete({ where: { id: art.targetId } })
+            else if (art.targetTable === 'Protocolo') await tx.protocolo.delete({ where: { id: art.targetId } })
           } catch { /* já removido */ }
         }
         await tx.motorArtefato.update({ where: { id: art.id }, data: { status: 'undone', undoneEm: new Date() } })
@@ -173,9 +195,11 @@ export async function POST(request: NextRequest) {
       const tipoProcessoId = processo.tipoProcessoMotorId
 
       const wantTrigger = opautoTriggerFor(event)
-      const [taskRules, finAutoRules, triggerRules, produtos] = await Promise.all([
+      const [taskRules, finAutoRules, eventRules, protocolRules, triggerRules, produtos] = await Promise.all([
         prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'task', active: true, arquivado: false } }),
         prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'financial', active: true, arquivado: false } }),
+        prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'event', active: true, arquivado: false } }),
+        prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'protocol', active: true, arquivado: false } }),
         prisma.phaseTriggerRule.findMany({ where: { phaseKey, arquivado: false } }),
         prisma.produtoFinanceiro.findMany({ where: { ativo: true }, select: { codigo: true, nome: true, valorPadrao: true, moedaPadrao: true } }),
       ])
@@ -259,6 +283,29 @@ export async function POST(request: NextRequest) {
         await fazer(akey, isReceita ? 'Receita' : 'Custo', 'financial', 'automation', r.id, r.name, { valor, moeda, condicional },
           async () => (isReceita ? criarReceita(processoId, r.name, valor, moeda, fx, honorario) : criarCusto(processoId, r.name, valor, moeda, fx)),
           (id) => created.push({ kind: 'financial', targetTable: isReceita ? 'Receita' : 'Custo', targetId: id, name: r.name, amount: valor, currency: moeda, condicional }),
+        )
+      }
+
+      // ===== EVENTO / AGENDA (PhaseAutomationRule kind=event) =====
+      for (const r of eventRules) {
+        if (wantTrigger == null || r.trigger !== wantTrigger) { skipped.push({ name: r.name, reason: `gatilho não corresponde (dispara em "${r.trigger}")` }); continue }
+        const offset = pnum(r.params, 'eventOffsetDays') ?? 0
+        const dataInicio = new Date(Date.now() + offset * 86400000)
+        const tipo = toTipoEvento(pstr(r.params, 'eventType'))
+        const akey = `${processoId}::${phaseKey}::automation::${r.id}`
+        await fazer(akey, 'Evento', 'event', 'automation', r.id, r.name, { tipo, dataInicio: dataInicio.toISOString() },
+          async () => criarEvento(processoId, r.name, r.description || null, dataInicio, tipo),
+          (id) => created.push({ kind: 'event', targetTable: 'Evento', targetId: id, name: r.name }),
+        )
+      }
+
+      // ===== PROTOCOLO (PhaseAutomationRule kind=protocol) =====
+      for (const r of protocolRules) {
+        if (wantTrigger == null || r.trigger !== wantTrigger) { skipped.push({ name: r.name, reason: `gatilho não corresponde (dispara em "${r.trigger}")` }); continue }
+        const akey = `${processoId}::${phaseKey}::automation::${r.id}`
+        await fazer(akey, 'Protocolo', 'protocol', 'automation', r.id, r.name, { nota: 'consulado OUTROS (ajustar)' },
+          async () => criarProtocolo(processoId, r.name),
+          (id) => created.push({ kind: 'protocol', targetTable: 'Protocolo', targetId: id, name: r.name }),
         )
       }
 
