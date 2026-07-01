@@ -2110,6 +2110,12 @@ model MotorArtefato {
   @@index([phaseKey])
 }
 
+model MotorConfig {
+  id                    Int      @id @default(1)   // sempre a linha 1 (config única)
+  autoExecutarAoAvancar Boolean  @default(false)   // motor roda sozinho ao avançar de fase?
+  atualizadoEm          DateTime @updatedAt
+}
+
 enum Pais {
   PORTUGAL
   ESPANHA

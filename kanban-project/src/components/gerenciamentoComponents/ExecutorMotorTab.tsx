@@ -49,6 +49,7 @@ export default function ExecutorMotorTab() {
   const [processos, setProcessos] = useState<Processo[]>([])
   const [tipos, setTipos] = useState<Tipo[]>([])
   const [loading, setLoading] = useState(true)
+  const [autoExecutar, setAutoExecutar] = useState(false)
 
   const [procId, setProcId] = useState<number | null>(null)
   const [assignTipoId, setAssignTipoId] = useState<number | "">("")
@@ -71,6 +72,7 @@ export default function ExecutorMotorTab() {
         const d = await res.json()
         setProcessos(d.processos || [])
         setTipos(d.tipos || [])
+        setAutoExecutar(d.autoExecutar ?? false)
       }
     } finally { setLoading(false) }
   }, [])
@@ -124,6 +126,14 @@ export default function ExecutorMotorTab() {
     else { const j = await res.json().catch(() => ({})); setErro(j.error || "Erro ao desfazer.") }
   }
 
+  async function toggleAuto() {
+    const novo = !autoExecutar
+    setAutoExecutar(novo)
+    const res = await fetch("/api/gerenciamento/executor-motor", { method: "POST", headers: authHeaders(), body: JSON.stringify({ action: "config", value: novo }) })
+    if (res.ok) showFlash(novo ? "Gatilho automático LIGADO — o motor roda ao avançar a fase." : "Gatilho automático desligado — só pelo botão.")
+    else { setAutoExecutar(!novo); setErro("Não consegui mudar a chave.") }
+  }
+
   if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
 
   const ativos = artefatos.filter(a => a.status === "active")
@@ -131,6 +141,20 @@ export default function ExecutorMotorTab() {
   return (
     <div className="space-y-5">
       {flash && <div className="rounded-xl border border-green-400/20 bg-green-500/15 px-4 py-2.5 text-sm text-green-200">{flash}</div>}
+
+      {/* chave liga/desliga do gatilho automático */}
+      <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-medium text-white">
+            Gatilho automático
+            <span className={`rounded-full px-2 py-0.5 text-[10px] ${autoExecutar ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}>{autoExecutar ? "LIGADO" : "desligado"}</span>
+          </div>
+          <div className="mt-0.5 text-xs text-white/50">Ligado: o motor roda sozinho ao <b>avançar a fase</b> de um processo conectado. Desligado: só pelo botão abaixo. {autoExecutar && <span className="text-amber-300/80">Cuidado — cria artefatos automaticamente.</span>}</div>
+        </div>
+        <button onClick={toggleAuto} role="switch" aria-checked={autoExecutar} aria-label="Gatilho automático" className={`relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors ${autoExecutar ? "bg-green-600" : "bg-white/15"}`}>
+          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${autoExecutar ? "translate-x-6" : "translate-x-1"}`} />
+        </button>
+      </div>
 
       <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Executor do Motor</h2>
