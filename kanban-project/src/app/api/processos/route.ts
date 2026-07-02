@@ -13,6 +13,7 @@ export async function GET(request: Request) {
     const pais = searchParams.get("pais") as Pais | null
     const requerenteId = searchParams.get("requerenteId")
     const contratanteId = searchParams.get("contratanteId")
+    const motor = searchParams.get("motor") // ✅ MOTOR
 
     // Construir filtro dinâmico
     const where: any = {}
@@ -37,6 +38,11 @@ export async function GET(request: Request) {
           contratanteId: parseInt(contratanteId)
         }
       }
+    }
+
+    // ✅ MOTOR: só processos conectados ao motor (tipoProcessoMotorId preenchido)
+    if (motor === "1") {
+      where.tipoProcessoMotorId = { not: null }
     }
 
     const processos = await prisma.processo.findMany({

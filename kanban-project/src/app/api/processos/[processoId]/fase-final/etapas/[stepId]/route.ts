@@ -3,6 +3,7 @@
 // POST → conclui uma etapa da fase final. Na última etapa avança o card
 // (Aguardando protocolo→Protocolado→Finalizado). receber_decisao:
 // deferido avança; exigência/indeferido registra sem concluir.
+// (+ gatilho do MOTOR quando a fase avança — 1 linha, best-effort)
 // ============================================================
 
 import { NextResponse } from "next/server"
@@ -12,6 +13,7 @@ import {
   applyStep, calcProgress, keyFromFaseCode,
   type FinalState,
 } from "@/src/lib/process-stage/final-engine"
+import { dispararMotorNaFaseAtual } from "@/src/lib/motor/executor"
 
 export async function POST(
   request: Request,
@@ -85,6 +87,11 @@ export async function POST(
       },
       { timeout: 30000, maxWait: 10000 }
     )
+
+    // MOTOR — se o card avançou de fase, dispara o motor (best-effort)
+    if (colunaDestinoId) {
+      await dispararMotorNaFaseAtual(id)
+    }
 
     return NextResponse.json({
       ok: true,

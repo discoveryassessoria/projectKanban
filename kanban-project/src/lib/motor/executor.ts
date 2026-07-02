@@ -241,3 +241,30 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
 
   return { created, skipped, errors, totalCriado: created.length }
 }
+
+// ============================================================
+// GATILHO AUTOMÁTICO — auto-suficiente.
+// Chame esta função com o processoId DEPOIS que a fase já mudou.
+// Ela sozinha: confere a chave, vê se o processo está conectado,
+// descobre a fase atual, e dispara o motor (evento "entrar na fase").
+// Best-effort: qualquer erro aqui é engolido (não quebra quem chamou).
+// ============================================================
+export async function dispararMotorNaFaseAtual(processoId: number): Promise<void> {
+  try {
+    const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 } })
+    if (!cfg?.autoExecutarAoAvancar) return
+
+    const proc = await prisma.processo.findUnique({
+      where: { id: processoId },
+      select: { tipoProcessoMotorId: true, status: { select: { faseCode: true } } },
+    })
+    if (!proc?.tipoProcessoMotorId || !proc.status?.faseCode) return
+
+    const phaseKey = await resolvePhaseKey(proc.tipoProcessoMotorId, proc.status.faseCode)
+    if (!phaseKey) return
+
+    await executarMotorNaFase(processoId, proc.tipoProcessoMotorId, phaseKey, 'entered')
+  } catch (e) {
+    console.error('[motor] disparo automático falhou (a fase mudou normalmente):', e)
+  }
+}

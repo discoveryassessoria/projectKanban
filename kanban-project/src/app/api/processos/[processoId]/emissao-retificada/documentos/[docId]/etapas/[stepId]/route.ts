@@ -1,12 +1,7 @@
 // src/app/api/processos/[processoId]/emissao-retificada/documentos/[docId]/etapas/[stepId]/route.ts
 //
 // POST — aplica uma etapa do workflow de um documento em Emissão documental retificada.
-// Espelha apostilamento/etapas/[stepId]/route.ts (Next 15, prisma @/lib/prisma,
-// $transaction com timeout pra mover o card).
-//
-// `docId` = id do registro EmissaoRetificada (o que o GET devolve em `documentos[].id`).
-// Quando TODOS os documentos do processo ficam validados, o card avança para
-// "Tradução juramentada" (advanceToPhase do mockup → completeRetifiedEmissionPhase).
+// (+ gatilho do MOTOR quando a fase avança — 1 linha, best-effort)
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
@@ -14,6 +9,7 @@ import {
   applyStep, allValidated, reProgress,
   type ReWorkflow,
 } from "@/src/lib/process-stage/emissao-retificada-engine"
+import { dispararMotorNaFaseAtual } from "@/src/lib/motor/executor"
 
 const PROXIMA_FASE = "TRADUCAO_JURAMENTADA" // FaseCode
 
@@ -46,7 +42,6 @@ export async function POST(
       status: r.status,
       nextAction: r.nextAction,
       retifiedValidated: r.validated ? true : registro.retifiedValidated,
-      // guarda os blocos preenchidos da etapa (averbacao/solicitation/...) já vêm no workflow
     },
   })
 
@@ -71,6 +66,9 @@ export async function POST(
             { timeout: 30000, maxWait: 10000 },
           )
           completePhase = true
+
+          // MOTOR — a fase avançou; dispara o motor (best-effort)
+          await dispararMotorNaFaseAtual(processoId)
         }
       }
     }

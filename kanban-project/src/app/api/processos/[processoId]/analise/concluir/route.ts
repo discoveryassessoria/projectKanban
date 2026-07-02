@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import type { FaseCode } from "@prisma/client"
+import { dispararMotorNaFaseAtual } from "@/src/lib/motor/executor"
 
 export async function POST(
   request: Request,
@@ -63,6 +64,9 @@ export async function POST(
       })
       await tx.processo.update({ where: { id }, data: { statusId: colunaDestino.id } })
     }, { timeout: 30000, maxWait: 10000 })
+
+    // MOTOR — a fase avançou; dispara o motor (best-effort)
+    await dispararMotorNaFaseAtual(id)
 
     return NextResponse.json({ ok: true, decisao: decisaoJuridica, proximaFase })
   } catch (error) {
