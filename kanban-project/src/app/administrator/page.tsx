@@ -57,6 +57,8 @@ const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
     ["imtemplates", "Modelos Internos de Fase"], ["phasemodes", "Modos Internos das Fases"],
     ["amtemplates", "Modelos de Automação"], ["opauto", "Automações por Fase"],
     ["phasemap", "Regras de Disparo por Fase"],
+    ["crosstpl", "Modelos de Tarefa Transversal"],
+    ["crossrules", "Regras de Tarefas Transversais"],
     ["simfase", "Simulação de Fase"],
     ["execmotor", "Executor do Motor"],
     ["migracao", "Conectar Processos (Motor)"],
@@ -149,6 +151,8 @@ const LogAuditoriaTab = dynamic(() => import("@/src/components/gerenciamentoComp
 const SimulacaoFaseTab = dynamic(() => import("@/src/components/gerenciamentoComponents/SimulacaoFaseTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ExecutorMotorTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ExecutorMotorTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const MigracaoMotorTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MigracaoMotorTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const ModelosTarefaTransversalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosTarefaTransversalTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const RegrasTarefaTransversalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasTarefaTransversalTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
@@ -211,6 +215,8 @@ const TELAS: Record<string, React.ComponentType> = {
   discrules: RegrasDescontoTab,
   pricing: PricingRulesTab,
   phasemap: PhaseTriggerRulesTab,
+  crosstpl: ModelosTarefaTransversalTab,
+  crossrules: RegrasTarefaTransversalTab,
   simfase: SimulacaoFaseTab,
   execmotor: ExecutorMotorTab,
   diagnostics: DiagnosticsTab,

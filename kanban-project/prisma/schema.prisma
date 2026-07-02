@@ -2116,6 +2116,63 @@ model MotorConfig {
   atualizadoEm          DateTime @updatedAt
 }
 
+model ModeloTarefaTransversal {
+  id                            Int      @id @default(autoincrement())
+  templateKey                   String   @unique @db.VarChar(80)   // âncora do seed (cross_tpl_*)
+  name                          String   @db.VarChar(200)
+  type                          String   @db.VarChar(40)           // investigative_certificate | support_certificate | document_correction | ... | custom
+  description                   String?  @db.Text
+  defaultOriginPhase            String?  @db.VarChar(60)           // null = qualquer fase de origem
+  defaultOperationalPhase       String   @db.VarChar(60)           // fase cujo fluxo é reaproveitado
+  defaultMandatory              Boolean  @default(true)
+  defaultResultAction           String   @default("apply_back_to_origin_phase") @db.VarChar(60)
+  operationalWorkflow Json?   // { source, templateId, allowChangeOnCreate, instantiateStepsAutomatically, requireRequiredStepsBeforeApply }
+  originLinkConfig    Json?   // { defaultType, requireOriginLink, captureSnapshot, blockWithoutOriginLink }
+  duplicatePolicy     Json?   // { mode, allowDuplicateWithJustification }
+  recommendedForOriginPhases    Json?    // lista de phaseKeys
+  operationalWorkflowTemplateId Int?     // → ModeloWorkflowInterno (solto)
+  defaultEffects                Json?    // { createsDocument, createsCost, createsRevenue }
+  defaultOriginLinkType         String   @default("document") @db.VarChar(30)
+  defaultIdempotencyPattern     String   @default("processId+originPhase+operationalPhase+type+originLink.id") @db.VarChar(160)
+  allowDuplicateWithJustification Boolean @default(true)
+  isSystemTemplate              Boolean  @default(false)
+  usedByCount                   Int      @default(0)
+  arquivado                     Boolean  @default(false)
+  criadoEm                      DateTime @default(now())
+  atualizadoEm                  DateTime @updatedAt
+}
+
+model RegraTarefaTransversal {
+  id               Int      @id @default(autoincrement())
+  ruleKey          String?  @unique @db.VarChar(80)   // cross_rule_* (seed); null p/ criadas na tela
+  name             String   @db.VarChar(200)
+  tipoProcessoId   Int?     // → TipoProcessoNacionalidade (solto); null = todos
+  originPhase      String   @db.VarChar(60)           // fase onde a regra dispara
+  operationalPhase String   @db.VarChar(60)           // fase cujo fluxo é usado
+  templateId       Int?     // → ModeloTarefaTransversal (solto)
+
+  // config detalhada (as seções do modal)
+  trigger          Json?    // { type, watchedField, expectedValue, condition, expression }
+  creation         Json?    // { mode, mandatory, defaultReason, defaultExpectedResult, defaultResponsibleRoleId, defaultSlaDays, defaultPriority }
+  originLink       Json?    // { type, useDocument, usePerson, useDivergence, useProtocolRequirement }
+  duplicatePolicy  Json?    // { mode }
+  applyResult      Json?    // { mode, updateTarget, autoResolveIfComplete, keepReviewingIfPartial }
+
+  // atalhos p/ a lista
+  autoCreate       Boolean  @default(false)
+  suggested        Boolean  @default(true)
+  mandatory        Boolean  @default(true)
+
+  isSystemTemplate Boolean  @default(false)
+  usedByCount      Int      @default(0)
+  arquivado        Boolean  @default(false)
+  criadoEm         DateTime @default(now())
+  atualizadoEm     DateTime @updatedAt
+
+  @@index([tipoProcessoId])
+  @@index([originPhase])
+}
+
 enum Pais {
   PORTUGAL
   ESPANHA
