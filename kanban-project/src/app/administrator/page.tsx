@@ -59,6 +59,7 @@ const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
     ["phasemap", "Regras de Disparo por Fase"],
     ["simfase", "Simulação de Fase"],
     ["execmotor", "Executor do Motor"],
+    ["migracao", "Conectar Processos (Motor)"],
   ]},
   { grupo: "Cadastros do Motor", itens: [
     ["rolecat", "Papéis e Responsáveis"], ["permprofiles", "Usuários e Permissões"],
@@ -147,6 +148,7 @@ const MatrizDocumentalTab = dynamic(() => import("@/src/components/gerenciamento
 const LogAuditoriaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/LogAuditoriaTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const SimulacaoFaseTab = dynamic(() => import("@/src/components/gerenciamentoComponents/SimulacaoFaseTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ExecutorMotorTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ExecutorMotorTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const MigracaoMotorTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MigracaoMotorTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
@@ -227,6 +229,8 @@ const TELAS: Record<string, React.ComponentType> = {
   cfgdiagnosis: ConfigDiagnosisTab,
   execmatrix: ExecMatrixTab,
   syshealth: SystemHealthTab,
+
+  migracao: MigracaoMotorTab,
 }
 
 function CarregandoTela() {
