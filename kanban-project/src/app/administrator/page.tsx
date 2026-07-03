@@ -52,10 +52,10 @@ import {
 const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
   { grupo: "Painel", itens: [["overview", "Painel Geral"]] },
   { grupo: "Centro do Processo", itens: [
-    ["proctypes", "Processos de Nacionalidade"], ["macrokanban", "Workflow Macro / Kanban"],
-    ["iwtemplates", "Modelos de Workflow Interno"], ["phaseiwf", "Workflows Internos das Fases"],
-    ["imtemplates", "Modelos Internos de Fase"], ["phasemodes", "Modos Internos das Fases"],
-    ["amtemplates", "Modelos de Automação"], ["opauto", "Automações por Fase"],
+    ["proctypes", "Processos de Nacionalidade"],
+    ["workflowsphases", "Workflows e Fases"],
+    ["amtemplates", "Modelos de Automação"],
+    ["opauto", "Automações por Fase"],
     ["phasemap", "Regras de Disparo por Fase"],
     ["crosstpl", "Modelos de Tarefa Transversal"],
     ["crossrules", "Regras de Tarefas Transversais"],
@@ -153,6 +153,7 @@ const ExecutorMotorTab = dynamic(() => import("@/src/components/gerenciamentoCom
 const MigracaoMotorTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MigracaoMotorTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ModelosTarefaTransversalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosTarefaTransversalTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RegrasTarefaTransversalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasTarefaTransversalTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const WorkflowsFasesHubTab = dynamic(() => import("@/src/components/gerenciamentoComponents/WorkflowsFasesHubTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
@@ -188,6 +189,7 @@ const TELAS: Record<string, React.ComponentType> = {
   teams: TeamsTab,
   finauto: FinAutomationsTab,
   opauto: PhaseAutomationsFasesTab,
+  workflowsphases: WorkflowsFasesHubTab,
   protocols: ProtocolsTab,
   sla: SLATab,
   templates: TemplatesTab,
