@@ -2173,6 +2173,18 @@ model RegraTarefaTransversal {
   @@index([originPhase])
 }
 
+model PerfilPermissaoMotor {
+  id               Int      @id @default(autoincrement())
+  chave            String   @unique @db.VarChar(80)   // slug do perfil (admin, analyst, ...) — âncora do seed
+  nome             String   @db.VarChar(200)
+  permissoes       Json?    // { manageProcessTypes, manageWorkflowMacro, ... } — as 12 permissões (true/false)
+  isSystemTemplate Boolean  @default(false)
+  usedByCount      Int      @default(0)
+  arquivado        Boolean  @default(false)
+  criadoEm         DateTime @default(now())
+  atualizadoEm     DateTime @updatedAt
+}
+
 enum Pais {
   PORTUGAL
   ESPANHA

@@ -154,6 +154,7 @@ const MigracaoMotorTab = dynamic(() => import("@/src/components/gerenciamentoCom
 const ModelosTarefaTransversalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosTarefaTransversalTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RegrasTarefaTransversalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasTarefaTransversalTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const WorkflowsFasesHubTab = dynamic(() => import("@/src/components/gerenciamentoComponents/WorkflowsFasesHubTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const PerfisPermissaoMotorTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PerfisPermissaoMotorTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
@@ -230,7 +231,7 @@ const TELAS: Record<string, React.ComponentType> = {
 
   // bespoke (lote 6) — Cadastros do Motor + Saúde
   rolecat: RoleCatalogTab,
-  permprofiles: PermProfilesTab,
+  permprofiles: PerfisPermissaoMotorTab,
   pricingtable: TabelaValoresTab,
   docmatrix: MatrizDocumentalTab,
   cfgversions: ConfigVersionsTab,
