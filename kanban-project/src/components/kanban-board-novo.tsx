@@ -290,6 +290,7 @@ export function KanbanBoard({
         body: JSON.stringify({ statusId: targetStatusId }),
       })
       if (!response.ok) throw new Error("Erro ao mover processo")
+        onRefresh()
     } catch (error) {
       console.error("Error updating processo status:", error)
       setLocalProcessos(previousProcessos)
