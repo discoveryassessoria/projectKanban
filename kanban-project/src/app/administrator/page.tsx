@@ -231,7 +231,7 @@ const TELAS: Record<string, React.ComponentType> = {
 
   // bespoke (lote 6) — Cadastros do Motor + Saúde
   rolecat: RoleCatalogTab,
-  permprofiles: PerfisPermissaoMotorTab,
+  permprofiles: RolesTab,
   pricingtable: TabelaValoresTab,
   docmatrix: MatrizDocumentalTab,
   cfgversions: ConfigVersionsTab,
