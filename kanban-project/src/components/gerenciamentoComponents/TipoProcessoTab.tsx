@@ -5,7 +5,8 @@
 // País e Modalidade puxam de CatalogoPais / ModalidadePais (seletores em cascata).
 // Código e Nome são auto-sugeridos (prefixo do país + sufixo da modalidade), editáveis.
 // Backend: /api/gerenciamento/tipos-processo (GET/POST) + /[id] (PUT/DELETE)
-// ⚠ Fase 1B liga o Workflow Macro + Fases variáveis a cada tipo.
+// ➕ NOVO: botão "+ Novo país" abre um mini-modal que cria CatalogoPais + ModalidadePais
+//         via POST /api/gerenciamento/paises (não mexe no enum Pais / kanban).
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 
@@ -48,6 +49,18 @@ export default function TipoProcessoTab() {
   const [nameTouched, setNameTouched] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [erroModal, setErroModal] = useState<string | null>(null)
+
+  // ➕ mini-modal "Novo país"
+  const [paisModal, setPaisModal] = useState(false)
+  const [pLabel, setPLabel] = useState('')
+  const [pFlag, setPFlag] = useState('')
+  const [pNat, setPNat] = useState('')
+  const [pPrefix, setPPrefix] = useState('')
+  const [pMoeda, setPMoeda] = useState('EUR')
+  const [pJud, setPJud] = useState(true)
+  const [pAdm, setPAdm] = useState(true)
+  const [salvandoPais, setSalvandoPais] = useState(false)
+  const [erroPais, setErroPais] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {
     setLoading(true); setErroLista(null)
@@ -139,6 +152,46 @@ export default function TipoProcessoTab() {
     } catch (e: any) {
       alert(e.message || 'Não foi possível excluir.')
     }
+  }
+
+  // ➕ Novo país
+  function abrirNovoPais() {
+    setPLabel(''); setPFlag(''); setPNat(''); setPPrefix(''); setPMoeda('EUR')
+    setPJud(true); setPAdm(true)
+    setErroPais(null); setPaisModal(true)
+  }
+
+  async function salvarPais() {
+    const label = pLabel.trim()
+    const nat = pNat.trim()
+    if (!label) { setErroPais('Informe o nome do país.'); return }
+    if (!nat) { setErroPais('Informe a nacionalidade.'); return }
+    if (!pJud && !pAdm) { setErroPais('Selecione ao menos uma modalidade.'); return }
+
+    const mods: { modalityKey: string; modalityLabel: string; codeSuffix: string; ordem: number }[] = []
+    if (pJud) mods.push({ modalityKey: 'judicial', modalityLabel: 'Judicial', codeSuffix: 'JUD', ordem: 0 })
+    if (pAdm) mods.push({ modalityKey: 'administrativa', modalityLabel: 'Administrativa', codeSuffix: 'ADM', ordem: 1 })
+
+    setSalvandoPais(true); setErroPais(null)
+    try {
+      const novo = await jsonFetch('/api/gerenciamento/paises', {
+        method: 'POST',
+        body: JSON.stringify({
+          countryLabel: label,
+          flag: pFlag.trim() || null,
+          nationalityLabel: nat,
+          codePrefix: pPrefix.trim() || null,
+          defaultCurrency: pMoeda,
+          modalidades: mods,
+        }),
+      })
+      const novoKey = (novo as any)?.pais?.countryKey as string | undefined
+      await carregar()
+      if (novoKey) { setCountryKey(novoKey); setModalityKey('') } // já seleciona o país criado
+      setPaisModal(false)
+    } catch (e: any) {
+      setErroPais(e.message || 'Não foi possível criar o país.')
+    } finally { setSalvandoPais(false) }
   }
 
   const inputCls = 'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20'
@@ -234,7 +287,10 @@ export default function TipoProcessoTab() {
             <div className="space-y-4 px-6 py-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">País *</label>
+                  <div className="mb-1 flex items-center justify-between">
+                    <label className="block text-xs text-white/60">País *</label>
+                    <button type="button" onClick={abrirNovoPais} className="text-[11px] font-medium text-blue-300 transition hover:text-blue-200">+ Novo país</button>
+                  </div>
                   <select value={countryKey} onChange={(e) => trocarPais(e.target.value)} className={inputCls}>
                     <option value="" className="bg-zinc-900">— selecione —</option>
                     {paises.map((p) => <option key={p.countryKey} value={p.countryKey} className="bg-zinc-900">{p.flag ? p.flag + ' ' : ''}{p.countryLabel}</option>)}
@@ -273,6 +329,75 @@ export default function TipoProcessoTab() {
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ➕ MINI-MODAL: Novo país (cria CatalogoPais + ModalidadePais) */}
+      {paisModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+              <h3 className="text-lg font-semibold text-white">Novo país</h3>
+              <button onClick={() => setPaisModal(false)} className="text-white/40 transition hover:text-white">✕</button>
+            </div>
+
+            <div className="space-y-4 px-6 py-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-xs text-white/60">Nome do país *</label>
+                  <input value={pLabel} onChange={(e) => setPLabel(e.target.value)} placeholder="França" className={inputCls} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-white/60">Bandeira</label>
+                  <input value={pFlag} onChange={(e) => setPFlag(e.target.value)} placeholder="🇫🇷" className={inputCls} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-xs text-white/60">Nacionalidade *</label>
+                  <input value={pNat} onChange={(e) => setPNat(e.target.value)} placeholder="Francesa" className={inputCls} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-white/60">Prefixo do código</label>
+                  <input value={pPrefix} onChange={(e) => setPPrefix(e.target.value)} placeholder="FRA" className={inputCls + ' font-mono'} />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs text-white/60">Moeda padrão</label>
+                <select value={pMoeda} onChange={(e) => setPMoeda(e.target.value)} className={inputCls}>
+                  <option value="EUR" className="bg-zinc-900">EUR</option>
+                  <option value="USD" className="bg-zinc-900">USD</option>
+                  <option value="BRL" className="bg-zinc-900">BRL</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs text-white/60">Modalidades</label>
+                <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-3">
+                  <label className="flex items-center gap-2 text-sm text-white/80">
+                    <input type="checkbox" checked={pJud} onChange={(e) => setPJud(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+                    Judicial
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-white/80">
+                    <input type="checkbox" checked={pAdm} onChange={(e) => setPAdm(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+                    Administrativa
+                  </label>
+                </div>
+                <p className="mt-1 text-[11px] text-white/40">O país precisa de pelo menos uma modalidade para ser usado.</p>
+              </div>
+
+              {erroPais && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroPais}</div>}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-white/10 px-6 py-4">
+              <button onClick={() => setPaisModal(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button onClick={salvarPais} disabled={salvandoPais} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50">
+                {salvandoPais ? 'Criando...' : 'Criar país'}
               </button>
             </div>
           </div>

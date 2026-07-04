@@ -334,7 +334,8 @@ export default function GerenciamentoPage() {
           <div className="flex gap-4 items-start">
             {/* MENU LATERAL */}
             <aside className="w-[230px] flex-none sticky top-4 max-h-[calc(100vh-90px)] overflow-auto bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-3">
-              <div className="relative mb-3">
+              {/* busca */}
+              <div className="relative mb-4">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
                 <input
                   value={busca} onChange={e => setBusca(e.target.value)}
@@ -342,15 +343,35 @@ export default function GerenciamentoPage() {
                   className="w-full pl-8 pr-2 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:outline-none focus:border-white/30"
                 />
               </div>
-              {gruposFiltrados.map(g => (
-                <div key={g.grupo} className="mb-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/40 px-2 mb-1">{g.grupo}</div>
-                  {g.itens.map(([key, label]) => (
-                    <button key={key} onClick={() => { setTab(key); setBusca("") }}
-                      className={`block w-full text-left px-2.5 py-1.5 rounded-lg text-[12.5px] transition-colors ${tab === key ? "bg-white/15 text-white font-semibold" : "text-white/60 hover:text-white hover:bg-white/5"}`}>
-                      {label}
-                    </button>
-                  ))}
+
+              {gruposFiltrados.map((g, gi) => (
+                <div key={g.grupo} className={gi === 0 ? "" : "mt-6"}>
+                  {/* TÍTULO DA CATEGORIA */}
+                  <div className="mb-2 border-b border-white/10 px-1 pb-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/50">
+                      {g.grupo}
+                    </span>
+                  </div>
+
+                  {/* PÁGINAS */}
+                  <div className="space-y-0.5">
+                    {g.itens.map(([key, label]) => {
+                      const ativo = tab === key
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => { setTab(key); setBusca("") }}
+                          className={`block w-full rounded-lg px-2.5 py-2 text-left text-[12.5px] transition-colors ${
+                            ativo
+                              ? "bg-white/15 font-semibold text-white"
+                              : "text-white/60 hover:bg-white/5 hover:text-white"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               ))}
             </aside>
