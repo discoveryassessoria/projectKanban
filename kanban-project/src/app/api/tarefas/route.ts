@@ -34,9 +34,11 @@ export async function GET(request: Request) {
     const usuario = await extrairUsuarioKanban(request)
     
     if (usuario && usuario.tipo !== 'admin') {
-      // Usuário comum: FORÇAR filtro por responsavelId
-      // Isso NÃO pode ser sobrescrito por nenhum parâmetro da URL
-      where.responsavelId = usuario.userId
+        // Usuário comum: só as próprias tarefas + as sem responsável
+        where.AND = [
+          ...(where.AND || []),
+          { OR: [{ responsavelId: usuario.userId }, { responsavelId: null }] }
+        ]
     }
     // =====================================================
 
