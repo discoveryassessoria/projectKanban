@@ -64,7 +64,7 @@ const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
     ["migracao", "Conectar Processos (Motor)"],
   ]},
   { grupo: "Cadastros do Motor", itens: [
-    ["rolecat", "Papéis e Responsáveis"], ["permprofiles", "Usuários e Permissões"],
+    ["permprofiles", "Usuários e Permissões"],
     ["pricingtable", "Tabela de Valores"], ["doctypes", "Tipos de Documento"],
     ["docmatrix", "Matriz Documental"], ["organs", "Órgãos de Protocolo"],
     ["sla", "SLAs e Prazos"], ["templates", "Modelos de Documento"],

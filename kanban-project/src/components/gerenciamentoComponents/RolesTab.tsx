@@ -1,15 +1,9 @@
 'use client'
 
 // src/components/gerenciamentoComponents/RolesTab.tsx
-// Fatia 3 — PERFIS (real)
-// Lista, cria, edita, duplica e exclui perfis de permissão.
+// PERFIS (real) — lista, cria, edita, duplica e exclui perfis de permissão.
 // Backend: GET/POST /api/perfis e PUT/DELETE /api/perfis/[id]
-//   GET  -> { perfis: [...] }   (cada perfil traz _count.usuarios)
-//   POST -> { perfil }          body { nome, descricao, cor, permissoes }
-//   PUT  -> { perfil }          mesmo body
-//   DELETE -> { ok: true }
-// As chaves de permissão vêm da MESMA fonte que a API valida (@/src/lib/permissoes),
-// então a matriz nunca diverge do que o servidor aceita.
+// Regra de trava: SÓ o Administrador é protegido (não edita nem exclui). O resto é livre.
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { PERMISSOES, MODULOS_PERMISSOES } from '@/src/lib/permissoes'
@@ -29,6 +23,9 @@ type Perfil = {
 const TODAS_CHAVES = Object.keys(PERMISSOES) as string[]
 const TOTAL_PERMISSOES = TODAS_CHAVES.length
 
+// Só o Administrador é protegido (não pode editar nem excluir). Os outros são livres.
+const ehAdministrador = (nome: string) => (nome || '').trim().toLowerCase() === 'administrador'
+
 const CORES = [
   '#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6',
   '#10B981', '#EC4899', '#14B8A6', '#6366F1',
@@ -46,8 +43,6 @@ function contarAtivas(perm?: MapaPermissoes | null): number {
   return TODAS_CHAVES.reduce((n, k) => (perm[k] ? n + 1 : n), 0)
 }
 
-// fetch que já trata erro e devolve a mensagem do servidor (ex.: "Permissões inválidas")
-// Auth igual ao UsersTab: token em localStorage('authToken') no header Authorization.
 async function jsonFetch(url: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
   const res = await fetch(url, {
@@ -120,7 +115,7 @@ export default function RolesTab() {
 
   function abrirEditar(p: Perfil) {
     setEditando(p)
-    setSomenteLeitura(p.sistema) // perfis do sistema: só leitura
+    setSomenteLeitura(ehAdministrador(p.nome)) // só o Administrador é bloqueado
     setNome(p.nome)
     setDescricao(p.descricao || '')
     setCor(p.cor || CORES[2])
@@ -193,7 +188,7 @@ export default function RolesTab() {
   }
 
   async function excluir(p: Perfil) {
-    if (p.sistema) return
+    if (ehAdministrador(p.nome)) return
     const usuarios = p._count?.usuarios || 0
     const aviso =
       usuarios > 0
@@ -262,6 +257,7 @@ export default function RolesTab() {
           {perfisFiltrados.map((p) => {
             const ativas = contarAtivas(p.permissoes)
             const usuarios = p._count?.usuarios || 0
+            const bloqueado = ehAdministrador(p.nome)
             return (
               <div
                 key={p.id}
@@ -275,15 +271,15 @@ export default function RolesTab() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="truncate font-medium text-white">{p.nome}</h3>
-                      <span
-                        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                          p.sistema
-                            ? 'bg-amber-500/15 text-amber-300'
-                            : 'bg-blue-500/15 text-blue-300'
-                        }`}
-                      >
-                        {p.sistema ? 'Sistema' : 'Personalizado'}
-                      </span>
+                      {bloqueado ? (
+                        <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+                          Protegido
+                        </span>
+                      ) : p.sistema ? (
+                        <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/60">
+                          Padrão
+                        </span>
+                      ) : null}
                     </div>
                     <p className="truncate text-xs text-white/50">
                       {p.descricao || 'Sem descrição'}
@@ -305,7 +301,7 @@ export default function RolesTab() {
                     onClick={() => abrirEditar(p)}
                     className="rounded-md border border-white/10 px-2.5 py-1.5 text-white/70 transition hover:bg-white/10 hover:text-white"
                   >
-                    {p.sistema ? 'Ver' : 'Editar'}
+                    {bloqueado ? 'Ver' : 'Editar'}
                   </button>
                   <button
                     onClick={() => abrirDuplicar(p)}
@@ -313,7 +309,7 @@ export default function RolesTab() {
                   >
                     Duplicar
                   </button>
-                  {!p.sistema && (
+                  {!bloqueado && (
                     <button
                       onClick={() => excluir(p)}
                       className="ml-auto rounded-md border border-red-500/20 px-2.5 py-1.5 text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200"
@@ -335,7 +331,7 @@ export default function RolesTab() {
             {/* topo do modal */}
             <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
               <h3 className="text-lg font-semibold text-white">
-                {editando ? (somenteLeitura ? 'Perfil do sistema' : 'Editar perfil') : 'Novo perfil'}
+                {editando ? (somenteLeitura ? 'Perfil Administrador' : 'Editar perfil') : 'Novo perfil'}
               </h3>
               <button
                 onClick={() => setModalAberto(false)}
@@ -349,7 +345,7 @@ export default function RolesTab() {
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {somenteLeitura && (
                 <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200">
-                  Perfis do sistema não podem ser editados. Use <strong>Duplicar</strong> para criar uma versão editável.
+                  O perfil <strong>Administrador</strong> não pode ser editado. Use <strong>Duplicar</strong> para criar uma versão editável.
                 </div>
               )}
 

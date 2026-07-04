@@ -1,14 +1,14 @@
 // src/app/api/perfis/[id]/route.ts
-// PUT    - Atualizar perfil (bloqueia perfis do sistema)
-// DELETE - Excluir perfil (bloqueia sistema e perfis em uso)
-//
-// ✅ Next 15: params é Promise → await params (corrige o build do Vercel).
-// Resto idêntico: guard verificarPermissao, validação de chaves, etc.
+// PUT    - Atualizar perfil (bloqueia SÓ o Administrador)
+// DELETE - Excluir perfil (bloqueia o Administrador e perfis em uso)
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { PERMISSOES } from '@/src/lib/permissoes'
+
+// Só o Administrador é protegido (não pode editar nem excluir). O resto é livre.
+const ehAdministrador = (nome: string) => (nome || '').trim().toLowerCase() === 'administrador'
 
 // PUT - Atualizar perfil
 export async function PUT(
@@ -29,9 +29,9 @@ export async function PUT(
     if (!atual) {
       return NextResponse.json({ error: 'Perfil não encontrado' }, { status: 404 })
     }
-    if (atual.sistema) {
+    if (ehAdministrador(atual.nome)) {
       return NextResponse.json(
-        { error: 'Perfis do sistema não podem ser editados' },
+        { error: 'O perfil Administrador não pode ser editado' },
         { status: 403 }
       )
     }
@@ -103,9 +103,9 @@ export async function DELETE(
     if (!atual) {
       return NextResponse.json({ error: 'Perfil não encontrado' }, { status: 404 })
     }
-    if (atual.sistema) {
+    if (ehAdministrador(atual.nome)) {
       return NextResponse.json(
-        { error: 'Perfis do sistema não podem ser excluídos' },
+        { error: 'O perfil Administrador não pode ser excluído' },
         { status: 403 }
       )
     }
