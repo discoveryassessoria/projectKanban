@@ -111,7 +111,8 @@ export async function POST(request: Request) {
       contratanteIds,
       arvoreId,
       previsaoTermino,
-      requerenteIds
+      requerenteIds,
+      tipoProcessoMotorId,
     } = body
 
     if (!nome) {
@@ -162,6 +163,16 @@ export async function POST(request: Request) {
       )
     }
 
+    // ✅ Se veio tipo do motor, confere se existe
+    if (tipoProcessoMotorId != null) {
+      const tipoMotor = await prisma.tipoProcessoNacionalidade.findUnique({
+        where: { id: tipoProcessoMotorId },
+      })
+      if (!tipoMotor) {
+        return NextResponse.json({ error: "Tipo de processo (motor) não encontrado" }, { status: 400 })
+      }
+    }
+
     // Criar o processo
     const processo = await prisma.processo.create({
       data: {
@@ -172,6 +183,7 @@ export async function POST(request: Request) {
         statusId,
         arvoreId: arvoreId || null,
         previsaoTermino: previsaoTermino ? new Date(previsaoTermino) : null,
+        tipoProcessoMotorId: tipoProcessoMotorId ?? null,   // ✅ nasce ligado ao motor
       }
     })
 

@@ -3,6 +3,7 @@
 "use client"
 
 import type React from "react"
+import { createPortal } from "react-dom"
 import { useState, useRef, useEffect, useMemo } from "react"
 import {
   DndContext,
@@ -46,6 +47,17 @@ interface KanbanBoardProps {
   initialTarefaPaiId?: number | null  // ← NOVO
   initialAtividadeId?: number | null  // ← NOVO
   onModalOpened?: () => void
+}
+
+// ✅ Tipo do motor (só o que o seletor precisa)
+type TipoMotor = {
+  id: number
+  code: string
+  name: string
+  countryKey: string
+  countryLabel: string
+  modalityKey: string
+  modalityLabel: string
 }
 
 // ✅ Helper para extrair ID numérico de IDs prefixados
@@ -98,6 +110,15 @@ export function KanbanBoard({
   const [modalInitialTarefaPaiId, setModalInitialTarefaPaiId] = useState<number | undefined>(undefined)
   const [modalInitialAtividadeId, setModalInitialAtividadeId] = useState<number | undefined>(undefined)
   const { pode } = usePermissoes()
+
+  // ✅ NOVO: tipos do motor + modal de criar processo (com tipo)
+  const [tiposMotor, setTiposMotor] = useState<TipoMotor[]>([])
+  const [criarModal, setCriarModal] = useState(false)
+  const [criarNome, setCriarNome] = useState("")
+  const [criarStatusId, setCriarStatusId] = useState<number | null>(null)
+  const [criarTipoId, setCriarTipoId] = useState<number | null>(null)
+  const [salvandoCriar, setSalvandoCriar] = useState(false)
+  const [erroCriar, setErroCriar] = useState<string | null>(null)
   
   const [isDragging, setIsDragging] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -110,7 +131,30 @@ export function KanbanBoard({
     }
   }, [initialProcessoId])
 
+  // ✅ Buscar os tipos do motor (pro seletor ao criar processo)
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/tipos-processo", {
+          headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setTiposMotor(data.tipos || [])
+        }
+      } catch {
+        /* silencioso — se falhar, o seletor fica vazio e avisa */
+      }
+    })()
+  }, [])
+
   const paisConfig = PAISES_CONFIG[pais]
+
+  // ✅ Tipos do país selecionado (casa enum ITALIA ↔ countryKey "italia")
+  const tiposDoPais = useMemo(
+    () => tiposMotor.filter((t) => (t.countryKey || "").toLowerCase() === String(pais).toLowerCase()),
+    [tiposMotor, pais]
+  )
 
   // Sensores
   const sensors = useSensors(
@@ -180,7 +224,24 @@ export function KanbanBoard({
     }
   }
 
-  const handleAddNewProcesso = async (nome: string, statusId: number) => {
+  // ✅ ALTERADO: em vez de criar direto, abre o modal pra escolher o TIPO do motor.
+  //    (a coluna passa o nome digitado + o statusId dela)
+  const handleAddNewProcesso = (nome: string, statusId: number) => {
+    setCriarNome(nome)
+    setCriarStatusId(statusId)
+    // pré-seleciona o tipo se o país só tiver um
+    setCriarTipoId(tiposDoPais.length === 1 ? tiposDoPais[0].id : null)
+    setErroCriar(null)
+    setCriarModal(true)
+  }
+
+  // ✅ Cria o processo JÁ LIGADO ao motor (tipoProcessoMotorId)
+  const confirmarCriarProcesso = async () => {
+    if (!criarNome.trim()) { setErroCriar("Informe o nome do processo."); return }
+    if (!criarStatusId) { setErroCriar("Coluna inválida."); return }
+    if (!criarTipoId) { setErroCriar("Escolha o tipo de processo."); return }
+
+    setSalvandoCriar(true); setErroCriar(null)
     try {
       const response = await fetch('/api/processos', {
         method: 'POST',
@@ -189,17 +250,24 @@ export function KanbanBoard({
           'Authorization': `Bearer ${localStorage.getItem("authToken")}`
         },
         body: JSON.stringify({
-          nome: nome,
-          statusId: statusId,
-          pais: pais
+          nome: criarNome.trim(),
+          statusId: criarStatusId,
+          pais: pais,
+          tipoProcessoMotorId: criarTipoId,
         })
       })
 
-      if (!response.ok) throw new Error("Falha ao criar novo processo")
+      if (!response.ok) {
+        const d = await response.json().catch(() => ({}))
+        throw new Error(d.error || "Falha ao criar novo processo")
+      }
+      setCriarModal(false)
       onRefresh()
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
-      alert("Não foi possível adicionar o processo.")
+      setErroCriar(error.message || "Não foi possível adicionar o processo.")
+    } finally {
+      setSalvandoCriar(false)
     }
   }
 
@@ -423,6 +491,68 @@ export function KanbanBoard({
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {/* ✅ MODAL: Novo processo — vai num PORTAL pro <body>, senão abre "preso"
+          dentro do kanban por causa do backdrop-blur do painel */}
+      {criarModal && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+              <h3 className="text-lg font-semibold text-white">Novo processo</h3>
+              <button onClick={() => setCriarModal(false)} className="text-white/40 transition hover:text-white">✕</button>
+            </div>
+
+            <div className="space-y-4 px-6 py-4">
+              <div>
+                <label className="mb-1 block text-xs text-white/60">Nome *</label>
+                <input
+                  autoFocus
+                  value={criarNome}
+                  onChange={(e) => setCriarNome(e.target.value)}
+                  placeholder="Nome do processo"
+                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs text-white/60">Tipo de processo (motor) *</label>
+                {tiposDoPais.length > 0 ? (
+                  <select
+                    value={criarTipoId ?? ""}
+                    onChange={(e) => setCriarTipoId(e.target.value ? parseInt(e.target.value) : null)}
+                    className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/20"
+                  >
+                    <option value="" className="bg-zinc-900">— selecione —</option>
+                    {tiposDoPais.map((t) => (
+                      <option key={t.id} value={t.id} className="bg-zinc-900">{t.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                    Nenhum tipo de processo cadastrado para {paisConfig.label}. Cadastre em Gerenciamento → Processos de Nacionalidade antes de criar.
+                  </div>
+                )}
+              </div>
+
+              {erroCriar && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroCriar}</div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-white/10 px-6 py-4">
+              <button onClick={() => setCriarModal(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button
+                onClick={confirmarCriarProcesso}
+                disabled={salvandoCriar || tiposDoPais.length === 0}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
+              >
+                {salvandoCriar ? "Criando..." : "Criar processo"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       <ProcessoDetailsModal
         processo={selectedProcesso}

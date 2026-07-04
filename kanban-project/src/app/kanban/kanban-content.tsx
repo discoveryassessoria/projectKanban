@@ -362,39 +362,6 @@ export function KanbanContent({ motorOnly = false }: { motorOnly?: boolean } = {
                 </div>
               )}
 
-              {/* Toggle Todos / Motor — troca de kanban */}
-            {tabPrincipal === "processos" && pode('processos.ver') && (
-              <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
-                <button
-                  onClick={() => router.push(`/kanban?pais=${paisSelecionado}`)}
-                  className={`
-                    px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200
-                    ${!motorOnly
-                      ? "bg-white/20 text-white"
-                      : "text-white/60 hover:text-white hover:bg-white/10"
-                    }
-                  `}
-                >
-                  Todos
-                </button>
-                <button
-                  onClick={() => router.push(`/kanban-motor?pais=${paisSelecionado}`)}
-                  className={`
-                    flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200
-                    ${motorOnly
-                      ? "bg-indigo-600 text-white shadow"
-                      : "text-white/60 hover:text-white hover:bg-white/10"
-                    }
-                  `}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                  </svg>
-                  Motor
-                </button>
-              </div>
-            )}
-
               {/* Contador + Países (só em Processos) */}
               {tabPrincipal === "processos" && pode('processos.ver') && (
                 <div className="flex items-center gap-4">
