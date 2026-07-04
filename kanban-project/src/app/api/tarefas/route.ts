@@ -116,7 +116,8 @@ export async function GET(request: Request) {
     if (excluirEstruturais === "true") {
       where.OR = [
         { tarefaPaiId: { not: null } },
-        { processoId: null }
+        { processoId: null },
+        { subtarefas: { none: {} } }
       ]
     }
 
