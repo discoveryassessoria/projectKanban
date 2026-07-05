@@ -23,11 +23,11 @@ export async function GET(
 
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { id: true, status: { select: { faseCode: true } } },
+      select: { id: true, faseAtualKey: true, status: { select: { faseCode: true } } },
     })
     if (!processo) return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
 
-    const key = keyFromFaseCode(processo.status.faseCode)
+    const key = (processo.faseAtualKey ?? keyFromFaseCode(processo.status?.faseCode ?? null)) as ReturnType<typeof keyFromFaseCode>
     if (!key) return NextResponse.json({ fase: null })
 
     let fase = await prisma.faseFinal.findUnique({

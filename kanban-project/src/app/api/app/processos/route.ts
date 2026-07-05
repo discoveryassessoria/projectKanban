@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
         id: processo.id,
         nome: processo.nome,
         pais: processo.pais,
-        etapaAtual: processo.status.nome,
+        etapaAtual: processo.status?.nome ?? processo.faseAtualKey ?? null,
         progresso,
         totalTarefas,
         tarefasConcluidas,

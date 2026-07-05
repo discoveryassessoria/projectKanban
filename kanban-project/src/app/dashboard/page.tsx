@@ -174,7 +174,7 @@ export default function DashboardPage() {
     if (!acc[pais]) acc[pais] = []
     acc[pais].push(processo)
     return acc
-  }, {} as Record<Pais, ProcessoWithStatus[]>)
+  }, {} as Record<string, ProcessoWithStatus[]>)
 
   // Agrupar por status
   const processosPorStatus = processos.reduce((acc, processo) => {
@@ -466,8 +466,8 @@ export default function DashboardPage() {
                                 >
                                   <p className="text-sm font-medium text-white truncate">{processo.nome}</p>
                                   <p className="text-xs text-white/40 mt-1 truncate flex items-center gap-1.5">
-                                    <BandeiraPais pais={processo.pais} size="sm" />
-                                    {PAISES_CONFIG[processo.pais]?.label || processo.pais}
+                                    <BandeiraPais pais={processo.pais as any} size="sm" />
+                                    {PAISES_CONFIG[processo.pais as keyof typeof PAISES_CONFIG]?.label || processo.pais}
                                   </p>
                                 </div>
                               )
@@ -622,7 +622,7 @@ export default function DashboardPage() {
                           </div>
                           <p className="text-sm font-medium text-white truncate">{tarefa.titulo}</p>
                           <p className="text-xs text-white/50 truncate mt-1 flex items-center gap-1.5">
-                            <BandeiraPais pais={tarefa.pais} size="sm" />
+                            <BandeiraPais pais={tarefa.pais as any} size="sm" />
                             {tarefa.processoNome}
                           </p>
                         </div>

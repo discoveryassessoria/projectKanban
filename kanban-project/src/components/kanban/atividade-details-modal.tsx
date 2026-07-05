@@ -485,7 +485,7 @@ export function ProcessoDetailsModal({
 
   if (!isOpen || !processo) return null
 
-  const paisConfig = PAISES_CONFIG[processo.pais] || { label: processo.pais, bandeira: "🏳️" }
+  const paisConfig = PAISES_CONFIG[processo.pais as keyof typeof PAISES_CONFIG] || { label: processo.pais, bandeira: "🏳" }
   const sortedEtapas = [...etapas].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
   const etapaAtualIndex = sortedEtapas.findIndex(e => e.id === statusIdAtual)
   const etapaAtual = sortedEtapas.find(e => e.id === statusIdAtual)
@@ -832,7 +832,7 @@ export function ProcessoDetailsModal({
                     <div className="mb-6">
                       <label className="text-xs text-gray-500 uppercase mb-1 block">Etapa</label>
                       <select
-                        value={statusIdAtual}
+                        value={statusIdAtual ?? ""}
                         onChange={(e) => setStatusIdAtual(Number(e.target.value))}
                         className={selectClass}
                         style={selectStyle}

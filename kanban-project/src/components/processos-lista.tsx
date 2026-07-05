@@ -167,14 +167,14 @@ export function ProcessosLista({
                   <td className="py-3 px-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <div className={`h-2 w-2 rounded-full ${getStatusColor(processo.statusId)}`} />
-                        <span className="text-white/80 text-sm">{getStatusNome(processo.statusId)}</span>
+                        <div className={`h-2 w-2 rounded-full ${getStatusColor(processo.statusId ?? 0)}`} />
+                        <span className="text-white/80 text-sm">{getStatusNome(processo.statusId ?? 0)}</span>
                       </div>
                       {/* Barra de progresso */}
                       <div className="w-32 h-1.5 bg-white/10 rounded-full overflow-hidden">
                         <div 
-                          className={`h-full ${getStatusColor(processo.statusId)} transition-all duration-300`}
-                          style={{ width: `${getProgress(processo.statusId)}%` }}
+                          className={`h-full ${getStatusColor(processo.statusId ?? 0)} transition-all duration-300`}
+                          style={{ width: `${getProgress(processo.statusId ?? 0)}%` }}
                         />
                       </div>
                     </div>
