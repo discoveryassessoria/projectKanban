@@ -10,7 +10,7 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const pais = searchParams.get("pais") as Pais | null
+    const pais = searchParams.get("pais")
     const requerenteId = searchParams.get("requerenteId")
     const contratanteId = searchParams.get("contratanteId")
     const motor = searchParams.get("motor") // ✅ MOTOR
@@ -136,31 +136,21 @@ export async function POST(request: Request) {
       )
     }
 
-    // Validar se o país é válido
-    if (!Object.values(Pais).includes(pais)) {
-      return NextResponse.json(
-        { error: "País inválido" },
-        { status: 400 }
-      )
+    const paisCat = await prisma.catalogoPais.findFirst({ where: { countryKey: pais, ativo: true } })
+    if (!paisCat) return NextResponse.json({ error: "País inválido ou inativo." }, { status: 400 })
+
+    if (!tipoProcessoMotorId) return NextResponse.json({ error: "Escolha o tipo de processo." }, { status: 400 })
+    const tipoMotor = await prisma.tipoProcessoNacionalidade.findUnique({ where: { id: tipoProcessoMotorId } })
+    if (!tipoMotor || tipoMotor.countryKey !== pais) {
+      return NextResponse.json({ error: "Tipo de processo inválido para este país." }, { status: 400 })
     }
 
-    // Verificar se o status existe e pertence ao país correto
-    const status = await prisma.status.findUnique({
-      where: { id: statusId }
+    const wf = await prisma.macroWorkflow.findUnique({
+      where: { tipoProcessoId: tipoMotor.id },
+      include: { fases: { where: { showInKanban: true }, orderBy: { ordem: "asc" } } },
     })
-
-    if (!status) {
-      return NextResponse.json(
-        { error: "Status não encontrado" },
-        { status: 404 }
-      )
-    }
-
-    if (status.pais !== pais) {
-      return NextResponse.json(
-        { error: "Status não pertence a este país" },
-        { status: 400 }
-      )
+    if (!wf || wf.fases.length === 0) {
+      return NextResponse.json({ error: "Este tipo ainda não tem fases. Monte o workflow em Gerenciamento → Workflows e Fases." }, { status: 400 })
     }
 
     // ✅ Se veio tipo do motor, confere se existe
@@ -180,7 +170,7 @@ export async function POST(request: Request) {
         descricao: descricao || null,
         observacoes: observacoes || null,
         pais,
-        statusId,
+        faseAtualKey: wf.fases[0].phaseKey,
         arvoreId: arvoreId || null,
         previsaoTermino: previsaoTermino ? new Date(previsaoTermino) : null,
         tipoProcessoMotorId: tipoProcessoMotorId ?? null,   // ✅ nasce ligado ao motor

@@ -1,133 +1,63 @@
+// ESTE ARQUIVO VAI EM: src/components/ui/pais-selector.tsx
+//
+// Tabs de países do kanban — agora DINÂMICAS: a lista vem do
+// /api/kanban-config (CatalogoPais ativos), via props. Nada fixo no código.
+
 "use client"
 
-import { useState } from "react"
-import { Check, ChevronDown } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Pais, PAISES_CONFIG, PAISES_LISTA } from "@/src/types/kanban"
-
-interface PaisSelectorProps {
-  selectedPais: Pais
-  onSelect: (pais: Pais) => void
-  className?: string
-}
-
-export function PaisSelector({ selectedPais, onSelect, className }: PaisSelectorProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const config = PAISES_CONFIG[selectedPais]
-
-  const paisesOrdenados = [...PAISES_LISTA].sort((a, b) => 
-    PAISES_CONFIG[a].label.localeCompare(PAISES_CONFIG[b].label)
-  )
-
-  return (
-    <div className={cn("relative", className)}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={cn(
-          "flex items-center justify-between gap-2 w-full px-3 py-2 rounded-lg",
-          "bg-white/10 border border-white/20 text-white",
-          "hover:bg-white/15 transition-colors",
-          "focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        )}
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-xl">{config.bandeira}</span>
-          <span className="font-medium">{config.label}</span>
-        </div>
-        <ChevronDown className={cn(
-          "h-4 w-4 transition-transform",
-          isOpen && "rotate-180"
-        )} />
-      </button>
-
-      {isOpen && (
-        <>
-          <div 
-            className="fixed inset-0 z-10" 
-            onClick={() => setIsOpen(false)} 
-          />
-          
-          <div className={cn(
-            "absolute top-full left-0 right-0 mt-1 z-20",
-            "bg-white/95 backdrop-blur-xl rounded-lg shadow-xl",
-            "border border-gray-200 overflow-hidden"
-          )}>
-            {paisesOrdenados.map((pais) => {
-              const paisConfig = PAISES_CONFIG[pais]
-              const isSelected = pais === selectedPais
-              
-              return (
-                <button
-                  key={pais}
-                  type="button"
-                  onClick={() => {
-                    onSelect(pais)
-                    setIsOpen(false)
-                  }}
-                  className={cn(
-                    "flex items-center justify-between w-full px-3 py-2.5",
-                    "hover:bg-gray-100 transition-colors text-left",
-                    isSelected && "bg-indigo-50"
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{paisConfig.bandeira}</span>
-                    <span className={cn(
-                      "font-medium text-gray-900",
-                      isSelected && "text-indigo-600"
-                    )}>
-                      {paisConfig.label}
-                    </span>
-                  </div>
-                  {isSelected && (
-                    <Check className="h-4 w-4 text-indigo-600" />
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
+import type { PaisKanban } from "@/src/types/kanban"
 
 interface PaisTabsProps {
-  selectedPais: Pais
-  onSelect: (pais: Pais) => void
-  className?: string
+  paises: PaisKanban[]
+  paisSelecionado: string | null            // countryKey
+  onSelect: (countryKey: string) => void
 }
 
-export function PaisTabs({ selectedPais, onSelect, className }: PaisTabsProps) {
-  const paisesOrdenados = [...PAISES_LISTA].sort((a, b) => 
-    PAISES_CONFIG[a].label.localeCompare(PAISES_CONFIG[b].label)
-  )
-
+export function PaisTabs({ paises, paisSelecionado, onSelect }: PaisTabsProps) {
+  if (!paises.length) return null
   return (
-    <div className={cn("flex gap-1 p-1 bg-white/10 rounded-lg", className)}>
-      {paisesOrdenados.map((pais) => {
-        const config = PAISES_CONFIG[pais]
-        const isSelected = pais === selectedPais
-        
+    <div className="flex items-center gap-1 overflow-x-auto">
+      {paises.map((p) => {
+        const ativo = p.countryKey === paisSelecionado
         return (
           <button
-            key={pais}
-            type="button"
-            onClick={() => onSelect(pais)}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all",
-              "text-sm font-medium",
-              isSelected 
-                ? "bg-white text-gray-900 shadow-sm" 
-                : "text-white/70 hover:text-white hover:bg-white/10"
-            )}
+            key={p.countryKey}
+            onClick={() => onSelect(p.countryKey)}
+            className={`
+              flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200
+              ${ativo ? "bg-white text-gray-900 shadow" : "text-white/70 hover:text-white hover:bg-white/10"}
+            `}
           >
-            <span>{config.bandeira}</span>
-            <span>{config.label}</span>
+            {p.flag && <span>{p.flag}</span>}
+            {p.countryLabel}
           </button>
         )
       })}
     </div>
+  )
+}
+
+// Versão dropdown (para telas menores ou formulários)
+interface PaisSelectorProps {
+  paises: PaisKanban[]
+  paisSelecionado: string | null
+  onSelect: (countryKey: string) => void
+  className?: string
+}
+
+export function PaisSelector({ paises, paisSelecionado, onSelect, className = "" }: PaisSelectorProps) {
+  return (
+    <select
+      value={paisSelecionado ?? ""}
+      onChange={(e) => e.target.value && onSelect(e.target.value)}
+      className={`rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/20 ${className}`}
+    >
+      <option value="" className="bg-zinc-900">— selecione o país —</option>
+      {paises.map((p) => (
+        <option key={p.countryKey} value={p.countryKey} className="bg-zinc-900">
+          {p.flag ? `${p.flag} ` : ""}{p.countryLabel}
+        </option>
+      ))}
+    </select>
   )
 }

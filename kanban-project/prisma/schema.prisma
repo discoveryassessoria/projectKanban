@@ -225,7 +225,7 @@ model Status {
   id        Int        @id @default(autoincrement())
   nome      String     @db.VarChar(50)
   ordem     Int        @default(0)
-  pais      Pais
+  pais      String
   faseCode  FaseCode?
   processos Processo[]
   tarefas   Tarefa[]
@@ -240,8 +240,8 @@ model Processo {
   nome              String                @db.VarChar(100)
   descricao         String?               @db.VarChar(500)
   observacoes       String?
-  pais              Pais
-  statusId          Int
+  pais              String
+  statusId          Int?
   arvoreId          Int?
   dataInicio        DateTime              @default(now())
   previsaoTermino   DateTime?
@@ -259,8 +259,9 @@ model Processo {
   mensagens         Mensagem[]
   outrosCustos      OutroCusto[]
   arvore            Arvore?               @relation(fields: [arvoreId], references: [id])
-  status            Status                @relation(fields: [statusId], references: [id], onDelete: Cascade)
+  status            Status?                @relation(fields: [statusId], references: [id], onDelete: SetNull)
   analise           AnaliseDocumental?
+  faseAtualKey      String?
   contratantes      ProcessoContratante[]
   requerentes       ProcessoRequerente[]
   protocolos        Protocolo[]
@@ -299,7 +300,7 @@ model Tarefa {
   descricao           String?
   processoId          Int?
   statusId            Int?
-  pais                Pais?
+  pais                String?
   responsavelId       Int?
   concluida           Boolean           @default(false)
   prioridade          PrioridadeTarefa  @default(MEDIA)

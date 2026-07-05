@@ -1,11 +1,8 @@
-// src/app/api/gerenciamento/paises/route.ts
+// ESTE ARQUIVO SUBSTITUI: src/app/api/gerenciamento/paises/route.ts
 //
-// Cria um País no catálogo do MOTOR (CatalogoPais) + as Modalidades dele
-// (ModalidadePais). É o back do botão "+ Novo país" dentro de
-// "Processos de Nacionalidade" (TipoProcessoTab).
-//
-// ⚠ NÃO mexe no enum Pais nem no kanban antigo — é só o catálogo do motor.
-// ⚠ As duas tabelas já existem no schema → NÃO precisa de db push.
+// GET  - lista TODOS os países (ativos e inativos) + quantos tipos cada um tem
+//        (pro modal "Gerenciar países" — o GET de tipos-processo só traz ativos)
+// POST - cria País (CatalogoPais) + Modalidades (ModalidadePais) — igual antes
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -22,6 +19,28 @@ function slug(s: string) {
 }
 
 type ModalidadeIn = { modalityKey?: string; modalityLabel?: string; codeSuffix?: string | null; ordem?: number }
+
+// GET - todos os países + contagem de tipos (pra saber se pode excluir)
+export async function GET(request: Request) {
+  const erro = await verificarPermissao(request, 'usuarios.gerenciar')
+  if (erro) return erro
+
+  try {
+    const [paises, tipos] = await Promise.all([
+      prisma.catalogoPais.findMany({ orderBy: { countryLabel: 'asc' } }),
+      prisma.tipoProcessoNacionalidade.findMany({ select: { countryKey: true } }),
+    ])
+
+    const contagem = new Map<string, number>()
+    for (const t of tipos) contagem.set(t.countryKey, (contagem.get(t.countryKey) || 0) + 1)
+
+    const out = paises.map((p) => ({ ...p, tiposCount: contagem.get(p.countryKey) || 0 }))
+    return NextResponse.json({ paises: out })
+  } catch (error) {
+    console.error('Erro ao listar países:', error)
+    return NextResponse.json({ error: 'Erro ao listar países' }, { status: 500 })
+  }
+}
 
 export async function POST(request: Request) {
   const erro = await verificarPermissao(request, 'usuarios.gerenciar')

@@ -1,10 +1,16 @@
 // ESTE ARQUIVO VAI EM: src/components/kanban-board-novo.tsx
+//
+// BOARD MOTOR-NATIVE (5/jul):
+// - Colunas = FASES do Workflow Macro do TIPO selecionado (vêm por prop)
+// - Arrastar card = mover de FASE (PUT /api/processos/[id]/fase)
+// - "+ Novo processo" único no topo (nasce na 1ª fase do tipo, ligado ao motor)
+// - SEM criar/editar/excluir coluna (colunas são do Gerenciamento)
 
 "use client"
 
 import type React from "react"
 import { createPortal } from "react-dom"
-import { useState, useRef, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   DndContext,
   type DragEndEvent,
@@ -18,25 +24,26 @@ import {
 } from "@dnd-kit/core"
 import { snapCenterToCursor } from "@dnd-kit/modifiers"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Plus } from "lucide-react"
 import { KanbanColumn } from "./kanban/kanban-column"
 import { KanbanCard } from "./kanban/kanban-card"
 import { ProcessoDetailsModal } from "./kanban/atividade-details-modal"
-import { 
-  Pais, 
-  PAISES_CONFIG,
-  type ProcessoWithStatus, 
+import {
+  corDoPais,
+  type PaisKanban,
+  type TipoKanban,
+  type Processo,
   type Status,
-  type Contratante, 
-  type Requerente 
+  type Contratante,
+  type Requerente,
 } from "@/src/types/kanban"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 interface KanbanBoardProps {
-  pais: Pais
-  processos: ProcessoWithStatus[]
-  statusList: Status[]
+  pais: PaisKanban
+  tipo: TipoKanban                    // tipo selecionado — as fases dele são as colunas
+  processos: Processo[]
+  statusList?: Status[]               // LEGADO — só repassado ao modal de detalhes
   contratantes?: Contratante[]
   requerentes?: Requerente[]
   onRefresh: () => void
@@ -44,44 +51,33 @@ interface KanbanBoardProps {
   initialTab?: string | null
   initialPessoaId?: number | null
   initialSidebarTab?: string | null
-  initialTarefaPaiId?: number | null  // ← NOVO
-  initialAtividadeId?: number | null  // ← NOVO
+  initialTarefaPaiId?: number | null
+  initialAtividadeId?: number | null
   onModalOpened?: () => void
 }
 
-// ✅ Tipo do motor (só o que o seletor precisa)
-type TipoMotor = {
-  id: number
-  code: string
-  name: string
-  countryKey: string
-  countryLabel: string
-  modalityKey: string
-  modalityLabel: string
-}
-
-// ✅ Helper para extrair ID numérico de IDs prefixados
+// Helper para extrair ID numérico de IDs prefixados ("card-12" -> 12)
 const extractId = (id: string | number): number => {
   if (typeof id === 'number') return id
-  // Remove prefixos "card-" ou "column-"
   const match = id.match(/\d+$/)
   return match ? parseInt(match[0]) : 0
 }
 
-// ✅ Helper para verificar se é um card
-const isCardId = (id: string | number): boolean => {
-  return typeof id === 'string' && id.startsWith('card-')
-}
+const isCardId = (id: string | number): boolean =>
+  typeof id === 'string' && id.startsWith('card-')
 
-// ✅ Helper para verificar se é uma coluna
-const isColumnId = (id: string | number): boolean => {
-  return typeof id === 'string' && id.startsWith('column-')
-}
+const isColumnId = (id: string | number): boolean =>
+  typeof id === 'string' && id.startsWith('column-')
 
-export function KanbanBoard({ 
+// "column-analise_documental" -> "analise_documental"
+const faseFromColumnId = (id: string | number): string | null =>
+  isColumnId(id) ? String(id).slice('column-'.length) : null
+
+export function KanbanBoard({
   pais,
+  tipo,
   processos: processosFromProps,
-  statusList,
+  statusList = [],
   contratantes = [],
   requerentes = [],
   onRefresh,
@@ -90,19 +86,17 @@ export function KanbanBoard({
   initialPessoaId = null,
   initialSidebarTab = null,
   onModalOpened,
-  initialTarefaPaiId = null,  // ← NOVO
-  initialAtividadeId = null,  // ← NOVO
+  initialTarefaPaiId = null,
+  initialAtividadeId = null,
 }: KanbanBoardProps) {
-  const [localProcessos, setLocalProcessos] = useState<ProcessoWithStatus[]>(processosFromProps)
-  
+  const [localProcessos, setLocalProcessos] = useState<Processo[]>(processosFromProps)
+
   useEffect(() => {
     setLocalProcessos(processosFromProps)
   }, [processosFromProps])
 
-  const [newStatusName, setNewStatusName] = useState("")
-  const [isAddingStatus, setIsAddingStatus] = useState(false)
-  const [activeProcesso, setActiveProcesso] = useState<ProcessoWithStatus | null>(null)
-  const [selectedProcesso, setSelectedProcesso] = useState<ProcessoWithStatus | null>(null)
+  const [activeProcesso, setActiveProcesso] = useState<Processo | null>(null)
+  const [selectedProcesso, setSelectedProcesso] = useState<Processo | null>(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [modalInitialTab, setModalInitialTab] = useState<string | undefined>(undefined)
   const [modalInitialPessoaId, setModalInitialPessoaId] = useState<number | undefined>(undefined)
@@ -111,50 +105,24 @@ export function KanbanBoard({
   const [modalInitialAtividadeId, setModalInitialAtividadeId] = useState<number | undefined>(undefined)
   const { pode } = usePermissoes()
 
-  // ✅ NOVO: tipos do motor + modal de criar processo (com tipo)
-  const [tiposMotor, setTiposMotor] = useState<TipoMotor[]>([])
+  // Modal "Novo processo" (nasce na 1ª fase do tipo, ligado ao motor)
   const [criarModal, setCriarModal] = useState(false)
   const [criarNome, setCriarNome] = useState("")
-  const [criarStatusId, setCriarStatusId] = useState<number | null>(null)
-  const [criarTipoId, setCriarTipoId] = useState<number | null>(null)
   const [salvandoCriar, setSalvandoCriar] = useState(false)
   const [erroCriar, setErroCriar] = useState<string | null>(null)
-  
-  const [isDragging, setIsDragging] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+
   const [initialParamsProcessed, setInitialParamsProcessed] = useState(false)
 
-  // ✅ CORREÇÃO: Resetar initialParamsProcessed quando um novo processoId chega
   useEffect(() => {
     if (initialProcessoId !== null) {
       setInitialParamsProcessed(false)
     }
   }, [initialProcessoId])
 
-  // ✅ Buscar os tipos do motor (pro seletor ao criar processo)
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/tipos-processo", {
-          headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
-          setTiposMotor(data.tipos || [])
-        }
-      } catch {
-        /* silencioso — se falhar, o seletor fica vazio e avisa */
-      }
-    })()
-  }, [])
+  const corPais = corDoPais(pais.countryKey)
 
-  const paisConfig = PAISES_CONFIG[pais]
-
-  // ✅ Tipos do país selecionado (casa enum ITALIA ↔ countryKey "italia")
-  const tiposDoPais = useMemo(
-    () => tiposMotor.filter((t) => (t.countryKey || "").toLowerCase() === String(pais).toLowerCase()),
-    [tiposMotor, pais]
-  )
+  // Fases visíveis (colunas) — já vêm ordenadas do config
+  const fases = tipo?.fases ?? []
 
   // Sensores
   const sensors = useSensors(
@@ -166,7 +134,7 @@ export function KanbanBoard({
     })
   )
 
-  // Efeito para abrir modal automaticamente
+  // Abrir modal automaticamente (deep-link)
   useEffect(() => {
     if (initialProcessoId && localProcessos.length > 0 && !initialParamsProcessed) {
       const processo = localProcessos.find(p => p.id === initialProcessoId)
@@ -184,94 +152,21 @@ export function KanbanBoard({
     }
   }, [initialProcessoId, initialTab, initialPessoaId, initialSidebarTab, localProcessos, initialParamsProcessed, onModalOpened])
 
-  // Ordenar status
-  const sortedStatusList = useMemo(() => {
-    return [...statusList].sort((a, b) => {
-      const aIsConcluido = a.nome.toLowerCase() === "concluído"
-      const bIsConcluido = b.nome.toLowerCase() === "concluído"
-      if (aIsConcluido) return 1
-      if (bIsConcluido) return -1
-      return (a.ordem ?? 0) - (b.ordem ?? 0)
-    })
-  }, [statusList])
-
-  // Handlers
-  const handleAddNewStatus = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newStatusName.trim()) return
-
-    try {
-      const response = await fetch("/api/status", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
-        },
-        body: JSON.stringify({ nome: newStatusName, pais }),
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Falha ao criar novo status")
-      }
-
-      setNewStatusName("")
-      setIsAddingStatus(false)
-      onRefresh()
-    } catch (error: any) {
-      console.error(error)
-      alert(error.message || "Não foi possível adicionar a coluna.")
+  // Processos agrupados por fase (A-Z dentro da fase)
+  const processosByFase = useMemo(() => {
+    const map = new Map<string, Processo[]>()
+    for (const fase of fases) {
+      map.set(
+        fase.phaseKey,
+        localProcessos
+          .filter(p => p.faseAtualKey === fase.phaseKey)
+          .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+      )
     }
-  }
+    return map
+  }, [localProcessos, fases])
 
-  // ✅ ALTERADO: em vez de criar direto, abre o modal pra escolher o TIPO do motor.
-  //    (a coluna passa o nome digitado + o statusId dela)
-  const handleAddNewProcesso = (nome: string, statusId: number) => {
-    setCriarNome(nome)
-    setCriarStatusId(statusId)
-    // pré-seleciona o tipo se o país só tiver um
-    setCriarTipoId(tiposDoPais.length === 1 ? tiposDoPais[0].id : null)
-    setErroCriar(null)
-    setCriarModal(true)
-  }
-
-  // ✅ Cria o processo JÁ LIGADO ao motor (tipoProcessoMotorId)
-  const confirmarCriarProcesso = async () => {
-    if (!criarNome.trim()) { setErroCriar("Informe o nome do processo."); return }
-    if (!criarStatusId) { setErroCriar("Coluna inválida."); return }
-    if (!criarTipoId) { setErroCriar("Escolha o tipo de processo."); return }
-
-    setSalvandoCriar(true); setErroCriar(null)
-    try {
-      const response = await fetch('/api/processos', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem("authToken")}`
-        },
-        body: JSON.stringify({
-          nome: criarNome.trim(),
-          statusId: criarStatusId,
-          pais: pais,
-          tipoProcessoMotorId: criarTipoId,
-        })
-      })
-
-      if (!response.ok) {
-        const d = await response.json().catch(() => ({}))
-        throw new Error(d.error || "Falha ao criar novo processo")
-      }
-      setCriarModal(false)
-      onRefresh()
-    } catch (error: any) {
-      console.error(error)
-      setErroCriar(error.message || "Não foi possível adicionar o processo.")
-    } finally {
-      setSalvandoCriar(false)
-    }
-  }
-
-  const handleProcessoClick = (processo: ProcessoWithStatus) => {
+  const handleProcessoClick = (processo: Processo) => {
     setSelectedProcesso(processo)
     setModalInitialTab(undefined)
     setModalInitialPessoaId(undefined)
@@ -293,48 +188,77 @@ export function KanbanBoard({
     onRefresh()
   }
 
-  // ✅ CORREÇÃO: Drag handlers atualizados para IDs prefixados
+  // ✅ Criar processo — nasce na 1ª fase, já ligado ao motor
+  const abrirCriar = () => {
+    setCriarNome("")
+    setErroCriar(null)
+    setCriarModal(true)
+  }
+
+  const confirmarCriarProcesso = async () => {
+    if (!criarNome.trim()) { setErroCriar("Informe o nome do processo."); return }
+
+    setSalvandoCriar(true); setErroCriar(null)
+    try {
+      const response = await fetch('/api/processos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem("authToken")}`
+        },
+        body: JSON.stringify({
+          nome: criarNome.trim(),
+          pais: pais.countryKey,
+          tipoProcessoMotorId: tipo.id,
+        })
+      })
+
+      if (!response.ok) {
+        const d = await response.json().catch(() => ({}))
+        throw new Error(d.error || "Falha ao criar novo processo")
+      }
+      setCriarModal(false)
+      onRefresh()
+    } catch (error: any) {
+      console.error(error)
+      setErroCriar(error.message || "Não foi possível adicionar o processo.")
+    } finally {
+      setSalvandoCriar(false)
+    }
+  }
+
+  // Drag handlers
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
-    // Extrair ID numérico do processo
     const activeId = extractId(active.id)
     const processo = localProcessos.find((p) => p.id === activeId)
     setActiveProcesso(processo || null)
-    setIsDragging(true)
   }
 
-  // Drag handlers não precisam mais de auto-scroll com scroll nativo
-  const handleDragMove = () => {
-    // Scroll nativo do browser vai funcionar automaticamente
-  }
-
-  // ✅ CORREÇÃO: handleDragEnd atualizado para IDs prefixados
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
 
     setActiveProcesso(null)
-    setIsDragging(false)
     if (!over) return
 
     const activeId = extractId(active.id)
     const processo = localProcessos.find((p) => p.id === activeId)
     if (!processo) return
 
-    let targetStatusId: number | null = null
-    if (over.data.current?.statusId) {
-      targetStatusId = over.data.current.statusId
+    // Fase de destino
+    let targetFaseKey: string | null = null
+    if (over.data.current?.faseKey) {
+      targetFaseKey = over.data.current.faseKey
     } else if (isColumnId(over.id)) {
-      targetStatusId = extractId(over.id)
+      targetFaseKey = faseFromColumnId(over.id)
     } else if (isCardId(over.id)) {
       const overProcessoId = extractId(over.id)
       const overProcesso = localProcessos.find((p) => p.id === overProcessoId)
-      if (overProcesso) {
-        targetStatusId = overProcesso.statusId
-      }
+      if (overProcesso) targetFaseKey = overProcesso.faseAtualKey ?? null
     }
 
-    // Mesmo status ou indefinido: não faz nada
-    if (!targetStatusId || processo.statusId === targetStatusId) return
+    // Mesma fase ou indefinida: não faz nada
+    if (!targetFaseKey || processo.faseAtualKey === targetFaseKey) return
 
     // 🔒 Mover de fase na mão exige permissão. Sem ela: avisa e o card volta.
     if (!pode('processos.editar_status')) {
@@ -342,158 +266,114 @@ export function KanbanBoard({
       return
     }
 
-    // Com permissão: move de verdade (atualização otimista + PUT)
+    // Com permissão: move de verdade (atualização otimista + PUT de fase)
     const previousProcessos = [...localProcessos]
     setLocalProcessos(prev =>
-      prev.map(p => p.id === activeId ? { ...p, statusId: targetStatusId! } : p)
+      prev.map(p => p.id === activeId ? { ...p, faseAtualKey: targetFaseKey! } : p)
     )
 
     try {
-      const response = await fetch(`/api/processos/${activeId}`, {
+      const response = await fetch(`/api/processos/${activeId}/fase`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem("authToken")}`
         },
-        body: JSON.stringify({ statusId: targetStatusId }),
+        body: JSON.stringify({ faseAtualKey: targetFaseKey }),
       })
-      if (!response.ok) throw new Error("Erro ao mover processo")
-        onRefresh()
-    } catch (error) {
-      console.error("Error updating processo status:", error)
+      if (!response.ok) {
+        const d = await response.json().catch(() => ({}))
+        throw new Error(d.error || "Erro ao mover processo")
+      }
+      onRefresh()
+    } catch (error: any) {
+      console.error("Erro ao mover processo de fase:", error)
       setLocalProcessos(previousProcessos)
-      alert("Erro ao mover o processo. Tente novamente.")
+      alert(error.message || "Erro ao mover o processo. Tente novamente.")
     }
   }
-
-  // Todas as colunas (sem paginação)
-  const showAddButton = true
-
-  // ✅ Memoizar processos por status - ordenados alfabeticamente (A-Z)
-  const processosByStatus = useMemo(() => {
-    const map = new Map<number, ProcessoWithStatus[]>()
-    for (const status of statusList) {
-      map.set(status.id, localProcessos.filter(p => p.statusId === status.id).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
-    }
-    return map
-  }, [localProcessos, statusList])
 
   return (
     <>
       <div className="flex justify-between items-center mb-4">
         <div>
           <h3 className="text-lg font-medium text-white flex items-center gap-2">
-            <span className="text-xl">{paisConfig.bandeira}</span>
-            Processos - {paisConfig.label}
+            {pais.flag && <span className="text-xl">{pais.flag}</span>}
+            Processos - {pais.countryLabel}
+            <span className="text-sm font-normal text-white/50">· {tipo.name}</span>
           </h3>
           <p className="text-sm text-white/70">
-            Arraste e solte os processos entre as colunas
+            Arraste e solte os processos entre as fases
           </p>
         </div>
+        {pode('processos.criar') && (
+          <Button
+            onClick={abrirCriar}
+            className="bg-blue-600 hover:bg-blue-500 text-white"
+          >
+            <Plus className="mr-1.5 h-4 w-4" /> Novo processo
+          </Button>
+        )}
       </div>
 
-      <DndContext
-        sensors={sensors}
-        onDragStart={handleDragStart}
-        onDragMove={handleDragMove}
-        onDragEnd={handleDragEnd}
-        collisionDetection={pointerWithin}
-      >
-        <div ref={containerRef} className="relative w-full max-w-full">
-          {/* Container das colunas com scroll horizontal */}
-          <div 
-            className="rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm pb-3 scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-white/10"
-            style={{ 
-              overflowX: 'auto', 
-              overflowY: 'hidden',
-              maxWidth: '100%'
-            }}
-          >
-            <div className="flex h-[calc(100vh-280px)] min-h-[500px]" style={{ width: 'max-content' }}>
-              {sortedStatusList.map((status, index) => (
-                <div 
-                  key={status.id}
-                  className="flex-shrink-0 w-[260px] h-full"
-                >
-                  <KanbanColumn
-                    id={status.id}
-                    title={status.nome}
-                    processos={processosByStatus.get(status.id) || []}
-                    headerColor={paisConfig.cor}
-                    isFirst={index === 0}
-                    isLast={index === sortedStatusList.length - 1 && !showAddButton}
-                    onProcessoAdd={handleAddNewProcesso}
-                    onProcessoClick={handleProcessoClick}
-                    onStatusUpdate={onRefresh}
-                    pais={pais}
-                    podeCriarProcesso={pode('processos.criar')}
-                    podeEditarColuna={pode('processos.editar_coluna')}
-                    podeExcluirColuna={pode('processos.excluir_coluna')}
-                  />
-                </div>
-              ))}
-
-              {/* Botão Adicionar Coluna */}
-              {pode('processos.criar_coluna') && (
-              <div className="flex-shrink-0 w-[260px] p-2 h-full">
-                {isAddingStatus ? (
-                  <div className="p-3 rounded-lg bg-white border border-gray-200 shadow-sm h-full">
-                    <form onSubmit={handleAddNewStatus}>
-                      <Input
-                        autoFocus
-                        placeholder="Nome da nova coluna..."
-                        value={newStatusName}
-                        onChange={(e) => setNewStatusName(e.target.value)}
-                        className="mb-2 bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 text-sm h-8"
-                      />
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setIsAddingStatus(false)}
-                          className="h-7 px-2 hover:bg-gray-100 text-gray-600 text-xs"
-                        >
-                          Cancelar
-                        </Button>
-                        <Button type="submit" size="sm" className="h-7 px-2 bg-blue-600 hover:bg-blue-700 text-white text-xs">
-                          Adicionar
-                        </Button>
-                      </div>
-                    </form>
-                  </div>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    className="w-full h-full min-h-[80px] border border-dashed border-white/20 hover:border-white/40 hover:bg-white/5 text-white/50 hover:text-white/80 text-sm"
-                    onClick={() => setIsAddingStatus(true)}
+      {fases.length === 0 ? (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-6 text-center text-sm text-amber-200">
+          Este tipo de processo ainda não tem fases configuradas.
+          Monte o workflow em Gerenciamento → Workflows e Fases → Workflow Macro.
+        </div>
+      ) : (
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          collisionDetection={pointerWithin}
+        >
+          <div className="relative w-full max-w-full">
+            <div
+              className="rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm pb-3 scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-white/10"
+              style={{
+                overflowX: 'auto',
+                overflowY: 'hidden',
+                maxWidth: '100%'
+              }}
+            >
+              <div className="flex h-[calc(100vh-280px)] min-h-[500px]" style={{ width: 'max-content' }}>
+                {fases.map((fase, index) => (
+                  <div
+                    key={fase.phaseKey}
+                    className="flex-shrink-0 w-[260px] h-full"
                   >
-                    <Plus className="mr-1.5 h-4 w-4" /> Nova coluna
-                  </Button>
-                )}
+                    <KanbanColumn
+                      faseKey={fase.phaseKey}
+                      title={fase.label}
+                      processos={processosByFase.get(fase.phaseKey) || []}
+                      headerColor={corPais}
+                      isLast={index === fases.length - 1}
+                      onProcessoClick={handleProcessoClick}
+                    />
+                  </div>
+                ))}
               </div>
-              )}
             </div>
           </div>
-        </div>
 
-        <DragOverlay 
-          modifiers={[snapCenterToCursor]}
-          dropAnimation={{
-            duration: 200,
-            easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-          }}
-        >
-          {activeProcesso ? (
-            <div style={{ transform: 'rotate(2deg) scale(1.02)', opacity: 0.95 }}>
-              <KanbanCard processo={activeProcesso} isDragging />
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+          <DragOverlay
+            modifiers={[snapCenterToCursor]}
+            dropAnimation={{
+              duration: 200,
+              easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+            }}
+          >
+            {activeProcesso ? (
+              <div style={{ transform: 'rotate(2deg) scale(1.02)', opacity: 0.95 }}>
+                <KanbanCard processo={activeProcesso} isDragging />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      )}
 
-      {/* ✅ MODAL: Novo processo — vai num PORTAL pro <body>, senão abre "preso"
-          dentro do kanban por causa do backdrop-blur do painel */}
+      {/* MODAL: Novo processo — em portal pro body (senão fica preso no painel com blur) */}
       {criarModal && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
@@ -511,28 +391,14 @@ export function KanbanBoard({
                   onChange={(e) => setCriarNome(e.target.value)}
                   placeholder="Nome do processo"
                   className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
+                  onKeyDown={(e) => { if (e.key === 'Enter') confirmarCriarProcesso() }}
                 />
               </div>
 
-              <div>
-                <label className="mb-1 block text-xs text-white/60">Tipo de processo (motor) *</label>
-                {tiposDoPais.length > 0 ? (
-                  <select
-                    value={criarTipoId ?? ""}
-                    onChange={(e) => setCriarTipoId(e.target.value ? parseInt(e.target.value) : null)}
-                    className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/20"
-                  >
-                    <option value="" className="bg-zinc-900">— selecione —</option>
-                    {tiposDoPais.map((t) => (
-                      <option key={t.id} value={t.id} className="bg-zinc-900">{t.name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-                    Nenhum tipo de processo cadastrado para {paisConfig.label}. Cadastre em Gerenciamento → Processos de Nacionalidade antes de criar.
-                  </div>
-                )}
-              </div>
+              <p className="text-xs text-white/40">
+                Tipo: <span className="text-white/70">{tipo.name}</span> — o processo nasce na primeira fase
+                {fases[0] ? ` (${fases[0].label})` : ""} e já entra no motor.
+              </p>
 
               {erroCriar && (
                 <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroCriar}</div>
@@ -543,7 +409,7 @@ export function KanbanBoard({
               <button onClick={() => setCriarModal(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
               <button
                 onClick={confirmarCriarProcesso}
-                disabled={salvandoCriar || tiposDoPais.length === 0}
+                disabled={salvandoCriar}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
               >
                 {salvandoCriar ? "Criando..." : "Criar processo"}
@@ -555,7 +421,7 @@ export function KanbanBoard({
       )}
 
       <ProcessoDetailsModal
-        processo={selectedProcesso}
+        processo={selectedProcesso as any}
         isOpen={isDetailsModalOpen}
         onClose={handleModalClose}
         onSave={handleProcessoSave}

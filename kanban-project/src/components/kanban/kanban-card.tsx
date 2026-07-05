@@ -1,22 +1,27 @@
+// ESTE ARQUIVO VAI EM: src/components/kanban/kanban-card.tsx
+//
+// Card do kanban. Igual ao anterior — só muda:
+// - type: Processo (o kanban agrupa por faseAtualKey, não mais por Status)
+// - data do drag: faseKey em vez de statusId
+
 "use client"
 
 import type React from "react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Phone, Mail, MessageCircle, Users, CheckSquare } from "lucide-react"
-import type { ProcessoWithStatus } from "@/src/types/kanban"
+import type { Processo } from "@/src/types/kanban"
 
 interface KanbanCardProps {
-  processo: ProcessoWithStatus
+  processo: Processo
   onClick?: () => void
   isDragging?: boolean // Prop para quando está no DragOverlay
 }
 
 export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: KanbanCardProps) {
-  const { 
-    id, 
-    nome, 
-    descricao, 
+  const {
+    id,
+    nome,
     contratantes = [], // Array de contratantes
     requerentes = [],
     tarefas = [],
@@ -26,20 +31,19 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
   // Pegar o primeiro contratante para exibir dados de contato
   const contratante = contratantes[0] || null
 
-  // ✅ CORREÇÃO: Usar ID com prefixo "card-" para evitar conflito com IDs de colunas
-  const { 
-    attributes, 
-    listeners, 
-    setNodeRef, 
-    transform, 
-    transition, 
-    isDragging: isDraggingSortable 
-  } = useSortable({ 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging: isDraggingSortable
+  } = useSortable({
     id: `card-${id}`,
     data: {
       type: "Card",
       processo: processo,
-      statusId: processo.statusId,
+      faseKey: processo.faseAtualKey ?? null,
     },
   })
 
@@ -68,7 +72,7 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
   const todasTarefas = tarefas ?? []
   const tarefasReais = todasTarefas.filter((t: any) => t.tarefaPaiId != null)
   const tarefasCount = _count?.tarefas ?? tarefasReais.length
-  const tarefasConcluidas = tarefasReais.filter((t: any) => 
+  const tarefasConcluidas = tarefasReais.filter((t: any) =>
     isTarefaEfetivamenteConcluida(t, todasTarefas)
   ).length
 
