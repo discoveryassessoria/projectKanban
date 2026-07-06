@@ -446,7 +446,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 
                 <div className="">
                   <div className="text-sm font-medium text-white/70">
-                    {PAIS_LABELS[atividade.pais] || atividade.pais || '-'}
+                    {PAIS_LABELS[atividade.pais || ''] || atividade.pais || '-'}
                   </div>
                 </div>
               </div>

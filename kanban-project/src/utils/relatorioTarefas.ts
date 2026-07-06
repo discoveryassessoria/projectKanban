@@ -13,7 +13,7 @@ interface Atividade {
   descricao: string | null
   data_termino: string | null
   data_criacao: string
-  pais: string
+  pais: string | null
   status?: { nome: string } | null
   concluida?: boolean
   processo?: { id: number; nome: string } | null
@@ -101,7 +101,7 @@ function prepararDados(atividades: Atividade[]) {
     prazoFinal: formatDate(a.data_termino),
     status: getStatusLabel(a),
     responsavel: getResponsavel(a),
-    pais: PAIS_LABELS[a.pais] || a.pais || '-',
+    pais: PAIS_LABELS[a.pais || ''] || a.pais || '-',
   }))
 
   return {
