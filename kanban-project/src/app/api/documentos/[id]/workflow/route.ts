@@ -1,17 +1,15 @@
-// src/app/api/documentos/[id]/workflow/route.ts
+// ESTE ARQUIVO SUBSTITUI: src/app/api/documentos/[id]/workflow/route.ts
 //
-// ETAPA 3 · PARTE 1 — POST reescrito para o modelo WORKFLOW-POR-FASE.
-//
-// Antes: criava sempre um template fixo de 6 etapas (Genealogia+Emissão juntas)
-//        e usava tipoOperacao para escolher onde começar.
-// Agora: descobre a FASE ATUAL do processo (Status.faseCode da coluna do kanban)
-//        e cria o workflow só daquela fase, lendo o catálogo de fases.
-//
-// GET e PATCH ficam IGUAIS (não mexi neles). Só o POST mudou.
+// FIX (6/jul): o POST descobria a fase do processo SÓ pelo Status legado
+// (processo.status.faseCode). Processo criado pelo motor não tem Status →
+// erro "ainda não tem faseCode definido" ao Iniciar operação.
+// Agora a fase vem PRIMEIRO do motor (processo.faseAtualKey — é ela que o
+// kanban atualiza) e só cai pro Status antigo se o processo não tiver.
+// GET e PATCH continuam iguais.
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { StatusDocumento } from "@prisma/client"
+import { StatusDocumento, FaseCode } from "@prisma/client"
 import { getFase, isFaseReady } from "@/src/lib/process-stage/fases-catalog"
 
 // ============================================================
@@ -118,7 +116,9 @@ export async function POST(
     }
 
     // ── Descobrir a FASE ATUAL do processo ───────────────────────────────
-    // Caminho: documento → pessoa → arvore → processos → status → faseCode
+    // Caminho: documento → pessoa → arvore → processos.
+    // Fonte da fase: 1º faseAtualKey (motor — é ela que o kanban move);
+    //                2º Status legado (faseCode da coluna antiga).
     const docComProcesso = await prisma.documento.findUnique({
       where: { id: documentoId },
       select: {
@@ -127,7 +127,11 @@ export async function POST(
             arvore: {
               select: {
                 processos: {
-                  select: { id: true, status: { select: { faseCode: true, nome: true } } },
+                  select: {
+                    id: true,
+                    faseAtualKey: true,
+                    status: { select: { faseCode: true, nome: true } },
+                  },
                 },
               },
             },
@@ -153,15 +157,21 @@ export async function POST(
       )
     }
     const processo = processos[0]
-    const faseCode = processo.status?.faseCode
 
-    // ── Proteção: a coluna do processo precisa ter faseCode preenchido ───
+    // motor primeiro ("genealogia" → "GENEALOGIA"), Status legado como fallback
+    const faseCode = (
+      (processo.faseAtualKey ? processo.faseAtualKey.toUpperCase() : null) ??
+      processo.status?.faseCode ??
+      null
+    ) as FaseCode | null
+
+    // ── Proteção: o processo precisa ter fase (motor ou legado) ──────────
     if (!faseCode) {
       return NextResponse.json(
         {
           error:
-            `A coluna do kanban deste processo (status "${processo.status?.nome ?? "?"}") ainda não tem faseCode definido. ` +
-            `Rode o backfill de faseCode antes de iniciar workflows.`,
+            `Este processo não tem fase definida — nem no motor (faseAtualKey) nem na coluna antiga do kanban. ` +
+            `Mova o processo para uma fase no kanban ou conecte-o a um tipo do motor.`,
         },
         { status: 422 }
       )
