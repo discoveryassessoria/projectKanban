@@ -1,5 +1,12 @@
 ﻿"use client"
 
+// ESTE ARQUIVO SUBSTITUI: src/app/activities/page.tsx
+//
+// FIX (6/jul): a tela quebrava porque usava o enum fixo Pais do Prisma
+// (não existe no navegador). Agora os países vêm do catálogo via usePaises()
+// — cada item é { countryKey, countryLabel, flag }. França e países novos
+// aparecem sozinhos no filtro.
+
 import { useEffect, useState, useCallback, useMemo } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -16,18 +23,10 @@ import ListaActivities from "@/src/components/activitiesComponents/listaActiviti
 import PrazoActivities from "@/src/components/activitiesComponents/prazoActivities"
 import CalendarioActivities from "@/src/components/activitiesComponents/calendarioActivities"
 import { HeaderBar } from "@/src/components/header-bar"
-import { usePaises, useStatuses, useUsers, useActivities, invalidateActivities } from "@/src/hooks/useActivitiesData"
-import type { Atividade, Status } from "@/src/hooks/useActivitiesData"
+import { usePaises, useUsers, useActivities, invalidateActivities } from "@/src/hooks/useActivitiesData"
+import type { Atividade } from "@/src/hooks/useActivitiesData"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
-
-// Mapeamento de países para exibição
-const PAIS_LABELS: Record<string, string> = {
-  PORTUGAL: 'Portugal',
-  ESPANHA: 'Espanha',
-  ALEMANHA: 'Alemanha',
-  ITALIA: 'Itália'
-}
 
 // Interfaces
 interface UserData {
@@ -74,7 +73,6 @@ export default function ActivitiesPage() {
 
   // Dados
   const { activities } = useActivities()
-  const { paises } = usePaises()
 
   useEffect(() => {
     setMounted(true)
@@ -247,9 +245,11 @@ export default function ActivitiesPage() {
           onSearchTermChange={handleSearchTermChange}
           onActivityClick={(activity) => {
             if (activity.processo?.id) {
-              const pais = activity.processo.pais || activity.pais || 'PORTUGAL'
+              // countryKey em minúsculo (dados antigos podem vir "PORTUGAL")
+              const pais = String(activity.processo.pais || activity.pais || '').toLowerCase()
+              const paisParam = pais ? `&pais=${pais}` : ''
               const tarefaPaiId = activity.tarefaPai?.id ? `&tarefaPaiId=${activity.tarefaPai.id}` : ''
-              router.push(`/kanban?processoId=${activity.processo.id}&tab=tarefas&pais=${pais}${tarefaPaiId}`)
+              router.push(`/kanban?processoId=${activity.processo.id}&tab=tarefas${paisParam}${tarefaPaiId}`)
             }
           }}
         />
@@ -345,9 +345,9 @@ function FilterModal({
               </SelectTrigger>
               <SelectContent className="bg-white border-gray-200 text-gray-900">
                 <SelectItem value="all">Todos os Países</SelectItem>
-                {paises.map((pais) => (
-                  <SelectItem key={pais} value={pais}>
-                    {PAIS_LABELS[pais] || pais}
+                {paises.map((p) => (
+                  <SelectItem key={p.countryKey} value={p.countryKey}>
+                    {p.flag ? `${p.flag} ` : ''}{p.countryLabel}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -425,6 +425,14 @@ function SearchModal({
   onActivityClick
 }: SearchModalProps) {
   const { activities } = useActivities()
+  const { paises } = usePaises()
+
+  // Nome do país a partir do countryKey — aceita valor antigo em maiúsculo
+  const labelDoPais = (v?: string | null) => {
+    if (!v) return ''
+    const k = String(v).toLowerCase()
+    return paises.find((p) => p.countryKey === k)?.countryLabel || v
+  }
   
   const filteredActivities = useMemo(() => {
     if (searchTerm && activities && activities.length > 0) {
@@ -471,7 +479,7 @@ function SearchModal({
                   <div className="flex items-center gap-2 mt-2">
                     {activity.pais && (
                       <Badge variant="outline" className="text-xs bg-gray-100 border-gray-300 text-gray-700">
-                        {PAIS_LABELS[activity.pais] || activity.pais}
+                        {labelDoPais(activity.pais)}
                       </Badge>
                     )}
                     {activity.status?.nome && (

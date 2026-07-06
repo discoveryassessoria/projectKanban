@@ -1,9 +1,13 @@
 /**
  * Hooks para gerenciamento de dados com cache usando SWR
  * Centraliza fetches e evita requisições redundantes
+ *
+ * FIX (6/jul): removido o enum Pais do @prisma/client — ele não existe no
+ * bundle do navegador e derrubava a página inteira ("Cannot convert
+ * undefined or null to object"). Agora `pais` é string (countryKey) e
+ * usePaises busca os países ATIVOS do catálogo em /api/paises.
  */
 import useSWR, { mutate } from 'swr'
-import { Pais } from '@prisma/client'
 
 // Tipos compartilhados
 export interface Usuario {
@@ -28,13 +32,20 @@ export interface Contratante {
   email: string | null
 }
 
+// País do catálogo (CatalogoPais ativos)
+export interface PaisInfo {
+  countryKey: string
+  countryLabel: string
+  flag?: string | null
+}
+
 export interface Atividade {
   id: number
   nome: string
   descricao: string | null
   data_termino: string | null
   data_criacao: string
-  pais: Pais
+  pais: string | null
   status: Status | null
   contratante: Contratante | null
   usuarios: UserAtv[]
@@ -42,7 +53,7 @@ export interface Atividade {
   processo?: {
     id: number
     nome: string
-    pais?: Pais
+    pais?: string
   }
   responsavel?: Usuario | null
   concluida?: boolean
@@ -62,13 +73,13 @@ interface TarefaAPI {
   descricao: string | null
   dataPrazo: string | null
   createdAt: string
-  pais: Pais | null
+  pais: string | null
   status: Status | null
   statusId: number | null
   processo: {
     id: number
     nome: string
-    pais?: Pais
+    pais?: string
   } | null
   responsavel: Usuario | null
   concluida: boolean
@@ -142,7 +153,7 @@ function mapTarefaToAtividade(tarefa: TarefaAPI): Atividade {
     descricao: tarefa.descricao,
     data_termino: tarefa.dataPrazo,
     data_criacao: tarefa.createdAt,
-    pais: tarefa.pais || tarefa.processo?.pais || null as any,
+    pais: tarefa.pais || tarefa.processo?.pais || null,
     status: getStatusFromConcluida(tarefa.concluida),
     contratante: null,
     usuarios: tarefa.responsavel 
@@ -205,14 +216,22 @@ export function useActivities(filters?: any) {
 }
 
 /**
- * Hook para obter lista de países (enum fixo)
+ * Hook para obter lista de países — agora vem do CatalogoPais (países ativos),
+ * não mais do enum fixo do Prisma. Cada item: { countryKey, countryLabel, flag }.
  */
 export function usePaises() {
-  const paises = Object.values(Pais)
+  const { data, error, isLoading } = useSWR<{ paises: PaisInfo[] }>(
+    '/api/paises',
+    fetcher,
+    swrConfig
+  )
+
+  const paises: PaisInfo[] = Array.isArray((data as any)?.paises) ? (data as any).paises : []
+
   return {
     paises,
-    isLoading: false,
-    error: null
+    isLoading,
+    error: error?.message || null
   }
 }
 
