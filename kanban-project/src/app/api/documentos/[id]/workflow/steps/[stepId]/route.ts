@@ -132,6 +132,20 @@ export async function PATCH(
     // Gate 2: liberar próximo step só na PRIMEIRA conclusão
     const liberarProximo = vaiSerConcluida && !eraConcluida
 
+    // ============================================================
+    // ✅ HOTFIX — GATE DE CONCLUSÃO REAL (tarefa ≠ passo)
+    // Concluir a etapa exige que a condição REAL tenha sido cumprida —
+    // não basta clicar "concluir". Sem isso, o passo ia a "concluída"
+    // (e o workflow a 100%) com o documento ainda pendente.
+    // Só barra na PRIMEIRA conclusão (não em re-conclusão/reabertura).
+    // ============================================================
+    if (liberarProximo) {
+      const bloqueioConclusao = await checarConclusaoDoPasso(step.stepKey, documentoId)
+      if (bloqueioConclusao) {
+        return NextResponse.json({ error: bloqueioConclusao }, { status: 422 })
+      }
+    }
+
     // -- Campos simples (whitelist)
     if (body.assigneeId !== undefined) {
       updateData.assignee = body.assigneeId
@@ -454,4 +468,50 @@ async function recalcularProgressoWorkflow(workflowId: number, now: Date) {
       completedAt: todosConcluidos ? now : null,
     },
   })
+}
+
+// ============================================================
+// ✅ HOTFIX — condição REAL de conclusão por etapa
+// Retorna mensagem de erro se a etapa NÃO pode ser concluída ainda,
+// ou null se pode. Passos sem regra aqui seguem com conclusão manual
+// (comportamento antigo) — só travamos onde faz sentido.
+// ============================================================
+async function checarConclusaoDoPasso(
+  stepKey: string,
+  documentoId: number
+): Promise<string | null> {
+  switch (stepKey) {
+    // GENEALOGIA — "Buscar documento": localizar o ato e preencher os
+    // dados registrais. Só conclui quando o documento tem esses dados
+    // preenchidos (= o ato foi de fato localizado no cartório).
+    case "buscar_documento": {
+      const doc = await prisma.documento.findUnique({
+        where: { id: documentoId },
+        select: {
+          cartorio: true,
+          numero_registro: true,
+          livro: true,
+          folha: true,
+          termo: true,
+          data_registro: true,
+        },
+      })
+      const localizado = !!(
+        doc &&
+        (doc.cartorio ||
+          doc.numero_registro ||
+          doc.livro ||
+          doc.folha ||
+          doc.termo ||
+          doc.data_registro)
+      )
+      if (!localizado) {
+        return 'Não dá para concluir "Buscar documento": o ato ainda não foi localizado. Preencha os dados registrais (cartório, livro/folha/termo ou nº de registro) na aba Dados Registrais antes de concluir.'
+      }
+      return null
+    }
+
+    default:
+      return null
+  }
 }
