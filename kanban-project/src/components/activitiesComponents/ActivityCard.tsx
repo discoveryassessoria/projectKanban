@@ -1,19 +1,31 @@
 "use client"
 
+// ESTE ARQUIVO SUBSTITUI: src/components/activitiesComponents/ActivityCard.tsx
+//
+// FIX (6/jul): removido o enum Pais do @prisma/client (não existe no browser).
+// O rótulo do país agora aceita tanto o valor antigo ("ALEMANHA") quanto a
+// chave nova do catálogo ("alemanha").
+
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { CalendarDays, Clock, User, Flag } from "lucide-react"
 import { classifyByDeadline, getUrgencyColor } from "@/src/utils/prazoUtils"
-import { Pais } from "@prisma/client"
 import type { Atividade } from "@/src/hooks/useActivitiesData"
 
-// Mapeamento de países para exibição
-const PAIS_LABELS: Record<Pais, string> = {
+// Mapeamento de países para exibição (fallback local; aceita chave em qualquer caixa)
+const PAIS_LABELS: Record<string, string> = {
   PORTUGAL: 'Portugal',
   ESPANHA: 'Espanha',
   ALEMANHA: 'Alemanha',
-  ITALIA: 'Itália'
+  ITALIA: 'Itália',
+  FRANCA: 'França'
+}
+
+// "ALEMANHA" ou "alemanha" -> "Alemanha"; desconhecido -> valor cru
+const paisLabel = (v?: string | null) => {
+  if (!v) return ''
+  return PAIS_LABELS[String(v).toUpperCase()] || v
 }
 
 interface ActivityCardProps {
@@ -99,7 +111,7 @@ export default function ActivityCard({ activity, onClick, isDragging = false }: 
         {/* País */}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Flag className="h-3 w-3" />
-          <span className="truncate">{PAIS_LABELS[activity.pais] || activity.pais}</span>
+          <span className="truncate">{paisLabel(activity.pais)}</span>
         </div>
 
         {/* Prazo */}
