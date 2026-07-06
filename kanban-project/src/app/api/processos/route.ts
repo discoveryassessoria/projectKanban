@@ -1,8 +1,12 @@
 // src/app/api/processos/route.ts
+//
+// FIX (6/jul): tirada a validação antiga "Status é obrigatório".
+// O processo agora nasce pela FASE do motor (faseAtualKey), não pelo Status
+// legado. Se algum lugar antigo ainda mandar statusId, ele é salvo — mas não
+// é mais obrigatório. Também removida a checagem duplicada do tipo do motor.
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { Pais } from "@prisma/client"
 import { logProcesso } from "@/lib/auditoria"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
@@ -17,7 +21,7 @@ export async function GET(request: Request) {
 
     // Construir filtro dinâmico
     const where: any = {}
-    
+
     if (pais) {
       where.pais = pais
     }
@@ -67,11 +71,11 @@ export async function GET(request: Request) {
           orderBy: { createdAt: "desc" }
         },
         _count: {
-          select: { 
+          select: {
             tarefas: {
               where: { tarefaPaiId: { not: null } }
             },
-            anexos: true 
+            anexos: true
           }
         }
       },
@@ -102,12 +106,12 @@ export async function POST(request: Request) {
     if (erro) return erro
 
     const body = await request.json()
-    const { 
-      nome, 
-      descricao, 
+    const {
+      nome,
+      descricao,
       observacoes,
-      statusId, 
-      pais, 
+      statusId,
+      pais,
       contratanteIds,
       arvoreId,
       previsaoTermino,
@@ -118,13 +122,6 @@ export async function POST(request: Request) {
     if (!nome) {
       return NextResponse.json(
         { error: "Nome é obrigatório" },
-        { status: 400 }
-      )
-    }
-
-    if (!statusId) {
-      return NextResponse.json(
-        { error: "Status é obrigatório" },
         { status: 400 }
       )
     }
@@ -153,17 +150,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Este tipo ainda não tem fases. Monte o workflow em Gerenciamento → Workflows e Fases." }, { status: 400 })
     }
 
-    // ✅ Se veio tipo do motor, confere se existe
-    if (tipoProcessoMotorId != null) {
-      const tipoMotor = await prisma.tipoProcessoNacionalidade.findUnique({
-        where: { id: tipoProcessoMotorId },
-      })
-      if (!tipoMotor) {
-        return NextResponse.json({ error: "Tipo de processo (motor) não encontrado" }, { status: 400 })
-      }
-    }
-
-    // Criar o processo
+    // Criar o processo — nasce na 1ª fase do motor.
+    // statusId legado só é salvo se alguma tela antiga ainda mandar (opcional).
     const processo = await prisma.processo.create({
       data: {
         nome,
@@ -171,9 +159,10 @@ export async function POST(request: Request) {
         observacoes: observacoes || null,
         pais,
         faseAtualKey: wf.fases[0].phaseKey,
+        statusId: statusId ?? null,
         arvoreId: arvoreId || null,
         previsaoTermino: previsaoTermino ? new Date(previsaoTermino) : null,
-        tipoProcessoMotorId: tipoProcessoMotorId ?? null,   // ✅ nasce ligado ao motor
+        tipoProcessoMotorId,   // ✅ nasce ligado ao motor
       }
     })
 

@@ -2,11 +2,13 @@
 
 // ESTE ARQUIVO SUBSTITUI: src/components/gerenciamentoComponents/TipoProcessoTab.tsx
 //
-// NOVO (5/jul): o link "+ Novo país" virou "Gerenciar países" — abre um modal
-// com a LISTA de países do catálogo: criar, editar, ativar/inativar e excluir.
-// - Excluir só funciona se o país não tiver tipos/processos (senão a API
+// NOVO (6/jul): botão "Gerenciar modalidades" ao lado de "Gerenciar países" —
+// abre um modal com seletor de país + a LISTA de modalidades daquele país:
+// criar, editar, ativar/inativar e excluir.
+// - Excluir só funciona se nenhum tipo usar a modalidade (senão a API
 //   devolve 409 e a UI sugere inativar).
-// - Inativar tira o país do kanban e dos dropdowns, sem apagar nada.
+// - Inativar tira a modalidade do dropdown de "Novo processo", sem apagar.
+// - O dropdown de modalidade do "Novo processo" agora esconde inativas.
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 
@@ -17,7 +19,7 @@ type Pais = {
   defaultCurrency?: string; ativo?: boolean
   tiposCount?: number
 }
-type Modalidade = { id: number; countryKey: string; modalityKey: string; modalityLabel: string; codeSuffix: string | null; ordem: number }
+type Modalidade = { id: number; countryKey: string; modalityKey: string; modalityLabel: string; codeSuffix: string | null; ordem: number; ativo?: boolean; tiposCount?: number }
 type Tipo = {
   id: number; code: string; name: string
   countryKey: string; countryLabel: string; nationalityLabel: string
@@ -72,6 +74,18 @@ export default function TipoProcessoTab() {
   const [salvandoPais, setSalvandoPais] = useState(false)
   const [erroPais, setErroPais] = useState<string | null>(null)
 
+  // ===== Gerenciar modalidades =====
+  const [modsModal, setModsModal] = useState(false)
+  const [modCountryKey, setModCountryKey] = useState('')
+  const [modsAdmin, setModsAdmin] = useState<Modalidade[]>([])
+  const [carregandoMods, setCarregandoMods] = useState(false)
+  const [visaoMod, setVisaoMod] = useState<'lista' | 'form'>('lista')
+  const [editandoMod, setEditandoMod] = useState<Modalidade | null>(null) // null = criando
+  const [mLabel, setMLabel] = useState('')
+  const [mSuffix, setMSuffix] = useState('')
+  const [salvandoMod, setSalvandoMod] = useState(false)
+  const [erroMod, setErroMod] = useState<string | null>(null)
+
   const carregar = useCallback(async () => {
     setLoading(true); setErroLista(null)
     try {
@@ -96,8 +110,21 @@ export default function TipoProcessoTab() {
     } finally { setCarregandoPaises(false) }
   }, [])
 
+  const carregarModsAdmin = useCallback(async (ck: string) => {
+    if (!ck) { setModsAdmin([]); return }
+    setCarregandoMods(true); setErroMod(null)
+    try {
+      const d = await jsonFetch(`/api/gerenciamento/paises/${ck}/modalidades`, { cache: 'no-store' })
+      setModsAdmin((d as any).modalidades || [])
+    } catch (e: any) {
+      setErroMod(e.message || 'Não foi possível carregar as modalidades.')
+    } finally { setCarregandoMods(false) }
+  }, [])
+
   const paisSel = useMemo(() => paises.find((p) => p.countryKey === countryKey) || null, [paises, countryKey])
   const modsDoPais = useMemo(() => modalidades.filter((m) => m.countryKey === countryKey), [modalidades, countryKey])
+  // dropdown de "Novo processo" só mostra ativas (inativa some, sem apagar)
+  const modsAtivasDoPais = useMemo(() => modsDoPais.filter((m) => m.ativo !== false), [modsDoPais])
   const modSel = useMemo(() => modsDoPais.find((m) => m.modalityKey === modalityKey) || null, [modsDoPais, modalityKey])
 
   // sugestões automáticas de código e nome
@@ -261,6 +288,84 @@ export default function TipoProcessoTab() {
     }
   }
 
+  // ===== Gerenciar modalidades =====
+  function abrirMods() {
+    const ck = modCountryKey && paises.some((p) => p.countryKey === modCountryKey)
+      ? modCountryKey
+      : (paises[0]?.countryKey || '')
+    setModCountryKey(ck)
+    setVisaoMod('lista'); setErroMod(null); setModsModal(true)
+    carregarModsAdmin(ck)
+  }
+
+  function trocarPaisMods(ck: string) {
+    setModCountryKey(ck)
+    setVisaoMod('lista'); setErroMod(null)
+    carregarModsAdmin(ck)
+  }
+
+  function abrirNovaMod() {
+    setEditandoMod(null)
+    setMLabel(''); setMSuffix('')
+    setErroMod(null); setVisaoMod('form')
+  }
+
+  function abrirEditarMod(m: Modalidade) {
+    setEditandoMod(m)
+    setMLabel(m.modalityLabel); setMSuffix(m.codeSuffix || '')
+    setErroMod(null); setVisaoMod('form')
+  }
+
+  async function salvarMod() {
+    const label = mLabel.trim()
+    if (!label) { setErroMod('Informe o nome da modalidade.'); return }
+    if (!modCountryKey) { setErroMod('Escolha o país.'); return }
+
+    setSalvandoMod(true); setErroMod(null)
+    try {
+      if (editandoMod) {
+        await jsonFetch(`/api/gerenciamento/paises/${modCountryKey}/modalidades/${editandoMod.modalityKey}`, {
+          method: 'PUT',
+          body: JSON.stringify({ modalityLabel: label, codeSuffix: mSuffix.trim() || null }),
+        })
+      } else {
+        await jsonFetch(`/api/gerenciamento/paises/${modCountryKey}/modalidades`, {
+          method: 'POST',
+          body: JSON.stringify({ modalityLabel: label, codeSuffix: mSuffix.trim() || null }),
+        })
+      }
+      await Promise.all([carregarModsAdmin(modCountryKey), carregar()])
+      setVisaoMod('lista')
+    } catch (e: any) {
+      setErroMod(e.message || 'Não foi possível salvar a modalidade.')
+    } finally { setSalvandoMod(false) }
+  }
+
+  async function toggleAtivoMod(m: Modalidade) {
+    try {
+      await jsonFetch(`/api/gerenciamento/paises/${modCountryKey}/modalidades/${m.modalityKey}`, {
+        method: 'PUT',
+        body: JSON.stringify({ ativo: !(m.ativo ?? true) }),
+      })
+      await Promise.all([carregarModsAdmin(modCountryKey), carregar()])
+    } catch (e: any) {
+      setErroMod(e.message || 'Não foi possível alterar a modalidade.')
+    }
+  }
+
+  async function excluirMod(m: Modalidade) {
+    if (!confirm(`Excluir a modalidade "${m.modalityLabel}"? Só é possível se nenhum tipo de processo usar.`)) return
+    setErroMod(null)
+    try {
+      await jsonFetch(`/api/gerenciamento/paises/${modCountryKey}/modalidades/${m.modalityKey}`, { method: 'DELETE' })
+      await Promise.all([carregarModsAdmin(modCountryKey), carregar()])
+    } catch (e: any) {
+      setErroMod(e.message || 'Não foi possível excluir a modalidade.')
+    }
+  }
+
+  const paisDoModMods = useMemo(() => paises.find((p) => p.countryKey === modCountryKey) || null, [paises, modCountryKey])
+
   const inputCls = 'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20'
 
   return (
@@ -273,6 +378,9 @@ export default function TipoProcessoTab() {
         <div className="flex items-center gap-2">
           <button onClick={abrirPaises} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white">
             Gerenciar países
+          </button>
+          <button onClick={abrirMods} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white">
+            Gerenciar modalidades
           </button>
           <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500">
             + Novo processo
@@ -370,7 +478,7 @@ export default function TipoProcessoTab() {
                   <label className="mb-1 block text-xs text-white/60">Modalidade *</label>
                   <select value={modalityKey} onChange={(e) => setModalityKey(e.target.value)} disabled={!countryKey} className={inputCls + (!countryKey ? ' opacity-50' : '')}>
                     <option value="" className="bg-zinc-900">{countryKey ? '— selecione —' : 'escolha o país primeiro'}</option>
-                    {modsDoPais.map((m) => <option key={m.modalityKey} value={m.modalityKey} className="bg-zinc-900">{m.modalityLabel}</option>)}
+                    {modsAtivasDoPais.map((m) => <option key={m.modalityKey} value={m.modalityKey} className="bg-zinc-900">{m.modalityLabel}</option>)}
                   </select>
                 </div>
               </div>
@@ -535,6 +643,120 @@ export default function TipoProcessoTab() {
                   <button onClick={() => { setVisao('lista'); setErroPais(null) }} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">← Voltar</button>
                   <button onClick={salvarPais} disabled={salvandoPais} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50">
                     {salvandoPais ? 'Salvando...' : editandoPais ? 'Salvar alterações' : 'Criar país'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Gerenciar modalidades (seletor de país + lista + criar/editar) */}
+      {modsModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+              <h3 className="text-lg font-semibold text-white">
+                {visaoMod === 'lista'
+                  ? 'Modalidades'
+                  : editandoMod
+                    ? `Editar modalidade — ${editandoMod.modalityLabel}`
+                    : `Nova modalidade${paisDoModMods ? ` — ${paisDoModMods.countryLabel}` : ''}`}
+              </h3>
+              <button onClick={() => setModsModal(false)} className="text-white/40 transition hover:text-white">✕</button>
+            </div>
+
+            {visaoMod === 'lista' && (
+              <div className="space-y-3 px-6 py-4">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div className="min-w-[220px] flex-1">
+                    <label className="mb-1 block text-xs text-white/60">País</label>
+                    <select value={modCountryKey} onChange={(e) => trocarPaisMods(e.target.value)} className={inputCls}>
+                      {paises.map((p) => <option key={p.countryKey} value={p.countryKey} className="bg-zinc-900">{p.flag ? p.flag + ' ' : ''}{p.countryLabel}</option>)}
+                    </select>
+                  </div>
+                  <button onClick={abrirNovaMod} disabled={!modCountryKey} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50">
+                    + Nova modalidade
+                  </button>
+                </div>
+
+                {carregandoMods && <div className="py-8 text-center text-sm text-white/40">Carregando...</div>}
+
+                {!carregandoMods && modsAdmin.length === 0 && (
+                  <div className="py-8 text-center text-sm text-white/40">Nenhuma modalidade neste país.</div>
+                )}
+
+                {!carregandoMods && modsAdmin.length > 0 && (
+                  <div className="overflow-hidden rounded-xl border border-white/10">
+                    <table className="w-full text-[13px]">
+                      <thead>
+                        <tr className="bg-white/5">
+                          <th className="border-b border-white/10 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Modalidade</th>
+                          <th className="border-b border-white/10 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Sufixo</th>
+                          <th className="border-b border-white/10 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Tipos</th>
+                          <th className="border-b border-white/10 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
+                          <th className="border-b border-white/10 px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {modsAdmin.map((m) => (
+                          <tr key={m.modalityKey} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
+                            <td className="px-3 py-2 font-medium text-white">{m.modalityLabel}</td>
+                            <td className="px-3 py-2 font-mono text-[12px] text-white/70">{m.codeSuffix || '—'}</td>
+                            <td className="px-3 py-2 text-white/70">{m.tiposCount ?? 0}</td>
+                            <td className="px-3 py-2">
+                              {(m.ativo ?? true)
+                                ? <span className="rounded-md bg-green-500/15 px-2 py-0.5 text-[11px] font-medium text-green-300">ativa</span>
+                                : <span className="rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white/50">inativa</span>}
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button onClick={() => abrirEditarMod(m)} className="rounded-md border border-white/10 px-2 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white">Editar</button>
+                                <button onClick={() => toggleAtivoMod(m)} className="rounded-md border border-white/10 px-2 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white">
+                                  {(m.ativo ?? true) ? 'Inativar' : 'Ativar'}
+                                </button>
+                                <button onClick={() => excluirMod(m)} className="rounded-md border border-red-500/20 px-2 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200">Excluir</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <p className="text-[11px] text-white/40">
+                  Excluir só funciona para modalidade que nenhum tipo de processo usa. Se já estiver em uso, use "Inativar" — ela some do dropdown de novo processo, sem apagar nada.
+                </p>
+
+                {erroMod && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroMod}</div>}
+              </div>
+            )}
+
+            {visaoMod === 'form' && (
+              <>
+                <div className="space-y-4 px-6 py-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block text-xs text-white/60">Nome da modalidade *</label>
+                      <input value={mLabel} onChange={(e) => setMLabel(e.target.value)} placeholder="Judicial" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-white/60">Sufixo do código</label>
+                      <input value={mSuffix} onChange={(e) => setMSuffix(e.target.value)} placeholder="JUD" className={inputCls + ' font-mono'} />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-white/40">
+                    O sufixo entra na sugestão do código do processo (ex.: FRA-JUD). Vale só para o país selecionado ({paisDoModMods?.countryLabel || '—'}).
+                  </p>
+
+                  {erroMod && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroMod}</div>}
+                </div>
+
+                <div className="flex items-center justify-between gap-2 border-t border-white/10 px-6 py-4">
+                  <button onClick={() => { setVisaoMod('lista'); setErroMod(null) }} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">← Voltar</button>
+                  <button onClick={salvarMod} disabled={salvandoMod} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50">
+                    {salvandoMod ? 'Salvando...' : editandoMod ? 'Salvar alterações' : 'Criar modalidade'}
                   </button>
                 </div>
               </>
