@@ -1,14 +1,16 @@
-// src/app/api/processos/route.ts
+// ESTE ARQUIVO SUBSTITUI: src/app/api/processos/route.ts
 //
-// FIX (6/jul): tirada a validação antiga "Status é obrigatório".
-// O processo agora nasce pela FASE do motor (faseAtualKey), não pelo Status
-// legado. Se algum lugar antigo ainda mandar statusId, ele é salvo — mas não
-// é mais obrigatório. Também removida a checagem duplicada do tipo do motor.
+// NOVO (6/jul): GATILHO AUTOMÁTICO — se a chave MotorConfig.autoExecutarAoAvancar
+// estiver LIGADA (Gerenciamento → Executor do Motor), ao CRIAR o processo o motor
+// roda sozinho as automações "ao entrar na fase" da PRIMEIRA fase.
+// Se o motor falhar, o processo é criado normal — só loga o erro.
+// (Mantém o fix anterior: sem exigir Status legado; statusId é opcional.)
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { logProcesso } from "@/lib/auditoria"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { executarMotorNaFase } from '@/src/lib/motor/executor'
 
 // GET - Buscar processos (filtrado por país, requerente ou contratante)
 export async function GET(request: Request) {
@@ -150,6 +152,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Este tipo ainda não tem fases. Monte o workflow em Gerenciamento → Workflows e Fases." }, { status: 400 })
     }
 
+    const primeiraFase = wf.fases[0].phaseKey
+
     // Criar o processo — nasce na 1ª fase do motor.
     // statusId legado só é salvo se alguma tela antiga ainda mandar (opcional).
     const processo = await prisma.processo.create({
@@ -158,7 +162,7 @@ export async function POST(request: Request) {
         descricao: descricao || null,
         observacoes: observacoes || null,
         pais,
-        faseAtualKey: wf.fases[0].phaseKey,
+        faseAtualKey: primeiraFase,
         statusId: statusId ?? null,
         arvoreId: arvoreId || null,
         previsaoTermino: previsaoTermino ? new Date(previsaoTermino) : null,
@@ -189,6 +193,17 @@ export async function POST(request: Request) {
     // ✅ REGISTRAR LOG
     await logProcesso.criar(processo.nome, processo.id)
 
+    // ✅ GATILHO AUTOMÁTICO: roda as automações "ao entrar na fase" da 1ª fase
+    let motor: unknown = null
+    try {
+      const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 } })
+      if (cfg?.autoExecutarAoAvancar) {
+        motor = await executarMotorNaFase(processo.id, tipoProcessoMotorId, primeiraFase, "entered")
+      }
+    } catch (e) {
+      console.error("Gatilho automático do motor falhou (criar processo):", e)
+    }
+
     // Buscar processo completo com relacionamentos
     const processoCompleto = await prisma.processo.findUnique({
       where: { id: processo.id },
@@ -215,7 +230,7 @@ export async function POST(request: Request) {
       requerentes: processoCompleto?.requerentes.map(r => r.requerente) || []
     }
 
-    return NextResponse.json({ processo: processoFormatado }, { status: 201 })
+    return NextResponse.json({ processo: processoFormatado, motor }, { status: 201 })
   } catch (error) {
     console.error("Erro ao criar processo:", error)
     return NextResponse.json(

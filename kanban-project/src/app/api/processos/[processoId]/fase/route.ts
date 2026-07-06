@@ -1,12 +1,18 @@
-// ESTE ARQUIVO VAI EM: src/app/api/processos/[processoId]/fase/route.ts
-// (a pasta do projeto é [processoId], não [id])
+// ESTE ARQUIVO SUBSTITUI: src/app/api/processos/[processoId]/fase/route.ts
 //
 // Move o processo de FASE (arrastar o card no kanban).
 // Valida que a fase de destino pertence ao Workflow Macro do TIPO do processo.
+//
+// NOVO (6/jul): GATILHO AUTOMÁTICO — se a chave MotorConfig.autoExecutarAoAvancar
+// estiver LIGADA (Gerenciamento → Executor do Motor), ao mover de fase o motor
+// roda sozinho as automações "ao entrar na fase" da fase de destino.
+// O executor já evita duplicar (idempotência por automaticKey).
+// Se o motor falhar, a mudança de fase NÃO é desfeita — só loga o erro.
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
+import { executarMotorNaFase } from "@/src/lib/motor/executor"
 
 export async function PUT(request: Request, { params }: { params: Promise<{ processoId: string }> }) {
   const erro = await verificarPermissao(request, "processos.editar_status")
@@ -45,7 +51,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ proc
       data: { faseAtualKey },
     })
 
-    return NextResponse.json({ processo: atualizado })
+    // ✅ GATILHO AUTOMÁTICO: roda as automações "ao entrar na fase" de destino
+    let motor: unknown = null
+    try {
+      const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 } })
+      if (cfg?.autoExecutarAoAvancar) {
+        motor = await executarMotorNaFase(processoId, processo.tipoProcessoMotorId, faseAtualKey, "entered")
+      }
+    } catch (e) {
+      console.error("Gatilho automático do motor falhou (mover fase):", e)
+    }
+
+    return NextResponse.json({ processo: atualizado, motor })
   } catch (error) {
     console.error("Erro ao mover processo de fase:", error)
     return NextResponse.json({ error: "Erro ao mover processo de fase" }, { status: 500 })
