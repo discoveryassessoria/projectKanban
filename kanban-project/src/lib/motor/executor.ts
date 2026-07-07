@@ -20,7 +20,7 @@ import { gerarParcelas } from '@/lib/financeiro/parcelas'
 import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
 
 // ---- tipos de saída ----
-export interface CreatedItem { kind: string; targetTable: string; targetId: number; name: string; amount?: number; currency?: string; condicional?: boolean }
+export interface CreatedItem { kind: string; targetTable: string; targetId: number; name: string; amount?: number; currency?: string; condicional?: boolean; condicaoNaoVerificada?: boolean }
 export interface RunResultado {
   created: CreatedItem[]
   skipped: { name: string; reason: string }[]
@@ -75,12 +75,8 @@ async function fxParaBRL(moeda: Moeda, cache: Map<string, number>): Promise<numb
 // ============================================================
 // SEAM (E3) — resolve o RESPONSÁVEL de uma regra do motor.
 // Hoje: se a regra já trouxer um id numérico de usuário, usa (conferindo que
-// existe). Senão, deixa SEM dono — MESMO comportamento de antes, nada de
-// adivinhar por nome/papel.
-//
-// ⚠ QUANDO existir uma config "papel → usuário" (ex.: params.responsibleRole
-//    → Usuario.id), é AQUI o único lugar pra ligar. Enquanto não houver, a
-//    tarefa automática nasce sem responsável (o operador atribui na tela).
+// existe). Senão, deixa SEM dono. É AQUI o lugar do mapa papel→usuário no
+// futuro.
 // ============================================================
 async function resolverResponsavelDaRegra(params: Prisma.JsonValue | null | undefined): Promise<number | null> {
   const id = pnum(params, 'responsibleId')
@@ -89,6 +85,72 @@ async function resolverResponsavelDaRegra(params: Prisma.JsonValue | null | unde
     return u ? u.id : null
   }
   return null
+}
+
+// ============================================================
+// ✅ E5 PARTE 2 — AVALIAÇÃO DE CONDIÇÕES
+// ------------------------------------------------------------
+// Uma automação pode ter conditions = [{ field, op, value }], op = "eq"|"neq".
+// Antes o executor IGNORAVA isso (criava sempre). Agora avalia de verdade.
+//
+// CAMPOS_CONHECIDOS = registro dos campos que o motor SABE ler/checar. Está
+// VAZIO de propósito: hoje não existe condição real no sistema (só de teste,
+// com "AAAA"). Quando existir uma condição real (ex.: "contrato assinado"),
+// adicione o campo AQUI com a função que lê o valor atual do processo — e aí
+// ela passa a ser CHECADA de verdade, não só marcada.
+//
+// Enquanto o campo não estiver aqui, a condição é "não verificada".
+// ============================================================
+type CampoResolver = (processoId: number) => Promise<string | null>
+
+const CAMPOS_CONHECIDOS: Record<string, CampoResolver> = {
+  // Exemplos (DESLIGADOS) — descomente/implemente quando a condição for real:
+  // contrato_assinado: async (pid) => { ... return "true" | "false" },
+  // proposta_aprovada: async (pid) => { ... return "true" | "false" },
+}
+
+type DecisaoCondicao = 'passa' | 'bloqueia' | 'nao_verificada'
+
+async function avaliarCondicoes(
+  conditions: Prisma.JsonValue | null | undefined,
+  processoId: number,
+): Promise<{ decisao: DecisaoCondicao; motivo: string | null }> {
+  // sem condição → passa
+  if (!Array.isArray(conditions) || conditions.length === 0) {
+    return { decisao: 'passa', motivo: null }
+  }
+
+  let algumaNaoVerificada = false
+
+  for (const raw of conditions) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { algumaNaoVerificada = true; continue }
+    const cond = raw as Record<string, unknown>
+    const field = typeof cond.field === 'string' ? cond.field : null
+    const op = typeof cond.op === 'string' ? cond.op : null
+    const value = cond.value == null ? null : String(cond.value)
+
+    if (!field || !op) { algumaNaoVerificada = true; continue }
+
+    const resolver = CAMPOS_CONHECIDOS[field]
+    if (!resolver) { algumaNaoVerificada = true; continue }   // campo desconhecido
+
+    const atual = await resolver(processoId)
+    const bate = op === 'eq' ? atual === value : op === 'neq' ? atual !== value : null
+    if (bate === null) { algumaNaoVerificada = true; continue }   // operador desconhecido
+
+    if (!bate) {
+      // condição REAL e FALSA → não cria
+      return { decisao: 'bloqueia', motivo: `condição não satisfeita: ${field} ${op} ${value} (atual: ${atual ?? '—'})` }
+    }
+    // condição real e verdadeira → segue avaliando as outras
+  }
+
+  if (algumaNaoVerificada) {
+    // política ESCOLHIDA (opção B): cria mesmo assim, mas MARCADO p/ revisão.
+    return { decisao: 'nao_verificada', motivo: 'condição com campo/operador que o motor ainda não sabe avaliar' }
+  }
+
+  return { decisao: 'passa', motivo: null }
 }
 
 // ---- criadores de artefato (idênticos ao route manual) ----
@@ -135,9 +197,8 @@ async function criarProtocolo(pid: number, nome: string): Promise<number> {
 }
 
 // ============================================================
-// Converte um FaseCode (enum do kanban, ex. RETIFICACAO_REGISTROS) no
-// phaseKey REAL usado pelo motor, lendo as fases do próprio tipo de processo
-// (casa pelo nome/label). Robusto: não depende de regra de texto.
+// Converte um FaseCode no phaseKey REAL do tipo de processo (casa pelo
+// nome/label). Robusto: não depende de regra de texto.
 // ============================================================
 export async function resolvePhaseKey(tipoProcessoId: number, faseCode: FaseCode): Promise<string | null> {
   const mw = await prisma.macroWorkflow.findUnique({ where: { tipoProcessoId }, select: { fases: { select: { phaseKey: true, label: true } } } })
@@ -190,16 +251,19 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
     }
   }
 
-  // TAREFAS — agora via Task Engine (título/responsável/prioridade/prazo/SLA/
-  // ordem/follow-up/auditoria num lugar só). A idempotência continua no fazer().
+  // TAREFAS
   for (const rule of taskRules) {
     if (wantTrigger == null || rule.trigger !== wantTrigger) { skipped.push({ name: rule.name, reason: `gatilho não corresponde (dispara em "${rule.trigger}")` }); continue }
+    const cond = await avaliarCondicoes(rule.conditions, processoId)
+    if (cond.decisao === 'bloqueia') { skipped.push({ name: rule.name, reason: cond.motivo || 'condição não satisfeita' }); continue }
+    const naoVerificada = cond.decisao === 'nao_verificada'
     const akey = `${processoId}::${phaseKey}::automation::${rule.id}`
     const prio = mapPrio(pstr(rule.params, 'priority'))
     const slaDays = pnum(rule.params, 'slaDays')
     const followUpDias = pnum(rule.params, 'followUpDays')
     const responsavelId = await resolverResponsavelDaRegra(rule.params)
-    await fazer(akey, 'Tarefa', 'task', 'automation', rule.id, rule.name, { prioridade: prio },
+    await fazer(akey, 'Tarefa', 'task', 'automation', rule.id, rule.name,
+      { prioridade: prio, ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
       async () => {
         const t = await criarTarefaDeSpec({
           titulo: rule.name,
@@ -209,14 +273,15 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
           prioridade: prio,
           slaDays,
           followUp: followUpDias != null ? { prazoCobranca: followUpDias } : null,
-          observacoes: `Criada automaticamente pelo motor · fase "${phaseKey}" · regra "${rule.name}"`,
+          observacoes: `Criada automaticamente pelo motor · fase "${phaseKey}" · regra "${rule.name}"${naoVerificada ? ' · ⚠ condição não verificada' : ''}`,
         })
         return t.id
       },
-      (id) => created.push({ kind: 'task', targetTable: 'Tarefa', targetId: id, name: rule.name }))
+      (id) => created.push({ kind: 'task', targetTable: 'Tarefa', targetId: id, name: rule.name, condicaoNaoVerificada: naoVerificada || undefined }))
   }
 
-  // FINANCEIRO — Regras de Disparo (PhaseTriggerRule)
+  // FINANCEIRO — Regras de Disparo (PhaseTriggerRule) — sem conditions Json;
+  // usa os flags requiresContractSigned/requiresProposalApproved (marca condicional).
   for (const t of triggerRules) {
     if (t.phaseEvent !== event) { skipped.push({ name: t.name, reason: `gatilho não corresponde (dispara em "${t.phaseEvent}")` }); continue }
     if (!t.active) { skipped.push({ name: t.name, reason: 'inativa' }); continue }
@@ -237,6 +302,9 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
   // FINANCEIRO — Automações kind=financial
   for (const r of finAutoRules) {
     if (wantTrigger == null || r.trigger !== wantTrigger) { skipped.push({ name: r.name, reason: `gatilho não corresponde (dispara em "${r.trigger}")` }); continue }
+    const cond = await avaliarCondicoes(r.conditions, processoId)
+    if (cond.decisao === 'bloqueia') { skipped.push({ name: r.name, reason: cond.motivo || 'condição não satisfeita' }); continue }
+    const naoVerificada = cond.decisao === 'nao_verificada'
     const code = pstr(r.params, 'financialItemCode')
     const prod = code ? prodByCode.get(code) : undefined
     const valor = pnum(r.params, 'amount') ?? (prod?.valorPadrao != null ? Number(prod.valorPadrao) : null)
@@ -244,33 +312,41 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
     const moeda = toMoeda(pstr(r.params, 'currency'), (prod?.moedaPadrao as Moeda) || 'EUR')
     const honorario = r.financialType === 'honorarium'
     const isReceita = r.financialType === 'revenue' || honorario
-    const condicional = Array.isArray(r.conditions) && r.conditions.length > 0
     const fx = await fxParaBRL(moeda, fxCache)
     const akey = `${processoId}::${phaseKey}::automation::${r.id}`
-    await fazer(akey, isReceita ? 'Receita' : 'Custo', 'financial', 'automation', r.id, r.name, { valor, moeda, condicional },
+    await fazer(akey, isReceita ? 'Receita' : 'Custo', 'financial', 'automation', r.id, r.name,
+      { valor, moeda, condicional: naoVerificada, ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
       async () => (isReceita ? criarReceita(processoId, r.name, valor, moeda, fx, honorario) : criarCusto(processoId, r.name, valor, moeda, fx)),
-      (id) => created.push({ kind: 'financial', targetTable: isReceita ? 'Receita' : 'Custo', targetId: id, name: r.name, amount: valor, currency: moeda, condicional }))
+      (id) => created.push({ kind: 'financial', targetTable: isReceita ? 'Receita' : 'Custo', targetId: id, name: r.name, amount: valor, currency: moeda, condicional: naoVerificada, condicaoNaoVerificada: naoVerificada || undefined }))
   }
 
   // EVENTO / AGENDA
   for (const r of eventRules) {
     if (wantTrigger == null || r.trigger !== wantTrigger) { skipped.push({ name: r.name, reason: `gatilho não corresponde (dispara em "${r.trigger}")` }); continue }
+    const cond = await avaliarCondicoes(r.conditions, processoId)
+    if (cond.decisao === 'bloqueia') { skipped.push({ name: r.name, reason: cond.motivo || 'condição não satisfeita' }); continue }
+    const naoVerificada = cond.decisao === 'nao_verificada'
     const offset = pnum(r.params, 'eventOffsetDays') ?? 0
     const dataInicio = new Date(Date.now() + offset * 86400000)
     const tipo = toTipoEvento(pstr(r.params, 'eventType'))
     const akey = `${processoId}::${phaseKey}::automation::${r.id}`
-    await fazer(akey, 'Evento', 'event', 'automation', r.id, r.name, { tipo, dataInicio: dataInicio.toISOString() },
+    await fazer(akey, 'Evento', 'event', 'automation', r.id, r.name,
+      { tipo, dataInicio: dataInicio.toISOString(), ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
       async () => criarEvento(processoId, r.name, r.description || null, dataInicio, tipo),
-      (id) => created.push({ kind: 'event', targetTable: 'Evento', targetId: id, name: r.name }))
+      (id) => created.push({ kind: 'event', targetTable: 'Evento', targetId: id, name: r.name, condicaoNaoVerificada: naoVerificada || undefined }))
   }
 
   // PROTOCOLO
   for (const r of protocolRules) {
     if (wantTrigger == null || r.trigger !== wantTrigger) { skipped.push({ name: r.name, reason: `gatilho não corresponde (dispara em "${r.trigger}")` }); continue }
+    const cond = await avaliarCondicoes(r.conditions, processoId)
+    if (cond.decisao === 'bloqueia') { skipped.push({ name: r.name, reason: cond.motivo || 'condição não satisfeita' }); continue }
+    const naoVerificada = cond.decisao === 'nao_verificada'
     const akey = `${processoId}::${phaseKey}::automation::${r.id}`
-    await fazer(akey, 'Protocolo', 'protocol', 'automation', r.id, r.name, { nota: 'consulado OUTROS (ajustar)' },
+    await fazer(akey, 'Protocolo', 'protocol', 'automation', r.id, r.name,
+      { nota: 'consulado OUTROS (ajustar)', ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
       async () => criarProtocolo(processoId, r.name),
-      (id) => created.push({ kind: 'protocol', targetTable: 'Protocolo', targetId: id, name: r.name }))
+      (id) => created.push({ kind: 'protocol', targetTable: 'Protocolo', targetId: id, name: r.name, condicaoNaoVerificada: naoVerificada || undefined }))
   }
 
   return { created, skipped, errors, totalCriado: created.length }
@@ -278,10 +354,9 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
 
 // ============================================================
 // GATILHO AUTOMÁTICO — auto-suficiente.
-// Chame esta função com o processoId DEPOIS que a fase já mudou.
-// Ela sozinha: confere a chave, vê se o processo está conectado,
-// descobre a fase atual, e dispara o motor (evento "entrar na fase").
-// Best-effort: qualquer erro aqui é engolido (não quebra quem chamou).
+// Chame com o processoId DEPOIS que a fase já mudou. Best-effort: qualquer
+// erro aqui é engolido (não quebra quem chamou). Só roda se
+// MotorConfig.autoExecutarAoAvancar estiver LIGADO (OFF por padrão).
 // ============================================================
 export async function dispararMotorNaFaseAtual(processoId: number): Promise<void> {
   try {
@@ -298,9 +373,8 @@ export async function dispararMotorNaFaseAtual(processoId: number): Promise<void
     })
     if (!proc?.tipoProcessoMotorId) return
 
-    // ✅ E5 — fase REAL = faseAtualKey (fonte de verdade pós-E2). Só cai na
-    // coluna legada (status.faseCode) se, por algum motivo, faseAtualKey estiver
-    // vazio. Antes lia SÓ a coluna legada, que podia estar defasada/nula.
+    // ✅ E5 — fase REAL = faseAtualKey (fonte de verdade pós-E2). Fallback p/ a
+    // coluna legada só se faseAtualKey estiver vazio.
     const faseAtual =
       ((proc.faseAtualKey?.toUpperCase() as FaseCode) ?? proc.status?.faseCode ?? null)
     if (!faseAtual) return
