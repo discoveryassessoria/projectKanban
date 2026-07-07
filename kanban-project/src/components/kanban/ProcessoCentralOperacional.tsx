@@ -18,6 +18,7 @@ import { ProcessoFaseFinal } from "./ProcessoFaseFinal"
 import { ProcessoRetificacao } from "./ProcessoRetificacao"
 import { ProcessoEmissaoRetificada } from "./ProcessoEmissaoRetificada"
 import type { FaseCode } from "@prisma/client"
+import { FASES } from "@/src/lib/process-stage/fases-catalog"
 
 // ============================================================
 // TIPOS (espelho do endpoint)
@@ -341,7 +342,11 @@ export function ProcessoCentralOperacional({
   if (!data) return null
 
   // ====== CÁLCULOS (ordem importa: declarar ANTES de usar) ======
-  const faseAtualNome = processo.status?.nome || "Genealogia"
+  const faseKey = (processo as { faseAtualKey?: string | null }).faseAtualKey?.toUpperCase() as FaseCode | undefined
+  const faseAtualNome =
+    (faseKey ? FASES[faseKey]?.label : undefined) ??
+    processo.status?.nome ??
+    "Genealogia"
   const idxAtual = PROCESS_PHASES.indexOf(faseAtualNome as (typeof PROCESS_PHASES)[number])
   const fasesConcluidas = idxAtual > 0 ? PROCESS_PHASES.slice(0, idxAtual) : []
   const progressoPorFase: Record<string, number> = {}

@@ -114,21 +114,20 @@ const faseAtual = (processo?.faseAtualKey?.toUpperCase() as FaseCode) ?? process
   if (!proximaFase) {
     return { mudou: false, faseAnterior: faseAtual, faseNova: faseAtual, motivo: "Fase terminal ou condicional (sem next automático)" }
   }
-  if (!isFaseReady(proximaFase)) {
+  // Fases "documento" precisam de etapas prontas. Fases "processo" (Análise,
+  // Retificação...) não têm workflow por-doc — o card entra e é trabalhado no
+  // painel próprio da fase. Por isso liberamos elas mesmo sem steps.
+  if (!isFaseReady(proximaFase) && getFase(proximaFase).kind !== "processo") {
     return { mudou: false, faseAnterior: faseAtual, faseNova: faseAtual, motivo: `Próxima fase ${proximaFase} ainda não especificada (pendingSpec)` }
   }
 
-  // ── 6. Coluna de destino (LEGADO) — OPCIONAL ──────────────────────────
-  // O kanban é motor-native: ele posiciona o card pela faseAtualKey, NÃO
-  // pelo statusId. A linha em Status (país + faseCode) é só compat com a
-  // board antiga. Se existir, atualizamos o statusId junto (7b); se NÃO
-  // existir, o card avança do mesmo jeito, só pela faseAtualKey.
-  // ⚠ Antes isto era um return fatal → o card NUNCA movia em país sem a
-  // coluna Status cadastrada (ex.: Alemanha na fase EMISSAO_DOCUMENTAL).
+  // ── 6. Achar a coluna de destino: mesmo país, faseCode = proximaFase ───
   const colunaDestino = await prisma.status.findFirst({
     where: { pais: processo.pais, faseCode: proximaFase },
     select: { id: true },
   })
+  // colunaDestino é OPCIONAL: o kanban posiciona o card pela faseAtualKey.
+  // País sem a coluna legada na tabela Status segue normal (só não atualiza a board antiga).
 
   // ── 7. AVANÇO em transação: arquiva + move card + cria workflows novos ─
   const now = new Date()
@@ -145,19 +144,15 @@ const faseAtual = (processo?.faseAtualKey?.toUpperCase() as FaseCode) ?? process
       data: { status: "arquivado" },
     })
 
-    // 7b. Move o card. A board lê faseAtualKey → SEMPRE atualiza isso.
-    //     O statusId (legado) só entra se houver coluna Status correspondente.
+    // 7b. Move o card: troca o statusId do processo pra coluna de destino
     await tx.processo.update({
       where: { id: processoId },
-      data: {
-        faseAtualKey: proximaFase.toLowerCase(),
-        ...(colunaDestino ? { statusId: colunaDestino.id } : {}),
-      },
+      data: { faseAtualKey: proximaFase.toLowerCase(), ...(colunaDestino ? { statusId: colunaDestino.id } : {}) },
     })
 
     // 7c. Cria os workflows da próxima fase nos docs ativos da linha reta
     //     (primeira etapa já em andamento — sem pedir "iniciar")
-    for (const d of docsLinhaReta) {
+    if (stepsProxima.length > 0) for (const d of docsLinhaReta) {
       // Idempotência: se o doc já tem um workflow ATIVO da próxima fase,
       // não cria de novo (evita duplicar se o motor rodar duas vezes).
       const jaExiste = await tx.workflow.findFirst({

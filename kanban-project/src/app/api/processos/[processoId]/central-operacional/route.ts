@@ -174,14 +174,15 @@ export async function GET(
     // ============================================================
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { id: true, arvoreId: true, status: { select: { faseCode: true } } },
+      select: { id: true, arvoreId: true, faseAtualKey: true, status: { select: { faseCode: true } } },
     })
 
     if (!processo) {
       return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
     }
 
-    const faseAtualCode = processo.status?.faseCode ?? null
+    const faseAtualCode =
+      ((processo.faseAtualKey?.toUpperCase() as FaseCode) ?? processo.status?.faseCode ?? null)
 
     // pessoas e documentos não dependem um do outro (ambos só precisam do
     // arvoreId) → busca os dois EM PARALELO, economizando um round-trip ao banco.
@@ -397,9 +398,10 @@ export async function GET(
         break
       case "all":
       default:
-        // inclui PENDENTE: num processo novo os docs ainda não foram solicitados,
-        // mas precisam aparecer pro operador começar.
-        filtered = docs.filter((d) => isAtivo(d) || isPendente(d))
+        // A tabela por pessoa da fase usa esta lista, então mostramos TODOS os
+        // documentos — inclusive os já recebidos/validados. (Antes só "ativos"
+        // → doc Recebido sumia da tabela.)
+        filtered = docs
         queueTitle = "Todas as tarefas ativas"
         break
     }
