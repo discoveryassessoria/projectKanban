@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getOrdemFase } from "@/src/lib/process-stage/fases-catalog"
+import { getOrdemFase, getStepsForFase, getFase } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
 
 // ============================================================
@@ -79,11 +79,40 @@ interface QueueRow {
   isLinhaReta: boolean
 }
 
+// ============================================================
+// ✅ NOVO: estado REAL dos passos da fase atual.
+// Antes o painel INFERIA os passos/KPIs pelo status do documento (chutava).
+// Este bloco carrega a verdade gravada nos WorkflowStep da fase corrente.
+// ============================================================
+interface FaseStepReal {
+  ordem: number
+  stepKey: string
+  title: string
+  status: "concluida" | "em_andamento" | "bloqueada"
+  concluidos: number // docs que concluíram este passo
+  total: number       // docs (linha reta) que possuem este passo nesta fase
+}
+
+interface FaseProgress {
+  faseCode: string | null
+  kind: "documento" | "processo"
+  steps: FaseStepReal[]
+  docsNaFase: number
+  counts: {
+    solicitados: number
+    aguardando: number
+    recebidos: number
+    conferidos: number
+    validados: number
+  }
+}
+
 interface CentralOperacionalResponse {
   matrix: MatrixResponse
   cards: CardCounts
   queue: QueueRow[]
   queueTitle: string
+  faseProgress: FaseProgress
   schemaCapabilities: {
     hasResponsavel: boolean
     hasPrazoOperacao: boolean
@@ -223,9 +252,11 @@ export async function GET(
             where: { documento: { pessoa: { arvoreId: processo.arvoreId } } },
             select: {
               documentoId: true,
+              faseCode: true, // ✅ NOVO: p/ filtrar os workflows da fase atual
               steps: {
                 select: {
                   ordem: true,
+                  stepKey: true, // ✅ NOVO: p/ casar cada passo com o catálogo da fase
                   status: true,
                   assigneeId: true,
                   assignee: { select: { nome: true } },
@@ -553,11 +584,81 @@ export async function GET(
       missing,
     }
 
+    // ============================================================
+    // 9) ✅ NOVO: Estado REAL dos passos da fase atual
+    // ------------------------------------------------------------
+    // Fonte: WorkflowStep.status (a verdade já gravada). Quando um passo é
+    // concluído na tela, a rota de conclusão chama o stepCompletionResolver e,
+    // se passou, grava status = concluída. Então aqui NÃO reavaliamos o portão
+    // (isso seria uma 2ª fonte de verdade + N consultas por polling): apenas
+    // LEMOS o que já está gravado.
+    //
+    // Conta só os documentos da LINHA RETA — mesma régua da matriz e do KPI
+    // "Obrigatórios". (Docs de apoio continuam aparecendo na fila/tabela, mas
+    // não entram nas contagens da fase.)
+    // ============================================================
+    const stepConcluido = (status: string) => /conclu|finaliz/i.test(status)
+
+    const docIdsLinhaReta = new Set(
+      docs.filter((d) => pessoasMap.get(d.pessoaId)?.linhaReta).map((d) => d.id),
+    )
+
+    const wfsDaFase = (workflowsRaw as any[]).filter(
+      (wf) => wf.faseCode === faseAtualCode && docIdsLinhaReta.has(wf.documentoId),
+    )
+    const docsNaFase = wfsDaFase.length
+
+    // concluídos / total por stepKey (agregado entre os docs da fase)
+    const concluidosPorKey = new Map<string, number>()
+    const totalPorKey = new Map<string, number>()
+    for (const wf of wfsDaFase) {
+      for (const s of wf.steps as any[]) {
+        totalPorKey.set(s.stepKey, (totalPorKey.get(s.stepKey) ?? 0) + 1)
+        if (stepConcluido(s.status)) {
+          concluidosPorKey.set(s.stepKey, (concluidosPorKey.get(s.stepKey) ?? 0) + 1)
+        }
+      }
+    }
+
+    // Monta os passos na ORDEM do catálogo, marcando concluída/em_andamento/bloqueada.
+    // "em_andamento" = 1º passo que ainda não foi concluído por TODOS os docs (a frente).
+    const stepsCatalogo = faseAtualCode ? getStepsForFase(faseAtualCode) : []
+    let frontierAchada = false
+    const faseStepsReais: FaseStepReal[] = stepsCatalogo.map((sc) => {
+      const concl = concluidosPorKey.get(sc.stepKey) ?? 0
+      const tot = totalPorKey.get(sc.stepKey) ?? 0
+      const todosConcluiram = tot > 0 && concl >= tot
+      let status: "concluida" | "em_andamento" | "bloqueada"
+      if (todosConcluiram) status = "concluida"
+      else if (!frontierAchada) {
+        frontierAchada = true
+        status = "em_andamento"
+      } else status = "bloqueada"
+      return { ordem: sc.ordem, stepKey: sc.stepKey, title: sc.title, status, concluidos: concl, total: tot }
+    })
+
+    const contarKey = (k: string) => concluidosPorKey.get(k) ?? 0
+    const faseProgress: FaseProgress = {
+      faseCode: faseAtualCode ?? null,
+      kind: faseAtualCode ? getFase(faseAtualCode).kind : "documento",
+      steps: faseStepsReais,
+      docsNaFase,
+      counts: {
+        solicitados: contarKey("solicitar_certidao"),
+        // "aguardando" = solicitou mas ainda não recebeu
+        aguardando: Math.max(0, contarKey("solicitar_certidao") - contarKey("receber_certidao")),
+        recebidos: contarKey("receber_certidao"),
+        conferidos: contarKey("conferir_certidao"),
+        validados: contarKey("validar_certidao"),
+      },
+    }
+
     const response: CentralOperacionalResponse = {
       matrix,
       cards,
       queue,
       queueTitle,
+      faseProgress,
       schemaCapabilities,
     }
 

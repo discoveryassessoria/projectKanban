@@ -42,6 +42,28 @@ interface MatrixMissing {
   generation: number
 }
 
+// ✅ NOVO: espelho do bloco faseProgress da rota (estado REAL dos passos).
+interface FaseProgress {
+  faseCode: string | null
+  kind: "documento" | "processo"
+  steps: Array<{
+    ordem: number
+    stepKey: string
+    title: string
+    status: "concluida" | "em_andamento" | "bloqueada"
+    concluidos: number
+    total: number
+  }>
+  docsNaFase: number
+  counts: {
+    solicitados: number
+    aguardando: number
+    recebidos: number
+    conferidos: number
+    validados: number
+  }
+}
+
 interface CentralOpData {
   matrix: {
     percentage: number
@@ -85,6 +107,7 @@ interface CentralOpData {
     isLinhaReta: boolean
   }>
   queueTitle: string
+  faseProgress?: FaseProgress // ✅ NOVO (opcional: fallback cobre ausência)
   schemaCapabilities: {
     hasResponsavel: boolean
     hasPrazoOperacao: boolean
@@ -121,44 +144,69 @@ function abreviar(tipo: string): string {
 function mapearPainel(data: CentralOpData, faseNome: string) {
   const queue = data.queue
   const matrix = data.matrix
+  const fp = data.faseProgress
 
-  // --- 7 contadores (derivados do status genérico) ---
   const total = matrix.total
   const validados = matrix.completed
-  const solicitados = queue.filter((q) => q.statusRaw === "SOLICITADO").length
-  const aguardando = queue.filter((q) => q.statusRaw === "EM_BUSCA").length
-  const recebidos = validados
-  const conferidos = 0
   const divergentes = queue.filter((q) => ["INVALIDO", "NAO_ENCONTRADO"].includes(q.statusRaw)).length
 
-  const kpis: FaseKpi[] = [
-    { label: "Obrigatórios", value: total },
-    { label: "Validados", value: validados, tone: "ok" },
-    { label: "Solicitados", value: solicitados, tone: "busca" },
-    { label: "Aguardando", value: aguardando, tone: "busca" },
-    { label: "Recebidos", value: recebidos },
-    { label: "Conferidos", value: conferidos },
-    { label: "Divergentes", value: divergentes, tone: "late" },
-  ]
+  // ============================================================
+  // KPIs + 5 passos
+  // ============================================================
+  let kpis: FaseKpi[]
+  let steps: FaseStep[]
 
-  // --- 5 etapas (inferidas do estado geral) ---
-  const algumSolicitado = solicitados > 0 || recebidos > 0
-  const algumRecebido = recebidos > 0
-  const stepDefs = [
-    { title: "Solicitar certidão", done: algumSolicitado },
-    { title: "Aguardar retorno", done: algumRecebido },
-    { title: "Receber certidão", done: algumRecebido },
-    { title: "Conferir certidão", done: false },
-    { title: "Validar certidão", done: validados >= total && total > 0 },
-  ]
-  let achouAtiva = false
-  const steps: FaseStep[] = stepDefs.map((s) => {
-    if (s.done) return { title: s.title, status: "concluida" as const }
-    if (!achouAtiva) { achouAtiva = true; return { title: s.title, status: "em_andamento" as const } }
-    return { title: s.title, status: "bloqueada" as const }
-  })
+  if (fp && fp.steps.length > 0) {
+    // ✅ CAMINHO REAL: números e passos vêm do estado gravado nos WorkflowSteps
+    // (fp), não mais do status do documento. Aqui é que "0 Recebidos com doc
+    // recebido" e o "passo ativo errado" são corrigidos.
+    const c = fp.counts
+    kpis = [
+      { label: "Obrigatórios", value: total },
+      { label: "Validados", value: c.validados, tone: "ok" },
+      { label: "Solicitados", value: c.solicitados, tone: "busca" },
+      { label: "Aguardando", value: c.aguardando, tone: "busca" },
+      { label: "Recebidos", value: c.recebidos },
+      { label: "Conferidos", value: c.conferidos },
+      { label: "Divergentes", value: divergentes, tone: "late" },
+    ]
+    steps = fp.steps.map((s) => ({ title: s.title, status: s.status }))
+  } else {
+    // FALLBACK — só entra se a rota ainda não devolveu faseProgress (ex.: janela
+    // de deploy). Mantém o comportamento antigo (inferido do status do doc) pra
+    // nunca ficar pior do que estava. No fluxo normal, o caminho real acima é o
+    // que roda.
+    const solicitados = queue.filter((q) => q.statusRaw === "SOLICITADO").length
+    const aguardando = queue.filter((q) => q.statusRaw === "EM_BUSCA").length
+    kpis = [
+      { label: "Obrigatórios", value: total },
+      { label: "Validados", value: validados, tone: "ok" },
+      { label: "Solicitados", value: solicitados, tone: "busca" },
+      { label: "Aguardando", value: aguardando, tone: "busca" },
+      { label: "Recebidos", value: validados },
+      { label: "Conferidos", value: 0 },
+      { label: "Divergentes", value: divergentes, tone: "late" },
+    ]
+    const algumSolicitado = solicitados > 0 || validados > 0
+    const algumRecebido = validados > 0
+    const stepDefs = [
+      { title: "Solicitar certidão", done: algumSolicitado },
+      { title: "Aguardar retorno", done: algumRecebido },
+      { title: "Receber certidão", done: algumRecebido },
+      { title: "Conferir certidão", done: false },
+      { title: "Validar certidão", done: validados >= total && total > 0 },
+    ]
+    let achouAtiva = false
+    steps = stepDefs.map((s) => {
+      if (s.done) return { title: s.title, status: "concluida" as const }
+      if (!achouAtiva) { achouAtiva = true; return { title: s.title, status: "em_andamento" as const } }
+      return { title: s.title, status: "bloqueada" as const }
+    })
+  }
 
-  // --- tabela por pessoa ---
+  // ============================================================
+  // tabela por pessoa (inalterada: mostra o status de cada documento)
+  // ============================================================
   const porPessoa = new Map<string, FasePersonRow>()
   const ord = (g: number) => (g === 99 ? 100 : g)
 
