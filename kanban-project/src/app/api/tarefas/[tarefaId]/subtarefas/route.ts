@@ -1,7 +1,10 @@
+// src/app/api/tarefas/[tarefaId]/subtarefas/route.ts
+
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { PrioridadeTarefa } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
 
 export async function GET(
   request: Request,
@@ -28,6 +31,10 @@ export async function GET(
         { status: 404 }
       )
     }
+
+    // 🔒 E4 — só o dono (ou admin) do pai vê as subtarefas.
+    const negado = await negarSeNaoForDonoDaTarefa(request, tarefaPai.responsavelId)
+    if (negado) return negado
 
     const subtarefas = await prisma.tarefa.findMany({
       where: { tarefaPaiId: id },
@@ -111,6 +118,10 @@ export async function POST(
         { status: 404 }
       )
     }
+
+    // 🔒 E4 — só o dono (ou admin) do pai cria subtarefa.
+    const negado = await negarSeNaoForDonoDaTarefa(request, tarefaPai.responsavelId)
+    if (negado) return negado
 
     const body = await request.json()
     const { 
@@ -250,6 +261,20 @@ export async function PUT(
         { status: 400 }
       )
     }
+
+    // 🔒 E4 — confere o dono do pai antes de reordenar as subtarefas.
+    const tarefaPai = await prisma.tarefa.findUnique({
+      where: { id: tarefaPaiId },
+      select: { id: true, responsavelId: true }
+    })
+    if (!tarefaPai) {
+      return NextResponse.json(
+        { error: "Tarefa pai não encontrada" },
+        { status: 404 }
+      )
+    }
+    const negado = await negarSeNaoForDonoDaTarefa(request, tarefaPai.responsavelId)
+    if (negado) return negado
 
     const body = await request.json()
     const { ordem } = body

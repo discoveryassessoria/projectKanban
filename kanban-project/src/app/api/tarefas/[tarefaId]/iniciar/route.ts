@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { hojeBrasil, hojeBrasilMaisDias } from "@/src/lib/date-utils"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
 
 // POST - Iniciar tarefa (SEM criar cobrança)
 export async function POST(
@@ -38,6 +39,10 @@ export async function POST(
         { status: 404 }
       )
     }
+
+    // 🔒 E4 — só o dono (ou admin) inicia esta tarefa.
+    const negado = await negarSeNaoForDonoDaTarefa(request, tarefa.responsavelId)
+    if (negado) return negado
 
     // Verificar se já foi iniciada
     if (tarefa.dataInicio) {

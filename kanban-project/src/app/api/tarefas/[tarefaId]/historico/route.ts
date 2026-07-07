@@ -1,7 +1,8 @@
-// src/app/api/tarefas/[id]/historico/route.ts
+// src/app/api/tarefas/[tarefaId]/historico/route.ts
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
 
 // GET - Listar histórico da tarefa (incluindo comentários)
 export async function GET(
@@ -14,6 +15,17 @@ export async function GET(
     if (isNaN(tarefaId)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
+
+    // 🔒 E4 — confere o dono antes de ler o histórico (a tarefa e suas subtarefas).
+    const tarefa = await prisma.tarefa.findUnique({
+      where: { id: tarefaId },
+      select: { responsavelId: true }
+    })
+    if (!tarefa) {
+      return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 })
+    }
+    const negado = await negarSeNaoForDonoDaTarefa(request, tarefa.responsavelId)
+    if (negado) return negado
 
     // Buscar histórico da tarefa E de todas as subtarefas
     const historico = await prisma.tarefaHistorico.findMany({
@@ -77,6 +89,10 @@ export async function POST(
         { status: 404 }
       )
     }
+
+    // 🔒 E4 — só o dono (ou admin) comenta/registra nesta tarefa.
+    const negado = await negarSeNaoForDonoDaTarefa(request, tarefa.responsavelId)
+    if (negado) return negado
 
     // Criar entrada no histórico
     const entrada = await prisma.tarefaHistorico.create({

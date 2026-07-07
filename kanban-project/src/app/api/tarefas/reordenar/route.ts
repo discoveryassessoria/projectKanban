@@ -1,6 +1,9 @@
+// src/app/api/tarefas/reordenar/route.ts
+
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { negarSeNaoForDonoDasTarefas } from "@/src/lib/tarefa-acesso"
 
 // PUT /api/tarefas/reordenar
 export async function PUT(request: NextRequest) {
@@ -17,6 +20,12 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // 🔒 E4 — comum só reordena as PRÓPRIAS tarefas (ou sem dono); admin, todas.
+    // Como mexe em várias de uma vez, a checagem é em lote.
+    const ids = tarefas.map((t: { id: number }) => t.id)
+    const negado = await negarSeNaoForDonoDasTarefas(request, ids)
+    if (negado) return negado
 
     // Atualizar ordem de todas as tarefas em uma transação
     await prisma.$transaction(

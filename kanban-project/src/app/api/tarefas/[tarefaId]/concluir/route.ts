@@ -1,7 +1,10 @@
+// src/app/api/tarefas/[tarefaId]/concluir/route.ts
+
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { hojeBrasil } from "@/src/lib/date-utils"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
 
 export async function POST(
   request: NextRequest,
@@ -27,6 +30,10 @@ export async function POST(
     if (!tarefaAtual) {
       return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 })
     }
+
+    // 🔒 E4 — só o dono (ou admin) conclui esta tarefa.
+    const negado = await negarSeNaoForDonoDaTarefa(request, tarefaAtual.responsavelId)
+    if (negado) return negado
 
     let statusTarefa: any
     let observacaoTexto: string

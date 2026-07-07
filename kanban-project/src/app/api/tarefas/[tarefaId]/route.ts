@@ -8,6 +8,7 @@ import { toUTCNoon } from "@/src/lib/date-utils"
 import { hojeBrasil } from "@/src/lib/date-utils"
 import { hojeBrasilMaisDias } from "@/src/lib/date-utils"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
 
 async function verificarEConcluirTarefaPai(tarefaPaiId: number) {
   const tarefaPai = await prisma.tarefa.findUnique({
@@ -195,6 +196,12 @@ export async function GET(
       )
     }
 
+    // 🔒 E4 — cadeado de dono. GET antes NÃO tinha auth: qualquer um puxava
+    // qualquer tarefa por id. Agora exige login e só devolve a própria/sem
+    // dono (admin vê tudo).
+    const negado = await negarSeNaoForDonoDaTarefa(request, tarefa.responsavelId)
+    if (negado) return negado
+
     return NextResponse.json({ tarefa })
   } catch (error) {
     console.error("Erro ao buscar tarefa:", error)
@@ -253,6 +260,11 @@ export async function PUT(
         { status: 404 }
       )
     }
+
+    // 🔒 E4 — só o dono (ou admin) edita esta tarefa. Permissão de cargo não
+    // basta: sem isto, um usuário com 'tarefas.editar' mexia na tarefa alheia.
+    const negado = await negarSeNaoForDonoDaTarefa(request, tarefaExistente.responsavelId)
+    if (negado) return negado
 
     if (responsavelId) {
       const responsavel = await prisma.usuario.findUnique({
@@ -424,6 +436,10 @@ export async function DELETE(
         { status: 404 }
       )
     }
+
+    // 🔒 E4 — só o dono (ou admin) exclui esta tarefa.
+    const negado = await negarSeNaoForDonoDaTarefa(request, tarefa.responsavelId)
+    if (negado) return negado
 
     const tarefaPaiId = tarefa.tarefaPaiId
     const tituloTarefa = tarefa.titulo

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { logTarefa } from "@/lib/auditoria"
 import { hojeBrasil } from "@/src/lib/date-utils"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
 
 async function verificarEConcluirTarefaPai(tarefaPaiId: number) {
   const tarefaPai = await prisma.tarefa.findUnique({
@@ -89,6 +90,10 @@ export async function POST(
         { status: 404 }
       )
     }
+
+    // 🔒 E4 — só o dono (ou admin) marca/desmarca esta tarefa.
+    const negado = await negarSeNaoForDonoDaTarefa(request, tarefaAtual.responsavelId)
+    if (negado) return negado
 
     const novaConcluida = !tarefaAtual.concluida
 

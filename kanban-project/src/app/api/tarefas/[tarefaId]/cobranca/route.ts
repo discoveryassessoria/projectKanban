@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { hojeBrasil, hojeBrasilMaisDias } from "@/src/lib/date-utils"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
 
 async function iniciarProximaSubtarefa(tarefaConcluidaId: number, tarefaPaiId: number) {
   console.log("🔄 [COBRANCA] iniciarProximaSubtarefa chamada:", { tarefaConcluidaId, tarefaPaiId })
@@ -121,6 +122,10 @@ export async function POST(
         { status: 404 }
       )
     }
+
+    // 🔒 E4 — só o dono (ou admin) faz ação de cobrança nesta tarefa.
+    const negado = await negarSeNaoForDonoDaTarefa(request, tarefa.responsavelId)
+    if (negado) return negado
 
     // Determinar se é uma subtarefa de cobrança ou uma tarefa normal
     const isCobranca = tarefa.tipoSubtarefa === "COBRANCA"
