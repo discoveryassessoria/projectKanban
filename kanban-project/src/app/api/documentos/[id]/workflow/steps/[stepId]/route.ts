@@ -510,7 +510,18 @@ async function checarConclusaoDoPasso(
       }
       return null
     }
-
+case "receber_certidao":
+    case "conferir_certidao":
+    case "validar_certidao": {
+      const doc = await prisma.documento.findUnique({
+        where: { id: documentoId },
+        select: { arquivo_url: true },
+      })
+      if (!doc?.arquivo_url) {
+        return 'Não dá para concluir esta etapa: anexe o arquivo da certidão recebida antes.'
+      }
+      return null
+    }
     default:
       return null
   }
