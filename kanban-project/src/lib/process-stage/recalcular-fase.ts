@@ -144,7 +144,7 @@ export async function recalcularFaseDoProcesso(
     // 7b. Move o card: troca o statusId do processo pra coluna de destino
     await tx.processo.update({
       where: { id: processoId },
-      data: { statusId: colunaDestino.id },
+      data: { statusId: colunaDestino.id, faseAtualKey: proximaFase.toLowerCase() },
     })
 
     // 7c. Cria os workflows da próxima fase nos docs ativos da linha reta
