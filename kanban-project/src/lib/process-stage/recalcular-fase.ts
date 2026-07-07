@@ -53,9 +53,9 @@ export async function recalcularFaseDoProcesso(
   // ── 2. Fase atual do card (faseCode da coluna onde o processo está) ────
   const processo = await prisma.processo.findUnique({
     where: { id: processoId },
-    select: { id: true, pais: true, status: { select: { faseCode: true } } },
+    select: { id: true, pais: true, faseAtualKey: true, status: { select: { faseCode: true } } },
   })
-  const faseAtual = processo?.status?.faseCode ?? null
+const faseAtual = (processo?.faseAtualKey?.toUpperCase() as FaseCode) ?? processo?.status?.faseCode ?? null
   if (!processo || !faseAtual) {
     return { mudou: false, faseAnterior: faseAtual, faseNova: faseAtual, motivo: "Processo sem faseCode" }
   }
