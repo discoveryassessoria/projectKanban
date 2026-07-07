@@ -403,6 +403,8 @@ export async function PATCH(
         const r = await recalcularFaseDoProcesso(documentoId)
         if (r.mudou) {
           console.log(`[avanço de fase] doc ${documentoId}: ${r.faseAnterior} → ${r.faseNova}`)
+        } else {
+          console.log(`[avanço de fase] doc ${documentoId}: card NÃO moveu — motivo: ${r.motivo}`)
         }
       } catch (e) {
         // Não derruba a conclusão do step se o avanço falhar — só loga.
