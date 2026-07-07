@@ -290,11 +290,22 @@ export async function dispararMotorNaFaseAtual(processoId: number): Promise<void
 
     const proc = await prisma.processo.findUnique({
       where: { id: processoId },
-      select: { tipoProcessoMotorId: true, status: { select: { faseCode: true } } },
+      select: {
+        tipoProcessoMotorId: true,
+        faseAtualKey: true,
+        status: { select: { faseCode: true } },
+      },
     })
-    if (!proc?.tipoProcessoMotorId || !proc.status?.faseCode) return
+    if (!proc?.tipoProcessoMotorId) return
 
-    const phaseKey = await resolvePhaseKey(proc.tipoProcessoMotorId, proc.status.faseCode)
+    // ✅ E5 — fase REAL = faseAtualKey (fonte de verdade pós-E2). Só cai na
+    // coluna legada (status.faseCode) se, por algum motivo, faseAtualKey estiver
+    // vazio. Antes lia SÓ a coluna legada, que podia estar defasada/nula.
+    const faseAtual =
+      ((proc.faseAtualKey?.toUpperCase() as FaseCode) ?? proc.status?.faseCode ?? null)
+    if (!faseAtual) return
+
+    const phaseKey = await resolvePhaseKey(proc.tipoProcessoMotorId, faseAtual)
     if (!phaseKey) return
 
     await executarMotorNaFase(processoId, proc.tipoProcessoMotorId, phaseKey, 'entered')

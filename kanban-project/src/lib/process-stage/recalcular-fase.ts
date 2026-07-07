@@ -21,6 +21,7 @@ import {
 } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
 import { politicaPadraoParaStep } from "@/src/services/processEngine/stepCompletionResolver"
+import { dispararMotorNaFaseAtual } from "@/src/lib/motor/executor"
 
 interface ResultadoRecalculo {
   mudou: boolean
@@ -203,6 +204,13 @@ const faseAtual = (processo?.faseAtualKey?.toUpperCase() as FaseCode) ?? process
     timeout: 30000,
     maxWait: 10000,
   })
+
+  // ── 8. ✅ E5 — MOTOR: dispara as automações da NOVA fase ────────────────
+  // Fora da transação (a fase JÁ foi movida acima). Best-effort e só roda se
+  // MotorConfig.autoExecutarAoAvancar estiver LIGADO — desligado, é no-op.
+  // Antes, o avanço AUTOMÁTICO não disparava o motor (só o botão manual). Agora
+  // o fluxo Genealogia→Emissão→Análise também aciona as automações da fase.
+  await dispararMotorNaFaseAtual(processoId)
 
   return { mudou: true, faseAnterior: faseAtual, faseNova: proximaFase, motivo: "Avançou de fase" }
 }
