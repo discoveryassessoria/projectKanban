@@ -17,6 +17,7 @@ import type { FaseCode } from '@prisma/client'
 import { getFase } from '@/src/lib/process-stage/fases-catalog'
 import { gerarCodigoReceita, gerarCodigoCusto } from '@/lib/financeiro/codigos'
 import { gerarParcelas } from '@/lib/financeiro/parcelas'
+import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
 
 // ---- tipos de saída ----
 export interface CreatedItem { kind: string; targetTable: string; targetId: number; name: string; amount?: number; currency?: string; condicional?: boolean }
@@ -69,6 +70,25 @@ async function fxParaBRL(moeda: Moeda, cache: Map<string, number>): Promise<numb
   const taxa = cot ? Number(cot.taxa) : 1
   cache.set(moeda, taxa)
   return taxa
+}
+
+// ============================================================
+// SEAM (E3) — resolve o RESPONSÁVEL de uma regra do motor.
+// Hoje: se a regra já trouxer um id numérico de usuário, usa (conferindo que
+// existe). Senão, deixa SEM dono — MESMO comportamento de antes, nada de
+// adivinhar por nome/papel.
+//
+// ⚠ QUANDO existir uma config "papel → usuário" (ex.: params.responsibleRole
+//    → Usuario.id), é AQUI o único lugar pra ligar. Enquanto não houver, a
+//    tarefa automática nasce sem responsável (o operador atribui na tela).
+// ============================================================
+async function resolverResponsavelDaRegra(params: Prisma.JsonValue | null | undefined): Promise<number | null> {
+  const id = pnum(params, 'responsibleId')
+  if (id && id > 0) {
+    const u = await prisma.usuario.findUnique({ where: { id }, select: { id: true } })
+    return u ? u.id : null
+  }
+  return null
 }
 
 // ---- criadores de artefato (idênticos ao route manual) ----
@@ -170,15 +190,29 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
     }
   }
 
-  // TAREFAS
+  // TAREFAS — agora via Task Engine (título/responsável/prioridade/prazo/SLA/
+  // ordem/follow-up/auditoria num lugar só). A idempotência continua no fazer().
   for (const rule of taskRules) {
     if (wantTrigger == null || rule.trigger !== wantTrigger) { skipped.push({ name: rule.name, reason: `gatilho não corresponde (dispara em "${rule.trigger}")` }); continue }
     const akey = `${processoId}::${phaseKey}::automation::${rule.id}`
     const prio = mapPrio(pstr(rule.params, 'priority'))
     const slaDays = pnum(rule.params, 'slaDays')
-    const dataPrazo = slaDays && slaDays > 0 ? new Date(Date.now() + slaDays * 86400000) : null
+    const followUpDias = pnum(rule.params, 'followUpDays')
+    const responsavelId = await resolverResponsavelDaRegra(rule.params)
     await fazer(akey, 'Tarefa', 'task', 'automation', rule.id, rule.name, { prioridade: prio },
-      async () => { const t = await prisma.tarefa.create({ data: { titulo: rule.name, descricao: rule.description || null, processoId, prioridade: prio, dataPrazo, observacoes: `Criada automaticamente pelo motor · fase "${phaseKey}" · regra "${rule.name}"` } }); return t.id },
+      async () => {
+        const t = await criarTarefaDeSpec({
+          titulo: rule.name,
+          descricao: rule.description || null,
+          processoId,
+          responsavelId,
+          prioridade: prio,
+          slaDays,
+          followUp: followUpDias != null ? { prazoCobranca: followUpDias } : null,
+          observacoes: `Criada automaticamente pelo motor · fase "${phaseKey}" · regra "${rule.name}"`,
+        })
+        return t.id
+      },
       (id) => created.push({ kind: 'task', targetTable: 'Tarefa', targetId: id, name: rule.name }))
   }
 
