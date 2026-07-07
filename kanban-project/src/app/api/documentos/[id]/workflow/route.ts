@@ -11,6 +11,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { StatusDocumento, FaseCode } from "@prisma/client"
 import { getFase, isFaseReady } from "@/src/lib/process-stage/fases-catalog"
+import { politicaPadraoParaStep } from "@/src/services/processEngine/stepCompletionResolver"
 
 // ============================================================
 // GET — sem alterações
@@ -220,6 +221,7 @@ export async function POST(
               weight: s.weight,
               ownerKey: s.ownerKey,
               slaDays: s.slaDays,
+              completionPolicy: politicaPadraoParaStep(s.stepKey),
               status: isActive ? "em_andamento" : "bloqueada",
               startedAt: isActive ? now : null,
               dueAt: isActive ? dueAt : null,

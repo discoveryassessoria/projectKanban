@@ -1255,6 +1255,9 @@ model WorkflowStep {
 
   legalOpinion       String?     @db.Text
 
+  // Regra de conclusão do passo (motor). null = usa o padrão por stepKey.
+  completionPolicy   String?     @db.VarChar(40)
+
   @@index([workflowId])
   @@index([status])
   @@index([assigneeId])

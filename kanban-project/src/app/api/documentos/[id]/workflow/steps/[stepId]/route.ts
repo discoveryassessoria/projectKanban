@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { recalcularFaseDoProcesso } from "@/src/lib/process-stage/recalcular-fase"
+import { resolveStepCompletionState } from "@/src/services/processEngine/stepCompletionResolver"
 
 // ============================================================
 // PATCH — atualiza um step (status/assignee/dueAt/notes/bloqueio/etc.)
@@ -140,7 +141,7 @@ export async function PATCH(
     // Só barra na PRIMEIRA conclusão (não em re-conclusão/reabertura).
     // ============================================================
     if (liberarProximo) {
-      const bloqueioConclusao = await checarConclusaoDoPasso(step.stepKey, documentoId)
+      const bloqueioConclusao = await checarConclusaoDoPasso(step.stepKey, documentoId, step.completionPolicy)
       if (bloqueioConclusao) {
         return NextResponse.json({ error: bloqueioConclusao }, { status: 422 })
       }
@@ -473,58 +474,14 @@ async function recalcularProgressoWorkflow(workflowId: number, now: Date) {
 }
 
 // ============================================================
-// ✅ HOTFIX — condição REAL de conclusão por etapa
-// Retorna mensagem de erro se a etapa NÃO pode ser concluída ainda,
-// ou null se pode. Passos sem regra aqui seguem com conclusão manual
-// (comportamento antigo) — só travamos onde faz sentido.
+// ✅ ETAPA 2 — a decisão de conclusão agora vive no motor central.
+// Esta função só repassa pro resolver.
 // ============================================================
 async function checarConclusaoDoPasso(
   stepKey: string,
-  documentoId: number
+  documentoId: number,
+  policyDoStep?: string | null
 ): Promise<string | null> {
-  switch (stepKey) {
-    // GENEALOGIA — "Buscar documento": localizar o ato e preencher os
-    // dados registrais. Só conclui quando o documento tem esses dados
-    // preenchidos (= o ato foi de fato localizado no cartório).
-    case "buscar_documento": {
-      const doc = await prisma.documento.findUnique({
-        where: { id: documentoId },
-        select: {
-          cartorio: true,
-          numero_registro: true,
-          livro: true,
-          folha: true,
-          termo: true,
-          data_registro: true,
-        },
-      })
-      const localizado = !!(
-        doc &&
-        (doc.cartorio ||
-          doc.numero_registro ||
-          doc.livro ||
-          doc.folha ||
-          doc.termo ||
-          doc.data_registro)
-      )
-      if (!localizado) {
-        return 'Não dá para concluir "Buscar documento": o ato ainda não foi localizado. Preencha os dados registrais (cartório, livro/folha/termo ou nº de registro) na aba Dados Registrais antes de concluir.'
-      }
-      return null
-    }
-case "receber_certidao":
-    case "conferir_certidao":
-    case "validar_certidao": {
-      const doc = await prisma.documento.findUnique({
-        where: { id: documentoId },
-        select: { arquivo_url: true },
-      })
-      if (!doc?.arquivo_url) {
-        return 'Não dá para concluir esta etapa: anexe o arquivo da certidão recebida antes.'
-      }
-      return null
-    }
-    default:
-      return null
-  }
+  const r = await resolveStepCompletionState(stepKey, documentoId, policyDoStep)
+  return r.podeConcluir ? null : r.motivo
 }

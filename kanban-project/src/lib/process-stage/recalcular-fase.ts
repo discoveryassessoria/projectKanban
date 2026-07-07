@@ -20,6 +20,7 @@ import {
   type FaseStep,
 } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
+import { politicaPadraoParaStep } from "@/src/services/processEngine/stepCompletionResolver"
 
 interface ResultadoRecalculo {
   mudou: boolean
@@ -190,6 +191,7 @@ const faseAtual = (processo?.faseAtualKey?.toUpperCase() as FaseCode) ?? process
               weight: s.weight,
               ownerKey: s.ownerKey,
               slaDays: s.slaDays,
+              completionPolicy: politicaPadraoParaStep(s.stepKey),
               status: i === 0 ? "em_andamento" : "bloqueada",
               startedAt: i === 0 ? now : null,
               dueAt: i === 0 ? dueAt : null,
