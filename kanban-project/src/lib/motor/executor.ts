@@ -18,6 +18,10 @@ import { getFase } from '@/src/lib/process-stage/fases-catalog'
 import { gerarCodigoReceita, gerarCodigoCusto } from '@/lib/financeiro/codigos'
 import { gerarParcelas } from '@/lib/financeiro/parcelas'
 import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
+// ✅ E8 (fatia Emissão) — motor econômico por ELEGIBILIDADE. Roda AO LADO do
+// executor clássico, atrás da MESMA trava (autoExecutarAoAvancar). Import
+// relativo porque os dois arquivos vivem em src/lib/motor/.
+import { gerarEconomicoDaMatriz } from './matriz-economica'
 
 // ---- tipos de saída ----
 export interface CreatedItem { kind: string; targetTable: string; targetId: number; name: string; amount?: number; currency?: string; condicional?: boolean; condicaoNaoVerificada?: boolean }
@@ -382,7 +386,22 @@ export async function dispararMotorNaFaseAtual(processoId: number): Promise<void
     const phaseKey = await resolvePhaseKey(proc.tipoProcessoMotorId, faseAtual)
     if (!phaseKey) return
 
+    // Motor CLÁSSICO (tarefas/eventos/protocolos + financeiro por regra de fase).
     await executarMotorNaFase(processoId, proc.tipoProcessoMotorId, phaseKey, 'entered')
+
+    // ✅ E8 (fatia Emissão) — Motor econômico por ELEGIBILIDADE.
+    // Auto-gated DUAS vezes: (1) só chega aqui se a trava global
+    // autoExecutarAoAvancar estiver LIGADA; (2) gerarEconomicoDaMatriz só cria
+    // algo se existir regra na MatrizDocumental para este tipoProcesso + fase —
+    // caso contrário, ele retorna sem criar nada (no-op).
+    // Isolado em try/catch próprio: uma falha aqui NÃO derruba o motor clássico
+    // acima nem quem chamou este gatilho.
+    // phaseCycle = 1 fixo por enquanto (reemissão/ciclo entra numa fatia futura).
+    try {
+      await gerarEconomicoDaMatriz(processoId, proc.tipoProcessoMotorId, phaseKey, 1)
+    } catch (e) {
+      console.error('[motor] gerarEconomicoDaMatriz falhou (fluxo seguiu normal):', e)
+    }
   } catch (e) {
     console.error('[motor] disparo automático falhou (a fase mudou normalmente):', e)
   }
