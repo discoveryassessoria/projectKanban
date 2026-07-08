@@ -83,6 +83,8 @@ model Pessoa {
   documentacao       Boolean       @default(true)
   casado             Boolean       @default(false)
   linhaReta          Boolean       @default(true)
+  custosFin   Custo[]
+  receitasFin Receita[]
 
   @@index([arvoreId])
   @@index([pais_nasc])
@@ -210,6 +212,9 @@ model Documento {
   dataStatus      String    @default("not_filled")   // not_filled | ai_extracted | manual_filled | reviewed
   analysisStatus  String    @default("not_ready")    // not_ready | ready
   registral       Json?                              // dados registrais revisados (verdade canônica)
+
+  custosFin   Custo[]
+  receitasFin Receita[]
 
   @@index([pessoaId])
   @@index([tipo])
@@ -626,6 +631,9 @@ model TipoServico {
   createdAt  DateTime      @default(now())
   custos     CustoPessoa[]
   processo   Processo      @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  custosFin   Custo[]
+  receitasFin Receita[]
 
   @@index([processoId])
 }
@@ -1066,10 +1074,26 @@ model Receita {
   processo      Processo            @relation(fields: [processoId], references: [id], onDelete: Cascade)
   requerentes   ReceitaRequerente[]
 
+  personId         Int?
+  pessoa           Pessoa?      @relation(fields: [personId], references: [id], onDelete: SetNull)
+  documentoId      Int?
+  documento        Documento?   @relation(fields: [documentoId], references: [id], onDelete: SetNull)
+  tipoServicoId    Int?
+  tipoServico      TipoServico? @relation(fields: [tipoServicoId], references: [id], onDelete: SetNull)
+  phaseKey         String?      @db.VarChar(60)
+  productServiceId Int?         // → ServicoProduto (catálogo; solto por ora)
+  origem           String       @default("manual") @db.VarChar(20) // manual | motor | migration
+
+  phaseCycle    Int?   // ciclo da fase (reemissão)
+  pricingRuleId Int?   // qual regra de preço resolveu o valor
+
   @@index([processoId])
   @@index([categoria])
   @@index([cancelada])
   @@index([codigo])
+  @@index([personId])
+  @@index([documentoId])
+  @@index([tipoServicoId])
 }
 
 model Custo {
@@ -1102,11 +1126,27 @@ model Custo {
   eventos             EventoFinanceiro[]
   parcelas            ParcelaFinanceira[]
 
+  personId         Int?
+  pessoa           Pessoa?      @relation(fields: [personId], references: [id], onDelete: SetNull)
+  documentoId      Int?
+  documento        Documento?   @relation(fields: [documentoId], references: [id], onDelete: SetNull)
+  tipoServicoId    Int?
+  tipoServico      TipoServico? @relation(fields: [tipoServicoId], references: [id], onDelete: SetNull)
+  phaseKey         String?      @db.VarChar(60)
+  productServiceId Int?         // → ServicoProduto (catálogo; solto por ora)
+  origem           String       @default("manual") @db.VarChar(20) // manual | motor | migration
+
+  phaseCycle    Int?   // ciclo da fase (reemissão)
+  pricingRuleId Int?   // qual regra de preço resolveu o valor
+
   @@index([processoId])
   @@index([tipo])
   @@index([categoria])
   @@index([cancelado])
   @@index([codigo])
+  @@index([personId])
+  @@index([documentoId])
+  @@index([tipoServicoId])
 }
 
 model ParcelaFinanceira {

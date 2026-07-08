@@ -1,5 +1,7 @@
 // src/app/api/processos/[processoId]/custos/route.ts
 // ✅ ATUALIZADO: Custos por documento (tipoRegistro) ao invés de apenas por pessoa
+// ✅ PASSO 3 (E8): a Planilha agora MOSTRA o Custo do motor econômico (fonte oficial),
+//    com CustoPessoa como FALLBACK (adapter — não removido). Formato de resposta idêntico.
 
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
@@ -142,17 +144,39 @@ export async function GET(
     const todasPessoas = processo?.arvore?.pessoas || []
     const custos = processo?.custosPessoa || []
 
-    // ✅ ATUALIZADO: Criar mapa de custos incluindo tipoRegistro
+    // ── FALLBACK (manual antigo): mapa de CustoPessoa ────────────────────────
     // Chave: pessoaId-tipoRegistro-tipoServicoId
     const custosMap: Record<string, { valor: number; observacao: string | null }> = {}
     custos.forEach(c => {
-      // Nova chave com tipoRegistro
       const tipoReg = (c as any).tipoRegistro || ''
       const key = `${c.pessoaId}-${tipoReg}-${c.tipoServicoId}`
-      custosMap[key] = { 
-        valor: Number(c.valor), 
-        observacao: c.observacao 
+      custosMap[key] = {
+        valor: Number(c.valor),
+        observacao: c.observacao
       }
+    })
+
+    // ── PASSO 3 (E8): FONTE OFICIAL = tabela Custo (motor econômico) ──────────
+    // A Planilha passa a MOSTRAR o Custo gerado pelo motor. O CustoPessoa acima
+    // vira FALLBACK: só é usado quando NÃO há Custo oficial para aquela célula.
+    // Casamento das chaves: cada linha da grade é UM documento (doc.id) e cada
+    // coluna é UM tipoServico (servico.id). O Custo grava os dois campos, então
+    // o join é direto por (documentoId + tipoServicoId) — sem adivinhar nada.
+    const custosOficiais = await prisma.custo.findMany({
+      where: {
+        processoId: id,
+        status: 'ATIVA',
+        documentoId: { not: null },
+        tipoServicoId: { not: null },
+      },
+      select: { documentoId: true, tipoServicoId: true, valor: true },
+    })
+    // Chave: documentoId-tipoServicoId → soma dos custos ativos daquela célula
+    // (soma cobre o caso raro de mais de um custo na mesma célula; hoje é 1).
+    const custosOficiaisMap: Record<string, number> = {}
+    custosOficiais.forEach(c => {
+      const key = `${c.documentoId}-${c.tipoServicoId}`
+      custosOficiaisMap[key] = (custosOficiaisMap[key] || 0) + Number(c.valor)
     })
 
     // Criar linhas da tabela (uma linha por documento/certidão)
@@ -162,11 +186,11 @@ export async function GET(
       const nomeCompleto = `${pessoa.nome} ${pessoa.sobrenome || ''}`.trim()
       const numeroLinhagem = pessoa.numeroLinhagem || 999
       const ordemCusto = (pessoa as any).ordemCusto || 0
-      
+
       // Genitores
       const paiNome = pessoa.pai ? `${pessoa.pai.nome} ${pessoa.pai.sobrenome || ''}`.trim() : null
       const maeNome = pessoa.mae ? `${pessoa.mae.nome} ${pessoa.mae.sobrenome || ''}`.trim() : null
-      
+
       // Cônjuges (pode ter múltiplos)
       const conjuges: string[] = []
       pessoa.unioesComoPessoa1?.forEach(u => {
@@ -203,12 +227,17 @@ export async function GET(
             dataRegistro = pessoa.data_obito
           }
 
-          // ✅ ATUALIZADO: Valores de custos POR DOCUMENTO (usando tipoRegistro)
+          // ── VALOR DA CÉLULA: oficial (Custo do motor) com fallback (CustoPessoa) ──
           const valoresPorServico: Record<number, number> = {}
           let totalLinha = 0
           servicos.forEach(servico => {
-            const key = `${pessoa.id}-${tipoRegistro}-${servico.id}`
-            const valor = custosMap[key]?.valor || 0
+            // 1º) FONTE OFICIAL: Custo do motor para este documento + serviço
+            const oficial = custosOficiaisMap[`${doc.id}-${servico.id}`]
+            // 2º) FALLBACK: CustoPessoa manual antigo (mesma chave de antes)
+            const legadoKey = `${pessoa.id}-${tipoRegistro}-${servico.id}`
+            const legado = custosMap[legadoKey]?.valor || 0
+            // Se existe custo oficial (mesmo que 0), ele manda; senão cai no manual.
+            const valor = oficial != null ? oficial : legado
             valoresPorServico[servico.id] = valor
             totalLinha += valor
           })
@@ -221,14 +250,14 @@ export async function GET(
             tipoRegistro,
             ordemRegistro: getOrdemRegistro(tipoRegistro),
             data: dataRegistro,
-            local: doc.cidade_registro 
+            local: doc.cidade_registro
               ? `${doc.cidade_registro}${doc.estado_registro ? ' - ' + doc.estado_registro : ''}`
               : doc.cartorio || '',
             cartorio: doc.cartorio || '',
             livro: doc.livro || '',
             folha: doc.folha || '',
             termo: doc.termo || '',
-            dadosRegistro: doc.livro || doc.folha || doc.termo 
+            dadosRegistro: doc.livro || doc.folha || doc.termo
               ? `Livro ${doc.livro || '-'} / Folhas ${doc.folha || '-'} / Termo ${doc.termo || '-'}`
               : '',
             // ✅ CORRIGIDO: Cônjuge em TODAS as linhas (não só na primeira)
@@ -236,7 +265,7 @@ export async function GET(
             paiNome,
             maeNome,
             observacao: doc.observacoes || '',
-            // ✅ ATUALIZADO: Valores em CADA linha
+            // Valores em CADA linha
             valores: valoresPorServico,
             total: totalLinha,
             isPrimeiraLinha: idx === 0,
@@ -264,7 +293,7 @@ export async function GET(
       return a.ordemRegistro - b.ordemRegistro
     })
 
-    // ✅ ATUALIZADO: Calcular totais por serviço (soma de TODAS as linhas)
+    // Calcular totais por serviço (soma de TODAS as linhas — já reflete o oficial)
     const totaisPorServico: Record<number, number> = {}
     servicos.forEach(servico => {
       totaisPorServico[servico.id] = linhasTabela
@@ -286,14 +315,18 @@ export async function GET(
     return NextResponse.json({
       // Novo formato para tabela estilo Excel
       linhas: linhasTabela,
-      
+
       // Formato antigo para compatibilidade
       pessoas: pessoasUnicas,
-      
+
       servicos,
       custosMap,
       totaisPorServico,
-      totalGeral
+      totalGeral,
+
+      // 🔎 Só para conferência do Passo 3 (a tela ignora): quantas células vieram
+      // da fonte oficial (Custo do motor). Some >0 = motor aparecendo na Planilha.
+      custosOficiaisCount: custosOficiais.length,
     })
   } catch (error) {
     console.error("Erro ao listar custos:", error)
@@ -302,6 +335,7 @@ export async function GET(
 }
 
 // POST - Salvar/Atualizar custo de uma pessoa para um serviço
+// (mantém CustoPessoa: é a ENTRADA MANUAL / fallback. Não mexer no Passo 3.)
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ processoId: string }> }
@@ -356,6 +390,7 @@ export async function POST(
 }
 
 // PUT - Salvar múltiplos custos de uma vez (batch)
+// (mantém CustoPessoa: entrada manual / fallback. Não mexer no Passo 3.)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ processoId: string }> }
@@ -421,9 +456,9 @@ export async function PATCH(
   try {
     const erro = await verificarPermissao(request, 'financeiro.custos_editar')
     if (erro) return erro
-    
+
     const { ordens } = await request.json()
-    
+
     // ordens é um array de { pessoaId: number, ordemCusto: number }
     if (!Array.isArray(ordens)) {
       return NextResponse.json({ error: "Dados inválidos" }, { status: 400 })
@@ -431,7 +466,7 @@ export async function PATCH(
 
     // Atualizar cada pessoa
     const resultados = await Promise.all(
-      ordens.map(({ pessoaId, ordemCusto }: { pessoaId: number, ordemCusto: number }) => 
+      ordens.map(({ pessoaId, ordemCusto }: { pessoaId: number, ordemCusto: number }) =>
         prisma.pessoa.update({
           where: { id: pessoaId },
           data: { ordemCusto }
