@@ -23,6 +23,11 @@ import {
 } from '@prisma/client'
 import { gerarCodigoReceita, gerarCodigoCusto } from '@/lib/financeiro/codigos'
 import { gerarParcelas } from '@/lib/financeiro/parcelas'
+// LOTE A · B4 — trava de estado civil (reusa a MESMA engine da árvore, não recria)
+import { analyzePessoa } from '@/src/lib/document-generator'
+// LOTE A · B3 — preço hierárquico (arquivo separado, testável isolado)
+import { resolverPreco } from './pricing-resolver'
+import { NaturezaPreco } from '@prisma/client'
 import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
 
 // ── (a/c) COMPONENTE ECONÔMICO: CONFIGURÁVEL via PhaseEconomicRule ────────────
@@ -49,6 +54,7 @@ function resolverRegraEconomica(rules: RegraEconomica[], docCode: string): Regra
 
 type PessoaMin = {
   id: number; nome: string; sobrenome: string | null; linhaReta: boolean
+  casado: boolean; vivo: boolean
   documentos: { id: number; tipo: string }[]
 }
 
@@ -106,7 +112,7 @@ export async function gerarEconomicoDaMatriz(
   const proc = await prisma.processo.findUnique({
     where: { id: processoId },
     select: { arvore: { select: { pessoas: { select: {
-      id: true, nome: true, sobrenome: true, linhaReta: true,
+      id: true, nome: true, sobrenome: true, linhaReta: true, casado: true, vivo: true,
       documentos: { where: { status: { notIn: ['CANCELADO', 'INVALIDO'] } }, select: { id: true, tipo: true } },
     } } } } },
   })
@@ -129,6 +135,13 @@ export async function gerarEconomicoDaMatriz(
 
     // (b) quem é elegível vem da REGRA
     for (const pessoa of selecionarPessoas(regra, pessoas)) {
+      // (B4) TRAVA DE ESTADO CIVIL — reusa a MESMA engine da árvore.
+      // Nascimento: sempre. Casamento: só se casado. Óbito: só se falecido.
+      // Mesmo que um doc "errado" exista na pessoa, o motor NÃO gera fora do estado civil.
+      const flags = analyzePessoa({ id: pessoa.id, nome: pessoa.nome, sobrenome: pessoa.sobrenome, casado: pessoa.casado, vivo: pessoa.vivo })
+      const permitido = kw === 'NASCIMENTO' ? flags.needsBirth : kw === 'CASAMENTO' ? flags.needsMarriage : kw === 'OBITO' ? flags.needsDeath : false
+      if (!permitido) { pulados.push({ motivo: `estado civil não exige ${kw.toLowerCase()}`, detalhe: `${pessoa.nome} ${pessoa.sobrenome ?? ''}`.trim() }); continue }
+
       for (const doc of pessoa.documentos.filter((d) => String(d.tipo).includes(kw))) {
         const nomePessoa = `${pessoa.nome} ${pessoa.sobrenome ?? ''}`.trim()
         const desc = `${componente} · ${nomePessoa}`
@@ -145,18 +158,28 @@ export async function gerarEconomicoDaMatriz(
             (id) => { item.tarefaId = id }, pulados, erros)
         }
         if (regra.createsCost) {
-          const val = prodCusto?.valorPadrao != null ? Number(prodCusto.valorPadrao) : null
-          if (val == null) pulados.push({ motivo: 'sem preço de CUSTO (ProdutoFinanceiro)', detalhe: componente })
+          // (B3) preço HIERÁRQUICO (TabelaValor) → fallback valorPadrao de hoje.
+          const p = prodCusto?.itemCatalogoId
+            ? await resolverPreco({ itemCatalogoId: prodCusto.itemCatalogoId, natureza: NaturezaPreco.CUSTO, processoId, processoTipoId: String(tipoProcessoId) })
+            : null
+          const val = p ? p.valor : (prodCusto?.valorPadrao != null ? Number(prodCusto.valorPadrao) : null)
+          const moedaC = (p ? p.moeda : prodCusto?.moedaPadrao) as Moeda
+          if (val == null) pulados.push({ motivo: 'sem preço de CUSTO (nem TabelaValor nem valorPadrao)', detalhe: componente })
           else await comIdempotencia(`${base}::custo`, processoId, tipoProcessoId, phaseKey, 'financial', regra.id, 'Custo', desc,
-            () => criarCusto(processoId, desc, val, prodCusto!.moedaPadrao as Moeda, { ...vinc, productServiceId: prodCusto!.id }),
-            (id) => { item.custoId = id; item.custo = { valor: val, moeda: prodCusto!.moedaPadrao } }, pulados, erros)
+            () => criarCusto(processoId, desc, val, moedaC, { ...vinc, productServiceId: prodCusto!.id }),
+            (id) => { item.custoId = id; item.custo = { valor: val, moeda: moedaC } }, pulados, erros)
         }
         if (regra.createsRevenue) {
-          const val = prodReceita?.valorPadrao != null ? Number(prodReceita.valorPadrao) : null
-          if (val == null) pulados.push({ motivo: 'sem preço de RECEITA (ProdutoFinanceiro)', detalhe: componente })
+          // (B3) preço HIERÁRQUICO (TabelaValor) → fallback valorPadrao de hoje. Independente do custo.
+          const p = prodReceita?.itemCatalogoId
+            ? await resolverPreco({ itemCatalogoId: prodReceita.itemCatalogoId, natureza: NaturezaPreco.RECEITA, processoId, processoTipoId: String(tipoProcessoId) })
+            : null
+          const val = p ? p.valor : (prodReceita?.valorPadrao != null ? Number(prodReceita.valorPadrao) : null)
+          const moedaR = (p ? p.moeda : prodReceita?.moedaPadrao) as Moeda
+          if (val == null) pulados.push({ motivo: 'sem preço de RECEITA (nem TabelaValor nem valorPadrao)', detalhe: componente })
           else await comIdempotencia(`${base}::receita`, processoId, tipoProcessoId, phaseKey, 'financial', regra.id, 'Receita', desc,
-            () => criarReceita(processoId, desc, val, prodReceita!.moedaPadrao as Moeda, { ...vinc, productServiceId: prodReceita!.id }),
-            (id) => { item.receitaId = id; item.receita = { valor: val, moeda: prodReceita!.moedaPadrao } }, pulados, erros)
+            () => criarReceita(processoId, desc, val, moedaR, { ...vinc, productServiceId: prodReceita!.id }),
+            (id) => { item.receitaId = id; item.receita = { valor: val, moeda: moedaR } }, pulados, erros)
         }
         if (item.tarefaId || item.custoId || item.receitaId) criados.push(item)
       }

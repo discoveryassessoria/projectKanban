@@ -1659,8 +1659,15 @@ model TabelaValor {
   arquivado        Boolean     @default(false)
   criadoEm         DateTime    @default(now())
   atualizadoEm     DateTime    @updatedAt
+  itemCatalogoId Int?            // → ItemCatalogo (o QUE está sendo precificado)
+  itemCatalogo   ItemCatalogo?  @relation(fields: [itemCatalogoId], references: [id])
+  natureza       NaturezaPreco?  // CUSTO ou RECEITA (independentes!). null = legado/ambíguo
+  regiao         String?        @db.VarChar(60)   // nível país/região da precedência
+  processoId     Int?            // preço específico de UM processo (nível + específico)
 
   @@index([fornecedorId])
+  @@index([itemCatalogoId])
+  @@index([natureza])
 }
 
 // ── Condições de Pagamento (fin_paycond) ──
@@ -2277,9 +2284,15 @@ model ItemCatalogo {
   tiposDocumento   TipoDocumentoCadastro[]
   produtos         ProdutoFinanceiro[]
   servicos         ServicoProduto[]
+  precos TabelaValor[]
 
   @@index([natureza])
   @@index([ativo])
+}
+
+enum NaturezaPreco {
+  CUSTO
+  RECEITA
 }
 
 enum NaturezaItem {
