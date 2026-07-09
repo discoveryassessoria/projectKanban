@@ -25,25 +25,26 @@ import { gerarCodigoReceita, gerarCodigoCusto } from '@/lib/financeiro/codigos'
 import { gerarParcelas } from '@/lib/financeiro/parcelas'
 import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
 
-// ── (a) COMPONENTE: presets INICIAIS, configuráveis/extensíveis ──────────────
-// Mesma fase pode gerar componentes diferentes → considera fase + tipoDoc + alvo.
-// Hoje só Emissão está mapeada; as outras entram como presets depois.
-function resolverComponente(phaseKey: string, _docCode: string, _target: string): string | null {
-  switch (phaseKey) {
-    case 'emissao_documental':
-      return 'Certidão Inteiro Teor' // (Desmaterialização entra por regra/config específica)
-    // case 'traducao_juramentada':  return 'Tradução Juramentada'
-    // case 'apostilamento':         return _target === 'translation' ? 'Apostilamento Tradução' : 'Apostilamento Certidão'
-    // case 'retificacao_registros': return 'Retificação'
-    default: return null
-  }
+// ── (a/c) COMPONENTE ECONÔMICO: CONFIGURÁVEL via PhaseEconomicRule ────────────
+// Antes era hardcoded (switch por fase + mapa de preços). Agora o administrador
+// cadastra pela tela: fase → componente (+ produtos de custo/receita separados).
+// Regra aplicável = 1ª ativa cujo documentTypeCode casa (ou é null = qualquer).
+// appliesTo (natureza do doc) fica pronto p/ o caso "mesma fase, doc diferente,
+// componente diferente" (tradução vs original) — hoje 'any' casa tudo.
+type RegraEconomica = {
+  documentTypeCode: string | null
+  appliesTo: string
+  componentKey: string
+  componentName: string
+  custoProdutoCode: string | null
+  receitaProdutoCode: string | null
 }
-
-// ── (a/c) COMPONENTE → produtos de preço (CUSTO e RECEITA SEPARADOS) ─────────
-// Placeholder de teste (ProdutoFinanceiro por código). O modelo real (TabelaValor
-// por processoTipo+fase+produto, vigência) entra depois.
-const COMPONENTE_PRECOS: Record<string, { custo: string; receita: string }> = {
-  'Certidão Inteiro Teor': { custo: 'CIT_CUSTO', receita: 'CIT_RECEITA' },
+function resolverRegraEconomica(rules: RegraEconomica[], docCode: string): RegraEconomica | null {
+  return (
+    rules.find((r) => r.documentTypeCode === docCode) ?? // match exato tem prioridade
+    rules.find((r) => r.documentTypeCode == null) ??      // regra "qualquer doc"
+    null
+  )
 }
 
 type PessoaMin = {
@@ -96,6 +97,12 @@ export async function gerarEconomicoDaMatriz(
     return { criados, pulados, erros }
   }
 
+  // Regras econômicas CONFIGURADAS p/ esta fase (tipo específico OU qualquer tipo).
+  const economicRules = await prisma.phaseEconomicRule.findMany({
+    where: { phaseKey, ativo: true, OR: [{ tipoProcessoId }, { tipoProcessoId: null }] },
+    orderBy: { ordem: 'asc' },
+  })
+
   const proc = await prisma.processo.findUnique({
     where: { id: processoId },
     select: { arvore: { select: { pessoas: { select: {
@@ -107,13 +114,14 @@ export async function gerarEconomicoDaMatriz(
   if (pessoas.length === 0) { pulados.push({ motivo: 'processo sem pessoas na árvore' }); return { criados, pulados, erros } }
 
   for (const regra of regras) {
-    const componente = resolverComponente(phaseKey, regra.documentTypeCode, regra.target)
-    if (!componente) { pulados.push({ motivo: `fase "${phaseKey}" sem componente mapeado (fatia futura)` }); continue }
+    const econ = resolverRegraEconomica(economicRules, regra.documentTypeCode)
+    if (!econ) { pulados.push({ motivo: `fase "${phaseKey}" sem regra econômica configurada`, detalhe: `cadastre em PhaseEconomicRule (doc "${regra.documentTypeCode}")` }); continue }
 
-    // (c) dois preços INDEPENDENTES
-    const precos = COMPONENTE_PRECOS[componente]
-    const prodCusto = precos ? await prisma.produtoFinanceiro.findFirst({ where: { codigo: precos.custo, ativo: true } }) : null
-    const prodReceita = precos ? await prisma.produtoFinanceiro.findFirst({ where: { codigo: precos.receita, ativo: true } }) : null
+    const componente = econ.componentName
+
+    // (c) dois preços INDEPENDENTES — códigos vêm da regra configurada
+    const prodCusto = econ.custoProdutoCode ? await prisma.produtoFinanceiro.findFirst({ where: { codigo: econ.custoProdutoCode, ativo: true } }) : null
+    const prodReceita = econ.receitaProdutoCode ? await prisma.produtoFinanceiro.findFirst({ where: { codigo: econ.receitaProdutoCode, ativo: true } }) : null
 
     const tipoServico = await acharOuCriarTipoServico(processoId, componente)
     const kw = tipoDocKeyword(regra.documentTypeCode)

@@ -82,6 +82,18 @@ interface CustoAPI {
   status?: CustoStatus
   cancelado?: boolean
   parcelas: ParcelaAPI[]
+  // 🆕 Pasta Documental — vínculos do motor econômico (já vêm da API; usados
+  // para classificar e detalhar os custos documentais). Todos opcionais.
+  origem?: string | null
+  personId?: number | null
+  documentoId?: number | null
+  tipoServicoId?: number | null
+  phaseKey?: string | null
+  phaseCycle?: number | null
+  productServiceId?: number | null
+  pessoa?: { id: number; nome: string; sobrenome?: string | null } | null
+  tipoServico?: { id: number; nome: string } | null
+  documento?: { id: number; tipo: string } | null
 }
 
 type Filter = 'todos' | 'pagos' | 'pendentes' | 'rascunhos'
@@ -128,6 +140,33 @@ function cambioEfetivo(c: CustoAPI): number {
   if (c.fxRule === 'FIXO' && c.fxFixo) return num(c.fxFixo)
   return num(c.fxEstimado) || 1
 }
+// ============================================================================
+// Pasta Documental — classificação
+// ----------------------------------------------------------------------------
+// REGRA ÚNICA de "o que é custo documental" (entra na Pasta). Centralizada aqui
+// de propósito: quando existir um campo de grupo no schema (ex.: financialGroupKey
+// = DOCUMENT_FOLDER), troca-se SÓ esta função — nada de espalhar nomes soltos.
+// Hoje: documental = gerado pelo motor (origem 'motor') OU vinculado a um
+// documento (documentoId). Custos manuais soltos (advogado, taxa, etc.) NÃO
+// entram — ficam na lista normal, separados.
+// ============================================================================
+function isCustoDocumental(c: CustoAPI): boolean {
+  return c.origem === 'motor' || c.documentoId != null
+}
+
+// Nome do componente/serviço p/ exibir no detalhe (ex.: "Certidão Inteiro Teor").
+// Preferimos o nome do TipoServico; se não vier, caímos na descrição do custo.
+function componenteLabel(c: CustoAPI): string {
+  if (c.tipoServico?.nome) return c.tipoServico.nome
+  // descrição do motor = "Componente · Pessoa" → pega a parte antes do "·"
+  const antes = c.descricao?.split('·')[0]?.trim()
+  return antes || c.descricao || '—'
+}
+function pessoaLabel(c: CustoAPI): string {
+  if (c.pessoa) return `${c.pessoa.nome} ${c.pessoa.sobrenome ?? ''}`.trim()
+  return '—'
+}
+
 function isVencida(p: ParcelaAPI): boolean {
   if (p.status !== 'PENDENTE') return false
   if (!p.vencimento) return false
@@ -166,6 +205,7 @@ export function Custos({
   const [filtro, setFiltro] = useState<Filter>('todos')
   const [excluindoId, setExcluindoId] = useState<number | null>(null)
   const [templateAberto, setTemplateAberto] = useState(false)
+  const [pastaAberta, setPastaAberta] = useState(true) // Pasta Documental expandida por padrão
 
   // ---- Load ----
   useEffect(() => {
@@ -316,6 +356,176 @@ export function Custos({
       c.parcelas?.some((p) => p.status === 'PENDENTE'),
     )
   }, [custosAtivos, custosRascunho, filtro])
+
+  // ---- Pasta Documental: separa documentais × outros (dentro do filtro atual) ----
+  // NÃO funde no banco: só agrupa PARA EXIBIR. Cada custo continua individual.
+  const { pastaCustos, outrosCustos, pastaResumo } = useMemo(() => {
+    const pastaCustos = custosExibidos.filter(isCustoDocumental)
+    const outrosCustos = custosExibidos.filter((c) => !isCustoDocumental(c))
+    const pessoas = new Set<number>()
+    const porMoeda: Record<string, number> = {}
+    let totalBrl = 0
+    let pagoBrl = 0
+    for (const c of pastaCustos) {
+      if (c.personId != null) pessoas.add(c.personId)
+      const cx = cambioEfetivo(c)
+      const orig = num(c.valor)
+      totalBrl += orig * cx
+      porMoeda[c.moeda] = (porMoeda[c.moeda] || 0) + orig // ⚠ soma por moeda ORIGINAL (não mistura)
+      c.parcelas?.forEach((p) => {
+        if (p.status === 'PAGA' || p.status === 'RECEBIDA') {
+          pagoBrl += num(p.valorBrl) || num(p.valor) * (num(p.cambioAplicado) || cx)
+        }
+      })
+    }
+    return {
+      pastaCustos,
+      outrosCustos,
+      pastaResumo: {
+        nPessoas: pessoas.size,
+        nComponentes: pastaCustos.length,
+        totalBrl,
+        pagoBrl,
+        porMoeda,
+        multiMoeda: Object.keys(porMoeda).length > 1,
+      },
+    }
+  }, [custosExibidos])
+
+  // Renderiza UMA linha de custo. Reusada pela Pasta (dentroPasta) e pela lista normal.
+  function renderCustoRow(c: CustoAPI, opts?: { dentroPasta?: boolean }): React.ReactNode {
+    const dentroPasta = opts?.dentroPasta === true
+    const cx = cambioEfetivo(c)
+    const totOrig = num(c.valor)
+    const totBrl = totOrig * cx
+    let pgCount = 0
+    c.parcelas?.forEach((p) => {
+      if (p.status === 'PAGA' || p.status === 'RECEBIDA') pgCount++
+    })
+    const totParc = c.parcelas?.length || 0
+    const isQuit = totParc > 0 && pgCount === totParc
+    const temAtraso = c.parcelas?.some(isVencida)
+    const isRascunho = c.status === 'RASCUNHO'
+    const sendoExcluido = excluindoId === c.id
+
+    let statusBadge: React.ReactNode
+    if (isRascunho)
+      statusBadge = (
+        <span className="badge" style={{ background: '#f1f5f9', color: '#475569' }}>
+          📝 Rascunho
+        </span>
+      )
+    else if (isQuit) statusBadge = <span className="badge badge-recebida">Pago</span>
+    else if (temAtraso) statusBadge = <span className="badge badge-atrasada">Atrasado</span>
+    else statusBadge = <span className="badge badge-pendente">A pagar</span>
+
+    const fxBadge =
+      c.moeda === 'BRL' ? (
+        <span className="badge badge-pendente">BRL</span>
+      ) : c.fxRule === 'FIXO' ? (
+        <span className="badge-fx-fixo-sm">FIXO</span>
+      ) : (
+        <span className="badge-fx-var-sm">VAR</span>
+      )
+
+    return (
+      <tr
+        key={c.id}
+        style={
+          sendoExcluido
+            ? { opacity: 0.4 }
+            : isRascunho
+              ? { opacity: 0.7 }
+              : dentroPasta
+                ? { background: '#fcfdff' }
+                : undefined
+        }
+      >
+        <td style={dentroPasta ? { paddingLeft: 28 } : undefined}>
+          {isRascunho ? '📝' : dentroPasta ? '↳' : '📋'}
+        </td>
+        <td>
+          <strong>{dentroPasta ? componenteLabel(c) : c.descricao}</strong>
+          <span className="muted-xs">
+            {dentroPasta ? `${pessoaLabel(c)} · ${c.codigo}` : c.codigo}
+          </span>
+        </td>
+        <td>
+          {TIPO_LABEL[c.tipo]}
+          <span className="muted-xs">{CAT_LABEL[c.categoria]}</span>
+        </td>
+        <td>{c.fornecedor || <span className="muted">—</span>}</td>
+        <td>{fmtMoeda(totOrig, c.moeda)}</td>
+        <td className="brl">
+          <strong>
+            {fmtBRL(totBrl)}
+            {c.moeda !== 'BRL' && c.fxRule === 'VARIAVEL' && (
+              <span className="muted-xs">(est.)</span>
+            )}
+          </strong>
+        </td>
+        <td>
+          {c.moeda === 'BRL' ? (
+            <span className="muted">—</span>
+          ) : c.fxRule === 'FIXO' ? (
+            <>
+              {fmtFX(num(c.fxFixo))} {fxBadge}
+            </>
+          ) : (
+            <>
+              {fmtFX(num(c.fxEstimado))} {fxBadge}
+            </>
+          )}
+        </td>
+        <td>
+          {pgCount}/{totParc}
+        </td>
+        <td>{statusBadge}</td>
+        <td>
+          {isRascunho ? (
+            <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
+              <button
+                type="button"
+                className="btn-link-sm"
+                onClick={() => setView({ kind: 'editar', custo: c })}
+                disabled={sendoExcluido}
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                className="btn-link-sm"
+                style={{ color: '#dc2626' }}
+                onClick={() => excluirRascunho(c)}
+                disabled={sendoExcluido}
+              >
+                {sendoExcluido ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
+              <button
+                type="button"
+                className="btn-link-sm"
+                disabled
+                title="Em desenvolvimento"
+                style={{ opacity: 0.5, cursor: 'not-allowed' }}
+              >
+                Comprovante
+              </button>
+              <button
+                type="button"
+                className="btn-link-sm"
+                onClick={() => setView({ kind: 'detalhes', custo: c })}
+              >
+                Ver
+              </button>
+            </div>
+          )}
+        </td>
+      </tr>
+    )
+  }
 
   // ---- Render por view ----
   if (view.kind === 'nova') {
@@ -545,137 +755,69 @@ export function Custos({
                 </tr>
               </thead>
               <tbody>
-                {custosExibidos.map((c) => {
-                  const cx = cambioEfetivo(c)
-                  const totOrig = num(c.valor)
-                  const totBrl = totOrig * cx
-                  let pgCount = 0
-                  c.parcelas?.forEach((p) => {
-                    if (p.status === 'PAGA' || p.status === 'RECEBIDA') pgCount++
-                  })
-                  const totParc = c.parcelas?.length || 0
-                  const isQuit = totParc > 0 && pgCount === totParc
-                  const temAtraso = c.parcelas?.some(isVencida)
-                  const isRascunho = c.status === 'RASCUNHO'
-                  const sendoExcluido = excluindoId === c.id
-
-                  let statusBadge: React.ReactNode
-                  if (isRascunho)
-                    statusBadge = (
-                      <span
-                        className="badge"
-                        style={{ background: '#f1f5f9', color: '#475569' }}
-                      >
-                        📝 Rascunho
-                      </span>
-                    )
-                  else if (isQuit)
-                    statusBadge = <span className="badge badge-recebida">Pago</span>
-                  else if (temAtraso)
-                    statusBadge = <span className="badge badge-atrasada">Atrasado</span>
-                  else statusBadge = <span className="badge badge-pendente">A pagar</span>
-
-                  const fxBadge =
-                    c.moeda === 'BRL' ? (
-                      <span className="badge badge-pendente">BRL</span>
-                    ) : c.fxRule === 'FIXO' ? (
-                      <span className="badge-fx-fixo-sm">FIXO</span>
-                    ) : (
-                      <span className="badge-fx-var-sm">VAR</span>
-                    )
-
-                  const proximaPendente = c.parcelas?.find((p) => p.status === 'PENDENTE')
-
-                  return (
+                {/* === Grupo: Pasta Documental (agrupador visual; custos seguem individuais) === */}
+                {pastaCustos.length > 0 && (
+                  <>
                     <tr
-                      key={c.id}
-                      style={
-                        isRascunho || sendoExcluido
-                          ? { opacity: sendoExcluido ? 0.4 : 0.7 }
-                          : undefined
-                      }
+                      onClick={() => setPastaAberta((v) => !v)}
+                      style={{ cursor: 'pointer', background: '#f8fafc', fontWeight: 600 }}
                     >
-                      <td>{isRascunho ? '📝' : '📋'}</td>
+                      <td>{pastaAberta ? '▾' : '▸'}</td>
                       <td>
-                        <strong>{c.descricao}</strong>
-                        <span className="muted-xs">{c.codigo}</span>
+                        <strong>📂 Pasta Documental</strong>
+                        <span className="muted-xs">
+                          {pastaResumo.nPessoas}{' '}
+                          {pastaResumo.nPessoas === 1 ? 'pessoa' : 'pessoas'} ·{' '}
+                          {pastaResumo.nComponentes}{' '}
+                          {pastaResumo.nComponentes === 1 ? 'componente' : 'componentes'}
+                        </span>
                       </td>
                       <td>
-                        {TIPO_LABEL[c.tipo]}
-                        <span className="muted-xs">{CAT_LABEL[c.categoria]}</span>
+                        <span className="muted">—</span>
                       </td>
-                      <td>{c.fornecedor || <span className="muted">—</span>}</td>
-                      <td>{fmtMoeda(totOrig, c.moeda)}</td>
+                      <td>
+                        <span className="muted">—</span>
+                      </td>
+                      <td>
+                        {pastaResumo.multiMoeda ? (
+                          <span className="muted-xs">
+                            {Object.entries(pastaResumo.porMoeda)
+                              .map(([m, v]) => fmtMoeda(v, m as Moeda))
+                              .join(' + ')}
+                          </span>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
                       <td className="brl">
                         <strong>
-                          {fmtBRL(totBrl)}
-                          {c.moeda !== 'BRL' && c.fxRule === 'VARIAVEL' && (
-                            <span className="muted-xs">(est.)</span>
+                          {fmtBRL(pastaResumo.totalBrl)}
+                          {pastaResumo.multiMoeda && (
+                            <span className="muted-xs">(conv.)</span>
                           )}
                         </strong>
                       </td>
                       <td>
-                        {c.moeda === 'BRL' ? (
-                          <span className="muted">—</span>
-                        ) : c.fxRule === 'FIXO' ? (
-                          <>
-                            {fmtFX(num(c.fxFixo))} {fxBadge}
-                          </>
-                        ) : (
-                          <>
-                            {fmtFX(num(c.fxEstimado))} {fxBadge}
-                          </>
-                        )}
+                        <span className="muted">—</span>
                       </td>
                       <td>
-                        {pgCount}/{totParc}
+                        <span className="muted">—</span>
                       </td>
-                      <td>{statusBadge}</td>
                       <td>
-                        {isRascunho ? (
-                          <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
-                            <button
-                              type="button"
-                              className="btn-link-sm"
-                              onClick={() => setView({ kind: 'editar', custo: c })}
-                              disabled={sendoExcluido}
-                            >
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-link-sm"
-                              style={{ color: '#dc2626' }}
-                              onClick={() => excluirRascunho(c)}
-                              disabled={sendoExcluido}
-                            >
-                              {sendoExcluido ? 'Excluindo...' : 'Excluir'}
-                            </button>
-                          </div>
-) : (
-                        <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
-                          <button
-                            type="button"
-                            className="btn-link-sm"
-                            disabled
-                            title="Em desenvolvimento"
-                            style={{ opacity: 0.5, cursor: 'not-allowed' }}
-                          >
-                            Comprovante
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-link-sm"
-                            onClick={() => setView({ kind: 'detalhes', custo: c })}
-                          >
-                            Ver
-                          </button>
-                        </div>
-                      )}
+                        <span className="badge badge-pendente">
+                          {pastaResumo.nComponentes}{' '}
+                          {pastaResumo.nComponentes === 1 ? 'item' : 'itens'}
+                        </span>
                       </td>
+                      <td></td>
                     </tr>
-                  )
-                })}
+                    {pastaAberta &&
+                      pastaCustos.map((c) => renderCustoRow(c, { dentroPasta: true }))}
+                  </>
+                )}
+
+                {/* === Custos não-documentais (advogado, taxa, etc.) — soltos, separados === */}
+                {outrosCustos.map((c) => renderCustoRow(c))}
               </tbody>
             </table>
           )}

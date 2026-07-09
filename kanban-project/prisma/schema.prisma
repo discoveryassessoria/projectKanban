@@ -2229,6 +2229,26 @@ model PerfilPermissaoMotor {
   atualizadoEm     DateTime @updatedAt
 }
 
+model PhaseEconomicRule {
+  id                 Int      @id @default(autoincrement())
+  tipoProcessoId     Int?     // null = vale p/ qualquer tipo de processo
+  phaseKey           String   @db.VarChar(60)   // ex: "emissao_documental"
+  documentTypeCode   String?  @db.VarChar(40)   // null = qualquer doc; senão só p/ esse code (→ TipoDocumentoCadastro.code)
+  appliesTo          String   @default("any") @db.VarChar(30)  // any|certificate|translation|original|... (natureza do doc elegível)
+  componentKey       String   @db.VarChar(40)   // identidade do componente, ex: "CERTIDAO_INTEIRO_TEOR"
+  componentName      String   @db.VarChar(100)  // nome exibido = COLUNA da planilha, ex: "Certidão Inteiro Teor"
+  custoProdutoCode   String?  @db.VarChar(30)   // → ProdutoFinanceiro.codigo (CUSTO)   — separado
+  receitaProdutoCode String?  @db.VarChar(30)   // → ProdutoFinanceiro.codigo (RECEITA) — separado
+  participaPlanilha  Boolean  @default(true)    // componente aparece como coluna na Planilha Documental
+  ordem              Int      @default(0)
+  ativo              Boolean  @default(true)
+  criadoEm           DateTime @default(now())
+  atualizadoEm       DateTime @updatedAt
+
+  @@index([tipoProcessoId])
+  @@index([phaseKey])
+}
+
 enum Pais {
   PORTUGAL
   ESPANHA

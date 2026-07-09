@@ -39,6 +39,11 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: "desc" },
         include: {
           parcelas: { orderBy: { numero: "asc" } },
+          // 🆕 Pasta Documental: nomes p/ o detalhe agrupado (aditivo — não quebra
+          // consumidores existentes; campos podem vir null p/ custos não vinculados).
+          pessoa: { select: { id: true, nome: true, sobrenome: true } },
+          tipoServico: { select: { id: true, nome: true } },
+          documento: { select: { id: true, tipo: true } },
         },
       })
     );
