@@ -1631,7 +1631,10 @@ model ProdutoFinanceiro {
   repasse            Boolean  @default(false)
   reembolsavel       Boolean  @default(false)
   servicos ServicoProduto[] @relation("ServicoProdutoItens")
-
+  itemCatalogoId Int?
+  itemCatalogo   ItemCatalogo? @relation(fields: [itemCatalogoId], references: [id])
+  
+  @@index([itemCatalogoId])
   @@index([categoriaId])
   @@index([planoContaId])
 }
@@ -1731,6 +1734,10 @@ model ServicoProduto {
   itensFinanceiros ProdutoFinanceiro[] @relation("ServicoProdutoItens")
   criadoEm         DateTime            @default(now())
   atualizadoEm     DateTime            @updatedAt
+  itemCatalogoId Int?
+  itemCatalogo   ItemCatalogo? @relation(fields: [itemCatalogoId], references: [id])
+
+  @@index([itemCatalogoId])
 }
 
 model MoedaCadastro {
@@ -2103,6 +2110,10 @@ model TipoDocumentoCadastro {
   ativo        Boolean  @default(true)
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
+  itemCatalogoId Int?
+  itemCatalogo   ItemCatalogo? @relation(fields: [itemCatalogoId], references: [id])
+
+  @@index([itemCatalogoId])
 }
 
 // Matriz Documental (documentRequirementMatrix) — quais documentos são
@@ -2247,6 +2258,55 @@ model PhaseEconomicRule {
 
   @@index([tipoProcessoId])
   @@index([phaseKey])
+}
+
+model ItemCatalogo {
+  id           Int          @id @default(autoincrement())
+  code         String       @unique @db.VarChar(60)   // identidade única (ex.: CERT_NASCIMENTO_IT)
+  name         String       @db.VarChar(200)          // ex.: "Certidão de Nascimento - Inteiro Teor"
+  descricao    String?      @db.Text
+  natureza     NaturezaItem @default(OUTRO)
+  categoria    String?      @db.VarChar(60)           // ex.: "Registro civil"
+  unidade      UnidadeItem  @default(UNIDADE)
+  ativo        Boolean      @default(true)
+  metadata     Json?                                   // extensível, sem virar coluna por item novo
+  criadoEm     DateTime     @default(now())
+  atualizadoEm DateTime     @updatedAt
+
+  // back-relations (as ilhas apontam pra cá)
+  tiposDocumento   TipoDocumentoCadastro[]
+  produtos         ProdutoFinanceiro[]
+  servicos         ServicoProduto[]
+
+  @@index([natureza])
+  @@index([ativo])
+}
+
+enum NaturezaItem {
+  DOCUMENTO
+  PRODUTO
+  SERVICO
+  HONORARIO
+  TAXA
+  DESPESA
+  LOGISTICA
+  OUTRO
+}
+
+enum UnidadeItem {
+  UNIDADE
+  DOCUMENTO
+  PESSOA
+  REQUERENTE
+  PAGINA
+  PACOTE
+  PROCESSO
+  FASE
+  HORA
+  DIA
+  MES
+  PERCENTUAL
+  CUSTOM
 }
 
 enum Pais {
