@@ -216,6 +216,10 @@ model Documento {
   custosFin   Custo[]
   receitasFin Receita[]
 
+  documentTypeId Int?
+  documentType   TipoDocumentoCadastro? @relation(fields: [documentTypeId], references: [id])
+  
+  @@index([documentTypeId])
   @@index([pessoaId])
   @@index([tipo])
   @@index([status])
@@ -2119,6 +2123,11 @@ model TipoDocumentoCadastro {
   atualizadoEm DateTime @updatedAt
   itemCatalogoId Int?
   itemCatalogo   ItemCatalogo? @relation(fields: [itemCatalogoId], references: [id])
+  legacyEnumKey String? @unique @db.VarChar(60)  // ← valor do enum TipoDocumento (ponte)
+  nature        String? @db.VarChar(30)          // documento|certidao|identidade|... (config futura)
+  countryCode   String? @db.VarChar(8)           // opcional (país)
+  description   String? @db.Text
+  documentos    Documento[]                       // back-relation (docs que apontam pra este tipo)
 
   @@index([itemCatalogoId])
 }
