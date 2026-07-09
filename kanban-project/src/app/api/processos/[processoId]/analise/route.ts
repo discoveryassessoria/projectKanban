@@ -113,8 +113,8 @@ export async function POST(
       localNasc: p.local_nasc ?? null,
       documentos: p.documentos.map<DocumentoParaAnalise>((d) => ({
         id: d.id,
-        tipo: d.tipo,
-        titulo: DOC_LABEL[d.tipo] || d.tipo,
+        tipo: d.tipo ?? "",
+        titulo: (d.tipo ? DOC_LABEL[d.tipo] : "") || d.tipo || "",
         nomeRegistrado: d.nome_registrado ?? null,
         paiRegistrado: d.pai_registrado ?? null,
         maeRegistrada: d.mae_registrada ?? null,

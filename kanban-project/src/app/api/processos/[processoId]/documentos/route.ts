@@ -11,7 +11,7 @@ type TransmissionState = "TRANSMITE" | "RISCO" | "BLOQUEADA" | "JUDICIAL" | "NA"
 
 interface DocCompact {
   id: number
-  tipo: string
+  tipo: string | null
   tipoShort: string       // "Nasc.", "Cas.", "Óbito", outros
   status: string
   statusShort: string     // "recebido", "não iniciado", "em busca", etc.
@@ -232,7 +232,7 @@ export async function GET(
       const docsCompact: DocCompact[] = docs.map((d) => ({
         id: d.id,
         tipo: d.tipo,
-        tipoShort: tipoShort(d.tipo),
+        tipoShort: tipoShort(d.tipo ?? ""),
         status: d.status,
         statusShort: statusShortMap[d.status] || d.status.toLowerCase(),
         statusClass: statusToCompactClass(d.status),
@@ -254,9 +254,9 @@ export async function GET(
       }
 
       if (isDirectLine) {
-        const docNasc = docsCompact.find((d) => d.tipo.includes("NASCIMENTO"))
-        const docCas = docsCompact.find((d) => d.tipo.includes("CASAMENTO"))
-        const docObt = docsCompact.find((d) => d.tipo.includes("OBITO"))
+        const docNasc = docsCompact.find((d) => d.tipo?.includes("NASCIMENTO"))
+        const docCas = docsCompact.find((d) => d.tipo?.includes("CASAMENTO"))
+        const docObt = docsCompact.find((d) => d.tipo?.includes("OBITO"))
 
         const nascRecebida = docNasc?.isRecebido === true
         const nascAusente = !docNasc || docNasc.status === "PENDENTE"
@@ -302,7 +302,7 @@ export async function GET(
       const blockedDocs = docs.filter((d) => d.motivoBloqueio)
       for (const bd of blockedDocs.slice(0, 2)) {
         impedimentos.push({
-          label: `${tipoShort(bd.tipo).toLowerCase()} bloqueado`,
+          label: `${tipoShort(bd.tipo ?? "").toLowerCase()} bloqueado`,
           severity: "warn",
           detail: bd.motivoBloqueio || undefined,
         })
@@ -322,9 +322,9 @@ export async function GET(
 
       // Documentos faltantes (pra linha direta)
       if (isDirectLine) {
-        const docNasc = docsCompact.find((d) => d.tipo.includes("NASCIMENTO"))
-        const docCas = docsCompact.find((d) => d.tipo.includes("CASAMENTO"))
-        const docObt = docsCompact.find((d) => d.tipo.includes("OBITO"))
+        const docNasc = docsCompact.find((d) => d.tipo?.includes("NASCIMENTO"))
+        const docCas = docsCompact.find((d) => d.tipo?.includes("CASAMENTO"))
+        const docObt = docsCompact.find((d) => d.tipo?.includes("OBITO"))
         if (docNasc && docNasc.status === "PENDENTE") {
           impedimentos.push({ label: "falta nascimento", severity: "warn" })
         }
@@ -361,7 +361,7 @@ export async function GET(
       } else if (transmissao.state === "BLOQUEADA") {
         const docFalta = docsCompact.find(
           (d) =>
-            (d.tipo.includes("NASCIMENTO") || d.tipo.includes("CASAMENTO")) &&
+            (d.tipo?.includes("NASCIMENTO") || d.tipo?.includes("CASAMENTO")) &&
             d.status === "PENDENTE"
         )
         if (docFalta) {

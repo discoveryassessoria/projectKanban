@@ -207,8 +207,9 @@ export async function GET(
       // Se a pessoa tem documentos, criar uma linha para cada
       if (pessoa.documentos && pessoa.documentos.length > 0) {
         pessoa.documentos.forEach((doc, idx) => {
-          const tipoRegistro = getTipoRegistro(doc.tipo)
-          if (!tipoRegistro) return
+        if (!doc.tipo) return              // 🆕 doc de tipo novo (sem enum) — pula desta grade legada por ora
+        const tipoRegistro = getTipoRegistro(doc.tipo)
+        if (!tipoRegistro) return
 
           // Pegar data do casamento da união (se tiver)
           let dataCasamento: Date | null = null

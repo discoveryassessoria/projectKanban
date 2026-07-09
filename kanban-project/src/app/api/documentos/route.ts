@@ -134,6 +134,8 @@ export async function POST(request: NextRequest) {
       arquivo_apostila_url,
       // Observações
       observacoes,
+      // 🆕 LOTE C — tipo configurável (novo): id do TipoDocumentoCadastro
+      documentTypeId,
     } = body
 
     // Validações
@@ -141,16 +143,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "pessoaId é obrigatório" }, { status: 400 })
     }
 
-    if (!tipo) {
-      return NextResponse.json({ error: "tipo é obrigatório" }, { status: 400 })
+    // 🆕 LOTE C — aceita documentTypeId (tipo configurável, criado pela tela)
+    // OU tipo do enum (legado). Pelo menos um é obrigatório.
+    if (!tipo && !documentTypeId) {
+      return NextResponse.json({ error: "tipo ou documentTypeId é obrigatório" }, { status: 400 })
     }
 
-    // Verificar se o tipo é válido
-    if (!Object.values(TipoDocumento).includes(tipo)) {
+    // Resolve o tipo configurável (se veio documentTypeId, valida que existe)
+    let tipoCadastro: { id: number; legacyEnumKey: string | null } | null = null
+    if (documentTypeId) {
+      tipoCadastro = await prisma.tipoDocumentoCadastro.findUnique({
+        where: { id: parseInt(String(documentTypeId)) },
+        select: { id: true, legacyEnumKey: true },
+      })
+      if (!tipoCadastro) {
+        return NextResponse.json({ error: "documentTypeId inválido (tipo não cadastrado)" }, { status: 400 })
+      }
+    }
+
+    // Se veio SÓ tipo (legado), valida contra o enum como antes.
+    if (tipo && !documentTypeId && !Object.values(TipoDocumento).includes(tipo)) {
       return NextResponse.json(
         { error: "Tipo de documento inválido", tiposValidos: Object.values(TipoDocumento) },
         { status: 400 }
       )
+    }
+
+    // DUAL-WRITE: grava documentTypeId sempre que resolvido; grava `tipo` (enum)
+    // só quando o tipo tem equivalente no enum (compatibilidade). Tipo novo → tipo=null.
+    let tipoEnum: TipoDocumento | null = null
+    let docTypeIdFinal: number | null = tipoCadastro?.id ?? null
+    if (documentTypeId) {
+      // veio pelo cadastro: se o cadastro tem legacyEnumKey, também preenche o enum
+      if (tipoCadastro?.legacyEnumKey && Object.values(TipoDocumento).includes(tipoCadastro.legacyEnumKey as TipoDocumento)) {
+        tipoEnum = tipoCadastro.legacyEnumKey as TipoDocumento
+      }
+    } else {
+      // veio pelo enum (legado): grava o enum e, se houver, liga o cadastro correspondente
+      tipoEnum = tipo as TipoDocumento
+      const equiv = await prisma.tipoDocumentoCadastro.findFirst({ where: { legacyEnumKey: String(tipo) }, select: { id: true } })
+      docTypeIdFinal = equiv?.id ?? null
     }
 
     // Buscar pessoa COM árvore e processos para automação
@@ -175,7 +207,8 @@ export async function POST(request: NextRequest) {
     const documento = await prisma.documento.create({
       data: {
         pessoaId: parseInt(pessoaId),
-        tipo: tipo as TipoDocumento,
+        tipo: tipoEnum,                    // 🆕 nullable: null quando o tipo é novo (só cadastro)
+        documentTypeId: docTypeIdFinal,    // 🆕 fonte nova (dual-write)
         status: (status as StatusDocumento) || 'PENDENTE',
         descricao: descricao || null,
         // Dados do registro

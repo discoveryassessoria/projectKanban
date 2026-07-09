@@ -112,7 +112,7 @@ export async function GET(
               create: docs.map((d) => ({
                 documentoId: d.id,
                 pessoaNome: nomeCompleto(d.pessoa),
-                documentoTitulo: d.descricao || TIPO_DOC_LABEL[d.tipo] || d.tipo,
+                documentoTitulo: d.descricao || (d.tipo ? TIPO_DOC_LABEL[d.tipo] : "") || d.tipo || "",
                 origem: "Documento validado",
                 status: DEFAULT_DOC_STATUS,
               })),

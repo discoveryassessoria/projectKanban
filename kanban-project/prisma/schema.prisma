@@ -134,7 +134,7 @@ model Arvore {
 model Documento {
   id                    Int             @id @default(autoincrement())
   pessoaId              Int
-  tipo                  TipoDocumento
+  tipo                  TipoDocumento?
   status                StatusDocumento @default(PENDENTE)
   descricao             String?         @db.VarChar(200)
   cartorio              String?         @db.VarChar(200)
@@ -218,7 +218,7 @@ model Documento {
 
   documentTypeId Int?
   documentType   TipoDocumentoCadastro? @relation(fields: [documentTypeId], references: [id])
-  
+
   @@index([documentTypeId])
   @@index([pessoaId])
   @@index([tipo])

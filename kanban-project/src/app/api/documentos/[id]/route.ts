@@ -322,7 +322,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
       if (processoId) {
         const nomePessoa = `${documentoAtual.pessoa.nome} ${documentoAtual.pessoa.sobrenome || ""}`.trim()
-        await criarTarefasDocumento(body.status, documentoAtual.tipo, nomePessoa, processoId)
+        await criarTarefasDocumento(body.status, documentoAtual.tipo ?? "", nomePessoa, processoId)
       }
     }
 
@@ -384,7 +384,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     // Tentar excluir as tarefas relacionadas (se existirem)
     const processoId = documento.pessoa.arvore?.processos[0]?.id
     if (processoId) {
-      const tipoLabel = getTipoDocumentoLabel(documento.tipo)
+      const tipoLabel = getTipoDocumentoLabel(documento.tipo ?? "")
       const nomePessoa = `${documento.pessoa.nome} ${documento.pessoa.sobrenome || ""}`.trim()
 
       // Buscar tarefa de busca
@@ -505,7 +505,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (processoId) {
       const nomePessoa = `${documentoAtual.pessoa.nome} ${documentoAtual.pessoa.sobrenome || ""}`.trim()
-      await criarTarefasDocumento(body.status, documentoAtual.tipo, nomePessoa, processoId)
+      await criarTarefasDocumento(body.status, documentoAtual.tipo ?? "", nomePessoa, processoId)
     }
 
     // ✅ recalcula fase do processo também no PATCH
