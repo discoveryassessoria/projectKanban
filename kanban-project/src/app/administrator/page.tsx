@@ -159,6 +159,7 @@ const UsersTab = dynamic(() => import("@/src/components/gerenciamentoComponents/
   ssr: false, loading: () => <CarregandoTela />,
 })
 const RolesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RolesTab"), { ssr: false })
+const AplicabilidadeEconomicaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/AplicabilidadeEconomicaTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CatalogoMestreTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogoMestreTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CatalogTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogTab"), {
   ssr: false, loading: () => <CarregandoTela />,
@@ -265,7 +266,7 @@ const TELAS: Record<string, React.ComponentType> = {
   paycond: CondicoesPagamentoTab,
   commrules: RegrasComissaoTab,
   discrules: RegrasDescontoTab,
-  pricing: PricingRulesTab,
+  pricing: AplicabilidadeEconomicaTab,
   phasemap: PhaseTriggerRulesTab,
   crosstpl: ModelosTarefaTransversalTab,
   crossrules: RegrasTarefaTransversalTab,
