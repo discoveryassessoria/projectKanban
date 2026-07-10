@@ -49,54 +49,103 @@ import {
 // ============================================================
 // MENU — 11 grupos (fiel ao mockup Operacional v4)
 // ============================================================
+// ============================================================
+// LOTE D — Gerenciamento reorganizado nos 13 DOMÍNIOS do Marco.
+// REUSA as telas existentes (mesmas keys); só muda a organização do menu.
+// Nada de tela nova aqui — cada key já existe no MAPA DE TELAS abaixo.
+// ============================================================
 const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
   { grupo: "Painel", itens: [["overview", "Painel Geral"]] },
-  { grupo: "Centro do Processo", itens: [
-    ["proctypes", "Processos de Nacionalidade"],
+
+  { grupo: "Processos e Workflows", itens: [
+    ["proctypes", "Tipos de Processo"],
     ["workflowsphases", "Workflows e Fases"],
-    ["amtemplates", "Modelos de Automação"],
-    ["opauto", "Automações por Fase"],
-    ["phasemap", "Regras de Disparo por Fase"],
-    ["crosstpl", "Modelos de Tarefa Transversal"],
-    ["crossrules", "Regras de Tarefas Transversais"],
-    ["simfase", "Simulação de Fase"],
-    ["execmotor", "Executor do Motor"],
+    ["phasemodes", "Modos Internos"],
+    ["phasemap", "Regras do Processo"],
+    ["simfase", "Configurações Aplicadas"],
   ]},
-  { grupo: "Cadastros do Motor", itens: [
-    ["permprofiles", "Usuários e Permissões"],
-    ["pricingtable", "Tabela de Valores"], ["doctypes", "Tipos de Documento"],
-    ["docmatrix", "Matriz Documental"], ["organs", "Órgãos de Protocolo"],
-    ["sla", "SLAs e Prazos"], ["templates", "Modelos de Documento"],
-    ["notifications", "Notificações"], ["cfgversions", "Versionamento e Publicação"],
-    ["cfgdiagnosis", "Diagnóstico de Configuração"],
+
+  { grupo: "Catálogo Mestre", itens: [
+    ["catalog", "Itens"],
+    ["categories", "Categorias"],
+    ["currencies", "Unidades"],
+    ["products", "Composições"],
   ]},
-  { grupo: "Documentos", itens: [
-    ["doctypes", "Tipos de Documento"], ["docrules", "Matriz Documental"], ["certtypes", "Tipos de Certidão"],
+
+  { grupo: "Matrizes e Aplicabilidade", itens: [
+    ["docmatrix", "Matriz Documental"],
+    ["docrules", "Aplicabilidade Operacional"],
+    ["pricing", "Aplicabilidade Econômica"],
+    ["imtemplates", "Pacotes"],
   ]},
-  { grupo: "Financeiro", itens: [
-    ["honorariums", "Honorários"], ["products", "Produtos e Serviços"], ["catalog", "Catálogo Financeiro"],
-    ["paycond", "Condições de Pagamento"], ["commrules", "Regras de Comissão"], ["discrules", "Regras de Desconto"],
-    ["pricing", "Regras de Preço"], ["finauto", "Regras de Disparo Financeiro"],
-    ["currencies", "Moedas"], ["fx", "Câmbio"], ["methods", "Formas de Pagamento"],
-    ["banks", "Bancos"], ["accounts", "Contas"], ["wallets", "Carteiras"], ["coa", "Plano de Contas"],
-    ["categories", "Categorias"], ["costcenters", "Centros de Custo"],
-    ["taxes", "Impostos e Taxas"], ["fees", "Taxas de Pagamento"],
+
+  { grupo: "Biblioteca Operacional", itens: [
+    ["iwtemplates", "Passos"],
+    ["crosstpl", "Tarefas"],
+    ["certtypes", "Checklists"],
+    ["sla", "SLAs e Prazos"],
+    ["notifications", "Eventos"],
   ]},
-  { grupo: "Protocolo e Órgãos", itens: [
-    ["organs", "Órgãos"], ["protocols", "Regras de Protocolo"], ["prottypes", "Tipos de Protocolo"],
+
+  { grupo: "Automações", itens: [
+    ["amtemplates", "Biblioteca"],
+    ["opauto", "Regras Aplicadas"],
+    ["finauto", "Gatilhos e Condições"],
+    ["simfase", "Simulador"],
+    ["execmotor", "Conflitos"],
   ]},
-  { grupo: "Fornecedores", itens: [["suppliers", "Fornecedores"]] },
-  { grupo: "Modelos", itens: [["templates", "Modelos"]] },
-  { grupo: "Agenda e SLA", itens: [["sla", "Regras de SLA / Prazos"], ["notifications", "Alertas e Lembretes"]] },
-  { grupo: "Segurança e Auditoria", itens: [
-    ["users", "Usuários"], ["roles", "Perfis"], ["teams", "Equipes"],
-    ["departments", "Departamentos"], ["audit", "Logs / Auditoria"],
+
+  { grupo: "Tarefas Transversais", itens: [
+    ["crosstpl", "Biblioteca"],
+    ["crossrules", "Regras"],
+    ["crossrules", "Regularização"],
   ]},
-  { grupo: "Saúde do Sistema", itens: [
-    ["mgmthealth", "Diagnóstico Executivo"], ["execmatrix", "Painel Executivo"],
-    ["syshealth", "Taxonomia / Saúde"], ["countrycatalog", "Catálogo Técnico de Países"],
-    ["settings", "Configurações"], ["impexp", "Importação / Exportação"],
-    ["backup", "Backup"], ["diagnostics", "Diagnóstico"],
+
+  { grupo: "Financeiro e Precificação", itens: [
+    ["pricingtable", "Precificação"],
+    ["suppliers", "Fornecedores"],
+    ["honorariums", "Comercial"],
+    ["methods", "Pagamentos"],
+    ["coa", "Estrutura Financeira"],
+    ["impexp", "Integração Financeira"],
+  ]},
+
+  { grupo: "Usuários e Acesso", itens: [
+    ["users", "Usuários"],
+    ["teams", "Perfis e Equipes"],
+    ["permprofiles", "Permissões"],
+    ["roles", "Permissões de Tarefas"],
+    ["departments", "Delegações e Ausências"],
+  ]},
+
+  { grupo: "Protocolos e Órgãos", itens: [
+    ["organs", "Órgãos"],
+    ["prottypes", "Tipos de Protocolo"],
+    ["protocols", "Regras"],
+    ["docrules", "Exigências"],
+  ]},
+
+  { grupo: "Governança", itens: [
+    ["cfgversions", "Aprovações"],
+    ["commrules", "Alçadas"],
+    ["cfgversions", "Versionamento"],
+    ["cfgdiagnosis", "Publicação"],
+    ["audit", "Auditoria"],
+  ]},
+
+  { grupo: "Motor e Saúde", itens: [
+    ["execmatrix", "Execuções"],
+    ["mgmthealth", "Falhas e Retry"],
+    ["diagnostics", "Reconciliação"],
+    ["syshealth", "Diagnóstico"],
+    ["audit", "Logs"],
+  ]},
+
+  { grupo: "Sistema", itens: [
+    ["settings", "Configurações"],
+    ["impexp", "Importação e Exportação"],
+    ["backup", "Backup"],
+    ["countrycatalog", "Integrações"],
   ]},
 ]
 
