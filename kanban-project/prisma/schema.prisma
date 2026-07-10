@@ -2128,6 +2128,7 @@ model TipoDocumentoCadastro {
   countryCode   String? @db.VarChar(8)           // opcional (país)
   description   String? @db.Text
   documentos    Documento[]                       // back-relation (docs que apontam pra este tipo)
+  participaPlanilha Boolean @default(false)
 
   @@index([itemCatalogoId])
 }

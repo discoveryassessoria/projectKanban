@@ -18,14 +18,16 @@ const SERVICOS_PADRAO = [
 ]
 
 // Tipos de certidão que queremos mostrar
-const TIPOS_CERTIDAO = [
-  'CERTIDAO_NASCIMENTO',
-  'CERTIDAO_NASCIMENTO_INTEIRO_TEOR',
-  'CERTIDAO_CASAMENTO',
-  'CERTIDAO_CASAMENTO_INTEIRO_TEOR',
-  'CERTIDAO_OBITO',
-  'CERTIDAO_OBITO_INTEIRO_TEOR',
-]
+// LOTE C · Fase 9 — participação na Planilha vem da CONFIG (TipoDocumentoCadastro
+// .participaPlanilha), não de lista fixa. Carregado por processo em runtime (abaixo).
+// (TIPOS_CERTIDAO removido; ver carregarTiposDaPlanilha)
+async function carregarTiposDaPlanilha(): Promise<string[]> {
+  const tipos = await prisma.tipoDocumentoCadastro.findMany({
+    where: { participaPlanilha: true, legacyEnumKey: { not: null } },
+    select: { legacyEnumKey: true },
+  })
+  return tipos.map((t) => t.legacyEnumKey as string)
+}
 
 // Helper para extrair tipo de registro
 function getTipoRegistro(tipoDocumento: string): 'Nascimento' | 'Casamento' | 'Óbito' | null {
@@ -65,6 +67,9 @@ export async function GET(
     if (!processoExiste) {
       return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
     }
+
+    // Fase 9: tipos que participam da Planilha vêm da CONFIG (não mais hardcoded)
+    const TIPOS_PLANILHA = await carregarTiposDaPlanilha()
 
     // Buscar serviços existentes
     let servicos = await prisma.tipoServico.findMany({
@@ -123,7 +128,7 @@ export async function GET(
                 // Documentos (certidões)
                 documentos: {
                   where: {
-                    tipo: { in: TIPOS_CERTIDAO as any }
+                    tipo: { in: TIPOS_PLANILHA as any }
                   },
                   orderBy: { tipo: 'asc' }
                 }

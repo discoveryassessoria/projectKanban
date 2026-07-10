@@ -104,6 +104,70 @@ const NOME_COMPLETO: Record<string, string> = {
   "Ób.": "Certidão de Óbito",
 }
 
+// ------------------------------------------------------------
+// Colunas Tradução / Apostila / Retificação
+// ------------------------------------------------------------
+// O schema guarda UM status por documento (StatusDocumento), que caminha por
+// um pipeline sequencial. Aqui a gente DERIVA o estágio de cada coluna a partir
+// desse status. Não é um tracking separado por serviço — quando o motor
+// econômico estiver ligado, dá pra trocar por status real por serviço (a
+// Tarefa/artefato que o motor gera para tradução/apostila). Enquanto isso,
+// derivar do estágio já é bem melhor que mostrar "Não se aplica" fixo.
+//
+// Pipeline (ordem):
+//   PENDENTE → SOLICITAR/SOLICITADO → EM_BUSCA → RECEBIDO → EM_ANALISE →
+//   RETIFICANDO → EM_TRADUCAO → TRADUZIDO → EM_APOSTILAMENTO → APOSTILADO → ENTREGUE
+// (INVALIDO / NAO_ENCONTRADO / CANCELADO = fora do pipeline, rank -1)
+
+type ColunaStatus = "validada" | "recebida" | "pendente" | "nao_aplica"
+
+const STATUS_RANK: Record<string, number> = {
+  PENDENTE: 0,
+  SOLICITAR: 1,
+  SOLICITADO: 2,
+  EM_BUSCA: 3,
+  RECEBIDO: 4,
+  EM_ANALISE: 5,
+  RETIFICANDO: 6,
+  EM_TRADUCAO: 7,
+  TRADUZIDO: 8,
+  EM_APOSTILAMENTO: 9,
+  APOSTILADO: 10,
+  ENTREGUE: 11,
+}
+const rankOf = (status: string): number =>
+  STATUS_RANK[status] !== undefined ? STATUS_RANK[status] : -1
+
+const RANK_RECEBIDO = STATUS_RANK.RECEBIDO // 4  (certidão em mãos)
+const RANK_TRADUZIDO = STATUS_RANK.TRADUZIDO // 8
+const RANK_APOSTILADO = STATUS_RANK.APOSTILADO // 10
+
+// Tradução: só faz sentido depois que a certidão chegou. Antes = "não se aplica";
+// entre RECEBIDO e TRADUZIDO = "pendente"; de TRADUZIDO em diante = "validada".
+function deriveTraducao(status: string): ColunaStatus {
+  const r = rankOf(status)
+  if (r < RANK_RECEBIDO) return "nao_aplica"
+  if (r >= RANK_TRADUZIDO) return "validada"
+  return "pendente"
+}
+
+// Apostila: idem — só depois da certidão em mãos; "validada" quando APOSTILADO.
+function deriveApostila(status: string): ColunaStatus {
+  const r = rankOf(status)
+  if (r < RANK_RECEBIDO) return "nao_aplica"
+  if (r >= RANK_APOSTILADO) return "validada"
+  return "pendente"
+}
+
+// Retificação é CONDICIONAL (nem todo doc retifica). O status único só revela
+// que houve retificação enquanto o doc está RETIFICANDO; fora disso deixamos
+// "não se aplica". Quando a Matriz de obrigações estiver ligada aqui, ela vira
+// a fonte de "aplica ou não aplica" por tipo de documento.
+function deriveRetificacao(status: string): ColunaStatus {
+  if (status === "RETIFICANDO") return "pendente"
+  return "nao_aplica"
+}
+
 function mapearBiblioteca(data: ProcessoDocumentosData) {
   const toGroup = (row: PersonRow): BibPersonGroup => {
     const docs: BibDocItem[] = row.docs.map((d) => {
@@ -117,9 +181,9 @@ function mapearBiblioteca(data: ProcessoDocumentosData) {
         documentFormat: "Inteiro teor",
         personName: row.nome,
         certificate: { status: certSt },
-        retifiedCertificate: { status: "nao_aplica" }, // backend ainda nao separa
-        translation: { status: "nao_aplica" },         // idem
-        apostille: { status: "nao_aplica" },            // idem
+        retifiedCertificate: { status: deriveRetificacao(d.status) },
+        translation: { status: deriveTraducao(d.status) },
+        apostille: { status: deriveApostila(d.status) },
         finalStatus,
       }
     })
