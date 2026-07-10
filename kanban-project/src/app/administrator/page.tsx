@@ -325,7 +325,45 @@ export default function GerenciamentoPage() {
   const { pode, carregando: permLoading } = usePermissoes()
   const isAdmin = pode("usuarios.gerenciar")
 
+  // LOTE D — deep-link + compatibilidade: a tela ativa vem da URL (?screen=).
+  // ALIASES: keys antigas (substituídas pelas concentradoras) → nova tela, pra
+  // links salvos continuarem funcionando (o "redirect" que o Marco pediu, no
+  // modelo real do sistema, que é navegação por state e não por rota).
+  const ALIAS_TELAS: Record<string, string> = {
+    coa: "estruturafin", accounts: "estruturafin", banks: "estruturafin", wallets: "estruturafin",
+    costcenters: "estruturafin", fx: "estruturafin",
+    pricingtable: "precificacao",
+    suppliers: "fornecedoresconc",
+    honorariums: "comercial", paycond: "comercial", discrules: "comercial",
+    methods: "pagamentos", fees: "pagamentos", taxes: "pagamentos",
+    impexp: "integracaofin",
+    catalog: "catalogmestre",
+  }
+  const resolverTela = (k: string | null): string => {
+    if (!k) return "overview"
+    return ALIAS_TELAS[k] || k
+  }
+
   const [tab, setTab] = useState("overview")
+
+  // lê a tela da URL na montagem (deep-link) e aplica alias se for key antiga
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const screen = new URLSearchParams(window.location.search).get("screen")
+    if (screen) setTab(resolverTela(screen))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // troca de tela: atualiza state E URL (?screen=), preservando ?tab= da concentradora
+  const irParaTela = (key: string) => {
+    setTab(key); setBusca("")
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href)
+      url.searchParams.set("screen", key)
+      url.searchParams.delete("tab") // a nova tela define sua própria aba
+      window.history.replaceState({}, "", url.toString())
+    }
+  }
   const [busca, setBusca] = useState("")
   const [user, setUser] = useState<UserData>({ nome: "Usuário" })
   const [processos, setProcessos] = useState<any[]>([])
@@ -421,7 +459,7 @@ export default function GerenciamentoPage() {
                       return (
                         <button
                           key={key}
-                          onClick={() => { setTab(key); setBusca("") }}
+                          onClick={() => irParaTela(key)}
                           className={`block w-full rounded-lg px-2.5 py-2 text-left text-[12.5px] transition-colors ${
                             ativo
                               ? "bg-white/15 font-semibold text-white"
