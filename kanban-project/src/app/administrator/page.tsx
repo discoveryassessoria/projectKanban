@@ -102,12 +102,12 @@ const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
   ]},
 
   { grupo: "Financeiro e Precificação", itens: [
-    ["pricingtable", "Precificação"],
-    ["suppliers", "Fornecedores"],
-    ["honorariums", "Comercial"],
-    ["methods", "Pagamentos"],
+    ["precificacao", "Precificação"],
+    ["fornecedoresconc", "Fornecedores"],
+    ["comercial", "Comercial"],
+    ["pagamentos", "Pagamentos"],
     ["estruturafin", "Estrutura Financeira"],
-    ["impexp", "Integração Financeira"],
+    ["integracaofin", "Integração Financeira"],
   ]},
 
   { grupo: "Usuários e Acesso", itens: [
@@ -159,6 +159,11 @@ const UsersTab = dynamic(() => import("@/src/components/gerenciamentoComponents/
   ssr: false, loading: () => <CarregandoTela />,
 })
 const RolesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RolesTab"), { ssr: false })
+const PrecificacaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PrecificacaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const FornecedoresConcentradoraTab = dynamic(() => import("@/src/components/gerenciamentoComponents/FornecedoresConcentradoraTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const ComercialTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ComercialTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const PagamentosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PagamentosTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const IntegracaoFinanceiraTab = dynamic(() => import("@/src/components/gerenciamentoComponents/IntegracaoFinanceiraTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const EstruturaFinanceiraTab = dynamic(() => import("@/src/components/gerenciamentoComponents/EstruturaFinanceiraTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const AplicabilidadeEconomicaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/AplicabilidadeEconomicaTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CatalogoMestreTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogoMestreTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -227,6 +232,11 @@ const TELAS: Record<string, React.ComponentType> = {
   wallets: CarteirasTab,
   coa: PlanoContasTab,
   estruturafin: EstruturaFinanceiraTab,
+  precificacao: PrecificacaoTab,
+  fornecedoresconc: FornecedoresConcentradoraTab,
+  comercial: ComercialTab,
+  pagamentos: PagamentosTab,
+  integracaofin: IntegracaoFinanceiraTab,
   categories: CategoriasTab,
   costcenters: CentrosCustoTab,
   taxes: ImpostosTab,
