@@ -186,12 +186,28 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const dataToUpdate: Prisma.DocumentoUpdateInput = {}
 
-    // Tipo e status
-    if (body.tipo !== undefined) {
+    // Tipo — LOTE C: aceita documentTypeId (tipo novo, do cadastro) OU tipo do enum.
+    if (body.documentTypeId !== undefined) {
+      const tc = await prisma.tipoDocumentoCadastro.findUnique({
+        where: { id: parseInt(String(body.documentTypeId)) },
+        select: { id: true, legacyEnumKey: true },
+      })
+      if (!tc) {
+        return NextResponse.json({ error: "documentTypeId inválido (tipo não cadastrado)" }, { status: 400 })
+      }
+      dataToUpdate.documentType = { connect: { id: tc.id } }
+      // dual-write: se o tipo tem equivalente no enum, também atualiza o legado; senão, limpa
+      dataToUpdate.tipo = (tc.legacyEnumKey && Object.values(TipoDocumento).includes(tc.legacyEnumKey as TipoDocumento))
+        ? (tc.legacyEnumKey as TipoDocumento)
+        : null
+    } else if (body.tipo !== undefined) {
       if (!Object.values(TipoDocumento).includes(body.tipo)) {
         return NextResponse.json({ error: "Tipo de documento inválido" }, { status: 400 })
       }
       dataToUpdate.tipo = body.tipo
+      // liga o cadastro correspondente, se houver (dual-write)
+      const equiv = await prisma.tipoDocumentoCadastro.findFirst({ where: { legacyEnumKey: String(body.tipo) }, select: { id: true } })
+      if (equiv) dataToUpdate.documentType = { connect: { id: equiv.id } }
     }
     if (body.status !== undefined) {
       if (!Object.values(StatusDocumento).includes(body.status)) {
