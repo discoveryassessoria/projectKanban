@@ -67,7 +67,6 @@ const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
 
   { grupo: "Catálogo Mestre", itens: [
     ["catalogmestre", "Itens"],
-    ["doctypes", "Tipos de Documento"],
     ["categories", "Categorias"],
     ["currencies", "Unidades"],
     ["products", "Composições"],
@@ -107,7 +106,7 @@ const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
     ["suppliers", "Fornecedores"],
     ["honorariums", "Comercial"],
     ["methods", "Pagamentos"],
-    ["coa", "Estrutura Financeira"],
+    ["estruturafin", "Estrutura Financeira"],
     ["impexp", "Integração Financeira"],
   ]},
 
@@ -160,6 +159,7 @@ const UsersTab = dynamic(() => import("@/src/components/gerenciamentoComponents/
   ssr: false, loading: () => <CarregandoTela />,
 })
 const RolesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RolesTab"), { ssr: false })
+const EstruturaFinanceiraTab = dynamic(() => import("@/src/components/gerenciamentoComponents/EstruturaFinanceiraTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const AplicabilidadeEconomicaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/AplicabilidadeEconomicaTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CatalogoMestreTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogoMestreTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CatalogTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogTab"), {
@@ -226,6 +226,7 @@ const TELAS: Record<string, React.ComponentType> = {
   accounts: ContasTab,
   wallets: CarteirasTab,
   coa: PlanoContasTab,
+  estruturafin: EstruturaFinanceiraTab,
   categories: CategoriasTab,
   costcenters: CentrosCustoTab,
   taxes: ImpostosTab,
