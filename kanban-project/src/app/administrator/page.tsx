@@ -67,6 +67,7 @@ const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
 
   { grupo: "Catálogo Mestre", itens: [
     ["catalogmestre", "Itens"],
+    ["doctypes", "Tipos de Documento"],
     ["categories", "Categorias"],
     ["currencies", "Unidades"],
     ["products", "Composições"],
