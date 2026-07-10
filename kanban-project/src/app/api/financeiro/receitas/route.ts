@@ -40,6 +40,10 @@ export async function GET(req: NextRequest) {
         include: {
           parcelas: { orderBy: { numero: "asc" } },
           requerentes: { orderBy: { idx: "asc" } },
+          // 🆕 Pasta Documental (espelho de Custos): nomes p/ o detalhe agrupado
+          pessoa: { select: { id: true, nome: true, sobrenome: true } },
+          tipoServico: { select: { id: true, nome: true } },
+          documento: { select: { id: true, tipo: true } },
         },
       })
     );

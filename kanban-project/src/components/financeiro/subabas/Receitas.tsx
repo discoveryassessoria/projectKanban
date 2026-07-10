@@ -79,6 +79,14 @@ interface ReceitaAPI {
   cancelada?: boolean
   parcelas: ParcelaAPI[]
   requerentes?: ReceitaRequerenteAPI[]
+  // 🆕 Pasta Documental (espelho de Custos)
+  origem?: string | null
+  personId?: number | null
+  documentoId?: number | null
+  tipoServicoId?: number | null
+  pessoa?: { id: number; nome: string; sobrenome?: string | null } | null
+  tipoServico?: { id: number; nome: string } | null
+  documento?: { id: number; tipo: string | null } | null
 }
 
 type Filter = 'todas' | 'recebidas' | 'pendentes' | 'rascunhos'
@@ -124,6 +132,20 @@ function cambioEfetivo(r: ReceitaAPI): number {
   if (r.fxRule === 'FIXO' && r.fxFixo) return num(r.fxFixo)
   return num(r.fxEstimado) || 1
 }
+// Pasta Documental — mesma regra do Custos: receita documental = motor ou vinculada a doc
+function isReceitaDocumental(r: ReceitaAPI): boolean {
+  return r.origem === 'motor' || r.documentoId != null
+}
+function componenteLabelR(r: ReceitaAPI): string {
+  if (r.tipoServico?.nome) return r.tipoServico.nome
+  const antes = r.descricao?.split('·')[0]?.trim()
+  return antes || r.descricao || '—'
+}
+function pessoaLabelR(r: ReceitaAPI): string {
+  if (r.pessoa) return `${r.pessoa.nome} ${r.pessoa.sobrenome ?? ''}`.trim()
+  return '—'
+}
+
 function isVencida(p: ParcelaAPI): boolean {
   if (p.status !== 'PENDENTE') return false
   if (!p.vencimento) return false
@@ -160,6 +182,7 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
   const [filtro, setFiltro] = useState<Filter>('todas')
   const [excluindoId, setExcluindoId] = useState<number | null>(null)
   const [templateAberto, setTemplateAberto] = useState(false)
+  const [pastaAberta, setPastaAberta] = useState(true) // Pasta Documental expandida por padrão
 
   // ---- Load ----
   useEffect(() => {
@@ -318,6 +341,101 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
       r.parcelas?.some((p) => p.status === 'PENDENTE'),
     )
   }, [receitasAtivas, receitasRascunho, filtro])
+
+  // ---- Pasta Documental: separa documentais × outros (espelho de Custos) ----
+  const { pastaReceitas, outrasReceitas, pastaResumo } = useMemo(() => {
+    const pastaReceitas = receitasExibidas.filter(isReceitaDocumental)
+    const outrasReceitas = receitasExibidas.filter((r) => !isReceitaDocumental(r))
+    const pessoas = new Set<number>()
+    const porMoeda: Record<string, number> = {}
+    let totalBrl = 0
+    for (const r of pastaReceitas) {
+      if (r.personId != null) pessoas.add(r.personId)
+      const cx = cambioEfetivo(r)
+      const orig = num(r.valor)
+      totalBrl += orig * cx
+      porMoeda[r.moeda] = (porMoeda[r.moeda] || 0) + orig
+    }
+    return {
+      pastaReceitas,
+      outrasReceitas,
+      pastaResumo: {
+        nPessoas: pessoas.size,
+        nComponentes: pastaReceitas.length,
+        totalBrl,
+        porMoeda,
+        multiMoeda: Object.keys(porMoeda).length > 1,
+      },
+    }
+  }, [receitasExibidas])
+
+  // Renderiza UMA linha de receita (reusada pela Pasta e pela lista normal).
+  function renderReceitaRow(r: ReceitaAPI, opts?: { dentroPasta?: boolean }): React.ReactNode {
+    const dentroPasta = opts?.dentroPasta === true
+    const cx = cambioEfetivo(r)
+    const totOrig = num(r.valor)
+    const totBrl = totOrig * cx
+    let recCount = 0
+    r.parcelas?.forEach((p) => { if (p.status === 'RECEBIDA' || p.status === 'PAGA') recCount++ })
+    const totParc = r.parcelas?.length || 0
+    const pct = totParc > 0 ? (recCount / totParc) * 100 : 0
+    const isQuit = totParc > 0 && recCount === totParc
+    const temAtraso = r.parcelas?.some(isVencida)
+    const isRascunho = r.status === 'RASCUNHO'
+    const sendoExcluido = excluindoId === r.id
+
+    let statusBadge: React.ReactNode
+    if (isRascunho) statusBadge = <span className="badge" style={{ background: '#f1f5f9', color: '#475569' }}>📝 Rascunho</span>
+    else if (isQuit) statusBadge = <span className="badge badge-recebida">Quitada</span>
+    else if (temAtraso) statusBadge = <span className="badge badge-atrasada">Atrasada</span>
+    else statusBadge = <span className="badge badge-pendente">Em aberto</span>
+
+    const fxBadge =
+      r.moeda === 'BRL' ? <span className="badge badge-pendente">BRL</span>
+      : r.fxRule === 'FIXO' ? <span className="badge-fx-fixo-sm">FIXO</span>
+      : <span className="badge-fx-var-sm">VAR</span>
+
+    return (
+      <tr key={r.id} style={sendoExcluido ? { opacity: 0.4 } : isRascunho ? { opacity: 0.7 } : dentroPasta ? { background: '#fcfdff' } : undefined}>
+        <td style={dentroPasta ? { paddingLeft: 28 } : undefined}>{isRascunho ? '📝' : dentroPasta ? '↳' : '📑'}</td>
+        <td>
+          <strong>{dentroPasta ? componenteLabelR(r) : r.descricao}</strong>
+          <span className="muted-xs">{dentroPasta ? `${pessoaLabelR(r)} · ${r.codigo}` : r.codigo}</span>
+        </td>
+        <td>{CATEGORIA_LABEL[r.categoria]}</td>
+        <td>{fmtMoeda(totOrig, r.moeda)}</td>
+        <td className="brl">
+          <strong>{fmtBRL(totBrl)}{r.moeda !== 'BRL' && r.fxRule === 'VARIAVEL' && <span className="muted-xs">(est.)</span>}</strong>
+        </td>
+        <td>
+          {r.moeda === 'BRL' ? <span className="muted">—</span>
+            : r.fxRule === 'FIXO' ? <>{fmtFX(num(r.fxFixo))} {fxBadge}</>
+            : <>{fmtFX(num(r.fxEstimado))} {fxBadge}</>}
+        </td>
+        <td>{recCount}/{totParc}</td>
+        <td>
+          <div style={{ width: 100, height: 6, background: 'var(--fpag-gray-100)', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{ width: `${pct}%`, height: '100%', background: 'var(--fpag-success)', transition: 'width .3s' }} />
+          </div>
+          <div className="muted-xs">{pct.toFixed(0)}%</div>
+        </td>
+        <td>{statusBadge}</td>
+        <td>
+          {isRascunho ? (
+            <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
+              <button type="button" className="btn-link-sm" onClick={() => setView({ kind: 'editar', receita: r })} disabled={sendoExcluido}>Editar</button>
+              <button type="button" className="btn-link-sm" style={{ color: '#dc2626' }} onClick={() => excluirRascunho(r)} disabled={sendoExcluido}>{sendoExcluido ? 'Excluindo...' : 'Excluir'}</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
+              <button type="button" className="btn-link-sm" disabled title="Em desenvolvimento" style={{ opacity: 0.5, cursor: 'not-allowed' }}>Fatura</button>
+              <button type="button" className="btn-link-sm" onClick={() => setView({ kind: 'detalhes', receita: r })}>Ver</button>
+            </div>
+          )}
+        </td>
+      </tr>
+    )
+  }
 
   // ---- Render por view ----
   if (view.kind === 'nova') {
@@ -531,156 +649,30 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
               </tr>
             </thead>
             <tbody>
-              {receitasExibidas.map((r) => {
-                const cx = cambioEfetivo(r)
-                const totOrig = num(r.valor)
-                const totBrl = totOrig * cx
-                let recCount = 0
-                r.parcelas?.forEach((p) => {
-                  if (p.status === 'RECEBIDA' || p.status === 'PAGA') recCount++
-                })
-                const totParc = r.parcelas?.length || 0
-                const pct = totParc > 0 ? (recCount / totParc) * 100 : 0
-                const isQuit = totParc > 0 && recCount === totParc
-                const temAtraso = r.parcelas?.some(isVencida)
-                const isRascunho = r.status === 'RASCUNHO'
-                const sendoExcluido = excluindoId === r.id
-
-                let statusBadge: React.ReactNode
-                if (isRascunho)
-                  statusBadge = (
-                    <span
-                      className="badge"
-                      style={{ background: '#f1f5f9', color: '#475569' }}
-                    >
-                      📝 Rascunho
-                    </span>
-                  )
-                else if (isQuit)
-                  statusBadge = <span className="badge badge-recebida">Quitada</span>
-                else if (temAtraso)
-                  statusBadge = <span className="badge badge-atrasada">Atrasada</span>
-                else statusBadge = <span className="badge badge-pendente">Em aberto</span>
-
-                const fxBadge =
-                  r.moeda === 'BRL' ? (
-                    <span className="badge badge-pendente">BRL</span>
-                  ) : r.fxRule === 'FIXO' ? (
-                    <span className="badge-fx-fixo-sm">FIXO</span>
-                  ) : (
-                    <span className="badge-fx-var-sm">VAR</span>
-                  )
-
-                const proximaPendente = r.parcelas?.find((p) => p.status === 'PENDENTE')
-
-                return (
-                  <tr
-                    key={r.id}
-                    style={
-                      isRascunho || sendoExcluido
-                        ? { opacity: sendoExcluido ? 0.4 : 0.7 }
-                        : undefined
-                    }
-                  >
-                    <td>{isRascunho ? '📝' : '📑'}</td>
-                    <td>
-                      <strong>{r.descricao}</strong>
-                      <span className="muted-xs">{r.codigo}</span>
-                    </td>
-                    <td>{CATEGORIA_LABEL[r.categoria]}</td>
-                    <td>{fmtMoeda(totOrig, r.moeda)}</td>
-                    <td className="brl">
-                      <strong>
-                        {fmtBRL(totBrl)}
-                        {r.moeda !== 'BRL' && r.fxRule === 'VARIAVEL' && (
-                          <span className="muted-xs">(est.)</span>
-                        )}
-                      </strong>
-                    </td>
-                    <td>
-                      {r.moeda === 'BRL' ? (
-                        <span className="muted">—</span>
-                      ) : r.fxRule === 'FIXO' ? (
-                        <>
-                          {fmtFX(num(r.fxFixo))} {fxBadge}
-                        </>
-                      ) : (
-                        <>
-                          {fmtFX(num(r.fxEstimado))} {fxBadge}
-                        </>
-                      )}
-                    </td>
-                    <td>
-                      {recCount}/{totParc}
-                    </td>
-                    <td>
-                      <div
-                        style={{
-                          width: 100,
-                          height: 6,
-                          background: 'var(--fpag-gray-100)',
-                          borderRadius: 3,
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: `${pct}%`,
-                            height: '100%',
-                            background: 'var(--fpag-success)',
-                            transition: 'width .3s',
-                          }}
-                        />
-                      </div>
-                      <div className="muted-xs">{pct.toFixed(0)}%</div>
-                    </td>
-                    <td>{statusBadge}</td>
-                    <td>
-                      {isRascunho ? (
-                        <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
-                          <button
-                            type="button"
-                            className="btn-link-sm"
-                            onClick={() => setView({ kind: 'editar', receita: r })}
-                            disabled={sendoExcluido}
-                          >
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-link-sm"
-                            style={{ color: '#dc2626' }}
-                            onClick={() => excluirRascunho(r)}
-                            disabled={sendoExcluido}
-                          >
-                            {sendoExcluido ? 'Excluindo...' : 'Excluir'}
-                          </button>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
-                          <button
-                            type="button"
-                            className="btn-link-sm"
-                            disabled
-                            title="Em desenvolvimento"
-                            style={{ opacity: 0.5, cursor: 'not-allowed' }}
-                          >
-                            Fatura
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-link-sm"
-                            onClick={() => setView({ kind: 'detalhes', receita: r })}
-                          >
-                            Ver
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
+                {/* Grupo: Pasta Documental (agrupador visual; receitas seguem individuais) */}
+                {pastaReceitas.length > 0 && (
+                  <>
+                    <tr onClick={() => setPastaAberta((v) => !v)} style={{ cursor: 'pointer', background: '#f8fafc', fontWeight: 600 }}>
+                      <td>{pastaAberta ? '\u25be' : '\u25b8'}</td>
+                      <td>
+                        <strong>\ud83d\udcc2 Pasta Documental</strong>
+                        <span className="muted-xs">{pastaResumo.nPessoas} {pastaResumo.nPessoas === 1 ? 'pessoa' : 'pessoas'} \u00b7 {pastaResumo.nComponentes} {pastaResumo.nComponentes === 1 ? 'componente' : 'componentes'}</span>
+                      </td>
+                      <td><span className="muted">\u2014</span></td>
+                      <td>{pastaResumo.multiMoeda ? <span className="muted-xs">{Object.entries(pastaResumo.porMoeda).map(([m, v]) => fmtMoeda(v, m as Moeda)).join(' + ')}</span> : <span className="muted">\u2014</span>}</td>
+                      <td className="brl"><strong>{fmtBRL(pastaResumo.totalBrl)}{pastaResumo.multiMoeda && <span className="muted-xs">(conv.)</span>}</strong></td>
+                      <td><span className="muted">\u2014</span></td>
+                      <td><span className="muted">\u2014</span></td>
+                      <td><span className="muted">\u2014</span></td>
+                      <td><span className="badge badge-pendente">{pastaResumo.nComponentes} {pastaResumo.nComponentes === 1 ? 'item' : 'itens'}</span></td>
+                      <td></td>
+                    </tr>
+                    {pastaAberta && pastaReceitas.map((r) => renderReceitaRow(r, { dentroPasta: true }))}
+                  </>
+                )}
+                {/* Receitas não-documentais (honorários, etc.) — soltas, separadas */}
+                {outrasReceitas.map((r) => renderReceitaRow(r))}
+              </tbody>
           </table>
         )}
       </div>
