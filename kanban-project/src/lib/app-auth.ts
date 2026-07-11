@@ -5,9 +5,25 @@
 
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { randomInt } from 'crypto';
 import { NextRequest } from 'next/server';
 
-const JWT_SECRET = process.env.APP_JWT_SECRET || 'discovery-app-secret-change-this';
+// CP-SEC — segredo OBRIGATÓRIO, sem fallback inseguro.
+// Getter lazy: não avalia no import (senão o `next build`, que importa o
+// módulo, quebraria em ambientes sem env). Lança apenas quando um token é
+// realmente assinado/verificado, garantindo falha controlada (fail-closed).
+function getAppSecret(): string {
+  const secret = process.env.APP_JWT_SECRET;
+  if (!secret) {
+    throw new Error(
+      'APP_JWT_SECRET não definido. Defina uma string longa e aleatória (>=32 chars).'
+    );
+  }
+  if (secret.length < 32) {
+    throw new Error('APP_JWT_SECRET deve ter pelo menos 32 caracteres.');
+  }
+  return secret;
+}
 
 export interface AppTokenPayload {
   clienteAuthId: number;
@@ -19,13 +35,13 @@ export interface AppTokenPayload {
 
 // Gerar token JWT
 export function gerarToken(payload: AppTokenPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
+  return jwt.sign(payload, getAppSecret(), { expiresIn: '30d' });
 }
 
 // Verificar token JWT
 export function verificarToken(token: string): AppTokenPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as AppTokenPayload;
+    return jwt.verify(token, getAppSecret()) as AppTokenPayload;
   } catch {
     return null;
   }
@@ -50,12 +66,13 @@ export async function verificarSenha(senha: string, hash: string): Promise<boole
   return bcrypt.compare(senha, hash);
 }
 
-// Gerar senha temporária (6 caracteres alfanuméricos)
+// Gerar senha temporária (10 caracteres alfanuméricos, CSPRNG)
+// CP-SEC — usa crypto.randomInt em vez de Math.random (não-criptográfico).
 export function gerarSenhaTemporaria(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let senha = '';
-  for (let i = 0; i < 6; i++) {
-    senha += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i = 0; i < 10; i++) {
+    senha += chars.charAt(randomInt(chars.length));
   }
   return senha;
 }

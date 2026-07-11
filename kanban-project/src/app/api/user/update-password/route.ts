@@ -1,27 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcrypt'
+import { requireUsuario } from '@/src/lib/guard'
 
 export async function PUT(request: NextRequest) {
   try {
-    const { currentPassword, newPassword, userId } = await request.json()
+    // CP-SEC — exige autenticação e troca a senha SOMENTE do próprio usuário.
+    const { usuario, erro } = await requireUsuario(request)
+    if (erro) return erro
 
-    if (!currentPassword || !newPassword || !userId) {
+    const { currentPassword, newPassword } = await request.json()
+    const userId = usuario.userId
+
+    if (!currentPassword || !newPassword) {
       return NextResponse.json(
-        { message: 'Senha atual, nova senha e ID do usuário são obrigatórios' },
+        { message: 'Senha atual e nova senha são obrigatórias' },
         { status: 400 }
       )
     }
 
     // Validar tamanho da nova senha
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       return NextResponse.json(
-        { message: 'A nova senha deve ter pelo menos 6 caracteres' },
+        { message: 'A nova senha deve ter pelo menos 8 caracteres' },
         { status: 400 }
       )
     }
 
-    // Buscar usuário atual
+    // Buscar o próprio usuário autenticado
     const user = await prisma.usuario.findUnique({
       where: { id: userId }
     })
@@ -43,10 +49,8 @@ export async function PUT(request: NextRequest) {
     }
 
     // Gerar hash da nova senha
-    const saltRounds = 10
-    const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds)
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10)
 
-    // Atualizar a senha
     await prisma.usuario.update({
       where: { id: userId },
       data: { senha: hashedNewPassword }

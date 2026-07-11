@@ -1,18 +1,9 @@
 // src/app/api/app/mensagens/[processoId]/[mensagemId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-
-function extrairToken(request: NextRequest) {
-  const auth = request.headers.get('authorization');
-  if (!auth || !auth.startsWith('Bearer ')) return null;
-  try {
-    const token = auth.split(' ')[1];
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-    return payload;
-  } catch {
-    return null;
-  }
-}
+// CP-SEC — usa a verificação REAL de assinatura (app-auth) em vez do
+// decoder inline que apenas fazia base64 do payload (forjável).
+import { extrairToken } from '@/src/lib/app-auth';
 
 // PATCH - Cliente edita sua própria mensagem
 export async function PATCH(

@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
-import { verifyAuth } from "@/src/lib/verify-auth"
+import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 
 export async function GET(request: NextRequest) {
   try {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
-    
-    const { isAuthenticated, isAdmin } = verifyAuth(request)
 
-    if (!isAuthenticated) {
+    // CP-SEC — identidade verificada (jose), não mais o decoder inseguro.
+    const usuario = await extrairUsuarioComPermissoes(request)
+    if (!usuario) {
       return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
     }
+    const isAdmin = usuario.tipo === 'admin'
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''

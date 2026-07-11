@@ -3,12 +3,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { hashSenha, gerarSenhaTemporaria } from '@/src/lib/app-auth';
+import { verificarPermissao } from '@/src/lib/verificar-permissao';
 
 // GET - Verificar se um cliente já tem acesso ao app
 // Query params: tipo (contratante|requerente) + id (número)
 // Ou sem params: lista todos os acessos
 export async function GET(request: NextRequest) {
   try {
+    // CP-SEC — gestão de credenciais de cliente é exclusiva de staff autorizado.
+    const semPermissao = await verificarPermissao(request, 'usuarios.gerenciar');
+    if (semPermissao) return semPermissao;
+
     const { searchParams } = new URL(request.url);
     const tipo = searchParams.get('tipo');
     const id = searchParams.get('id');
@@ -67,6 +72,10 @@ export async function GET(request: NextRequest) {
 // POST - Gerar novo acesso
 export async function POST(request: NextRequest) {
   try {
+    // CP-SEC — apenas staff autorizado cria acesso de cliente.
+    const semPermissao = await verificarPermissao(request, 'usuarios.gerenciar');
+    if (semPermissao) return semPermissao;
+
     const { email, contratanteId, requerenteId } = await request.json();
 
     if (!email) {
@@ -138,6 +147,10 @@ export async function POST(request: NextRequest) {
 // PUT - Resetar senha de um acesso existente
 export async function PUT(request: NextRequest) {
   try {
+    // CP-SEC — apenas staff autorizado reseta senha de acesso de cliente.
+    const semPermissao = await verificarPermissao(request, 'usuarios.gerenciar');
+    if (semPermissao) return semPermissao;
+
     const { acessoId } = await request.json();
 
     if (!acessoId) {
@@ -177,6 +190,10 @@ export async function PUT(request: NextRequest) {
 // DELETE - Revogar acesso
 export async function DELETE(request: NextRequest) {
   try {
+    // CP-SEC — apenas staff autorizado revoga acesso de cliente.
+    const semPermissao = await verificarPermissao(request, 'usuarios.gerenciar');
+    if (semPermissao) return semPermissao;
+
     const { searchParams } = new URL(request.url);
     const acessoId = searchParams.get('id');
 

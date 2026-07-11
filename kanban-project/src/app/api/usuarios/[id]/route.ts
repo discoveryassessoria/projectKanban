@@ -2,8 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { hash } from "bcrypt"
 import { UserType } from "@/src/utils/userTypes"
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
-import { verifyAuth } from "@/src/lib/verify-auth"
+import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 
 // PUT - Atualizar usuário
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -11,7 +10,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const erro = await verificarPermissao(request, 'usuarios.editar')
     if (erro) return erro
 
-    const { isAdmin, userId: requesterId } = verifyAuth(request)
+    // CP-SEC — identidade verificada (jose), não mais o decoder inseguro.
+    const requester = await extrairUsuarioComPermissoes(request)
+    if (!requester) {
+      return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
+    }
+    const requesterId = requester.userId
 
     const { id: idParam } = await params
     const userId = parseInt(idParam)
@@ -89,7 +93,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const erro = await verificarPermissao(request, 'usuarios.excluir')
     if (erro) return erro
 
-    const { isAdmin, userId: requesterId, tipo: requesterTipo } = verifyAuth(request)
+    // CP-SEC — identidade verificada (jose), não mais o decoder inseguro.
+    const requester = await extrairUsuarioComPermissoes(request)
+    if (!requester) {
+      return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
+    }
+    const requesterId = requester.userId
+    const isAdmin = requester.tipo === 'admin'
 
     const { id: idParam } = await params
     const userId = parseInt(idParam)

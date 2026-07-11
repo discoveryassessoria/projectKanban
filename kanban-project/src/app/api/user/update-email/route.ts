@@ -1,17 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireUsuario } from '@/src/lib/guard'
 
 export async function PUT(request: NextRequest) {
   try {
+    // CP-SEC — exige autenticação e opera SOMENTE no próprio usuário.
+    // O id vem do token verificado, nunca do body (evita account-takeover).
+    const { usuario, erro } = await requireUsuario(request)
+    if (erro) return erro
+
     const body = await request.json()
-    const { newEmail, userId } = body
+    const { newEmail } = body
+    const userId = usuario.userId
 
-    console.log('Dados recebidos:', { newEmail, userId, bodyComplete: body })
-
-    if (!newEmail || !userId) {
-      console.log('Dados obrigatórios ausentes:', { newEmail: !!newEmail, userId: !!userId })
+    if (!newEmail) {
       return NextResponse.json(
-        { message: 'Email e ID do usuário são obrigatórios' },
+        { message: 'Email é obrigatório' },
         { status: 400 }
       )
     }
@@ -19,31 +23,27 @@ export async function PUT(request: NextRequest) {
     // Validar formato do email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(newEmail)) {
-      console.log('Formato de email inválido:', newEmail)
       return NextResponse.json(
         { message: 'Formato de email inválido' },
         { status: 400 }
       )
     }
 
-    console.log('Verificando se email já existe:', newEmail)
-    // Verificar se o email já existe
+    // Verificar se o email já existe em outro usuário
     const existingUser = await prisma.usuario.findUnique({
       where: { email: newEmail }
     })
 
-    if (existingUser && existingUser.id !== parseInt(userId)) {
-      console.log('Email já existe para outro usuário:', { existingUserId: existingUser.id, requestUserId: userId })
+    if (existingUser && existingUser.id !== userId) {
       return NextResponse.json(
         { message: 'Este email já está sendo usado por outro usuário' },
         { status: 409 }
       )
     }
 
-    console.log('Atualizando email do usuário:', { userId, newEmail })
-    // Atualizar o email
+    // Atualizar o email do próprio usuário autenticado
     const updatedUser = await prisma.usuario.update({
-      where: { id: parseInt(userId) },
+      where: { id: userId },
       data: { email: newEmail },
       select: {
         id: true,
@@ -53,7 +53,6 @@ export async function PUT(request: NextRequest) {
       }
     })
 
-    console.log('Email atualizado com sucesso:', updatedUser)
     return NextResponse.json(updatedUser, { status: 200 })
 
   } catch (error) {

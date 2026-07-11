@@ -3,7 +3,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/src/lib/r2";
-import { verifyAuth } from "@/src/lib/verify-auth";
+import { extrairUsuarioKanban } from "@/lib/kanban-auth";
 
 // Mesmas regras do anexoUploader do UploadThing
 const MAX_SIZE = 64 * 1024 * 1024; // 64MB
@@ -30,10 +30,11 @@ function sanitize(name: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = verifyAuth(req);
-    if (!auth.isAuthenticated) {
+  // CP-SEC — verificação real de assinatura (jose) em vez do decoder inseguro.
+  const usuario = await extrairUsuarioKanban(req);
+  if (!usuario) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-    }
+  }
 
   let body: { filename?: string; contentType?: string; size?: number; prefix?: string };
   try {
