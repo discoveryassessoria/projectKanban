@@ -1,115 +1,44 @@
-// CRIAR EM: src/app/api/fornecedores/route.ts
+// src/app/api/fornecedores/route.ts
+// @deprecated CP-2 — ROTA LEGADA. Use a canônica /api/gerenciamento/fornecedores.
+// Mantida temporariamente como ADAPTADOR sobre o MESMO service canônico
+// (src/services/fornecedor.ts). Não reimplementa CRUD nem validação.
+// Preserva o envelope de resposta histórico (array + totais).
 
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
+import { listarFornecedores, criarFornecedor } from "@/src/services/fornecedor"
 
-// GET - Listar fornecedores
+// GET - Listar (com busca/ativo/totais — envelope legado: array)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const ativo = searchParams.get("ativo")
+    const ativoParam = searchParams.get("ativo")
     const busca = searchParams.get("busca")
-
-    const where: any = {}
-    
-    if (ativo !== null) {
-      where.ativo = ativo === "true"
-    }
-    
-    if (busca) {
-      where.OR = [
-        { nome: { contains: busca, mode: "insensitive" } },
-        { nomeFantasia: { contains: busca, mode: "insensitive" } },
-        { cpfCnpj: { contains: busca } },
-      ]
-    }
-
-    const fornecedores = await prisma.fornecedor.findMany({
-      where,
-      orderBy: { nome: "asc" },
-      include: {
-        _count: {
-          select: { contasPagar: true }
-        }
-      }
+    const fornecedores = await listarFornecedores({
+      busca: busca || undefined,
+      ativo: ativoParam !== null ? ativoParam === "true" : undefined,
+      comTotais: true,
     })
-
-    // Calcular total pago por fornecedor
-    const fornecedoresComTotais = await Promise.all(
-      fornecedores.map(async (fornecedor) => {
-        const totalPago = await prisma.contaPagar.aggregate({
-          where: {
-            fornecedorId: fornecedor.id,
-            status: "PAGO"
-          },
-          _sum: {
-            valorPago: true
-          }
-        })
-
-        return {
-          ...fornecedor,
-          totalContas: fornecedor._count.contasPagar,
-          totalPago: totalPago._sum.valorPago?.toNumber() || 0
-        }
-      })
-    )
-
-    return NextResponse.json(fornecedoresComTotais)
+    return NextResponse.json(fornecedores)
   } catch (error) {
     console.error("Erro ao listar fornecedores:", error)
-    return NextResponse.json(
-      { error: "Erro ao listar fornecedores" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Erro ao listar fornecedores" }, { status: 500 })
   }
 }
 
-// POST - Criar fornecedor
+// POST - Criar (envelope legado: fornecedor "cru")
 export async function POST(request: NextRequest) {
+  const erro = await verificarPermissao(request, "financeiro.ver")
+  if (erro) return erro
   try {
-    const erro = await verificarPermissao(request, 'financeiro.ver')
-    if (erro) return erro
-    
     const body = await request.json()
-
-    const fornecedor = await prisma.fornecedor.create({
-      data: {
-        nome: body.nome,
-        nomeFantasia: body.nomeFantasia || null,
-        tipo: body.tipo || "PJ",
-        cpfCnpj: body.cpfCnpj || null,
-        inscricaoEstadual: body.inscricaoEstadual || null,
-        inscricaoMunicipal: body.inscricaoMunicipal || null,
-        telefone: body.telefone || null,
-        celular: body.celular || null,
-        email: body.email || null,
-        website: body.website || null,
-        cep: body.cep || null,
-        endereco: body.endereco || null,
-        numero: body.numero || null,
-        complemento: body.complemento || null,
-        bairro: body.bairro || null,
-        cidade: body.cidade || null,
-        estado: body.estado || null,
-        banco: body.banco || null,
-        agencia: body.agencia || null,
-        conta: body.conta || null,
-        tipoConta: body.tipoConta || null,
-        chavePix: body.chavePix || null,
-        tipoChavePix: body.tipoChavePix || null,
-        observacoes: body.observacoes || null,
-        ativo: true,
-      },
-    })
-
+    const fornecedor = await criarFornecedor(body)
     return NextResponse.json(fornecedor, { status: 201 })
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith("VALIDATION:")) {
+      return NextResponse.json({ error: error.message.replace("VALIDATION:", "") }, { status: 400 })
+    }
     console.error("Erro ao criar fornecedor:", error)
-    return NextResponse.json(
-      { error: "Erro ao criar fornecedor" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Erro ao criar fornecedor" }, { status: 500 })
   }
 }

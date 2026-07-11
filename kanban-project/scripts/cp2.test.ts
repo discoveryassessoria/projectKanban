@@ -11,6 +11,7 @@ import {
   nomeDocumentoMestre,
   resolverItemCatalogoDeTipoServico,
 } from "../src/services/catalogo-helpers"
+import { chaveFiscal, digitosFiscais } from "../src/services/fornecedor-helpers"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 
@@ -47,8 +48,16 @@ function run() {
   ok(!/DROP\s+COLUMN/i.test(mig), "não contém DROP COLUMN")
   ok(/ALTER TABLE "TipoServico" ADD COLUMN\s+"itemCatalogoId"/.test(mig), "adiciona TipoServico.itemCatalogoId")
 
-  // 4) Schema
-  console.log("\n4) Schema:")
+  // 4) Fornecedor: dedup fiscal (correspondência forte só com CPF/CNPJ)
+  console.log("\n4) Fornecedor (dedup fiscal):")
+  ok(digitosFiscais("12.345.678/0001-90") === "12345678000190", "digitosFiscais extrai só dígitos")
+  ok(chaveFiscal("111.444.777-35") === "11144477735", "CPF (11 dígitos) => chave forte")
+  ok(chaveFiscal("12.345.678/0001-90") === "12345678000190", "CNPJ (14 dígitos) => chave forte")
+  ok(chaveFiscal("123") === "", "id curto/duvidoso => sem chave forte (unresolved)")
+  ok(chaveFiscal(null) === "", "sem id => sem chave forte")
+
+  // 5) Schema
+  console.log("\n5) Schema:")
   const schema = readFileSync(join(ROOT, "prisma/schema.prisma"), "utf8")
   ok(/itemCatalogoId\s+Int\?/.test(schema), "schema tem itemCatalogoId aditivo")
   ok(/tiposServico\s+TipoServico\[\]/.test(schema), "ItemCatalogo tem back-relation tiposServico")
