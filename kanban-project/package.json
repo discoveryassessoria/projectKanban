@@ -9,8 +9,12 @@
     "seed": "tsx prisma/seed.ts",
     "test:cp-sec": "tsx scripts/cp-sec.test.ts",
     "test:cp1": "tsx scripts/cp1.test.ts",
+    "test:cp2": "tsx scripts/cp2.test.ts",
     "backfill:cp1:familias": "tsx prisma/backfill-cp1-familias.ts",
-    "backfill:cp1:identidade": "tsx prisma/backfill-cp1-identidade.ts"
+    "backfill:cp1:identidade": "tsx prisma/backfill-cp1-identidade.ts",
+    "backfill:cp2:catalogo": "tsx prisma/backfill-cp2-catalogo.ts",
+    "backfill:cp2:tiposervico": "tsx prisma/backfill-cp2-tiposervico.ts",
+    "backfill:cp2:fornecedores": "tsx prisma/backfill-cp2-fornecedores.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
