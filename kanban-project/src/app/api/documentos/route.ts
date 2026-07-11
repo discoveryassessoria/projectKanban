@@ -5,6 +5,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { TipoDocumento, StatusDocumento } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { resolverNecessidadeDeDocumento } from '@/src/services/necessidade-documental'
 
 // Helper para obter label do tipo de documento
 function getTipoDocumentoLabel(tipo: string): string {
@@ -204,11 +205,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Pessoa não encontrada" }, { status: 404 })
     }
 
+    // CP-3 — vincular a uma NecessidadeDocumental de ORIGEM (Regra 4).
+    // Preferir necessidadeId explícito; senão resolver por dual-read
+    // (pessoa + tipo). NÃO criamos necessidade aqui (é papel das rotas de
+    // geração árvore/matriz) — evita necessidade pessoa-vs-união inconsistente.
+    // Sem necessidade resolvível, cai no fallback legado (necessidadeId=null).
+    let necessidadeIdFinal: number | null = body.necessidadeId
+      ? parseInt(String(body.necessidadeId))
+      : null
+    if (!necessidadeIdFinal) {
+      const nec = await resolverNecessidadeDeDocumento(
+        { pessoaId: parseInt(pessoaId), documentTypeId: docTypeIdFinal },
+        prisma
+      )
+      necessidadeIdFinal = nec?.id ?? null
+    }
+
     const documento = await prisma.documento.create({
       data: {
         pessoaId: parseInt(pessoaId),
         tipo: tipoEnum,                    // 🆕 nullable: null quando o tipo é novo (só cadastro)
         documentTypeId: docTypeIdFinal,    // 🆕 fonte nova (dual-write)
+        necessidadeId: necessidadeIdFinal, // CP-3 — necessidade de origem (dual-read)
         status: (status as StatusDocumento) || 'PENDENTE',
         descricao: descricao || null,
         // Dados do registro
