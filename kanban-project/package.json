@@ -7,7 +7,10 @@
     "build": "prisma generate && next build --turbopack",
     "start": "next start",
     "seed": "tsx prisma/seed.ts",
-    "test:cp-sec": "tsx scripts/cp-sec.test.ts"
+    "test:cp-sec": "tsx scripts/cp-sec.test.ts",
+    "test:cp1": "tsx scripts/cp1.test.ts",
+    "backfill:cp1:familias": "tsx prisma/backfill-cp1-familias.ts",
+    "backfill:cp1:identidade": "tsx prisma/backfill-cp1-identidade.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
