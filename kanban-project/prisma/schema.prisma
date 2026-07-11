@@ -677,7 +677,13 @@ model TipoServico {
   custosFin   Custo[]
   receitasFin Receita[]
 
+  // CP-2 — referência aditiva ao Catálogo Mestre (ItemCatalogo).
+  // Nullable; preferir este vínculo quando presente, com fallback legado.
+  itemCatalogoId Int?
+  itemCatalogo   ItemCatalogo? @relation(fields: [itemCatalogoId], references: [id], onDelete: SetNull)
+
   @@index([processoId])
+  @@index([itemCatalogoId])
 }
 
 model CustoPessoa {
@@ -2336,6 +2342,7 @@ model ItemCatalogo {
   produtos       ProdutoFinanceiro[]
   servicos       ServicoProduto[]
   precos         TabelaValor[]
+  tiposServico   TipoServico[] // CP-2 — referência aditiva de TipoServico
 
   @@index([natureza])
   @@index([ativo])
