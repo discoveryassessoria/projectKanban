@@ -90,6 +90,9 @@ model Pessoa {
   contratantesVinculados Contratante[] @relation("ContratantePessoa")
   requerentesVinculados  Requerente[]  @relation("RequerentePessoa")
 
+  // CP-3 — necessidades documentais desta pessoa
+  necessidades NecessidadeDocumental[]
+
   @@index([arvoreId])
   @@index([pais_nasc])
   @@index([maeId])
@@ -117,6 +120,9 @@ model Uniao {
   updatedAt       DateTime  @updatedAt
   pessoa1         Pessoa    @relation("Pessoa1", fields: [pessoa1Id], references: [id], onDelete: Cascade)
   pessoa2         Pessoa    @relation("Pessoa2", fields: [pessoa2Id], references: [id], onDelete: Cascade)
+
+  // CP-3 — necessidades de vínculo (casamento/união) referenciam a União.
+  necessidades NecessidadeDocumental[]
 
   @@index([pessoa1Id])
   @@index([pessoa2Id])
@@ -242,7 +248,13 @@ model Documento {
   documentTypeId Int?
   documentType   TipoDocumentoCadastro? @relation(fields: [documentTypeId], references: [id])
 
+  // CP-3 — Documento Operacional atende a uma NecessidadeDocumental de origem.
+  // Nullable (dual-read + backfill); 1 necessidade -> N documentos (múltiplas vias).
+  necessidadeId Int?
+  necessidade   NecessidadeDocumental? @relation(fields: [necessidadeId], references: [id], onDelete: SetNull)
+
   @@index([documentTypeId])
+  @@index([necessidadeId])
   @@index([pessoaId])
   @@index([tipo])
   @@index([status])
@@ -308,6 +320,9 @@ model Processo {
   fasesFinais         FaseFinal[]
   retificacaoPacotes  RetificacaoPacote[]
   emissoesRetificadas EmissaoRetificada[]
+
+  // CP-3 — necessidades documentais do processo
+  necessidades NecessidadeDocumental[]
 
   tipoProcessoMotorId Int?
   tipoProcessoMotor   TipoProcessoNacionalidade? @relation("ProcessoTipoMotor", fields: [tipoProcessoMotorId], references: [id], onDelete: SetNull)
@@ -2198,6 +2213,9 @@ model MatrizDocumental {
   blocksPhaseCompletion Boolean  @default(false)
   usedByCount           Int      @default(0)
   arquivado             Boolean  @default(false)
+  // CP-3 — versão da regra (snapshot imutável por versão; mudança futura
+  // incrementa a versão e NÃO reescreve necessidades já produzidas).
+  versao                Int      @default(1)
   criadoEm              DateTime @default(now())
   atualizadoEm          DateTime @updatedAt
 
@@ -2343,9 +2361,107 @@ model ItemCatalogo {
   servicos       ServicoProduto[]
   precos         TabelaValor[]
   tiposServico   TipoServico[] // CP-2 — referência aditiva de TipoServico
+  necessidades   NecessidadeDocumental[] // CP-3 — Documento Mestre requerido
 
   @@index([natureza])
   @@index([ativo])
+}
+
+// ============================================================
+// CP-3 — NecessidadeDocumental (cadeia: Documento Mestre -> Necessidade ->
+// Documento Operacional -> Arquivo -> Tarefa -> Custo/Receita -> Auditoria)
+// ============================================================
+enum OrigemNecessidade {
+  ARVORE
+  MATRIZ
+  MANUAL
+  MIGRACAO
+}
+
+enum ObrigatoriedadeNecessidade {
+  OBRIGATORIA
+  OPCIONAL
+}
+
+enum StatusNecessidade {
+  PENDENTE
+  EM_ATENDIMENTO
+  ATENDIDA
+  NAO_LOCALIZADA
+  DISPENSADA
+}
+
+enum TipoEventoNecessidade {
+  CRIADA
+  EM_ATENDIMENTO
+  ATENDIDA
+  NAO_LOCALIZADA
+  REABERTA
+  DISPENSADA
+  SUPERSEDIDA
+  RETORNO_GENEALOGIA
+}
+
+model NecessidadeDocumental {
+  id             Int          @id @default(autoincrement())
+  processoId     Int
+  processo       Processo     @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  itemCatalogoId Int
+  itemCatalogo   ItemCatalogo @relation(fields: [itemCatalogoId], references: [id])
+
+  // Sujeito: pessoaId XOR uniaoId (CHECK aplicado na migration).
+  pessoaId Int?
+  pessoa   Pessoa? @relation(fields: [pessoaId], references: [id], onDelete: SetNull)
+  uniaoId  Int?
+  uniao    Uniao?  @relation(fields: [uniaoId], references: [id], onDelete: SetNull)
+
+  varianteKey       String @default("padrao") @db.VarChar(60)
+  ciclo             Int    @default(1)
+  chaveIdempotencia String @unique @db.VarChar(200)
+
+  origem          OrigemNecessidade          @default(MANUAL)
+  obrigatoriedade ObrigatoriedadeNecessidade @default(OBRIGATORIA)
+  status          StatusNecessidade          @default(PENDENTE)
+
+  // Snapshot IMUTÁVEL da regra da Matriz que originou + auditoria de origem.
+  matrizRegraId        Int?
+  matrizRegraVersao    Int?
+  matrizSnapshot       Json?
+  avaliadaEm           DateTime?
+  motivoAplicabilidade String?   @db.Text
+  arvoreId             Int?
+  ruleCode             String?   @db.VarChar(20)
+
+  // Supersessão: uma nova necessidade pode substituir a anterior, que é
+  // preservada (histórico append-only).
+  supersedePorId Int?
+  supersedePor   NecessidadeDocumental?  @relation("Supersessao", fields: [supersedePorId], references: [id], onDelete: SetNull)
+  supersedidas   NecessidadeDocumental[] @relation("Supersessao")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documentos Documento[]
+  eventos    NecessidadeDocumentalEvento[]
+
+  @@index([processoId])
+  @@index([itemCatalogoId])
+  @@index([pessoaId])
+  @@index([uniaoId])
+  @@index([status])
+}
+
+model NecessidadeDocumentalEvento {
+  id            Int                   @id @default(autoincrement())
+  necessidadeId Int
+  necessidade   NecessidadeDocumental @relation(fields: [necessidadeId], references: [id], onDelete: Cascade)
+  tipo          TipoEventoNecessidade
+  descricao     String?               @db.VarChar(300)
+  dados         Json?
+  criadoEm      DateTime              @default(now())
+
+  @@index([necessidadeId])
+  @@index([criadoEm])
 }
 
 enum NaturezaPreco {
