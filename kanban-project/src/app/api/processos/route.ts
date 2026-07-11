@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma"
 import { logProcesso } from "@/lib/auditoria"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { executarMotorNaFase } from '@/src/lib/motor/executor'
+import { garantirFamiliaParaProcesso } from '@/src/services/familia'
 
 // GET - Buscar processos (filtrado por país, requerente ou contratante)
 export async function GET(request: Request) {
@@ -61,6 +62,7 @@ export async function GET(request: Request) {
           }
         },
         arvore: true,
+        familia: { select: { id: true, nome: true } }, // CP-1 dual-read
         requerentes: {
           include: {
             requerente: true
@@ -190,6 +192,14 @@ export async function POST(request: Request) {
       })
     }
 
+    // CP-1 — forward-fill: garantir a Família do processo (Regra 11).
+    // Best-effort: nunca bloqueia a criação do processo.
+    try {
+      await garantirFamiliaParaProcesso(processo.id)
+    } catch (e) {
+      console.error("CP-1 forward-fill de família falhou (criar processo):", e)
+    }
+
     // ✅ REGISTRAR LOG
     await logProcesso.criar(processo.nome, processo.id)
 
@@ -215,6 +225,7 @@ export async function POST(request: Request) {
           }
         },
         arvore: true,
+        familia: { select: { id: true, nome: true } }, // CP-1 dual-read
         requerentes: {
           include: {
             requerente: true

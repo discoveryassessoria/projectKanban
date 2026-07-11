@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { garantirFamiliaParaArvore } from "@/src/services/familia"
 
 // GET - Listar todas as árvores
 export async function GET() {
@@ -7,6 +8,7 @@ export async function GET() {
     const arvores = await prisma.arvore.findMany({
       include: {
         pessoaPrincipal: true,
+        familia: { select: { id: true, nome: true } }, // CP-1 dual-read
         _count: {
           select: { pessoas: true }
         }
@@ -40,15 +42,18 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Se foi passado processoId, vincular ao processo
+    // CP-1 — forward-fill: toda nova árvore recebe sua Família (1 por árvore).
+    const familiaId = await garantirFamiliaParaArvore(novaArvore.id)
+
+    // Se foi passado processoId, vincular ao processo (árvore + família).
     if (processoId) {
       await prisma.processo.update({
         where: { id: processoId },
-        data: { arvoreId: novaArvore.id }
+        data: { arvoreId: novaArvore.id, familiaId }
       })
     }
 
-    return NextResponse.json(novaArvore, { status: 201 })
+    return NextResponse.json({ ...novaArvore, familiaId }, { status: 201 })
   } catch (error) {
     console.error("Erro ao criar árvore:", error)
     if (error instanceof Error) {
