@@ -72,6 +72,7 @@ export const PERMISSOES = {
 
   // CP-4A — Motor de Workflow/Avanço (catálogo; enforcement nos subcheckpoints)
   'workflow.avancar': 'Avançar de fase (Motor de Avanço)',
+  'workflow.gerarTarefa': 'Gerar tarefa a partir de passo do workflow', // CP-4C
   'workflow.forcarAvanco': 'Forçar avanço de fase (independente de admin genérico)',
   'workflow.reabrirFase': 'Reabrir fase / novo ciclo',
   'workflow.dispensarPasso': 'Dispensar passo do workflow',
