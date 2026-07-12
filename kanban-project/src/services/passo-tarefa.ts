@@ -9,7 +9,7 @@
 
 import { randomUUID } from "crypto"
 import { prisma } from "@/lib/prisma"
-import type { Tarefa } from "@prisma/client"
+import type { Tarefa, Prisma } from "@prisma/client"
 import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import {
   type FailureCodeC,
@@ -51,25 +51,32 @@ function ehPassoAplicavel(step: { bloqueadoManual: boolean }, snap: SnapshotPass
   return true
 }
 
-export async function garantirTarefaDePasso(input: GarantirTarefaInput): Promise<GarantirTarefaResultado> {
+export async function garantirTarefaDePasso(
+  input: GarantirTarefaInput,
+  txExterno?: Prisma.TransactionClient
+): Promise<GarantirTarefaResultado> {
   const correlationId = input.correlationId ?? randomUUID()
   const taskRole = input.taskRole ?? TASK_ROLE_PADRAO
   const fail = (code: FailureCodeC, errors: TarefaGenIssue[] = []): GarantirTarefaResultado => ({
     success: false, code, errors, correlationId,
   })
 
-  const step = await prisma.phaseWorkflowStepInstance.findUnique({
+  // Sob txExterno, as leituras DEVEM usar a mesma tx para enxergar Passos
+  // recém-criados dentro da transação (ex.: instanciação da próxima fase no advance).
+  const db = txExterno ?? prisma
+
+  const step = await db.phaseWorkflowStepInstance.findUnique({
     where: { id: input.stepInstanceId },
     include: { workflowInstance: { select: { status: true } } },
   })
   if (!step) return fail("STEP_NAO_ENCONTRADO")
 
   // runtime v2 + feature flag
-  const processo = await prisma.processo.findUnique({
+  const processo = await db.processo.findUnique({
     where: { id: step.processoId },
     select: { workflowRuntime: true },
   })
-  const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 }, select: { runtimeV2Habilitado: true } })
+  const cfg = await db.motorConfig.findUnique({ where: { id: 1 }, select: { runtimeV2Habilitado: true } })
   const v2Global = cfg?.runtimeV2Habilitado ?? false
   if (!v2Global) return fail("RUNTIME_V2_DESABILITADO")
   if (resolveWorkflowRuntime(processo?.workflowRuntime, v2Global) !== "v2") return fail("PROCESSO_LEGACY")
@@ -99,8 +106,8 @@ export async function garantirTarefaDePasso(input: GarantirTarefaInput): Promise
   const causationId = input.causationId ?? step.chaveIdempotencia
   const origem = input.origem ?? "workflow"
 
-  try {
-    return await prisma.$transaction(async (tx) => {
+  // txExterno: compõe DENTRO de uma transação já aberta (ex.: PhaseAdvanceService).
+  const corpo = async (tx: Prisma.TransactionClient): Promise<GarantirTarefaResultado> => {
       const existente = await tx.tarefa.findFirst({ where: { chaveIdempotencia: chaveTarefa } })
       if (existente) return { success: true, created: false, tarefa: existente, warnings, correlationId }
 
@@ -147,9 +154,12 @@ export async function garantirTarefaDePasso(input: GarantirTarefaInput): Promise
       })
 
       return { success: true, created: true, tarefa, warnings, correlationId }
-    })
+  }
+  try {
+    return txExterno ? await corpo(txExterno) : await prisma.$transaction(corpo)
   } catch (e) {
-    if ((e as { code?: string })?.code === "P2002") {
+    // Convergência só no modo standalone; sob txExterno, propaga p/ rollback do chamador.
+    if (!txExterno && (e as { code?: string })?.code === "P2002") {
       const existente = await prisma.tarefa.findFirst({ where: { chaveIdempotencia: chaveTarefa } })
       if (existente) return { success: true, created: false, tarefa: existente, warnings, correlationId }
     }

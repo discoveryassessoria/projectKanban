@@ -106,7 +106,8 @@ export async function resolverWorkflowAplicavel(
 }
 
 export async function instanciarWorkflowDaFase(
-  input: InstanciarWorkflowDaFaseInput
+  input: InstanciarWorkflowDaFaseInput,
+  txExterno?: Prisma.TransactionClient
 ): Promise<InstanciarResultado> {
   const correlationId = input.correlationId ?? randomUUID()
   const ciclo = input.ciclo && input.ciclo > 0 ? input.ciclo : 1
@@ -155,9 +156,9 @@ export async function instanciarWorkflowDaFase(
   })
   const instantiatedAt = new Date().toISOString()
 
-  // 6) transação única (rollback integral em falha)
-  try {
-    return await prisma.$transaction(async (tx) => {
+  // 6) transação única (rollback integral em falha).
+  // txExterno: compõe DENTRO de uma transação já aberta (ex.: PhaseAdvanceService).
+  const corpo = async (tx: Prisma.TransactionClient): Promise<InstanciarResultado> => {
       const existente = await tx.phaseWorkflowInstance.findUnique({ where: { chaveIdempotencia: chaveWorkflow } })
       if (existente) {
         const stepInstances = await tx.phaseWorkflowStepInstance.findMany({
@@ -264,10 +265,13 @@ export async function instanciarWorkflowDaFase(
       })
 
       return { success: true, created: true, workflowInstance: instancia, stepInstances, warnings: val.warnings, correlationId }
-    })
+  }
+  try {
+    return txExterno ? await corpo(txExterno) : await prisma.$transaction(corpo)
   } catch (e) {
-    // Concorrência: unique da chave do workflow → converge na instância existente.
-    if ((e as { code?: string })?.code === "P2002") {
+    // Concorrência: unique da chave do workflow → converge (só no modo standalone;
+    // sob txExterno, propaga para o chamador tratar como conflito e dar rollback).
+    if (!txExterno && (e as { code?: string })?.code === "P2002") {
       const existente = await prisma.phaseWorkflowInstance.findUnique({ where: { chaveIdempotencia: chaveWorkflow } })
       if (existente) {
         const stepInstances = await prisma.phaseWorkflowStepInstance.findMany({
