@@ -54,99 +54,107 @@ import {
 // REUSA as telas existentes (mesmas keys); só muda a organização do menu.
 // Nada de tela nova aqui — cada key já existe no MAPA DE TELAS abaixo.
 // ============================================================
+// Estrutura oficial aprovada — 11 domínios. Reorganização de MENU apenas:
+// reusa as screen keys existentes (URLs preservadas); itens sem tela ainda
+// caem no placeholder "Em breve" (padrão já existente no shell).
 const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
   { grupo: "Painel", itens: [["overview", "Painel Geral"]] },
 
-  { grupo: "Processos e Workflows", itens: [
+  { grupo: "Processos", itens: [
     ["proctypes", "Tipos de Processo"],
-    ["workflowsphases", "Workflows e Fases"],
-    ["phasemodes", "Modos Internos"],
     ["phasemap", "Regras do Processo"],
     ["simfase", "Configurações Aplicadas"],
   ]},
 
-  { grupo: "Catálogo Mestre", itens: [
-    ["catalogmestre", "Itens"],
-    ["doctypes", "Tipos de Documento"],
-    ["categories", "Categorias"],
-    ["currencies", "Unidades"],
-    ["products", "Composições"],
+  { grupo: "Workflows", itens: [
+    ["macrokanban", "Workflow Macro / Kanban"],
+    ["phaseiwf", "Workflow Interno das Fases"],
+    ["phasemodes", "Modos Internos das Fases"],
+    ["wf_politicas", "Políticas de Avanço"],
   ]},
 
-  { grupo: "Matrizes e Aplicabilidade", itens: [
+  { grupo: "Catálogo Mestre", itens: [
+    ["catalogmestre", "Itens Mestres"],
+  ]},
+
+  { grupo: "Cadastros Mestres", itens: [
+    ["cad_categorias", "Categorias"],
+    ["cad_unidades", "Unidades"],
+    ["cad_composicoes", "Composições"],
+    ["cad_tags", "Tags"],
+    ["cad_motivos", "Motivos Padronizados"],
+  ]},
+
+  { grupo: "Documentos", itens: [
+    ["doctypes", "Tipos de Documento"],
     ["docmatrix", "Matriz Documental"],
     ["docrules", "Aplicabilidade Operacional"],
-    ["pricing", "Aplicabilidade Econômica"],
-    ["imtemplates", "Pacotes"],
+    ["doc_regras", "Regras Documentais"],
   ]},
 
-  { grupo: "Biblioteca Operacional", itens: [
-    ["iwtemplates", "Passos"],
-    ["crosstpl", "Tarefas"],
-    ["certtypes", "Checklists"],
-    ["sla", "SLAs e Prazos"],
-    ["notifications", "Eventos"],
+  { grupo: "Financeiro", itens: [
+    ["catalog", "Produtos Financeiros"],
+    ["products", "Serviços"],
+    ["honorariums", "Honorários"],
+    ["pricingtable", "Tabelas de Valores"],
+    ["suppliers", "Fornecedores"],
+    ["categories", "Categorias Financeiras"],
+    ["coa", "Plano de Contas"],
+    ["costcenters", "Centros de Custo"],
+    ["accounts", "Contas Bancárias"],
+    ["currencies", "Moedas"],
+    ["methods", "Formas de Pagamento"],
+    ["paycond", "Condições de Pagamento"],
+    ["taxes", "Impostos"],
+    ["commrules", "Comissões"],
+    ["discrules", "Regras Econômicas"],
+    ["pricing", "Aplicabilidade Econômica"],
+  ]},
+
+  { grupo: "Modelos", itens: [
+    ["mod_wfmacro", "Modelos de Workflow Macro"],
+    ["iwtemplates", "Modelos de Workflow Interno"],
+    ["amtemplates", "Modelos de Automação"],
+    ["mod_documento", "Modelos de Documento"],
+    ["mod_contrato", "Modelos de Contrato"],
+    ["mod_email", "Modelos de E-mail"],
+    ["mod_mensagem", "Modelos de Mensagem"],
+    ["templates", "Templates Diversos"],
   ]},
 
   { grupo: "Automações", itens: [
-    ["amtemplates", "Biblioteca"],
-    ["opauto", "Regras Aplicadas"],
-    ["finauto", "Gatilhos e Condições"],
-    ["simfase", "Simulador"],
-    ["execmotor", "Conflitos"],
+    ["opauto", "Automações por Fase"],
+    ["phasemap", "Gatilhos"],
+    ["auto_condicoes", "Condições"],
+    ["auto_acoes", "Ações"],
+    ["simfase", "Simulação"],
+    ["auto_filas", "Filas"],
+    ["execmatrix", "Histórico"],
   ]},
 
-  { grupo: "Tarefas Transversais", itens: [
-    ["crosstpl", "Biblioteca"],
-    ["crossrules", "Regras"],
-    ["crossrules", "Regularização"],
+  { grupo: "Integrações", itens: [
+    ["integ_painel", "Painel de Integrações"],
+    ["integ_apis", "APIs e Conectores"],
+    ["integ_ia", "Inteligência Artificial"],
+    ["integ_comunicacao", "Comunicação"],
+    ["integ_armazenamento", "Armazenamento"],
+    ["integ_assinatura", "Assinatura Digital"],
+    ["integ_ocr", "OCR e Extração"],
+    ["integ_externos", "Serviços Externos"],
+    ["integ_monitoramento", "Monitoramento"],
   ]},
 
-  { grupo: "Financeiro e Precificação", itens: [
-    ["precificacao", "Precificação"],
-    ["fornecedoresconc", "Fornecedores"],
-    ["comercial", "Comercial"],
-    ["pagamentos", "Pagamentos"],
-    ["estruturafin", "Estrutura Financeira"],
-    ["integracaofin", "Integração Financeira"],
-  ]},
-
-  { grupo: "Usuários e Acesso", itens: [
+  { grupo: "Administração", itens: [
     ["users", "Usuários"],
-    ["teams", "Perfis e Equipes"],
+    ["roles", "Perfis"],
     ["permprofiles", "Permissões"],
-    ["roles", "Permissões de Tarefas"],
-    ["departments", "Delegações e Ausências"],
-  ]},
-
-  { grupo: "Protocolos e Órgãos", itens: [
-    ["organs", "Órgãos"],
-    ["prottypes", "Tipos de Protocolo"],
-    ["protocols", "Regras"],
-    ["docrules", "Exigências"],
-  ]},
-
-  { grupo: "Governança", itens: [
-    ["cfgversions", "Aprovações"],
-    ["commrules", "Alçadas"],
-    ["cfgversions", "Versionamento"],
-    ["cfgdiagnosis", "Publicação"],
+    ["teams", "Equipes"],
+    ["departments", "Departamentos"],
+    ["rolecat", "Cargos"],
+    ["adm_featureflags", "Feature Flags"],
+    ["settings", "Configurações Gerais"],
     ["audit", "Auditoria"],
-  ]},
-
-  { grupo: "Motor e Saúde", itens: [
-    ["execmatrix", "Execuções"],
-    ["mgmthealth", "Falhas e Retry"],
-    ["diagnostics", "Reconciliação"],
-    ["syshealth", "Diagnóstico"],
-    ["audit", "Logs"],
-  ]},
-
-  { grupo: "Sistema", itens: [
-    ["settings", "Configurações"],
-    ["impexp", "Importação e Exportação"],
-    ["backup", "Backup"],
-    ["countrycatalog", "Integrações"],
+    ["syshealth", "Logs do Sistema"],
   ]},
 ]
 
@@ -329,16 +337,12 @@ export default function GerenciamentoPage() {
   // ALIASES: keys antigas (substituídas pelas concentradoras) → nova tela, pra
   // links salvos continuarem funcionando (o "redirect" que o Marco pediu, no
   // modelo real do sistema, que é navegação por state e não por rota).
-  const ALIAS_TELAS: Record<string, string> = {
-    coa: "estruturafin", accounts: "estruturafin", banks: "estruturafin", wallets: "estruturafin",
-    costcenters: "estruturafin", fx: "estruturafin",
-    pricingtable: "precificacao",
-    suppliers: "fornecedoresconc",
-    honorariums: "comercial", paycond: "comercial", discrules: "comercial",
-    methods: "pagamentos", fees: "pagamentos", taxes: "pagamentos",
-    impexp: "integracaofin",
-    catalog: "catalogmestre",
-  }
+  // Estrutura oficial (menu por domínio): as keys financeiras agora são itens
+  // planos e resolvem para suas próprias telas. Aliases das concentradoras foram
+  // removidos (as concentradoras seguem acessíveis por suas keys próprias em
+  // TELAS: estruturafin, precificacao, comercial, pagamentos, integracaofin,
+  // fornecedoresconc). Bookmarks antigos continuam resolvendo (nenhuma key sumiu).
+  const ALIAS_TELAS: Record<string, string> = {}
   const resolverTela = (k: string | null): string => {
     if (!k) return "overview"
     return ALIAS_TELAS[k] || k
@@ -414,6 +418,7 @@ export default function GerenciamentoPage() {
 
   const TelaAtiva = TELAS[tab]
   const labelAtivo = GRUPOS.flatMap(g => g.itens).find(([k]) => k === tab)?.[1] || "Gerenciamento"
+  const grupoAtivo = GRUPOS.find(g => g.itens.some(([k]) => k === tab))?.grupo
 
   return (
     <div className="relative min-h-screen text-white overflow-x-hidden">
@@ -477,6 +482,10 @@ export default function GerenciamentoPage() {
 
             {/* CONTEÚDO */}
             <section className="flex-1 min-w-0">
+              {/* Breadcrumb: Gerenciamento › Grupo › Item */}
+              <div className="mb-3 text-[12px] text-white/50">
+                Gerenciamento{grupoAtivo ? ` › ${grupoAtivo}` : ""} › {labelAtivo}
+              </div>
               {TelaAtiva ? <TelaAtiva /> : <EmBreve titulo={labelAtivo} />}
             </section>
           </div>
