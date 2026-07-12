@@ -19,6 +19,7 @@ import {
   resolverResponsavel, passoGeraTarefa,
 } from "../src/services/passo-tarefa-helpers"
 import * as D from "../src/services/task-step-sync-helpers"
+import * as B from "../src/lib/motor/blocking-helpers"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 
@@ -284,9 +285,64 @@ function run() {
   const perms4d = readFileSync(join(ROOT, "src/lib/permissoes.ts"), "utf8")
   ok(perms4d.includes("'workflow.iniciarPasso'") && perms4d.includes("'workflow.supersederPasso'") && perms4d.includes("'tarefas.bloquear'"), "permissões CP-4D no catálogo")
 
+  // ============================================================
+  // CP-4E — Motor de Pendências e simulação
+  // ============================================================
+  console.log("\n--- CP-4E ---")
+
+  // 26) NecessidadeDocumental (por fase)
+  console.log("26) Necessidades:")
+  ok(B.classificarNecessidade("PENDENTE", true, true, 1) === null, "Genealogia: necessidade existente não bloqueia (não exige atendida)")
+  ok(B.classificarNecessidade("NAO_LOCALIZADA", true, false, 1)?.code === "DOCUMENTO_NAO_LOCALIZADO", "Emissão: NAO_LOCALIZADA => DOCUMENTO_NAO_LOCALIZADO")
+  ok(B.classificarNecessidade("PENDENTE", true, false, 1)?.severity === "BLOCKING", "Emissão: obrigatória pendente => BLOCKING")
+  ok(B.classificarNecessidade("ATENDIDA", true, false, 1) === null, "Emissão: ATENDIDA não bloqueia")
+  ok(B.classificarNecessidade("PENDENTE", false, false, 1)?.severity === "WARNING", "opcional pendente => WARNING")
+
+  // 27) Passos
+  console.log("\n27) Passos:")
+  ok(B.classificarPasso("CONCLUIDO", true, "s", 1) === null && B.classificarPasso("DISPENSADO", true, "s", 1) === null && B.classificarPasso("SUPERSEDIDO", true, "s", 1) === null, "CONCLUIDO/DISPENSADO/SUPERSEDIDO não bloqueiam")
+  ok(B.classificarPasso("AGUARDANDO_APROVACAO", true, "s", 1)?.code === "PASSO_AGUARDANDO_APROVACAO", "AGUARDANDO_APROVACAO bloqueia")
+  ok(B.classificarPasso("BLOQUEADO", true, "s", 1)?.code === "PASSO_BLOQUEADO", "BLOQUEADO bloqueia")
+  ok(B.classificarPasso("FALHOU", true, "s", 1)?.code === "PASSO_FALHOU", "FALHOU bloqueia")
+  ok(B.classificarPasso("DISPONIVEL", true, "s", 1)?.severity === "BLOCKING", "obrigatório aberto bloqueia")
+  ok(B.classificarPasso("DISPONIVEL", false, "s", 1)?.severity === "WARNING", "opcional aberto => WARNING")
+
+  // 28) Tarefas
+  console.log("\n28) Tarefas:")
+  ok(B.classificarTarefa("CONCLUIDO_RECEBIDO", true, true, false, 1).length === 0, "concluída não bloqueia")
+  ok(B.classificarTarefa("EM_ANDAMENTO", true, true, false, 1).some((i) => i.code === "TAREFA_OBRIGATORIA_ABERTA" && i.severity === "BLOCKING"), "obrigatória aberta bloqueia")
+  ok(B.classificarTarefa("EM_ANDAMENTO", false, true, false, 1).some((i) => i.severity === "WARNING"), "opcional aberta => WARNING")
+  ok(B.classificarTarefa("CANCELADA", true, true, false, 1).length === 0, "CANCELADA não bloqueia por si (avaliada pelo Passo)")
+  ok(B.classificarTarefa("EM_ANDAMENTO", true, false, true, 1).some((i) => i.code === "TAREFA_SEM_RESPONSAVEL" && i.severity === "BLOCKING"), "sem responsável + exige => BLOCKING")
+  ok(B.classificarTarefa("EM_ANDAMENTO", true, false, false, 1).some((i) => i.code === "TAREFA_SEM_RESPONSAVEL" && i.severity === "WARNING"), "sem responsável default => WARNING")
+
+  // 29) Transversal + política
+  console.log("\n29) Transversal + política:")
+  ok(B.classificarTransversal(true, true, true, 1)?.category === "TAREFA_TRANSVERSAL", "transversal aplicável+obrigatória+aberta bloqueia")
+  ok(B.classificarTransversal(false, true, true, 1) === null && B.classificarTransversal(true, false, true, 1) === null, "transversal não aplicável/opcional => não bloqueia")
+  ok(B.avaliarPolitica([{ code: "x", category: "PASSO", severity: "BLOCKING", message: "" }]) === false, "ALL_REQUIRED_COMPLETED: BLOCKING impede avanço")
+  ok(B.avaliarPolitica([{ code: "x", category: "PASSO", severity: "WARNING", message: "" }]) === true, "só WARNING => pode avançar")
+  // determinismo
+  ok(JSON.stringify(B.classificarPasso("BLOQUEADO", true, "s", 1)) === JSON.stringify(B.classificarPasso("BLOQUEADO", true, "s", 1)), "classificação determinística")
+
+  // 30) Engine + simulação (estrutural, somente leitura)
+  console.log("\n30) Engine/simulação (somente leitura):")
+  const eng = readFileSync(join(ROOT, "src/lib/motor/blocking-engine.ts"), "utf8")
+  ok(!/\.(create|update|updateMany|delete|deleteMany|upsert)\(/.test(eng) && !/\$transaction/.test(eng), "blocking-engine NÃO escreve (só findMany/findUnique/count)")
+  ok(!/faseAtualKey:/.test(eng), "engine não altera faseAtualKey")
+  const sim = readFileSync(join(ROOT, "src/lib/motor/phase-simulation.ts"), "utf8")
+  ok(!/\.(create|update|updateMany|delete|deleteMany|upsert)\(/.test(sim) && !/\$transaction/.test(sim), "phase-simulation NÃO escreve (sem create/update/outbox)")
+  ok(!/workflowEvento\.create|domainOutbox\.create/.test(sim), "simulação sem WorkflowEvento/DomainOutbox (decisão: 100% sem escrita)")
+  ok(/RUNTIME_V2_DESABILITADO/.test(sim) && /PROCESSO_LEGACY/.test(sim), "kill switch/legacy => diagnóstico claro")
+  ok(/tarefasPrevistas/.test(sim) && /stepKeys/.test(sim), "preview de próximos passos/tarefas")
+  ok(!/tarefa\.create|\.tarefa\.create/.test(sim), "simulação não cria Tarefa")
+  const rotaPend = readFileSync(join(ROOT, "src/app/api/processos/[processoId]/pendencias/route.ts"), "utf8")
+  const rotaSim = readFileSync(join(ROOT, "src/app/api/processos/[processoId]/advance/simulate/route.ts"), "utf8")
+  ok(/verificarPermissao\(request, "workflow\.avancar"\)/.test(rotaPend) && /verificarPermissao\(request, "workflow\.avancar"\)/.test(rotaSim), "rotas gated por workflow.avancar")
+
   console.log(`\n${passed} passaram, ${failed} falharam`)
   if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }
-  console.log("CP-4 (A+B+C+D): todos os testes verdes ✅")
+  console.log("CP-4 (A+B+C+D+E): todos os testes verdes ✅")
 }
 
 run()
