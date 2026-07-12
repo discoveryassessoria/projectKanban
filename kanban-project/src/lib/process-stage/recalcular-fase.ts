@@ -12,6 +12,7 @@
 // Chamado pela rota de conclusão de step quando um workflow fica concluído.
 
 import { prisma } from "@/lib/prisma"
+import { processoEmRuntimeV2 } from "@/src/lib/motor/runtime-guard" // CP-4H
 import {
   getFase,
   getOrdemFase,
@@ -50,6 +51,12 @@ export async function recalcularFaseDoProcesso(
   const processoId = doc?.pessoa?.arvore?.processos?.[0]?.id
   if (!processoId) {
     return { mudou: false, faseAnterior: null, faseNova: null, motivo: "Documento sem processo" }
+  }
+
+  // CP-4H — no-op para processos em runtime v2: a fase é escrita SOMENTE pelo
+  // PhaseAdvanceService; o recálculo legado não pode mover faseAtualKey no v2.
+  if (await processoEmRuntimeV2(processoId)) {
+    return { mudou: false, faseAnterior: null, faseNova: null, motivo: "Processo em runtime v2 — recálculo de fase legado inativo" }
   }
 
   // ── 2. Fase atual do card (faseCode da coluna onde o processo está) ────

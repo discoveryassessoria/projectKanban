@@ -22,6 +22,7 @@ import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
 // executor clássico, atrás da MESMA trava (autoExecutarAoAvancar). Import
 // relativo porque os dois arquivos vivem em src/lib/motor/.
 import { gerarEconomicoDaMatriz } from './matriz-economica'
+import { processoEmRuntimeV2 } from './runtime-guard' // CP-4H
 
 // ---- tipos de saída ----
 export interface CreatedItem { kind: string; targetTable: string; targetId: number; name: string; amount?: number; currency?: string; condicional?: boolean; condicaoNaoVerificada?: boolean }
@@ -221,6 +222,11 @@ export async function resolvePhaseKey(tipoProcessoId: number, faseCode: FaseCode
 // Quem chama garante que o processo está conectado (passa tipoProcessoId).
 // ============================================================
 export async function executarMotorNaFase(processoId: number, tipoProcessoId: number, phaseKey: string, event: string): Promise<RunResultado> {
+  // CP-4H — no-op para processos em runtime v2: o motor legado (tarefas/eventos/
+  // protocolos + FINANCEIRO por regra de fase) não pode executar sobre processos v2.
+  if (await processoEmRuntimeV2(processoId)) {
+    return { created: [], skipped: [{ name: "motor-legado", reason: "processo em runtime v2 — motor legado inativo" }], errors: [], totalCriado: 0 }
+  }
   const wantTrigger = opautoTriggerFor(event)
   const [taskRules, finAutoRules, eventRules, protocolRules, triggerRules, produtos] = await Promise.all([
     prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'task', active: true, arquivado: false } }),
@@ -366,6 +372,9 @@ export async function dispararMotorNaFaseAtual(processoId: number): Promise<void
   try {
     const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 } })
     if (!cfg?.autoExecutarAoAvancar) return
+
+    // CP-4H — v2 não usa o motor legado (fase é do PhaseAdvanceService; sem financeiro).
+    if (await processoEmRuntimeV2(processoId)) return
 
     const proc = await prisma.processo.findUnique({
       where: { id: processoId },

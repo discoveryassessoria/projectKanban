@@ -549,9 +549,28 @@ function run() {
   ok(/temPermissao\(usuario\.permissoes, "workflow\.ativarV2"\)/.test(rWr), "workflow-runtime gated por workflow.ativarV2")
   ok(/'workflow\.ativarV2'/.test(readFileSync(join(ROOT, "src/lib/permissoes.ts"), "utf8")), "permissão workflow.ativarV2 no catálogo")
 
+  // ================= CP-4H — trava fail-closed do motor legado em v2 =================
+  console.log("\n--- CP-4H ---")
+
+  // 49) Decisão da trava (fail-closed): kill switch OFF => nunca v2 (legacy intacto)
+  console.log("\n49) Trava de runtime (fail-closed):")
+  ok(resolveWorkflowRuntime("v2", false) === "legacy", "kill switch OFF => legacy mesmo com processo v2 (trava não dispara)")
+  ok(resolveWorkflowRuntime("legacy", true) === "legacy", "processo legacy + kill switch ON => legacy (trava não dispara)")
+  ok(resolveWorkflowRuntime("v2", true) === "v2", "processo v2 + kill switch ON => v2 (trava dispara/no-op legado)")
+  const rg = readFileSync(join(ROOT, "src/lib/motor/runtime-guard.ts"), "utf8")
+  ok(/resolveWorkflowRuntime\(proc\.workflowRuntime, cfg\?\.runtimeV2Habilitado \?\? false\) === "v2"/.test(rg), "processoEmRuntimeV2 usa resolveWorkflowRuntime (kill switch incluso)")
+
+  // 50) Guards aplicadas nos pontos de entrada do motor/recálculo legado
+  console.log("\n50) Guards no motor legado:")
+  const exec = readFileSync(join(ROOT, "src/lib/motor/executor.ts"), "utf8")
+  ok(/if \(await processoEmRuntimeV2\(processoId\)\) \{[\s\S]*?motor-legado/.test(exec), "executarMotorNaFase no-op em v2 (financeiro legado não executa)")
+  ok(/if \(await processoEmRuntimeV2\(processoId\)\) return/.test(exec), "dispararMotorNaFaseAtual retorna cedo em v2")
+  const rec = readFileSync(join(ROOT, "src/lib/process-stage/recalcular-fase.ts"), "utf8")
+  ok(/if \(await processoEmRuntimeV2\(processoId\)\)/.test(rec) && /recálculo de fase legado inativo/.test(rec), "recalcularFaseDoProcesso não move faseAtualKey em v2")
+
   console.log(`\n${passed} passaram, ${failed} falharam`)
   if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }
-  console.log("CP-4 (A+B+C+D+E+F+G): todos os testes verdes ✅")
+  console.log("CP-4 (A+B+C+D+E+F+G+H): todos os testes verdes ✅")
 }
 
 run()
