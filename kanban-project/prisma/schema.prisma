@@ -403,6 +403,13 @@ model Tarefa {
   previousTarefa         Tarefa?                    @relation("TarefaSupersessao", fields: [previousTarefaId], references: [id], onDelete: SetNull)
   supersededByTarefas    Tarefa[]                   @relation("TarefaSupersessao")
 
+  // CP-4D — sincronização Tarefa↔Passo (CAS otimista, executor, motivo, restauração).
+  lockVersion           Int     @default(0)
+  executedById          Int? // quem concluiu (executor) — segregação executor≠aprovador
+  blockedPreviousStatus String? @db.VarChar(30) // estado da Tarefa antes de BLOQUEADA (restauração)
+  motivoCodigo          String? @db.VarChar(40)
+  justificativa         String? @db.Text
+
   @@index([processoId])
   @@index([responsavelId])
   @@index([concluida])
@@ -2574,6 +2581,7 @@ enum WorkflowEventoTipo {
   PASSO_BLOQUEADO
   PASSO_DESBLOQUEADO
   PASSO_EXECUTADO
+  PASSO_AGUARDANDO_APROVACAO // CP-4D
   PASSO_APROVADO
   PASSO_CONCLUIDO
   PASSO_FALHOU
@@ -2583,8 +2591,12 @@ enum WorkflowEventoTipo {
   PASSO_SUPERSEDIDO
   TAREFA_GERADA
   TAREFA_ATRIBUIDA
+  TAREFA_INICIADA // CP-4D
   TAREFA_CONCLUIDA
+  TAREFA_BLOQUEADA // CP-4D
+  TAREFA_DESBLOQUEADA // CP-4D
   TAREFA_CANCELADA
+  TAREFA_SUPERSEDIDA // CP-4D
   TAREFA_REABERTA
   TAREFA_SINCRONIZADA
   FASE_SIMULADA
@@ -2692,10 +2704,12 @@ model PhaseWorkflowStepInstance {
   previousStepInstance   PhaseWorkflowStepInstance?  @relation("StepInstanceSupersessao", fields: [previousStepInstanceId], references: [id], onDelete: SetNull)
   supersededBySteps      PhaseWorkflowStepInstance[] @relation("StepInstanceSupersessao")
 
-  metadata    Json?
-  lockVersion Int      @default(0) // versionamento otimista
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  metadata               Json?
+  lockVersion            Int      @default(0) // versionamento otimista
+  // CP-4D — estado do Passo antes de BLOQUEADO (para restauração no desbloqueio).
+  statusAnteriorBloqueio String?  @db.VarChar(30)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   tarefas Tarefa[]
 
@@ -2797,6 +2811,7 @@ enum StatusTarefa {
   CONCLUIDO_NAO_POSSUI
   BLOQUEADA // CP-4A (aditivo)
   SUPERSEDIDA // CP-4A (aditivo)
+  CANCELADA // CP-4D (aditivo)
 }
 
 enum PrioridadeTarefa {

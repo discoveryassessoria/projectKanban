@@ -12,6 +12,7 @@ export const PERMISSOES = {
   'tarefas.editar': 'Editar tarefas',
   'tarefas.excluir': 'Excluir tarefas',
   'tarefas.iniciar_concluir': 'Iniciar e concluir tarefas',
+  'tarefas.bloquear': 'Bloquear e desbloquear tarefas', // CP-4D
 
   // Processos
   'processos.ver': 'Ver processos',
@@ -73,6 +74,8 @@ export const PERMISSOES = {
   // CP-4A — Motor de Workflow/Avanço (catálogo; enforcement nos subcheckpoints)
   'workflow.avancar': 'Avançar de fase (Motor de Avanço)',
   'workflow.gerarTarefa': 'Gerar tarefa a partir de passo do workflow', // CP-4C
+  'workflow.iniciarPasso': 'Iniciar passo do workflow', // CP-4D
+  'workflow.supersederPasso': 'Superseder passo do workflow (nova rodada)', // CP-4D
   'workflow.forcarAvanco': 'Forçar avanço de fase (independente de admin genérico)',
   'workflow.reabrirFase': 'Reabrir fase / novo ciclo',
   'workflow.dispensarPasso': 'Dispensar passo do workflow',
