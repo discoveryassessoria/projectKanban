@@ -1,5 +1,5 @@
 /**
- * CP-4A — testes estruturais (sem servidor/DB).
+ * CP-4A + CP-4B — testes estruturais/unitários (sem servidor/DB).
  * Rodar: npm run test:cp4
  */
 
@@ -7,6 +7,13 @@ import { readFileSync, existsSync } from "fs"
 import { fileURLToPath } from "url"
 import { dirname, join } from "path"
 import { resolveWorkflowRuntime, runtimeV2Ativo } from "../src/lib/workflow-runtime"
+import {
+  montarChaveWorkflow, montarChavePasso, montarChaveEvento, mapearTipoPasso,
+  estadoInicialPasso, ordenarStepsDeterministico, detectarCicloDependencia,
+  dependenciasInvalidas, construirSnapshotWorkflow, construirSnapshotPasso,
+  type DefStep,
+} from "../src/services/phase-workflow-helpers"
+import { validarDefinicao } from "../src/services/workflow-definition-validator"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 
@@ -69,9 +76,92 @@ function run() {
   console.log("\n5) WorkflowEvento append-only:")
   ok(!existsSync(join(ROOT, "src/app/api/workflow-eventos")), "não existe rota de mutação de WorkflowEvento")
 
+  // ============================================================
+  // CP-4B — instanciação versionada
+  // ============================================================
+  console.log("\n--- CP-4B ---")
+
+  // 6) Chaves de idempotência determinísticas
+  console.log("6) Idempotência (chaves):")
+  const bw = { processoId: 1, faseMacroId: 9, faseMacroKey: "GENEALOGIA", faseMacroVersion: 1, workflowDefinitionId: 5, workflowVersion: 2, ciclo: 1 }
+  ok(montarChaveWorkflow(bw) === montarChaveWorkflow({ ...bw }), "chave workflow determinística")
+  ok(montarChaveWorkflow(bw) !== montarChaveWorkflow({ ...bw, ciclo: 2 }), "ciclo distinto => chave distinta")
+  ok(montarChaveWorkflow(bw) !== montarChaveWorkflow({ ...bw, workflowVersion: 3 }), "versão distinta => chave distinta")
+  const bp = { workflowInstanceId: 7, stepDefinitionId: 3, stepKey: "solicitar", stepDefinitionVersion: 1, ciclo: 1 }
+  ok(montarChavePasso(bp) === montarChavePasso({ ...bp }), "chave passo determinística")
+  ok(montarChavePasso(bp) !== montarChavePasso({ ...bp, ciclo: 2 }), "passo: ciclo distinto => chave distinta")
+  ok(montarChaveEvento({ correlationId: "c", tipo: "T", entityType: "e", entityId: 1, operationKey: "k" }) ===
+     montarChaveEvento({ correlationId: "c", tipo: "T", entityType: "e", entityId: 1, operationKey: "k" }), "chave evento determinística")
+
+  // 7) Tipo do passo (decisão 11)
+  console.log("\n7) Tipo do passo:")
+  ok(mapearTipoPasso({ tipo: "VALIDACAO", createsTask: true }).tipo === "VALIDACAO", "tipo explícito preservado")
+  const inf = mapearTipoPasso({ createsTask: true })
+  ok(inf.tipo === "HUMANO" && inf.warnings.some((w) => w.code === "PASSO_TIPO_INFERIDO"), "createsTask=true => HUMANO + warning")
+  ok(mapearTipoPasso({ createsTask: false }).tipo === "AUTOMATICO", "createsTask=false => AUTOMATICO")
+  ok(mapearTipoPasso({ tipo: "XPTO", createsTask: true }).error?.code === "CONFIGURACAO_TIPO_INVALIDA", "tipo inválido => CONFIGURACAO_TIPO_INVALIDA")
+
+  // 8) Estado inicial + ordenação determinística
+  console.log("\n8) Estado inicial e ordem:")
+  ok(estadoInicialPasso(false) === "DISPONIVEL", "sem dependência => DISPONIVEL")
+  ok(estadoInicialPasso(true) === "PENDENTE", "com dependência => PENDENTE")
+  const ord = ordenarStepsDeterministico([{ ordem: 1, key: "b" }, { ordem: 1, key: "a" }, { ordem: 0, key: "z" }])
+  ok(ord.map((s) => s.key).join(",") === "z,a,b", "ordem ASC, desempate stepKey ASC")
+
+  // 9) Dependências e ciclo
+  console.log("\n9) Dependências:")
+  ok(detectarCicloDependencia([{ key: "a", dependeDeStepKeys: ["b"] }, { key: "b", dependeDeStepKeys: ["a"] }]) !== null, "detecta ciclo")
+  ok(detectarCicloDependencia([{ key: "a", dependeDeStepKeys: [] }, { key: "b", dependeDeStepKeys: ["a"] }]) === null, "sem ciclo => null")
+  ok(dependenciasInvalidas([{ key: "a", dependeDeStepKeys: ["x"] }]).length === 1, "dependência inexistente detectada")
+
+  // 10) Validator
+  console.log("\n10) Validator:")
+  const wf = { id: 5, wfUid: "u", name: "W", phaseKey: "GENEALOGIA", tipoProcessoId: 1, versao: 1, active: true, arquivado: false }
+  const stepOk: DefStep = { id: 1, key: "solicitar", label: "L", description: null, ordem: 0, createsTask: true, required: true, owner: null, priority: "medium", slaDays: 3, completionRule: null, checklist: null, versao: 1 }
+  ok(validarDefinicao(wf, []).errors.some((e) => e.code === "WORKFLOW_SEM_PASSOS"), "workflow sem passos => WORKFLOW_SEM_PASSOS")
+  ok(validarDefinicao(wf, [{ ...stepOk, key: "" }]).errors.some((e) => e.code === "STEP_SEM_KEY"), "step sem key => STEP_SEM_KEY")
+  ok(validarDefinicao(wf, [stepOk, { ...stepOk, id: 2 }]).errors.some((e) => e.code === "STEP_KEY_DUPLICADA"), "stepKey duplicada => STEP_KEY_DUPLICADA")
+  ok(validarDefinicao(wf, [{ ...stepOk, dependeDeStepKeys: ["nao-existe"] }]).errors.some((e) => e.code === "DEPENDENCIA_INVALIDA"), "dep inexistente => DEPENDENCIA_INVALIDA")
+  ok(validarDefinicao(wf, [{ ...stepOk, key: "a", dependeDeStepKeys: ["b"] }, { ...stepOk, id: 2, key: "b", dependeDeStepKeys: ["a"] }]).errors.some((e) => e.code === "CICLO_DE_DEPENDENCIA"), "ciclo => CICLO_DE_DEPENDENCIA")
+  ok(validarDefinicao({ ...wf, active: false }, [stepOk]).errors.some((e) => e.code === "SEM_VERSAO_ATIVA"), "inativo => SEM_VERSAO_ATIVA")
+  const vok = validarDefinicao(wf, [stepOk])
+  ok(vok.valid && vok.warnings.some((w) => w.code === "PASSO_TIPO_INFERIDO"), "definição válida => valid true + warning tipo inferido")
+
+  // 11) Snapshot autocontido, versionado e imutável
+  console.log("\n11) Snapshot:")
+  const snapW = construirSnapshotWorkflow({ workflowDefinitionId: 5, workflowVersion: 1, name: "W", faseMacroId: 9, faseMacroKey: "GENEALOGIA", faseMacroVersion: 1, modoKey: null, tipoProcessoId: 1, instantiatedAt: "2026-07-12T00:00:00Z" })
+  ok(snapW.snapshotSchemaVersion === 1, "snapshotSchemaVersion = 1 (workflow)")
+  const defMut: DefStep = { ...stepOk }
+  const snapS = construirSnapshotPasso(defMut, { tipo: "HUMANO", dependeDeStepKeys: [], instantiatedAt: "2026-07-12T00:00:00Z" })
+  ok(snapS.snapshotSchemaVersion === 1 && snapS.stepKey === "solicitar" && snapS.tipo === "HUMANO", "snapshot passo autocontido (stepKey/tipo/versão)")
+  defMut.label = "ALTERADO"
+  ok(snapS.titulo === "L", "mudança posterior na definição NÃO altera o snapshot")
+
+  // 12) Service (estrutural) — contrato, idempotência, sem tarefa/legado
+  console.log("\n12) Service (estrutural):")
+  const svc = readFileSync(join(ROOT, "src/services/phase-workflow.ts"), "utf8")
+  ok(/export async function instanciarWorkflowDaFase/.test(svc), "exporta instanciarWorkflowDaFase")
+  ok(/RUNTIME_V2_DESABILITADO/.test(svc) && /PROCESSO_LEGACY/.test(svc), "diagnósticos de runtime/flag")
+  ok(/prisma\.\$transaction/.test(svc), "instanciação em transação única")
+  ok(/findUnique\(\{ where: \{ chaveIdempotencia: chaveWorkflow \} \}\)/.test(svc) && /"P2002"/.test(svc), "idempotência: findUnique + P2002 convergem")
+  ok(/status: "ATIVO"/.test(svc), "instância nasce ATIVO (decisão 8)")
+  ok(!/\.tarefa\.create/.test(svc), "NÃO cria Tarefa no CP-4B")
+  ok(!/workflowStep\.(create|update|delete)/.test(svc) && !/\bworkflow\.(create|update|delete)/.test(svc), "NÃO escreve no Workflow/WorkflowStep legado")
+  const rota = readFileSync(join(ROOT, "src/app/api/processos/[processoId]/phase-workflow/instantiate/route.ts"), "utf8")
+  ok(/verificarPermissao\(request, "workflow\.avancar"\)/.test(rota), "rota instantiate gated por workflow.avancar")
+
+  // 13) Migration CP-4B aditiva
+  console.log("\n13) Migration CP-4B:")
+  const mig4b = readFileSync(join(ROOT, "prisma/migrations/20260712130000_cp4b_instance_identity_snapshot/migration.sql"), "utf8")
+  ok(!/DROP\s+(TABLE|COLUMN)/i.test(mig4b), "sem DROP")
+  ok(/ADD COLUMN\s+"faseMacroId" INTEGER/.test(mig4b), "adiciona faseMacroId")
+  ok(/"snapshotSchemaVersion" INTEGER NOT NULL DEFAULT 1/.test(mig4b), "snapshotSchemaVersion default 1")
+  ok(/ADD COLUMN\s+"causationId" VARCHAR\(60\)/.test(mig4b), "adiciona causationId")
+  ok(/CREATE UNIQUE INDEX "WorkflowEvento_chaveIdempotencia_key"/.test(mig4b), "unique chaveIdempotencia em WorkflowEvento")
+
   console.log(`\n${passed} passaram, ${failed} falharam`)
   if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }
-  console.log("CP-4A: todos os testes verdes ✅")
+  console.log("CP-4 (A+B): todos os testes verdes ✅")
 }
 
 run()
