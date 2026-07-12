@@ -12,6 +12,8 @@ import { ArvoreGenealogicaView } from "../arvore"
 // import { ProcessoTarefas } from "./ProcessoTarefas"
 import { ProcessoEstatisticas } from "./ProcessoEstatisticas"
 import { ProcessoCentralOperacional } from "./ProcessoCentralOperacional"
+import { WorkflowV2Panel } from "./WorkflowV2Panel" // CP-4G — UI mínima do runtime v2
+import { WorkflowV2AtivacaoPanel } from "./WorkflowV2AtivacaoPanel" // CP-4G — ativação controlada
 import { ProcessoDocumentos } from "./ProcessoDocumentos"
 import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoInformacoes } from "./ProcessoInformacoes"
@@ -1016,7 +1018,12 @@ export function ProcessoDetailsModal({
           )}
 
           {activeTab === "central" && (
-            <ProcessoCentralOperacional processo={processo} />
+            <>
+              {/* CP-4G — UI mínima do runtime v2 integrada à Central (não é 2ª central) */}
+              <WorkflowV2AtivacaoPanel processoId={processo.id} />
+              <WorkflowV2Panel processoId={processo.id} />
+              <ProcessoCentralOperacional processo={processo} />
+            </>
           )}
 
           {activeTab === "documentos" && (
