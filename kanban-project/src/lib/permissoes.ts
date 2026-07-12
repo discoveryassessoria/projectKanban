@@ -78,6 +78,7 @@ export const PERMISSOES = {
   'workflow.supersederPasso': 'Superseder passo do workflow (nova rodada)', // CP-4D
   'workflow.forcarAvanco': 'Forçar avanço de fase (independente de admin genérico)',
   'workflow.reabrirFase': 'Reabrir fase / novo ciclo',
+  'workflow.retornarFase': 'Retorno controlado a fase anterior (novo ciclo)', // CP-4F
   'workflow.dispensarPasso': 'Dispensar passo do workflow',
   'workflow.concluirPasso': 'Concluir passo do workflow',
   'workflow.aprovarPasso': 'Aprovar passo do workflow',

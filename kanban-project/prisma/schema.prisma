@@ -331,6 +331,7 @@ model Processo {
   // CP-4A — feature flag por processo (default "legacy"; v2 nunca automático)
   // + instâncias do runtime de workflow v2.
   workflowRuntime        String                  @default("legacy") @db.VarChar(20)
+  lockVersion            Int                     @default(0) // CP-4F — CAS na mudança de fase (v2)
   phaseWorkflowInstances PhaseWorkflowInstance[]
 
   tipoProcessoMotorId Int?
@@ -2741,6 +2742,48 @@ model WorkflowEvento {
   @@index([correlationId])
   @@index([processoId])
   @@index([criadoEm])
+}
+
+// CP-4F — auditoria completa de toda tentativa de mudança de fase (v2).
+enum AdvanceResultado {
+  BLOQUEADO
+  AVANCADO
+  FORCADO
+  REABERTO
+  RETORNADO
+  IDEMPOTENTE
+  CONFLITO
+}
+
+model PhaseAdvanceLog {
+  id                      Int              @id @default(autoincrement())
+  processoId              Int
+  faseAtual               String           @db.VarChar(60)
+  fasePretendida          String?          @db.VarChar(60)
+  faseAnteriorId          Int?
+  fasePretendidaId        Int?
+  macroWorkflowId         Int?
+  macroVersion            Int?
+  internalWorkflowVersion Int?
+  policy                  String           @default("ALL_REQUIRED_COMPLETED") @db.VarChar(40)
+  regrasAvaliadas         Json
+  pendencias              Json
+  warnings                Json?
+  resultado               AdvanceResultado
+  origem                  String           @db.VarChar(20)
+  solicitadoPorId         Int?
+  justificativa           String?          @db.Text
+  motivoCodigo            String?          @db.VarChar(40)
+  forcado                 Boolean          @default(false)
+  correlationId           String           @db.VarChar(60)
+  causationId             String?          @db.VarChar(60)
+  chaveIdempotencia       String           @unique @db.VarChar(200)
+  criadoEm                DateTime         @default(now())
+
+  @@index([processoId])
+  @@index([correlationId])
+  @@index([criadoEm])
+  @@index([resultado])
 }
 
 // Outbox transacional (estrutural no CP-4A; worker/publicação em checkpoint futuro).
