@@ -79,6 +79,7 @@ export const PERMISSOES = {
   'workflow.forcarAvanco': 'Forçar avanço de fase (independente de admin genérico)',
   'workflow.reabrirFase': 'Reabrir fase / novo ciclo',
   'workflow.retornarFase': 'Retorno controlado a fase anterior (novo ciclo)', // CP-4F
+  'workflow.ativarV2': 'Ativar runtime v2 no processo (operação administrativa)', // CP-4G
   'workflow.dispensarPasso': 'Dispensar passo do workflow',
   'workflow.concluirPasso': 'Concluir passo do workflow',
   'workflow.aprovarPasso': 'Aprovar passo do workflow',
