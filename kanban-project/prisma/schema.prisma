@@ -2595,23 +2595,29 @@ enum WorkflowEventoTipo {
 }
 
 model PhaseWorkflowInstance {
-  id           Int      @id @default(autoincrement())
-  processoId   Int
-  processo     Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
-  faseMacroKey String   @db.VarChar(60)
+  id               Int      @id @default(autoincrement())
+  processoId       Int
+  processo         Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  faseMacroKey     String   @db.VarChar(60)
+  // CP-4B — identidade da fase: id estrutural (solto/snapshot) + versão aplicada.
+  // faseMacroKey continua sendo a identidade lógica estável; label nunca é identidade.
+  faseMacroId      Int?
+  faseMacroVersion Int?
 
   // Snapshot da definição (SOLTO/imutável — alteração de template não altera a instância).
-  macroWorkflowId      Int?
-  macroVersion         Int?
-  workflowDefinitionId Int? // → PhaseInternalWorkflow (snapshot, sem FK)
-  workflowVersion      Int?
-  snapshot             Json?
+  macroWorkflowId       Int?
+  macroVersion          Int?
+  workflowDefinitionId  Int? // → PhaseInternalWorkflow (snapshot, sem FK)
+  workflowVersion       Int?
+  snapshot              Json?
+  snapshotSchemaVersion Int   @default(1) // CP-4B
 
   ciclo             Int                    @default(1)
   status            WorkflowInstanceStatus @default(PENDENTE)
   origem            OrigemInstancia        @default(MOTOR)
   instanciadoPor    String?                @db.VarChar(60) // userId ou "MOTOR"
   correlationId     String?                @db.VarChar(60)
+  causationId       String?                @db.VarChar(60) // CP-4B — causa imediata
   chaveIdempotencia String                 @unique @db.VarChar(200)
 
   previousInstanceId    Int?
@@ -2643,6 +2649,7 @@ model PhaseWorkflowStepInstance {
   stepDefinitionVersion Int?
   stepKey               String @db.VarChar(80)
   snapshot              Json?
+  snapshotSchemaVersion Int    @default(1) // CP-4B
 
   processoId   Int
   faseMacroKey String    @db.VarChar(60)
@@ -2679,6 +2686,7 @@ model PhaseWorkflowStepInstance {
   dependeDeStepKeys Json? // por stepKey/definitionId — nunca label
   chaveIdempotencia String  @unique @db.VarChar(200)
   correlationId     String? @db.VarChar(60)
+  causationId       String? @db.VarChar(60) // CP-4B — causa imediata
 
   previousStepInstanceId Int?
   previousStepInstance   PhaseWorkflowStepInstance?  @relation("StepInstanceSupersessao", fields: [previousStepInstanceId], references: [id], onDelete: SetNull)
@@ -2710,6 +2718,8 @@ model WorkflowEvento {
   stepInstanceId     Int?
   tarefaId           Int?
   correlationId      String?            @db.VarChar(60)
+  causationId        String?            @db.VarChar(60) // CP-4B — causa imediata
+  chaveIdempotencia  String?            @unique @db.VarChar(200) // CP-4B — dedup de evento
   dados              Json?
   criadoEm           DateTime           @default(now())
 
@@ -2721,17 +2731,19 @@ model WorkflowEvento {
 
 // Outbox transacional (estrutural no CP-4A; worker/publicação em checkpoint futuro).
 model DomainOutbox {
-  id            Int          @id @default(autoincrement())
-  tipo          String       @db.VarChar(80)
-  aggregateType String?      @db.VarChar(40)
-  aggregateId   Int?
-  payload       Json
-  correlationId String?      @db.VarChar(60)
-  status        OutboxStatus @default(PENDENTE)
-  tentativas    Int          @default(0)
-  erro          String?      @db.Text
-  criadoEm      DateTime     @default(now())
-  processadoEm  DateTime?
+  id                Int          @id @default(autoincrement())
+  tipo              String       @db.VarChar(80)
+  aggregateType     String?      @db.VarChar(40)
+  aggregateId       Int?
+  payload           Json
+  correlationId     String?      @db.VarChar(60)
+  causationId       String?      @db.VarChar(60) // CP-4B — causa imediata
+  chaveIdempotencia String?      @unique @db.VarChar(200) // CP-4B — dedup de outbox
+  status            OutboxStatus @default(PENDENTE)
+  tentativas        Int          @default(0)
+  erro              String?      @db.Text
+  criadoEm          DateTime     @default(now())
+  processadoEm      DateTime?
 
   @@index([status, criadoEm])
   @@index([correlationId])
