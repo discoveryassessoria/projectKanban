@@ -21,6 +21,10 @@ import {
 import * as D from "../src/services/task-step-sync-helpers"
 import * as B from "../src/lib/motor/blocking-helpers"
 import * as F from "../src/lib/motor/phase-advance-helpers"
+import * as G from "../prisma/backfill-cp4-helpers"
+import * as A from "../src/services/workflow-activation-helpers"
+import * as OW from "../src/services/operational-workflow-helpers"
+import * as OB from "../src/lib/motor/observability-helpers"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 
@@ -438,9 +442,116 @@ function run() {
   ok(!/ALTER COLUMN .* SET NOT NULL/i.test(migF), "sem NOT NULL prematuro em coluna existente")
   ok(/valores de enum PostgreSQL não são removíveis trivialmente/.test(migF), "rollback do enum documentado como não-trivial")
 
+  // ================= CP-4G — Backfill, dual-read, feature flag, UI =================
+  console.log("\n--- CP-4G ---")
+
+  // 39) Backfill: dry-run default + resolução segura (nunca inventa)
+  console.log("\n39) Backfill (dry-run + resolução segura):")
+  const relDry = new G.RelatorioBackfill(true)
+  ok(relDry.finalizar().dryRun === true, "RelatorioBackfill preserva dryRun=true")
+  const bd = G.novaBreakdown()
+  ok(Object.keys(bd).length === 11 && Object.values(bd).every((v) => v === 0), "breakdown com 11 chaves zeradas")
+  ok(G.resolverUnico([42], "faseNaoResolvida", "faseNaoResolvida").ok === true, "exatamente-1 candidato => resolve")
+  const vazio = G.resolverUnico<number>([], "workflowSemDefinicaoInterna", "versaoNaoDeterminavel")
+  ok(vazio.ok === false && (vazio as { motivo: string }).motivo === "workflowSemDefinicaoInterna", "0 candidatos => não resolve (sem inventar)")
+  const ambiguo = G.resolverUnico([1, 2], "workflowSemDefinicaoInterna", "versaoNaoDeterminavel")
+  ok(ambiguo.ok === false && (ambiguo as { ambiguo: boolean }).ambiguo === true, ">1 candidato => ambíguo (preservado)")
+  ok(G.resolverProcessoDoWorkflow([]).ok === false && G.resolverProcessoDoWorkflow([9]).ok === true, "processo do workflow: 0 falha, 1 resolve")
+  ok(G.resolverStepDefinition("x", ["a", "b"]).ok === false, "stepKey inexistente na definição => não resolve")
+  ok(G.resolverStepDefinition("a", ["a", "b"]).ok === true, "stepKey presente => resolve")
+
+  // 40) unresolvedCount = soma exata do breakdown (invariante)
+  console.log("\n40) unresolvedCount (invariante):")
+  const rel2 = new G.RelatorioBackfill(true)
+  rel2.scan(); rel2.naoResolvido("faseNaoResolvida"); rel2.naoResolvido("stepSemDefinicaoSegura"); rel2.naoResolvido("faseNaoResolvida")
+  const r2 = rel2.finalizar()
+  ok(r2.unresolvedCount === 3, "unresolvedCount soma o breakdown")
+  ok(r2.breakdown.faseNaoResolvida === 2 && r2.breakdown.stepSemDefinicaoSegura === 1, "breakdown discrimina por motivo")
+  ok(G.somaUnresolved(r2.breakdown) === r2.unresolvedCount, "somaUnresolved == unresolvedCount")
+  const rel3 = new G.RelatorioBackfill(true)
+  rel3.criouInstancia(); rel3.criouStep(); rel3.vinculouTarefa()
+  const r3 = rel3.finalizar()
+  ok(r3.createdWorkflowInstances === 1 && r3.createdStepInstances === 1 && r3.linkedTasks === 1, "contadores de criação/vínculo")
+
+  // 41) Backfill script — DRY-RUN obrigatório + só escreve models novos + dupla trava
+  console.log("\n41) Backfill script (segurança):")
+  const bf = readFileSync(join(ROOT, "prisma/backfill-cp4-workflow.ts"), "utf8")
+  ok(/BACKFILL_EXECUTE === "1"/.test(bf) && /opts\.dryRun === false/.test(bf), "escrita real exige dupla trava (código + ambiente)")
+  ok(/dryRun = .*\? false : true/.test(bf), "default é dry-run (true)")
+  ok(!/workflow\.update|workflowStep\.update|\.workflow\.delete|workflowStep\.delete/.test(bf), "NÃO altera Workflow/WorkflowStep legado")
+  ok(/phaseWorkflowInstance\.create|phaseWorkflowStepInstance\.create/.test(bf), "escreve apenas models v2 novos")
+  ok(/if \(!dryRun\)/.test(bf), "escrita guardada por !dryRun")
+
+  // 42) Dual-read: decisão de source por runtime/kill switch/instância
+  console.log("\n42) Dual-read (source + warnings):")
+  ok(OW.montarWarnings({ runtime: "legacy", killSwitchGlobal: false, temInstanciaV2: false }).source === "legacy", "legacy => source legacy")
+  ok(OW.montarWarnings({ runtime: "v2", killSwitchGlobal: false, temInstanciaV2: true }).source === "legacy", "v2 + kill switch OFF => leitura efetiva legacy")
+  ok(OW.montarWarnings({ runtime: "v2", killSwitchGlobal: true, temInstanciaV2: false }).source === "legacy-fallback", "v2 sem instância => fallback histórico")
+  ok(OW.montarWarnings({ runtime: "v2", killSwitchGlobal: true, temInstanciaV2: true }).source === "v2", "v2 + kill switch ON + instância => v2")
+  ok(OW.montarWarnings({ runtime: "v2", killSwitchGlobal: false, temInstanciaV2: true }).warnings.length > 0, "kill switch OFF gera warning claro")
+  ok(OW.iso(null) === null, "iso(null) => null")
+
+  // 43) Dual-read é SOMENTE LEITURA (sem dual-write)
+  console.log("\n43) Dual-read read-only:")
+  const ow = readFileSync(join(ROOT, "src/services/operational-workflow.ts"), "utf8")
+  ok(!/\.(create|update|updateMany|delete|deleteMany|upsert)\(/.test(ow) && !/\$transaction/.test(ow), "operational-workflow NÃO escreve (sem dual-write)")
+  ok(/runtime=legacy|leitura legada/i.test(ow) || /não toca v2/i.test(ow), "regra legacy documentada (não escreve v2)")
+
+  // 44) Feature flag / ativação controlada
+  console.log("\n44) Ativação controlada (critérios):")
+  const base: A.EntradaCriterios = { killSwitchGlobal: true, unresolvedCount: 0, workflowInternoValido: true, faseMacroResolvida: true, snapshotPossivel: true, conflitos: 0, justificativaPresente: true }
+  ok(A.avaliarCriterios(base).podeAtivarEfetivo === true, "todos os critérios + kill switch ON => pode ativar")
+  ok(A.avaliarCriterios({ ...base, killSwitchGlobal: false }).podeAtivarEfetivo === false, "kill switch OFF => NÃO pode ativar (efetivo)")
+  ok(A.avaliarCriterios({ ...base, killSwitchGlobal: false }).elegivel === true, "kill switch OFF ainda permite preparação (elegível)")
+  ok(A.avaliarCriterios({ ...base, unresolvedCount: 3 }).podeAtivarEfetivo === false, "unresolvedCount>0 => não ativa")
+  ok(A.avaliarCriterios({ ...base, unresolvedCount: 3 }).bloqueios.includes("unresolvedZero"), "bloqueio unresolvedZero listado")
+  ok(A.avaliarCriterios({ ...base, workflowInternoValido: false }).podeAtivarEfetivo === false, "config inválida (workflow interno) => não ativa")
+  ok(A.avaliarCriterios({ ...base, justificativaPresente: false }).podeAtivarEfetivo === false, "sem justificativa => não ativa")
+  ok(A.avaliarCriterios(base).criterios.length === 7, "7 critérios avaliados")
+
+  // 45) Ativação service — nunca ativa com kill switch OFF; escreve só runtime + auditoria
+  console.log("\n45) Ativação service (segurança):")
+  const act = readFileSync(join(ROOT, "src/services/workflow-activation.ts"), "utf8")
+  ok(/podeAtivarEfetivo/.test(act), "ativação depende de podeAtivarEfetivo (kill switch incluso)")
+  ok(/workflowRuntime: "v2"/.test(act), "ativação marca Processo como v2 (operação administrativa)")
+  ok(/prepararAtivacaoV2/.test(act) && /não escreve|dry-run/i.test(act), "preparação é dry-run (não escreve)")
+  ok(/backfillCp4Workflow\(\{ dryRun: true/.test(act), "compatibilidade usa backfill dry-run")
+  // lê faseAtualKey (select) é ok; ESCREVER (data) não — só workflowRuntime é escrito.
+  ok(!/faseAtualKey: (?!true)/.test(act), "ativação NÃO escreve faseAtualKey (apenas lê)")
+
+  // 46) Observabilidade (contadores puros)
+  console.log("\n46) Observabilidade:")
+  const cont = OB.contarResultados(["AVANCADO", "AVANCADO", "FORCADO", "BLOQUEADO", "CONFLITO", "IDEMPOTENTE", "REABERTO", "RETORNADO"])
+  ok(cont.AVANCADO === 2 && cont.FORCADO === 1 && cont.BLOQUEADO === 1 && cont.CONFLITO === 1, "contarResultados agrega por resultado")
+  ok(OB.contarResultados(["XPTO"]).AVANCADO === 0, "resultado desconhecido ignorado")
+  ok(OB.mapaRuntime([{ runtime: "v2", total: 3 }, { runtime: "legacy", total: 5 }]).v2 === 3, "mapaRuntime separa v2/legacy")
+  const obs = readFileSync(join(ROOT, "src/lib/motor/observability.ts"), "utf8")
+  ok(!/\.(create|update|updateMany|delete|deleteMany|upsert)\(/.test(obs), "observability é somente leitura")
+
+  // 47) UI mínima integrada (estrutural)
+  console.log("\n47) UI mínima:")
+  const panel = readFileSync(join(ROOT, "src/components/kanban/WorkflowV2Panel.tsx"), "utf8")
+  ok(/operational-workflow/.test(panel), "UI resolve runtime via dual-read")
+  ok(/pendencias/.test(panel) && /blocking/.test(panel), "UI mostra pendências do BlockingEngine")
+  ok(/advance\/simulate/.test(panel), "UI simula avanço")
+  ok(/pode\("workflow\.avancar"\)/.test(panel) && /pode\("workflow\.forcarAvanco"\)/.test(panel), "UI respeita permissões")
+  ok(/kill switch OFF|Runtime v2 desligado/i.test(panel), "UI mostra diagnóstico quando v2 desligado")
+  const modal = readFileSync(join(ROOT, "src/components/kanban/atividade-details-modal.tsx"), "utf8")
+  ok(/WorkflowV2Panel/.test(modal) && /ProcessoCentralOperacional/.test(modal), "painel integrado à Central existente (não é 2ª central)")
+  const ativPanel = readFileSync(join(ROOT, "src/components/kanban/WorkflowV2AtivacaoPanel.tsx"), "utf8")
+  ok(/podeAtivarEfetivo/.test(ativPanel) && /window\.prompt/.test(ativPanel), "UI de ativação exige critérios + justificativa")
+
+  // 48) Rotas CP-4G gated
+  console.log("\n48) Rotas CP-4G:")
+  const rOp = readFileSync(join(ROOT, "src/app/api/processos/[processoId]/operational-workflow/route.ts"), "utf8")
+  const rWr = readFileSync(join(ROOT, "src/app/api/processos/[processoId]/workflow-runtime/route.ts"), "utf8")
+  ok(/verificarPermissao\(request, "processos\.ver"\)/.test(rOp), "operational-workflow gated por processos.ver (leitura)")
+  ok(/temPermissao\(usuario\.permissoes, "workflow\.ativarV2"\)/.test(rWr), "workflow-runtime gated por workflow.ativarV2")
+  ok(/'workflow\.ativarV2'/.test(readFileSync(join(ROOT, "src/lib/permissoes.ts"), "utf8")), "permissão workflow.ativarV2 no catálogo")
+
   console.log(`\n${passed} passaram, ${failed} falharam`)
   if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }
-  console.log("CP-4 (A+B+C+D+E+F): todos os testes verdes ✅")
+  console.log("CP-4 (A+B+C+D+E+F+G): todos os testes verdes ✅")
 }
 
 run()
