@@ -18,6 +18,7 @@ import {
   montarChaveTarefa, mapearPrioridade, addDiasUteis, calcularPrazo,
   resolverResponsavel, passoGeraTarefa,
 } from "../src/services/passo-tarefa-helpers"
+import * as D from "../src/services/task-step-sync-helpers"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 
@@ -216,9 +217,76 @@ function run() {
   const perms4c = readFileSync(join(ROOT, "src/lib/permissoes.ts"), "utf8")
   ok(perms4c.includes("'workflow.gerarTarefa'"), "catálogo tem workflow.gerarTarefa")
 
+  // ============================================================
+  // CP-4D — Sincronização Tarefa ↔ Passo
+  // ============================================================
+  console.log("\n--- CP-4D ---")
+
+  // 19) Precedência de conflito
+  console.log("19) Precedência (conflito):")
+  ok(D.podeAplicarPasso("EM_ANDAMENTO", "CONCLUIDO") === true, "EM_ANDAMENTO → CONCLUIDO permitido")
+  ok(D.podeAplicarPasso("CONCLUIDO", "EM_ANDAMENTO") === false, "CONCLUIDO → EM_ANDAMENTO proibido (terminal)")
+  ok(D.podeAplicarPasso("CANCELADO", "CONCLUIDO") === false, "CANCELADO não é sobrescrito por CONCLUIDO")
+  ok(D.podeAplicarPasso("CONCLUIDO", "SUPERSEDIDO") === true, "SUPERSEDIDO vence CONCLUIDO (nova rodada)")
+  ok(D.podeAplicarPasso("EXECUTADO", "AGUARDANDO_APROVACAO") === true, "EXECUTADO → AGUARDANDO_APROVACAO (fluxo aprovação)")
+  ok(D.podeAplicarPasso("AGUARDANDO_APROVACAO", "CONCLUIDO") === true, "AGUARDANDO_APROVACAO → CONCLUIDO (aprovação)")
+  ok(D.podeAplicarPasso("BLOQUEADO", "DISPONIVEL") === true, "BLOQUEADO → DISPONIVEL (desbloqueio)")
+  ok(D.podeAplicarTarefa("CANCELADA", "CONCLUIDO_RECEBIDO") === false, "Tarefa CANCELADA não vira CONCLUIDA")
+  ok(D.ehTerminalPasso("CONCLUIDO") && !D.ehTerminalPasso("BLOQUEADO"), "bloqueio NÃO é terminal")
+
+  // 20) Chaves idempotentes
+  console.log("\n20) Chaves idempotentes:")
+  ok(D.chaveComando("task-complete", "tarefa", 5, "CONCLUIDO_RECEBIDO", 1) === D.chaveComando("task-complete", "tarefa", 5, "CONCLUIDO_RECEBIDO", 1), "chaveComando determinística")
+  ok(D.chaveComando("task-complete", "tarefa", 5, "X", 1) !== D.chaveComando("task-complete", "tarefa", 5, "X", 2), "ciclo distinto => chave distinta")
+  ok(D.chaveEvento("PASSO_CONCLUIDO", "step_instance", 3, "CONCLUIDO", 1).startsWith("evt|PASSO_CONCLUIDO|"), "chaveEvento formada")
+
+  // 21) Política de cancelamento
+  console.log("\n21) Política de cancelamento:")
+  ok(D.destinoCancelamentoTarefa("REFAZER").passoAlvo === "DISPONIVEL", "REFAZER => Passo DISPONIVEL")
+  ok(D.destinoCancelamentoTarefa("INVALIDO").passoAlvo === "BLOQUEADO", "INVALIDO => Passo BLOQUEADO")
+  ok(D.destinoCancelamentoTarefa("SUPERSESSAO").tarefaAlvo === "SUPERSEDIDA" && D.destinoCancelamentoTarefa("SUPERSESSAO").passoAlvo === "SUPERSEDIDO", "SUPERSESSAO => ambos SUPERSEDIDO")
+  ok(D.destinoCancelamentoTarefa("ADMINISTRATIVO").passoAlvo === null, "ADMINISTRATIVO => não infere estado do Passo")
+
+  // 22) Restauração de bloqueio
+  console.log("\n22) Restauração:")
+  ok(D.restaurarStatusPasso("EM_ANDAMENTO") === "EM_ANDAMENTO", "restaura Passo ao estado anterior válido")
+  ok(D.restaurarStatusPasso("CONCLUIDO") === "DISPONIVEL", "estado inválido => DISPONIVEL")
+  ok(D.restaurarStatusTarefa(null) === "NAO_INICIADA", "restaura Tarefa default NAO_INICIADA")
+
+  // 23) Service (estrutural) — CAS, sem loop, sem legado, sem fase
+  console.log("\n23) Service (estrutural):")
+  const svcS = readFileSync(join(ROOT, "src/services/task-step-sync.ts"), "utf8")
+  ok(/updateMany\(/.test(svcS) && /lockVersion: \{ increment: 1 \}/.test(svcS), "CAS: updateMany + lockVersion increment")
+  ok(/lockVersion: step\.lockVersion/.test(svcS) && /lockVersion: t\.lockVersion/.test(svcS), "CAS condicionado ao lockVersion lido")
+  ok(/"P2002"/.test(svcS) && /convergirOuThrow/.test(svcS), "P2002 => convergência idempotente")
+  ok(/if \(step\.status === alvo\) return/.test(svcS) && /if \(t\.statusTarefa === alvo\) return/.test(svcS), "no-op quando já no alvo")
+  // ausência de loop: appliers não chamam operações públicas nem entre si
+  const bodyConcluirTarefa = svcS.slice(svcS.indexOf("export async function concluirTarefa"), svcS.indexOf("export async function bloquearTarefa"))
+  ok(!/concluirPasso\(/.test(bodyConcluirTarefa), "concluirTarefa NÃO chama concluirPasso (sem loop)")
+  const bodyConcluirPasso = svcS.slice(svcS.indexOf("export async function concluirPasso"), svcS.indexOf("export async function aprovarPasso"))
+  ok(!/concluirTarefa\(/.test(bodyConcluirPasso), "concluirPasso NÃO chama concluirTarefa (sem loop)")
+  ok(!/faseAtualKey/.test(svcS), "NÃO avança fase")
+  ok(!/workflowStep\.(create|update|updateMany|delete)/.test(svcS), "NÃO escreve no WorkflowStep legado")
+  ok(/step\.status !== "AGUARDANDO_APROVACAO"/.test(svcS) && /SEGREGACAO_VIOLADA/.test(svcS), "aprovarPasso: exige AGUARDANDO_APROVACAO + segregação executor≠aprovador")
+
+  // 24) Delegação nas rotas legadas (só v2 + step instance)
+  console.log("\n24) Delegação legada:")
+  const rotaConcluir = readFileSync(join(ROOT, "src/app/api/tarefas/[tarefaId]/concluir/route.ts"), "utf8")
+  ok(/workflowStepInstanceId && tarefaAtual\.processoId/.test(rotaConcluir) && /workflowRuntime === "v2"/.test(rotaConcluir) && /concluirTarefa\(/.test(rotaConcluir), "concluir delega ao sync só se v2 + step instance")
+
+  // 25) Migration CP-4D aditiva
+  console.log("\n25) Migration CP-4D:")
+  const mig4d = readFileSync(join(ROOT, "prisma/migrations/20260712140000_cp4d_sync_lock_events/migration.sql"), "utf8")
+  ok(!/DROP\s+(TABLE|COLUMN)/i.test(mig4d), "sem DROP")
+  ok(/ALTER TYPE "StatusTarefa" ADD VALUE 'CANCELADA'/.test(mig4d), "StatusTarefa +CANCELADA")
+  ok(/ADD VALUE 'PASSO_AGUARDANDO_APROVACAO'/.test(mig4d) && /ADD VALUE 'TAREFA_INICIADA'/.test(mig4d), "novos eventos aditivos")
+  ok(/"lockVersion" INTEGER NOT NULL DEFAULT 0/.test(mig4d), "Tarefa.lockVersion default 0")
+  const perms4d = readFileSync(join(ROOT, "src/lib/permissoes.ts"), "utf8")
+  ok(perms4d.includes("'workflow.iniciarPasso'") && perms4d.includes("'workflow.supersederPasso'") && perms4d.includes("'tarefas.bloquear'"), "permissões CP-4D no catálogo")
+
   console.log(`\n${passed} passaram, ${failed} falharam`)
   if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }
-  console.log("CP-4 (A+B+C): todos os testes verdes ✅")
+  console.log("CP-4 (A+B+C+D): todos os testes verdes ✅")
 }
 
 run()
