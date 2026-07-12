@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { hojeBrasil } from "@/src/lib/date-utils"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
+import { concluirTarefa } from "@/src/services/task-step-sync"
 
 export async function POST(
   request: NextRequest,
@@ -34,6 +35,18 @@ export async function POST(
     // 🔒 E4 — só o dono (ou admin) conclui esta tarefa.
     const negado = await negarSeNaoForDonoDaTarefa(request, tarefaAtual.responsavelId)
     if (negado) return negado
+
+    // CP-4D — delegação ao runtime v2: se a Tarefa é de workflow v2
+    // (workflowStepInstanceId) e o Processo está em runtime v2, delega ao
+    // TaskStepSyncService (sincroniza o Passo, sem loop). Senão, fluxo legado intacto.
+    if (tarefaAtual.workflowStepInstanceId && tarefaAtual.processoId) {
+      const proc = await prisma.processo.findUnique({ where: { id: tarefaAtual.processoId }, select: { workflowRuntime: true } })
+      const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 }, select: { runtimeV2Habilitado: true } })
+      if ((cfg?.runtimeV2Habilitado ?? false) && proc?.workflowRuntime === "v2") {
+        const r = await concluirTarefa(id, { origem: "USER", usuarioId })
+        return NextResponse.json(r, { status: r.success ? 200 : 409 })
+      }
+    }
 
     let statusTarefa: any
     let observacaoTexto: string

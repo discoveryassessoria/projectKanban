@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { hojeBrasil, hojeBrasilMaisDias } from "@/src/lib/date-utils"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
+import { iniciarTarefa } from "@/src/services/task-step-sync"
 
 // POST - Iniciar tarefa (SEM criar cobrança)
 export async function POST(
@@ -43,6 +44,16 @@ export async function POST(
     // 🔒 E4 — só o dono (ou admin) inicia esta tarefa.
     const negado = await negarSeNaoForDonoDaTarefa(request, tarefa.responsavelId)
     if (negado) return negado
+
+    // CP-4D — delegação ao runtime v2 (inicia o Passo junto). Legado intacto se não for v2.
+    if (tarefa.workflowStepInstanceId && tarefa.processoId) {
+      const proc = await prisma.processo.findUnique({ where: { id: tarefa.processoId }, select: { workflowRuntime: true } })
+      const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 }, select: { runtimeV2Habilitado: true } })
+      if ((cfg?.runtimeV2Habilitado ?? false) && proc?.workflowRuntime === "v2") {
+        const r = await iniciarTarefa(id, { origem: "USER", usuarioId: body.usuarioId })
+        return NextResponse.json(r, { status: r.success ? 200 : 409 })
+      }
+    }
 
     // Verificar se já foi iniciada
     if (tarefa.dataInicio) {
