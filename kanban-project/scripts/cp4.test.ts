@@ -20,6 +20,7 @@ import {
 } from "../src/services/passo-tarefa-helpers"
 import * as D from "../src/services/task-step-sync-helpers"
 import * as B from "../src/lib/motor/blocking-helpers"
+import * as F from "../src/lib/motor/phase-advance-helpers"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 
@@ -340,9 +341,106 @@ function run() {
   const rotaSim = readFileSync(join(ROOT, "src/app/api/processos/[processoId]/advance/simulate/route.ts"), "utf8")
   ok(/verificarPermissao\(request, "workflow\.avancar"\)/.test(rotaPend) && /verificarPermissao\(request, "workflow\.avancar"\)/.test(rotaSim), "rotas gated por workflow.avancar")
 
+  // ================= CP-4F — Motor de Avanço de Fase =================
+  console.log("\n--- CP-4F ---")
+
+  // 31) Helpers puros: ordem, próxima/anterior fase
+  console.log("\n31) Ordem de fases (nunca por label):")
+  const fasesF: F.FaseOrdenada[] = [
+    { phaseKey: "GENEALOGIA", ordem: 1 },
+    { phaseKey: "EMISSAO", ordem: 2 },
+    { phaseKey: "TRADUCAO", ordem: 3 },
+  ]
+  ok(F.proximaFasePorOrdem(fasesF, "GENEALOGIA") === "EMISSAO", "próxima de GENEALOGIA => EMISSAO (por ordem)")
+  ok(F.proximaFasePorOrdem(fasesF, "TRADUCAO") === null, "última fase => sem próxima")
+  ok(F.proximaFasePorOrdem(fasesF, "INEXISTENTE") === null, "fase desconhecida => sem próxima")
+  // desordenado na entrada, mas ordenado internamente
+  ok(F.proximaFasePorOrdem([...fasesF].reverse(), "GENEALOGIA") === "EMISSAO", "próxima independe da ordem do array de entrada")
+  ok(F.faseAlvoEhAnterior(fasesF, "TRADUCAO", "GENEALOGIA") === true, "GENEALOGIA é anterior a TRADUCAO")
+  ok(F.faseAlvoEhAnterior(fasesF, "GENEALOGIA", "TRADUCAO") === false, "TRADUCAO não é anterior a GENEALOGIA")
+  ok(F.faseAlvoEhAnterior(fasesF, "GENEALOGIA", "GENEALOGIA") === false, "mesma fase não é anterior")
+
+  // 32) Resultado e política de justificativa
+  console.log("\n32) Resultado da operação + justificativa:")
+  ok(F.resultadoDaOperacao("AVANCAR") === "AVANCADO", "AVANCAR => AVANCADO")
+  ok(F.resultadoDaOperacao("FORCAR") === "FORCADO", "FORCAR => FORCADO")
+  ok(F.resultadoDaOperacao("REABRIR") === "REABERTO", "REABRIR => REABERTO")
+  ok(F.resultadoDaOperacao("RETORNAR") === "RETORNADO", "RETORNAR => RETORNADO")
+  ok(F.exigeJustificativa("AVANCAR") === false, "avanço normal NÃO exige justificativa")
+  ok(F.exigeJustificativa("FORCAR") && F.exigeJustificativa("REABRIR") && F.exigeJustificativa("RETORNAR"), "forçar/reabrir/retornar exigem justificativa")
+
+  // 33) Idempotência da chave de avanço (clique duplo converge)
+  console.log("\n33) Chave idempotente do avanço:")
+  const kbase = { processoId: 7, operacao: "AVANCAR" as const, faseAtual: "GENEALOGIA", fasePretendida: "EMISSAO", lockVersion: 3, cicloAlvo: 1 }
+  ok(F.montarChaveAdvance(kbase) === F.montarChaveAdvance({ ...kbase }), "chave determinística (mesmo estado => mesma chave)")
+  ok(F.montarChaveAdvance(kbase) !== F.montarChaveAdvance({ ...kbase, lockVersion: 4 }), "lockVersion diferente => chave diferente (guarda concorrência)")
+  ok(F.montarChaveAdvance(kbase) !== F.montarChaveAdvance({ ...kbase, operacao: "FORCAR" }), "operação diferente => chave diferente")
+  ok(!F.montarChaveAdvance(kbase).includes(" "), "chave sem espaços (determinística)")
+  const kblk = F.montarChaveAdvanceBloqueio({ processoId: 7, operacao: "AVANCAR", faseAtual: "EMISSAO", correlationId: "c1" })
+  ok(kblk !== F.montarChaveAdvanceBloqueio({ processoId: 7, operacao: "AVANCAR", faseAtual: "EMISSAO", correlationId: "c2" }), "bloqueio: uma auditoria por correlação")
+
+  // 34) PhaseAdvanceService — regra suprema + atomicidade (estrutural)
+  console.log("\n34) PhaseAdvanceService (único escritor de fase):")
+  const svcF = readFileSync(join(ROOT, "src/lib/motor/phase-advance.ts"), "utf8")
+  ok(/\$transaction\(async \(tx\)/.test(svcF), "mutação ocorre em transação única")
+  // faseAtualKey só é escrita via CAS (updateMany com lockVersion), nunca update direto
+  ok(/faseAtualKey: p\.faseAtual, lockVersion: p\.lockVersion/.test(svcF), "CAS: where inclui faseAtualKey + lockVersion")
+  ok(/lockVersion: \{ increment: 1 \}/.test(svcF), "CAS incrementa lockVersion")
+  ok(!/processo\.update\(\{/.test(svcF), "não usa processo.update direto (só updateMany/CAS)")
+  ok(/cas\.count === 0/.test(svcF) && /CONFLITO/.test(svcF), "conflito de concorrência detectado (count===0)")
+  ok(/resultado: "IDEMPOTENTE"/.test(svcF), "clique duplo converge para IDEMPOTENTE")
+  ok(/phaseAdvanceLog\.create/.test(svcF) && /workflowEvento\.create/.test(svcF) && /domainOutbox\.create/.test(svcF), "auditoria: log + evento + outbox")
+  ok(/calcularPendencias/.test(svcF), "recalcula pendências antes do avanço normal")
+  ok(/instanciarWorkflowDaFase\(/.test(svcF) && /garantirTarefaDePasso\(/.test(svcF), "compõe instanciação de fase + geração de tarefas na mesma tx")
+  ok(/JUSTIFICATIVA_OBRIGATORIA/.test(svcF) && /MOTIVO_OBRIGATORIO/.test(svcF), "forçado/retorno exigem justificativa + motivo")
+  ok(/FASE_ALVO_NAO_ANTERIOR/.test(svcF), "retorno só para fase anterior")
+  ok(!/\.custo|contaPagar|fatura|pagamento/i.test(svcF), "avanço NÃO executa efeito financeiro")
+
+  // 35) Services compõem tx externa (sem transação aninhada)
+  console.log("\n35) Composição transacional (tx externa):")
+  const pw = readFileSync(join(ROOT, "src/services/phase-workflow.ts"), "utf8")
+  const pt = readFileSync(join(ROOT, "src/services/passo-tarefa.ts"), "utf8")
+  ok(/txExterno\?: Prisma\.TransactionClient/.test(pw), "instanciarWorkflowDaFase aceita tx externo")
+  ok(/txExterno\?: Prisma\.TransactionClient/.test(pt), "garantirTarefaDePasso aceita tx externo")
+  ok(/txExterno \? await corpo\(txExterno\) : await prisma\.\$transaction\(corpo\)/.test(pw), "phase-workflow: usa tx externa ou abre a própria")
+  ok(/const db = txExterno \?\? prisma/.test(pt), "passo-tarefa: leituras sob tx externa enxergam passos recém-criados")
+
+  // 36) Rotas canônicas + delegação gradual
+  console.log("\n36) Rotas canônicas + delegação:")
+  const rAdv = readFileSync(join(ROOT, "src/app/api/processos/[processoId]/advance/route.ts"), "utf8")
+  const rForce = readFileSync(join(ROOT, "src/app/api/processos/[processoId]/advance/force/route.ts"), "utf8")
+  const rReopen = readFileSync(join(ROOT, "src/app/api/processos/[processoId]/phase/reopen/route.ts"), "utf8")
+  const rReturn = readFileSync(join(ROOT, "src/app/api/processos/[processoId]/phase/return/route.ts"), "utf8")
+  ok(/temPermissao\(usuario\.permissoes, "workflow\.avancar"\)/.test(rAdv), "advance gated por workflow.avancar")
+  ok(/temPermissao\(usuario\.permissoes, "workflow\.forcarAvanco"\)/.test(rForce), "force gated por workflow.forcarAvanco (não admin genérico)")
+  ok(/temPermissao\(usuario\.permissoes, "workflow\.reabrirFase"\)/.test(rReopen), "reopen gated por workflow.reabrirFase")
+  ok(/temPermissao\(usuario\.permissoes, "workflow\.retornarFase"\)/.test(rReturn), "return gated por workflow.retornarFase")
+  const rAvancarLegacy = readFileSync(join(ROOT, "src/app/api/processos/[processoId]/avancar-fase/route.ts"), "utf8")
+  const rFaseLegacy = readFileSync(join(ROOT, "src/app/api/processos/[processoId]/fase/route.ts"), "utf8")
+  ok(/resolveWorkflowRuntime/.test(rAvancarLegacy) && /advance\(id\)/.test(rAvancarLegacy), "avancar-fase delega ao serviço canônico quando v2")
+  ok(/Mudança direta de fase não é permitida/.test(rFaseLegacy), "fase (drag) bloqueia mudança direta sob v2")
+  ok(/getNextFase/.test(rAvancarLegacy), "caminho legado preservado (dual-read, sem remoção)")
+
+  // 37) Permissão workflow.retornarFase no catálogo
+  console.log("\n37) Permissões CP-4F:")
+  const perm = readFileSync(join(ROOT, "src/lib/permissoes.ts"), "utf8")
+  ok(/'workflow\.retornarFase'/.test(perm), "workflow.retornarFase no catálogo de permissões")
+
+  // 38) Migration CP-4F aditiva (sem DROP, sem NOT NULL prematuro sobre FK)
+  console.log("\n38) Migration CP-4F (aditiva, sem DROP):")
+  const migDir = join(ROOT, "prisma/migrations/20260712150000_cp4f_phase_advance_log/migration.sql")
+  ok(existsSync(migDir), "migration CP-4F existe")
+  const migF = existsSync(migDir) ? readFileSync(migDir, "utf8") : ""
+  ok(!/DROP\s+(TABLE|COLUMN|TYPE|CONSTRAINT)/i.test(migF), "migration sem DROP")
+  ok(/CREATE TABLE "PhaseAdvanceLog"/.test(migF), "cria PhaseAdvanceLog")
+  ok(/CREATE TYPE "AdvanceResultado"/.test(migF), "cria enum AdvanceResultado")
+  ok(/ADD COLUMN\s+"lockVersion" INTEGER NOT NULL DEFAULT 0/.test(migF), "lockVersion NOT NULL com DEFAULT 0 (seguro p/ linhas existentes)")
+  ok(!/ALTER COLUMN .* SET NOT NULL/i.test(migF), "sem NOT NULL prematuro em coluna existente")
+  ok(/valores de enum PostgreSQL não são removíveis trivialmente/.test(migF), "rollback do enum documentado como não-trivial")
+
   console.log(`\n${passed} passaram, ${failed} falharam`)
   if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }
-  console.log("CP-4 (A+B+C+D+E): todos os testes verdes ✅")
+  console.log("CP-4 (A+B+C+D+E+F): todos os testes verdes ✅")
 }
 
 run()
