@@ -253,6 +253,10 @@ model Documento {
   necessidadeId Int?
   necessidade   NecessidadeDocumental? @relation(fields: [necessidadeId], references: [id], onDelete: SetNull)
 
+  // CP-4A — vínculos operacionais do runtime v2 (back-relations)
+  tarefasVinculadas Tarefa[]                    @relation("TarefaDocumento")
+  stepInstances     PhaseWorkflowStepInstance[]
+
   @@index([documentTypeId])
   @@index([necessidadeId])
   @@index([pessoaId])
@@ -324,6 +328,11 @@ model Processo {
   // CP-3 — necessidades documentais do processo
   necessidades NecessidadeDocumental[]
 
+  // CP-4A — feature flag por processo (default "legacy"; v2 nunca automático)
+  // + instâncias do runtime de workflow v2.
+  workflowRuntime        String                  @default("legacy") @db.VarChar(20)
+  phaseWorkflowInstances PhaseWorkflowInstance[]
+
   tipoProcessoMotorId Int?
   tipoProcessoMotor   TipoProcessoNacionalidade? @relation("ProcessoTipoMotor", fields: [tipoProcessoMotorId], references: [id], onDelete: SetNull)
   motorArtefatos      MotorArtefato[]            @relation("ProcessoMotorArtefatos")
@@ -375,6 +384,25 @@ model Tarefa {
   subtarefas          Tarefa[]          @relation("Subtarefas")
   historico           TarefaHistorico[]
 
+  // CP-4A — vínculos aditivos (nullable) com o runtime de workflow v2.
+  workflowInstanceId     Int?
+  workflowInstance       PhaseWorkflowInstance?     @relation(fields: [workflowInstanceId], references: [id], onDelete: SetNull)
+  workflowStepInstanceId Int?
+  workflowStepInstance   PhaseWorkflowStepInstance? @relation(fields: [workflowStepInstanceId], references: [id], onDelete: SetNull)
+  necessidadeId          Int?
+  necessidade            NecessidadeDocumental?     @relation("TarefaNecessidade", fields: [necessidadeId], references: [id], onDelete: SetNull)
+  documentoId            Int?
+  documento              Documento?                 @relation("TarefaDocumento", fields: [documentoId], references: [id], onDelete: SetNull)
+  faseMacroKey           String?                    @db.VarChar(60)
+  origem                 String?                    @db.VarChar(20)
+  chaveIdempotencia      String?                    @unique @db.VarChar(200)
+  ciclo                  Int?
+  taskRole               String?                    @db.VarChar(40)
+  correlationId          String?                    @db.VarChar(60)
+  previousTarefaId       Int?
+  previousTarefa         Tarefa?                    @relation("TarefaSupersessao", fields: [previousTarefaId], references: [id], onDelete: SetNull)
+  supersededByTarefas    Tarefa[]                   @relation("TarefaSupersessao")
+
   @@index([processoId])
   @@index([responsavelId])
   @@index([concluida])
@@ -383,6 +411,9 @@ model Tarefa {
   @@index([statusId])
   @@index([pais])
   @@index([dataPrazo])
+  @@index([workflowStepInstanceId])
+  @@index([workflowInstanceId])
+  @@index([necessidadeId])
 }
 
 model TarefaHistorico {
@@ -1925,6 +1956,7 @@ model MacroWorkflow {
   tipoProcesso   TipoProcessoNacionalidade @relation(fields: [tipoProcessoId], references: [id], onDelete: Cascade)
   name           String                    @db.VarChar(200)
   ativo          Boolean                   @default(true)
+  versao         Int                       @default(1) // CP-4A — versionamento
   criadoEm       DateTime                  @default(now())
   atualizadoEm   DateTime                  @updatedAt
   fases          FaseMacro[]
@@ -1944,6 +1976,7 @@ model FaseMacro {
   exitRule        String?       @db.VarChar(120)
   slaDays         Int           @default(30)
   showInKanban    Boolean       @default(true)
+  versao          Int           @default(1) // CP-4A — versionamento
   criadoEm        DateTime      @default(now())
   atualizadoEm    DateTime      @updatedAt
 
@@ -2067,6 +2100,7 @@ model PhaseInternalWorkflow {
   name           String   @db.VarChar(200)
   active         Boolean  @default(true)
   arquivado      Boolean  @default(false)
+  versao         Int      @default(1) // CP-4A — versionamento (definição/template)
   criadoEm       DateTime @default(now())
   atualizadoEm   DateTime @updatedAt
 
@@ -2091,6 +2125,7 @@ model PhaseInternalWorkflowStep {
   slaDays        Int                   @default(0)
   completionRule String?               @db.Text // "Condição de conclusão"
   checklist      Json?
+  versao         Int                   @default(1) // CP-4A — versionamento (definição/template)
 
   // TRAVA: cada chave só existe UMA vez por workflow (impede duplicação silenciosa)
   @@unique([workflowId, key])
@@ -2250,6 +2285,9 @@ model MotorArtefato {
 model MotorConfig {
   id                    Int      @id @default(1) // sempre a linha 1 (config única)
   autoExecutarAoAvancar Boolean  @default(false) // motor roda sozinho ao avançar de fase?
+  // CP-4A — kill switch global do runtime v2 (default false = v2 bloqueado
+  // em todos os processos, mesmo os marcados workflowRuntime="v2").
+  runtimeV2Habilitado   Boolean  @default(false)
   atualizadoEm          DateTime @updatedAt
 }
 
@@ -2444,6 +2482,10 @@ model NecessidadeDocumental {
   documentos Documento[]
   eventos    NecessidadeDocumentalEvento[]
 
+  // CP-4A — vínculos operacionais do runtime v2 (back-relations)
+  tarefasVinculadas Tarefa[]                    @relation("TarefaNecessidade")
+  stepInstances     PhaseWorkflowStepInstance[]
+
   @@index([processoId])
   @@index([itemCatalogoId])
   @@index([pessoaId])
@@ -2462,6 +2504,237 @@ model NecessidadeDocumentalEvento {
 
   @@index([necessidadeId])
   @@index([criadoEm])
+}
+
+// ============================================================
+// CP-4A — Runtime de Workflow v2 (instâncias, eventos, outbox).
+// Definições (PhaseInternalWorkflow/Step) permanecem como template; estas são
+// as entidades OPERACIONAIS. É proibido usar a definição como estado do processo.
+// ============================================================
+enum PassoTipo {
+  HUMANO
+  AUTOMATICO
+  ESPERA
+  VALIDACAO
+  DECISAO
+  APROVACAO
+  MANUAL_SEM_TAREFA
+}
+
+enum WorkflowInstanceStatus {
+  PENDENTE
+  INSTANCIANDO
+  ATIVO
+  BLOQUEADO
+  AGUARDANDO
+  CONCLUIDO
+  CANCELADO
+  SUPERSEDIDO
+  FALHOU
+}
+
+enum StepInstanceStatus {
+  PENDENTE
+  DISPONIVEL
+  EM_ANDAMENTO
+  AGUARDANDO
+  BLOQUEADO
+  EXECUTADO
+  AGUARDANDO_APROVACAO
+  CONCLUIDO
+  FALHOU
+  CANCELADO
+  DISPENSADO
+  SUPERSEDIDO
+}
+
+enum OrigemInstancia {
+  MOTOR
+  MANUAL
+  MIGRACAO
+  REABERTURA
+}
+
+enum OutboxStatus {
+  PENDENTE
+  ENVIADO
+  ERRO
+}
+
+enum WorkflowEventoTipo {
+  WORKFLOW_INSTANCIADO
+  WORKFLOW_INICIADO
+  WORKFLOW_BLOQUEADO
+  WORKFLOW_CONCLUIDO
+  WORKFLOW_REABERTO
+  WORKFLOW_SUPERSEDIDO
+  PASSO_INSTANCIADO
+  PASSO_DISPONIBILIZADO
+  PASSO_INICIADO
+  PASSO_BLOQUEADO
+  PASSO_DESBLOQUEADO
+  PASSO_EXECUTADO
+  PASSO_APROVADO
+  PASSO_CONCLUIDO
+  PASSO_FALHOU
+  PASSO_REABERTO
+  PASSO_DISPENSADO
+  PASSO_CANCELADO
+  PASSO_SUPERSEDIDO
+  TAREFA_GERADA
+  TAREFA_ATRIBUIDA
+  TAREFA_CONCLUIDA
+  TAREFA_CANCELADA
+  TAREFA_REABERTA
+  TAREFA_SINCRONIZADA
+  FASE_SIMULADA
+  FASE_AVANCADA
+  FASE_AVANCADA_FORCADO
+  FASE_REABERTA
+  FASE_RETORNADA
+}
+
+model PhaseWorkflowInstance {
+  id           Int      @id @default(autoincrement())
+  processoId   Int
+  processo     Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  faseMacroKey String   @db.VarChar(60)
+
+  // Snapshot da definição (SOLTO/imutável — alteração de template não altera a instância).
+  macroWorkflowId      Int?
+  macroVersion         Int?
+  workflowDefinitionId Int? // → PhaseInternalWorkflow (snapshot, sem FK)
+  workflowVersion      Int?
+  snapshot             Json?
+
+  ciclo             Int                    @default(1)
+  status            WorkflowInstanceStatus @default(PENDENTE)
+  origem            OrigemInstancia        @default(MOTOR)
+  instanciadoPor    String?                @db.VarChar(60) // userId ou "MOTOR"
+  correlationId     String?                @db.VarChar(60)
+  chaveIdempotencia String                 @unique @db.VarChar(200)
+
+  previousInstanceId    Int?
+  previousInstance      PhaseWorkflowInstance?  @relation("PhaseWorkflowInstanceSupersessao", fields: [previousInstanceId], references: [id], onDelete: SetNull)
+  supersededByInstances PhaseWorkflowInstance[] @relation("PhaseWorkflowInstanceSupersessao")
+
+  startedAt    DateTime?
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+  supersededAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  steps   PhaseWorkflowStepInstance[]
+  tarefas Tarefa[]
+
+  @@index([processoId, faseMacroKey, status])
+  @@index([chaveIdempotencia])
+  @@index([previousInstanceId])
+}
+
+model PhaseWorkflowStepInstance {
+  id                 Int                   @id @default(autoincrement())
+  workflowInstanceId Int
+  workflowInstance   PhaseWorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+
+  // Snapshot da definição do passo (SOLTO/imutável).
+  stepDefinitionId      Int?
+  stepDefinitionVersion Int?
+  stepKey               String @db.VarChar(80)
+  snapshot              Json?
+
+  processoId   Int
+  faseMacroKey String    @db.VarChar(60)
+  ordem        Int       @default(0)
+  tipo         PassoTipo @default(HUMANO)
+  obrigatorio  Boolean   @default(true)
+  geraTarefa   Boolean   @default(true)
+
+  necessidadeId Int?
+  necessidade   NecessidadeDocumental? @relation(fields: [necessidadeId], references: [id], onDelete: SetNull)
+  documentoId   Int?
+  documento     Documento?             @relation(fields: [documentoId], references: [id], onDelete: SetNull)
+
+  ciclo         Int                @default(1)
+  status        StepInstanceStatus @default(PENDENTE)
+  prioridade    String?            @db.VarChar(20)
+  responsavelId Int? // ref. solta a Usuario (snapshot operacional)
+  equipe        String?            @db.VarChar(120)
+  papel         String?            @db.VarChar(80)
+  aprovadorId   Int?
+  slaDays       Int?
+  prazo         DateTime?
+
+  startedAt    DateTime?
+  completedAt  DateTime?
+  approvedAt   DateTime?
+  blockedAt    DateTime?
+  dispensedAt  DateTime?
+  cancelledAt  DateTime?
+  supersededAt DateTime?
+  motivo       String?   @db.VarChar(300)
+
+  bloqueadoManual   Boolean @default(false)
+  dependeDeStepKeys Json? // por stepKey/definitionId — nunca label
+  chaveIdempotencia String  @unique @db.VarChar(200)
+  correlationId     String? @db.VarChar(60)
+
+  previousStepInstanceId Int?
+  previousStepInstance   PhaseWorkflowStepInstance?  @relation("StepInstanceSupersessao", fields: [previousStepInstanceId], references: [id], onDelete: SetNull)
+  supersededBySteps      PhaseWorkflowStepInstance[] @relation("StepInstanceSupersessao")
+
+  metadata    Json?
+  lockVersion Int      @default(0) // versionamento otimista
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tarefas Tarefa[]
+
+  @@index([workflowInstanceId, ordem])
+  @@index([processoId, faseMacroKey, status])
+  @@index([necessidadeId])
+  @@index([documentoId])
+  @@index([stepKey])
+  @@index([chaveIdempotencia])
+}
+
+// Eventos append-only (sem rota de update/delete — garantido por contrato).
+model WorkflowEvento {
+  id                 Int                @id @default(autoincrement())
+  tipo               WorkflowEventoTipo
+  entityType         String             @db.VarChar(30) // workflow_instance|step_instance|tarefa|fase
+  entityId           Int?
+  processoId         Int?
+  workflowInstanceId Int?
+  stepInstanceId     Int?
+  tarefaId           Int?
+  correlationId      String?            @db.VarChar(60)
+  dados              Json?
+  criadoEm           DateTime           @default(now())
+
+  @@index([entityType, entityId])
+  @@index([correlationId])
+  @@index([processoId])
+  @@index([criadoEm])
+}
+
+// Outbox transacional (estrutural no CP-4A; worker/publicação em checkpoint futuro).
+model DomainOutbox {
+  id            Int          @id @default(autoincrement())
+  tipo          String       @db.VarChar(80)
+  aggregateType String?      @db.VarChar(40)
+  aggregateId   Int?
+  payload       Json
+  correlationId String?      @db.VarChar(60)
+  status        OutboxStatus @default(PENDENTE)
+  tentativas    Int          @default(0)
+  erro          String?      @db.Text
+  criadoEm      DateTime     @default(now())
+  processadoEm  DateTime?
+
+  @@index([status, criadoEm])
+  @@index([correlationId])
 }
 
 enum NaturezaPreco {
@@ -2510,6 +2783,8 @@ enum StatusTarefa {
   AGUARDANDO_TERCEIRO
   CONCLUIDO_RECEBIDO
   CONCLUIDO_NAO_POSSUI
+  BLOQUEADA // CP-4A (aditivo)
+  SUPERSEDIDA // CP-4A (aditivo)
 }
 
 enum PrioridadeTarefa {

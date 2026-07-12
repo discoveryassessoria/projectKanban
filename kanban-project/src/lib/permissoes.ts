@@ -69,6 +69,15 @@ export const PERMISSOES = {
   'usuarios.criar': 'Criar usuários',
   'usuarios.editar': 'Editar usuários',
   'usuarios.excluir': 'Excluir usuários',
+
+  // CP-4A — Motor de Workflow/Avanço (catálogo; enforcement nos subcheckpoints)
+  'workflow.avancar': 'Avançar de fase (Motor de Avanço)',
+  'workflow.forcarAvanco': 'Forçar avanço de fase (independente de admin genérico)',
+  'workflow.reabrirFase': 'Reabrir fase / novo ciclo',
+  'workflow.dispensarPasso': 'Dispensar passo do workflow',
+  'workflow.concluirPasso': 'Concluir passo do workflow',
+  'workflow.aprovarPasso': 'Aprovar passo do workflow',
+  'workflow.cancelarPasso': 'Cancelar passo do workflow',
 } as const
 
 export type PermissaoChave = keyof typeof PERMISSOES
