@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma"
 import { getNextFase } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
 import { dispararMotorNaFaseAtual } from "@/src/lib/motor/executor"
+import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
+import { advance } from "@/src/lib/motor/phase-advance"
 
 export async function POST(
   request: Request,
@@ -17,9 +19,19 @@ export async function POST(
 
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { id: true, pais: true, faseAtualKey: true, status: { select: { faseCode: true } } },
+      select: { id: true, pais: true, faseAtualKey: true, workflowRuntime: true, status: { select: { faseCode: true } } },
     })
     if (!processo) return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
+
+    // CP-4F — DELEGAÇÃO GRADUAL: processos em runtime v2 avançam SOMENTE pelo
+    // serviço canônico PhaseAdvanceService (único escritor de faseAtualKey).
+    // Processos legacy seguem o caminho legado abaixo (dual-read, sem dual-write).
+    const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 }, select: { runtimeV2Habilitado: true } })
+    if (resolveWorkflowRuntime(processo.workflowRuntime, cfg?.runtimeV2Habilitado ?? false) === "v2") {
+      const r = await advance(id)
+      const status = r.success ? 200 : r.resultado === "CONFLITO" ? 409 : r.resultado === "BLOQUEADO" ? 422 : 400
+      return NextResponse.json(r, { status })
+    }
 
     // ✅ E5 — fase REAL = faseAtualKey (fonte de verdade). Fallback p/ a coluna
     // legada só se faseAtualKey estiver vazio. Antes lia SÓ status.faseCode.
