@@ -14,6 +14,10 @@ import {
   type DefStep,
 } from "../src/services/phase-workflow-helpers"
 import { validarDefinicao } from "../src/services/workflow-definition-validator"
+import {
+  montarChaveTarefa, mapearPrioridade, addDiasUteis, calcularPrazo,
+  resolverResponsavel, passoGeraTarefa,
+} from "../src/services/passo-tarefa-helpers"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 
@@ -159,9 +163,62 @@ function run() {
   ok(/ADD COLUMN\s+"causationId" VARCHAR\(60\)/.test(mig4b), "adiciona causationId")
   ok(/CREATE UNIQUE INDEX "WorkflowEvento_chaveIdempotencia_key"/.test(mig4b), "unique chaveIdempotencia em WorkflowEvento")
 
+  // ============================================================
+  // CP-4C — Passo humano → Tarefa real
+  // ============================================================
+  console.log("\n--- CP-4C ---")
+
+  // 14) Chave da Tarefa + prioridade
+  console.log("14) Chave e prioridade:")
+  const bt = { stepInstanceId: 10, taskRole: "principal", ciclo: 1 }
+  ok(montarChaveTarefa(bt) === montarChaveTarefa({ ...bt }), "chave Tarefa determinística")
+  ok(montarChaveTarefa(bt) !== montarChaveTarefa({ ...bt, ciclo: 2 }), "ciclo distinto => chave distinta")
+  ok(montarChaveTarefa(bt) !== montarChaveTarefa({ ...bt, taskRole: "revisor" }), "role distinto => chave distinta")
+  ok(mapearPrioridade("low") === "BAIXA" && mapearPrioridade("medium") === "MEDIA" && mapearPrioridade("high") === "ALTA", "prioridade low/medium/high")
+  ok(mapearPrioridade(undefined) === "MEDIA" && mapearPrioridade("xyz") === "MEDIA", "prioridade default MEDIA")
+
+  // 15) Prazo por dias úteis
+  console.log("\n15) Prazo (dias úteis):")
+  ok(calcularPrazo(new Date("2026-07-17T12:00:00Z"), null) === null, "sem SLA => sem prazo")
+  ok(calcularPrazo(new Date("2026-07-17T12:00:00Z"), 0) === null, "SLA 0 => sem prazo")
+  const sexta = new Date("2026-07-17T12:00:00Z") // sexta-feira
+  const mais1 = addDiasUteis(sexta, 1)
+  ok(mais1.getUTCDay() !== 0 && mais1.getUTCDay() !== 6, "addDiasUteis pula fim de semana")
+  ok(mais1.getTime() > sexta.getTime(), "prazo > base")
+
+  // 16) Responsável (atribuição pendente)
+  console.log("\n16) Responsável:")
+  ok(resolverResponsavel({ responsavelId: 5 }).responsavelId === 5 && !resolverResponsavel({ responsavelId: 5 }).warning, "responsavelId explícito => sem warning")
+  ok(resolverResponsavel({ papel: "analista" }).responsavelId === null && resolverResponsavel({ papel: "analista" }).warning?.code === "ATRIBUICAO_PENDENTE", "só papel => warning ATRIBUICAO_PENDENTE")
+  ok(resolverResponsavel({}).warning?.code === "ATRIBUICAO_PENDENTE", "sem nada => warning")
+
+  // 17) Regra normativa de geração
+  console.log("\n17) Regra normativa:")
+  ok(passoGeraTarefa({ tipo: "HUMANO", geraTarefa: true, status: "DISPONIVEL", aplicavel: true }).gera === true, "HUMANO+geraTarefa+DISPONIVEL+aplicável => gera")
+  ok(passoGeraTarefa({ tipo: "AUTOMATICO", geraTarefa: true, status: "DISPONIVEL", aplicavel: true }).code === "PASSO_TIPO_NAO_HUMANO", "AUTOMATICO => não gera")
+  ok(passoGeraTarefa({ tipo: "HUMANO", geraTarefa: false, status: "DISPONIVEL", aplicavel: true }).code === "PASSO_NAO_GERA_TAREFA", "geraTarefa=false => não gera")
+  ok(passoGeraTarefa({ tipo: "HUMANO", geraTarefa: true, status: "PENDENTE", aplicavel: true }).code === "PASSO_ESTADO_INCOMPATIVEL", "status!=DISPONIVEL => não gera")
+  ok(passoGeraTarefa({ tipo: "HUMANO", geraTarefa: true, status: "DISPONIVEL", aplicavel: false }).code === "PASSO_NAO_APLICAVEL", "não aplicável => não gera")
+
+  // 18) Service (estrutural)
+  console.log("\n18) Service (estrutural):")
+  const svcT = readFileSync(join(ROOT, "src/services/passo-tarefa.ts"), "utf8")
+  ok(/export async function garantirTarefaDePasso/.test(svcT), "exporta garantirTarefaDePasso")
+  ok(/RUNTIME_V2_DESABILITADO/.test(svcT) && /PROCESSO_LEGACY/.test(svcT), "diagnósticos de runtime/flag")
+  ok(/prisma\.\$transaction/.test(svcT), "criação em transação única")
+  ok(/findFirst\(\{ where: \{ chaveIdempotencia: chaveTarefa \} \}\)/.test(svcT) && /"P2002"/.test(svcT), "idempotência findFirst + P2002")
+  ok(/statusTarefa: "NAO_INICIADA"/.test(svcT), "Tarefa nasce NAO_INICIADA")
+  ok(/"TAREFA_GERADA"/.test(svcT) && /domainOutbox\.create/.test(svcT), "evento TAREFA_GERADA + outbox na transação")
+  ok(!/phaseWorkflowStepInstance\.update/.test(svcT), "NÃO altera o Passo (sem sincronização/conclusão)")
+  ok(!/faseAtualKey/.test(svcT), "NÃO avança fase")
+  const rotaT = readFileSync(join(ROOT, "src/app/api/workflow-step-instances/[id]/gerar-tarefa/route.ts"), "utf8")
+  ok(/verificarPermissao\(request, "workflow\.gerarTarefa"\)/.test(rotaT), "rota gated por workflow.gerarTarefa (permissão específica)")
+  const perms4c = readFileSync(join(ROOT, "src/lib/permissoes.ts"), "utf8")
+  ok(perms4c.includes("'workflow.gerarTarefa'"), "catálogo tem workflow.gerarTarefa")
+
   console.log(`\n${passed} passaram, ${failed} falharam`)
   if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }
-  console.log("CP-4 (A+B): todos os testes verdes ✅")
+  console.log("CP-4 (A+B+C): todos os testes verdes ✅")
 }
 
 run()
