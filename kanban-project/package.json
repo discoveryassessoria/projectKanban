@@ -12,6 +12,7 @@
     "test:cp2": "tsx scripts/cp2.test.ts",
     "test:cp3": "tsx scripts/cp3.test.ts",
     "test:cp4": "tsx scripts/cp4.test.ts",
+    "test:completion": "tsx scripts/completion-engine.test.ts",
     "backfill:cp1:familias": "tsx prisma/backfill-cp1-familias.ts",
     "backfill:cp1:identidade": "tsx prisma/backfill-cp1-identidade.ts",
     "backfill:cp2:catalogo": "tsx prisma/backfill-cp2-catalogo.ts",

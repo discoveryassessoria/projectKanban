@@ -1,132 +1,185 @@
 // src/services/processEngine/stepCompletionResolver.ts
 //
-// ETAPA 2 — FONTE ÚNICA DE VERDADE (parte 1: conclusão de PASSO)
+// ETAPA 2 — ADAPTADOR DE BANCO do Motor de Conclusão.
 //
-// Este é o único lugar que decide "esse passo pode ser concluído?".
-// Antes essa decisão vivia num switch fixo dentro da rota
-// (checarConclusaoDoPasso). Agora ela é guiada por uma POLÍTICA
-// (completionPolicy), que no futuro o Gerenciamento vai configurar.
+// A DECISÃO (regra de domínio) vive no núcleo PURO em
+// ../completion-engine/policies.ts. Este arquivo só monta o "context" (lê o
+// banco) e chama o núcleo. Assim existe UMA fonte de verdade (regras 9/10) e
+// nada de regra de domínio no front.
 //
-// Origem da política, em ordem:
-//   1. a que estiver gravada no próprio passo (WorkflowStep.completionPolicy);
-//   2. senão, o padrão por stepKey (mapa abaixo — a "semente");
-//   3. senão, MANUAL_CONFIRMATION (sem trava automática).
-//
-// ⚠ Este arquivo PRESERVA o comportamento atual: as mesmas travas e as
-//    mesmas mensagens de hoje. Ele ainda não muda nada no sistema — só
-//    passará a ser usado quando ligarmos a rota a ele (passo seguinte).
+// Consumido hoje por: src/app/api/documentos/[id]/workflow/steps/[stepId] (gate
+// de conclusão) e src/app/api/documentos/[id]/workflow (stamp de política).
+// A assinatura pública { podeConcluir, motivo, policy } é PRESERVADA (sem
+// regressão): podeConcluir = result.completed, motivo = result.reason (se travado).
 
 import { prisma } from "@/lib/prisma"
+import {
+  evaluateStepCompletion,
+  normalizePolicy,
+  type CompletionPolicy,
+  type DocumentFact,
+  type StepCompletionResult,
+} from "@/src/services/completion-engine/policies"
 
-// Políticas suportadas nesta etapa. Outras (da apostila) entram conforme
-// as fases forem ficando prontas.
-export type CompletionPolicy =
-  | "MANUAL_CONFIRMATION"   // sem trava — conclui manualmente
-  | "DOCUMENT_LOCATED"      // o ato foi localizado (dados registrais preenchidos)
-  | "DOCUMENT_RECEIVED"     // a certidão foi anexada (arquivo)
-  | "DOCUMENT_VALIDATED"    // validada — hoje = arquivo anexado (placeholder, ver TODO)
+export type { CompletionPolicy } from "@/src/services/completion-engine/policies"
 
-// SEMENTE: política padrão por passo, enquanto o Gerenciamento não grava
-// isso no banco. Baseado nas travas atuais (E1/E2) + normalização da apostila.
-const POLITICA_PADRAO: Record<string, CompletionPolicy> = {
-  buscar_documento: "DOCUMENT_LOCATED",
+// ── Política autoritativa por stepKey conhecido ─────────────────────────────
+// Enquanto o Gerenciamento não grava política por passo, o stepKey manda para
+// os passos conhecidos da Genealogia/Emissão (inclusive corrige passos já
+// gravados com o default antigo). "buscar_documento" agora é agregado
+// (ALL_REQUIRED_DOCUMENTS_LOCATED) — nunca TASK_COMPLETED por padrão (regra 7).
+const KNOWN_STEP_POLICY: Record<string, CompletionPolicy> = {
+  buscar_documento: "ALL_REQUIRED_DOCUMENTS_LOCATED", // FIX (regra 7)
   receber_certidao: "DOCUMENT_RECEIVED",
   conferir_certidao: "DOCUMENT_RECEIVED",
   validar_certidao: "DOCUMENT_VALIDATED",
-  // qualquer passo não listado → MANUAL_CONFIRMATION (sem trava)
-}
-
-/** Retorna a política padrão de um passo (usado também para carimbar passos novos). */
-export function politicaPadraoParaStep(stepKey: string): CompletionPolicy {
-  return POLITICA_PADRAO[stepKey] ?? "MANUAL_CONFIRMATION"
-}
-
-export interface ResultadoConclusaoPasso {
-  /** true = pode concluir; false = travado. */
-  podeConcluir: boolean
-  /** null quando pode; mensagem amigável (vira erro 422) quando travado. */
-  motivo: string | null
-  /** política que foi de fato avaliada (útil pra log/auditoria). */
-  policy: CompletionPolicy
 }
 
 /**
- * Decide se um passo pode ser concluído agora.
- *
- * @param stepKey       chave do passo (ex.: "buscar_documento")
- * @param documentoId   documento ao qual o passo pertence
- * @param policyDoStep  política gravada no passo (WorkflowStep.completionPolicy);
- *                      pode ser null/undefined — cai no padrão por stepKey
+ * Política padrão de um passo (usada para carimbar passos novos no workflow).
+ * Para passos NÃO conhecidos: MANUAL_CONFIRMATION (sem trava — comportamento
+ * legado preservado). Passos conhecidos: mapa autoritativo acima.
+ */
+export function politicaPadraoParaStep(stepKey: string): CompletionPolicy {
+  return KNOWN_STEP_POLICY[stepKey] ?? "MANUAL_CONFIRMATION"
+}
+
+/**
+ * Política EFETIVA de um passo já existente:
+ *   - passo conhecido  → mapa autoritativo (corrige stamps antigos);
+ *   - senão            → a política gravada no passo;
+ *   - senão            → MANUAL_CONFIRMATION (legado, sem trava).
+ * Política gravada porém inválida/desconhecida → normalizePolicy vira
+ * NEEDS_REVIEW no núcleo (regra 8), e o passo NÃO conclui.
+ */
+function politicaEfetiva(stepKey: string, policyDoStep?: string | null): string {
+  if (KNOWN_STEP_POLICY[stepKey]) return KNOWN_STEP_POLICY[stepKey]
+  return policyDoStep ?? "MANUAL_CONFIRMATION"
+}
+
+export interface ResultadoConclusaoPasso {
+  /** true = pode concluir; false = travado. (retrocompatível) */
+  podeConcluir: boolean
+  /** null quando pode; mensagem amigável (vira 422) quando travado. */
+  motivo: string | null
+  /** política que foi de fato avaliada. */
+  policy: string
+  /** resultado completo do motor (blockers/evidence/progress/evaluatedAt). */
+  result: StepCompletionResult
+}
+
+// Status que já contam como "documento localizado/pronto" na Genealogia
+// (espelha POS_VALIDADO de compute-phase-progress: recebido/entregue/etc.).
+const STATUS_LOCALIZADO = new Set([
+  "RECEBIDO",
+  "ENTREGUE",
+  "APOSTILADO",
+  "TRADUZIDO",
+])
+const STATUS_CANCELADO = new Set(["CANCELADO", "INVALIDO"])
+
+type DocRegistral = {
+  status: string
+  cartorio: string | null
+  numero_registro: string | null
+  livro: string | null
+  folha: string | null
+  termo: string | null
+  data_registro: Date | string | null
+  arquivo_url: string | null
+}
+
+const temDadosRegistrais = (d: DocRegistral) =>
+  !!(d.cartorio || d.numero_registro || d.livro || d.folha || d.termo || d.data_registro)
+
+function docFact(id: number, d: DocRegistral): DocumentFact {
+  const located = temDadosRegistrais(d) || STATUS_LOCALIZADO.has(d.status)
+  const received = !!d.arquivo_url || STATUS_LOCALIZADO.has(d.status)
+  return {
+    ref: String(id),
+    required: true,
+    cancelled: STATUS_CANCELADO.has(d.status),
+    located,
+    received,
+    // ⚠ validado ainda = recebido (arquivo). Sinal REAL de validação jurídica
+    // é seam de fase futura — mantido assim para NÃO regredir validar_certidao.
+    validated: received,
+  }
+}
+
+const SELECT_REGISTRAL = {
+  status: true,
+  cartorio: true,
+  numero_registro: true,
+  livro: true,
+  folha: true,
+  termo: true,
+  data_registro: true,
+  arquivo_url: true,
+} as const
+
+/**
+ * Decide se um passo pode ser concluído agora (adaptador → núcleo puro).
  */
 export async function resolveStepCompletionState(
   stepKey: string,
   documentoId: number,
   policyDoStep?: string | null,
 ): Promise<ResultadoConclusaoPasso> {
-  // 1. Qual política vale?
-  const policy: CompletionPolicy =
-    (policyDoStep as CompletionPolicy) ||
-    politicaPadraoParaStep(stepKey)
+  const now = new Date()
+  const rawPolicy = politicaEfetiva(stepKey, policyDoStep)
+  const policy = normalizePolicy(rawPolicy)
 
-  // 2. Avalia a política contra o documento.
-  switch (policy) {
-    case "MANUAL_CONFIRMATION":
-      return { podeConcluir: true, motivo: null, policy }
+  // Monta só o que a política precisa (evita I/O desnecessário).
+  let self: DocumentFact | undefined
+  let requiredDocuments: DocumentFact[] | undefined
 
-    case "DOCUMENT_LOCATED": {
-      // O ato foi localizado quando há QUALQUER dado registral preenchido.
-      const doc = await prisma.documento.findUnique({
-        where: { id: documentoId },
-        select: {
-          cartorio: true,
-          numero_registro: true,
-          livro: true,
-          folha: true,
-          termo: true,
-          data_registro: true,
+  if (policy === "DOCUMENT_LOCATED" || policy === "DOCUMENT_RECEIVED" || policy === "DOCUMENT_VALIDATED") {
+    const d = await prisma.documento.findUnique({
+      where: { id: documentoId },
+      select: SELECT_REGISTRAL,
+    })
+    if (d) self = docFact(documentoId, d as DocRegistral)
+  }
+
+  if (policy === "ALL_REQUIRED_DOCUMENTS_LOCATED" || policy === "ALL_REQUIRED_DOCUMENTS_VALIDATED") {
+    // conjunto obrigatório = docs da LINHA RETA da árvore do processo (mesma
+    // régua da matriz/Central e de compute-phase-progress).
+    const doc = await prisma.documento.findUnique({
+      where: { id: documentoId },
+      select: {
+        pessoa: {
+          select: {
+            arvore: {
+              select: {
+                pessoas: {
+                  where: { linhaReta: true },
+                  select: { documentos: { select: { id: true, ...SELECT_REGISTRAL } } },
+                },
+              },
+            },
+          },
         },
-      })
-      const localizado = !!(
-        doc &&
-        (doc.cartorio ||
-          doc.numero_registro ||
-          doc.livro ||
-          doc.folha ||
-          doc.termo ||
-          doc.data_registro)
-      )
-      if (!localizado) {
-        return {
-          podeConcluir: false,
-          policy,
-          motivo:
-            'Não dá para concluir "Buscar documento": o ato ainda não foi localizado. Preencha os dados registrais (cartório, livro/folha/termo ou nº de registro) na aba Dados Registrais antes de concluir.',
-        }
-      }
-      return { podeConcluir: true, motivo: null, policy }
-    }
+      },
+    })
+    const docs =
+      doc?.pessoa?.arvore?.pessoas.flatMap((p) => p.documentos) ?? []
+    requiredDocuments = docs.map((dd) => docFact(dd.id, dd as unknown as DocRegistral))
+  }
 
-    case "DOCUMENT_RECEIVED":
-    case "DOCUMENT_VALIDATED": {
-      // Hoje as duas exigem o arquivo da certidão anexado — igual ao E2 atual.
-      // TODO (etapa futura): DOCUMENT_VALIDATED deve exigir um sinal REAL de
-      // validação jurídica, não só a presença do arquivo.
-      const doc = await prisma.documento.findUnique({
-        where: { id: documentoId },
-        select: { arquivo_url: true },
-      })
-      if (!doc?.arquivo_url) {
-        return {
-          podeConcluir: false,
-          policy,
-          motivo: "Não dá para concluir esta etapa: anexe o arquivo da certidão recebida antes.",
-        }
-      }
-      return { podeConcluir: true, motivo: null, policy }
-    }
+  const result = evaluateStepCompletion({
+    rawPolicy,
+    now,
+    self,
+    requiredDocuments,
+    // linkedTasks/condition/customRule: seams para fases futuras (o núcleo já
+    // trata; o adaptador legado da Genealogia não usa essas políticas hoje).
+  })
 
-    default:
-      // Política desconhecida → não trava (conservador; não quebra o fluxo).
-      return { podeConcluir: true, motivo: null, policy }
+  return {
+    podeConcluir: result.completed,
+    motivo: result.completed ? null : result.reason,
+    policy: result.policy,
+    result,
   }
 }
