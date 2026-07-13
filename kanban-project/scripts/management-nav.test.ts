@@ -3,6 +3,11 @@
  * Rodar: npm run test:nav
  */
 import { MANAGEMENT_NAVIGATION, GESTAO_PERMISSION } from "../src/components/gerenciamentoComponents/managementNavigation"
+import { readFileSync } from "fs"
+import { fileURLToPath } from "url"
+import { dirname, join } from "path"
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 
 let passed = 0, failed = 0
 const falhas: string[] = []
@@ -40,13 +45,18 @@ const motor = MANAGEMENT_NAVIGATION.find((g) => g.key === "grp_motor")
 ok(motor?.technicalOnly === true && motor?.permission === GESTAO_PERMISSION, "grupo Motor Técnico gated por regra de admin do Gerenciamento")
 
 // 6) busca por keywords cobre os exemplos da spec
+const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
 const matchesKeyword = (kw: string) =>
-  todosItens.filter((i) => i.status !== "hidden" && [i.label, ...(i.keywords ?? [])].join(" ").toLowerCase().includes(kw))
+  todosItens.filter((i) => i.status !== "hidden" && norm([i.label, ...(i.keywords ?? [])].join(" ")).includes(norm(kw)))
 ok(matchesKeyword("preço").length >= 2, 'busca "preço" retorna itens de precificação')
 ok(matchesKeyword("certidão").some((i) => i.key === "doctypes"), 'busca "certidão" alcança Tipos de Documento')
 ok(matchesKeyword("tradutor").some((i) => i.key === "suppliers"), 'busca "tradutor" alcança Fornecedores')
 ok(matchesKeyword("workflow").length >= 2, 'busca "workflow" retorna itens de workflow')
 ok(matchesKeyword("permiss").some((i) => i.key === "roles"), 'busca "permissão" alcança Perfis e Permissões')
+// normalização sem acento
+ok(matchesKeyword("certidao").length >= 1 && matchesKeyword("certidão").length === matchesKeyword("certidao").length, 'busca normaliza acento: "certidao" == "certidão"')
+ok(matchesKeyword("preco").length >= 2, 'busca "preco" (sem acento) encontra precificação')
+ok(matchesKeyword("permissao").some((i) => i.key === "roles"), 'busca "permissao" (sem acento) alcança Perfis e Permissões')
 
 // 7) itens active possuem key não vazia (viram deep-link ?screen=)
 ok(todosItens.filter((i) => i.status === "active").every((i) => !!i.key), "itens active têm key para deep-link")
@@ -70,6 +80,31 @@ ok(grupoDe("crossrules") === "grp_workflow", "D8: Tarefas Transversais em Workfl
 ok(grupoDe("imtemplates") === "grp_biblioteca", "D8: Modelos de Passos em Biblioteca Operacional")
 ok(grupoDe("prottypes") === "grp_workflow" && itemDe("prottypes")?.label === "Tipos de Protocolo", "D9: prottypes em Workflow como 'Tipos de Protocolo'")
 ok(!itemDe("protocols"), "D9: protocols NÃO está na sidebar do Gerenciamento")
+
+// 9) Refinamento visual 10/10 (labels curtos + fullLabel + ordem + a11y)
+console.log("\nRefinamento visual:")
+const gLabel = (k: string) => MANAGEMENT_NAVIGATION.find((g) => g.key === k)
+const curtos: Array<[string, string, string]> = [
+  ["grp_visao", "Painel", "Visão Geral"],
+  ["grp_pessoas", "Pessoas", "Pessoas e Organizações"],
+  ["grp_biblioteca", "Biblioteca", "Biblioteca Operacional"],
+  ["grp_relatorios", "Relatórios", "Relatórios e Indicadores"],
+  ["grp_usuarios", "Usuários", "Usuários e Acessos"],
+  ["grp_governanca", "Sistema", "Governança e Sistema"],
+  ["grp_motor", "Motor", "Motor Técnico"],
+]
+ok(curtos.every(([k, short, full]) => gLabel(k)?.label === short && gLabel(k)?.fullLabel === full), "labels curtos aplicados com fullLabel completo")
+ok(["grp_processos", "grp_workflow", "grp_documentos", "grp_financeiro", "grp_automacoes", "grp_comunicacao", "grp_integracoes"].every((k) => !gLabel(k)?.fullLabel), "grupos mantidos ficaram com label inalterado")
+// só os grupos que RENDERIZAM (têm ≥1 item active) — Agenda/IA ficam ocultos e não aparecem
+const gruposVisiveis = MANAGEMENT_NAVIGATION.filter((g) => (g.children ?? []).some((c) => c.status === "active"))
+ok(gruposVisiveis.every((g) => g.label.length <= 12), "labels de grupo VISÍVEIS curtos (sem risco de ellipsis)")
+const orders = MANAGEMENT_NAVIGATION.map((g) => g.order)
+ok(orders.every((o, i) => i === 0 || o > orders[i - 1]), "ordem dos grupos preservada (ascendente)")
+// a11y + normalização + deep-link no componente (source check)
+const pageSrc = readFileSync(join(ROOT, "src/app/administrator/page.tsx"), "utf8")
+ok(/aria-expanded=\{aberto\}/.test(pageSrc) && /aria-controls=/.test(pageSrc), "cabeçalho de grupo tem aria-expanded + aria-controls")
+ok(/normalize\("NFD"\)/.test(pageSrc), "busca normaliza acentos (NFD) no componente")
+ok(/\?screen=/.test(pageSrc), "deep-link ?screen= preservado no componente (rotas intactas)")
 
 console.log(`\n${passed} passaram, ${failed} falharam`)
 if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }

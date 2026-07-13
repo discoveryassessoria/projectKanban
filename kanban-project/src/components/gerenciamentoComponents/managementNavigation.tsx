@@ -26,6 +26,8 @@ export type NavStatus = "active" | "coming_soon" | "hidden"
 export interface ManagementNavigationItem {
   key: string
   label: string
+  /** nome completo p/ tooltip/aria/busca quando o label exibido é encurtado (grupos). */
+  fullLabel?: string
   href?: string
   icon?: ComponentType<{ className?: string }>
   permission?: string
@@ -51,7 +53,7 @@ const h = (order: number, key: string, label: string): ManagementNavigationItem 
 
 export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
   {
-    key: "grp_visao", label: "Visão Geral", icon: LayoutDashboard, order: 10, status: "active",
+    key: "grp_visao", label: "Painel", fullLabel: "Visão Geral", icon: LayoutDashboard, order: 10, status: "active",
     children: [
       a(10, "overview", "Painel do Gerenciamento", ["dashboard", "resumo", "inicio", "home"]),
       h(20, "pendencias_config", "Pendências de Configuração"),
@@ -137,7 +139,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     ],
   },
   {
-    key: "grp_pessoas", label: "Pessoas e Organizações", icon: Users2, order: 60, status: "active",
+    key: "grp_pessoas", label: "Pessoas", fullLabel: "Pessoas e Organizações", icon: Users2, order: 60, status: "active",
     children: [
       // Dono canônico de Fornecedor é o Financeiro → aqui é ATALHO para a mesma tela.
       a(10, "suppliers", "Fornecedores (Financeiro)", ["fornecedor", "parceiro", "tradutor", "advogado"]),
@@ -153,7 +155,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     ],
   },
   {
-    key: "grp_biblioteca", label: "Biblioteca Operacional", icon: Library, order: 70, status: "active",
+    key: "grp_biblioteca", label: "Biblioteca", fullLabel: "Biblioteca Operacional", icon: Library, order: 70, status: "active",
     children: [
       a(10, "crosstpl", "Modelos de Tarefas", ["modelo", "tarefa", "template"]),
       a(15, "imtemplates", "Modelos de Passos", ["modelo", "passo", "step", "template"]),
@@ -226,7 +228,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     ],
   },
   {
-    key: "grp_relatorios", label: "Relatórios e Indicadores", icon: BarChart3, order: 120, status: "active",
+    key: "grp_relatorios", label: "Relatórios", fullLabel: "Relatórios e Indicadores", icon: BarChart3, order: 120, status: "active",
     children: [
       a(10, "mgmthealth", "Diagnóstico Executivo", ["diagnostico", "saude", "indicador", "dashboard"]),
       a(20, "diagnostics", "Diagnósticos", ["diagnostico", "relatorio"]),
@@ -253,7 +255,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     ],
   },
   {
-    key: "grp_usuarios", label: "Usuários e Acessos", icon: Users2, order: 140, status: "active",
+    key: "grp_usuarios", label: "Usuários", fullLabel: "Usuários e Acessos", icon: Users2, order: 140, status: "active",
     children: [
       a(10, "users", "Usuários", ["usuario", "user", "conta", "acesso", "login"]),
       a(20, "teams", "Equipes", ["equipe", "time"]),
@@ -270,7 +272,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     ],
   },
   {
-    key: "grp_governanca", label: "Governança e Sistema", icon: ShieldCheck, order: 150, status: "active",
+    key: "grp_governanca", label: "Sistema", fullLabel: "Governança e Sistema", icon: ShieldCheck, order: 150, status: "active",
     children: [
       a(10, "settings", "Configurações Gerais", ["config", "configuracao", "sistema", "geral"]),
       a(20, "audit", "Auditoria Geral", ["auditoria", "log", "historico"]),
@@ -286,7 +288,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     ],
   },
   {
-    key: "grp_motor", label: "Motor Técnico", icon: Cpu, order: 160, status: "active",
+    key: "grp_motor", label: "Motor", fullLabel: "Motor Técnico", icon: Cpu, order: 160, status: "active",
     technicalOnly: true, permission: GESTAO_PERMISSION,
     children: [
       { key: "execmotor", label: "Visão Geral do Motor", keywords: ["motor", "executor", "tecnico"], status: "active", technicalOnly: true, order: 10 },

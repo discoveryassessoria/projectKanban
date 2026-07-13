@@ -10,7 +10,7 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { HeaderBar } from "@/src/components/header-bar"
-import { Search, Loader2, Settings2, ChevronDown, ChevronRight } from "lucide-react"
+import { Search, Loader2, Settings2, ChevronRight, Menu, X } from "lucide-react"
 import dynamic from "next/dynamic"
 import {
   MANAGEMENT_NAVIGATION,
@@ -297,6 +297,7 @@ export default function GerenciamentoPage() {
     setOpenGroup(nv); persistirGrupo(nv)
   }
   const [busca, setBusca] = useState("")
+  const [mobileOpen, setMobileOpen] = useState(false)
   const [user, setUser] = useState<UserData>({ nome: "Usuário" })
   const [processos, setProcessos] = useState<any[]>([])
   const [arvores, setArvores] = useState<any[]>([])
@@ -339,29 +340,34 @@ export default function GerenciamentoPage() {
   }
   if (!isAdmin) return null
 
-  // ── grupos VISÍVEIS a partir da config central (status + permissão + busca) ─
-  const q = busca.trim().toLowerCase()
+  // ── grupos VISÍVEIS (status + permissão + busca normalizada sem acento) ─────
+  const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+  const q = norm(busca.trim())
+  const grupoDoAtivo = grupoDaKey(tab)
   const itemRenderavel = (it: ManagementNavigationItem) =>
     it.status !== "hidden" && (!it.permission || pode(it.permission))
-  const casaBusca = (it: ManagementNavigationItem, grupoLabel: string) => {
+  const casaBusca = (it: ManagementNavigationItem, g: ManagementNavigationItem) => {
     if (!q) return true
-    const hay = [it.label, it.key, grupoLabel, ...(it.keywords ?? [])].join(" ").toLowerCase()
+    const hay = norm(
+      [it.label, it.fullLabel ?? "", it.key, g.label, g.fullLabel ?? "", ...(it.keywords ?? [])].join(" "),
+    )
     return hay.includes(q)
   }
   const gruposVisiveis = MANAGEMENT_NAVIGATION
     .filter((g) => !g.permission || pode(g.permission)) // grupo técnico só com permissão
     .map((g) => ({
-      grupo: g.label,
       key: g.key,
+      grupo: g.label,
+      fullLabel: g.fullLabel || g.label,
       icon: g.icon,
       itens: (g.children ?? [])
-        .filter((it) => itemRenderavel(it) && casaBusca(it, g.label))
+        .filter((it) => itemRenderavel(it) && casaBusca(it, g))
         .sort((x, y) => x.order - y.order),
     }))
     .filter((g) => g.itens.length > 0)
 
   const flatItens = MANAGEMENT_NAVIGATION.flatMap((g) =>
-    (g.children ?? []).map((it) => ({ ...it, grupo: g.label })))
+    (g.children ?? []).map((it) => ({ ...it, grupo: g.fullLabel || g.label })))
   const TelaAtiva = TELAS[tab]
   const labelAtivo = flatItens.find((it) => it.key === tab)?.label || "Gerenciamento"
   const grupoAtivo = flatItens.find((it) => it.key === tab)?.grupo
@@ -381,75 +387,117 @@ export default function GerenciamentoPage() {
         <div className="absolute inset-0 bg-black/40 pointer-events-none" />
 
         <main className="relative px-4 md:px-6 py-6 max-w-[1400px] mx-auto">
+          {/* Abrir menu em viewport menor */}
+          <button
+            onClick={() => setMobileOpen(true)}
+            aria-label="Abrir menu do Gerenciamento"
+            className="md:hidden mb-3 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/10 px-3 py-1.5 text-[12.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+          >
+            <Menu className="h-4 w-4" /> Menu
+          </button>
+
+          {/* Backdrop — só quando a sidebar está aberta em mobile */}
+          {mobileOpen ? (
+            <div
+              className="fixed inset-0 z-30 bg-black/50 md:hidden"
+              onClick={() => setMobileOpen(false)}
+              aria-hidden="true"
+            />
+          ) : null}
+
           <div className="flex gap-4 items-start">
             {/* MENU LATERAL */}
-            <aside className="w-[230px] flex-none sticky top-4 max-h-[calc(100vh-90px)] overflow-auto bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-3">
-              {/* busca */}
-              <div className="relative mb-4">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
-                <input
-                  value={busca} onChange={e => setBusca(e.target.value)}
-                  placeholder="Buscar cadastro…"
-                  className="w-full pl-8 pr-2 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:outline-none focus:border-white/30"
-                />
+            <aside
+              aria-label="Navegação do Gerenciamento"
+              className={`mgmt-scroll w-[240px] flex-none overflow-y-auto overflow-x-hidden bg-white/[0.06] backdrop-blur-md border border-white/10 p-2.5 fixed top-0 left-0 z-40 h-full rounded-none transition-transform duration-200 motion-reduce:transition-none ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:sticky md:top-4 md:z-auto md:h-auto md:max-h-[calc(100vh-90px)] md:rounded-xl md:translate-x-0`}
+            >
+              {/* BUSCA — fixa no topo ao rolar */}
+              <div className="sticky top-0 z-10 -mt-0.5 mb-2 pb-2 bg-white/[0.06] backdrop-blur-md">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+                  <input
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                    placeholder="Buscar configuração…"
+                    aria-label="Buscar configuração"
+                    className="w-full rounded-lg border border-white/10 bg-white/5 pl-8 pr-7 py-1.5 text-xs text-white placeholder:text-white/40 focus:border-white/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  />
+                  {busca ? (
+                    <button
+                      onClick={() => setBusca("")}
+                      aria-label="Limpar busca"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-white/40 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               {gruposVisiveis.length === 0 ? (
                 <div className="px-1 py-3 text-[12px] text-white/40">Nada encontrado.</div>
               ) : null}
+
               {gruposVisiveis.map((g) => {
                 const aberto = !!q || openGroup === g.key
+                const contemAtivo = grupoDoAtivo === g.key
                 const Icon = g.icon
+                const painelId = `grp-items-${g.key}`
                 return (
-                  <div key={g.key} className="mb-1">
+                  <div key={g.key} className="mb-0.5">
                     {/* CABEÇALHO DO GRUPO — recolhível */}
                     <button
                       onClick={() => toggleGroup(g.key)}
-                      title={g.grupo}
-                      className="w-full flex items-center gap-2 px-1 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                      aria-expanded={aberto}
+                      aria-controls={painelId}
+                      aria-label={g.fullLabel}
+                      title={g.fullLabel}
+                      className={`w-full flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${contemAtivo ? "bg-white/[0.06]" : ""}`}
                     >
-                      {Icon ? <Icon className="h-3.5 w-3.5 text-white/50 flex-none" /> : null}
-                      <span className="flex-1 min-w-0 truncate text-left text-[11px] font-bold uppercase tracking-[0.14em] text-white/50">
+                      {Icon ? <Icon className={`h-4 w-4 flex-none ${contemAtivo ? "text-white/80" : "text-white/50"}`} /> : null}
+                      <span className={`flex-1 min-w-0 text-left text-[11px] font-bold uppercase tracking-[0.12em] ${contemAtivo ? "text-white/80" : "text-white/50"}`}>
                         {g.grupo}
                       </span>
-                      {aberto ? (
-                        <ChevronDown className="h-3.5 w-3.5 text-white/40 flex-none" />
-                      ) : (
-                        <ChevronRight className="h-3.5 w-3.5 text-white/40 flex-none" />
-                      )}
+                      <ChevronRight className={`h-3.5 w-3.5 flex-none text-white/40 transition-transform duration-200 motion-reduce:transition-none ${aberto ? "rotate-90" : ""}`} />
                     </button>
 
-                    {/* PÁGINAS DO GRUPO */}
-                    {aberto ? (
-                      <div className="space-y-0.5 mt-1 pl-1">
-                        {g.itens.map((it) => {
-                          const ativo = tab === it.key
-                          const soon = it.status === "coming_soon"
-                          return (
-                            <button
-                              key={it.key}
-                              disabled={soon}
-                              onClick={() => { if (!soon) irParaTela(it.key) }}
-                              title={it.label}
-                              className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12.5px] transition-colors ${
-                                ativo
-                                  ? "bg-white/15 font-semibold text-white"
-                                  : soon
-                                  ? "text-white/30 cursor-not-allowed"
-                                  : "text-white/60 hover:bg-white/5 hover:text-white"
-                              }`}
-                            >
-                              <span className="flex-1 min-w-0 truncate">{it.label}</span>
-                              {soon ? (
-                                <span className="text-[9px] uppercase tracking-wide text-white/30 flex-none">
-                                  Em breve
-                                </span>
-                              ) : null}
-                            </button>
-                          )
-                        })}
+                    {/* PÁGINAS DO GRUPO — animação de altura (grid-rows) */}
+                    <div
+                      id={painelId}
+                      aria-hidden={!aberto}
+                      className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${aberto ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+                    >
+                      <div className="min-h-0 overflow-hidden">
+                        <div className={`space-y-px pl-1 pt-0.5 pb-0.5 transition-opacity duration-200 motion-reduce:transition-none ${aberto ? "opacity-100" : "opacity-0"}`}>
+                          {g.itens.map((it) => {
+                            const ativo = tab === it.key
+                            const soon = it.status === "coming_soon"
+                            return (
+                              <button
+                                key={it.key}
+                                disabled={soon}
+                                tabIndex={aberto ? undefined : -1}
+                                onClick={() => { if (!soon) { irParaTela(it.key); setMobileOpen(false) } }}
+                                title={it.label}
+                                aria-current={ativo ? "page" : undefined}
+                                className={`w-full flex items-center gap-2 rounded-md border-l-2 pl-2 pr-2.5 py-1.5 text-left text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+                                  ativo
+                                    ? "border-white/70 bg-white/[0.12] font-semibold text-white"
+                                    : soon
+                                    ? "border-transparent text-white/30 cursor-not-allowed"
+                                    : "border-transparent text-white/60 hover:bg-white/5 hover:text-white"
+                                }`}
+                              >
+                                <span className="flex-1 min-w-0 truncate">{it.label}</span>
+                                {soon ? (
+                                  <span className="text-[9px] uppercase tracking-wide text-white/30 flex-none">Em breve</span>
+                                ) : null}
+                              </button>
+                            )
+                          })}
+                        </div>
                       </div>
-                    ) : null}
+                    </div>
                   </div>
                 )
               })}
@@ -464,6 +512,13 @@ export default function GerenciamentoPage() {
               {TelaAtiva ? <TelaAtiva /> : <EmBreve titulo={labelAtivo} />}
             </section>
           </div>
+
+          <style>{`
+            .mgmt-scroll{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent}
+            .mgmt-scroll::-webkit-scrollbar{width:8px}
+            .mgmt-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:8px}
+            .mgmt-scroll::-webkit-scrollbar-track{background:transparent}
+          `}</style>
         </main>
       </div>
     </div>
