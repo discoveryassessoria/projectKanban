@@ -8,3 +8,5 @@ node_modules
 backup-discovery.sql
 restore.log
 scripts/*.log
+.vercel
+.env*
