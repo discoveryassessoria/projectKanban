@@ -106,6 +106,16 @@ ok(/aria-expanded=\{aberto\}/.test(pageSrc) && /aria-controls=/.test(pageSrc), "
 ok(/normalize\("NFD"\)/.test(pageSrc), "busca normaliza acentos (NFD) no componente")
 ok(/\?screen=/.test(pageSrc), "deep-link ?screen= preservado no componente (rotas intactas)")
 
+// 10) Consolidação Tipos de Documento x Tipos de Certidão
+console.log("\nConsolidação Documentos/Certidões:")
+ok(itemDe("certtypes")?.status === "hidden", "Tipos de Certidão removido da sidebar (status hidden)")
+ok(itemDe("doctypes")?.status === "active", "Tipos de Documento (mestre) permanece ativo")
+ok(!MANAGEMENT_NAVIGATION.some((g) => (g.children ?? []).some((c) => c.key === "certtypes" && c.status === "active")), "nenhum item ativo 'Tipos de Certidão'")
+ok(/certtypes:\s*"doctypes"/.test(pageSrc), "?screen=certtypes redireciona (alias) para doctypes")
+const tdTab = readFileSync(join(ROOT, "src/components/gerenciamentoComponents/TiposDocumentoTab.tsx"), "utf8")
+ok(/setFiltro/.test(tdTab) && /certid/i.test(tdTab), "Tipos de Documento tem filtro 'Certidões' client-side")
+ok(/mestre/i.test(tdTab), "Tipos de Documento marcado como cadastro mestre")
+
 console.log(`\n${passed} passaram, ${failed} falharam`)
 if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }
 console.log("Sidebar: config declarativa validada ✅")

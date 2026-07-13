@@ -249,7 +249,10 @@ export default function GerenciamentoPage() {
   // removidos (as concentradoras seguem acessíveis por suas keys próprias em
   // TELAS: estruturafin, precificacao, comercial, pagamentos, integracaofin,
   // fornecedoresconc). Bookmarks antigos continuam resolvendo (nenhuma key sumiu).
-  const ALIAS_TELAS: Record<string, string> = {}
+  // Consolidação: "Tipos de Certidão" foi unificado em "Tipos de Documento" (cadastro
+  // mestre). Links antigos (?screen=certtypes) continuam funcionando, redirecionando
+  // para a tela real do mestre (doctypes). Nenhuma rota/API/entidade alterada.
+  const ALIAS_TELAS: Record<string, string> = { certtypes: "doctypes" }
   const resolverTela = (k: string | null): string => {
     if (!k) return "overview"
     return ALIAS_TELAS[k] || k

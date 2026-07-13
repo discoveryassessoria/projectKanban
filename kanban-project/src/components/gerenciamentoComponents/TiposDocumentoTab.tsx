@@ -28,6 +28,7 @@ export default function TiposDocumentoTab() {
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState("")
   const [form, setForm] = useState<Form | null>(null)
+  const [filtro, setFiltro] = useState<"todos" | "certidoes">("todos")
 
   const load = useCallback(async () => {
     try {
@@ -61,6 +62,18 @@ export default function TiposDocumentoTab() {
 
   if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
 
+  // Filtro client-side (sem schema/API): "Certidões" = tipos cujo nome é de certidão.
+  //
+  // TODO ARQUITETURA:
+  // O filtro atual por nome (/certid/i) é temporário.
+  // Quando o domínio TipoDocumento possuir um campo estruturado de classificação,
+  // como categoriaDocumental ou naturezaDocumental, substituir a heurística textual
+  // por filtro baseado nesse campo.
+  // Não alterar schema neste lote.
+  const ehCertidao = (r: Tipo) => /certid/i.test(r.name)
+  const visiveis = filtro === "certidoes" ? rows.filter(ehCertidao) : rows
+  const totalCertidoes = rows.filter(ehCertidao).length
+
   return (
     <div className="space-y-5">
       {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
@@ -69,9 +82,14 @@ export default function TiposDocumentoTab() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">Tipos de Documento</h2>
-            <p className="mt-1 text-sm text-white/60">Tipos documentais usados nos processos.</p>
+            <p className="mt-1 text-sm text-white/60">Cadastro <strong className="text-white/80">mestre</strong> de tipos documentais — inclui certidões, identidades, judiciais, etc. Certidões são criadas aqui (não há cadastro separado).</p>
           </div>
           <button onClick={() => setForm({ code: "", name: "", category: "", ativo: true })} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500">+ Novo tipo de documento</button>
+        </div>
+        {/* Filtro rápido — consolidação de "Tipos de Certidão" */}
+        <div className="mt-4 inline-flex overflow-hidden rounded-lg border border-white/10 text-xs">
+          <button onClick={() => setFiltro("todos")} aria-pressed={filtro === "todos"} className={`px-3 py-1.5 ${filtro === "todos" ? "bg-white/15 font-medium text-white" : "text-white/60 hover:bg-white/5"}`}>Todos ({rows.length})</button>
+          <button onClick={() => setFiltro("certidoes")} aria-pressed={filtro === "certidoes"} className={`px-3 py-1.5 ${filtro === "certidoes" ? "bg-white/15 font-medium text-white" : "text-white/60 hover:bg-white/5"}`}>Certidões ({totalCertidoes})</button>
         </div>
       </div>
 
@@ -81,9 +99,9 @@ export default function TiposDocumentoTab() {
             <tr><th className="px-4 py-3 font-medium">Código</th><th className="px-4 py-3 font-medium">Nome</th><th className="px-4 py-3 font-medium">Categoria</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 text-right font-medium">Ações</th></tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-white/40">Nenhum tipo de documento cadastrado.</td></tr>
-            ) : rows.map(d => (
+            {visiveis.length === 0 ? (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-white/40">{filtro === "certidoes" ? "Nenhuma certidão encontrada." : "Nenhum tipo de documento cadastrado."}</td></tr>
+            ) : visiveis.map(d => (
               <tr key={d.id} className="border-b border-white/5 last:border-0">
                 <td className="px-4 py-2.5 text-white/70">{d.code || "—"}</td>
                 <td className="px-4 py-2.5 text-white">{d.name}</td>
