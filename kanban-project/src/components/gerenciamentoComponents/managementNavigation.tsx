@@ -36,11 +36,13 @@ export interface ManagementNavigationItem {
   order: number
 }
 
-// Permissão que gate o grupo 16 (Motor Técnico). REUTILIZA a regra existente
-// mais restritiva de superadmin: a permissão "sistema" ("Acesso total ao
-// sistema"), que o admin (tipo === "admin") SEMPRE tem e o admin comum (só
-// usuarios.gerenciar) NÃO. Nenhuma permissão nova foi criada no backend.
-export const TECH_PERMISSION = "sistema"
+// Gate do grupo 16 (Motor Técnico): usa EXATAMENTE a mesma regra dos demais
+// módulos administrativos do Gerenciamento — a permissão existente
+// "usuarios.gerenciar", que é o próprio gate da página (isAdmin = pode(
+// "usuarios.gerenciar")). Assim o grupo aparece para o MESMO conjunto de
+// admins que já têm acesso administrativo completo ao Gerenciamento.
+// Nenhuma permissão nova; nenhum papel/auth/backend alterado.
+export const GESTAO_PERMISSION = "usuarios.gerenciar"
 
 const a = (order: number, key: string, label: string, keywords?: string[]): ManagementNavigationItem =>
   ({ key, label, keywords, status: "active", order })
@@ -285,7 +287,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
   },
   {
     key: "grp_motor", label: "Motor Técnico", icon: Cpu, order: 160, status: "active",
-    technicalOnly: true, permission: TECH_PERMISSION,
+    technicalOnly: true, permission: GESTAO_PERMISSION,
     children: [
       { key: "execmotor", label: "Visão Geral do Motor", keywords: ["motor", "executor", "tecnico"], status: "active", technicalOnly: true, order: 10 },
       h(20, "mt_eventos", "Eventos"),

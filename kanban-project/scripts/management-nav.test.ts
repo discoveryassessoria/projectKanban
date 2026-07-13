@@ -2,7 +2,7 @@
  * Sidebar do Gerenciamento — testes estruturais da config declarativa.
  * Rodar: npm run test:nav
  */
-import { MANAGEMENT_NAVIGATION, TECH_PERMISSION } from "../src/components/gerenciamentoComponents/managementNavigation"
+import { MANAGEMENT_NAVIGATION, GESTAO_PERMISSION } from "../src/components/gerenciamentoComponents/managementNavigation"
 
 let passed = 0, failed = 0
 const falhas: string[] = []
@@ -37,7 +37,7 @@ ok(!todosItens.some((i) => i.label === "Produtos Financeiros"), 'nenhum item "Pr
 
 // 5) grupo técnico (16) exige permissão técnica (não exposto sem permissão)
 const motor = MANAGEMENT_NAVIGATION.find((g) => g.key === "grp_motor")
-ok(motor?.technicalOnly === true && motor?.permission === TECH_PERMISSION, "grupo Motor Técnico gated por permissão técnica")
+ok(motor?.technicalOnly === true && motor?.permission === GESTAO_PERMISSION, "grupo Motor Técnico gated por regra de admin do Gerenciamento")
 
 // 6) busca por keywords cobre os exemplos da spec
 const matchesKeyword = (kw: string) =>
@@ -65,7 +65,7 @@ ok(itemDe("syshealth")?.label === "Saúde do Sistema", "D4: syshealth = 'Saúde 
 ok(todosItens.filter((i) => i.key === "suppliers").some((i) => i.label === "Fornecedores"), "D5: suppliers = 'Fornecedores' (cadastro mestre)")
 ok(itemDe("fornecedoresconc")?.label === "Concentradoras e Adquirentes", "D5: fornecedoresconc = 'Concentradoras e Adquirentes'")
 ok(itemDe("roles")?.label === "Perfis e Permissões" && !itemDe("permprofiles"), "D6: item único 'Perfis e Permissões' (permprofiles vira alias)")
-ok(motor?.technicalOnly === true && motor?.permission === TECH_PERMISSION && TECH_PERMISSION === "sistema", "D7: Motor Técnico gated pela permissão existente 'sistema'")
+ok(motor?.permission === GESTAO_PERMISSION && GESTAO_PERMISSION === "usuarios.gerenciar", "D7: Motor Técnico usa a MESMA regra dos demais módulos (usuarios.gerenciar)")
 ok(grupoDe("crossrules") === "grp_workflow", "D8: Tarefas Transversais em Workflow")
 ok(grupoDe("imtemplates") === "grp_biblioteca", "D8: Modelos de Passos em Biblioteca Operacional")
 ok(grupoDe("prottypes") === "grp_workflow" && itemDe("prottypes")?.label === "Tipos de Protocolo", "D9: prottypes em Workflow como 'Tipos de Protocolo'")
