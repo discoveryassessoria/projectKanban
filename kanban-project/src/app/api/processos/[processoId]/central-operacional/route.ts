@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { getOrdemFase, getStepsForFase, getFase } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
 
@@ -181,6 +182,11 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ processoId: string }> }
 ) {
+  // Item 1 da auditoria — gate canônico de LEITURA: exige processos.ver
+  // (rota GET/consulta; as ações de avanço usam workflow.avancar).
+  const erro = await verificarPermissao(request, "processos.ver")
+  if (erro) return erro
+
   try {
     const { processoId } = await params
     const id = parseInt(processoId)

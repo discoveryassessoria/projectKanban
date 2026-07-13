@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { getNextFase } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
 import { dispararMotorNaFaseAtual } from "@/src/lib/motor/executor"
@@ -12,6 +13,10 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ processoId: string }> }
 ) {
+  // Item 1 da auditoria — gate canônico: avançar de fase exige workflow.avancar.
+  const erro = await verificarPermissao(request, "workflow.avancar")
+  if (erro) return erro
+
   try {
     const { processoId } = await params
     const id = parseInt(processoId)

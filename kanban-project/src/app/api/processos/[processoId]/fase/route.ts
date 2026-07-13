@@ -17,7 +17,8 @@ import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import { advance } from "@/src/lib/motor/phase-advance"
 
 export async function PUT(request: Request, { params }: { params: Promise<{ processoId: string }> }) {
-  const erro = await verificarPermissao(request, "processos.editar_status")
+  // Item 1 da auditoria — alinhado ao gate canônico de avanço (antes: processos.editar_status).
+  const erro = await verificarPermissao(request, "workflow.avancar")
   if (erro) return erro
 
   try {
