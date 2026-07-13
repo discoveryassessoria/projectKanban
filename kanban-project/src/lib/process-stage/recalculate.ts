@@ -18,6 +18,7 @@
  */
 
 import type { PrismaClient } from "@prisma/client"
+import { processoEmRuntimeV2Com } from "@/src/lib/motor/runtime-guard"
 import {
   deriveProcessStage,
   STAGE_LABELS,
@@ -56,6 +57,13 @@ export async function recalculateProcessStage(
   processoId: number,
 ): Promise<RecalculateResult> {
   try {
+    // Auditoria item 2 — FAIL-CLOSED: em runtime v2 o recálculo legado NÃO move o
+    // board (statusId). Só o PhaseAdvanceService controla a fase no v2. Lê o runtime
+    // pelo mesmo client recebido (tx-consistente).
+    if (await processoEmRuntimeV2Com(prisma, processoId)) {
+      return { ok: true, processoId, moved: false, warning: "runtime v2: recálculo/statusId legado inativo" }
+    }
+
     // 1. Busca processo + documentos via árvore -> pessoas -> documentos
     const processo = await prisma.processo.findUnique({
       where: { id: processoId },

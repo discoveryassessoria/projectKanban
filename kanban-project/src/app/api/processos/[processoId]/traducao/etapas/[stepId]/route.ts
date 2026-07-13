@@ -9,6 +9,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { moverStatusIdLegacy } from "@/src/lib/motor/runtime-guard"
 import type { FaseCode, Prisma } from "@prisma/client"
 import {
   applyStep,
@@ -146,7 +147,7 @@ export async function POST(
             where: { id: { in: ids } },
             data: { traduzido: true },
           })
-          await tx.processo.update({ where: { id }, data: { statusId: colunaDestinoId } })
+          await moverStatusIdLegacy(tx, id, colunaDestinoId)
         }
       },
       { timeout: 30000, maxWait: 10000 }

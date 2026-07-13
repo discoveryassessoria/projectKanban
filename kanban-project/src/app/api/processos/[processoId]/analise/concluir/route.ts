@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { moverStatusIdLegacy } from "@/src/lib/motor/runtime-guard"
 import type { FaseCode } from "@prisma/client"
 import { dispararMotorNaFaseAtual } from "@/src/lib/motor/executor"
 
@@ -62,7 +63,7 @@ export async function POST(
           decisaoJuridica, requerRetificacao: comRetificacao, completedAt: now,
         },
       })
-      await tx.processo.update({ where: { id }, data: { statusId: colunaDestino.id } })
+      await moverStatusIdLegacy(tx, id, colunaDestino.id)
     }, { timeout: 30000, maxWait: 10000 })
 
     // MOTOR — a fase avançou; dispara o motor (best-effort)

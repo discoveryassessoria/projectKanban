@@ -5,6 +5,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { moverStatusIdLegacy } from "@/src/lib/motor/runtime-guard"
 import {
   applyStep, allValidated, reProgress,
   type ReWorkflow,
@@ -61,7 +62,7 @@ export async function POST(
         if (destino) {
           await prisma.$transaction(
             async (tx) => {
-              await tx.processo.update({ where: { id: processoId }, data: { statusId: destino.id } })
+              await moverStatusIdLegacy(tx, processoId, destino.id)
             },
             { timeout: 30000, maxWait: 10000 },
           )

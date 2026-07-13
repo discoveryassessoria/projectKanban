@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { logProcesso } from "@/lib/auditoria"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { processoEmRuntimeV2 } from "@/src/lib/motor/runtime-guard"
 
 // GET - Buscar processo por ID
 export async function GET(
@@ -124,19 +125,26 @@ export async function PUT(
       )
     }
 
+    // Auditoria item 2 (item J) — em runtime v2 o board (statusId) NÃO é movido por
+    // edição manual: o card segue faseAtualKey (só o PhaseAdvanceService controla a
+    // fase). Neutraliza o statusId do body p/ todo o restante do handler (validação,
+    // persistência e auditoria). Demais campos seguem editáveis normalmente.
+    const emRuntimeV2 = await processoEmRuntimeV2(id)
+    const statusIdEfetivo = emRuntimeV2 ? undefined : statusId
+
     // 🔒 Mudança de fase manual exige a permissão específica (default: só admin).
     // O motor automático mexe no statusId direto no servidor e NÃO passa por aqui,
     // então isto não atrapalha o avanço automático.
-    if (statusId && statusId !== processoExistente.statusId) {
+    if (statusIdEfetivo && statusIdEfetivo !== processoExistente.statusId) {
       const erroStatus = await verificarPermissao(request, 'processos.editar_status')
       if (erroStatus) return erroStatus
     }
 
     // Se statusId foi fornecido, verificar se pertence ao mesmo país
     let statusNovo = null
-    if (statusId && statusId !== processoExistente.statusId) {
+    if (statusIdEfetivo && statusIdEfetivo !== processoExistente.statusId) {
       statusNovo = await prisma.status.findUnique({
-        where: { id: statusId }
+        where: { id: statusIdEfetivo }
       })
 
       if (!statusNovo) {
@@ -193,7 +201,7 @@ export async function PUT(
         nome: nome !== undefined ? nome : undefined,
         descricao: descricao !== undefined ? descricao : undefined,
         observacoes: observacoes !== undefined ? observacoes : undefined,
-        statusId: statusId !== undefined ? statusId : undefined,
+        statusId: statusIdEfetivo !== undefined ? statusIdEfetivo : undefined,
         arvoreId: arvoreId !== undefined ? arvoreId : undefined,
         previsaoTermino: previsaoTermino !== undefined 
           ? (previsaoTermino ? new Date(previsaoTermino) : null) 

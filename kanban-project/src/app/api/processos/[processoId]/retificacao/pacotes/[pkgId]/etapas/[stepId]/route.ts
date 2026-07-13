@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { moverStatusIdLegacy } from "@/src/lib/motor/runtime-guard"
 import type { FaseCode, Prisma } from "@prisma/client"
 import { applyStep, allValidated, type RetPkg } from "@/src/lib/process-stage/retificacao-engine"
 
@@ -95,7 +96,7 @@ export async function POST(
           data: result.patch as Prisma.RetificacaoPacoteUpdateInput,
         })
         if (colunaDestinoId) {
-          await tx.processo.update({ where: { id }, data: { statusId: colunaDestinoId } })
+          await moverStatusIdLegacy(tx, id, colunaDestinoId)
         }
       },
       { timeout: 30000, maxWait: 10000 }
