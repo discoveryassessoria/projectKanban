@@ -10,8 +10,12 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { HeaderBar } from "@/src/components/header-bar"
-import { Search, Loader2, Settings2 } from "lucide-react"
+import { Search, Loader2, Settings2, ChevronDown, ChevronRight } from "lucide-react"
 import dynamic from "next/dynamic"
+import {
+  MANAGEMENT_NAVIGATION,
+  type ManagementNavigationItem,
+} from "@/src/components/gerenciamentoComponents/managementNavigation"
 
 // Lote 1 — 12 telas bespoke
 import {
@@ -57,106 +61,9 @@ import {
 // Estrutura oficial aprovada — 11 domínios. Reorganização de MENU apenas:
 // reusa as screen keys existentes (URLs preservadas); itens sem tela ainda
 // caem no placeholder "Em breve" (padrão já existente no shell).
-const GRUPOS: { grupo: string; itens: [string, string][] }[] = [
-  { grupo: "Painel", itens: [["overview", "Painel Geral"]] },
-
-  { grupo: "Processos", itens: [
-    ["proctypes", "Tipos de Processo"],
-    ["phasemap", "Regras do Processo"],
-    ["simfase", "Configurações Aplicadas"],
-  ]},
-
-  { grupo: "Workflows", itens: [
-    ["macrokanban", "Workflow Macro / Kanban"],
-    ["phaseiwf", "Workflow Interno das Fases"],
-    ["phasemodes", "Modos Internos das Fases"],
-    ["wf_politicas", "Políticas de Avanço"],
-  ]},
-
-  { grupo: "Catálogo Mestre", itens: [
-    ["catalogmestre", "Itens Mestres"],
-  ]},
-
-  { grupo: "Cadastros Mestres", itens: [
-    ["cad_categorias", "Categorias"],
-    ["cad_unidades", "Unidades"],
-    ["cad_composicoes", "Composições"],
-    ["cad_tags", "Tags"],
-    ["cad_motivos", "Motivos Padronizados"],
-  ]},
-
-  { grupo: "Documentos", itens: [
-    ["doctypes", "Tipos de Documento"],
-    ["docmatrix", "Matriz Documental"],
-    ["docrules", "Aplicabilidade Operacional"],
-    ["doc_regras", "Regras Documentais"],
-  ]},
-
-  { grupo: "Financeiro", itens: [
-    ["catalog", "Produtos Financeiros"],
-    ["products", "Serviços"],
-    ["honorariums", "Honorários"],
-    ["pricingtable", "Tabelas de Valores"],
-    ["suppliers", "Fornecedores"],
-    ["categories", "Categorias Financeiras"],
-    ["coa", "Plano de Contas"],
-    ["costcenters", "Centros de Custo"],
-    ["accounts", "Contas Bancárias"],
-    ["currencies", "Moedas"],
-    ["methods", "Formas de Pagamento"],
-    ["paycond", "Condições de Pagamento"],
-    ["taxes", "Impostos"],
-    ["commrules", "Comissões"],
-    ["discrules", "Regras Econômicas"],
-    ["pricing", "Aplicabilidade Econômica"],
-  ]},
-
-  { grupo: "Modelos", itens: [
-    ["mod_wfmacro", "Modelos de Workflow Macro"],
-    ["iwtemplates", "Modelos de Workflow Interno"],
-    ["amtemplates", "Modelos de Automação"],
-    ["mod_documento", "Modelos de Documento"],
-    ["mod_contrato", "Modelos de Contrato"],
-    ["mod_email", "Modelos de E-mail"],
-    ["mod_mensagem", "Modelos de Mensagem"],
-    ["templates", "Templates Diversos"],
-  ]},
-
-  { grupo: "Automações", itens: [
-    ["opauto", "Automações por Fase"],
-    ["phasemap", "Gatilhos"],
-    ["auto_condicoes", "Condições"],
-    ["auto_acoes", "Ações"],
-    ["simfase", "Simulação"],
-    ["auto_filas", "Filas"],
-    ["execmatrix", "Histórico"],
-  ]},
-
-  { grupo: "Integrações", itens: [
-    ["integ_painel", "Painel de Integrações"],
-    ["integ_apis", "APIs e Conectores"],
-    ["integ_ia", "Inteligência Artificial"],
-    ["integ_comunicacao", "Comunicação"],
-    ["integ_armazenamento", "Armazenamento"],
-    ["integ_assinatura", "Assinatura Digital"],
-    ["integ_ocr", "OCR e Extração"],
-    ["integ_externos", "Serviços Externos"],
-    ["integ_monitoramento", "Monitoramento"],
-  ]},
-
-  { grupo: "Administração", itens: [
-    ["users", "Usuários"],
-    ["roles", "Perfis"],
-    ["permprofiles", "Permissões"],
-    ["teams", "Equipes"],
-    ["departments", "Departamentos"],
-    ["rolecat", "Cargos"],
-    ["adm_featureflags", "Feature Flags"],
-    ["settings", "Configurações Gerais"],
-    ["audit", "Auditoria"],
-    ["syshealth", "Logs do Sistema"],
-  ]},
-]
+// A navegação (grupos, itens, ordem, ícones, keywords, status, permissão) agora
+// vive na configuração central declarativa: managementNavigation.tsx. Este page
+// apenas a RENDERIZA. As screen keys (deep-link ?screen=) são preservadas.
 
 // ============================================================
 // MAPA DE TELAS
@@ -349,24 +256,45 @@ export default function GerenciamentoPage() {
   }
 
   const [tab, setTab] = useState("overview")
+  // colapso da sidebar: só UM grupo aberto por vez (persistido em localStorage).
+  const [openGroup, setOpenGroup] = useState<string | null>(null)
 
-  // lê a tela da URL na montagem (deep-link) e aplica alias se for key antiga
+  const grupoDaKey = (key: string): string | undefined =>
+    MANAGEMENT_NAVIGATION.find((g) => (g.children ?? []).some((it) => it.key === key))?.key
+
+  const persistirGrupo = (g: string | null) => {
+    if (typeof window === "undefined") return
+    if (g) localStorage.setItem("mgmt_open_group", g)
+    else localStorage.removeItem("mgmt_open_group")
+  }
+
+  // lê a tela da URL na montagem (deep-link) + restaura o grupo aberto salvo
   useEffect(() => {
     if (typeof window === "undefined") return
     const screen = new URLSearchParams(window.location.search).get("screen")
-    if (screen) setTab(resolverTela(screen))
+    const telaInicial = screen ? resolverTela(screen) : "overview"
+    if (screen) setTab(telaInicial)
+    const salvo = localStorage.getItem("mgmt_open_group")
+    setOpenGroup(salvo || grupoDaKey(telaInicial) || MANAGEMENT_NAVIGATION[0]?.key || null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // troca de tela: atualiza state E URL (?screen=), preservando ?tab= da concentradora
+  // troca de tela: atualiza state E URL (?screen=), mantém o grupo do item aberto
   const irParaTela = (key: string) => {
     setTab(key); setBusca("")
+    const g = grupoDaKey(key)
+    if (g) { setOpenGroup(g); persistirGrupo(g) }
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href)
       url.searchParams.set("screen", key)
       url.searchParams.delete("tab") // a nova tela define sua própria aba
       window.history.replaceState({}, "", url.toString())
     }
+  }
+  // recolher/expandir um grupo (fecha os demais → só um aberto)
+  const toggleGroup = (gkey: string) => {
+    const nv = openGroup === gkey ? null : gkey
+    setOpenGroup(nv); persistirGrupo(nv)
   }
   const [busca, setBusca] = useState("")
   const [user, setUser] = useState<UserData>({ nome: "Usuário" })
@@ -411,14 +339,32 @@ export default function GerenciamentoPage() {
   }
   if (!isAdmin) return null
 
-  // filtro da busca do menu
-  const gruposFiltrados = busca
-    ? GRUPOS.map(g => ({ ...g, itens: g.itens.filter(([, label]) => label.toLowerCase().includes(busca.toLowerCase())) })).filter(g => g.itens.length)
-    : GRUPOS
+  // ── grupos VISÍVEIS a partir da config central (status + permissão + busca) ─
+  const q = busca.trim().toLowerCase()
+  const itemRenderavel = (it: ManagementNavigationItem) =>
+    it.status !== "hidden" && (!it.permission || pode(it.permission))
+  const casaBusca = (it: ManagementNavigationItem, grupoLabel: string) => {
+    if (!q) return true
+    const hay = [it.label, it.key, grupoLabel, ...(it.keywords ?? [])].join(" ").toLowerCase()
+    return hay.includes(q)
+  }
+  const gruposVisiveis = MANAGEMENT_NAVIGATION
+    .filter((g) => !g.permission || pode(g.permission)) // grupo técnico só com permissão
+    .map((g) => ({
+      grupo: g.label,
+      key: g.key,
+      icon: g.icon,
+      itens: (g.children ?? [])
+        .filter((it) => itemRenderavel(it) && casaBusca(it, g.label))
+        .sort((x, y) => x.order - y.order),
+    }))
+    .filter((g) => g.itens.length > 0)
 
+  const flatItens = MANAGEMENT_NAVIGATION.flatMap((g) =>
+    (g.children ?? []).map((it) => ({ ...it, grupo: g.label })))
   const TelaAtiva = TELAS[tab]
-  const labelAtivo = GRUPOS.flatMap(g => g.itens).find(([k]) => k === tab)?.[1] || "Gerenciamento"
-  const grupoAtivo = GRUPOS.find(g => g.itens.some(([k]) => k === tab))?.grupo
+  const labelAtivo = flatItens.find((it) => it.key === tab)?.label || "Gerenciamento"
+  const grupoAtivo = flatItens.find((it) => it.key === tab)?.grupo
 
   return (
     <div className="relative min-h-screen text-white overflow-x-hidden">
@@ -448,36 +394,65 @@ export default function GerenciamentoPage() {
                 />
               </div>
 
-              {gruposFiltrados.map((g, gi) => (
-                <div key={g.grupo} className={gi === 0 ? "" : "mt-6"}>
-                  {/* TÍTULO DA CATEGORIA */}
-                  <div className="mb-2 border-b border-white/10 px-1 pb-1.5">
-                    <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/50">
-                      {g.grupo}
-                    </span>
-                  </div>
+              {gruposVisiveis.length === 0 ? (
+                <div className="px-1 py-3 text-[12px] text-white/40">Nada encontrado.</div>
+              ) : null}
+              {gruposVisiveis.map((g) => {
+                const aberto = !!q || openGroup === g.key
+                const Icon = g.icon
+                return (
+                  <div key={g.key} className="mb-1">
+                    {/* CABEÇALHO DO GRUPO — recolhível */}
+                    <button
+                      onClick={() => toggleGroup(g.key)}
+                      title={g.grupo}
+                      className="w-full flex items-center gap-2 px-1 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                    >
+                      {Icon ? <Icon className="h-3.5 w-3.5 text-white/50 flex-none" /> : null}
+                      <span className="flex-1 min-w-0 truncate text-left text-[11px] font-bold uppercase tracking-[0.14em] text-white/50">
+                        {g.grupo}
+                      </span>
+                      {aberto ? (
+                        <ChevronDown className="h-3.5 w-3.5 text-white/40 flex-none" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5 text-white/40 flex-none" />
+                      )}
+                    </button>
 
-                  {/* PÁGINAS */}
-                  <div className="space-y-0.5">
-                    {g.itens.map(([key, label]) => {
-                      const ativo = tab === key
-                      return (
-                        <button
-                          key={key}
-                          onClick={() => irParaTela(key)}
-                          className={`block w-full rounded-lg px-2.5 py-2 text-left text-[12.5px] transition-colors ${
-                            ativo
-                              ? "bg-white/15 font-semibold text-white"
-                              : "text-white/60 hover:bg-white/5 hover:text-white"
-                          }`}
-                        >
-                          {label}
-                        </button>
-                      )
-                    })}
+                    {/* PÁGINAS DO GRUPO */}
+                    {aberto ? (
+                      <div className="space-y-0.5 mt-1 pl-1">
+                        {g.itens.map((it) => {
+                          const ativo = tab === it.key
+                          const soon = it.status === "coming_soon"
+                          return (
+                            <button
+                              key={it.key}
+                              disabled={soon}
+                              onClick={() => { if (!soon) irParaTela(it.key) }}
+                              title={it.label}
+                              className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12.5px] transition-colors ${
+                                ativo
+                                  ? "bg-white/15 font-semibold text-white"
+                                  : soon
+                                  ? "text-white/30 cursor-not-allowed"
+                                  : "text-white/60 hover:bg-white/5 hover:text-white"
+                              }`}
+                            >
+                              <span className="flex-1 min-w-0 truncate">{it.label}</span>
+                              {soon ? (
+                                <span className="text-[9px] uppercase tracking-wide text-white/30 flex-none">
+                                  Em breve
+                                </span>
+                              ) : null}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : null}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </aside>
 
             {/* CONTEÚDO */}
