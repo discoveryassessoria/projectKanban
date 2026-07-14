@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { sincronizarItemDeProduto } from '@/src/services/catalogo-sync'
 
 const MOEDAS = ['BRL', 'EUR', 'USD']
 const s = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
@@ -49,25 +50,32 @@ export async function PUT(
       return NextResponse.json({ error: 'Moeda inválida' }, { status: 400 })
     }
 
-    const produto = await prisma.produtoFinanceiro.update({
-      where: { id },
-      data: {
-        codigo: b.codigo !== undefined ? String(b.codigo).trim() : atual.codigo,
-        nome: b.nome !== undefined ? String(b.nome).trim() : atual.nome,
-        especie: b.especie !== undefined ? s(b.especie) : atual.especie,
-        tipoFinanceiro: b.tipoFinanceiro !== undefined ? s(b.tipoFinanceiro) : atual.tipoFinanceiro,
-        categoriaId: b.categoriaId !== undefined ? (b.categoriaId ? Number(b.categoriaId) : null) : atual.categoriaId,
-        planoContaId: b.planoContaId !== undefined ? (b.planoContaId ? Number(b.planoContaId) : null) : atual.planoContaId,
-        moedaPadrao: b.moedaPadrao !== undefined ? (b.moedaPadrao || 'BRL') : atual.moedaPadrao,
-        valorPadrao: b.valorPadrao !== undefined ? parseDecimal(b.valorPadrao) : atual.valorPadrao,
-        aplicaA: b.aplicaA !== undefined ? s(b.aplicaA) : atual.aplicaA,
-        cobravelDoCliente: b.cobravelDoCliente !== undefined ? !!b.cobravelDoCliente : atual.cobravelDoCliente,
-        ativo: b.ativo !== undefined ? !!b.ativo : atual.ativo,
-        naturezaFinanceira: b.naturezaFinanceira !== undefined ? (b.naturezaFinanceira || 'revenue') : atual.naturezaFinanceira,
-        custoInterno: b.custoInterno !== undefined ? !!b.custoInterno : atual.custoInterno,
-        repasse: b.repasse !== undefined ? !!b.repasse : atual.repasse,
-        reembolsavel: b.reembolsavel !== undefined ? !!b.reembolsavel : atual.reembolsavel,
-      },
+    const codigo = b.codigo !== undefined ? String(b.codigo).trim() : atual.codigo
+    const nome = b.nome !== undefined ? String(b.nome).trim() : atual.nome
+    // LOTE B — dual-write: re-sincroniza o ItemCatalogo (mestre) com os valores efetivos.
+    const produto = await prisma.$transaction(async (tx) => {
+      const itemCatalogoId = await sincronizarItemDeProduto(tx, { codigo, nome })
+      return tx.produtoFinanceiro.update({
+        where: { id },
+        data: {
+          codigo,
+          nome,
+          especie: b.especie !== undefined ? s(b.especie) : atual.especie,
+          tipoFinanceiro: b.tipoFinanceiro !== undefined ? s(b.tipoFinanceiro) : atual.tipoFinanceiro,
+          categoriaId: b.categoriaId !== undefined ? (b.categoriaId ? Number(b.categoriaId) : null) : atual.categoriaId,
+          planoContaId: b.planoContaId !== undefined ? (b.planoContaId ? Number(b.planoContaId) : null) : atual.planoContaId,
+          moedaPadrao: b.moedaPadrao !== undefined ? (b.moedaPadrao || 'BRL') : atual.moedaPadrao,
+          valorPadrao: b.valorPadrao !== undefined ? parseDecimal(b.valorPadrao) : atual.valorPadrao,
+          aplicaA: b.aplicaA !== undefined ? s(b.aplicaA) : atual.aplicaA,
+          cobravelDoCliente: b.cobravelDoCliente !== undefined ? !!b.cobravelDoCliente : atual.cobravelDoCliente,
+          ativo: b.ativo !== undefined ? !!b.ativo : atual.ativo,
+          naturezaFinanceira: b.naturezaFinanceira !== undefined ? (b.naturezaFinanceira || 'revenue') : atual.naturezaFinanceira,
+          custoInterno: b.custoInterno !== undefined ? !!b.custoInterno : atual.custoInterno,
+          repasse: b.repasse !== undefined ? !!b.repasse : atual.repasse,
+          reembolsavel: b.reembolsavel !== undefined ? !!b.reembolsavel : atual.reembolsavel,
+          itemCatalogoId,
+        },
+      })
     })
 
     return NextResponse.json({ produto })

@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { sincronizarItemDeProduto } from '@/src/services/catalogo-sync'
 
 const MOEDAS = ['BRL', 'EUR', 'USD']
 const s = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
@@ -56,22 +57,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Moeda inválida' }, { status: 400 })
     }
 
-    const produto = await prisma.produtoFinanceiro.create({
-      data: {
-        codigo: String(b.codigo).trim(),
-        nome: String(b.nome).trim(),
-        especie: s(b.especie),
-        naturezaFinanceira: b.naturezaFinanceira || 'revenue',
-        categoriaId: b.categoriaId ? Number(b.categoriaId) : null,
-        planoContaId: b.planoContaId ? Number(b.planoContaId) : null,
-        moedaPadrao: b.moedaPadrao || 'BRL',
-        valorPadrao: parseDecimal(b.valorPadrao),
-        cobravelDoCliente: !!b.cobravelDoCliente,
-        custoInterno: !!b.custoInterno,
-        repasse: !!b.repasse,
-        reembolsavel: !!b.reembolsavel,
-        ativo: b.ativo === undefined ? true : !!b.ativo,
-      },
+    const codigo = String(b.codigo).trim()
+    const nome = String(b.nome).trim()
+    // LOTE B — dual-write: ItemCatalogo (mestre, natureza PRODUTO) e vínculo por ID.
+    const produto = await prisma.$transaction(async (tx) => {
+      const itemCatalogoId = await sincronizarItemDeProduto(tx, { codigo, nome })
+      return tx.produtoFinanceiro.create({
+        data: {
+          codigo,
+          nome,
+          especie: s(b.especie),
+          naturezaFinanceira: b.naturezaFinanceira || 'revenue',
+          categoriaId: b.categoriaId ? Number(b.categoriaId) : null,
+          planoContaId: b.planoContaId ? Number(b.planoContaId) : null,
+          moedaPadrao: b.moedaPadrao || 'BRL',
+          valorPadrao: parseDecimal(b.valorPadrao),
+          cobravelDoCliente: !!b.cobravelDoCliente,
+          custoInterno: !!b.custoInterno,
+          repasse: !!b.repasse,
+          reembolsavel: !!b.reembolsavel,
+          ativo: b.ativo === undefined ? true : !!b.ativo,
+          itemCatalogoId,
+        },
+      })
     })
 
     return NextResponse.json({ produto }, { status: 201 })

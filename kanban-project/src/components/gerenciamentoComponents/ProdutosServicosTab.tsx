@@ -145,6 +145,13 @@ export default function ProdutosServicosTab() {
 
   return (
     <div className="space-y-5">
+      {/* LOTE B — ServicoProduto está sendo DEPRECIADO: a fonte canônica passou a ser
+          o Catálogo Mestre (ItemCatalogo, natureza SERVICO). Cada serviço salvo aqui
+          já é espelhado no mestre (dual-write). Novos cadastros devem migrar para o
+          Catálogo Mestre; esta tela permanece só para compatibilidade. */}
+      <div className="rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
+        <strong>Tela legada.</strong> Serviços agora são itens do <strong>Catálogo Mestre</strong> (natureza Serviço). O que você salvar aqui é espelhado no mestre automaticamente; prefira gerenciar pelo Catálogo Mestre.
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Produtos e Serviços</h2>

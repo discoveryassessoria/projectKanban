@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { sincronizarItemDeServico } from '@/src/services/catalogo-sync'
 
 function toStrOrNull(v: any): string | null {
   if (v === undefined || v === null) return null
@@ -51,16 +52,24 @@ export async function POST(request: NextRequest) {
     }
 
     const ids = toIdArray(b.itensFinanceirosIds)
-    const servico = await prisma.servicoProduto.create({
-      data: {
-        code: String(b.code).trim(),
-        name: String(b.name).trim(),
-        category: toStrOrNull(b.category),
-        nationality: (b.nationality && String(b.nationality).trim()) || 'all',
-        ativo: b.ativo !== undefined ? !!b.ativo : true,
-        itensFinanceiros: ids.length ? { connect: ids.map((id) => ({ id })) } : undefined,
-      },
-      include: { itensFinanceiros: { select: { id: true, codigo: true, nome: true } } },
+    const code = String(b.code).trim()
+    const name = String(b.name).trim()
+    const category = toStrOrNull(b.category)
+    // LOTE B — dual-write: ItemCatalogo (mestre) primeiro; vincula ServicoProduto por ID.
+    const servico = await prisma.$transaction(async (tx) => {
+      const itemCatalogoId = await sincronizarItemDeServico(tx, { code, name, category })
+      return tx.servicoProduto.create({
+        data: {
+          code,
+          name,
+          category,
+          nationality: (b.nationality && String(b.nationality).trim()) || 'all',
+          ativo: b.ativo !== undefined ? !!b.ativo : true,
+          itemCatalogoId,
+          itensFinanceiros: ids.length ? { connect: ids.map((id) => ({ id })) } : undefined,
+        },
+        include: { itensFinanceiros: { select: { id: true, codigo: true, nome: true } } },
+      })
     })
 
     return NextResponse.json({ servico })

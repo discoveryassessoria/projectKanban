@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { sincronizarItemDeServico } from '@/src/services/catalogo-sync'
 
 function toStrOrNull(v: any): string | null {
   if (v === undefined || v === null) return null
@@ -36,10 +37,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       data.itensFinanceiros = { set: toIdArray(b.itensFinanceirosIds).map((id) => ({ id })) }
     }
 
-    const servico = await prisma.servicoProduto.update({
-      where: { id },
-      data,
-      include: { itensFinanceiros: { select: { id: true, codigo: true, nome: true } } },
+    // LOTE B — dual-write: re-sincroniza o ItemCatalogo (mestre) com os valores efetivos.
+    const servico = await prisma.$transaction(async (tx) => {
+      const itemCatalogoId = await sincronizarItemDeServico(tx, { code: data.code, name: data.name, category: data.category })
+      return tx.servicoProduto.update({
+        where: { id },
+        data: { ...data, itemCatalogoId },
+        include: { itensFinanceiros: { select: { id: true, codigo: true, nome: true } } },
+      })
     })
 
     return NextResponse.json({ servico })

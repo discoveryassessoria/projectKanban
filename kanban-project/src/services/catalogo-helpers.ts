@@ -20,3 +20,22 @@ export function nomeDocumentoMestre(enumKey: string): string {
 export function resolverItemCatalogoDeTipoServico(ts: { itemCatalogoId?: number | null }): number | null {
   return ts.itemCatalogoId ?? null
 }
+
+// LOTE B — ItemCatalogo é a FONTE CANÔNICA de Serviços & Produtos. As ilhas legadas
+// (ServicoProduto, ProdutoFinanceiro) projetam-se no mestre por um `code` estável e
+// determinístico, permitindo dual-write/backfill idempotentes. Puro/testável.
+
+/** code canônico do ItemCatalogo (natureza SERVICO) derivado de ServicoProduto.code. */
+export function codeServicoMestre(code: string): string {
+  return `SRV_${String(code).trim()}`.toUpperCase()
+}
+
+/** code canônico do ItemCatalogo (natureza PRODUTO) derivado de ProdutoFinanceiro.codigo. */
+export function codeProdutoMestre(codigo: string): string {
+  return `PRD_${String(codigo).trim()}`.toUpperCase()
+}
+
+/** Preferir o vínculo canônico do ServicoProduto; fallback null (legado sem vínculo). */
+export function resolverItemCatalogoDeServico(s: { itemCatalogoId?: number | null }): number | null {
+  return s.itemCatalogoId ?? null
+}
