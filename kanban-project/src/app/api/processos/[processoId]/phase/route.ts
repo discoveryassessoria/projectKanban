@@ -20,6 +20,7 @@ import {
   computePhaseProgress,
   stageFromFaseCode,
 } from "@/src/lib/process-stage/compute-phase-progress"
+import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 
 export async function GET(
   _req: NextRequest,
@@ -71,8 +72,13 @@ export async function GET(
       })),
     )
 
-  const stageOverride = stageFromFaseCode(processo.status?.faseCode)
-  const progress = computePhaseProgress(docs, stageOverride, processo.status?.faseCode ?? null)
+  // Fonte CANÔNICA da fase = Processo.faseAtualKey (E5 / runtime v2), não a coluna
+  // legada (status.faseCode). Sob v2, statusId costuma ser null → antes caía no
+  // derive por documentos e exibia a fase ERRADA (ex.: "Análise Documental" quando a
+  // fase real é "Emissão Documental"). Ordem: faseAtualKey → status.faseCode → derive.
+  const faseCanonica = phaseKeyToFaseCode(processo.faseAtualKey) ?? processo.status?.faseCode ?? null
+  const stageOverride = stageFromFaseCode(faseCanonica ?? undefined)
+  const progress = computePhaseProgress(docs, stageOverride, faseCanonica)
 
   return NextResponse.json(progress)
 }
