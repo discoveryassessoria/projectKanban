@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { pkgProgress, phaseProgress, type RetWorkflowStep } from "@/src/lib/process-stage/retificacao-engine"
+import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 
 export async function GET(
   _request: Request,
@@ -23,7 +24,7 @@ export async function GET(
     })
     if (!processo) return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
 
-    if ((processo.status?.faseCode ?? processo.faseAtualKey?.toUpperCase()) !== "RETIFICACAO_REGISTROS") {
+    if ((processo.status?.faseCode ?? phaseKeyToFaseCode(processo.faseAtualKey)) !== "RETIFICACAO_REGISTROS") {
       return NextResponse.json({ emFase: false, pacotes: [] })
     }
 

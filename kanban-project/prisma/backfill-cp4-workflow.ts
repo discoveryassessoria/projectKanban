@@ -21,6 +21,7 @@ import {
   type BackfillReport,
 } from "./backfill-cp4-helpers"
 import { montarChaveWorkflow, montarChavePasso } from "../src/services/phase-workflow-helpers"
+import { faseCodeToPhaseKey } from "../src/lib/process-stage/fases-catalog"
 
 export interface BackfillOptions {
   dryRun?: boolean
@@ -69,7 +70,8 @@ export async function backfillCp4Workflow(opts: BackfillOptions = {}): Promise<B
       rel.pulou()
       continue
     }
-    const faseMacroKey = String(wf.faseCode) // identidade estável candidata
+    // Ponte canônica faseCode(enum, MAIÚSCULO) → phaseKey(estável, banco) via catálogo.
+    const faseMacroKey = faseCodeToPhaseKey(wf.faseCode) as string // wf.faseCode garantido não-nulo acima
 
     // 3) Definição de Workflow Interno correspondente (por fase + tipo do processo).
     const defs = await prisma.phaseInternalWorkflow.findMany({

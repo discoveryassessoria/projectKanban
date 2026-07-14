@@ -19,6 +19,8 @@ import {
   getStepsForFase,
   isFaseReady,
   type FaseStep,
+  phaseKeyToFaseCode,
+  faseCodeToPhaseKey,
 } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
 import { politicaPadraoParaStep } from "@/src/services/processEngine/stepCompletionResolver"
@@ -64,7 +66,7 @@ export async function recalcularFaseDoProcesso(
     where: { id: processoId },
     select: { id: true, pais: true, faseAtualKey: true, status: { select: { faseCode: true } } },
   })
-const faseAtual = (processo?.faseAtualKey?.toUpperCase() as FaseCode) ?? processo?.status?.faseCode ?? null
+const faseAtual = phaseKeyToFaseCode(processo?.faseAtualKey) ?? processo?.status?.faseCode ?? null
   if (!processo || !faseAtual) {
     return { mudou: false, faseAnterior: faseAtual, faseNova: faseAtual, motivo: "Processo sem faseCode" }
   }
@@ -155,7 +157,7 @@ const faseAtual = (processo?.faseAtualKey?.toUpperCase() as FaseCode) ?? process
     // 7b. Move o card: troca o statusId do processo pra coluna de destino
     await tx.processo.update({
       where: { id: processoId },
-      data: { faseAtualKey: proximaFase.toLowerCase(), ...(colunaDestino ? { statusId: colunaDestino.id } : {}) },
+      data: { faseAtualKey: faseCodeToPhaseKey(proximaFase) as string, ...(colunaDestino ? { statusId: colunaDestino.id } : {}) },
     })
 
     // 7c. Cria os workflows da próxima fase nos docs ativos da linha reta

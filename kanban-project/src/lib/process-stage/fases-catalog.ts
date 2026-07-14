@@ -25,6 +25,9 @@ export interface ProcessFaseStep {
 
 export interface FaseDef {
   code: FaseCode
+  /** Chave estável usada no banco (Processo.faseAtualKey, PhaseInternalWorkflow.phaseKey,
+   *  FaseMacro.phaseKey, Tarefa.faseMacroKey). CANÔNICA: renomear uma fase = mudar SÓ aqui. */
+  phaseKey: string
   ordem: number
   label: string
   /** "documento" = workflow por doc (gate automático). "processo" = checklist + avanço manual. */
@@ -38,7 +41,7 @@ export interface FaseDef {
 
 export const FASES: Record<FaseCode, FaseDef> = {
   GENEALOGIA: {
-    code: "GENEALOGIA", ordem: 0, label: "Genealogia", kind: "documento",
+    code: "GENEALOGIA", phaseKey: "genealogia", ordem: 0, label: "Genealogia", kind: "documento",
     next: "EMISSAO_DOCUMENTAL",
     steps: [
       { ordem: 1, stepKey: "buscar_documento", title: "Buscar documento",
@@ -48,7 +51,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   EMISSAO_DOCUMENTAL: {
-    code: "EMISSAO_DOCUMENTAL", ordem: 1, label: "Emissão documental", kind: "documento",
+    code: "EMISSAO_DOCUMENTAL", phaseKey: "emissao_documental", ordem: 1, label: "Emissão documental", kind: "documento",
     next: "ANALISE_DOCUMENTAL",
     steps: [
       { ordem: 1, stepKey: "solicitar_certidao", title: "Solicitar certidão",
@@ -71,12 +74,12 @@ export const FASES: Record<FaseCode, FaseDef> = {
 
   // ANÁLISE — por-processo, mas com painel PRÓPRIO (ProcessoAnalise). Não usa processSteps.
   ANALISE_DOCUMENTAL: {
-    code: "ANALISE_DOCUMENTAL", ordem: 2, label: "Análise Documental", kind: "processo",
+    code: "ANALISE_DOCUMENTAL", phaseKey: "analise_documental", ordem: 2, label: "Análise Documental", kind: "processo",
     next: null, steps: [],
   },
 
   RETIFICACAO_REGISTROS: {
-    code: "RETIFICACAO_REGISTROS", ordem: 3, label: "Retificação de registros", kind: "processo",
+    code: "RETIFICACAO_REGISTROS", phaseKey: "retificacao_registros", ordem: 3, label: "Retificação de registros", kind: "processo",
     next: "EMISSAO_DOCUMENTAL_RETIFICADA", steps: [],
     processSteps: [
       { stepKey: "definir_estrategia", title: "Definir estratégia", description: "Definir a via (judicial ou administrativa) e a estratégia da retificação." },
@@ -89,7 +92,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   EMISSAO_DOCUMENTAL_RETIFICADA: {
-    code: "EMISSAO_DOCUMENTAL_RETIFICADA", ordem: 4, label: "Emissão documental retificada", kind: "processo",
+    code: "EMISSAO_DOCUMENTAL_RETIFICADA", phaseKey: "emissao_documental_retificada", ordem: 4, label: "Emissão documental retificada", kind: "processo",
     next: "TRADUCAO_JURAMENTADA", steps: [],
     processSteps: [
       { stepKey: "enviar_pedido_averbacao", title: "Enviar pedido de averbação ao cartório", description: "Enviar ao cartório a decisão/mandado para lançar a averbação no registro." },
@@ -102,7 +105,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   TRADUCAO_JURAMENTADA: {
-    code: "TRADUCAO_JURAMENTADA", ordem: 5, label: "Tradução juramentada", kind: "processo",
+    code: "TRADUCAO_JURAMENTADA", phaseKey: "traducao_juramentada", ordem: 5, label: "Tradução juramentada", kind: "processo",
     next: "APOSTILAMENTO", steps: [],
     processSteps: [
       { stepKey: "montar_pasta_traducao", title: "Montar pasta de tradução", description: "Reunir os documentos que vão para tradução numa pasta única." },
@@ -115,7 +118,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   APOSTILAMENTO: {
-    code: "APOSTILAMENTO", ordem: 6, label: "Apostilamento", kind: "processo",
+    code: "APOSTILAMENTO", phaseKey: "apostilamento", ordem: 6, label: "Apostilamento", kind: "processo",
     next: "AGUARDANDO_PROTOCOLO", steps: [],
     processSteps: [
       { stepKey: "montar_pasta_apostilamento", title: "Montar pasta de apostilamento", description: "Reunir os documentos finais numa pasta para apostila." },
@@ -128,7 +131,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   AGUARDANDO_PROTOCOLO: {
-    code: "AGUARDANDO_PROTOCOLO", ordem: 7, label: "Aguardando protocolo", kind: "processo",
+    code: "AGUARDANDO_PROTOCOLO", phaseKey: "aguardando_protocolo", ordem: 7, label: "Aguardando protocolo", kind: "processo",
     next: "PROTOCOLADO", steps: [],
     processSteps: [
       { stepKey: "montar_dossie_final", title: "Montar dossiê final", description: "Reúna todos os documentos apostilados e traduzidos em um dossiê único." },
@@ -138,7 +141,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   PROTOCOLADO: {
-    code: "PROTOCOLADO", ordem: 8, label: "Protocolado", kind: "processo",
+    code: "PROTOCOLADO", phaseKey: "protocolado", ordem: 8, label: "Protocolado", kind: "processo",
     next: "FINALIZADO", steps: [],
     processSteps: [
       { stepKey: "registrar_protocolo", title: "Registrar nº do protocolo", description: "Confirme o número/recibo e a data de entrada no órgão." },
@@ -148,7 +151,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   FINALIZADO: {
-    code: "FINALIZADO", ordem: 9, label: "Finalizado", kind: "processo",
+    code: "FINALIZADO", phaseKey: "finalizado", ordem: 9, label: "Finalizado", kind: "processo",
     next: null, steps: [],
     processSteps: [
       { stepKey: "confirmar_deferimento", title: "Confirmar deferimento", description: "Confirme o reconhecimento da cidadania / deferimento do pedido." },
@@ -172,4 +175,27 @@ export function getOrdemFase(code: FaseCode): number { return FASES[code].ordem 
 export function getFaseByOrdem(ordem: number): FaseCode | null {
   const found = Object.values(FASES).find((f) => f.ordem === ordem)
   return found ? found.code : null
+}
+
+// ── Conversão canônica faseCode ⇄ phaseKey ─────────────────────────────────
+// ÚNICA fonte da ponte entre o enum FaseCode (Prisma) e a chave estável phaseKey
+// usada no banco. NENHUM outro ponto do código deve fazer toUpperCase/toLowerCase
+// para converter — sempre passar por aqui. Renomear/adicionar fase = mudar só o
+// catálogo acima.
+
+const PHASEKEY_TO_CODE: Record<string, FaseCode> = Object.fromEntries(
+  Object.values(FASES).map((f) => [f.phaseKey, f.code])
+) as Record<string, FaseCode>
+
+/** faseCode (enum) → phaseKey estável. Fallback tolerante p/ códigos fora do catálogo. */
+export function faseCodeToPhaseKey(code: FaseCode | string | null | undefined): string | null {
+  if (!code) return null
+  return FASES[code as FaseCode]?.phaseKey ?? String(code).toLowerCase()
+}
+
+/** phaseKey (ou faseAtualKey do banco) → faseCode do catálogo. null se desconhecido. */
+export function phaseKeyToFaseCode(phaseKey: string | null | undefined): FaseCode | null {
+  if (!phaseKey) return null
+  const k = String(phaseKey)
+  return PHASEKEY_TO_CODE[k] ?? PHASEKEY_TO_CODE[k.toLowerCase()] ?? null
 }

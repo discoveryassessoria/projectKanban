@@ -10,6 +10,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import type { StatusDocumento, TipoDocumento, Prisma } from "@prisma/client"
+import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import {
   buildInitialWorkflow,
   calcProgress,
@@ -77,7 +78,7 @@ export async function GET(
 
     // Não existe: só cria se o processo estiver de fato na fase de Tradução.
     if (!pasta) {
-      if ((processo.status?.faseCode ?? processo.faseAtualKey?.toUpperCase()) !== "TRADUCAO_JURAMENTADA") {
+      if ((processo.status?.faseCode ?? phaseKeyToFaseCode(processo.faseAtualKey)) !== "TRADUCAO_JURAMENTADA") {
         return NextResponse.json({ pasta: null })
       }
 

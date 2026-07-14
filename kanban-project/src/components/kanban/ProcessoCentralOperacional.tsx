@@ -18,7 +18,7 @@ import { ProcessoFaseFinal } from "./ProcessoFaseFinal"
 import { ProcessoRetificacao } from "./ProcessoRetificacao"
 import { ProcessoEmissaoRetificada } from "./ProcessoEmissaoRetificada"
 import type { FaseCode } from "@prisma/client"
-import { FASES } from "@/src/lib/process-stage/fases-catalog"
+import { FASES, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 
 // ============================================================
 // TIPOS (espelho do endpoint)
@@ -390,7 +390,7 @@ export function ProcessoCentralOperacional({
   if (!data) return null
 
   // ====== CÁLCULOS (ordem importa: declarar ANTES de usar) ======
-  const faseKey = (processo as { faseAtualKey?: string | null }).faseAtualKey?.toUpperCase() as FaseCode | undefined
+  const faseKey = phaseKeyToFaseCode((processo as { faseAtualKey?: string | null }).faseAtualKey) ?? undefined
   const faseAtualNome =
     (faseKey ? FASES[faseKey]?.label : undefined) ??
     processo.status?.nome ??

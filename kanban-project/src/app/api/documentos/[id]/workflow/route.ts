@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { StatusDocumento, FaseCode } from "@prisma/client"
-import { getFase, isFaseReady } from "@/src/lib/process-stage/fases-catalog"
+import { getFase, isFaseReady, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import { politicaPadraoParaStep } from "@/src/services/processEngine/stepCompletionResolver"
 
 // ============================================================
@@ -160,11 +160,10 @@ export async function POST(
     const processo = processos[0]
 
     // motor primeiro ("genealogia" → "GENEALOGIA"), Status legado como fallback
-    const faseCode = (
-      (processo.faseAtualKey ? processo.faseAtualKey.toUpperCase() : null) ??
+    const faseCode: FaseCode | null =
+      phaseKeyToFaseCode(processo.faseAtualKey) ??
       processo.status?.faseCode ??
       null
-    ) as FaseCode | null
 
     // ── Proteção: o processo precisa ter fase (motor ou legado) ──────────
     if (!faseCode) {

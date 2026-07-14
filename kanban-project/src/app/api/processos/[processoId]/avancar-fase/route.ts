@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
-import { getNextFase } from "@/src/lib/process-stage/fases-catalog"
+import { getNextFase, phaseKeyToFaseCode, faseCodeToPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
 import { dispararMotorNaFaseAtual } from "@/src/lib/motor/executor"
 import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
@@ -41,7 +41,7 @@ export async function POST(
     // ✅ E5 — fase REAL = faseAtualKey (fonte de verdade). Fallback p/ a coluna
     // legada só se faseAtualKey estiver vazio. Antes lia SÓ status.faseCode.
     const faseAtual =
-      ((processo.faseAtualKey?.toUpperCase() as FaseCode) ?? processo.status?.faseCode ?? null)
+      (phaseKeyToFaseCode(processo.faseAtualKey) ?? processo.status?.faseCode ?? null)
     if (!faseAtual) return NextResponse.json({ error: "O processo não tem fase definida." }, { status: 422 })
 
     const proximaFase = getNextFase(faseAtual)
@@ -58,7 +58,7 @@ export async function POST(
     // real, faseAtualKey, não mudava).
     await prisma.processo.update({
       where: { id },
-      data: { faseAtualKey: proximaFase.toLowerCase(), ...(colunaDestino ? { statusId: colunaDestino.id } : {}) },
+      data: { faseAtualKey: faseCodeToPhaseKey(proximaFase) as string, ...(colunaDestino ? { statusId: colunaDestino.id } : {}) },
     })
 
     // MOTOR — gatilho automático (best-effort; não derruba o avanço).

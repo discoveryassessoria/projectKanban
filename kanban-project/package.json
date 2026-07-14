@@ -16,6 +16,7 @@
     "test:nav": "tsx scripts/management-nav.test.ts",
     "test:doccats": "tsx scripts/lote-a-doccats.test.ts",
     "test:lote-b": "tsx scripts/lote-b-catalogo.test.ts",
+    "test:fases": "tsx scripts/fases-catalog.test.ts",
     "backfill:document-categories:dry": "tsx prisma/backfill-document-categories.ts --dry-run",
     "backfill:document-categories": "tsx prisma/backfill-document-categories.ts --execute",
     "backfill:lote-b:dry": "tsx prisma/backfill-lote-b-catalogo.ts --dry-run",

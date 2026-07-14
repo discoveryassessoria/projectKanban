@@ -14,7 +14,7 @@ import {
   TipoEvento, Consulado,
 } from '@prisma/client'
 import type { FaseCode } from '@prisma/client'
-import { getFase } from '@/src/lib/process-stage/fases-catalog'
+import { getFase, faseCodeToPhaseKey, phaseKeyToFaseCode } from '@/src/lib/process-stage/fases-catalog'
 import { gerarCodigoReceita, gerarCodigoCusto } from '@/lib/financeiro/codigos'
 import { gerarParcelas } from '@/lib/financeiro/parcelas'
 import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
@@ -212,7 +212,7 @@ export async function resolvePhaseKey(tipoProcessoId: number, faseCode: FaseCode
   let label = ''
   try { label = getFase(faseCode)?.label ?? '' } catch { label = '' }
   if (label) { const f = fases.find(x => norm(x.label) === norm(label)); if (f) return f.phaseKey }
-  const lc = String(faseCode).toLowerCase()
+  const lc = faseCodeToPhaseKey(faseCode) as string
   const f2 = fases.find(x => x.phaseKey === lc)
   return f2 ? f2.phaseKey : (fases.length ? null : lc)
 }
@@ -389,7 +389,7 @@ export async function dispararMotorNaFaseAtual(processoId: number): Promise<void
     // ✅ E5 — fase REAL = faseAtualKey (fonte de verdade pós-E2). Fallback p/ a
     // coluna legada só se faseAtualKey estiver vazio.
     const faseAtual =
-      ((proc.faseAtualKey?.toUpperCase() as FaseCode) ?? proc.status?.faseCode ?? null)
+      (phaseKeyToFaseCode(proc.faseAtualKey) ?? proc.status?.faseCode ?? null)
     if (!faseAtual) return
 
     const phaseKey = await resolvePhaseKey(proc.tipoProcessoMotorId, faseAtual)

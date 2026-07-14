@@ -13,6 +13,7 @@ import {
   stageFromFaseCode,
 } from "@/src/lib/process-stage/compute-phase-progress"
 import type { DocForStage } from "@/src/lib/process-stage/derive-stage"
+import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import {
   evaluateWorkflowProgress,
   canCompletePhase as canCompletePhasePure,
@@ -110,7 +111,7 @@ async function carregarFaseEDocs(processoId: number): Promise<{
     },
   })
   const faseCode =
-    (processo?.faseAtualKey ? processo.faseAtualKey.toUpperCase() : null) ??
+    phaseKeyToFaseCode(processo?.faseAtualKey) ??
     processo?.status?.faseCode ??
     null
   const docs: DocForStage[] = (processo?.arvore?.pessoas ?? []).flatMap((p) =>

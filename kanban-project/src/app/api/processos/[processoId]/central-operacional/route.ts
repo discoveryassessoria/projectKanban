@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
-import { getOrdemFase, getStepsForFase, getFase } from "@/src/lib/process-stage/fases-catalog"
+import { getOrdemFase, getStepsForFase, getFase, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
 
 // ============================================================
@@ -217,7 +217,7 @@ export async function GET(
     }
 
     const faseAtualCode =
-      ((processo.faseAtualKey?.toUpperCase() as FaseCode) ?? processo.status?.faseCode ?? null)
+      (phaseKeyToFaseCode(processo.faseAtualKey) ?? processo.status?.faseCode ?? null)
 
     // pessoas e documentos não dependem um do outro (ambos só precisam do
     // arvoreId) → busca os dois EM PARALELO, economizando um round-trip ao banco.
