@@ -51,7 +51,11 @@ export function WorkflowV2AtivacaoPanel({ processoId }: Props) {
   useEffect(() => {
     if (pode("workflow.ativarV2")) carregar()
     else setLoading(false)
-  }, [carregar, pode])
+    // `pode` fora das deps DE PROPÓSITO: sua identidade muda a cada render
+    // (usePermissoes) e reincluí-la causava refetch em LOOP de /workflow-runtime
+    // (que roda o backfill dry-run no servidor) → flicker. Reavalia por processoId.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carregar])
 
   const ativar = useCallback(async () => {
     const justificativa = window.prompt("Justificativa da ativação do runtime v2:")

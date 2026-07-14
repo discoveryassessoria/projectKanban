@@ -12,8 +12,9 @@ import { ArvoreGenealogicaView } from "../arvore"
 // import { ProcessoTarefas } from "./ProcessoTarefas"
 import { ProcessoEstatisticas } from "./ProcessoEstatisticas"
 import { ProcessoCentralOperacional } from "./ProcessoCentralOperacional"
-import { WorkflowV2Panel } from "./WorkflowV2Panel" // CP-4G — UI mínima do runtime v2
-import { WorkflowV2AtivacaoPanel } from "./WorkflowV2AtivacaoPanel" // CP-4G — ativação controlada
+// Diagnóstico técnico do Runtime v2 (WorkflowV2Panel/WorkflowV2AtivacaoPanel) foi
+// movido para Gerenciamento → Motor → Diagnóstico do Runtime. A Central Operacional
+// é puramente operacional.
 import { ProcessoDocumentos } from "./ProcessoDocumentos"
 import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoInformacoes } from "./ProcessoInformacoes"
@@ -1018,12 +1019,12 @@ export function ProcessoDetailsModal({
           )}
 
           {activeTab === "central" && (
-            <>
-              {/* CP-4G — UI mínima do runtime v2 integrada à Central (não é 2ª central) */}
-              <WorkflowV2AtivacaoPanel processoId={processo.id} />
-              <WorkflowV2Panel processoId={processo.id} />
+            // Central Operacional PURAMENTE operacional + área única de rolagem
+            // (header/abas fixos; só o conteúdo rola). Diagnóstico técnico do Runtime
+            // fica em Gerenciamento → Motor → Diagnóstico do Runtime.
+            <div className="h-full min-h-0 overflow-y-auto">
               <ProcessoCentralOperacional processo={processo} />
-            </>
+            </div>
           )}
 
           {activeTab === "documentos" && (

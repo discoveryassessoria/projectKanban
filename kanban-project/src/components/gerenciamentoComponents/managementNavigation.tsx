@@ -295,6 +295,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     technicalOnly: true, permission: GESTAO_PERMISSION,
     children: [
       { key: "execmotor", label: "Visão Geral do Motor", keywords: ["motor", "executor", "tecnico"], status: "active", technicalOnly: true, order: 10 },
+      { key: "runtimediag", label: "Diagnóstico do Runtime", keywords: ["runtime", "diagnostico", "diagnóstico", "v2", "readiness", "gate", "workflow"], status: "active", technicalOnly: true, order: 15 },
       h(20, "mt_eventos", "Eventos"),
       h(30, "mt_execucoes", "Execuções"),
       h(40, "mt_efeitos", "Efeitos Executados"),
