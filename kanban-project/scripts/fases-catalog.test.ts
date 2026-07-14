@@ -3,7 +3,7 @@
  * Rodar: npm run test:fases
  * Puro (sem banco) + guarda estrutural contra conversões diretas dispersas.
  */
-import { FASES, faseCodeToPhaseKey, phaseKeyToFaseCode } from "../src/lib/process-stage/fases-catalog"
+import { FASES, faseCodeToPhaseKey, phaseKeyToFaseCode, resolveStepKeyCompat } from "../src/lib/process-stage/fases-catalog"
 import { readFileSync } from "fs"
 import { fileURLToPath } from "url"
 import { dirname, join, relative } from "path"
@@ -50,6 +50,13 @@ ok(faseCodeToPhaseKey(null) === null && faseCodeToPhaseKey("QUALQUER_NOVA") === 
 const pks = codes.map((c) => FASES[c].phaseKey)
 ok(pks.every((k) => k === k.toLowerCase() && k.length > 0), "7. todo phaseKey é minúsculo e não-vazio")
 ok(new Set(pks).size === pks.length, "8. phaseKeys únicos")
+
+// 5b) Alias de stepKey (compatibilidade legado → publicado)
+console.log("\nAlias de stepKey (compat migração v2):")
+ok(resolveStepKeyCompat("genealogia", "buscar_documento") === "buscar_certidao", "A1. genealogia: buscar_documento → buscar_certidao")
+ok(resolveStepKeyCompat("emissao_documental", "aguardar_retorno") === "aguardar_retorno_do_cartorio", "A2. emissao: aguardar_retorno → aguardar_retorno_do_cartorio")
+ok(resolveStepKeyCompat("emissao_documental", "receber_certidao") === "receber_certidao", "A3. sem alias → identidade (não adivinha)")
+ok(resolveStepKeyCompat(null, "x") === "x" && resolveStepKeyCompat("fase_inexistente", "y") === "y", "A4. phaseKey nulo/desconhecido → passo inalterado")
 
 // 6) GUARDA ESTRUTURAL: nenhuma conversão direta faseCode↔phaseKey fora do catálogo
 console.log("\nGuarda estrutural (sem conversão direta dispersa):")

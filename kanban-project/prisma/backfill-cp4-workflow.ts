@@ -21,7 +21,7 @@ import {
   type BackfillReport,
 } from "./backfill-cp4-helpers"
 import { montarChaveWorkflow, montarChavePasso } from "../src/services/phase-workflow-helpers"
-import { faseCodeToPhaseKey } from "../src/lib/process-stage/fases-catalog"
+import { faseCodeToPhaseKey, resolveStepKeyCompat } from "../src/lib/process-stage/fases-catalog"
 
 export interface BackfillOptions {
   dryRun?: boolean
@@ -115,12 +115,14 @@ export async function backfillCp4Workflow(opts: BackfillOptions = {}): Promise<B
     // Coletar os steps que resolvem com segurança (dry-run só conta; execução criaria).
     const stepsResolvidos: { stepKey: string }[] = []
     for (const st of wf.steps) {
-      const resStep = resolverStepDefinition(st.stepKey, defKeys)
+      // Compatibilidade determinística: alias legado → passo publicado atual (fonte única no catálogo).
+      const chaveAtual = resolveStepKeyCompat(faseMacroKey, st.stepKey)
+      const resStep = resolverStepDefinition(chaveAtual, defKeys)
       if (!resStep.ok) {
-        rel.naoResolvido(resStep.motivo, { entityType: "WorkflowStep", entityId: st.id, detalhe: `stepKey ${st.stepKey} sem definição segura` })
+        rel.naoResolvido(resStep.motivo, { entityType: "WorkflowStep", entityId: st.id, detalhe: `stepKey ${st.stepKey} (→${chaveAtual}) sem definição segura` })
         continue
       }
-      stepsResolvidos.push({ stepKey: st.stepKey })
+      stepsResolvidos.push({ stepKey: chaveAtual })
     }
 
     if (!dryRun) {

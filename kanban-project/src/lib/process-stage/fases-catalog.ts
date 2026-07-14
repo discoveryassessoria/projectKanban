@@ -199,3 +199,23 @@ export function phaseKeyToFaseCode(phaseKey: string | null | undefined): FaseCod
   const k = String(phaseKey)
   return PHASEKEY_TO_CODE[k] ?? PHASEKEY_TO_CODE[k.toLowerCase()] ?? null
 }
+
+// ── Compatibilidade de stepKey (legado → passo publicado atual) ─────────────
+// FONTE ÚNICA e DETERMINÍSTICA para migração v2: quando um passo publicado é
+// renomeado/redesenhado, mapeie aqui o stepKey legado → o atual. Sem adivinhação
+// por texto/similaridade. Renomear passo ou limpar junk = ajustar SÓ este mapa.
+// Não altera dados legados nem publicados — é só a ponte de resolução do backfill.
+const STEP_KEY_ALIASES: Record<string, Record<string, string>> = {
+  genealogia: {
+    buscar_documento: "buscar_certidao", // redesenho 1→5 passos (decisão do dono)
+  },
+  emissao_documental: {
+    aguardar_retorno: "aguardar_retorno_do_cartorio", // rename do mesmo passo
+  },
+}
+
+/** Resolve o stepKey LEGADO para o stepKey PUBLICADO atual (alias), ou retorna o próprio. */
+export function resolveStepKeyCompat(phaseKey: string | null | undefined, stepKey: string): string {
+  if (!phaseKey) return stepKey
+  return STEP_KEY_ALIASES[String(phaseKey).toLowerCase()]?.[stepKey] ?? stepKey
+}
