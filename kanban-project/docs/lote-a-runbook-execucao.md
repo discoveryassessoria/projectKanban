@@ -48,13 +48,35 @@ npx prisma migrate status
 A migration `20260713120000_categoria_documental` deve aparecer como pendente.
 
 ## Passo 2 — Aplicar a migration (aditiva, não-destrutiva)
+
+> ⚠️ **Drift do histórico:** a cadeia de migrations do repo NÃO replaya do zero
+> (migration antiga `add_tipo_registro_custo` referencia `CustoPessoa`). Em bancos
+> onde as migrations anteriores já constam aplicadas, `migrate deploy` aplica só a
+> do LOTE A e funciona. Se `migrate deploy` reclamar de drift/pendências antigas,
+> **use o caminho cirúrgico** (valida sem mexer no histórico quebrado):
+
+**Opção A — canônica (se o histórico estiver limpo):**
 ```bash
 npx prisma migrate deploy
 ```
-Aplica: CREATE TABLE `CategoriaDocumental` (com `sistema`) + índice único de `code`
-+ seed das 7 categorias (`sistema=true`) + `ADD COLUMN categoriaDocumentalId`
+**Opção B — cirúrgica (recomendada se houver drift):**
+```bash
+export PGURL='<DIRECT_DATABASE_URL do banco alvo>'
+pg_dump "$PGURL" -Fc -f backup-pre-lote-a.dump   # backup antes (bancos com dados)
+psql "$PGURL" -v ON_ERROR_STOP=1 -f prisma/migrations/20260713120000_categoria_documental/migration.sql
+npx prisma migrate resolve --applied 20260713120000_categoria_documental  # registra sem reexecutar
+```
+Ambas aplicam: CREATE TABLE `CategoriaDocumental` (com `sistema`) + índice único de
+`code` + seed das 7 categorias (`sistema=true`) + `ADD COLUMN categoriaDocumentalId`
 (nullable) + índice + FK `ON DELETE RESTRICT`. **Não** remove a coluna legada
 `category`. Gerar o client após aplicar (se necessário): `npx prisma generate`.
+
+> Conexão via `prisma dev`/pooler pode exigir `?pgbouncer=true` na URL (evita o erro
+> `42P05 prepared statement already exists`). Prisma Postgres/Accelerate de produção
+> normalmente não precisa.
+
+> **Ordem em produção:** migration (Passo 2) + backfill (Passos 3–4) **antes** de
+> promover o deploy do código — o app novo referencia `categoriaDocumental`/`sistema`.
 
 ## Passo 3 — Backfill em DRY-RUN (não escreve nada)
 ```bash
