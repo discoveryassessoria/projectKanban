@@ -115,6 +115,8 @@ ok(/certtypes:\s*"doctypes"/.test(pageSrc), "?screen=certtypes redireciona (alia
 const tdTab = readFileSync(join(ROOT, "src/components/gerenciamentoComponents/TiposDocumentoTab.tsx"), "utf8")
 ok(/setFiltro/.test(tdTab) && /certid/i.test(tdTab), "Tipos de Documento tem filtro 'Certidões' client-side")
 ok(/mestre/i.test(tdTab), "Tipos de Documento marcado como cadastro mestre")
+// LOTE A — cadastro mestre de Categorias Documentais aparece em Documentos
+ok(itemDe("doccats")?.status === "active" && grupoDe("doccats") === "grp_documentos", "LOTE A: 'Categorias Documentais' (doccats) ativo em Documentos")
 
 console.log(`\n${passed} passaram, ${failed} falharam`)
 if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }

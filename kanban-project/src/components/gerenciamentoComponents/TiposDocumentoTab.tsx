@@ -1,14 +1,12 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import DocumentCategorySelector from "./DocumentCategorySelector"
 
-interface Tipo { id: number; code: string | null; name: string; category: string | null; ativo: boolean }
-
-const CATEGORIES: [string, string][] = [
-  ["civil_registry", "Registro civil"], ["identity", "Identidade"], ["judicial", "Judicial"],
-  ["consular", "Consular"], ["translation", "Tradução"], ["apostille", "Apostila"], ["other", "Outro"],
-]
-const catLabel = (c: string | null) => (c ? CATEGORIES.find(x => x[0] === c)?.[1] || c : "—")
+interface CatRel { id: number; code: string; name: string; ativo: boolean }
+interface Tipo { id: number; code: string | null; name: string; category: string | null; nature?: string | null; categoriaDocumentalId?: number | null; categoriaDocumental?: CatRel | null; ativo: boolean }
+// Sem lista fixa de categorias na UI: o nome exibido vem da relação canônica
+// (categoriaDocumental). Fallback textual só para linhas ainda não migradas.
 
 function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
@@ -16,11 +14,10 @@ function authHeaders(): HeadersInit {
 }
 const inputCls = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
 const labelCls = "mb-1 block text-xs text-white/60"
-const opt = "bg-zinc-900"
 const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
 const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>)
 
-type Form = { id?: number; code: string; name: string; category: string; ativo: boolean }
+type Form = { id?: number; code: string; name: string; category: string; categoriaDocumentalId: number | null; currentCat?: CatRel | null; ativo: boolean }
 
 export default function TiposDocumentoTab() {
   const [rows, setRows] = useState<Tipo[]>([])
@@ -62,17 +59,19 @@ export default function TiposDocumentoTab() {
 
   if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
 
-  // Filtro client-side (sem schema/API): "Certidões" = tipos cujo nome é de certidão.
-  //
-  // TODO ARQUITETURA:
-  // O filtro atual por nome (/certid/i) é temporário.
-  // Quando o domínio TipoDocumento possuir um campo estruturado de classificação,
-  // como categoriaDocumental ou naturezaDocumental, substituir a heurística textual
-  // por filtro baseado nesse campo.
-  // Não alterar schema neste lote.
-  const ehCertidao = (r: Tipo) => /certid/i.test(r.name)
+  // Filtro "Certidões" por CLASSIFICAÇÃO ESTRUTURADA. Certidão é um SUBTIPO técnico
+  // (naturezaDocumental / `nature`), eixo distinto de CategoriaDocumental — logo o
+  // filtro é por `nature`, não pela categoria "Registro Civil" (que contém também
+  // documentos que não são certidões). O fallback textual por nome (/certid/i) só
+  // vale para linhas SEM `nature` (ainda não migradas) e é CONTABILIZADO abaixo.
+  // CONDIÇÃO DE REMOÇÃO do fallback: 100% dos TipoDocumento com `nature` preenchido.
+  const ehCertidaoEstruturado = (r: Tipo) => r.nature != null && /^certid/i.test(r.nature)
+  const usaFallbackTextual = (r: Tipo) => r.nature == null && /certid/i.test(r.name)
+  const ehCertidao = (r: Tipo) => ehCertidaoEstruturado(r) || usaFallbackTextual(r)
   const visiveis = filtro === "certidoes" ? rows.filter(ehCertidao) : rows
   const totalCertidoes = rows.filter(ehCertidao).length
+  const certPorNature = rows.filter(ehCertidaoEstruturado).length   // cobertura estruturada
+  const certPorTexto = rows.filter(usaFallbackTextual).length       // caíram no fallback
 
   return (
     <div className="space-y-5">
@@ -84,13 +83,16 @@ export default function TiposDocumentoTab() {
             <h2 className="text-lg font-semibold text-white">Tipos de Documento</h2>
             <p className="mt-1 text-sm text-white/60">Cadastro <strong className="text-white/80">mestre</strong> de tipos documentais — inclui certidões, identidades, judiciais, etc. Certidões são criadas aqui (não há cadastro separado).</p>
           </div>
-          <button onClick={() => setForm({ code: "", name: "", category: "", ativo: true })} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500">+ Novo tipo de documento</button>
+          <button onClick={() => setForm({ code: "", name: "", category: "", categoriaDocumentalId: null, currentCat: null, ativo: true })} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500">+ Novo tipo de documento</button>
         </div>
         {/* Filtro rápido — consolidação de "Tipos de Certidão" */}
         <div className="mt-4 inline-flex overflow-hidden rounded-lg border border-white/10 text-xs">
           <button onClick={() => setFiltro("todos")} aria-pressed={filtro === "todos"} className={`px-3 py-1.5 ${filtro === "todos" ? "bg-white/15 font-medium text-white" : "text-white/60 hover:bg-white/5"}`}>Todos ({rows.length})</button>
           <button onClick={() => setFiltro("certidoes")} aria-pressed={filtro === "certidoes"} className={`px-3 py-1.5 ${filtro === "certidoes" ? "bg-white/15 font-medium text-white" : "text-white/60 hover:bg-white/5"}`}>Certidões ({totalCertidoes})</button>
         </div>
+        {filtro === "certidoes" && (
+          <p className="mt-2 text-[11px] text-white/40">Cobertura: {certPorNature} por natureza estruturada · {certPorTexto} por fallback textual{certPorTexto > 0 ? " (migrar `nature` para eliminar)" : ""}.</p>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
@@ -105,11 +107,11 @@ export default function TiposDocumentoTab() {
               <tr key={d.id} className="border-b border-white/5 last:border-0">
                 <td className="px-4 py-2.5 text-white/70">{d.code || "—"}</td>
                 <td className="px-4 py-2.5 text-white">{d.name}</td>
-                <td className="px-4 py-2.5 text-white/70">{catLabel(d.category)}</td>
+                <td className="px-4 py-2.5 text-white/70">{d.categoriaDocumental?.name ?? (d.category || "—")}</td>
                 <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-0.5 text-white/50">
-                    <button title="Editar" aria-label="Editar" onClick={() => setForm({ id: d.id, code: d.code || "", name: d.name, category: d.category || "", ativo: d.ativo })} className="rounded p-1 hover:bg-white/10 hover:text-white"><IEdit /></button>
+                    <button title="Editar" aria-label="Editar" onClick={() => setForm({ id: d.id, code: d.code || "", name: d.name, category: d.category || "", categoriaDocumentalId: d.categoriaDocumentalId ?? null, currentCat: d.categoriaDocumental ?? null, ativo: d.ativo })} className="rounded p-1 hover:bg-white/10 hover:text-white"><IEdit /></button>
                     <button title="Excluir" aria-label="Excluir" onClick={() => del(d)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>
                   </div>
                 </td>
@@ -127,11 +129,15 @@ export default function TiposDocumentoTab() {
               <div><label className={labelCls}>Código</label><input value={form.code} onChange={e => setForm(f => f && { ...f, code: e.target.value })} className={inputCls} /></div>
               <div><label className={labelCls}>Nome *</label><input value={form.name} onChange={e => setForm(f => f && { ...f, name: e.target.value })} className={inputCls} /></div>
               <div>
-                <label className={labelCls}>Categoria</label>
-                <select value={form.category} onChange={e => setForm(f => f && { ...f, category: e.target.value })} className={inputCls}>
-                  <option value="" className={opt}>—</option>
-                  {CATEGORIES.map(([v, l]) => <option key={v} value={v} className={opt}>{l}</option>)}
-                </select>
+                <label className={labelCls}>Categoria documental</label>
+                {/* LOTE A — categoria vem do cadastro mestre (API), não mais da lista fixa.
+                    Grava categoriaDocumentalId. Sem criação inline. */}
+                <DocumentCategorySelector
+                  value={form.categoriaDocumentalId}
+                  onChange={(id) => setForm(f => f && { ...f, categoriaDocumentalId: id })}
+                  currentInactive={form.currentCat && !form.currentCat.ativo ? { id: form.currentCat.id, name: form.currentCat.name } : null}
+                  className={inputCls}
+                />
               </div>
               <label className="flex items-center gap-2 text-sm text-white/70"><input type="checkbox" checked={form.ativo} onChange={e => setForm(f => f && { ...f, ativo: e.target.checked })} />Ativo</label>
             </div>

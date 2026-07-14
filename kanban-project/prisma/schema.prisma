@@ -2234,8 +2234,33 @@ model TipoDocumentoCadastro {
   description       String?       @db.Text
   documentos        Documento[] // back-relation (docs que apontam pra este tipo)
   participaPlanilha Boolean       @default(false)
+  // LOTE A — categoriaDocumentalId é a CLASSIFICAÇÃO CANÔNICA (consumida por ID).
+  // FK nullable p/ backfill seguro. A coluna `category` (String) permanece SÓ como
+  // compatibilidade transitória (dual-read/dual-write). Não remover neste lote.
+  // onDelete: Restrict — a API já proíbe excluir categoria em uso; a FK impede
+  // desclassificação silenciosa via SQL cru (alinha DB e regra de negócio).
+  categoriaDocumentalId Int?
+  categoriaDocumental   CategoriaDocumental? @relation(fields: [categoriaDocumentalId], references: [id], onDelete: Restrict)
 
   @@index([itemCatalogoId])
+  @@index([categoriaDocumentalId])
+}
+
+// LOTE A — Cadastro mestre de Categorias Documentais. FONTE CANÔNICA da
+// classificação documental (agrupamento administrativo/estrutural do documento),
+// consumida por ID/code. NÃO configura processo/fase/workflow/financeiro.
+// Eixo distinto de `nature` (subtipo técnico do documento — ver document-type-resolver).
+model CategoriaDocumental {
+  id          Int                     @id @default(autoincrement())
+  code        String                  @unique @db.VarChar(40) // estável; imutável após criação (A3)
+  name        String                  @db.VarChar(120)
+  description String?                 @db.Text
+  ordem       Int                     @default(0)
+  ativo       Boolean                 @default(true)
+  sistema     Boolean                 @default(false) // categorias de bootstrap: code imutável, não-excluíveis
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  tipos       TipoDocumentoCadastro[] // back-relation (tipos que usam esta categoria)
 }
 
 // Matriz Documental (documentRequirementMatrix) — quais documentos são

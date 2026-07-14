@@ -11,7 +11,7 @@
 // no enum legado só como compatibilidade. Não escreve nada (sem dual-write).
 
 import { prisma } from "@/lib/prisma"
-import { resolveDocumentType, type TipoResolvido } from "@/src/lib/document-type-resolver"
+import { resolveDocumentType, type TipoResolvido, type TipoComCategoria } from "@/src/lib/document-type-resolver"
 
 export {
   codeDocumentoMestre,
@@ -23,6 +23,9 @@ export interface DocumentoMestreResolvido {
   fonte: TipoResolvido["fonte"]
   tipoDocumentoCadastroId: number | null
   itemCatalogoId: number | null
+  // Classificação CANÔNICA propagada por ID/code (LOTE A) — para consumidores de regra.
+  categoriaDocumentalId: number | null
+  categoriaDocumentalCode: string | null
 }
 
 /**
@@ -30,22 +33,17 @@ export interface DocumentoMestreResolvido {
  *  1) documentTypeId -> TipoDocumentoCadastro.itemCatalogoId (preferido);
  *  2) enum tipo legado -> via legacyEnumKey -> itemCatalogoId (fallback);
  *  3) nenhum -> itemCatalogoId null.
+ * Expõe também a classificação canônica (categoriaDocumentalId/code) resolvida pelo
+ * resolver oficial — consumidores de regra devem usar ID/code, nunca a string legada.
  */
 export async function resolverDocumentoMestre(doc: {
   documentTypeId?: number | null
   tipo?: string | null
-  documentType?: {
-    id: number
-    code: string | null
-    name: string
-    category: string | null
-    nature: string | null
-    legacyEnumKey: string | null
-  } | null
+  documentType?: TipoComCategoria | null
 }): Promise<DocumentoMestreResolvido> {
   const t = await resolveDocumentType(doc)
   if (t.tipoDocumentoCadastroId == null) {
-    return { fonte: t.fonte, tipoDocumentoCadastroId: null, itemCatalogoId: null }
+    return { fonte: t.fonte, tipoDocumentoCadastroId: null, itemCatalogoId: null, categoriaDocumentalId: null, categoriaDocumentalCode: null }
   }
   const cad = await prisma.tipoDocumentoCadastro.findUnique({
     where: { id: t.tipoDocumentoCadastroId },
@@ -55,5 +53,7 @@ export async function resolverDocumentoMestre(doc: {
     fonte: t.fonte,
     tipoDocumentoCadastroId: t.tipoDocumentoCadastroId,
     itemCatalogoId: cad?.itemCatalogoId ?? null,
+    categoriaDocumentalId: t.categoriaDocumentalId,
+    categoriaDocumentalCode: t.categoriaDocumentalCode,
   }
 }

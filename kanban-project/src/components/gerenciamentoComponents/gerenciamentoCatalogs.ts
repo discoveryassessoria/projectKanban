@@ -26,17 +26,10 @@ export type CatalogConfig = {
 
 export const MG_CATALOG: Record<string, CatalogConfig> = {
   // ---------- DOCUMENTOS ----------
-  op_doctypes: {
-    path: 'operational.documentTypes',
-    title: 'Tipos de Documento',
-    desc: 'Tipos documentais usados nos processos.',
-    cols: [['code', 'Código'], ['name', 'Nome'], ['category', 'Categoria']],
-    fields: [
-      { key: 'code', label: 'Código', type: 'text' },
-      { key: 'name', label: 'Nome', type: 'text', required: true },
-      { key: 'category', label: 'Categoria', type: 'select', options: ['civil_registry', 'identity', 'judicial', 'consular', 'translation', 'apostille', 'other'] },
-    ],
-  },
+  // LOTE A — 'op_doctypes' (scaffold com lista de categorias hardcoded) foi
+  // APOSENTADO. Tipos de Documento têm tela real (TiposDocumentoTab, ?screen=doctypes)
+  // e a classificação vem do cadastro mestre CategoriaDocumental (por ID). Não
+  // reintroduzir lista fixa de categorias aqui.
   op_docrules: {
     path: 'operational.documentRules',
     title: 'Regras Documentais',
@@ -65,20 +58,10 @@ export const MG_CATALOG: Record<string, CatalogConfig> = {
     ],
   },
 
-  // OPERACIONAL — Tipos de Certidão e Tipos de Protocolo
-  'op_certtypes': {
-    path: 'operational.certificationTypes',
-    title: 'Tipos de Certidão',
-    desc: 'Tipos de certidão usados nos processos (nascimento, casamento, óbito, etc.).',
-    cols: [['code', 'Código'], ['name', 'Nome'], ['category', 'Categoria'], ['country', 'País']],
-    fields: [
-      { key: 'code', label: 'Código', type: 'text' },
-      { key: 'name', label: 'Nome', type: 'text', required: true },
-      { key: 'category', label: 'Categoria', type: 'select', options: ['nascimento', 'casamento', 'obito', 'divorcio', 'averbacao', 'inteiro_teor', 'negativa', 'outro'] },
-      { key: 'country', label: 'País de origem', type: 'text' },
-      { key: 'notes', label: 'Observações', type: 'text' },
-    ],
-  },
+  // OPERACIONAL — Tipos de Protocolo
+  // LOTE A — 'op_certtypes' (scaffold de "Tipos de Certidão" com salvar no-op, origem
+  // do bug de duplicidade) foi APOSENTADO e é inalcançável: certidões são Tipos de
+  // Documento (natureza CERTIDAO_*) geridos em doctypes. Não reintroduzir.
   'op_prottypes': {
     path: 'operational.protocolTypes',
     title: 'Tipos de Protocolo',

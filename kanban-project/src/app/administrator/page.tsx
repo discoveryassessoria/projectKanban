@@ -117,6 +117,7 @@ const PhaseAutomationsFasesTab = dynamic(() => import("@/src/components/gerencia
 const PhaseTriggerRulesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseTriggerRulesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const DepartamentosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DepartamentosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const TiposDocumentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TiposDocumentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const CategoriasDocumentaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CategoriasDocumentaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const OrgaosProtocoloTab = dynamic(() => import("@/src/components/gerenciamentoComponents/OrgaosProtocoloTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const MatrizDocumentalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MatrizDocumentalTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const LogAuditoriaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/LogAuditoriaTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -138,8 +139,11 @@ const TELAS: Record<string, React.ComponentType> = {
 
   // catálogos (genérico CatalogTab)
   doctypes: TiposDocumentoTab,
+  doccats: CategoriasDocumentaisTab,
   docrules: cat("op_docrules"),
-  certtypes: cat("op_certtypes"),
+  // certtypes NÃO tem tela própria: consolidado em doctypes (Tipos de Documento).
+  // O deep-link ?screen=certtypes é resolvido por ALIAS_TELAS → doctypes (abaixo).
+  // O scaffold op_certtypes foi aposentado (removido de gerenciamentoCatalogs).
   currencies: MoedasTab,
   fx: CambioTab,
   methods: FormasPagamentoTab,

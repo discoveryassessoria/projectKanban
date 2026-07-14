@@ -94,6 +94,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     key: "grp_documentos", label: "Documentos", icon: FileText, order: 40, status: "active",
     children: [
       a(10, "doctypes", "Tipos de Documento", ["documento", "certidao", "certidão", "tipo", "nascimento", "casamento", "obito"]),
+      a(15, "doccats", "Categorias Documentais", ["categoria", "categorias", "documental", "classificacao", "classificação"]),
       // CONSOLIDADO em "Tipos de Documento" (cadastro mestre). Removido da sidebar;
       // a rota ?screen=certtypes vira alias/redirect para doctypes (page.tsx).
       h(20, "certtypes", "Tipos de Certidão"),
