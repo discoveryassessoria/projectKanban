@@ -22,6 +22,8 @@ import {
 } from "./backfill-cp4-helpers"
 import { montarChaveWorkflow, montarChavePasso } from "../src/services/phase-workflow-helpers"
 import { faseCodeToPhaseKey, resolveStepKeyCompat } from "../src/lib/process-stage/fases-catalog"
+import { mapLegacyStepStatus, mapLegacyWorkflowStatus } from "../src/lib/process-stage/legacy-status-map"
+import type { StepInstanceStatus } from "@prisma/client"
 
 export interface BackfillOptions {
   dryRun?: boolean
@@ -104,16 +106,12 @@ export async function backfillCp4Workflow(opts: BackfillOptions = {}): Promise<B
       faseMacroVersion: faseMacro.versao, workflowDefinitionId: def.id, workflowVersion: 1, ciclo,
     })
 
-    // Idempotência: se a instância já existe (backfill re-executado), não recria.
-    const jaExiste = await prisma.phaseWorkflowInstance.findUnique({ where: { chaveIdempotencia: chaveInstancia }, select: { id: true } })
-    if (jaExiste) { rel.pulou(); continue }
-
     // 5) Mapear os passos por stepKey ESTÁVEL contra a definição interna.
     const defSteps = await prisma.phaseInternalWorkflowStep.findMany({ where: { workflowId: def.id }, select: { key: true } })
     const defKeys = defSteps.map((s) => s.key)
 
     // Coletar os steps que resolvem com segurança (dry-run só conta; execução criaria).
-    const stepsResolvidos: { stepKey: string }[] = []
+    const stepsResolvidos: { stepKey: string; status: StepInstanceStatus }[] = []
     for (const st of wf.steps) {
       // Compatibilidade determinística: alias legado → passo publicado atual (fonte única no catálogo).
       const chaveAtual = resolveStepKeyCompat(faseMacroKey, st.stepKey)
@@ -122,37 +120,47 @@ export async function backfillCp4Workflow(opts: BackfillOptions = {}): Promise<B
         rel.naoResolvido(resStep.motivo, { entityType: "WorkflowStep", entityId: st.id, detalhe: `stepKey ${st.stepKey} (→${chaveAtual}) sem definição segura` })
         continue
       }
-      stepsResolvidos.push({ stepKey: chaveAtual })
+      // RECONCILIAÇÃO integrada: espelha o STATUS real do passo legado na instância v2.
+      stepsResolvidos.push({ stepKey: chaveAtual, status: mapLegacyStepStatus(st.status) })
     }
 
+    // Status da instância espelha o Workflow legado (fase passada → CONCLUIDO; corrente → ATIVO).
+    const instStatus = mapLegacyWorkflowStatus(wf.status)
+
     if (!dryRun) {
-      // ESCRITA REAL (dupla trava): cria a instância + passos v2 (models novos apenas).
+      // ESCRITA REAL (dupla trava): CREATE-OR-RECONCILE idempotente. Instância e passos
+      // v2 espelham o ESTADO REAL do legado. Reexecutar apenas reconcilia o status
+      // (upsert por chave idempotente) — nunca duplica instância/passo/tarefa.
       await prisma.$transaction(async (tx) => {
-        const inst = await tx.phaseWorkflowInstance.create({
-          data: {
+        const inst = await tx.phaseWorkflowInstance.upsert({
+          where: { chaveIdempotencia: chaveInstancia },
+          create: {
             processoId: processo.id, faseMacroKey, faseMacroId: faseMacro.id, faseMacroVersion: faseMacro.versao,
             macroWorkflowId: faseMacro.macroWorkflow.id, macroVersion: faseMacro.macroWorkflow.versao,
             workflowDefinitionId: def.id, workflowVersion: 1, snapshot: { backfill: true } as Prisma.InputJsonValue,
-            snapshotSchemaVersion: 1, ciclo, status: "ATIVO", origem: "MIGRACAO",
+            snapshotSchemaVersion: 1, ciclo, status: instStatus, origem: "MIGRACAO",
             instanciadoPor: "BACKFILL", chaveIdempotencia: chaveInstancia,
           },
+          update: { status: instStatus }, // reconcilia instância já migrada
         })
         rel.criouInstancia()
         for (let i = 0; i < stepsResolvidos.length; i++) {
-          const sk = stepsResolvidos[i].stepKey
+          const { stepKey: sk, status: stepStatus } = stepsResolvidos[i]
           const chavePasso = montarChavePasso({ workflowInstanceId: inst.id, stepDefinitionId: def.id, stepKey: sk, stepDefinitionVersion: 1, ciclo })
-          await tx.phaseWorkflowStepInstance.create({
-            data: {
+          await tx.phaseWorkflowStepInstance.upsert({
+            where: { chaveIdempotencia: chavePasso },
+            create: {
               workflowInstanceId: inst.id, stepDefinitionId: def.id, stepDefinitionVersion: 1, stepKey: sk,
               snapshot: { backfill: true } as Prisma.InputJsonValue, snapshotSchemaVersion: 1,
-              processoId: processo.id, faseMacroKey, ordem: i, status: "PENDENTE", ciclo, chaveIdempotencia: chavePasso,
+              processoId: processo.id, faseMacroKey, ordem: i, status: stepStatus, ciclo, chaveIdempotencia: chavePasso,
             },
+            update: { status: stepStatus }, // reconcilia passo já migrado
           })
           rel.criouStep()
         }
       })
     } else {
-      // DRY-RUN: apenas contabiliza o que SERIA criado.
+      // DRY-RUN: apenas contabiliza o que SERIA criado/reconciliado.
       rel.criouInstancia()
       stepsResolvidos.forEach(() => rel.criouStep())
     }

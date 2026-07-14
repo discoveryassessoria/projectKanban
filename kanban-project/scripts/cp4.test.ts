@@ -480,7 +480,7 @@ async function run() {
   ok(/BACKFILL_EXECUTE === "1"/.test(bf) && /opts\.dryRun === false/.test(bf), "escrita real exige dupla trava (código + ambiente)")
   ok(/dryRun = .*\? false : true/.test(bf), "default é dry-run (true)")
   ok(!/workflow\.update|workflowStep\.update|\.workflow\.delete|workflowStep\.delete/.test(bf), "NÃO altera Workflow/WorkflowStep legado")
-  ok(/phaseWorkflowInstance\.create|phaseWorkflowStepInstance\.create/.test(bf), "escreve apenas models v2 novos")
+  ok(/phaseWorkflowInstance\.(create|upsert)|phaseWorkflowStepInstance\.(create|upsert)/.test(bf), "escreve apenas models v2 novos (create-or-reconcile)")
   ok(/if \(!dryRun\)/.test(bf), "escrita guardada por !dryRun")
 
   // 42) Dual-read: decisão de source por runtime/kill switch/instância
