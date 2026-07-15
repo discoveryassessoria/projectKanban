@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     const trigger = await prisma.phaseTriggerRule.create({
       data: {
-        itemCode, financialItemId: produto?.id ?? null, name, phaseKey,
+        itemCode, financialItemId: produto?.id ?? null, configItemId: produto?.id ?? null, name, phaseKey,
         phaseEvent: body.phaseEvent || 'entered',
         entryType: body.entryType || 'revenue',
         automatic: body.automatic !== false,

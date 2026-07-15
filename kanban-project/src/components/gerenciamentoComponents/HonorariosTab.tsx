@@ -159,6 +159,11 @@ export default function HonorariosTab() {
 
   return (
     <div className="space-y-5">
+      <div className="rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
+        <strong>Tela legada em migração.</strong> Valor, moeda e momento de cobrança saem daqui: o preço vai para
+        <strong> Tabelas de Preços</strong> e o papel financeiro (honorário) para <strong>Configurações Financeiras</strong>,
+        que referenciam o honorário mestre por FK. Este cadastro fica apenas com código/nome/tipo/status.
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Honorários</h2>

@@ -10,9 +10,9 @@ type Regra = {
   custoProdutoCode: string | null; receitaProdutoCode: string | null
   participaPlanilha: boolean; ordem: number; ativo: boolean
 }
-type Produto = { codigo: string; nome: string; naturezaFinanceira: string | null; moedaPadrao: string | null }
+type Produto = { id: number; codigo: string; nome: string; naturezaFinanceira: string | null; papelFinanceiro?: string | null; moedaPadrao: string | null }
 type ProcRef = { id: number; name: string }
-type DocRef = { code: string | null; name: string }
+type DocRef = { id?: number; code: string | null; name: string }
 type Data = { regras: Regra[]; produtos: Produto[]; tiposProcesso: ProcRef[]; docTypes: DocRef[] }
 type Form = Omit<Regra, 'id'> & { id?: number }
 
@@ -53,7 +53,11 @@ export default function AplicabilidadeEconomicaTab() {
     setSalvando(true); setErro(null)
     try {
       const url = form.id ? `/api/gerenciamento/aplicabilidade-economica/${form.id}` : '/api/gerenciamento/aplicabilidade-economica'
-      await jsonFetch(url, { method: form.id ? 'PUT' : 'POST', body: JSON.stringify(form) })
+      // F3.3 — envia os FKs canônicos (id) além dos códigos; o backend prioriza os ids.
+      const custoConfigId = (d?.produtos || []).find(p => p.codigo === form.custoProdutoCode)?.id ?? null
+      const receitaConfigId = (d?.produtos || []).find(p => p.codigo === form.receitaProdutoCode)?.id ?? null
+      const tipoDocumentoId = (d?.docTypes || []).find(t => t.code === form.documentTypeCode)?.id ?? null
+      await jsonFetch(url, { method: form.id ? 'PUT' : 'POST', body: JSON.stringify({ ...form, custoConfigId, receitaConfigId, tipoDocumentoId }) })
       setForm(null); await carregar()
     } catch (e: any) { setErro(e.message) } finally { setSalvando(false) }
   }

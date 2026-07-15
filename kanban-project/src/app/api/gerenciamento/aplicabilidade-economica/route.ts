@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       prisma.phaseEconomicRule.findMany({ orderBy: [{ phaseKey: 'asc' }, { ordem: 'asc' }] }),
       prisma.produtoFinanceiro.findMany({ where: { ativo: true }, select: { id: true, codigo: true, nome: true, naturezaFinanceira: true, papelFinanceiro: true, moedaPadrao: true }, orderBy: { nome: 'asc' } }),
       prisma.tipoProcessoNacionalidade.findMany({ where: { ativo: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
-      prisma.tipoDocumentoCadastro.findMany({ where: { ativo: true }, select: { code: true, name: true }, orderBy: { name: 'asc' } }),
+      prisma.tipoDocumentoCadastro.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
     ])
     return NextResponse.json({ regras, produtos, tiposProcesso, docTypes })
   } catch (error) {
