@@ -1,8 +1,16 @@
-// ESTE ARQUIVO SUBSTITUI: src/app/administrator/page.tsx
+// src/app/administrator/page.tsx
 //
-// GERENCIAMENTO GERAL — casca com menu lateral (11 grupos), fiel ao mockup Operacional v4.
-// Inclui grupo Cadastros do Motor, Financeiro completo e Saúde do Sistema completo.
-// Todas as telas montadas (scaffold). Próximo passo: ligar dados/CRUD (wiring).
+// GERENCIAMENTO GERAL — refatoração visual da navegação (sem mudança de regras de
+// negócio, rotas, APIs ou dados). Três views derivadas da URL:
+//   • HOME  (sem parâmetro)          → módulos em CARDS grandes + busca global.
+//   • MÓDULO (?module=<grupo>)        → página própria do módulo com itens em GRUPOS
+//                                       visuais (cards clicáveis), sem árvore de submenus.
+//   • TELA  (?screen=<key>)           → o componente da tela + navegação contextual
+//                                       (só o módulo atual, um grupo aberto por vez).
+//
+// FONTE ÚNICA de navegação: managementNavigation.tsx (módulos, seções, itens, ícones,
+// descrições, keywords, permissão, status). Este arquivo apenas RENDERIZA. Deep-links
+// ?screen= preservados (bookmarks continuam válidos); ALIAS mantém compat.
 
 "use client"
 
@@ -10,7 +18,10 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { HeaderBar } from "@/src/components/header-bar"
-import { Search, Loader2, Settings2, ChevronRight, Menu, X } from "lucide-react"
+import {
+  Search, Loader2, Settings2, ChevronRight, ArrowLeft, Home,
+  Menu, X, PanelLeftClose, PanelLeftOpen,
+} from "lucide-react"
 import dynamic from "next/dynamic"
 import {
   MANAGEMENT_NAVIGATION,
@@ -51,22 +62,8 @@ import {
 } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds6"
 
 // ============================================================
-// MENU — 11 grupos (fiel ao mockup Operacional v4)
-// ============================================================
-// ============================================================
-// LOTE D — Gerenciamento reorganizado nos 13 DOMÍNIOS do Marco.
-// REUSA as telas existentes (mesmas keys); só muda a organização do menu.
-// Nada de tela nova aqui — cada key já existe no MAPA DE TELAS abaixo.
-// ============================================================
-// Estrutura oficial aprovada — 11 domínios. Reorganização de MENU apenas:
-// reusa as screen keys existentes (URLs preservadas); itens sem tela ainda
-// caem no placeholder "Em breve" (padrão já existente no shell).
-// A navegação (grupos, itens, ordem, ícones, keywords, status, permissão) agora
-// vive na configuração central declarativa: managementNavigation.tsx. Este page
-// apenas a RENDERIZA. As screen keys (deep-link ?screen=) são preservadas.
-
-// ============================================================
-// MAPA DE TELAS
+// MAPA DE TELAS (screen key → componente). Inalterado — só as views que o
+// envolvem foram reorganizadas. As keys são as mesmas do deep-link ?screen=.
 // ============================================================
 const OverviewTab = dynamic(() => import("@/src/components/gerenciamentoComponents/OverviewTab"), {
   ssr: false, loading: () => <CarregandoTela />,
@@ -144,7 +141,6 @@ const TELAS: Record<string, React.ComponentType> = {
   docrules: cat("op_docrules"),
   // certtypes NÃO tem tela própria: consolidado em doctypes (Tipos de Documento).
   // O deep-link ?screen=certtypes é resolvido por ALIAS_TELAS → doctypes (abaixo).
-  // O scaffold op_certtypes foi aposentado (removido de gerenciamentoCatalogs).
   currencies: MoedasTab,
   fx: CambioTab,
   methods: FormasPagamentoTab,
@@ -225,91 +221,143 @@ const TELAS: Record<string, React.ComponentType> = {
 }
 
 function CarregandoTela() {
-  return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
+  return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/60" /></div>
 }
 
-// fallback de segurança (não deve mais aparecer — todas as telas estão registradas)
+// fallback de segurança (não deve aparecer — todas as telas estão registradas)
 function EmBreve({ titulo }: { titulo: string }) {
   return (
-    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-10 text-center">
-      <Settings2 className="h-10 w-10 text-white/30 mx-auto mb-3" />
-      <div className="text-white/80 font-semibold">{titulo}</div>
-      <div className="text-white/40 text-sm mt-1">Esta área será portada em breve.</div>
+    <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-10 text-center">
+      <Settings2 className="mx-auto mb-3 h-10 w-10 text-white/40" />
+      <div className="font-semibold text-white/90">{titulo}</div>
+      <div className="mt-1 text-sm text-white/50">Esta área será portada em breve.</div>
     </div>
   )
 }
 
+// ── helpers puros de navegação (derivam tudo da FONTE ÚNICA) ─────────────────
+type Pode = (p: string) => boolean
+const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+
+const grupoDaKey = (key: string): ManagementNavigationItem | undefined =>
+  MANAGEMENT_NAVIGATION.find((g) => (g.children ?? []).some((it) => it.key === key))
+
+const itensAtivos = (g: ManagementNavigationItem, pode: Pode): ManagementNavigationItem[] =>
+  (g.children ?? []).filter((it) => it.status === "active" && (!it.permission || pode(it.permission)))
+
+// seções (blocos visuais) na ORDEM em que aparecem no array — reflete a intenção
+// editorial de managementNavigation.tsx (ex.: Financeiro → Configuração, Precificação…).
+interface Secao { nome: string; itens: ManagementNavigationItem[] }
+const secoesDoModulo = (g: ManagementNavigationItem, pode: Pode): Secao[] => {
+  const ordem: string[] = []
+  const mapa = new Map<string, ManagementNavigationItem[]>()
+  for (const it of itensAtivos(g, pode)) {
+    const s = it.section || "Itens"
+    if (!mapa.has(s)) { mapa.set(s, []); ordem.push(s) }
+    mapa.get(s)!.push(it)
+  }
+  return ordem.map((nome) => ({ nome, itens: mapa.get(nome)! }))
+}
+const secaoDaKey = (g: ManagementNavigationItem | undefined, key: string): string | undefined =>
+  g?.children?.find((it) => it.key === key)?.section
+
 interface UserData { nome: string; email?: string; tipo?: string }
+
+type View = "home" | "module" | "screen"
 
 export default function GerenciamentoPage() {
   const router = useRouter()
   const { pode, carregando: permLoading } = usePermissoes()
   const isAdmin = pode("usuarios.gerenciar")
 
-  // LOTE D — deep-link + compatibilidade: a tela ativa vem da URL (?screen=).
-  // ALIASES: keys antigas (substituídas pelas concentradoras) → nova tela, pra
-  // links salvos continuarem funcionando (o "redirect" que o Marco pediu, no
-  // modelo real do sistema, que é navegação por state e não por rota).
-  // Estrutura oficial (menu por domínio): as keys financeiras agora são itens
-  // planos e resolvem para suas próprias telas. Aliases das concentradoras foram
-  // removidos (as concentradoras seguem acessíveis por suas keys próprias em
-  // TELAS: estruturafin, precificacao, comercial, pagamentos, integracaofin,
-  // fornecedoresconc). Bookmarks antigos continuam resolvendo (nenhuma key sumiu).
-  // Consolidação: "Tipos de Certidão" foi unificado em "Tipos de Documento" (cadastro
-  // mestre). Links antigos (?screen=certtypes) continuam funcionando, redirecionando
-  // para a tela real do mestre (doctypes). Nenhuma rota/API/entidade alterada.
+  // ALIASES: keys antigas → tela real (bookmarks continuam funcionando).
+  // Consolidação: "Tipos de Certidão" foi unificado em "Tipos de Documento".
   const ALIAS_TELAS: Record<string, string> = { certtypes: "doctypes" }
-  const resolverTela = (k: string | null): string => {
+  const resolverTela = useCallback((k: string | null): string => {
     if (!k) return "overview"
     return ALIAS_TELAS[k] || k
-  }
-
-  const [tab, setTab] = useState("overview")
-  // colapso da sidebar: só UM grupo aberto por vez (persistido em localStorage).
-  const [openGroup, setOpenGroup] = useState<string | null>(null)
-
-  const grupoDaKey = (key: string): string | undefined =>
-    MANAGEMENT_NAVIGATION.find((g) => (g.children ?? []).some((it) => it.key === key))?.key
-
-  const persistirGrupo = (g: string | null) => {
-    if (typeof window === "undefined") return
-    if (g) localStorage.setItem("mgmt_open_group", g)
-    else localStorage.removeItem("mgmt_open_group")
-  }
-
-  // lê a tela da URL na montagem (deep-link) + restaura o grupo aberto salvo
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const screen = new URLSearchParams(window.location.search).get("screen")
-    const telaInicial = screen ? resolverTela(screen) : "overview"
-    if (screen) setTab(telaInicial)
-    const salvo = localStorage.getItem("mgmt_open_group")
-    setOpenGroup(salvo || grupoDaKey(telaInicial) || MANAGEMENT_NAVIGATION[0]?.key || null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // troca de tela: atualiza state E URL (?screen=), mantém o grupo do item aberto
-  const irParaTela = (key: string) => {
-    setTab(key); setBusca("")
-    const g = grupoDaKey(key)
-    if (g) { setOpenGroup(g); persistirGrupo(g) }
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href)
-      url.searchParams.set("screen", key)
-      url.searchParams.delete("tab") // a nova tela define sua própria aba
-      window.history.replaceState({}, "", url.toString())
-    }
-  }
-  // recolher/expandir um grupo (fecha os demais → só um aberto)
-  const toggleGroup = (gkey: string) => {
-    const nv = openGroup === gkey ? null : gkey
-    setOpenGroup(nv); persistirGrupo(nv)
-  }
-  const [busca, setBusca] = useState("")
-  const [mobileOpen, setMobileOpen] = useState(false)
+  // ── estado derivado da URL ─────────────────────────────────────────────────
+  const [view, setView] = useState<View>("home")
+  const [activeModule, setActiveModule] = useState<string | null>(null) // group key
+  const [activeScreen, setActiveScreen] = useState<string | null>(null) // screen key
+  const [busca, setBusca] = useState("")                                 // busca da home
+  const [openSection, setOpenSection] = useState<string | null>(null)    // accordion contextual
+  const [navCollapsed, setNavCollapsed] = useState(false)                // nav contextual recolhida
+  const [mobileNav, setMobileNav] = useState(false)
+
   const [user, setUser] = useState<UserData>({ nome: "Usuário" })
   const [processos, setProcessos] = useState<any[]>([])
   const [arvores, setArvores] = useState<any[]>([])
+
+  const persistirSecao = (gkey: string, sec: string | null) => {
+    if (typeof window === "undefined") return
+    if (sec) localStorage.setItem(`mgmt_open_section:${gkey}`, sec)
+    else localStorage.removeItem(`mgmt_open_section:${gkey}`)
+  }
+
+  // lê a view atual a partir da URL (deep-link ?screen= / ?module=)
+  const sincronizarDaURL = useCallback(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const screen = params.get("screen")
+    const moduleKey = params.get("module")
+    if (screen) {
+      const key = resolverTela(screen)
+      const g = grupoDaKey(key)
+      setActiveScreen(key)
+      setActiveModule(g?.key ?? null)
+      setView("screen")
+      const sec = secaoDaKey(g, key)
+      const salvo = g ? localStorage.getItem(`mgmt_open_section:${g.key}`) : null
+      setOpenSection(sec || salvo || (g ? secoesDoModulo(g, pode)[0]?.nome ?? null : null))
+    } else if (moduleKey && MANAGEMENT_NAVIGATION.some((g) => g.key === moduleKey)) {
+      const g = MANAGEMENT_NAVIGATION.find((x) => x.key === moduleKey)!
+      setActiveModule(moduleKey)
+      setActiveScreen(null)
+      setView("module")
+      const salvo = localStorage.getItem(`mgmt_open_section:${moduleKey}`)
+      setOpenSection(salvo || (secoesDoModulo(g, pode)[0]?.nome ?? null))
+    } else {
+      setView("home"); setActiveModule(null); setActiveScreen(null)
+    }
+  }, [pode, resolverTela])
+
+  // navegação: atualiza URL (pushState → botão voltar do browser funciona) + estado
+  const pushURL = (params: { screen?: string; module?: string }) => {
+    if (typeof window === "undefined") return
+    const url = new URL(window.location.href)
+    url.searchParams.delete("screen"); url.searchParams.delete("module"); url.searchParams.delete("tab")
+    if (params.screen) url.searchParams.set("screen", params.screen)
+    else if (params.module) url.searchParams.set("module", params.module)
+    window.history.pushState({}, "", url.toString())
+  }
+
+  const irParaHome = () => {
+    pushURL({}); setView("home"); setActiveModule(null); setActiveScreen(null); setBusca(""); setMobileNav(false)
+  }
+  const irParaModulo = (gkey: string) => {
+    const g = MANAGEMENT_NAVIGATION.find((x) => x.key === gkey)
+    pushURL({ module: gkey })
+    setActiveModule(gkey); setActiveScreen(null); setView("module"); setBusca(""); setMobileNav(false)
+    const salvo = typeof window !== "undefined" ? localStorage.getItem(`mgmt_open_section:${gkey}`) : null
+    setOpenSection(salvo || (g ? secoesDoModulo(g, pode)[0]?.nome ?? null : null))
+  }
+  const irParaTela = (key: string) => {
+    const k = resolverTela(key)
+    const g = grupoDaKey(k)
+    pushURL({ screen: k })
+    setActiveScreen(k); setActiveModule(g?.key ?? null); setView("screen"); setBusca(""); setMobileNav(false)
+    const sec = secaoDaKey(g, k)
+    if (g && sec) { setOpenSection(sec); persistirSecao(g.key, sec) }
+  }
+  // accordion contextual — só UM grupo aberto por vez, lembrado por módulo
+  const toggleSecao = (gkey: string, sec: string) => {
+    const nv = openSection === sec ? null : sec
+    setOpenSection(nv); persistirSecao(gkey, nv)
+  }
 
   const handleLogout = () => {
     localStorage.removeItem("authToken"); localStorage.removeItem("user"); router.push("/login")
@@ -322,6 +370,13 @@ export default function GerenciamentoPage() {
       if (a.ok) { const ad = await a.json(); setArvores(Array.isArray(ad) ? ad : []) }
     } catch { /* silencioso */ }
   }, [])
+
+  // montagem: deep-link + sincronização com botão voltar/avançar do browser
+  useEffect(() => {
+    sincronizarDaURL()
+    window.addEventListener("popstate", sincronizarDaURL)
+    return () => window.removeEventListener("popstate", sincronizarDaURL)
+  }, [sincronizarDaURL])
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -338,10 +393,10 @@ export default function GerenciamentoPage() {
     return (
       <div className="relative min-h-screen text-white">
         <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center" />
-        <div className="min-h-screen bg-black/40 backdrop-blur-sm flex items-center justify-center">
+        <div className="flex min-h-screen items-center justify-center bg-slate-950/70">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4" />
-            <p className="text-lg">Verificando permissões...</p>
+            <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-b-2 border-white" />
+            <p className="text-lg">Verificando permissões…</p>
           </div>
         </div>
       </div>
@@ -349,41 +404,47 @@ export default function GerenciamentoPage() {
   }
   if (!isAdmin) return null
 
-  // ── grupos VISÍVEIS (status + permissão + busca normalizada sem acento) ─────
-  const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-  const q = norm(busca.trim())
-  const grupoDoAtivo = grupoDaKey(tab)
-  const itemRenderavel = (it: ManagementNavigationItem) =>
-    it.status !== "hidden" && (!it.permission || pode(it.permission))
-  const casaBusca = (it: ManagementNavigationItem, g: ManagementNavigationItem) => {
-    if (!q) return true
-    const hay = norm(
-      [it.label, it.fullLabel ?? "", it.key, g.label, g.fullLabel ?? "", ...(it.keywords ?? [])].join(" "),
-    )
-    return hay.includes(q)
-  }
-  const gruposVisiveis = MANAGEMENT_NAVIGATION
-    .filter((g) => !g.permission || pode(g.permission)) // grupo técnico só com permissão
-    .map((g) => ({
-      key: g.key,
-      grupo: g.label,
-      fullLabel: g.fullLabel || g.label,
-      icon: g.icon,
-      itens: (g.children ?? [])
-        .filter((it) => itemRenderavel(it) && casaBusca(it, g))
-        .sort((x, y) => x.order - y.order),
-    }))
-    .filter((g) => g.itens.length > 0)
+  // ── módulos visíveis (cards da home): com item ativo, permitidos, não ocultos ─
+  const modulosVisiveis = MANAGEMENT_NAVIGATION
+    .filter((g) => !g.hiddenAsModule)
+    .filter((g) => !g.permission || pode(g.permission))
+    .map((g) => ({ g, itens: itensAtivos(g, pode) }))
+    .filter((m) => m.itens.length > 0)
+    .sort((x, y) => x.g.order - y.g.order)
 
-  const flatItens = MANAGEMENT_NAVIGATION.flatMap((g) =>
-    (g.children ?? []).map((it) => ({ ...it, grupo: g.fullLabel || g.label })))
-  const TelaAtiva = TELAS[tab]
-  const labelAtivo = flatItens.find((it) => it.key === tab)?.label || "Gerenciamento"
-  const grupoAtivo = flatItens.find((it) => it.key === tab)?.grupo
+  // ── busca global (home): módulos + telas ────────────────────────────────────
+  const q = norm(busca.trim())
+  const resultados = q
+    ? MANAGEMENT_NAVIGATION
+        .filter((g) => !g.permission || pode(g.permission))
+        .flatMap((g) =>
+          itensAtivos(g, pode).map((it) => ({
+            key: it.key,
+            label: it.label,
+            modulo: g.fullLabel || g.label,
+            secao: it.section || "",
+            hay: norm([it.label, it.fullLabel ?? "", it.key, g.label, g.fullLabel ?? "", it.section ?? "", ...(it.keywords ?? [])].join(" ")),
+          })),
+        )
+        .filter((r) => r.hay.includes(q))
+        .slice(0, 40)
+    : []
+
+  const moduloAtivo = activeModule ? MANAGEMENT_NAVIGATION.find((g) => g.key === activeModule) : undefined
+  const secoes = moduloAtivo ? secoesDoModulo(moduloAtivo, pode) : []
+  const TelaAtiva = activeScreen ? TELAS[activeScreen] : undefined
+  const labelTela = activeScreen
+    ? moduloAtivo?.children?.find((it) => it.key === activeScreen)?.label || "Tela"
+    : ""
+
+  // classes de superfície — contraste real (fundo semissólido, blur discreto)
+  const PANEL = "rounded-2xl border border-white/10 bg-slate-900/75 backdrop-blur-sm"
 
   return (
-    <div className="relative min-h-screen text-white overflow-x-hidden">
+    <div className="relative min-h-screen overflow-x-hidden text-white">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
+      {/* Scrim sólido: garante leitura sobre o fundo (menos transparência/blur excessivo) */}
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-slate-950/72" />
 
       <HeaderBar
         title="Gerenciamento Geral"
@@ -392,144 +453,318 @@ export default function GerenciamentoPage() {
         projetos={[]} processos={processos} arvores={arvores} onLogout={handleLogout}
       />
 
-      <div className="min-h-screen relative">
-        <div className="absolute inset-0 bg-black/40 pointer-events-none" />
-
-        <main className="relative px-4 md:px-6 py-6 max-w-[1400px] mx-auto">
-          {/* Abrir menu em viewport menor */}
-          <button
-            onClick={() => setMobileOpen(true)}
-            aria-label="Abrir menu do Gerenciamento"
-            className="md:hidden mb-3 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/10 px-3 py-1.5 text-[12.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-          >
-            <Menu className="h-4 w-4" /> Menu
-          </button>
-
-          {/* Backdrop — só quando a sidebar está aberta em mobile */}
-          {mobileOpen ? (
-            <div
-              className="fixed inset-0 z-30 bg-black/50 md:hidden"
-              onClick={() => setMobileOpen(false)}
-              aria-hidden="true"
-            />
-          ) : null}
-
-          <div className="flex gap-4 items-start">
-            {/* MENU LATERAL */}
-            <aside
-              aria-label="Navegação do Gerenciamento"
-              className={`mgmt-scroll w-[240px] flex-none overflow-y-auto overflow-x-hidden bg-white/[0.06] backdrop-blur-md border border-white/10 p-2.5 fixed top-0 left-0 z-40 h-full rounded-none transition-transform duration-200 motion-reduce:transition-none ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:sticky md:top-4 md:z-auto md:h-auto md:max-h-[calc(100vh-90px)] md:rounded-xl md:translate-x-0`}
-            >
-              {/* BUSCA — fixa no topo ao rolar */}
-              <div className="sticky top-0 z-10 -mt-0.5 mb-2 pb-2 bg-white/[0.06] backdrop-blur-md">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
-                  <input
-                    value={busca}
-                    onChange={(e) => setBusca(e.target.value)}
-                    placeholder="Buscar configuração…"
-                    aria-label="Buscar configuração"
-                    className="w-full rounded-lg border border-white/10 bg-white/5 pl-8 pr-7 py-1.5 text-xs text-white placeholder:text-white/40 focus:border-white/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                  />
-                  {busca ? (
-                    <button
-                      onClick={() => setBusca("")}
-                      aria-label="Limpar busca"
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-white/40 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  ) : null}
-                </div>
+      <main className="relative mx-auto max-w-[1560px] px-5 py-7 md:px-9 md:pt-8">
+        {/* ══════════════════════ HOME — MÓDULOS EM CARDS ══════════════════════ */}
+        {view === "home" ? (
+          <section aria-label="Módulos do Gerenciamento">
+            <header className="mb-6">
+              <h1 className="text-[30px] font-bold tracking-tight text-white md:text-[32px]">Gerenciamento Geral</h1>
+              <p className="mt-1.5 max-w-3xl text-[15px] text-white/60">
+                Cadastros, regras, valores, automações, permissões e configurações.
+              </p>
+              {/* Busca global */}
+              <div className="relative mt-5 max-w-2xl">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/45" />
+                <input
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  placeholder="Buscar configuração, módulo ou tela…"
+                  aria-label="Buscar configuração, módulo ou tela"
+                  className="w-full rounded-xl border border-white/12 bg-slate-900/70 py-3.5 pl-12 pr-11 text-[15px] text-white placeholder:text-white/45 focus:border-white/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                />
+                {busca ? (
+                  <button
+                    onClick={() => setBusca("")}
+                    aria-label="Limpar busca"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-white/50 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                ) : null}
               </div>
+            </header>
 
-              {gruposVisiveis.length === 0 ? (
-                <div className="px-1 py-3 text-[12px] text-white/40">Nada encontrado.</div>
-              ) : null}
-
-              {gruposVisiveis.map((g) => {
-                const aberto = !!q || openGroup === g.key
-                const contemAtivo = grupoDoAtivo === g.key
-                const Icon = g.icon
-                const painelId = `grp-items-${g.key}`
-                return (
-                  <div key={g.key} className="mb-0.5">
-                    {/* CABEÇALHO DO GRUPO — recolhível */}
+            {q ? (
+              // ── resultados da busca ──────────────────────────────────────────
+              <div className={`${PANEL} p-2.5`}>
+                {resultados.length === 0 ? (
+                  <div className="px-3 py-8 text-center text-sm text-white/50">Nada encontrado para “{busca}”.</div>
+                ) : (
+                  <ul className="divide-y divide-white/5">
+                    {resultados.map((r) => (
+                      <li key={`${r.modulo}-${r.key}`}>
+                        <button
+                          onClick={() => irParaTela(r.key)}
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[15px] font-medium text-white">{r.label}</span>
+                            <span className="mt-0.5 block truncate text-[12.5px] text-white/50">
+                              {r.modulo}{r.secao ? ` › ${r.secao}` : ""}
+                            </span>
+                          </span>
+                          <ChevronRight className="h-4 w-4 flex-none text-white/40" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : (
+              // ── grid de cards de módulo ──────────────────────────────────────
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {modulosVisiveis.map(({ g }) => {
+                  const Icon = g.icon
+                  return (
                     <button
-                      onClick={() => toggleGroup(g.key)}
-                      aria-expanded={aberto}
-                      aria-controls={painelId}
-                      aria-label={g.fullLabel}
-                      title={g.fullLabel}
-                      className={`w-full flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${contemAtivo ? "bg-white/[0.06]" : ""}`}
+                      key={g.key}
+                      onClick={() => irParaModulo(g.key)}
+                      className="group flex min-h-[188px] flex-col rounded-2xl border border-white/10 bg-slate-900/75 p-5 text-left backdrop-blur-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-white/25 hover:bg-slate-900/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                     >
-                      {Icon ? <Icon className={`h-4 w-4 flex-none ${contemAtivo ? "text-white/80" : "text-white/50"}`} /> : null}
-                      <span className={`flex-1 min-w-0 text-left text-[11px] font-bold uppercase tracking-[0.12em] ${contemAtivo ? "text-white/80" : "text-white/50"}`}>
-                        {g.grupo}
-                      </span>
-                      <ChevronRight className={`h-3.5 w-3.5 flex-none text-white/40 transition-transform duration-200 motion-reduce:transition-none ${aberto ? "rotate-90" : ""}`} />
-                    </button>
-
-                    {/* PÁGINAS DO GRUPO — animação de altura (grid-rows) */}
-                    <div
-                      id={painelId}
-                      aria-hidden={!aberto}
-                      className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${aberto ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
-                    >
-                      <div className="min-h-0 overflow-hidden">
-                        <div className={`space-y-px pl-1 pt-0.5 pb-0.5 transition-opacity duration-200 motion-reduce:transition-none ${aberto ? "opacity-100" : "opacity-0"}`}>
-                          {g.itens.map((it) => {
-                            const ativo = tab === it.key
-                            const soon = it.status === "coming_soon"
-                            return (
-                              <button
-                                key={it.key}
-                                disabled={soon}
-                                tabIndex={aberto ? undefined : -1}
-                                onClick={() => { if (!soon) { irParaTela(it.key); setMobileOpen(false) } }}
-                                title={it.label}
-                                aria-current={ativo ? "page" : undefined}
-                                className={`w-full flex items-center gap-2 rounded-md border-l-2 pl-2 pr-2.5 py-1.5 text-left text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
-                                  ativo
-                                    ? "border-white/70 bg-white/[0.12] font-semibold text-white"
-                                    : soon
-                                    ? "border-transparent text-white/30 cursor-not-allowed"
-                                    : "border-transparent text-white/60 hover:bg-white/5 hover:text-white"
-                                }`}
-                              >
-                                <span className="flex-1 min-w-0 truncate">{it.label}</span>
-                                {soon ? (
-                                  <span className="text-[9px] uppercase tracking-wide text-white/30 flex-none">Em breve</span>
-                                ) : null}
-                              </button>
-                            )
-                          })}
-                        </div>
+                      <div className="mb-3.5 flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] text-white/85 transition-colors group-hover:bg-white/[0.12]">
+                        {Icon ? <Icon className="h-6 w-6" /> : <Settings2 className="h-6 w-6" />}
                       </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </aside>
-
-            {/* CONTEÚDO */}
-            <section className="flex-1 min-w-0">
-              {/* Breadcrumb: Gerenciamento › Grupo › Item */}
-              <div className="mb-3 text-[12px] text-white/50">
-                Gerenciamento{grupoAtivo ? ` › ${grupoAtivo}` : ""} › {labelAtivo}
+                      <h2 className="text-[19px] font-semibold leading-tight text-white">{g.fullLabel || g.label}</h2>
+                      <p className="mt-1.5 flex-1 text-[14px] leading-snug text-white/55">{g.description || ""}</p>
+                      <span className="mt-4 inline-flex items-center gap-1 text-[14px] font-medium text-white/80 group-hover:text-white">
+                        Acessar <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
-              {TelaAtiva ? <TelaAtiva /> : <EmBreve titulo={labelAtivo} />}
-            </section>
-          </div>
+            )}
+          </section>
+        ) : null}
 
-          <style>{`
-            .mgmt-scroll{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent}
-            .mgmt-scroll::-webkit-scrollbar{width:8px}
-            .mgmt-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:8px}
-            .mgmt-scroll::-webkit-scrollbar-track{background:transparent}
-          `}</style>
-        </main>
-      </div>
+        {/* ══════════════════════ MÓDULO — GRUPOS VISUAIS ══════════════════════ */}
+        {view === "module" && moduloAtivo ? (
+          <section aria-label={`Módulo ${moduloAtivo.fullLabel || moduloAtivo.label}`}>
+            <Breadcrumb
+              trilha={[
+                { label: "Gerenciamento", onClick: irParaHome },
+                { label: moduloAtivo.fullLabel || moduloAtivo.label },
+              ]}
+            />
+            <header className="mb-6 mt-1 flex items-start gap-3">
+              {moduloAtivo.icon ? (
+                <span className="mt-0.5 flex h-11 w-11 flex-none items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] text-white/85">
+                  <moduloAtivo.icon className="h-6 w-6" />
+                </span>
+              ) : null}
+              <div>
+                <h1 className="text-[26px] font-bold tracking-tight text-white md:text-[28px]">
+                  {moduloAtivo.fullLabel || moduloAtivo.label}
+                </h1>
+                <p className="mt-1 max-w-3xl text-[15px] text-white/60">{moduloAtivo.description}</p>
+              </div>
+            </header>
+
+            <div className="space-y-7">
+              {secoes.map((s) => (
+                <div key={s.nome}>
+                  <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[0.14em] text-white/45">{s.nome}</h2>
+                  <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+                    {s.itens.map((it) => (
+                      <button
+                        key={it.key}
+                        onClick={() => irParaTela(it.key)}
+                        title={it.fullLabel || it.label}
+                        className="group flex min-h-[56px] items-center gap-3 rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-white/25 hover:bg-slate-900/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                      >
+                        <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-white/90">{it.label}</span>
+                        <ChevronRight className="h-4 w-4 flex-none text-white/35 transition-transform group-hover:translate-x-0.5 group-hover:text-white/70" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {/* ══════════════════════ TELA — NAV CONTEXTUAL + CONTEÚDO ═════════════ */}
+        {view === "screen" && moduloAtivo ? (
+          <section aria-label={labelTela}>
+            {/* abrir nav contextual em mobile */}
+            <button
+              onClick={() => setMobileNav(true)}
+              aria-label="Abrir navegação do módulo"
+              className="mb-3 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.08] px-3 py-2 text-[13px] md:hidden"
+            >
+              <Menu className="h-4 w-4" /> {moduloAtivo.fullLabel || moduloAtivo.label}
+            </button>
+
+            {mobileNav ? (
+              <div className="fixed inset-0 z-30 bg-black/60 md:hidden" onClick={() => setMobileNav(false)} aria-hidden="true" />
+            ) : null}
+
+            <div className="flex items-start gap-5">
+              {/* NAV CONTEXTUAL — só o módulo atual, um grupo aberto por vez */}
+              <aside
+                aria-label={`Navegação de ${moduloAtivo.fullLabel || moduloAtivo.label}`}
+                className={`mgmt-scroll fixed left-0 top-0 z-40 h-full flex-none overflow-y-auto overflow-x-hidden border-r border-white/10 bg-slate-900/95 p-3 transition-transform duration-200 motion-reduce:transition-none md:sticky md:top-4 md:z-auto md:h-auto md:max-h-[calc(100vh-96px)] md:rounded-2xl md:border md:bg-slate-900/80 md:backdrop-blur-sm ${mobileNav ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 ${navCollapsed ? "md:w-[60px]" : "w-[280px] md:w-[272px]"}`}
+              >
+                {navCollapsed ? (
+                  // modo recolhido (rail com ícone do módulo)
+                  <div className="hidden flex-col items-center gap-3 md:flex">
+                    <button
+                      onClick={() => setNavCollapsed(false)}
+                      aria-label="Expandir navegação"
+                      title="Expandir navegação"
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 text-white/70 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                    >
+                      <PanelLeftOpen className="h-5 w-5" />
+                    </button>
+                    {moduloAtivo.icon ? (
+                      <button
+                        onClick={() => setNavCollapsed(false)}
+                        title={moduloAtivo.fullLabel || moduloAtivo.label}
+                        className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/[0.08] text-white/85 hover:bg-white/15"
+                      >
+                        <moduloAtivo.icon className="h-5 w-5" />
+                      </button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                      <button
+                        onClick={() => irParaModulo(moduloAtivo.key)}
+                        className="flex min-w-0 items-center gap-2 text-left text-[13px] font-bold uppercase tracking-wide text-white/75 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                        title={`Página do módulo ${moduloAtivo.fullLabel || moduloAtivo.label}`}
+                      >
+                        {moduloAtivo.icon ? <moduloAtivo.icon className="h-4 w-4 flex-none text-white/60" /> : null}
+                        <span className="truncate">{moduloAtivo.fullLabel || moduloAtivo.label}</span>
+                      </button>
+                      <button
+                        onClick={() => setNavCollapsed(true)}
+                        aria-label="Recolher navegação"
+                        title="Recolher navegação"
+                        className="hidden flex-none rounded-md p-1 text-white/45 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 md:block"
+                      >
+                        <PanelLeftClose className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setMobileNav(false)}
+                        aria-label="Fechar navegação"
+                        className="flex-none rounded-md p-1 text-white/45 hover:bg-white/10 hover:text-white md:hidden"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    {secoes.map((s) => {
+                      const aberto = openSection === s.nome
+                      const contemAtivo = s.itens.some((it) => it.key === activeScreen)
+                      const painelId = `sec-${moduloAtivo.key}-${norm(s.nome).replace(/\s+/g, "-")}`
+                      return (
+                        <div key={s.nome} className="mb-0.5">
+                          <button
+                            onClick={() => toggleSecao(moduloAtivo.key, s.nome)}
+                            aria-expanded={aberto}
+                            aria-controls={painelId}
+                            className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${contemAtivo ? "bg-white/[0.05]" : ""}`}
+                          >
+                            <span className={`flex-1 text-[12px] font-bold uppercase tracking-[0.1em] ${contemAtivo ? "text-white/85" : "text-white/55"}`}>
+                              {s.nome}
+                            </span>
+                            <ChevronRight className={`h-4 w-4 flex-none text-white/40 transition-transform duration-200 motion-reduce:transition-none ${aberto ? "rotate-90" : ""}`} />
+                          </button>
+                          <div
+                            id={painelId}
+                            aria-hidden={!aberto}
+                            className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${aberto ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+                          >
+                            <div className="min-h-0 overflow-hidden">
+                              <div className={`space-y-0.5 pb-1 pl-1 pt-1 transition-opacity duration-200 motion-reduce:transition-none ${aberto ? "opacity-100" : "opacity-0"}`}>
+                                {s.itens.map((it) => {
+                                  const ativo = activeScreen === it.key
+                                  return (
+                                    <button
+                                      key={it.key}
+                                      tabIndex={aberto ? undefined : -1}
+                                      onClick={() => irParaTela(it.key)}
+                                      title={it.fullLabel || it.label}
+                                      aria-current={ativo ? "page" : undefined}
+                                      className={`flex min-h-[40px] w-full items-center gap-2 rounded-lg border-l-2 py-2 pl-3 pr-2.5 text-left text-[14px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+                                        ativo
+                                          ? "border-sky-400/80 bg-white/[0.12] font-semibold text-white"
+                                          : "border-transparent text-white/65 hover:bg-white/[0.06] hover:text-white"
+                                      }`}
+                                    >
+                                      <span className="min-w-0 flex-1 truncate">{it.label}</span>
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </>
+                )}
+              </aside>
+
+              {/* CONTEÚDO DA TELA */}
+              <div className="min-w-0 flex-1">
+                <Breadcrumb
+                  trilha={[
+                    { label: "Gerenciamento", onClick: irParaHome },
+                    { label: moduloAtivo.fullLabel || moduloAtivo.label, onClick: () => irParaModulo(moduloAtivo.key) },
+                    { label: labelTela },
+                  ]}
+                />
+                <div className="mb-4 mt-1 flex items-center justify-between gap-3">
+                  <h1 className="text-[22px] font-bold tracking-tight text-white md:text-[24px]">{labelTela}</h1>
+                  <button
+                    onClick={() => irParaModulo(moduloAtivo.key)}
+                    className="inline-flex flex-none items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-[13px] font-medium text-white/75 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  >
+                    <ArrowLeft className="h-4 w-4" /> Voltar ao módulo
+                  </button>
+                </div>
+                {TelaAtiva ? <TelaAtiva /> : <EmBreve titulo={labelTela} />}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        <style>{`
+          .mgmt-scroll{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.2) transparent}
+          .mgmt-scroll::-webkit-scrollbar{width:8px}
+          .mgmt-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:8px}
+          .mgmt-scroll::-webkit-scrollbar-track{background:transparent}
+        `}</style>
+      </main>
     </div>
+  )
+}
+
+// ── Breadcrumb com links (Gerenciamento › Módulo › Tela) ─────────────────────
+function Breadcrumb({ trilha }: { trilha: { label: string; onClick?: () => void }[] }) {
+  return (
+    <nav aria-label="Trilha de navegação" className="flex flex-wrap items-center gap-1 text-[13px] text-white/50">
+      <Home className="mr-0.5 h-3.5 w-3.5 text-white/40" />
+      {trilha.map((c, i) => {
+        const ultimo = i === trilha.length - 1
+        return (
+          <span key={i} className="inline-flex items-center gap-1">
+            {c.onClick && !ultimo ? (
+              <button
+                onClick={c.onClick}
+                className="rounded px-0.5 text-white/60 hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+              >
+                {c.label}
+              </button>
+            ) : (
+              <span className={ultimo ? "font-medium text-white/85" : "text-white/60"}>{c.label}</span>
+            )}
+            {!ultimo ? <ChevronRight className="h-3.5 w-3.5 text-white/30" /> : null}
+          </span>
+        )
+      })}
+    </nav>
   )
 }

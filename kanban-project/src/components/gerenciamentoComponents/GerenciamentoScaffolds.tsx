@@ -8,6 +8,7 @@
 // Cada componente é exportado nomeado e registrado no mapa TELAS da page.tsx.
 
 import { useState } from 'react'
+import { Inbox } from 'lucide-react'
 
 /* ----------------------------- helpers de UI ----------------------------- */
 
@@ -59,8 +60,16 @@ function Table({ headers, empty }: { headers: string[]; empty?: string }) {
         </thead>
         <tbody>
           <tr>
-            <td colSpan={headers.length} className="px-3 py-6 text-center text-xs text-white/40">
-              {empty || 'Nenhum cadastro. Clique em “+ Novo” para começar.'}
+            <td colSpan={headers.length} className="px-4 py-10">
+              <div className="mx-auto flex max-w-sm flex-col items-center text-center">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.05]">
+                  <Inbox className="h-5 w-5 text-white/45" />
+                </div>
+                <div className="text-sm font-semibold text-white/85">Nenhum item cadastrado</div>
+                <div className="mt-1 text-[13px] text-white/50">
+                  {empty || 'Cadastre o primeiro item para começar — use “+ Novo” acima.'}
+                </div>
+              </div>
             </td>
           </tr>
         </tbody>
