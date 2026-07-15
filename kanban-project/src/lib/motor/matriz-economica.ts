@@ -26,7 +26,7 @@ import { gerarParcelas } from '@/lib/financeiro/parcelas'
 // LOTE A · B4 — trava de estado civil (reusa a MESMA engine da árvore, não recria)
 import { analyzePessoa } from '@/src/lib/document-generator'
 // LOTE A · B3 — preço hierárquico (arquivo separado, testável isolado)
-import { resolverPreco } from './pricing-resolver'
+import { resolverPrecoFinanceiroDB } from './resolver-preco-financeiro.prisma'
 import { NaturezaPreco } from '@prisma/client'
 import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
 
@@ -43,6 +43,8 @@ type RegraEconomica = {
   componentName: string
   custoProdutoCode: string | null
   receitaProdutoCode: string | null
+  custoConfigId?: number | null
+  receitaConfigId?: number | null
 }
 function resolverRegraEconomica(rules: RegraEconomica[], docCode: string): RegraEconomica | null {
   return (
@@ -126,8 +128,13 @@ export async function gerarEconomicoDaMatriz(
     const componente = econ.componentName
 
     // (c) dois preços INDEPENDENTES — códigos vêm da regra configurada
-    const prodCusto = econ.custoProdutoCode ? await prisma.produtoFinanceiro.findFirst({ where: { codigo: econ.custoProdutoCode, ativo: true } }) : null
-    const prodReceita = econ.receitaProdutoCode ? await prisma.produtoFinanceiro.findFirst({ where: { codigo: econ.receitaProdutoCode, ativo: true } }) : null
+    // F2 — dual-read: FK real (custoConfigId/receitaConfigId) tem prioridade; código-texto = fallback legado.
+    const prodCusto = econ.custoConfigId
+      ? await prisma.produtoFinanceiro.findUnique({ where: { id: econ.custoConfigId } })
+      : econ.custoProdutoCode ? await prisma.produtoFinanceiro.findFirst({ where: { codigo: econ.custoProdutoCode, ativo: true } }) : null
+    const prodReceita = econ.receitaConfigId
+      ? await prisma.produtoFinanceiro.findUnique({ where: { id: econ.receitaConfigId } })
+      : econ.receitaProdutoCode ? await prisma.produtoFinanceiro.findFirst({ where: { codigo: econ.receitaProdutoCode, ativo: true } }) : null
 
     const tipoServico = await acharOuCriarTipoServico(processoId, componente)
     const kw = tipoDocKeyword(regra.documentTypeCode)
@@ -158,25 +165,27 @@ export async function gerarEconomicoDaMatriz(
             (id) => { item.tarefaId = id }, pulados, erros)
         }
         if (regra.createsCost) {
-          // (B3) preço HIERÁRQUICO (TabelaValor) → fallback valorPadrao de hoje.
-          const p = prodCusto?.itemCatalogoId
-            ? await resolverPreco({ itemCatalogoId: prodCusto.itemCatalogoId, natureza: NaturezaPreco.CUSTO, processoId, processoTipoId: String(tipoProcessoId) })
+          // F2/Fase 7 — resolvedor endurecido: NUNCA zero silencioso; fallback explícito = valorPadrao (>0).
+          const fbC = prodCusto?.valorPadrao != null ? Number(prodCusto.valorPadrao) : null
+          const rC = prodCusto?.itemCatalogoId
+            ? await resolverPrecoFinanceiroDB({ itemCatalogoId: prodCusto.itemCatalogoId, natureza: NaturezaPreco.CUSTO, processoId, tipoProcessoId: String(tipoProcessoId), fallbackValorPadrao: fbC, fallbackMoeda: prodCusto.moedaPadrao })
             : null
-          const val = p ? p.valor : (prodCusto?.valorPadrao != null ? Number(prodCusto.valorPadrao) : null)
-          const moedaC = (p ? p.moeda : prodCusto?.moedaPadrao) as Moeda
-          if (val == null) pulados.push({ motivo: 'sem preço de CUSTO (nem TabelaValor nem valorPadrao)', detalhe: componente })
+          const val = rC?.ok ? rC.valor : (fbC != null && fbC > 0 ? fbC : null)
+          const moedaC = (rC?.ok ? rC.moeda : prodCusto?.moedaPadrao) as Moeda
+          if (val == null) pulados.push({ motivo: 'sem preço de CUSTO válido (Fase 7: nunca zero)', detalhe: componente + (rC && !rC.ok ? ` — ${rC.razao}` : '') })
           else await comIdempotencia(`${base}::custo`, processoId, tipoProcessoId, phaseKey, 'financial', regra.id, 'Custo', desc,
             () => criarCusto(processoId, desc, val, moedaC, { ...vinc, productServiceId: prodCusto!.id }),
             (id) => { item.custoId = id; item.custo = { valor: val, moeda: moedaC } }, pulados, erros)
         }
         if (regra.createsRevenue) {
-          // (B3) preço HIERÁRQUICO (TabelaValor) → fallback valorPadrao de hoje. Independente do custo.
-          const p = prodReceita?.itemCatalogoId
-            ? await resolverPreco({ itemCatalogoId: prodReceita.itemCatalogoId, natureza: NaturezaPreco.RECEITA, processoId, processoTipoId: String(tipoProcessoId) })
+          // F2/Fase 7 — resolvedor endurecido: NUNCA zero silencioso. Independente do custo.
+          const fbR = prodReceita?.valorPadrao != null ? Number(prodReceita.valorPadrao) : null
+          const rR = prodReceita?.itemCatalogoId
+            ? await resolverPrecoFinanceiroDB({ itemCatalogoId: prodReceita.itemCatalogoId, natureza: NaturezaPreco.RECEITA, processoId, tipoProcessoId: String(tipoProcessoId), fallbackValorPadrao: fbR, fallbackMoeda: prodReceita.moedaPadrao })
             : null
-          const val = p ? p.valor : (prodReceita?.valorPadrao != null ? Number(prodReceita.valorPadrao) : null)
-          const moedaR = (p ? p.moeda : prodReceita?.moedaPadrao) as Moeda
-          if (val == null) pulados.push({ motivo: 'sem preço de RECEITA (nem TabelaValor nem valorPadrao)', detalhe: componente })
+          const val = rR?.ok ? rR.valor : (fbR != null && fbR > 0 ? fbR : null)
+          const moedaR = (rR?.ok ? rR.moeda : prodReceita?.moedaPadrao) as Moeda
+          if (val == null) pulados.push({ motivo: 'sem preço de RECEITA válido (Fase 7: nunca zero)', detalhe: componente + (rR && !rR.ok ? ` — ${rR.razao}` : '') })
           else await comIdempotencia(`${base}::receita`, processoId, tipoProcessoId, phaseKey, 'financial', regra.id, 'Receita', desc,
             () => criarReceita(processoId, desc, val, moedaR, { ...vinc, productServiceId: prodReceita!.id }),
             (id) => { item.receitaId = id; item.receita = { valor: val, moeda: moedaR } }, pulados, erros)
