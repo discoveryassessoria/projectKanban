@@ -46,7 +46,7 @@ export async function PUT(
         codigo: b.codigo !== undefined ? String(b.codigo).trim() : atual.codigo,
         nome: b.nome !== undefined ? String(b.nome).trim() : atual.nome,
         tipo: b.tipo !== undefined ? s(b.tipo) : atual.tipo,
-        natureza: b.natureza !== undefined ? s(b.natureza) : atual.natureza,
+        // natureza NÃO é mais gravada aqui (pertence ao lançamento); valor legado é preservado no banco.
         ativo: b.ativo !== undefined ? !!b.ativo : atual.ativo,
       },
     })

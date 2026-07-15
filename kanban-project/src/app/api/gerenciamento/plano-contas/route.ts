@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
         codigo: String(b.codigo).trim(),
         nome: String(b.nome).trim(),
         tipo: s(b.tipo),
-        natureza: s(b.natureza),
+        // natureza (débito/crédito) NÃO é propriedade da conta — pertence ao lançamento. Campo ignorado.
         ativo: b.ativo === undefined ? true : !!b.ativo,
       },
     })

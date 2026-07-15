@@ -13,7 +13,6 @@ type PlanoConta = {
   codigo: string
   nome: string
   tipo: string | null
-  natureza: string | null
   ativo: boolean
 }
 
@@ -27,17 +26,8 @@ const TIPOS: [string, string][] = [
   ['transfer', 'Transferência'],
   ['equity', 'Patrimônio líquido'],
 ]
-const NATUREZAS: [string, string][] = [['debit', 'Débito'], ['credit', 'Crédito']]
-
-// UX: a Natureza (débito/crédito) é DERIVADA do Tipo — o usuário não precisa saber contabilidade.
-// Ativo/Despesa/Custo -> Débito; Passivo/Receita/Tributo/Patrimônio Líquido -> Crédito.
-// Transferência é a ÚNICA exceção (natureza editável). Não altera registros em lote; vale no cadastro/edição.
-const NATUREZA_POR_TIPO: Record<string, 'debit' | 'credit'> = {
-  asset: 'debit', expense: 'debit', cost: 'debit',
-  liability: 'credit', revenue: 'credit', tax: 'credit', equity: 'credit',
-}
-const naturezaDerivada = (t: string): string | null => NATUREZA_POR_TIPO[t] ?? null
-
+// Débito/Crédito NÃO são propriedades da conta — pertencem ao LANÇAMENTO contábil.
+// O cadastro do Plano de Contas tem apenas: Código, Nome, Tipo, Status.
 const lbl = (arr: [string, string][], v: string | null) => arr.find(([k]) => k === v)?.[1] || v || '—'
 
 async function jsonFetch(url: string, options: RequestInit = {}) {
@@ -66,7 +56,6 @@ export default function PlanoContasTab() {
   const [codigo, setCodigo] = useState('')
   const [nome, setNome] = useState('')
   const [tipo, setTipo] = useState('')
-  const [natureza, setNatureza] = useState('')
   const [ativo, setAtivo] = useState(true)
   const [salvando, setSalvando] = useState(false)
   const [erroModal, setErroModal] = useState<string | null>(null)
@@ -97,23 +86,13 @@ export default function PlanoContasTab() {
 
   function abrirNovo() {
     setEditando(null)
-    setCodigo(''); setNome(''); setTipo(''); setNatureza(''); setAtivo(true)
+    setCodigo(''); setNome(''); setTipo(''); setAtivo(true)
     setErroModal(null); setModalAberto(true)
   }
   function abrirEditar(c: PlanoConta) {
     setEditando(c)
-    const t = c.tipo || ''
-    setCodigo(c.codigo); setNome(c.nome); setTipo(t)
-    // tipos mapeados exibem a natureza derivada (padrão); Transferência/sem tipo preservam o valor salvo
-    setNatureza(naturezaDerivada(t) ?? (c.natureza || ''))
-    setAtivo(c.ativo)
+    setCodigo(c.codigo); setNome(c.nome); setTipo(c.tipo || ''); setAtivo(c.ativo)
     setErroModal(null); setModalAberto(true)
-  }
-
-  function mudarTipo(t: string) {
-    setTipo(t)
-    const d = naturezaDerivada(t)
-    if (d) setNatureza(d) // mapeado → natureza automática; Transferência/vazio mantêm p/ edição manual
   }
 
   async function salvar() {
@@ -125,7 +104,6 @@ export default function PlanoContasTab() {
         codigo: codigo.trim(),
         nome: nome.trim(),
         tipo: tipo || null,
-        natureza: natureza || null,
         ativo,
       })
       if (editando) {
@@ -196,7 +174,6 @@ export default function PlanoContasTab() {
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Código</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Nome</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Tipo</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Natureza</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
               </tr>
@@ -207,7 +184,6 @@ export default function PlanoContasTab() {
                   <td className="px-4 py-2.5 font-mono text-white/80">{c.codigo}</td>
                   <td className="px-4 py-2.5 font-medium text-white">{c.nome}</td>
                   <td className="px-4 py-2.5 text-white/70">{lbl(TIPOS, c.tipo)}</td>
-                  <td className="px-4 py-2.5 text-white/70">{lbl(NATUREZAS, c.natureza)}</td>
                   <td className="px-4 py-2.5">
                     <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${c.ativo ? 'bg-green-500/15 text-green-300' : 'bg-white/10 text-white/50'}`}>
                       {c.ativo ? 'Ativo' : 'Inativo'}
@@ -246,35 +222,13 @@ export default function PlanoContasTab() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs text-white/60">Tipo</label>
-                  <select value={tipo} onChange={(e) => mudarTipo(e.target.value)} className={inputCls}>
-                    <option value="" className="bg-zinc-900">—</option>
-                    {TIPOS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-white/60">Natureza</label>
-                  {naturezaDerivada(tipo) ? (
-                    <input
-                      value={`${lbl(NATUREZAS, natureza)} (automático)`}
-                      readOnly disabled
-                      title="A natureza é definida automaticamente conforme o tipo da conta."
-                      className={inputCls + ' cursor-not-allowed opacity-60'}
-                    />
-                  ) : (
-                    <select value={natureza} onChange={(e) => setNatureza(e.target.value)} className={inputCls}>
-                      <option value="" className="bg-zinc-900">—</option>
-                      {NATUREZAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
-                    </select>
-                  )}
-                </div>
+              <div>
+                <label className="mb-1 block text-xs text-white/60">Tipo</label>
+                <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={inputCls}>
+                  <option value="" className="bg-zinc-900">—</option>
+                  {TIPOS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
+                </select>
               </div>
-              <p className="text-[11px] text-white/40">
-                A natureza é definida automaticamente conforme o tipo da conta.
-                {tipo === 'transfer' ? ' Em Transferência, você escolhe Débito ou Crédito.' : ''}
-              </p>
 
               <label className="flex items-center gap-2 text-sm text-white/80">
                 <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="h-4 w-4 accent-blue-500" />
