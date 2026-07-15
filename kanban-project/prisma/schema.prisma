@@ -1736,9 +1736,25 @@ model ProdutoFinanceiro {
   itemCatalogoId     Int?
   itemCatalogo       ItemCatalogo?        @relation(fields: [itemCatalogoId], references: [id])
 
+  // F1 — Configuração Financeira canônica: papel financeiro + FKs DIRETAS aos mestres reais.
+  // Aditivo/nullable: ProdutoFinanceiro passa a REPRESENTAR uma configuração financeira de uma
+  // entidade mestre existente (não recria mestre). itemCatalogoId permanece como pivô de
+  // Serviço/Produto e alvo de preço (TabelaValor/resolverPreco). Exatamente UM mestre é apontado.
+  papelFinanceiro    PapelFinanceiro?
+  tipoDocumentoId    Int?
+  tipoDocumento      TipoDocumentoCadastro?     @relation("ConfigFinTipoDocumento", fields: [tipoDocumentoId], references: [id])
+  honorarioId        Int?
+  honorario          Honorario?                 @relation("ConfigFinHonorario", fields: [honorarioId], references: [id])
+  tipoProcessoId     Int?
+  tipoProcesso       TipoProcessoNacionalidade? @relation("ConfigFinTipoProcesso", fields: [tipoProcessoId], references: [id])
+
   @@index([itemCatalogoId])
   @@index([categoriaId])
   @@index([planoContaId])
+  @@index([tipoDocumentoId])
+  @@index([honorarioId])
+  @@index([tipoProcessoId])
+  @@index([papelFinanceiro])
 }
 
 // ── Tabela de Valores (fin_values) ──
@@ -1805,6 +1821,7 @@ model Honorario {
   ativo           Boolean  @default(true)
   criadoEm        DateTime @default(now())
   atualizadoEm    DateTime @updatedAt
+  configFinanceiras ProdutoFinanceiro[] @relation("ConfigFinHonorario")
 }
 
 // ── Regras de Comissão (fin_comm) ──
@@ -1908,6 +1925,7 @@ model TipoProcessoNacionalidade {
   atualizadoEm        DateTime       @updatedAt
   macroWorkflow       MacroWorkflow?
   processosVinculados Processo[]     @relation("ProcessoTipoMotor")
+  configFinanceiras   ProdutoFinanceiro[] @relation("ConfigFinTipoProcesso")
 
   @@index([countryKey])
   @@index([modalityKey])
@@ -2233,6 +2251,7 @@ model TipoDocumentoCadastro {
   countryCode       String?       @db.VarChar(8) // opcional (país)
   description       String?       @db.Text
   documentos        Documento[] // back-relation (docs que apontam pra este tipo)
+  configFinanceiras ProdutoFinanceiro[] @relation("ConfigFinTipoDocumento")
   participaPlanilha Boolean       @default(false)
   // LOTE A — categoriaDocumentalId é a CLASSIFICAÇÃO CANÔNICA (consumida por ID).
   // FK nullable p/ backfill seguro. A coluna `category` (String) permanece SÓ como
@@ -2829,6 +2848,18 @@ model DomainOutbox {
 
   @@index([status, criadoEm])
   @@index([correlationId])
+}
+
+// F1 — Papel financeiro de uma Configuração Financeira (ProdutoFinanceiro adaptado).
+// Uma MESMA entidade mestre pode ter várias configurações (papéis) — sem duplicar o mestre.
+enum PapelFinanceiro {
+  CUSTO
+  RECEITA
+  REPASSE
+  REEMBOLSO
+  DESPESA_INTERNA
+  TAXA
+  HONORARIO
 }
 
 enum NaturezaPreco {
