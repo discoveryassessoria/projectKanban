@@ -86,14 +86,20 @@ export function montarChavePasso(i: {
   stepKey: string
   stepDefinitionVersion: number
   ciclo: number
+  // Passo operacional POR-DOCUMENTO: distingue a mesma stepKey entre documentos
+  // sob a mesma instância. Ausente (passo-template da fase) mantém a chave legada.
+  documentoId?: number | null
 }): string {
-  return [
+  const base = [
     `wfi${i.workflowInstanceId}`,
     `stepdef${i.stepDefinitionId}`,
     `stepkey${i.stepKey}`,
     `stepv${i.stepDefinitionVersion}`,
     `c${i.ciclo}`,
-  ].join("|")
+  ]
+  // Retrocompat: só anexa o segmento quando há documento (passo-template inalterado).
+  if (i.documentoId != null) base.push(`doc${i.documentoId}`)
+  return base.join("|")
 }
 
 export function montarChaveEvento(i: {

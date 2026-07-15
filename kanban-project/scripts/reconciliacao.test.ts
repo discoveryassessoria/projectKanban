@@ -33,9 +33,18 @@ const bf = src("prisma/backfill-cp4-workflow.ts")
 ok(/mapLegacyStepStatus\(st\.status\)/.test(bf), "6. backfill espelha status do passo legado (mapLegacyStepStatus)")
 ok(/mapLegacyWorkflowStatus\(wf\.status\)/.test(bf), "7. backfill espelha status da instância (mapLegacyWorkflowStatus)")
 ok(/phaseWorkflowInstance\.upsert/.test(bf) && /phaseWorkflowStepInstance\.upsert/.test(bf), "8. usa upsert (create-or-reconcile idempotente)")
-ok(/update:\s*\{\s*status:\s*instStatus\s*\}/.test(bf) && /update:\s*\{\s*status:\s*stepStatus\s*\}/.test(bf), "9. reexecutar RECONCILIA o status (update no upsert)")
+ok(/update:\s*\{\s*status:\s*instStatus\s*\}/.test(bf) && /update:\s*\{[^}]*status:\s*p\.status/.test(bf), "9. reexecutar RECONCILIA o status (update no upsert, instância e passo)")
 ok(!/if \(jaExiste\)\s*\{\s*rel\.pulou\(\);\s*continue\s*\}/.test(bf), "10. removeu o skip que impedia reconciliar já-migrados")
 ok(!/status:\s*"PENDENTE"\s*,\s*ciclo/.test(bf), "11. não grava mais PENDENTE fixo (status vem do legado)")
+
+// CP-5 — camada operacional POR-DOCUMENTO (runtime único, sem model novo)
+console.log("\nCP-5 (operação por-documento):")
+ok(/montarChavePasso\(\{[^}]*documentoId\s*\}/.test(bf), "12. chave do passo inclui documentoId (distingue por documento)")
+ok(/documentoId,\s*\/\/ ← camada operacional por-documento/.test(bf) || /create:\s*\{[^]*?documentoId,[^]*?\}/.test(bf), "13. passo criado com documentoId (operação por-documento)")
+ok(/montarOperacaoMetadata\(st\)/.test(bf) && /\{\s*operacao:\s*p\.operacao\s*\}/.test(bf), "14. domínio vai para metadata.operacao (não vira coluna)")
+ok(/responsavelId:\s*p\.responsavelId/.test(bf) && /prazo:\s*p\.prazo/.test(bf), "15. universais (responsável/prazo) viram campos do passo")
+const modelV2 = (src("prisma/schema.prisma").match(/model PhaseWorkflowStepInstance \{[^]*?\n\}/) ?? [""])[0]
+ok(modelV2.length > 0 && !/externalProtocol|reviewResult|validationResult|trackingCode|costPaid/.test(modelV2), "16. nenhuma coluna de domínio adicionada ao PhaseWorkflowStepInstance (só extensão via metadata)")
 
 console.log(`\n${passed} passaram, ${failed} falharam`)
 if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }

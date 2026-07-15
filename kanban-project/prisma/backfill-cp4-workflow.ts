@@ -31,6 +31,35 @@ export interface BackfillOptions {
 }
 
 /**
+ * Estado operacional de DOMÍNIO de um passo legado (certidão/cartório/logística/
+ * financeiro) → objeto para metadata.operacao, com as MESMAS chaves do legado
+ * (sem renome — diretriz 9) e omitindo nulos (lean). Campos UNIVERSAIS (status,
+ * responsável, prazo, datas, motivo) NÃO entram aqui — viram colunas do passo.
+ * Retorna null quando não há nada de domínio a preservar.
+ */
+function montarOperacaoMetadata(st: {
+  externalProtocol?: string | null; trackingCode?: string | null; requestChannel?: string | null
+  reviewResult?: string | null; validationResult?: string | null; externalEntityName?: string | null
+  costPaid?: unknown; paymentMethod?: string | null; documentMedium?: string | null
+  physicalLocation?: string | null; reviewChecklist?: unknown; stepObservation?: string | null
+  legalOpinion?: string | null; notes?: string | null; completedById?: number | null
+  completionPolicy?: string | null; weight?: number | null
+}): Record<string, unknown> | null {
+  const o: Record<string, unknown> = {}
+  const put = (k: string, v: unknown) => { if (v !== null && v !== undefined) o[k] = v }
+  put("externalProtocol", st.externalProtocol); put("trackingCode", st.trackingCode)
+  put("requestChannel", st.requestChannel); put("reviewResult", st.reviewResult)
+  put("validationResult", st.validationResult); put("externalEntityName", st.externalEntityName)
+  put("costPaid", st.costPaid != null ? String(st.costPaid) : null) // Decimal → string (precisão)
+  put("paymentMethod", st.paymentMethod); put("documentMedium", st.documentMedium)
+  put("physicalLocation", st.physicalLocation); put("reviewChecklist", st.reviewChecklist)
+  put("stepObservation", st.stepObservation); put("legalOpinion", st.legalOpinion)
+  put("notes", st.notes); put("completedById", st.completedById)
+  put("completionPolicy", st.completionPolicy); put("weight", st.weight)
+  return Object.keys(o).length > 0 ? o : null
+}
+
+/**
  * Executa (por padrão em DRY-RUN) o mapeamento legado → v2 e retorna o relatório
  * com scannedCount / created* / linked* / skippedCount / unresolvedCount / breakdown.
  */
@@ -110,8 +139,24 @@ export async function backfillCp4Workflow(opts: BackfillOptions = {}): Promise<B
     const defSteps = await prisma.phaseInternalWorkflowStep.findMany({ where: { workflowId: def.id }, select: { key: true } })
     const defKeys = defSteps.map((s) => s.key)
 
+    // Documento do Workflow legado — o Workflow legado é POR-DOCUMENTO. O passo v2
+    // recebe esse documentoId (camada operacional por-documento no runtime único).
+    const documentoId = wf.documentoId
+
     // Coletar os steps que resolvem com segurança (dry-run só conta; execução criaria).
-    const stepsResolvidos: { stepKey: string; status: StepInstanceStatus }[] = []
+    // Universal (status/responsável/prazo/datas/motivo) vira campo do passo; domínio
+    // (protocolo/canal/devolução/custo/…) vai integral em metadata.operacao (chaves do legado).
+    const stepsResolvidos: {
+      stepKey: string
+      status: StepInstanceStatus
+      responsavelId: number | null
+      prazo: Date | null
+      startedAt: Date | null
+      completedAt: Date | null
+      motivo: string | null
+      papel: string | null
+      operacao: Record<string, unknown> | null
+    }[] = []
     for (const st of wf.steps) {
       // Compatibilidade determinística: alias legado → passo publicado atual (fonte única no catálogo).
       const chaveAtual = resolveStepKeyCompat(faseMacroKey, st.stepKey)
@@ -120,8 +165,18 @@ export async function backfillCp4Workflow(opts: BackfillOptions = {}): Promise<B
         rel.naoResolvido(resStep.motivo, { entityType: "WorkflowStep", entityId: st.id, detalhe: `stepKey ${st.stepKey} (→${chaveAtual}) sem definição segura` })
         continue
       }
-      // RECONCILIAÇÃO integrada: espelha o STATUS real do passo legado na instância v2.
-      stepsResolvidos.push({ stepKey: chaveAtual, status: mapLegacyStepStatus(st.status) })
+      // RECONCILIAÇÃO integrada: espelha o STATUS e o estado operacional real do legado.
+      stepsResolvidos.push({
+        stepKey: chaveAtual,
+        status: mapLegacyStepStatus(st.status),
+        responsavelId: st.assigneeId ?? null,
+        prazo: st.dueAt ?? null,
+        startedAt: st.startedAt ?? null,
+        completedAt: st.completedAt ?? null,
+        motivo: st.motivoBloqueio ?? null,
+        papel: st.ownerKey ?? null,
+        operacao: montarOperacaoMetadata(st),
+      })
     }
 
     // Status da instância espelha o Workflow legado (fase passada → CONCLUIDO; corrente → ATIVO).
@@ -145,18 +200,46 @@ export async function backfillCp4Workflow(opts: BackfillOptions = {}): Promise<B
         })
         rel.criouInstancia()
         for (let i = 0; i < stepsResolvidos.length; i++) {
-          const { stepKey: sk, status: stepStatus } = stepsResolvidos[i]
-          const chavePasso = montarChavePasso({ workflowInstanceId: inst.id, stepDefinitionId: def.id, stepKey: sk, stepDefinitionVersion: 1, ciclo })
+          const p = stepsResolvidos[i]
+          // Passo operacional POR-DOCUMENTO: documentoId na chave distingue a mesma
+          // stepKey entre documentos sob a mesma instância de fase.
+          const chavePasso = montarChavePasso({ workflowInstanceId: inst.id, stepDefinitionId: def.id, stepKey: p.stepKey, stepDefinitionVersion: 1, ciclo, documentoId })
+          const metadata = p.operacao ? ({ operacao: p.operacao } as Prisma.InputJsonValue) : undefined
           await tx.phaseWorkflowStepInstance.upsert({
             where: { chaveIdempotencia: chavePasso },
             create: {
-              workflowInstanceId: inst.id, stepDefinitionId: def.id, stepDefinitionVersion: 1, stepKey: sk,
+              workflowInstanceId: inst.id, stepDefinitionId: def.id, stepDefinitionVersion: 1, stepKey: p.stepKey,
               snapshot: { backfill: true } as Prisma.InputJsonValue, snapshotSchemaVersion: 1,
-              processoId: processo.id, faseMacroKey, ordem: i, status: stepStatus, ciclo, chaveIdempotencia: chavePasso,
+              processoId: processo.id, faseMacroKey, ordem: i, status: p.status, ciclo, chaveIdempotencia: chavePasso,
+              documentoId, // ← camada operacional por-documento
+              responsavelId: p.responsavelId, prazo: p.prazo, startedAt: p.startedAt, completedAt: p.completedAt,
+              motivo: p.motivo, papel: p.papel, ...(metadata ? { metadata } : {}),
             },
-            update: { status: stepStatus }, // reconcilia passo já migrado
+            // Reconcilia o estado operacional real do legado (status + universais + domínio).
+            update: {
+              status: p.status, responsavelId: p.responsavelId, prazo: p.prazo, startedAt: p.startedAt,
+              completedAt: p.completedAt, motivo: p.motivo, papel: p.papel, ...(metadata ? { metadata } : {}),
+            },
           })
           rel.criouStep()
+        }
+
+        // SUPERSEÇÃO do mapeamento interino (pré-CP-5): passos-template documentoId=null
+        // criados por um backfill anterior desta MESMA instância. A verdade agora são os
+        // passos POR-DOCUMENTO acima — a conclusão foi preservada neles (não reinicia nem
+        // apaga; req 9). Escopo cirúrgico: só backfill-origin (snapshot.backfill=true) e
+        // documentoId=null. Nunca toca passos-template instanciados pelo motor.
+        if (documentoId != null && stepsResolvidos.length > 0) {
+          const sup = await tx.phaseWorkflowStepInstance.updateMany({
+            where: {
+              workflowInstanceId: inst.id,
+              documentoId: null,
+              snapshot: { path: ["backfill"], equals: true },
+              status: { not: "SUPERSEDIDO" },
+            },
+            data: { status: "SUPERSEDIDO", supersededAt: new Date() },
+          })
+          if (sup.count > 0) console.warn(`[backfill CP-5] processo ${processo.id} fase ${faseMacroKey}: ${sup.count} passo(s)-template interino(s) supersedido(s) pela operação por-documento`)
         }
       })
     } else {
