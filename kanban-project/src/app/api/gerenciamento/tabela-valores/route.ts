@@ -32,12 +32,14 @@ function mapDbError(e: any): NextResponse | null {
   return null
 }
 
-// Rótulo canônico "Origem · Cadastro mestre · Papel" de uma Configuração Financeira.
+// Rótulo canônico "Origem · Cadastro mestre" de uma Configuração Financeira (UMA por
+// mestre). O papel NÃO faz parte da config: o preço escolhe a natureza (CUSTO/RECEITA)
+// dentre as que a config habilita (possuiCusto/possuiReceita).
 async function listarConfigs() {
   const cfgs = await prisma.produtoFinanceiro.findMany({
-    where: { ativo: true, papelFinanceiro: { not: null } },
+    where: { ativo: true },
     select: {
-      id: true, papelFinanceiro: true, moedaPadrao: true,
+      id: true, possuiCusto: true, possuiReceita: true, moedaPadrao: true,
       tipoDocumento: { select: { name: true } },
       honorario: { select: { name: true } },
       tipoProcesso: { select: { name: true } },
@@ -48,7 +50,7 @@ async function listarConfigs() {
   return cfgs.map((c) => {
     const origem = c.tipoDocumento ? 'Documento' : c.honorario ? 'Honorário' : c.tipoProcesso ? 'Processo' : (c.itemCatalogo?.natureza === 'SERVICO' ? 'Serviço' : 'Item')
     const mestre = c.tipoDocumento?.name ?? c.honorario?.name ?? c.tipoProcesso?.name ?? c.itemCatalogo?.name ?? '—'
-    return { id: c.id, papel: c.papelFinanceiro, moedaPadrao: c.moedaPadrao, origem, mestre, label: `${origem} · ${mestre} · ${c.papelFinanceiro}` }
+    return { id: c.id, possuiCusto: c.possuiCusto, possuiReceita: c.possuiReceita, moedaPadrao: c.moedaPadrao, origem, mestre, label: `${origem} · ${mestre}` }
   })
 }
 
@@ -67,7 +69,7 @@ export async function GET(request: NextRequest) {
           modalidade: { select: { id: true, modalityLabel: true } },
           configuracaoFinanceiraItem: {
             select: {
-              id: true, papelFinanceiro: true,
+              id: true, possuiCusto: true, possuiReceita: true,
               tipoDocumento: { select: { name: true } }, honorario: { select: { name: true } },
               tipoProcesso: { select: { name: true } }, itemCatalogo: { select: { name: true, natureza: true } },
             },
@@ -100,12 +102,22 @@ export async function POST(request: NextRequest) {
     const cfg = await prisma.produtoFinanceiro.findUnique({
       where: { id: configId },
       select: {
-        id: true, papelFinanceiro: true, itemCatalogoId: true, moedaPadrao: true,
+        id: true, possuiCusto: true, possuiReceita: true, itemCatalogoId: true, moedaPadrao: true,
         tipoDocumento: { select: { name: true } }, honorario: { select: { name: true } },
         tipoProcesso: { select: { name: true } }, itemCatalogo: { select: { name: true, natureza: true } },
       },
     })
     if (!cfg) return NextResponse.json({ error: 'Configuração Financeira não encontrada.' }, { status: 404 })
+
+    // O PREÇO define a natureza (papel vive na entidade de valores). Deve ser uma das
+    // naturezas habilitadas na config; se a config só tem uma, ela é assumida por padrão.
+    const naturezaReq = toStrOrNull(b.natureza)?.toUpperCase() ?? null
+    const naturezasHabilitadas = [cfg.possuiCusto ? 'CUSTO' : null, cfg.possuiReceita ? 'RECEITA' : null].filter(Boolean) as string[]
+    const natureza = naturezaReq ?? (naturezasHabilitadas.length === 1 ? naturezasHabilitadas[0] : null)
+    if (!natureza || !['CUSTO', 'RECEITA'].includes(natureza))
+      return NextResponse.json({ error: 'Informe a natureza do preço (CUSTO ou RECEITA).' }, { status: 400 })
+    if (!naturezasHabilitadas.includes(natureza))
+      return NextResponse.json({ error: `Esta configuração não habilita ${natureza.toLowerCase()}. Ative "possui ${natureza.toLowerCase()}" na Configuração Financeira.` }, { status: 400 })
 
     const valor = toAmount(b.valor)
     if (valor <= 0) return NextResponse.json({ error: 'Valor deve ser maior que zero (isenção não é modelada aqui).' }, { status: 400 })
@@ -119,13 +131,10 @@ export async function POST(request: NextRequest) {
     const vigenciaInicio = toStrOrNull(b.vigenciaInicio)
     const vigenciaFim = toStrOrNull(b.vigenciaFim)
 
-    // nome DERIVADO: [mestre] · [papel] · [contexto]
+    // nome DERIVADO: [mestre] · [natureza] · [contexto]
     const mestre = cfg.tipoDocumento?.name ?? cfg.honorario?.name ?? cfg.tipoProcesso?.name ?? cfg.itemCatalogo?.name ?? 'Config'
     const ctxNome = [processoTipoId, fornecedorId ? `forn.${fornecedorId}` : null].filter(Boolean).join(' · ')
-    const name = toStrOrNull(b.name) || `${mestre} · ${cfg.papelFinanceiro}${ctxNome ? ' · ' + ctxNome : ''}`.slice(0, 200)
-
-    // natureza espelha o papel (compat com o resolver por item), mas a CHAVE é a config.
-    const natureza = cfg.papelFinanceiro === 'CUSTO' ? 'CUSTO' : cfg.papelFinanceiro === 'RECEITA' ? 'RECEITA' : null
+    const name = toStrOrNull(b.name) || `${mestre} · ${natureza}${ctxNome ? ' · ' + ctxNome : ''}`.slice(0, 200)
 
     try {
       const regra = await prisma.tabelaValor.create({

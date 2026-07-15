@@ -10,7 +10,7 @@ type Regra = {
   custoProdutoCode: string | null; receitaProdutoCode: string | null
   participaPlanilha: boolean; ordem: number; ativo: boolean
 }
-type Produto = { id: number; codigo: string; nome: string; naturezaFinanceira: string | null; papelFinanceiro?: string | null; moedaPadrao: string | null }
+type Produto = { id: number; codigo: string; nome: string; naturezaFinanceira: string | null; possuiCusto?: boolean; possuiReceita?: boolean; moedaPadrao: string | null }
 type ProcRef = { id: number; name: string }
 type DocRef = { id?: number; code: string | null; name: string }
 type Data = { regras: Regra[]; produtos: Produto[]; tiposProcesso: ProcRef[]; docTypes: DocRef[] }
@@ -67,8 +67,10 @@ export default function AplicabilidadeEconomicaTab() {
     catch (e: any) { alert(e.message) }
   }
 
-  const custos = (d?.produtos || []).filter(p => p.naturezaFinanceira === 'cost')
-  const receitas = (d?.produtos || []).filter(p => p.naturezaFinanceira === 'revenue')
+  // M-UNIFICA — a config única habilita custo e/ou receita; a MESMA config pode ser
+  // escolhida como fonte de custo e de receita (a natureza mora no preço, não na config).
+  const custos = (d?.produtos || []).filter(p => p.possuiCusto)
+  const receitas = (d?.produtos || []).filter(p => p.possuiReceita)
   const procName = (id: number | null) => id == null ? 'Qualquer processo' : (d?.tiposProcesso.find(t => t.id === id)?.name || `#${id}`)
 
   return (

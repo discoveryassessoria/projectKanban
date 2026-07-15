@@ -7,17 +7,19 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 
-type ConfigRef = { id: number; papel: string | null; origem: string; mestre: string; label: string; moedaPadrao: string }
+type ConfigRef = { id: number; possuiCusto: boolean; possuiReceita: boolean; origem: string; mestre: string; label: string; moedaPadrao: string }
 type FornecedorRef = { id: number; nome: string }
 type ProcRef = { id: number; name: string }
 type ModRef = { id: number; modalityLabel: string }
 type CfgEmbed = {
-  id: number; papelFinanceiro: string | null
+  id: number; possuiCusto: boolean; possuiReceita: boolean
   tipoDocumento?: { name: string } | null; honorario?: { name: string } | null
   tipoProcesso?: { name: string } | null; itemCatalogo?: { name: string; natureza: string } | null
 }
 type Item = {
   id: number; name: string
+  // O papel (CUSTO/RECEITA) vive no PRÓPRIO preço, não na config.
+  natureza: string | null
   configuracaoFinanceiraItemId: number | null
   configuracaoFinanceiraItem?: CfgEmbed | null
   processoTipoId: string | null
@@ -45,11 +47,11 @@ const MODOS_CALCULO: [string, string][] = [
 const MOEDAS: [string, string][] = [['EUR', 'EUR'], ['BRL', 'BRL'], ['USD', 'USD']]
 const modoLabel = (v: string) => MODOS_CALCULO.find(([k]) => k === v)?.[1] || v || '—'
 
-function origemMestre(cfg?: CfgEmbed | null): { origem: string; mestre: string; papel: string } {
-  if (!cfg) return { origem: '—', mestre: '—', papel: '—' }
+function origemMestre(cfg?: CfgEmbed | null): { origem: string; mestre: string } {
+  if (!cfg) return { origem: '—', mestre: '—' }
   const origem = cfg.tipoDocumento ? 'Documento' : cfg.honorario ? 'Honorário' : cfg.tipoProcesso ? 'Processo' : (cfg.itemCatalogo?.natureza === 'SERVICO' ? 'Serviço' : 'Item')
   const mestre = cfg.tipoDocumento?.name ?? cfg.honorario?.name ?? cfg.tipoProcesso?.name ?? cfg.itemCatalogo?.name ?? '—'
-  return { origem, mestre, papel: cfg.papelFinanceiro ?? '—' }
+  return { origem, mestre }
 }
 
 async function jsonFetch(url: string, options: RequestInit = {}) {
@@ -65,7 +67,7 @@ const fmtMoeda = (v: any, moeda: string) => {
 }
 
 const EMPTY = {
-  configuracaoFinanceiraItemId: '', processoTipoId: '', modalidadeId: '', fornecedorId: '',
+  configuracaoFinanceiraItemId: '', natureza: '', processoTipoId: '', modalidadeId: '', fornecedorId: '',
   moeda: '', valor: '', modoCalculo: 'fixed', unidade: '', quantidadeMinima: '', quantidadeMaxima: '',
   vigenciaInicio: '', vigenciaFim: '', prioridade: '0', arquivado: false,
 }
@@ -108,7 +110,7 @@ export default function TabelaValoresTab() {
     if (!q) return itens
     return itens.filter((i) => {
       const om = origemMestre(i.configuracaoFinanceiraItem)
-      return `${om.mestre} ${om.origem} ${om.papel} ${i.name}`.toLowerCase().includes(q)
+      return `${om.mestre} ${om.origem} ${i.natureza ?? ''} ${i.name}`.toLowerCase().includes(q)
     })
   }, [itens, busca])
 
@@ -124,6 +126,7 @@ export default function TabelaValoresTab() {
     setEditando(i)
     setForm({
       configuracaoFinanceiraItemId: i.configuracaoFinanceiraItemId ? String(i.configuracaoFinanceiraItemId) : '',
+      natureza: i.natureza || '',
       processoTipoId: i.processoTipoId || '', modalidadeId: i.modalidadeId ? String(i.modalidadeId) : '',
       fornecedorId: i.fornecedorId ? String(i.fornecedorId) : '', moeda: i.moeda || '',
       valor: i.valor != null ? String(i.valor) : '', modoCalculo: i.modoCalculo || 'fixed',
@@ -137,6 +140,7 @@ export default function TabelaValoresTab() {
 
   async function salvar() {
     if (!form.configuracaoFinanceiraItemId) { setErroModal('Selecione a Configuração Financeira.'); return }
+    if (!form.natureza) { setErroModal('Selecione a natureza do preço (custo ou receita).'); return }
     if (form.valor === '' || Number(form.valor) <= 0) { setErroModal('Valor deve ser maior que zero.'); return }
     setSalvando(true); setErroModal(null)
     try {
@@ -197,7 +201,7 @@ export default function TabelaValoresTab() {
                   <tr key={i.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
                     <td className="px-3 py-2.5 font-medium text-white">{om.mestre}</td>
                     <td className="px-3 py-2.5 text-white/60">{om.origem}</td>
-                    <td className="px-3 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${om.papel === 'CUSTO' ? 'bg-amber-500/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300'}`}>{om.papel}</span></td>
+                    <td className="px-3 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${i.natureza === 'CUSTO' ? 'bg-amber-500/15 text-amber-300' : i.natureza === 'RECEITA' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-white/50'}`}>{i.natureza ?? '—'}</span></td>
                     <td className="px-3 py-2.5 text-white/70">{proc}{mod ? ` · ${mod}` : ''}</td>
                     <td className="px-3 py-2.5 text-white/70">{i.fornecedor?.nome || '—'}</td>
                     <td className="px-3 py-2.5 text-white/60">{modoLabel(i.modoCalculo)}</td>
@@ -236,16 +240,48 @@ export default function TabelaValoresTab() {
                   </div>
                 ) : (
                   <>
-                    <input value={cfgBusca} onChange={(e) => setCfgBusca(e.target.value)} autoFocus placeholder="Buscar: Origem · Cadastro mestre · Papel..." className={inputCls} />
+                    <input value={cfgBusca} onChange={(e) => setCfgBusca(e.target.value)} autoFocus placeholder="Buscar: Origem · Cadastro mestre..." className={inputCls} />
                     {cfgBusca && (
                       <div className="mt-1 max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-zinc-900">
                         {cfgFiltradas.length === 0 && <div className="px-3 py-2 text-xs text-white/40">Nenhuma configuração. Cadastre em Configurações Financeiras.</div>}
                         {cfgFiltradas.map((c) => (
-                          <button key={c.id} onClick={() => { set('configuracaoFinanceiraItemId', String(c.id)); if (!form.moeda) set('moeda', c.moedaPadrao); setCfgBusca('') }} className="block w-full px-3 py-1.5 text-left text-sm text-white/80 hover:bg-white/10">{c.label}</button>
+                          <button key={c.id} onClick={() => {
+                            setForm((f) => ({
+                              ...f,
+                              configuracaoFinanceiraItemId: String(c.id),
+                              moeda: f.moeda || c.moedaPadrao,
+                              // natureza padrão quando a config só habilita uma
+                              natureza: c.possuiCusto && !c.possuiReceita ? 'CUSTO' : c.possuiReceita && !c.possuiCusto ? 'RECEITA' : '',
+                            }))
+                            setCfgBusca('')
+                          }} className="block w-full px-3 py-1.5 text-left text-sm text-white/80 hover:bg-white/10">
+                            {c.label}
+                            <span className="text-white/40">{c.possuiCusto ? ' · custo' : ''}{c.possuiReceita ? ' · receita' : ''}</span>
+                          </button>
                         ))}
                       </div>
                     )}
                   </>
+                )}
+              </div>
+
+              {/* Natureza do preço — CUSTO ou RECEITA, dentre as que a config habilita. */}
+              <div>
+                <label className="mb-1 block text-xs text-white/60">Natureza do preço *</label>
+                <div className="flex gap-2">
+                  {(['CUSTO', 'RECEITA'] as const).map((nat) => {
+                    const habilitada = !cfgSelecionada || (nat === 'CUSTO' ? cfgSelecionada.possuiCusto : cfgSelecionada.possuiReceita)
+                    const ativo = form.natureza === nat
+                    return (
+                      <button key={nat} type="button" disabled={!habilitada} onClick={() => set('natureza', nat)}
+                        className={`flex-1 rounded-lg border px-3 py-2 text-sm transition ${ativo ? (nat === 'CUSTO' ? 'border-amber-400/40 bg-amber-500/15 text-amber-200' : 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200') : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'} ${habilitada ? '' : 'cursor-not-allowed opacity-40'}`}>
+                        {nat === 'CUSTO' ? 'Custo' : 'Receita'}
+                      </button>
+                    )
+                  })}
+                </div>
+                {cfgSelecionada && !cfgSelecionada.possuiCusto && !cfgSelecionada.possuiReceita && (
+                  <p className="mt-1 text-[11px] text-amber-300/80">Esta configuração não habilita custo nem receita. Ajuste-a em Configurações Financeiras.</p>
                 )}
               </div>
 

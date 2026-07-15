@@ -1,14 +1,11 @@
 'use client'
 
 // src/components/gerenciamentoComponents/ProdutosTab.tsx
-// Catálogo Financeiro / Itens Cobrados (tabela ProdutoFinanceiro).
-// Backend: /api/gerenciamento/produtos (GET/POST) + /[id] (PUT/DELETE)
-// Form alinhado ao operacional ("Novo · Item do Catálogo Financeiro"):
-//   codigo(req), nome(req), especie, naturezaFinanceira,
-//   categoriaId(→Categoria), planoContaId(→Conta contábil),
-//   moedaPadrao, valorPadrao,
-//   checkboxes: cobravelDoCliente, custoInterno, repasse, reembolsavel + ativo.
-// Categorias vêm de /api/gerenciamento/categorias; contas de /api/gerenciamento/plano-contas.
+// Configurações Financeiras (tabela ProdutoFinanceiro) — UMA config por cadastro mestre.
+// Custo e receita NÃO são registros independentes: são VALORES desta config
+// (possuiCusto/possuiReceita + valorCustoPadrao/valorReceitaPadrao). O papel financeiro
+// vive só na entidade de valores (TabelaValor.natureza).
+// Backend: /api/gerenciamento/produtos (GET/POST) + /[id] (PUT/DELETE).
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 
@@ -23,7 +20,11 @@ type Produto = {
   categoriaId: number | null
   planoContaId: number | null
   moedaPadrao: string
-  valorPadrao: string | number | null
+  // M-UNIFICA — custo e receita como valores da MESMA config
+  possuiCusto: boolean
+  possuiReceita: boolean
+  valorCustoPadrao: string | number | null
+  valorReceitaPadrao: string | number | null
   cobravelDoCliente: boolean
   custoInterno: boolean
   repasse: boolean
@@ -31,31 +32,20 @@ type Produto = {
   ativo: boolean
   categoria?: CategoriaRef | null
   planoConta?: ContaRef | null
-  papelFinanceiro: string | null
   tipoDocumentoId: number | null
   honorarioId: number | null
   tipoProcessoId: number | null
   itemCatalogoId: number | null
   fornecedorPadraoId: number | null
+  // Mestre REAL resolvido pelo backend (nome/código de negócio por relação — nunca derivado).
+  mestre?: { origem: string; codigo: string | null; nome: string } | null
 }
 
-const ESPECIES: [string, string][] = [
-  ['fee', 'Taxa'], ['honorarium', 'Honorário'], ['tax', 'Imposto'], ['cost', 'Custo'],
-  ['reimbursement', 'Reembolso'], ['service', 'Serviço'], ['discount', 'Desconto'],
-  ['adjustment', 'Ajuste'], ['commission', 'Comissão'], ['penalty', 'Multa'], ['other', 'Outro'],
-]
-const NATUREZAS: [string, string][] = [
-  ['revenue', 'Receita'], ['cost', 'Custo'], ['expense', 'Despesa'], ['transfer', 'Transferência'],
-  ['discount', 'Desconto'], ['tax', 'Imposto'], ['neutral', 'Neutro'],
-]
 const MOEDAS: [string, string][] = [['BRL', 'Real (BRL)'], ['EUR', 'Euro (EUR)'], ['USD', 'Dólar (USD)']]
-// F3.2 — origem do cadastro MESTRE (nunca recriado aqui) + papel financeiro da configuração.
+// Origem do cadastro MESTRE (nunca recriado aqui). O papel financeiro NÃO é mais atributo
+// da config — custo/receita são valores (checkboxes + valores abaixo).
 const ORIGENS: [string, string][] = [
   ['documento', 'Documento'], ['servico', 'Serviço'], ['honorario', 'Honorário'], ['processo', 'Processo / Modalidade'],
-]
-const PAPEIS: [string, string][] = [
-  ['CUSTO', 'Custo'], ['RECEITA', 'Receita'], ['REPASSE', 'Repasse'], ['REEMBOLSO', 'Reembolso'],
-  ['DESPESA_INTERNA', 'Despesa interna'], ['TAXA', 'Taxa'], ['HONORARIO', 'Honorário'],
 ]
 type MestreRef = { id: number; label: string; code: string | null }
 type Mestres = { documento: MestreRef[]; servico: MestreRef[]; honorario: MestreRef[]; processo: MestreRef[] }
@@ -71,9 +61,11 @@ const fmtMoney = (v: any, moeda?: string) =>
   v == null || v === '' ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: moeda || 'BRL' })
 
 const EMPTY = {
-  origem: 'documento', masterId: '', papelFinanceiro: 'RECEITA',
-  codigo: '', nome: '', especie: '', naturezaFinanceira: 'revenue',
-  categoriaId: '', planoContaId: '', moedaPadrao: 'BRL', valorPadrao: '', fornecedorPadraoId: '',
+  origem: 'documento', masterId: '',
+  possuiCusto: false, possuiReceita: true,
+  valorCustoPadrao: '', valorReceitaPadrao: '',
+  codigo: '', nome: '', naturezaFinanceira: 'revenue',
+  categoriaId: '', planoContaId: '', moedaPadrao: 'BRL', fornecedorPadraoId: '',
   cobravelDoCliente: false, custoInterno: false, repasse: false, reembolsavel: false, ativo: true,
 }
 type FormState = typeof EMPTY
@@ -101,6 +93,9 @@ function Secao({ titulo, children, primeira }: { titulo: string; children: React
     </div>
   )
 }
+
+const Check = ({ ok }: { ok: boolean }) =>
+  ok ? <span className="text-green-300">✓</span> : <span className="text-white/25">—</span>
 
 export default function ProdutosTab() {
   const [produtos, setProdutos] = useState<Produto[]>([])
@@ -141,7 +136,7 @@ export default function ProdutosTab() {
       setCategorias((dCat as any).categorias || [])
       setContas((dContas as any).contas || [])
     } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar os produtos.')
+      setErroLista(e.message || 'Não foi possível carregar as configurações.')
     } finally {
       setLoading(false)
     }
@@ -153,13 +148,11 @@ export default function ProdutosTab() {
     const q = busca.trim().toLowerCase()
     if (!q) return produtos
     return produtos.filter((p) =>
-      p.codigo.toLowerCase().includes(q) ||
-      p.nome.toLowerCase().includes(q) ||
-      lbl(ESPECIES, p.especie).toLowerCase().includes(q)
+      (p.mestre?.nome ?? p.nome).toLowerCase().includes(q) ||
+      (p.mestre?.codigo ?? '').toLowerCase().includes(q)
     )
   }, [produtos, busca])
 
-  const slug = (str: string) => str.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 20)
   const masterFiltrado = useMemo(() => {
     const arr = mestres[form.origem as keyof Mestres] ?? []
     const q = masterBusca.trim().toLowerCase()
@@ -168,18 +161,11 @@ export default function ProdutosTab() {
   }, [mestres, form.origem, masterBusca])
   const masterSelecionado = (mestres[form.origem as keyof Mestres] ?? []).find((m) => String(m.id) === form.masterId) || null
 
-  function selecionarMaster(m: MestreRef, papel = form.papelFinanceiro) {
-    const base = m.code || slug(m.label)
-    setForm((f) => ({ ...f, masterId: String(m.id), nome: m.label, codigo: `${base}_${papel}`.slice(0, 30) }))
+  // O nome/código de negócio vêm do MESTRE (não são montados aqui). Só guardamos o
+  // vínculo (masterId) e o nome real do mestre para exibição; o código real é do mestre.
+  function selecionarMaster(m: MestreRef) {
+    setForm((f) => ({ ...f, masterId: String(m.id), nome: m.label, codigo: '' }))
     setMasterBusca('')
-  }
-  function mudarPapel(papel: string) {
-    setForm((f) => {
-      const m = (mestres[f.origem as keyof Mestres] ?? []).find((x) => String(x.id) === f.masterId)
-      const base = m ? (m.code || slug(m.label)) : ''
-      const natureza = papel === 'CUSTO' || papel === 'DESPESA_INTERNA' ? 'cost' : papel === 'RECEITA' ? 'revenue' : f.naturezaFinanceira
-      return { ...f, papelFinanceiro: papel, naturezaFinanceira: natureza, codigo: m ? `${base}_${papel}`.slice(0, 30) : f.codigo }
-    })
   }
   function mudarOrigem(origem: string) {
     setForm((f) => ({ ...f, origem, masterId: '', codigo: '', nome: '' })); setMasterBusca('')
@@ -194,11 +180,13 @@ export default function ProdutosTab() {
     const masterId = p.tipoDocumentoId ?? p.honorarioId ?? p.tipoProcessoId ?? p.itemCatalogoId ?? null
     setForm({
       origem, masterId: masterId ? String(masterId) : '',
-      papelFinanceiro: p.papelFinanceiro || (p.naturezaFinanceira === 'cost' ? 'CUSTO' : 'RECEITA'),
-      codigo: p.codigo, nome: p.nome, especie: p.especie || '',
+      possuiCusto: p.possuiCusto, possuiReceita: p.possuiReceita,
+      valorCustoPadrao: p.valorCustoPadrao != null ? String(p.valorCustoPadrao) : '',
+      valorReceitaPadrao: p.valorReceitaPadrao != null ? String(p.valorReceitaPadrao) : '',
+      codigo: '', nome: p.mestre?.nome || p.nome,
       naturezaFinanceira: p.naturezaFinanceira || 'revenue',
       categoriaId: p.categoriaId ? String(p.categoriaId) : '', planoContaId: p.planoContaId ? String(p.planoContaId) : '',
-      moedaPadrao: p.moedaPadrao || 'BRL', valorPadrao: p.valorPadrao != null ? String(p.valorPadrao) : '',
+      moedaPadrao: p.moedaPadrao || 'BRL',
       fornecedorPadraoId: p.fornecedorPadraoId ? String(p.fornecedorPadraoId) : '',
       cobravelDoCliente: p.cobravelDoCliente, custoInterno: p.custoInterno,
       repasse: p.repasse, reembolsavel: p.reembolsavel, ativo: p.ativo,
@@ -208,7 +196,7 @@ export default function ProdutosTab() {
 
   async function salvar() {
     if (!form.masterId) { setErroModal('Selecione a entidade mestre (origem). O nome/código vêm dela.'); return }
-    if (!form.papelFinanceiro) { setErroModal('Selecione o papel financeiro.'); return }
+    if (!form.possuiCusto && !form.possuiReceita) { setErroModal('A configuração deve possuir custo, receita, ou ambos.'); return }
     setSalvando(true); setErroModal(null)
     try {
       const fkField = FK_POR_ORIGEM[form.origem]
@@ -218,7 +206,8 @@ export default function ProdutosTab() {
         categoriaId: form.categoriaId || null,
         planoContaId: form.planoContaId || null,
         fornecedorPadraoId: form.fornecedorPadraoId || null,
-        valorPadrao: form.valorPadrao === '' ? null : Number(form.valorPadrao),
+        valorCustoPadrao: form.valorCustoPadrao === '' ? null : Number(form.valorCustoPadrao),
+        valorReceitaPadrao: form.valorReceitaPadrao === '' ? null : Number(form.valorReceitaPadrao),
       })
       if (editando) {
         await jsonFetch(`/api/gerenciamento/produtos/${editando.id}`, { method: 'PUT', body })
@@ -235,7 +224,8 @@ export default function ProdutosTab() {
   }
 
   async function excluir(p: Produto) {
-    if (!confirm(`Excluir o produto "${p.codigo} — ${p.nome}"?`)) return
+    const nome = p.mestre?.nome || p.nome
+    if (!confirm(`Excluir a Configuração Financeira de "${nome}"?\n\nIsto remove a configuração INTEIRA (custo e receita), nunca só um deles.`)) return
     try {
       await jsonFetch(`/api/gerenciamento/produtos/${p.id}`, { method: 'DELETE' })
       await carregar()
@@ -251,17 +241,17 @@ export default function ProdutosTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Configurações Financeiras</h2>
-          <p className="text-sm text-white/50">Itens financeiros mestres: honorários, taxas, custos e itens cobráveis.</p>
+          <p className="text-sm text-white/50">Uma configuração por cadastro mestre. Custo e receita são valores dela.</p>
         </div>
         <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500">
-          + Novo item
+          + Nova configuração
         </button>
       </div>
 
       <input
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
-        placeholder="Buscar (código, nome ou espécie)..."
+        placeholder="Buscar (cadastro mestre ou código)..."
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
       />
 
@@ -276,7 +266,7 @@ export default function ProdutosTab() {
 
       {!loading && !erroLista && filtrados.length === 0 && (
         <div className="rounded-xl border border-white/10 bg-white/5 py-12 text-center text-sm text-white/40 backdrop-blur">
-          {busca ? 'Nenhum item encontrado.' : 'Nenhum item ainda. Crie o primeiro.'}
+          {busca ? 'Nenhuma configuração encontrada.' : 'Nenhuma configuração ainda. Crie a primeira.'}
         </div>
       )}
 
@@ -285,10 +275,11 @@ export default function ProdutosTab() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-white/5">
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Item</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Espécie / Natureza</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Categoria</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Valor padrão</th>
+                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Cadastro mestre</th>
+                <th className="border-b border-white/10 px-4 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-white/50">Possui custo</th>
+                <th className="border-b border-white/10 px-4 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-white/50">Possui receita</th>
+                <th className="border-b border-white/10 px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Valor custo padrão</th>
+                <th className="border-b border-white/10 px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Valor receita padrão</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
               </tr>
@@ -297,14 +288,13 @@ export default function ProdutosTab() {
               {filtrados.map((p) => (
                 <tr key={p.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
                   <td className="px-4 py-2.5">
-                    <div className="font-medium text-white">{p.nome}</div>
-                    <div className="text-[11px] text-white/40">Cód. {p.codigo}</div>
+                    <div className="font-medium text-white">{p.mestre?.nome || p.nome}</div>
+                    <div className="text-[11px] text-white/40">{p.mestre?.codigo ? `Cód. ${p.mestre.codigo}` : 'sem código de mestre'}</div>
                   </td>
-                  <td className="px-4 py-2.5 text-white/70">
-                    {lbl(ESPECIES, p.especie)}<span className="text-white/40"> · {lbl(NATUREZAS, p.naturezaFinanceira)}</span>
-                  </td>
-                  <td className="px-4 py-2.5 text-white/70">{p.categoria?.nome || '—'}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-white/80">{fmtMoney(p.valorPadrao, p.moedaPadrao)}</td>
+                  <td className="px-4 py-2.5 text-center"><Check ok={p.possuiCusto} /></td>
+                  <td className="px-4 py-2.5 text-center"><Check ok={p.possuiReceita} /></td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-white/80">{p.possuiCusto ? fmtMoney(p.valorCustoPadrao, p.moedaPadrao) : '—'}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-white/80">{p.possuiReceita ? fmtMoney(p.valorReceitaPadrao, p.moedaPadrao) : '—'}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.ativo ? 'bg-green-500/15 text-green-300' : 'bg-white/10 text-white/50'}`}>
@@ -340,19 +330,11 @@ export default function ProdutosTab() {
             <div className="max-h-[72vh] space-y-5 overflow-y-auto px-6 py-5">
               {/* Entidade mestre — a config REFERENCIA o cadastro real; nunca o recria */}
               <Secao titulo="Entidade mestre" primeira>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1 block text-xs text-white/60">Origem do cadastro</label>
-                    <select value={form.origem} onChange={(e) => mudarOrigem(e.target.value)} disabled={!!editando} className={inputCls + (editando ? ' opacity-60' : '')}>
-                      {ORIGENS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-white/60">Papel financeiro</label>
-                    <select value={form.papelFinanceiro} onChange={(e) => mudarPapel(e.target.value)} className={inputCls}>
-                      {PAPEIS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
-                    </select>
-                  </div>
+                <div>
+                  <label className="mb-1 block text-xs text-white/60">Origem do cadastro</label>
+                  <select value={form.origem} onChange={(e) => mudarOrigem(e.target.value)} disabled={!!editando} className={inputCls + (editando ? ' opacity-60' : '')}>
+                    {ORIGENS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-white/60">{lbl(ORIGENS, form.origem)} (mestre existente)</label>
@@ -378,32 +360,39 @@ export default function ProdutosTab() {
                   )}
                   <p className="mt-1 text-[11px] text-white/40">O nome e o código vêm do mestre — não é possível redigitá-los aqui.</p>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-1">
-                    <label className="mb-1 block text-xs text-white/60">Código (derivado)</label>
-                    <input value={form.codigo} readOnly disabled className={inputCls + ' opacity-60'} />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="mb-1 block text-xs text-white/60">Nome (do mestre)</label>
-                    <input value={form.nome} readOnly disabled className={inputCls + ' opacity-60'} />
-                  </div>
-                </div>
               </Secao>
 
-              {/* Valor */}
-              <Secao titulo="Valor">
+              {/* Custo e receita — valores da MESMA configuração */}
+              <Secao titulo="Custo e receita">
+                <div>
+                  <label className="mb-1 block text-xs text-white/60">Moeda padrão</label>
+                  <select value={form.moedaPadrao} onChange={(e) => set('moedaPadrao', e.target.value)} className={inputCls + ' max-w-[12rem]'}>
+                    {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
+                  </select>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1 block text-xs text-white/60">Moeda padrão</label>
-                    <select value={form.moedaPadrao} onChange={(e) => set('moedaPadrao', e.target.value)} className={inputCls}>
-                      {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
-                    </select>
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                    <label className="flex items-center gap-2 text-sm text-white/80">
+                      <input type="checkbox" checked={form.possuiCusto} onChange={(e) => set('possuiCusto', e.target.checked)} className="h-4 w-4 accent-amber-500" />
+                      Possui custo
+                    </label>
+                    <label className="mt-3 mb-1 block text-xs text-white/60">Valor custo padrão</label>
+                    <input type="number" step="0.01" value={form.valorCustoPadrao} disabled={!form.possuiCusto}
+                      onChange={(e) => set('valorCustoPadrao', e.target.value)} placeholder="0,00"
+                      className={inputCls + (form.possuiCusto ? '' : ' opacity-50')} />
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-white/60">Valor padrão</label>
-                    <input type="number" step="0.01" value={form.valorPadrao} onChange={(e) => set('valorPadrao', e.target.value)} placeholder="0,00" className={inputCls} />
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                    <label className="flex items-center gap-2 text-sm text-white/80">
+                      <input type="checkbox" checked={form.possuiReceita} onChange={(e) => set('possuiReceita', e.target.checked)} className="h-4 w-4 accent-emerald-500" />
+                      Possui receita
+                    </label>
+                    <label className="mt-3 mb-1 block text-xs text-white/60">Valor receita padrão</label>
+                    <input type="number" step="0.01" value={form.valorReceitaPadrao} disabled={!form.possuiReceita}
+                      onChange={(e) => set('valorReceitaPadrao', e.target.value)} placeholder="0,00"
+                      className={inputCls + (form.possuiReceita ? '' : ' opacity-50')} />
                   </div>
                 </div>
+                <p className="text-[11px] text-white/40">Estes são os valores padrão (fallback). Preços por contexto ficam na Tabela de Preços.</p>
               </Secao>
 
               {/* Classificação */}

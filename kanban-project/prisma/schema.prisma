@@ -1661,7 +1661,13 @@ model ProdutoFinanceiro {
   planoContaId       Int?
   planoConta         PlanoConta?          @relation(fields: [planoContaId], references: [id])
   moedaPadrao        Moeda                @default(BRL)
-  valorPadrao        Decimal?             @db.Decimal(12, 2)
+  valorPadrao        Decimal?             @db.Decimal(12, 2) // legado: fallback único (pré-unificação)
+  // M-UNIFICA — UMA config por mestre: custo e receita são VALORES desta config,
+  // não mais registros independentes. O papel financeiro vive só em TabelaValor.natureza.
+  possuiCusto        Boolean              @default(false)
+  possuiReceita      Boolean              @default(false)
+  valorCustoPadrao   Decimal?             @db.Decimal(12, 2)
+  valorReceitaPadrao Decimal?             @db.Decimal(12, 2)
   aplicaA            String?              @db.VarChar(20) // appliesTo
   cobravelDoCliente  Boolean              @default(false)
   ativo              Boolean              @default(true)
@@ -1675,11 +1681,10 @@ model ProdutoFinanceiro {
   itemCatalogoId     Int?
   itemCatalogo       ItemCatalogo?        @relation(fields: [itemCatalogoId], references: [id])
 
-  // F1 — Configuração Financeira canônica: papel financeiro + FKs DIRETAS aos mestres reais.
-  // Aditivo/nullable: ProdutoFinanceiro passa a REPRESENTAR uma configuração financeira de uma
-  // entidade mestre existente (não recria mestre). itemCatalogoId permanece como pivô de
-  // Serviço/Produto e alvo de preço (TabelaValor/resolverPreco). Exatamente UM mestre é apontado.
-  papelFinanceiro    PapelFinanceiro?
+  // F1 — Configuração Financeira canônica: FKs DIRETAS aos mestres reais.
+  // itemCatalogoId é o pivô (spine) e alvo de preço (TabelaValor/resolverPreco).
+  // Exatamente UM mestre é apontado. O papel financeiro NÃO vive mais aqui —
+  // custo/receita são valores desta config (M-UNIFICA); papel só em TabelaValor.natureza.
   tipoDocumentoId    Int?
   tipoDocumento      TipoDocumentoCadastro?     @relation("ConfigFinTipoDocumento", fields: [tipoDocumentoId], references: [id])
   honorarioId        Int?
@@ -1701,10 +1706,9 @@ model ProdutoFinanceiro {
   @@index([honorarioId])
   @@index([tipoProcessoId])
   @@index([fornecedorPadraoId])
-  @@index([papelFinanceiro])
-  // F3 — anti-duplicação: 1 configuração por (item mestre × papel financeiro).
+  // M-UNIFICA — anti-duplicação: UMA configuração por item mestre (pivô).
   // itemCatalogoId nulo é distinto no Postgres (não restringe configs sem pivô).
-  @@unique([itemCatalogoId, papelFinanceiro])
+  @@unique([itemCatalogoId])
 }
 
 // ── Tabela de Valores (fin_values) ──

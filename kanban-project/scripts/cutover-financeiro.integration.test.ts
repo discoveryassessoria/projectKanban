@@ -32,34 +32,35 @@ async function main() {
       const fornecedor = (await tx.fornecedor.findFirst({ select: { id: true } }))
         ?? (await tx.fornecedor.create({ data: { nome: 'Fornecedor Teste (rollback)', tipo: 'outro' }, select: { id: true } }))
 
-      // (2)(3) Criar configuração CUSTO e RECEITA referenciando o MESMO documento por FK — sem duplicar o doc
-      const cfgCusto = await tx.produtoFinanceiro.create({ data: {
-        codigo: 'ITEST_CUSTO', nome: 'cfg custo (teste)', papelFinanceiro: 'CUSTO', naturezaFinanceira: 'cost',
+      // (2)(3) M-UNIFICA — UMA configuração por documento (FK), habilitando CUSTO e
+      // RECEITA na MESMA config. O papel financeiro vive só em TabelaValor.natureza,
+      // então NÃO se duplica o doc nem a config (respeita @@unique([itemCatalogoId])).
+      const cfg = await tx.produtoFinanceiro.create({ data: {
+        codigo: 'ITEST_CFG', nome: 'cfg unificada (teste)',
+        possuiCusto: true, possuiReceita: true,
         tipoDocumentoId: doc.id, itemCatalogoId: doc.itemCatalogoId, moedaPadrao: Moeda.BRL,
         fornecedorPadraoId: fornecedor?.id ?? null } })
-      const cfgReceita = await tx.produtoFinanceiro.create({ data: {
-        codigo: 'ITEST_RECEITA', nome: 'cfg receita (teste)', papelFinanceiro: 'RECEITA', naturezaFinanceira: 'revenue',
-        tipoDocumentoId: doc.id, itemCatalogoId: doc.itemCatalogoId, moedaPadrao: Moeda.EUR } })
-      ok(cfgCusto.tipoDocumentoId === doc.id && cfgReceita.tipoDocumentoId === doc.id, '(2)(3) CUSTO e RECEITA referenciam o MESMO TipoDocumento por FK')
+      ok(cfg.tipoDocumentoId === doc.id && cfg.possuiCusto && cfg.possuiReceita,
+        '(2)(3) UMA config habilita CUSTO e RECEITA no MESMO TipoDocumento por FK (sem duplicar)')
 
-      // (4) Preço por FORNECEDOR (custo)
-      await tx.tabelaValor.create({ data: { name: 'custo fornecedor A', itemCatalogoId: doc.itemCatalogoId, natureza: NaturezaPreco.CUSTO, moeda: Moeda.BRL, valor: 150, fornecedorId: fornecedor?.id ?? null } })
-      await tx.tabelaValor.create({ data: { name: 'custo global', itemCatalogoId: doc.itemCatalogoId, natureza: NaturezaPreco.CUSTO, moeda: Moeda.BRL, valor: 100 } })
-      // (5) Preço de VENDA por NACIONALIDADE (receita)
-      await tx.tabelaValor.create({ data: { name: 'receita nac 99', itemCatalogoId: doc.itemCatalogoId, natureza: NaturezaPreco.RECEITA, moeda: Moeda.EUR, valor: 90, processoTipoId: '99' } })
-      ok(true, '(4)(5) preços por fornecedor (custo) e por nacionalidade (receita) criados')
+      // (4) Preço por FORNECEDOR (custo) — apontando para a MESMA config, natureza CUSTO
+      await tx.tabelaValor.create({ data: { name: 'custo fornecedor A', configuracaoFinanceiraItemId: cfg.id, itemCatalogoId: doc.itemCatalogoId, natureza: NaturezaPreco.CUSTO, moeda: Moeda.BRL, valor: 150, fornecedorId: fornecedor?.id ?? null } })
+      await tx.tabelaValor.create({ data: { name: 'custo global', configuracaoFinanceiraItemId: cfg.id, itemCatalogoId: doc.itemCatalogoId, natureza: NaturezaPreco.CUSTO, moeda: Moeda.BRL, valor: 100 } })
+      // (5) Preço de VENDA por NACIONALIDADE (receita) — MESMA config, natureza RECEITA
+      await tx.tabelaValor.create({ data: { name: 'receita nac 99', configuracaoFinanceiraItemId: cfg.id, itemCatalogoId: doc.itemCatalogoId, natureza: NaturezaPreco.RECEITA, moeda: Moeda.EUR, valor: 90, processoTipoId: '99' } })
+      ok(true, '(4)(5) preços por fornecedor (custo) e por nacionalidade (receita) na MESMA config')
 
-      // (6) Aplicabilidade apontando para as CONFIGURAÇÕES por FK (não para cópias)
+      // (6) Aplicabilidade apontando para a MESMA config unificada por FK (custo e receita)
       const econ = await tx.phaseEconomicRule.create({ data: {
         phaseKey: 'emissao_documental', componentKey: 'ITEST', componentName: 'Item Teste',
-        tipoDocumentoId: doc.id, custoConfigId: cfgCusto.id, receitaConfigId: cfgReceita.id } })
-      ok(econ.custoConfigId === cfgCusto.id && econ.receitaConfigId === cfgReceita.id, '(6) Aplicabilidade seleciona configs por FK')
+        tipoDocumentoId: doc.id, custoConfigId: cfg.id, receitaConfigId: cfg.id } })
+      ok(econ.custoConfigId === cfg.id && econ.receitaConfigId === cfg.id, '(6) Aplicabilidade seleciona a config unificada por FK (custo e receita)')
 
       // (7) Automação existente selecionando a configuração por FK
       const trig = await tx.phaseTriggerRule.create({ data: {
-        itemCode: cfgCusto.codigo, financialItemId: cfgCusto.id, configItemId: cfgCusto.id,
+        itemCode: cfg.codigo, financialItemId: cfg.id, configItemId: cfg.id,
         name: 'trigger teste', phaseKey: 'emissao_documental', entryType: 'cost' } })
-      ok(trig.configItemId === cfgCusto.id, '(7) Automação (PhaseTriggerRule) referencia config por FK')
+      ok(trig.configItemId === cfg.id, '(7) Automação (PhaseTriggerRule) referencia config por FK')
 
       // (8) RESOLVER preço — loader ligado à transação
       const carregar: CarregadorLinhasPreco = async (itemId, nat) => {
@@ -74,7 +75,7 @@ async function main() {
       ok(!semPreco.ok, '(8c) sem preço configurado → ok:false (NUNCA zero silencioso)')
 
       // (9) LANÇAMENTO idempotente — mesmo automaticKey não duplica (padrão MotorArtefato reusado)
-      const akey = `itest::${cfgCusto.id}::custo`
+      const akey = `itest::${cfg.id}::custo`
       const proc = await tx.processo.findFirst({ select: { id: true, tipoProcessoMotorId: true } })
       if (proc) {
         const tpid = proc.tipoProcessoMotorId ?? 1

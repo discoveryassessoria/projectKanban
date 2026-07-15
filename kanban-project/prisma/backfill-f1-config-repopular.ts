@@ -4,11 +4,15 @@
 // a partir dos cadastros MESTRES existentes. NÃO cria preços (valores monetários
 // são dado de negócio; ficam para o usuário preencher na Tabela de Preços).
 //
-// Respeita as constraints R14/R15/R16 já ativas em produção:
-//   • papelFinanceiro sempre setado (CUSTO e RECEITA por mestre) — R15;
-//   • itemCatalogoId (pivô) sempre presente — R14;
-//   • no máx. 1 mestre de domínio — R14;
-//   • idempotente: pula se já existe config para (mestre, papel) — R16.
+// M-UNIFICA — UMA config por mestre: o papel financeiro NÃO vive mais aqui.
+// Custo e receita são VALORES desta config (TabelaValor.natureza). O esqueleto
+// habilita ambos os papéis (possuiCusto e possuiReceita) por padrão; os valores
+// ficam nulos até o usuário preencher.
+//
+// Respeita as constraints já ativas em produção:
+//   • itemCatalogoId (pivô) sempre presente;
+//   • no máx. 1 config por mestre — @@unique([itemCatalogoId]);
+//   • idempotente: pula se já existe config para o mestre.
 //
 // Origem dos mestres:
 //   • Documento → TipoDocumentoCadastro (ativo, com itemCatalogoId) → tipoDocumentoId
@@ -20,41 +24,36 @@
 //   npx tsx prisma/backfill-f1-config-repopular.ts --execute  (grava)
 // Conexão: usa INSPECT_DB_URL se setado; senão o datasource padrão.
 // ============================================================================
-import { PrismaClient, PapelFinanceiro, Moeda } from '@prisma/client'
+import { PrismaClient, Moeda } from '@prisma/client'
 
 const url = process.env.INSPECT_DB_URL
 const prisma = url ? new PrismaClient({ datasources: { db: { url } } }) : new PrismaClient()
 const EXECUTE = process.argv.includes('--execute')
 
-type Plano = { codigo: string; nome: string; papel: PapelFinanceiro; itemCatalogoId: number; tipoDocumentoId: number | null; origem: string }
+type Plano = { codigo: string; nome: string; itemCatalogoId: number; tipoDocumentoId: number | null; origem: string }
 
 async function main() {
   const [docs, servicos, existentes] = await Promise.all([
     prisma.tipoDocumentoCadastro.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true, itemCatalogoId: true } }),
     prisma.itemCatalogo.findMany({ where: { ativo: true, natureza: 'SERVICO' }, select: { id: true, code: true, name: true } }),
-    prisma.produtoFinanceiro.findMany({ select: { tipoDocumentoId: true, itemCatalogoId: true, papelFinanceiro: true } }),
+    prisma.produtoFinanceiro.findMany({ select: { tipoDocumentoId: true, itemCatalogoId: true } }),
   ])
 
-  // chaves já existentes (idempotência)
-  const jaDoc = new Set(existentes.filter((e) => e.tipoDocumentoId != null).map((e) => `${e.tipoDocumentoId}::${e.papelFinanceiro}`))
-  const jaItem = new Set(existentes.filter((e) => e.tipoDocumentoId == null && e.itemCatalogoId != null).map((e) => `${e.itemCatalogoId}::${e.papelFinanceiro}`))
+  // chaves já existentes (idempotência) — UMA config por mestre (sem papel)
+  const jaDoc = new Set(existentes.filter((e) => e.tipoDocumentoId != null).map((e) => `${e.tipoDocumentoId}`))
+  const jaItem = new Set(existentes.filter((e) => e.tipoDocumentoId == null && e.itemCatalogoId != null).map((e) => `${e.itemCatalogoId}`))
 
-  const PAPEIS: PapelFinanceiro[] = [PapelFinanceiro.CUSTO, PapelFinanceiro.RECEITA]
   const plano: Plano[] = []
   const pulados: { origem: string; ref: string; motivo: string }[] = []
 
   for (const d of docs) {
     if (d.itemCatalogoId == null) { pulados.push({ origem: 'Documento', ref: d.code ?? d.name, motivo: 'sem itemCatalogo (pivô) — precisa espelho antes' }); continue }
-    for (const papel of PAPEIS) {
-      if (jaDoc.has(`${d.id}::${papel}`)) { pulados.push({ origem: 'Documento', ref: `${d.code ?? d.name}/${papel}`, motivo: 'config já existe' }); continue }
-      plano.push({ codigo: `CFG_DOC_${d.id}_${papel}`, nome: `${d.name} · ${papel}`, papel, itemCatalogoId: d.itemCatalogoId, tipoDocumentoId: d.id, origem: 'Documento' })
-    }
+    if (jaDoc.has(`${d.id}`)) { pulados.push({ origem: 'Documento', ref: d.code ?? d.name, motivo: 'config já existe' }); continue }
+    plano.push({ codigo: `CFG_DOC_${d.id}`, nome: d.name, itemCatalogoId: d.itemCatalogoId, tipoDocumentoId: d.id, origem: 'Documento' })
   }
   for (const sv of servicos) {
-    for (const papel of PAPEIS) {
-      if (jaItem.has(`${sv.id}::${papel}`)) { pulados.push({ origem: 'Serviço', ref: `${sv.code}/${papel}`, motivo: 'config já existe' }); continue }
-      plano.push({ codigo: `CFG_SRV_${sv.id}_${papel}`, nome: `${sv.name} · ${papel}`, papel, itemCatalogoId: sv.id, tipoDocumentoId: null, origem: 'Serviço' })
-    }
+    if (jaItem.has(`${sv.id}`)) { pulados.push({ origem: 'Serviço', ref: sv.code, motivo: 'config já existe' }); continue }
+    plano.push({ codigo: `CFG_SRV_${sv.id}`, nome: sv.name, itemCatalogoId: sv.id, tipoDocumentoId: null, origem: 'Serviço' })
   }
 
   console.log(`\n=== REPOPULAÇÃO F1 — ${EXECUTE ? 'EXECUTAR' : 'DRY-RUN (read-only)'} ===`)
@@ -79,9 +78,9 @@ async function main() {
     try {
       await prisma.produtoFinanceiro.create({
         data: {
-          codigo: p.codigo, nome: p.nome, papelFinanceiro: p.papel, moedaPadrao: p.papel === 'CUSTO' ? Moeda.BRL : Moeda.EUR,
+          codigo: p.codigo, nome: p.nome, moedaPadrao: Moeda.BRL,
+          possuiCusto: true, possuiReceita: true,
           itemCatalogoId: p.itemCatalogoId, tipoDocumentoId: p.tipoDocumentoId, ativo: true,
-          naturezaFinanceira: p.papel === 'CUSTO' ? 'cost' : 'revenue',
         },
       })
       criadas++

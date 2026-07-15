@@ -24,20 +24,22 @@ function overlaps(aI: string | null, aF: string | null, bI: string | null, bF: s
 
 async function main() {
   // ===== R14 — como os mestres estão preenchidos em ProdutoFinanceiro =====
+  // M-UNIFICA — UMA config por mestre; o papel financeiro vive em TabelaValor.natureza.
+  // Aqui checamos configs sem NENHUM papel habilitado (possuiCusto=false E possuiReceita=false).
   const cfgs = await prisma.produtoFinanceiro.findMany({
     select: {
-      id: true, codigo: true, papelFinanceiro: true, ativo: true,
+      id: true, codigo: true, possuiCusto: true, possuiReceita: true, ativo: true,
       tipoDocumentoId: true, honorarioId: true, tipoProcessoId: true, itemCatalogoId: true,
       tipoDocumento: { select: { itemCatalogoId: true } },
     },
   })
   const MASTER_KEYS = ['tipoDocumentoId', 'honorarioId', 'tipoProcessoId', 'itemCatalogoId']
   const distMask = new Map<string, number>()
-  let itemIsDocMirror = 0, itemStandaloneService = 0, semNenhum = 0, comPapelNull = 0
+  let itemIsDocMirror = 0, itemStandaloneService = 0, semNenhum = 0, comSemPapel = 0
   for (const c of cfgs) {
     const m = mask(c as any, MASTER_KEYS)
     distMask.set(m, (distMask.get(m) ?? 0) + 1)
-    if (c.papelFinanceiro == null) comPapelNull++
+    if (!c.possuiCusto && !c.possuiReceita) comSemPapel++
     const nMasters = MASTER_KEYS.filter((k) => (c as any)[k] != null).length
     if (nMasters === 0) semNenhum++
     // quando itemCatalogoId é o espelho do próprio tipoDocumento (doc), não conta como 2º mestre
@@ -105,7 +107,7 @@ async function main() {
 
   console.log(JSON.stringify({
     totais: {
-      configs: cfgs.length, configsPapelNull: comPapelNull, configsSemMestre: semNenhum,
+      configs: cfgs.length, configsSemPapelHabilitado: comSemPapel, configsSemMestre: semNenhum,
       precosAtivos: precos.length, precosCanonicos: ativosCanon.length,
       precosLegadoPendente: precos.filter((p) => p.legadoPendente).length,
       precosSemConfig: precos.filter((p) => p.configuracaoFinanceiraItemId == null).length,

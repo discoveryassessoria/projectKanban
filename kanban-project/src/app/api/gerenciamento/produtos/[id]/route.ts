@@ -39,35 +39,29 @@ export async function PUT(
 
     const b = await request.json()
 
-    if (b.codigo !== undefined && !String(b.codigo).trim()) {
-      return NextResponse.json({ error: 'Código não pode ficar vazio' }, { status: 400 })
-    }
-    if (b.nome !== undefined && !String(b.nome).trim()) {
-      return NextResponse.json({ error: 'Nome não pode ficar vazio' }, { status: 400 })
-    }
     if (b.moedaPadrao !== undefined && b.moedaPadrao && !MOEDAS.includes(b.moedaPadrao)) {
       return NextResponse.json({ error: 'Moeda inválida' }, { status: 400 })
     }
 
-    const codigo = b.codigo !== undefined ? String(b.codigo).trim() : atual.codigo
-    const nome = b.nome !== undefined ? String(b.nome).trim() : atual.nome
+    // Nome e código de negócio pertencem ao MESTRE — a config nunca os edita.
+    // Mantém os campos técnicos internos como estão (identidade estável); a exibição
+    // resolve nome/código do mestre por relação. Cliente não pode reescrevê-los.
+    const codigo = atual.codigo
+    const nome = atual.nome
     // R20 — a entidade mestre é IMUTÁVEL na edição: rejeita troca silenciosa de
     // Documento↔Serviço↔Processo↔Honorário (trocar origem = novo registro).
+    // (Papel não é mais atributo da config: custo/receita são valores editáveis abaixo.)
     const trocaMestre =
       (b.tipoDocumentoId !== undefined && (b.tipoDocumentoId ? Number(b.tipoDocumentoId) : null) !== atual.tipoDocumentoId) ||
       (b.honorarioId !== undefined && (b.honorarioId ? Number(b.honorarioId) : null) !== atual.honorarioId) ||
       (b.tipoProcessoId !== undefined && (b.tipoProcessoId ? Number(b.tipoProcessoId) : null) !== atual.tipoProcessoId) ||
-      (b.itemCatalogoId !== undefined && (b.itemCatalogoId ? Number(b.itemCatalogoId) : null) !== atual.itemCatalogoId) ||
-      (b.papelFinanceiro !== undefined && b.papelFinanceiro && b.papelFinanceiro !== atual.papelFinanceiro)
+      (b.itemCatalogoId !== undefined && (b.itemCatalogoId ? Number(b.itemCatalogoId) : null) !== atual.itemCatalogoId)
     if (trocaMestre) {
-      return NextResponse.json({ error: 'Não é permitido trocar a entidade mestre ou o papel de uma configuração existente. Crie uma nova configuração e inative esta.' }, { status: 400 })
+      return NextResponse.json({ error: 'Não é permitido trocar a entidade mestre de uma configuração existente. Crie uma nova configuração e inative esta.' }, { status: 400 })
     }
     const produto = await prisma.$transaction(async (tx) => {
-      // LOTE B — dual-write de NOME no MESMO item mestre (pivô imutável, R20):
-      // atualiza o rótulo do ItemCatalogo vinculado sem re-derivar/trocar o pivô.
-      if (atual.itemCatalogoId != null && nome !== atual.nome) {
-        await tx.itemCatalogo.update({ where: { id: atual.itemCatalogoId }, data: { name: nome } })
-      }
+      // Nome/código do mestre NÃO são editados aqui (pertencem ao cadastro mestre).
+      // O ItemCatalogo é rotulado pela tela do próprio mestre (Serviços/Documentos).
       return tx.produtoFinanceiro.update({
         where: { id },
         data: {
@@ -86,6 +80,11 @@ export async function PUT(
           custoInterno: b.custoInterno !== undefined ? !!b.custoInterno : atual.custoInterno,
           repasse: b.repasse !== undefined ? !!b.repasse : atual.repasse,
           reembolsavel: b.reembolsavel !== undefined ? !!b.reembolsavel : atual.reembolsavel,
+          // M-UNIFICA — custo e receita como valores editáveis da MESMA config.
+          possuiCusto: b.possuiCusto !== undefined ? !!b.possuiCusto : atual.possuiCusto,
+          possuiReceita: b.possuiReceita !== undefined ? !!b.possuiReceita : atual.possuiReceita,
+          valorCustoPadrao: b.valorCustoPadrao !== undefined ? parseDecimal(b.valorCustoPadrao) : atual.valorCustoPadrao,
+          valorReceitaPadrao: b.valorReceitaPadrao !== undefined ? parseDecimal(b.valorReceitaPadrao) : atual.valorReceitaPadrao,
           // itemCatalogoId (pivô/mestre) NÃO é alterado na edição — R20.
         },
       })

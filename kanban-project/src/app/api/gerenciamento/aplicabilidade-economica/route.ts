@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     if (erro) return erro
     const [regras, produtos, tiposProcesso, docTypes] = await Promise.all([
       prisma.phaseEconomicRule.findMany({ orderBy: [{ phaseKey: 'asc' }, { ordem: 'asc' }] }),
-      prisma.produtoFinanceiro.findMany({ where: { ativo: true }, select: { id: true, codigo: true, nome: true, naturezaFinanceira: true, papelFinanceiro: true, moedaPadrao: true }, orderBy: { nome: 'asc' } }),
+      prisma.produtoFinanceiro.findMany({ where: { ativo: true }, select: { id: true, codigo: true, nome: true, naturezaFinanceira: true, possuiCusto: true, possuiReceita: true, moedaPadrao: true }, orderBy: { nome: 'asc' } }),
       prisma.tipoProcessoNacionalidade.findMany({ where: { ativo: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
       prisma.tipoDocumentoCadastro.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
     ])
