@@ -102,9 +102,13 @@ const orders = MANAGEMENT_NAVIGATION.map((g) => g.order)
 ok(orders.every((o, i) => i === 0 || o > orders[i - 1]), "ordem dos grupos preservada (ascendente)")
 // a11y + normalização + deep-link no componente (source check)
 const pageSrc = readFileSync(join(ROOT, "src/app/administrator/page.tsx"), "utf8")
-ok(/aria-expanded=\{aberto\}/.test(pageSrc) && /aria-controls=/.test(pageSrc), "cabeçalho de grupo tem aria-expanded + aria-controls")
+ok(/aria-expanded=\{moduloAberto\}/.test(pageSrc) && /aria-controls=/.test(pageSrc), "linha do módulo (árvore) tem aria-expanded + aria-controls")
 ok(/normalize\("NFD"\)/.test(pageSrc), "busca normaliza acentos (NFD) no componente")
 ok(/\?screen=/.test(pageSrc), "deep-link ?screen= preservado no componente (rotas intactas)")
+// árvore lateral única: lista TODOS os módulos; sem página intermediária de cards por módulo
+ok(/aria-label="Módulos do Gerenciamento"/.test(pageSrc), "árvore lateral lista todos os módulos")
+ok(!/view === "module"/.test(pageSrc), "sem view intermediária de cards por módulo (navegação duplicada removida)")
+ok(/primeiraTelaDoModulo/.test(pageSrc), "módulo abre direto na 1ª tela útil (defaultRoute)")
 
 // 10) Consolidação Tipos de Documento x Tipos de Certidão
 console.log("\nConsolidação Documentos/Certidões:")
