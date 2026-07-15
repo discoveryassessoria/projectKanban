@@ -643,8 +643,16 @@ export default function GerenciamentoPage() {
                               }`}
                             >
                               <button
-                                onClick={() => irParaModulo(g.key)}
+                                onClick={() => {
+                                  // acordeão: aberto → recolhe; fechado-mas-ativo → só expande
+                                  // (sem re-navegar); outro módulo → abre + vai à 1ª tela útil.
+                                  if (moduloAberto) toggleModulo(g.key)
+                                  else if (moduloEhAtivo) setExpandedModule(g.key)
+                                  else irParaModulo(g.key)
+                                }}
                                 aria-current={moduloEhAtivo ? "true" : undefined}
+                                aria-expanded={moduloAberto}
+                                aria-controls={painelId}
                                 title={g.fullLabel || g.label}
                                 className="flex min-w-0 flex-1 items-center gap-2 rounded-l-lg py-2.5 pl-2.5 pr-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                               >
