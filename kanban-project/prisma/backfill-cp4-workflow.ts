@@ -68,24 +68,17 @@ export async function backfillCp4Workflow(opts: BackfillOptions = {}): Promise<B
   const dryRun = opts.dryRun === false && process.env.BACKFILL_EXECUTE === "1" ? false : true
   const rel = new RelatorioBackfill(dryRun)
 
-  // Escopo: um processo (ativação) ou todos os workflows legados.
-  const whereWf: Prisma.WorkflowWhereInput = opts.processoId
-    ? { documento: { pessoa: { arvore: { processos: { some: { id: opts.processoId } } } } } }
-    : {}
+  // CONTRACT MIGRATION: os models legados Workflow/WorkflowStep foram REMOVIDOS
+  // fisicamente. Não há mais estado legado a ler → o backfill/reconciliador é
+  // no-op (relatório vazio). O corpo do laço abaixo é preservado como referência
+  // histórica da lógica de reconciliação por-documento e NUNCA executa.
+  const workflows: Array<Record<string, unknown>> = []
 
-  const workflows = await prisma.workflow.findMany({
-    where: whereWf,
-    include: {
-      steps: { orderBy: { ordem: "asc" } },
-      documento: { select: { id: true, pessoa: { select: { arvore: { select: { processos: { select: { id: true, tipoProcessoMotorId: true } } } } } } } },
-    },
-  })
-
-  for (const wf of workflows) {
+  for (const wf of workflows as Array<Record<string, unknown> & { [k: string]: any }>) {
     rel.scan()
 
     // 1) Resolver o Processo de forma SEGURA (cadeia é 1:N ⇒ frequentemente ambígua).
-    const processosCandidatos = wf.documento?.pessoa?.arvore?.processos ?? []
+    const processosCandidatos: Array<{ id: number; tipoProcessoMotorId: number | null }> = wf.documento?.pessoa?.arvore?.processos ?? []
     const resProc = resolverProcessoDoWorkflow(processosCandidatos.map((p) => p.id))
     if (!resProc.ok) {
       rel.naoResolvido(resProc.motivo, { entityType: "Workflow", entityId: wf.id, detalhe: `${processosCandidatos.length} processos candidatos` })
