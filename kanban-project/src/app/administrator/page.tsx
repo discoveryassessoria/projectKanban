@@ -537,55 +537,14 @@ export default function GerenciamentoPage() {
           </section>
         ) : null}
 
-        {/* ══════════════════════ MÓDULO — GRUPOS VISUAIS ══════════════════════ */}
-        {view === "module" && moduloAtivo ? (
+        {/* ═══════════ MÓDULO — SHELL ÚNICO (sidebar persistente + conteúdo) ═══════════ */}
+        {/* Um ÚNICO layout para TODO o módulo: a navegação contextual (fonte única:
+            managementNavigation) fica SEMPRE presente; o conteúdo é a home do módulo
+            (cards por grupo) OU a tela selecionada. Trocar de página não altera
+            largura/posição/estrutura/estilo do sidebar. Vale para todos os módulos
+            (Financeiro incluído) — sem layout paralelo. */}
+        {(view === "module" || view === "screen") && moduloAtivo ? (
           <section aria-label={`Módulo ${moduloAtivo.fullLabel || moduloAtivo.label}`}>
-            <Breadcrumb
-              trilha={[
-                { label: "Gerenciamento", onClick: irParaHome },
-                { label: moduloAtivo.fullLabel || moduloAtivo.label },
-              ]}
-            />
-            <header className="mb-6 mt-1 flex items-start gap-3">
-              {moduloAtivo.icon ? (
-                <span className="mt-0.5 flex h-11 w-11 flex-none items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] text-white/85">
-                  <moduloAtivo.icon className="h-6 w-6" />
-                </span>
-              ) : null}
-              <div>
-                <h1 className="text-[26px] font-bold tracking-tight text-white md:text-[28px]">
-                  {moduloAtivo.fullLabel || moduloAtivo.label}
-                </h1>
-                <p className="mt-1 max-w-3xl text-[15px] text-white/60">{moduloAtivo.description}</p>
-              </div>
-            </header>
-
-            <div className="space-y-7">
-              {secoes.map((s) => (
-                <div key={s.nome}>
-                  <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[0.14em] text-white/45">{s.nome}</h2>
-                  <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-                    {s.itens.map((it) => (
-                      <button
-                        key={it.key}
-                        onClick={() => irParaTela(it.key)}
-                        title={it.fullLabel || it.label}
-                        className="group flex min-h-[56px] items-center gap-3 rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-white/25 hover:bg-slate-900/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-                      >
-                        <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-white/90">{it.label}</span>
-                        <ChevronRight className="h-4 w-4 flex-none text-white/35 transition-transform group-hover:translate-x-0.5 group-hover:text-white/70" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {/* ══════════════════════ TELA — NAV CONTEXTUAL + CONTEÚDO ═════════════ */}
-        {view === "screen" && moduloAtivo ? (
-          <section aria-label={labelTela}>
             {/* abrir nav contextual em mobile */}
             <button
               onClick={() => setMobileNav(true)}
@@ -707,25 +666,75 @@ export default function GerenciamentoPage() {
                 )}
               </aside>
 
-              {/* CONTEÚDO DA TELA */}
+              {/* CONTEÚDO — home do módulo (cards) OU a tela selecionada */}
               <div className="min-w-0 flex-1">
                 <Breadcrumb
-                  trilha={[
-                    { label: "Gerenciamento", onClick: irParaHome },
-                    { label: moduloAtivo.fullLabel || moduloAtivo.label, onClick: () => irParaModulo(moduloAtivo.key) },
-                    { label: labelTela },
-                  ]}
+                  trilha={
+                    activeScreen
+                      ? [
+                          { label: "Gerenciamento", onClick: irParaHome },
+                          { label: moduloAtivo.fullLabel || moduloAtivo.label, onClick: () => irParaModulo(moduloAtivo.key) },
+                          { label: labelTela },
+                        ]
+                      : [
+                          { label: "Gerenciamento", onClick: irParaHome },
+                          { label: moduloAtivo.fullLabel || moduloAtivo.label },
+                        ]
+                  }
                 />
-                <div className="mb-4 mt-1 flex items-center justify-between gap-3">
-                  <h1 className="text-[22px] font-bold tracking-tight text-white md:text-[24px]">{labelTela}</h1>
-                  <button
-                    onClick={() => irParaModulo(moduloAtivo.key)}
-                    className="inline-flex flex-none items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-[13px] font-medium text-white/75 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                  >
-                    <ArrowLeft className="h-4 w-4" /> Voltar ao módulo
-                  </button>
-                </div>
-                {TelaAtiva ? <TelaAtiva /> : <EmBreve titulo={labelTela} />}
+
+                {activeScreen ? (
+                  // ── TELA selecionada ──────────────────────────────────────────
+                  <>
+                    <div className="mb-4 mt-1 flex items-center justify-between gap-3">
+                      <h1 className="text-[22px] font-bold tracking-tight text-white md:text-[24px]">{labelTela}</h1>
+                      <button
+                        onClick={() => irParaModulo(moduloAtivo.key)}
+                        className="inline-flex flex-none items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-[13px] font-medium text-white/75 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                      >
+                        <ArrowLeft className="h-4 w-4" /> Voltar ao módulo
+                      </button>
+                    </div>
+                    {TelaAtiva ? <TelaAtiva /> : <EmBreve titulo={labelTela} />}
+                  </>
+                ) : (
+                  // ── HOME DO MÓDULO — cartões de acesso derivados da MESMA fonte ──
+                  <>
+                    <header className="mb-6 mt-1 flex items-start gap-3">
+                      {moduloAtivo.icon ? (
+                        <span className="mt-0.5 flex h-11 w-11 flex-none items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] text-white/85">
+                          <moduloAtivo.icon className="h-6 w-6" />
+                        </span>
+                      ) : null}
+                      <div>
+                        <h1 className="text-[26px] font-bold tracking-tight text-white md:text-[28px]">
+                          {moduloAtivo.fullLabel || moduloAtivo.label}
+                        </h1>
+                        <p className="mt-1 max-w-3xl text-[15px] text-white/60">{moduloAtivo.description}</p>
+                      </div>
+                    </header>
+                    <div className="space-y-7">
+                      {secoes.map((s) => (
+                        <div key={s.nome}>
+                          <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[0.14em] text-white/45">{s.nome}</h2>
+                          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+                            {s.itens.map((it) => (
+                              <button
+                                key={it.key}
+                                onClick={() => irParaTela(it.key)}
+                                title={it.fullLabel || it.label}
+                                className="group flex min-h-[56px] items-center gap-3 rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-white/25 hover:bg-slate-900/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                              >
+                                <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-white/90">{it.label}</span>
+                                <ChevronRight className="h-4 w-4 flex-none text-white/35 transition-transform group-hover:translate-x-0.5 group-hover:text-white/70" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </section>
