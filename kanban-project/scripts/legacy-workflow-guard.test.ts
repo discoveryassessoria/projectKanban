@@ -17,14 +17,9 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const SRC = join(ROOT, "src")
 
 // Consumidores operacionais do legado ainda NÃO migrados (a lista só encolhe).
-const ALLOWLIST = new Set<string>([
-  "src/app/api/documentos/[id]/workflow/route.ts",
-  "src/app/api/documentos/[id]/workflow/steps/[stepId]/route.ts",
-  "src/lib/process-stage/recalcular-fase.ts",
-  "src/app/api/processos/[processoId]/central-operacional/route.ts",
-  "src/app/api/processos/[processoId]/phase/route.ts",
-  "src/services/completion-engine/index.ts",
-])
+// CUTOVER V2 CONCLUÍDO no código: allowlist ZERADA — nenhum consumidor operacional
+// lê/escreve Workflow/WorkflowStep legado. Qualquer reintrodução falha o CI.
+const ALLOWLIST = new Set<string>([])
 
 // Padrões de uso OPERACIONAL do legado (exclui models/campos V2).
 const LEGACY = /(prisma|tx)\.(workflow|workflowStep)\.(create|update|delete|upsert|createMany|updateMany|deleteMany|findMany|findFirst|findUnique|count|aggregate)|workflows:\s*\{\s*(select|where|some)/

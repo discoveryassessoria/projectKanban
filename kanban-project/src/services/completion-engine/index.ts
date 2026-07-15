@@ -43,43 +43,10 @@ export { resolveStepCompletionState } from "@/src/services/processEngine/stepCom
 // ── resolveWorkflowProgress: progresso/conclusão do workflow de UM documento ─
 export async function resolveWorkflowProgress(documentoId: number): Promise<AggregateResult> {
   const now = new Date()
-  // FASE 3 (CP-5): fonte canônica = operação por-documento no V2. Se existir,
-  // manda; senão cai no legado (compatibilidade até o cutover definitivo).
+  // CUTOVER V2: fonte ÚNICA = operação por-documento no V2 (PhaseWorkflowStepInstance
+  // com documentoId). Sem operação V2 → progresso zero (nada a concluir).
   const v2 = await progressoOperacaoV2(documentoId)
-  if (v2) return v2
-  const wf = await prisma.workflow.findFirst({
-    where: { documentoId, status: { notIn: ["arquivado", "cancelado"] } },
-    orderBy: { createdAt: "desc" },
-    include: { steps: { orderBy: { ordem: "asc" }, select: { stepKey: true, weight: true, status: true, completionPolicy: true } } },
-  })
-  if (!wf) {
-    return { completed: false, progress: 0, blockers: [], mandatoryBlockers: [], evaluatedAt: now }
-  }
-
-  const inputs = await Promise.all(
-    wf.steps
-      .filter((s) => s.status !== "cancelada")
-      .map(async (s) => {
-        // Passo já concluído no banco conta como 100% (respeita estado gravado).
-        if (s.status === "concluida") {
-          return {
-            weight: s.weight,
-            result: {
-              completed: true,
-              progress: 100,
-              reason: "Passo concluído.",
-              policy: "MANUAL_CONFIRMATION" as const,
-              blockers: [],
-              evidence: [],
-              evaluatedAt: now,
-            },
-          }
-        }
-        const r = await resolveStepCompletionState(s.stepKey, documentoId, s.completionPolicy)
-        return { weight: s.weight, result: r.result }
-      }),
-  )
-  return evaluateWorkflowProgress(inputs, now)
+  return v2 ?? { completed: false, progress: 0, blockers: [], mandatoryBlockers: [], evaluatedAt: now }
 }
 
 // ── resolvePhaseProgress: progresso da FASE atual do processo ─────────────────
@@ -106,7 +73,8 @@ async function carregarFaseEDocs(processoId: number): Promise<{
               documentos: {
                 select: {
                   status: true,
-                  workflows: { select: { faseCode: true, status: true } },
+                  // CUTOVER V2: progresso da fase deriva do status (mestre) do documento;
+                  // não lê mais Workflow legado.
                 },
               },
             },
@@ -120,7 +88,7 @@ async function carregarFaseEDocs(processoId: number): Promise<{
     processo?.status?.faseCode ??
     null
   const docs: DocForStage[] = (processo?.arvore?.pessoas ?? []).flatMap((p) =>
-    p.documentos.map((d) => ({ status: d.status, required: true, workflows: d.workflows } as unknown as DocForStage)),
+    p.documentos.map((d) => ({ status: d.status, required: true, workflows: [] } as unknown as DocForStage)),
   )
   return { faseCode, docs }
 }

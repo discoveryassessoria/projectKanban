@@ -7,6 +7,25 @@
 import type { StepInstanceStatus, WorkflowInstanceStatus } from "@prisma/client"
 
 /**
+ * REVERSO: StepInstanceStatus (v2) → string legada (para o adaptador que serve o
+ * contrato antigo do frontend a partir da fonte V2). Não persiste legado.
+ */
+export function stepInstanceStatusToLegacy(s: StepInstanceStatus): string {
+  switch (s) {
+    case "CONCLUIDO": return "concluida"
+    case "EM_ANDAMENTO": return "em_andamento"
+    case "AGUARDANDO": return "aguardando_terceiro"
+    case "BLOQUEADO": return "bloqueada"
+    case "CANCELADO":
+    case "SUPERSEDIDO": return "cancelada"
+    case "DISPENSADO": return "cancelada"
+    case "PENDENTE": return "bloqueada"
+    case "DISPONIVEL": return "nao_iniciada"
+    default: return "nao_iniciada"
+  }
+}
+
+/**
  * WorkflowStep.status (legado, String) → StepInstanceStatus (v2).
  * Default seguro = PENDENTE (nunca marca como concluído por engano).
  */

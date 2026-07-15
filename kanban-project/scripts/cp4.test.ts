@@ -567,7 +567,7 @@ async function run() {
   ok(/if \(await processoEmRuntimeV2\(processoId\)\) \{[\s\S]*?motor-legado/.test(exec), "executarMotorNaFase no-op em v2 (financeiro legado não executa)")
   ok(/if \(await processoEmRuntimeV2\(processoId\)\) return/.test(exec), "dispararMotorNaFaseAtual retorna cedo em v2")
   const rec = readFileSync(join(ROOT, "src/lib/process-stage/recalcular-fase.ts"), "utf8")
-  ok(/if \(await processoEmRuntimeV2\(processoId\)\)/.test(rec) && /recálculo de fase legado inativo/.test(rec), "recalcularFaseDoProcesso não move faseAtualKey em v2")
+  ok(/from "@\/src\/lib\/motor\/phase-advance"/.test(rec) && /await advance\(processo\.id\)/.test(rec) && !/\.workflow\.(create|update|updateMany)\b/.test(rec), "recalcularFaseDoProcesso delega ao PhaseAdvanceService V2 (sem escrita de fase legada)")
 
   // ============== Auditoria item 2 — fail-closed de Processo.statusId ==============
   console.log("\n--- Auditoria item 2 (statusId fail-closed) ---")

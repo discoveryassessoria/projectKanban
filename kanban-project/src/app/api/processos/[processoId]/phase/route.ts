@@ -47,7 +47,7 @@ export async function GET(
                 select: {
                   id: true,
                   status: true,
-                  workflows: { select: { faseCode: true, status: true } },
+                  // CUTOVER V2: sem Workflow legado; o gate da fase deriva do status.
                 },
               },
             },
@@ -68,7 +68,7 @@ export async function GET(
       p.documentos.map((d) => ({
         id: d.id,
         status: d.status,
-        workflows: d.workflows,
+        workflows: [],
       })),
     )
 

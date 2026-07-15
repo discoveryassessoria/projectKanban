@@ -249,29 +249,15 @@ export async function GET(
               dataPrazoOperacao: true,
               motivoBloqueio: true,
               ultimaMovimentacao: true,
-              workflows: { select: { faseCode: true, status: true } },
+              // CUTOVER V2: sem leitura de Workflow legado. Passos V2 por-documento
+              // (PhaseWorkflowStepInstance com documentoId) alimentam a operação.
             },
           })
         : [],
-      processo.arvoreId
-        ? prisma.workflow.findMany({
-            where: { documento: { pessoa: { arvoreId: processo.arvoreId } } },
-            select: {
-              documentoId: true,
-              faseCode: true, // ✅ NOVO: p/ filtrar os workflows da fase atual
-              steps: {
-                select: {
-                  ordem: true,
-                  stepKey: true, // ✅ NOVO: p/ casar cada passo com o catálogo da fase
-                  status: true,
-                  assigneeId: true,
-                  assignee: { select: { nome: true } },
-                },
-                orderBy: { ordem: "asc" },
-              },
-            },
-          })
-        : [],
+      // CUTOVER V2: workflowsRaw legado eliminado. O dono do documento vem do
+      // mestre (Documento.responsavelId). TODO: enriquecer com o responsável do
+      // passo ATIVO via PhaseWorkflowStepInstance (responsavelId é ref solta a Usuario).
+      [] as Array<{ documentoId: number; faseCode: string | null; steps: Array<{ ordem: number; stepKey: string; status: string; assigneeId: number | null; assignee: { nome: string } | null }> }>,
     ])
 
     const nomeCompleto = (p: { nome: string; sobrenome: string | null }) =>
@@ -341,7 +327,6 @@ export async function GET(
         dataPrazoOperacao: d.dataPrazoOperacao,
         motivoBloqueio: d.motivoBloqueio,
         ultimaMovimentacao: d.ultimaMovimentacao,
-        workflows: d.workflows,
       }
     })
 
