@@ -24,6 +24,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (b.participaPlanilha !== undefined) data.participaPlanilha = !!b.participaPlanilha
     if (b.ordem !== undefined) data.ordem = toIntOrNull(b.ordem) ?? 0
     if (b.ativo !== undefined) data.ativo = !!b.ativo
+    // F3 — deriva os FKs canônicos quando os códigos/ids mudam (dual-write até o cutover final)
+    if (b.custoConfigId !== undefined) data.custoConfigId = toIntOrNull(b.custoConfigId)
+    else if (b.custoProdutoCode !== undefined) data.custoConfigId = data.custoProdutoCode ? (await prisma.produtoFinanceiro.findFirst({ where: { codigo: data.custoProdutoCode, ativo: true }, select: { id: true } }))?.id ?? null : null
+    if (b.receitaConfigId !== undefined) data.receitaConfigId = toIntOrNull(b.receitaConfigId)
+    else if (b.receitaProdutoCode !== undefined) data.receitaConfigId = data.receitaProdutoCode ? (await prisma.produtoFinanceiro.findFirst({ where: { codigo: data.receitaProdutoCode, ativo: true }, select: { id: true } }))?.id ?? null : null
+    if (b.tipoDocumentoId !== undefined) data.tipoDocumentoId = toIntOrNull(b.tipoDocumentoId)
+    else if (b.documentTypeCode !== undefined) data.tipoDocumentoId = data.documentTypeCode ? (await prisma.tipoDocumentoCadastro.findFirst({ where: { code: data.documentTypeCode }, select: { id: true } }))?.id ?? null : null
     const regra = await prisma.phaseEconomicRule.update({ where: { id: parseInt(id) }, data })
     return NextResponse.json(regra)
   } catch (error) {

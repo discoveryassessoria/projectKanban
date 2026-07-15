@@ -1763,6 +1763,9 @@ model ProdutoFinanceiro {
   @@index([tipoProcessoId])
   @@index([fornecedorPadraoId])
   @@index([papelFinanceiro])
+  // F3 — anti-duplicação: 1 configuração por (item mestre × papel financeiro).
+  // itemCatalogoId nulo é distinto no Postgres (não restringe configs sem pivô).
+  @@unique([itemCatalogoId, papelFinanceiro])
 }
 
 // ── Tabela de Valores (fin_values) ──

@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
 
     const codigo = String(b.codigo).trim()
     const nome = String(b.nome).trim()
+    const PAPEIS_VALIDOS = ['CUSTO', 'RECEITA', 'REPASSE', 'REEMBOLSO', 'DESPESA_INTERNA', 'TAXA', 'HONORARIO']
     // LOTE B — dual-write: ItemCatalogo (mestre, natureza PRODUTO) e vínculo por ID.
     const produto = await prisma.$transaction(async (tx) => {
       const itemCatalogoId = await sincronizarItemDeProduto(tx, { codigo, nome })
@@ -77,6 +78,12 @@ export async function POST(request: NextRequest) {
           repasse: !!b.repasse,
           reembolsavel: !!b.reembolsavel,
           ativo: b.ativo === undefined ? true : !!b.ativo,
+          // F3 — Configuração Financeira: papel + FKs diretas aos mestres reais (não recria mestre)
+          papelFinanceiro: PAPEIS_VALIDOS.includes(String(b.papelFinanceiro)) ? b.papelFinanceiro : (((b.naturezaFinanceira || 'revenue') === 'cost') ? 'CUSTO' : 'RECEITA'),
+          tipoDocumentoId: b.tipoDocumentoId ? Number(b.tipoDocumentoId) : null,
+          honorarioId: b.honorarioId ? Number(b.honorarioId) : null,
+          tipoProcessoId: b.tipoProcessoId ? Number(b.tipoProcessoId) : null,
+          fornecedorPadraoId: b.fornecedorPadraoId ? Number(b.fornecedorPadraoId) : null,
           itemCatalogoId,
         },
       })

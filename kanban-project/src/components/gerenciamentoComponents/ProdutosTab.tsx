@@ -182,7 +182,7 @@ export default function ProdutosTab() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-white">Catálogo Financeiro</h2>
+          <h2 className="text-xl font-semibold text-white">Configurações Financeiras</h2>
           <p className="text-sm text-white/50">Itens financeiros mestres: honorários, taxas, custos e itens cobráveis.</p>
         </div>
         <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500">

@@ -112,7 +112,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     key: "grp_financeiro", label: "Financeiro", icon: DollarSign, order: 50, status: "active",
     children: [
       // RENAME obrigatório: "Produtos Financeiros" -> "Produtos"
-      a(10, "catalog", "Produtos", ["produto", "financeiro", "catalogo", "preco", "preço"]),
+      a(10, "catalog", "Configurações Financeiras", ["configuracao", "config", "produto", "financeiro", "catalogo", "preco", "preço", "papel", "custo", "receita"]),
       a(20, "products", "Serviços", ["servico", "serviço", "produto"]),
       a(30, "honorariums", "Honorários", ["honorario", "honorário", "advogado"]),
       a(40, "fees", "Taxas", ["taxa", "pagamento"]),

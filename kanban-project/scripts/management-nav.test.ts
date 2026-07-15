@@ -35,9 +35,9 @@ const todosItens = MANAGEMENT_NAVIGATION.flatMap((g) => g.children ?? [])
 ok(todosItens.every((i) => ["active", "coming_soon", "hidden"].includes(i.status)), "todo item tem status válido")
 ok(todosItens.every((i) => typeof i.order === "number"), "todo item tem order numérico")
 
-// 4) rename obrigatório aplicado: catalog = "Produtos" (não "Produtos Financeiros")
+// 4) rename obrigatório (F3): catalog = "Configurações Financeiras" (não "Produtos"/"Produtos Financeiros")
 const catalog = todosItens.find((i) => i.key === "catalog")
-ok(catalog?.label === "Produtos", 'catalog renomeado para "Produtos"')
+ok(catalog?.label === "Configurações Financeiras", 'catalog renomeado para "Configurações Financeiras" (F3)')
 ok(!todosItens.some((i) => i.label === "Produtos Financeiros"), 'nenhum item "Produtos Financeiros" restante')
 
 // 5) grupo técnico (16) exige permissão técnica (não exposto sem permissão)
