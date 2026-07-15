@@ -31,8 +31,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // dual-write: re-sincroniza o ItemCatalogo (mestre) com os valores efetivos.
+    // Renomeia o item JÁ vinculado no lugar (preserva itemCatalogoId dos consumidores,
+    // ex.: Configuração Financeira) — editar o CÓDIGO do serviço não quebra o vínculo.
     const servico = await prisma.$transaction(async (tx) => {
-      const itemCatalogoId = await sincronizarItemDeServico(tx, { code: data.code, name: data.name, category: data.category })
+      const itemCatalogoId = await sincronizarItemDeServico(tx, { code: data.code, name: data.name, category: data.category }, atual.itemCatalogoId)
       return tx.servicoProduto.update({
         where: { id },
         data: { ...data, itemCatalogoId },
