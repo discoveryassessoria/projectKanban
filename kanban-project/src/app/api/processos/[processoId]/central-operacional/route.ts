@@ -528,23 +528,9 @@ export async function GET(
     const linhaRetaDocs = docs.filter((d) => pessoasMap.get(d.pessoaId)?.linhaReta)
     const totalDocs = linhaRetaDocs.length
 
-    // "concluiu a fase atual" = MESMA régua do motor (recalcular-fase.ts):
-    // tem um workflow da fase atual com status concluido/arquivado, OU um
-    // workflow de fase posterior (já passou). Sem faseCode (fallback), cai
-    // pro critério antigo de status validado.
-    const ordemAtual = faseAtualCode ? getOrdemFase(faseAtualCode) : -1
-    const concluiuFaseAtual = (d: DocFull): boolean => {
-      if (!faseAtualCode) return STATUS_VALIDADOS.includes(d.status)
-      const wfs = d.workflows
-      if (!wfs || wfs.length === 0) return false
-      return wfs.some((wf) => {
-        if (!wf.faseCode) return false
-        const ordemWf = getOrdemFase(wf.faseCode as FaseCode)
-        if (ordemWf > ordemAtual) return true
-        if (ordemWf < ordemAtual) return false
-        return wf.status === "concluido" || wf.status === "arquivado"
-      })
-    }
+    // CUTOVER V2: "concluiu a fase atual" deriva do STATUS mestre do documento
+    // (não lê mais Workflow legado). Status validado = documento passou da fase.
+    const concluiuFaseAtual = (d: DocFull): boolean => STATUS_VALIDADOS.includes(d.status)
 
     const validados = linhaRetaDocs.filter(concluiuFaseAtual).length
 
