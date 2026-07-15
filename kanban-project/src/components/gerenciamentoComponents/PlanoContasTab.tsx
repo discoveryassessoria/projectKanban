@@ -29,6 +29,15 @@ const TIPOS: [string, string][] = [
 ]
 const NATUREZAS: [string, string][] = [['debit', 'Débito'], ['credit', 'Crédito']]
 
+// UX: a Natureza (débito/crédito) é DERIVADA do Tipo — o usuário não precisa saber contabilidade.
+// Ativo/Despesa/Custo -> Débito; Passivo/Receita/Tributo/Patrimônio Líquido -> Crédito.
+// Transferência é a ÚNICA exceção (natureza editável). Não altera registros em lote; vale no cadastro/edição.
+const NATUREZA_POR_TIPO: Record<string, 'debit' | 'credit'> = {
+  asset: 'debit', expense: 'debit', cost: 'debit',
+  liability: 'credit', revenue: 'credit', tax: 'credit', equity: 'credit',
+}
+const naturezaDerivada = (t: string): string | null => NATUREZA_POR_TIPO[t] ?? null
+
 const lbl = (arr: [string, string][], v: string | null) => arr.find(([k]) => k === v)?.[1] || v || '—'
 
 async function jsonFetch(url: string, options: RequestInit = {}) {
@@ -93,8 +102,18 @@ export default function PlanoContasTab() {
   }
   function abrirEditar(c: PlanoConta) {
     setEditando(c)
-    setCodigo(c.codigo); setNome(c.nome); setTipo(c.tipo || ''); setNatureza(c.natureza || ''); setAtivo(c.ativo)
+    const t = c.tipo || ''
+    setCodigo(c.codigo); setNome(c.nome); setTipo(t)
+    // tipos mapeados exibem a natureza derivada (padrão); Transferência/sem tipo preservam o valor salvo
+    setNatureza(naturezaDerivada(t) ?? (c.natureza || ''))
+    setAtivo(c.ativo)
     setErroModal(null); setModalAberto(true)
+  }
+
+  function mudarTipo(t: string) {
+    setTipo(t)
+    const d = naturezaDerivada(t)
+    if (d) setNatureza(d) // mapeado → natureza automática; Transferência/vazio mantêm p/ edição manual
   }
 
   async function salvar() {
@@ -230,19 +249,32 @@ export default function PlanoContasTab() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs text-white/60">Tipo</label>
-                  <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={inputCls}>
+                  <select value={tipo} onChange={(e) => mudarTipo(e.target.value)} className={inputCls}>
                     <option value="" className="bg-zinc-900">—</option>
                     {TIPOS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-white/60">Natureza</label>
-                  <select value={natureza} onChange={(e) => setNatureza(e.target.value)} className={inputCls}>
-                    <option value="" className="bg-zinc-900">—</option>
-                    {NATUREZAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
-                  </select>
+                  {naturezaDerivada(tipo) ? (
+                    <input
+                      value={`${lbl(NATUREZAS, natureza)} (automático)`}
+                      readOnly disabled
+                      title="A natureza é definida automaticamente conforme o tipo da conta."
+                      className={inputCls + ' cursor-not-allowed opacity-60'}
+                    />
+                  ) : (
+                    <select value={natureza} onChange={(e) => setNatureza(e.target.value)} className={inputCls}>
+                      <option value="" className="bg-zinc-900">—</option>
+                      {NATUREZAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
+                    </select>
+                  )}
                 </div>
               </div>
+              <p className="text-[11px] text-white/40">
+                A natureza é definida automaticamente conforme o tipo da conta.
+                {tipo === 'transfer' ? ' Em Transferência, você escolhe Débito ou Crédito.' : ''}
+              </p>
 
               <label className="flex items-center gap-2 text-sm text-white/80">
                 <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="h-4 w-4 accent-blue-500" />
