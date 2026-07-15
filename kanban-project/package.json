@@ -28,7 +28,9 @@
     "backfill:cp2:catalogo": "tsx prisma/backfill-cp2-catalogo.ts",
     "backfill:cp2:tiposervico": "tsx prisma/backfill-cp2-tiposervico.ts",
     "backfill:cp2:fornecedores": "tsx prisma/backfill-cp2-fornecedores.ts",
-    "backfill:cp3:necessidades": "tsx prisma/backfill-cp3-necessidades.ts"
+    "backfill:cp3:necessidades": "tsx prisma/backfill-cp3-necessidades.ts",
+    "backfill:catfin:dry": "tsx prisma/backfill-categoria-financeira-mestre.ts --dry-run",
+    "backfill:catfin": "tsx prisma/backfill-categoria-financeira-mestre.ts --execute"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

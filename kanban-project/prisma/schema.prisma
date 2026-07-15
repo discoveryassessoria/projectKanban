@@ -774,8 +774,33 @@ model CategoriaFinanceira {
   transacoes          Transacao[]
   produtosFinanceiros ProdutoFinanceiro[]
 
+  // MDM — a Categoria Financeira REFERENCIA um cadastro mestre por FK real; nunca
+  // redigita/duplica a entidade. Exatamente UM destes é preenchido (CHECK na migration).
+  // `nome` passa a ser DERIVADO do mestre (system-owned na criação); linhas legadas
+  // sem FK permanecem válidas (nullable) até o backfill.
+  origem              OrigemCategoria       @default(LEGADO)
+  tipoDocumentoId     Int?
+  tipoDocumento       TipoDocumentoCadastro?     @relation("CatFinTipoDocumento", fields: [tipoDocumentoId], references: [id])
+  honorarioId         Int?
+  honorario           Honorario?                 @relation("CatFinHonorario", fields: [honorarioId], references: [id])
+  tipoProcessoId      Int?
+  tipoProcesso        TipoProcessoNacionalidade? @relation("CatFinTipoProcesso", fields: [tipoProcessoId], references: [id])
+  itemCatalogoId      Int?
+  itemCatalogo        ItemCatalogo?              @relation("CatFinItemCatalogo", fields: [itemCatalogoId], references: [id])
+
   @@index([tipo])
   @@index([categoriaPaiId])
+  @@index([origem])
+  @@index([tipoDocumentoId])
+  @@index([honorarioId])
+  @@index([tipoProcessoId])
+  @@index([itemCatalogoId])
+  // anti-duplicação: 1 categoria por (mestre × tipo). NULL é distinto no Postgres,
+  // logo só restringe quando a FK está preenchida (legado sem FK não é afetado).
+  @@unique([tipoDocumentoId, tipo])
+  @@unique([honorarioId, tipo])
+  @@unique([tipoProcessoId, tipo])
+  @@unique([itemCatalogoId, tipo])
 }
 
 model ContaBancaria {
@@ -1745,7 +1770,8 @@ model Honorario {
   ativo           Boolean  @default(true)
   criadoEm        DateTime @default(now())
   atualizadoEm    DateTime @updatedAt
-  configFinanceiras ProdutoFinanceiro[] @relation("ConfigFinHonorario")
+  configFinanceiras ProdutoFinanceiro[]   @relation("ConfigFinHonorario")
+  categoriasFin     CategoriaFinanceira[] @relation("CatFinHonorario")
 }
 
 // ── Regras de Comissão (fin_comm) ──
@@ -1852,7 +1878,8 @@ model TipoProcessoNacionalidade {
   atualizadoEm        DateTime       @updatedAt
   macroWorkflow       MacroWorkflow?
   processosVinculados Processo[]     @relation("ProcessoTipoMotor")
-  configFinanceiras   ProdutoFinanceiro[] @relation("ConfigFinTipoProcesso")
+  configFinanceiras   ProdutoFinanceiro[]   @relation("ConfigFinTipoProcesso")
+  categoriasFin       CategoriaFinanceira[] @relation("CatFinTipoProcesso")
 
   @@index([countryKey])
   @@index([modalityKey])
@@ -2184,6 +2211,7 @@ model TipoDocumentoCadastro {
   description       String?       @db.Text
   documentos        Documento[] // back-relation (docs que apontam pra este tipo)
   configFinanceiras ProdutoFinanceiro[] @relation("ConfigFinTipoDocumento")
+  categoriasFin     CategoriaFinanceira[] @relation("CatFinTipoDocumento")
   econRules         PhaseEconomicRule[] @relation("EconTipoDocumento")
   participaPlanilha Boolean       @default(false)
   // LOTE A — categoriaDocumentalId é a CLASSIFICAÇÃO CANÔNICA (consumida por ID).
@@ -2396,6 +2424,7 @@ model ItemCatalogo {
   precos         TabelaValor[]
   tiposServico   TipoServico[] // CP-2 — referência aditiva de TipoServico
   necessidades   NecessidadeDocumental[] // CP-3 — Documento Mestre requerido
+  categoriasFin  CategoriaFinanceira[]   @relation("CatFinItemCatalogo") // serviço (natureza SERVICO)
 
   @@index([natureza])
   @@index([ativo])
@@ -2820,6 +2849,16 @@ enum NaturezaItem {
   DESPESA
   LOGISTICA
   OUTRO
+}
+
+// Origem do cadastro mestre que ORIGINA uma Categoria Financeira.
+// LEGADO = linha antiga (texto livre) ainda não vinculada a um mestre.
+enum OrigemCategoria {
+  DOCUMENTO
+  SERVICO
+  HONORARIO
+  PROCESSO
+  LEGADO
 }
 
 enum UnidadeItem {

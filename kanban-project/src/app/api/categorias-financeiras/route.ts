@@ -36,32 +36,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Criar categoria
-export async function POST(request: NextRequest) {
-  try {
-    const erro = await verificarPermissao(request, 'financeiro.custos_editar')
-    if (erro) return erro
-    
-    const body = await request.json()
-
-    const categoria = await prisma.categoriaFinanceira.create({
-      data: {
-        nome: body.nome,
-        tipo: body.tipo,
-        cor: body.cor || null,
-        icone: body.icone || null,
-        descricao: body.descricao || null,
-        categoriaPaiId: body.categoriaPaiId ? parseInt(body.categoriaPaiId) : null,
-        ativo: true,
-      },
-    })
-
-    return NextResponse.json(categoria, { status: 201 })
-  } catch (error) {
-    console.error("Erro ao criar categoria:", error)
-    return NextResponse.json(
-      { error: "Erro ao criar categoria" },
-      { status: 500 }
-    )
-  }
+// POST - DESATIVADO. Categoria financeira NÃO é mais cadastro de texto livre:
+// ela deve REFERENCIAR um cadastro mestre por FK. Use POST /api/gerenciamento/categorias
+// (origem + mestre). Este endpoint só serve leitura (consumo em selects).
+export async function POST() {
+  return NextResponse.json(
+    {
+      error:
+        'Criação por texto livre desativada. Categorias financeiras referenciam um cadastro mestre por FK. Use /api/gerenciamento/categorias (origem + mestre).',
+    },
+    { status: 410 }
+  )
 }
