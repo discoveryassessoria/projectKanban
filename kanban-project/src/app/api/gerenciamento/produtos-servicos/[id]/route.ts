@@ -8,11 +8,6 @@ function toStrOrNull(v: any): string | null {
   const s = String(v).trim()
   return s === '' ? null : s
 }
-function toIdArray(v: any): number[] {
-  if (!Array.isArray(v)) return []
-  return v.map((x) => Number(x)).filter((n) => Number.isFinite(n))
-}
-
 // PUT - Atualizar serviço
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,21 +24,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       code: b.code !== undefined ? String(b.code).trim() : atual.code,
       name: b.name !== undefined ? String(b.name).trim() : atual.name,
       category: b.category !== undefined ? toStrOrNull(b.category) : atual.category,
+      descricao: b.descricao !== undefined ? toStrOrNull(b.descricao) : atual.descricao,
+      unidadePadrao: b.unidadePadrao !== undefined ? (b.unidadePadrao || null) : atual.unidadePadrao,
       nationality: b.nationality !== undefined ? ((String(b.nationality).trim()) || 'all') : atual.nationality,
       ativo: b.ativo !== undefined ? !!b.ativo : atual.ativo,
     }
-    // só mexe nos vínculos se o cliente mandou a lista
-    if (b.itensFinanceirosIds !== undefined) {
-      data.itensFinanceiros = { set: toIdArray(b.itensFinanceirosIds).map((id) => ({ id })) }
-    }
 
-    // LOTE B — dual-write: re-sincroniza o ItemCatalogo (mestre) com os valores efetivos.
+    // dual-write: re-sincroniza o ItemCatalogo (mestre) com os valores efetivos.
     const servico = await prisma.$transaction(async (tx) => {
       const itemCatalogoId = await sincronizarItemDeServico(tx, { code: data.code, name: data.name, category: data.category })
       return tx.servicoProduto.update({
         where: { id },
         data: { ...data, itemCatalogoId },
-        include: { itensFinanceiros: { select: { id: true, codigo: true, nome: true } } },
       })
     })
 

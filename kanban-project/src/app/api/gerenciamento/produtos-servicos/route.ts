@@ -8,29 +8,17 @@ function toStrOrNull(v: any): string | null {
   const s = String(v).trim()
   return s === '' ? null : s
 }
-function toIdArray(v: any): number[] {
-  if (!Array.isArray(v)) return []
-  return v.map((x) => Number(x)).filter((n) => Number.isFinite(n))
-}
-
-// GET - Listar serviços (com itens vinculados) + todos os itens do Catálogo Financeiro (p/ checkboxes)
+// GET - Cadastro MESTRE operacional de Serviços (sem financeiro).
 export async function GET(request: NextRequest) {
   try {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
 
-    const [servicos, produtosFinanceiros] = await Promise.all([
-      prisma.servicoProduto.findMany({
-        orderBy: { code: 'asc' },
-        include: { itensFinanceiros: { select: { id: true, codigo: true, nome: true } } },
-      }),
-      prisma.produtoFinanceiro.findMany({
-        orderBy: { codigo: 'asc' },
-        select: { id: true, codigo: true, nome: true },
-      }),
-    ])
+    // A relação M2M legada (itensFinanceiros) permanece no banco (dados preservados),
+    // mas NÃO é exibida/gerenciada aqui — o vínculo financeiro é feito em Configurações Financeiras.
+    const servicos = await prisma.servicoProduto.findMany({ orderBy: { code: 'asc' } })
 
-    return NextResponse.json({ servicos, produtosFinanceiros })
+    return NextResponse.json({ servicos })
   } catch (error) {
     console.error('Erro ao listar produtos e serviços:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
@@ -51,11 +39,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Informe o nome.' }, { status: 400 })
     }
 
-    const ids = toIdArray(b.itensFinanceirosIds)
     const code = String(b.code).trim()
     const name = String(b.name).trim()
     const category = toStrOrNull(b.category)
-    // LOTE B — dual-write: ItemCatalogo (mestre) primeiro; vincula ServicoProduto por ID.
+    // dual-write: ItemCatalogo (mestre, natureza SERVICO) — é o que o Financeiro referencia.
     const servico = await prisma.$transaction(async (tx) => {
       const itemCatalogoId = await sincronizarItemDeServico(tx, { code, name, category })
       return tx.servicoProduto.create({
@@ -63,12 +50,12 @@ export async function POST(request: NextRequest) {
           code,
           name,
           category,
+          descricao: toStrOrNull(b.descricao),
+          unidadePadrao: b.unidadePadrao || null,
           nationality: (b.nationality && String(b.nationality).trim()) || 'all',
           ativo: b.ativo !== undefined ? !!b.ativo : true,
           itemCatalogoId,
-          itensFinanceiros: ids.length ? { connect: ids.map((id) => ({ id })) } : undefined,
         },
-        include: { itensFinanceiros: { select: { id: true, codigo: true, nome: true } } },
       })
     })
 

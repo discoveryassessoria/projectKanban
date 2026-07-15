@@ -1,33 +1,40 @@
 'use client'
 
 // src/components/gerenciamentoComponents/ProdutosServicosTab.tsx
-// Produtos e Serviços (tabela ServicoProduto = operational.services do mockup).
-// SERVIÇOS POR NACIONALIDADE (SERV-ITALIA, SERV-ESPANHA, ...).
+// CADASTRO MESTRE de Serviços (ServicoProduto) — o que a empresa vende/executa.
+// Operacional puro: código, nome, categoria, descrição, nacionalidade/modalidade,
+// unidade padrão (opcional), status. SEM financeiro (preço/custo/receita/momento/
+// itens financeiros vivem no Financeiro, que só REFERENCIA este mestre por FK).
+// Cada serviço é espelhado no ItemCatalogo (natureza SERVICO) via dual-write —
+// é isso que aparece no select de "Serviço" em Configurações Financeiras.
 // Backend: /api/gerenciamento/produtos-servicos (GET/POST) + /[id] (PUT/DELETE)
-// Campos do mockup (openProductServiceModal): code, name, category, nationality
-//   + "Itens financeiros vinculados" = M2M -> ProdutoFinanceiro (Catálogo Financeiro).
-// GET ja traz { servicos, produtosFinanceiros } (lista p/ os checkboxes).
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 
-type ItemRef = { id: number; codigo: string; nome: string }
 type Servico = {
   id: number
   code: string
   name: string
   category: string | null
+  descricao: string | null
+  unidadePadrao: string | null
   nationality: string
   ativo: boolean
-  itensFinanceiros?: ItemRef[]
 }
 
-// Nacionalidades fixas do mockup (italiano/espanhol/portugues/alemao/all).
-// No mockup é campo de texto; aqui virou seleção porque o conjunto é fixo.
+// Nacionalidades/modalidades aplicáveis (conjunto operacional fixo).
 const NACIONALIDADES: [string, string][] = [
   ['all', 'Todas'], ['italiano', 'Italiana'], ['espanhol', 'Espanhola'],
   ['portugues', 'Portuguesa'], ['alemao', 'Alemã'],
 ]
 const nacLabel = (v: string) => NACIONALIDADES.find(([k]) => k === v)?.[1] || v || '—'
+
+// Unidade padrão (UnidadeItem) — opcional.
+const UNIDADES: [string, string][] = [
+  ['', '— (nenhuma)'], ['UNIDADE', 'Unidade'], ['DOCUMENTO', 'Documento'], ['PESSOA', 'Pessoa'],
+  ['REQUERENTE', 'Requerente'], ['PAGINA', 'Página'], ['PACOTE', 'Pacote'], ['PROCESSO', 'Processo'],
+  ['FASE', 'Fase'], ['HORA', 'Hora'], ['DIA', 'Dia'], ['MES', 'Mês'], ['PERCENTUAL', 'Percentual'], ['CUSTOM', 'Custom'],
+]
 
 async function jsonFetch(url: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
@@ -46,7 +53,6 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
 
 export default function ProdutosServicosTab() {
   const [servicos, setServicos] = useState<Servico[]>([])
-  const [produtos, setProdutos] = useState<ItemRef[]>([])
   const [loading, setLoading] = useState(true)
   const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
@@ -56,9 +62,10 @@ export default function ProdutosServicosTab() {
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
+  const [descricao, setDescricao] = useState('')
+  const [unidadePadrao, setUnidadePadrao] = useState('')
   const [nationality, setNationality] = useState('all')
   const [ativo, setAtivo] = useState(true)
-  const [itensSel, setItensSel] = useState<number[]>([])
   const [salvando, setSalvando] = useState(false)
   const [erroModal, setErroModal] = useState<string | null>(null)
 
@@ -67,9 +74,8 @@ export default function ProdutosServicosTab() {
     try {
       const d = await jsonFetch('/api/gerenciamento/produtos-servicos', { cache: 'no-store' })
       setServicos((d as any).servicos || [])
-      setProdutos((d as any).produtosFinanceiros || [])
     } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar os produtos e serviços.')
+      setErroLista(e.message || 'Não foi possível carregar os serviços.')
     } finally {
       setLoading(false)
     }
@@ -89,19 +95,15 @@ export default function ProdutosServicosTab() {
 
   function abrirNovo() {
     setEditando(null)
-    setCode(''); setName(''); setCategory(''); setNationality('all'); setAtivo(true); setItensSel([])
+    setCode(''); setName(''); setCategory(''); setDescricao(''); setUnidadePadrao(''); setNationality('all'); setAtivo(true)
     setErroModal(null); setModalAberto(true)
   }
   function abrirEditar(s: Servico) {
     setEditando(s)
     setCode(s.code); setName(s.name); setCategory(s.category || '')
+    setDescricao(s.descricao || ''); setUnidadePadrao(s.unidadePadrao || '')
     setNationality(s.nationality || 'all'); setAtivo(s.ativo)
-    setItensSel((s.itensFinanceiros || []).map((i) => i.id))
     setErroModal(null); setModalAberto(true)
-  }
-
-  function toggleItem(id: number) {
-    setItensSel((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
   }
 
   async function salvar() {
@@ -113,9 +115,10 @@ export default function ProdutosServicosTab() {
         code: code.trim(),
         name: name.trim(),
         category: category.trim() || null,
+        descricao: descricao.trim() || null,
+        unidadePadrao: unidadePadrao || null,
         nationality,
         ativo,
-        itensFinanceirosIds: itensSel,
       })
       if (editando) {
         await jsonFetch(`/api/gerenciamento/produtos-servicos/${editando.id}`, { method: 'PUT', body })
@@ -145,17 +148,10 @@ export default function ProdutosServicosTab() {
 
   return (
     <div className="space-y-5">
-      {/* LOTE B — ServicoProduto está sendo DEPRECIADO: a fonte canônica passou a ser
-          o Catálogo Mestre (ItemCatalogo, natureza SERVICO). Cada serviço salvo aqui
-          já é espelhado no mestre (dual-write). Novos cadastros devem migrar para o
-          Catálogo Mestre; esta tela permanece só para compatibilidade. */}
-      <div className="rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
-        <strong>Tela legada.</strong> Serviços agora são itens do <strong>Catálogo Mestre</strong> (natureza Serviço). O que você salvar aqui é espelhado no mestre automaticamente; prefira gerenciar pelo Catálogo Mestre.
-      </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-white">Produtos e Serviços</h2>
-          <p className="text-sm text-white/50">Serviços oferecidos (por nacionalidade), com os itens do Catálogo Financeiro vinculados a cada um.</p>
+          <h2 className="text-xl font-semibold text-white">Serviços</h2>
+          <p className="text-sm text-white/50">Cadastro mestre operacional do que a empresa vende/executa (assessoria, tradução, apostilamento, retificação, busca genealógica, logística…). O preço e a configuração financeira vivem no Financeiro, que apenas referencia este serviço.</p>
         </div>
         <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500">
           + Novo serviço
@@ -203,9 +199,7 @@ export default function ProdutosServicosTab() {
                   <td className="px-4 py-2.5 font-mono text-[12px] text-white/80">{s.code}</td>
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-white">{s.name}</div>
-                    {(s.itensFinanceiros?.length || 0) > 0 && (
-                      <div className="text-[11px] text-white/40">{s.itensFinanceiros!.length} item(ns) financeiro(s) vinculado(s)</div>
-                    )}
+                    {s.descricao && <div className="text-[11px] text-white/40">{s.descricao}</div>}
                   </td>
                   <td className="px-4 py-2.5 text-white/70">{s.category || '—'}</td>
                   <td className="px-4 py-2.5 text-white/70">{nacLabel(s.nationality)}</td>
@@ -239,21 +233,21 @@ export default function ProdutosServicosTab() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs text-white/60">Código</label>
-                  <input value={code} onChange={(e) => setCode(e.target.value)} autoFocus placeholder="SERV-ITALIA" className={inputCls} />
+                  <input value={code} onChange={(e) => setCode(e.target.value)} autoFocus placeholder="TRAD_JURAMENTADA" className={inputCls} />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-white/60">Nome</label>
-                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nacionalidade Italiana" className={inputCls} />
+                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tradução Juramentada" className={inputCls} />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs text-white/60">Categoria</label>
-                  <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="cidadania, retificacao, servico..." className={inputCls} />
+                  <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="cidadania, traducao, apostilamento..." className={inputCls} />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Nacionalidade</label>
+                  <label className="mb-1 block text-xs text-white/60">Nacionalidade / modalidade</label>
                   <select value={nationality} onChange={(e) => setNationality(e.target.value)} className={inputCls}>
                     {NACIONALIDADES.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
@@ -261,28 +255,22 @@ export default function ProdutosServicosTab() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs text-white/60">Itens financeiros vinculados</label>
-                {produtos.length === 0 ? (
-                  <p className="rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[11px] text-amber-300/80">
-                    Nenhum item no Catálogo Financeiro ainda. Cadastre itens lá para poder vinculá-los aqui.
-                  </p>
-                ) : (
-                  <div className="max-h-40 space-y-1.5 overflow-auto rounded-lg border border-white/10 bg-white/5 p-3">
-                    {produtos.map((p) => (
-                      <label key={p.id} className="flex items-center gap-2 text-[13px] text-white/80">
-                        <input type="checkbox" checked={itensSel.includes(p.id)} onChange={() => toggleItem(p.id)} className="h-4 w-4 accent-blue-500" />
-                        <span className="font-mono text-[12px] text-white/70">{p.codigo}</span>
-                        <span className="text-white/40">— {p.nome}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
+                <label className="mb-1 block text-xs text-white/60">Descrição</label>
+                <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} placeholder="O que o serviço entrega..." className={inputCls} />
               </div>
 
-              <label className="flex items-center gap-2 text-sm text-white/80">
-                <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="h-4 w-4 accent-blue-500" />
-                Ativo
-              </label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs text-white/60">Unidade padrão (opcional)</label>
+                  <select value={unidadePadrao} onChange={(e) => setUnidadePadrao(e.target.value)} className={inputCls}>
+                    {UNIDADES.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
+                  </select>
+                </div>
+                <label className="mt-6 flex items-center gap-2 text-sm text-white/80">
+                  <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+                  Ativo
+                </label>
+              </div>
 
               {erroModal && (
                 <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroModal}</div>

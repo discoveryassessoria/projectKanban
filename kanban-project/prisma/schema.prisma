@@ -1779,8 +1779,11 @@ model ServicoProduto {
   code             String              @unique @db.VarChar(40)
   name             String              @db.VarChar(200)
   category         String?             @db.VarChar(80)
+  descricao        String?             @db.Text
+  unidadePadrao    UnidadeItem?
   nationality      String              @default("all") @db.VarChar(40)
   ativo            Boolean             @default(true)
+  // relação mantida no banco (dados preservados); NÃO exibida/gravada na tela mestre (F Serviços)
   itensFinanceiros ProdutoFinanceiro[] @relation("ServicoProdutoItens")
   criadoEm         DateTime            @default(now())
   atualizadoEm     DateTime            @updatedAt

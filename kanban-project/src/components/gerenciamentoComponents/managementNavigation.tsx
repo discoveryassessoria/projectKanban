@@ -18,7 +18,7 @@ import type { ComponentType } from "react"
 import {
   LayoutDashboard, GitBranch, Workflow, FileText, DollarSign, Users2,
   Library, Zap, MessageSquare, CalendarClock, Brain, BarChart3, Plug,
-  ShieldCheck, Cpu,
+  ShieldCheck, Cpu, Briefcase,
 } from "lucide-react"
 
 export type NavStatus = "active" | "coming_soon" | "hidden"
@@ -109,6 +109,13 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     ],
   },
   {
+    key: "grp_servicos", label: "Serviços", icon: Briefcase, order: 45, status: "active",
+    children: [
+      // Cadastro MESTRE operacional de Serviços (o que a empresa vende/executa). Sem financeiro.
+      a(10, "products", "Catálogo de Serviços", ["servico", "serviço", "traducao", "tradução", "apostilamento", "retificacao", "cidadania", "genealogia", "logistica", "assessoria"]),
+    ],
+  },
+  {
     key: "grp_financeiro", label: "Financeiro", icon: DollarSign, order: 50, status: "active",
     children: [
       // MENU FINAL do Financeiro (arquitetura canônica) — exatamente estes 18 itens.
@@ -132,7 +139,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(180, "commrules", "Comissões", ["comissao", "comissão"]),
       // LEGADOS — OCULTOS da sidebar (status hidden). A rota/tela permanece acessível
       // como alias/read-only (page.tsx), sem exibição como cadastro paralelo.
-      h(900, "products", "Serviços"),
+      // (Serviços NÃO é legado: virou cadastro mestre operacional em grp_servicos.)
       h(910, "honorariums", "Honorários"),
       h(920, "catalogmestre", "Catálogo Mestre"),
       h(930, "estruturafin", "Estrutura Financeira"),
