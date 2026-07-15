@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { recalcularFaseDoProcesso } from "@/src/lib/process-stage/recalcular-fase"
+import { sincronizarStatusPassoV2 } from "@/src/services/documento-operacao"
 import { resolveStepCompletionState } from "@/src/services/processEngine/stepCompletionResolver"
 
 // ============================================================
@@ -226,6 +227,16 @@ export async function PATCH(
       where: { id: stepIdNum },
       data: updateData,
     })
+
+    // FASE 3 (CP-5): espelha o status no passo V2 por-documento (fonte canônica).
+    // Best-effort — não falha a operação legada se o documento não tiver operação V2.
+    if (typeof updateData.status === "string") {
+      try {
+        await sincronizarStatusPassoV2(documentoId, step.stepKey, updateData.status)
+      } catch (e) {
+        console.error("[steps PATCH] falha ao espelhar status no V2:", e)
+      }
+    }
 
     // ============================================================
     // EFEITOS COLATERAIS — só quando faz sentido

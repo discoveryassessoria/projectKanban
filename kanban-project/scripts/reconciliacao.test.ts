@@ -46,6 +46,18 @@ ok(/responsavelId:\s*p\.responsavelId/.test(bf) && /prazo:\s*p\.prazo/.test(bf),
 const modelV2 = (src("prisma/schema.prisma").match(/model PhaseWorkflowStepInstance \{[^]*?\n\}/) ?? [""])[0]
 ok(modelV2.length > 0 && !/externalProtocol|reviewResult|validationResult|trackingCode|costPaid/.test(modelV2), "16. nenhuma coluna de domínio adicionada ao PhaseWorkflowStepInstance (só extensão via metadata)")
 
+// CP-5 FASE 3 — consumidores leem/escrevem a operação por-documento V2 (runtime único)
+console.log("\nCP-5 FASE 3 (consumidores V2 por-documento):")
+const svc = src("src/services/documento-operacao.ts")
+ok(/phaseWorkflowStepInstance\.findMany\(\{[^]*?documentoId/.test(svc), "17. serviço lê passos V2 por documentoId")
+ok(/notIn:\s*INATIVOS/.test(svc) && /INATIVOS[^]*?"SUPERSEDIDO",\s*"CANCELADO"/.test(svc), "18. exclui passos SUPERSEDIDO/CANCELADO")
+ok(/evaluateWorkflowProgress/.test(svc) && /resolveStepCompletionState/.test(svc), "19. reusa o completion-engine (não recalcula regra)")
+ok(/mapLegacyStepStatus/.test(svc) && /phaseWorkflowStepInstance\.update/.test(svc), "20. sincronizarStatusPassoV2 espelha status legado→V2")
+const ce = src("src/services/completion-engine/index.ts")
+ok(/const v2 = await progressoOperacaoV2\(documentoId\)/.test(ce) && /if \(v2\) return v2/.test(ce), "21. completion-engine prefere V2 (fallback legado)")
+const stepRoute = src("src/app/api/documentos/[id]/workflow/steps/[stepId]/route.ts")
+ok(/sincronizarStatusPassoV2\(documentoId, step\.stepKey/.test(stepRoute), "22. steps PATCH espelha status no V2 (dual-write)")
+
 console.log(`\n${passed} passaram, ${failed} falharam`)
 if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }
 console.log("Reconciliação validada ✅")

@@ -14,6 +14,7 @@ import {
 } from "@/src/lib/process-stage/compute-phase-progress"
 import type { DocForStage } from "@/src/lib/process-stage/derive-stage"
 import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
+import { progressoOperacaoV2 } from "@/src/services/documento-operacao"
 import {
   evaluateWorkflowProgress,
   canCompletePhase as canCompletePhasePure,
@@ -42,6 +43,10 @@ export { resolveStepCompletionState } from "@/src/services/processEngine/stepCom
 // ── resolveWorkflowProgress: progresso/conclusão do workflow de UM documento ─
 export async function resolveWorkflowProgress(documentoId: number): Promise<AggregateResult> {
   const now = new Date()
+  // FASE 3 (CP-5): fonte canônica = operação por-documento no V2. Se existir,
+  // manda; senão cai no legado (compatibilidade até o cutover definitivo).
+  const v2 = await progressoOperacaoV2(documentoId)
+  if (v2) return v2
   const wf = await prisma.workflow.findFirst({
     where: { documentoId, status: { notIn: ["arquivado", "cancelado"] } },
     orderBy: { createdAt: "desc" },
