@@ -222,7 +222,7 @@ async function main() {
       linha({ id: 1, valor: 150, natureza: NaturezaPreco.CUSTO, moeda: Moeda.BRL }),
       linha({ id: 2, valor: 90, natureza: NaturezaPreco.RECEITA, moeda: Moeda.EUR }),
     ]
-    const loader = async (_item: number, nat: NaturezaPreco) => linhas.filter((l) => l.natureza === nat)
+    const loader = async (_item: number, nat: NaturezaPreco | null | undefined) => linhas.filter((l) => l.natureza === nat)
     const r = await resolverCustoEReceitaFinanceiro({ itemCatalogoId: ITEM, dataEvento: DATA }, loader)
     ok(r.custo.ok && r.custo.valor === 150 && r.custo.moeda === Moeda.BRL, '14) custo resolvido independente')
     ok(r.receita.ok && r.receita.valor === 90 && r.receita.moeda === Moeda.EUR, '14b) receita resolvida independente')
