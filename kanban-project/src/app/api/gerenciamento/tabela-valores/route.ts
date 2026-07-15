@@ -17,6 +17,20 @@ function toStrOrNull(v: any): string | null {
   const s = String(v).trim()
   return s === '' ? null : s
 }
+// R17 — vigência precisa ser ISO 'YYYY-MM-DD' (o EXCLUDE de sobreposição depende disso).
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+function vigenciaInvalida(v: unknown): boolean {
+  if (v === undefined || v === null || v === '') return false
+  return !ISO_DATE.test(String(v)) || Number.isNaN(Date.parse(String(v)))
+}
+function mapDbError(e: any): NextResponse | null {
+  const msg = String(e?.message ?? '')
+  if (e?.code === 'P2002' || msg.includes('config_contexto_ativo'))
+    return NextResponse.json({ error: 'Já existe um preço ativo idêntico (mesma config, contexto, moeda, unidade, faixa, prioridade e vigência).' }, { status: 409 })
+  if (msg.includes('vigencia_sem_sobreposicao'))
+    return NextResponse.json({ error: 'Vigência sobreposta a outro preço ativo no mesmo contexto e prioridade. Use prioridade distinta ou ajuste o período.' }, { status: 409 })
+  return null
+}
 
 // Rótulo canônico "Origem · Cadastro mestre · Papel" de uma Configuração Financeira.
 async function listarConfigs() {
@@ -95,6 +109,8 @@ export async function POST(request: NextRequest) {
 
     const valor = toAmount(b.valor)
     if (valor <= 0) return NextResponse.json({ error: 'Valor deve ser maior que zero (isenção não é modelada aqui).' }, { status: 400 })
+    if (vigenciaInvalida(b.vigenciaInicio) || vigenciaInvalida(b.vigenciaFim))
+      return NextResponse.json({ error: 'Vigência deve estar no formato ISO YYYY-MM-DD.' }, { status: 400 })
 
     const fornecedorId = toIntOrNull(b.fornecedorId)
     const processoTipoId = toStrOrNull(b.processoTipoId)
@@ -139,9 +155,8 @@ export async function POST(request: NextRequest) {
       })
       return NextResponse.json({ regra })
     } catch (e: any) {
-      if (e?.code === 'P2002') {
-        return NextResponse.json({ error: 'Já existe um preço ativo para esta configuração neste mesmo contexto, prioridade e vigência.' }, { status: 409 })
-      }
+      const mapped = mapDbError(e)
+      if (mapped) return mapped
       throw e
     }
   } catch (error) {
