@@ -49,8 +49,8 @@ export interface LinhaPreco {
 
 /** Contexto de resolução (Fase 7 — entrada estruturada). */
 export interface ContextoPrecoFinanceiro {
-  itemCatalogoId: number // FK — vínculo PRINCIPAL do item precificado
-  natureza: NaturezaPreco // CUSTO | RECEITA (independentes)
+  itemCatalogoId: number // FK — vínculo do item (ou o configId, ao resolver por Configuração Financeira)
+  natureza?: NaturezaPreco | null // opcional: ao resolver por config, o papel já é o da config (não filtra)
   processoId?: number | null
   tipoProcessoId?: string | number | null // aceita id numérico ou key; normalizado p/ string
   modalidadeId?: string | number | null // reservado (vira dimensão quando houver FK)
@@ -192,7 +192,7 @@ export function resolverPrecoCore(
   // 1) Filtra por natureza + arquivamento + vigência, registrando descartes.
   const candidatas: LinhaPreco[] = []
   for (const r of linhas) {
-    if (r.natureza !== ctx.natureza) {
+    if (ctx.natureza != null && r.natureza !== ctx.natureza) {
       descartadas.push({ tabelaValorId: r.id, nivel: 'indefinido', motivo: 'natureza_diferente', valor: r.valor })
       continue
     }
@@ -344,7 +344,7 @@ function finalizarFalha(
 // Mantém o core puro. Injeção de dependência p/ testes: aceita um loader.
 
 export interface CarregadorLinhasPreco {
-  (itemCatalogoId: number, natureza: NaturezaPreco): Promise<LinhaPreco[]>
+  (itemCatalogoId: number, natureza: NaturezaPreco | null | undefined): Promise<LinhaPreco[]>
 }
 
 /**

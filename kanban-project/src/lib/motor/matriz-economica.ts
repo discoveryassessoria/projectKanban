@@ -26,7 +26,7 @@ import { gerarParcelas } from '@/lib/financeiro/parcelas'
 // LOTE A · B4 — trava de estado civil (reusa a MESMA engine da árvore, não recria)
 import { analyzePessoa } from '@/src/lib/document-generator'
 // LOTE A · B3 — preço hierárquico (arquivo separado, testável isolado)
-import { resolverPrecoFinanceiroDB } from './resolver-preco-financeiro.prisma'
+import { resolverPrecoPorConfigDB } from './resolver-preco-financeiro.prisma'
 import { NaturezaPreco } from '@prisma/client'
 import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
 
@@ -167,8 +167,8 @@ export async function gerarEconomicoDaMatriz(
         if (regra.createsCost) {
           // F2/Fase 7 — resolvedor endurecido: NUNCA zero silencioso; fallback explícito = valorPadrao (>0).
           const fbC = prodCusto?.valorPadrao != null ? Number(prodCusto.valorPadrao) : null
-          const rC = prodCusto?.itemCatalogoId
-            ? await resolverPrecoFinanceiroDB({ itemCatalogoId: prodCusto.itemCatalogoId, natureza: NaturezaPreco.CUSTO, processoId, tipoProcessoId: String(tipoProcessoId), fallbackValorPadrao: fbC, fallbackMoeda: prodCusto.moedaPadrao })
+          const rC = prodCusto
+            ? await resolverPrecoPorConfigDB(prodCusto.id, { processoId, tipoProcessoId: String(tipoProcessoId), fallbackValorPadrao: fbC, fallbackMoeda: prodCusto.moedaPadrao })
             : null
           const val = rC?.ok ? rC.valor : (fbC != null && fbC > 0 ? fbC : null)
           const moedaC = (rC?.ok ? rC.moeda : prodCusto?.moedaPadrao) as Moeda
@@ -180,8 +180,8 @@ export async function gerarEconomicoDaMatriz(
         if (regra.createsRevenue) {
           // F2/Fase 7 — resolvedor endurecido: NUNCA zero silencioso. Independente do custo.
           const fbR = prodReceita?.valorPadrao != null ? Number(prodReceita.valorPadrao) : null
-          const rR = prodReceita?.itemCatalogoId
-            ? await resolverPrecoFinanceiroDB({ itemCatalogoId: prodReceita.itemCatalogoId, natureza: NaturezaPreco.RECEITA, processoId, tipoProcessoId: String(tipoProcessoId), fallbackValorPadrao: fbR, fallbackMoeda: prodReceita.moedaPadrao })
+          const rR = prodReceita
+            ? await resolverPrecoPorConfigDB(prodReceita.id, { processoId, tipoProcessoId: String(tipoProcessoId), fallbackValorPadrao: fbR, fallbackMoeda: prodReceita.moedaPadrao })
             : null
           const val = rR?.ok ? rR.valor : (fbR != null && fbR > 0 ? fbR : null)
           const moedaR = (rR?.ok ? rR.moeda : prodReceita?.moedaPadrao) as Moeda

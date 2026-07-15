@@ -1692,6 +1692,7 @@ model ProdutoFinanceiro {
   econRulesCusto     PhaseEconomicRule[]        @relation("EconCustoConfig")
   econRulesReceita   PhaseEconomicRule[]        @relation("EconReceitaConfig")
   triggerRules       PhaseTriggerRule[]         @relation("TriggerConfig")
+  precosConfig       TabelaValor[]              @relation("PrecoConfig")
 
   @@index([itemCatalogoId])
   @@index([categoriaId])
@@ -1731,10 +1732,23 @@ model TabelaValor {
   natureza         NaturezaPreco? // CUSTO ou RECEITA (independentes!). null = legado/ambíguo
   regiao           String?        @db.VarChar(60) // nível país/região da precedência
   processoId       Int? // preço específico de UM processo (nível + específico)
+  // F4 — CHAVE PRINCIPAL canônica: o preço pertence a uma Configuração Financeira
+  // (papel financeiro de uma entidade mestre). itemCatalogoId/natureza ficam só como legado.
+  configuracaoFinanceiraItemId Int?
+  configuracaoFinanceiraItem   ProdutoFinanceiro? @relation("PrecoConfig", fields: [configuracaoFinanceiraItemId], references: [id])
+  modalidadeId     Int?
+  modalidade       ModalidadePais? @relation(fields: [modalidadeId], references: [id])
+  prioridade       Int            @default(0)
+  unidade          String?        @db.VarChar(20)
+  quantidadeMinima Decimal?       @db.Decimal(12, 2)
+  quantidadeMaxima Decimal?       @db.Decimal(12, 2)
+  legadoPendente   Boolean        @default(false) // sem vínculo canônico seguro → fora da tela/resolver
 
   @@index([fornecedorId])
   @@index([itemCatalogoId])
   @@index([natureza])
+  @@index([configuracaoFinanceiraItemId])
+  @@index([modalidadeId])
 }
 
 // ── Condições de Pagamento (fin_paycond) ──
@@ -1910,6 +1924,7 @@ model ModalidadePais {
   ativo         Boolean  @default(true)
   criadoEm      DateTime @default(now())
   atualizadoEm  DateTime @updatedAt
+  precos        TabelaValor[]
 
   @@unique([countryKey, modalityKey])
   @@index([countryKey])
