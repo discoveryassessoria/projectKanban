@@ -18,6 +18,7 @@
     "test:lote-b": "tsx scripts/lote-b-catalogo.test.ts",
     "test:fases": "tsx scripts/fases-catalog.test.ts",
     "test:reconciliacao": "tsx scripts/reconciliacao.test.ts",
+    "test:legacy-guard": "tsx scripts/legacy-workflow-guard.test.ts",
     "backfill:document-categories:dry": "tsx prisma/backfill-document-categories.ts --dry-run",
     "backfill:document-categories": "tsx prisma/backfill-document-categories.ts --execute",
     "backfill:lote-b:dry": "tsx prisma/backfill-lote-b-catalogo.ts --dry-run",
