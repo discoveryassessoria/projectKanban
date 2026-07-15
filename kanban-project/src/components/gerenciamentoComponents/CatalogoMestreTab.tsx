@@ -69,6 +69,10 @@ export default function CatalogoMestreTab() {
 
   return (
     <div className="text-white">
+      <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-200">
+        Tela legada em migração. O papel financeiro (custo/receita/…) de cada item agora é configurado em
+        <span className="font-medium"> Configurações Financeiras</span>, que referenciam os mestres por FK — sem recriar documentos aqui.
+      </div>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Catálogo Mestre · Itens</h2>

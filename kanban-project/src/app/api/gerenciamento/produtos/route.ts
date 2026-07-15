@@ -24,15 +24,23 @@ export async function GET(request: NextRequest) {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
 
-    const produtos = await prisma.produtoFinanceiro.findMany({
-      orderBy: { nome: 'asc' },
-      include: {
-        categoria: { select: { id: true, nome: true } },
-        planoConta: { select: { id: true, codigo: true, nome: true } },
-      },
-    })
+    // F3.2 — além dos itens, devolve os MESTRES para o select pesquisável por origem.
+    const [produtos, tiposDocumento, servicos, honorarios, tiposProcesso, fornecedores] = await Promise.all([
+      prisma.produtoFinanceiro.findMany({
+        orderBy: { nome: 'asc' },
+        include: {
+          categoria: { select: { id: true, nome: true } },
+          planoConta: { select: { id: true, codigo: true, nome: true } },
+        },
+      }),
+      prisma.tipoDocumentoCadastro.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
+      prisma.itemCatalogo.findMany({ where: { natureza: 'SERVICO', ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
+      prisma.honorario.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
+      prisma.tipoProcessoNacionalidade.findMany({ where: { ativo: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+      prisma.fornecedor.findMany({ where: { ativo: true }, select: { id: true, nome: true }, orderBy: { nome: 'asc' } }),
+    ])
 
-    return NextResponse.json({ produtos })
+    return NextResponse.json({ produtos, mestres: { tiposDocumento, servicos, honorarios, tiposProcesso, fornecedores } })
   } catch (error) {
     console.error('Erro ao listar produtos:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
@@ -62,7 +70,17 @@ export async function POST(request: NextRequest) {
     const PAPEIS_VALIDOS = ['CUSTO', 'RECEITA', 'REPASSE', 'REEMBOLSO', 'DESPESA_INTERNA', 'TAXA', 'HONORARIO']
     // LOTE B — dual-write: ItemCatalogo (mestre, natureza PRODUTO) e vínculo por ID.
     const produto = await prisma.$transaction(async (tx) => {
-      const itemCatalogoId = await sincronizarItemDeProduto(tx, { codigo, nome })
+      // F3.2 — o pivô itemCatalogoId vem do MESTRE escolhido (não recria mirror):
+      //   documento → itemCatalogo do TipoDocumento;  serviço → o próprio ItemCatalogo.
+      //   Só cria mirror PRD_ quando não há mestre com item (honorário/processo/legado).
+      let itemCatalogoId: number | null = null
+      if (b.tipoDocumentoId) {
+        const td = await tx.tipoDocumentoCadastro.findUnique({ where: { id: Number(b.tipoDocumentoId) }, select: { itemCatalogoId: true } })
+        itemCatalogoId = td?.itemCatalogoId ?? null
+      } else if (b.itemCatalogoId) {
+        itemCatalogoId = Number(b.itemCatalogoId)
+      }
+      if (itemCatalogoId == null) itemCatalogoId = await sincronizarItemDeProduto(tx, { codigo, nome })
       return tx.produtoFinanceiro.create({
         data: {
           codigo,
