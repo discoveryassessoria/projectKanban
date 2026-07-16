@@ -155,15 +155,11 @@ export default function RegrasDocumentaisTab() {
     const j = await res.json().catch(() => ({}))
     if (res.ok) { showFlash("Feito."); await load() } else showFlash(j.error || "Erro.")
   }
-  // "Editar" é o fluxo PRINCIPAL: rascunho/inativa edita direto; publicada cria nova versão em rascunho e abre.
-  async function editar(r: RegraDocumental) {
-    if (r.status === "RASCUNHO" || r.status === "INATIVA") { setForm(regraParaForm(r)); setEtapa(0); return }
-    if (r.status === "PUBLICADA") {
-      const res = await fetch(`/api/gerenciamento/regras-documentais/${r.id}`, { method: "POST", headers: authHeaders(), body: JSON.stringify({ acao: "nova_versao" }) })
-      const j = await res.json().catch(() => ({}))
-      if (res.ok && j.regra) { await load(); setForm(regraParaForm(matrizRowParaRegra(j.regra))); setEtapa(0); showFlash(`Nova versão v${j.regra.versao} (rascunho) — a publicada anterior continua ativa.`) }
-      else showFlash(j.error || "Erro.")
-    }
+  // "Editar" edita a PRÓPRIA regra NO LUGAR — não duplica nem inativa. Vale para
+  // rascunho, inativa e publicada (mesma linha, mesmo id). Arquivada é somente leitura.
+  function editar(r: RegraDocumental) {
+    if (r.status === "ARQUIVADA") { showFlash("Regra arquivada é somente leitura — reabra para editar."); return }
+    setForm(regraParaForm(r)); setEtapa(0)
   }
   async function verHistorico(r: RegraDocumental) {
     const res = await fetch(`/api/gerenciamento/regras-documentais/${r.id}`, { headers: authHeaders() })

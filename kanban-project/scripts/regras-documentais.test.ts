@@ -123,10 +123,10 @@ console.log("\nConflitos")
   ok(detectarConflitos([a, b]).some((c) => c.tipo === "regra_duplicada"), "15) duplicação detectada")
 }
 
-console.log("\nVersionamento")
-// 16 / 17
-ok(podeEditarEmLugar("PUBLICADA") === false, "16) versão publicada NÃO é editável em lugar (exige nova versão)")
-ok(podeEditarEmLugar("RASCUNHO") === true && proximaVersao([1, 2]) === 3, "17) rascunho editável; nova versão = max+1")
+console.log("\nEdição no lugar")
+// 16 / 17 — edição NÃO duplica nem inativa: publicada/rascunho/inativa editam no lugar; só arquivada é bloqueada
+ok(podeEditarEmLugar("PUBLICADA") === true && podeEditarEmLugar("RASCUNHO") === true && podeEditarEmLugar("INATIVA") === true, "16) editar é sempre NO LUGAR (não duplica nem inativa)")
+ok(podeEditarEmLugar("ARQUIVADA") === false && proximaVersao([1, 2]) === 3, "17) arquivada é somente leitura; nova versão (ação avançada) = max+1")
 
 console.log("\nStatus / vigência")
 // 18

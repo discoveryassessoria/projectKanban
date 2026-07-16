@@ -5,9 +5,10 @@
 
 import type { StatusRegra } from "./tipos"
 
-/** Só RASCUNHO e INATIVA podem ser editadas em lugar. PUBLICADA/ARQUIVADA são imutáveis. */
+/** Edição é SEMPRE no lugar (não duplica nem inativa). Vale para rascunho, inativa
+ *  e publicada; apenas ARQUIVADA é somente leitura (reabrir antes de editar). */
 export function podeEditarEmLugar(status: StatusRegra): boolean {
-  return status === "RASCUNHO" || status === "INATIVA"
+  return status !== "ARQUIVADA"
 }
 
 /** Próxima versão de um grupo (código): max(versões) + 1. */

@@ -45,11 +45,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params
     const atual = await achar(Number(id))
     if (!atual) return NextResponse.json({ error: "Regra não encontrada." }, { status: 404 })
-    if (atual.status === "PUBLICADA") {
-      return NextResponse.json({ error: "Regra publicada não pode ser sobrescrita. Crie uma nova versão para editar.", code: "PUBLICADA_IMUTAVEL" }, { status: 409 })
-    }
+    // Edição SEMPRE no lugar (mesma linha, mesmo id) — não duplica nem inativa.
+    // Vale para rascunho, inativa e publicada. Arquivada é somente leitura.
     if (atual.status === "ARQUIVADA") {
-      return NextResponse.json({ error: "Regra arquivada é somente leitura.", code: "ARQUIVADA_IMUTAVEL" }, { status: 409 })
+      return NextResponse.json({ error: "Regra arquivada é somente leitura. Reabra para editar.", code: "ARQUIVADA_IMUTAVEL" }, { status: 409 })
     }
     const b = await request.json()
     const input = normalizarInput(b)
@@ -59,7 +58,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const usuarioId = await usuarioIdDe(request)
     const data = regraInputParaData(input)
     const row = await prisma.matrizDocumental.update({ where: { id: atual.id }, data: { ...(data as object), atualizadoPor: usuarioId ?? undefined } })
-    await auditar(prisma, { acao: "REGRA_EDITADA", entidadeId: row.id, descricao: `Rascunho editado: ${row.nome ?? row.documentTypeCode} (v${row.versao})`, detalhes: { antes: matrizParaRegra(atual), depois: matrizParaRegra(row) }, usuarioId })
+    await auditar(prisma, { acao: "REGRA_EDITADA", entidadeId: row.id, descricao: `Regra editada no lugar: ${row.nome ?? row.documentTypeCode} (v${row.versao}, ${row.status})`, detalhes: { antes: matrizParaRegra(atual), depois: matrizParaRegra(row) }, usuarioId })
     return NextResponse.json({ regra: row })
   } catch (e) {
     console.error("PUT regras-documentais/[id]", e)
