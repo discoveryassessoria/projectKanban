@@ -39,9 +39,6 @@ export async function GET(request: NextRequest) {
         OR: whereConditions,
       },
       include: {
-        status: {
-          select: { id: true, nome: true, ordem: true },
-        },
         // Contar tarefas de nível raiz (containers/atividades)
         tarefas: {
           where: { tarefaPaiId: null },
@@ -103,7 +100,7 @@ export async function GET(request: NextRequest) {
         id: processo.id,
         nome: processo.nome,
         pais: processo.pais,
-        etapaAtual: processo.status?.nome ?? processo.faseAtualKey ?? null,
+        etapaAtual: processo.faseAtualKey ?? null,
         progresso,
         totalTarefas,
         tarefasConcluidas,

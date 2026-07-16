@@ -20,7 +20,6 @@ export async function GET(
     const processo = await prisma.processo.findUnique({
       where: { id: processoId },
       include: {
-        status: true,
         contratantes: {
           include: { contratante: { select: { id: true, nome: true } } },
         },
@@ -65,12 +64,6 @@ export async function GET(
     if (!temAcesso) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
-
-    // Buscar todas as etapas (status) do país para mostrar a timeline
-    const etapas = await prisma.status.findMany({
-      where: { pais: processo.pais },
-      orderBy: { ordem: 'asc' },
-    });
 
     // Formatar tarefas em hierarquia
     const tarefasFormatadas = processo.tarefas.map((tarefa) => {
@@ -124,21 +117,14 @@ export async function GET(
       id: processo.id,
       nome: processo.nome,
       pais: processo.pais,
-      etapaAtual: processo.status?.nome ?? processo.faseAtualKey ?? null,
-      etapaAtualOrdem: processo.status?.ordem ?? null,
+      etapaAtual: processo.faseAtualKey ?? null,
       dataInicio: processo.dataInicio,
       previsaoTermino: processo.previsaoTermino,
       progressoGeral,
       totalTarefas,
       tarefasConcluidas,
-      // Timeline de etapas
-      etapas: etapas.map((e) => ({
-        id: e.id,
-        nome: e.nome,
-        ordem: e.ordem,
-        atual: e.id === processo.statusId,
-        concluida: processo.status ? e.ordem < processo.status.ordem : false,
-      })),
+      // Timeline de etapas (legado removido junto com Processo.statusId)
+      etapas: [],
       // Tarefas com hierarquia
       tarefas: tarefasFormatadas,
       // Pessoas envolvidas

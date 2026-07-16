@@ -56,7 +56,7 @@ export async function GET(
 
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { id: true, pais: true, arvoreId: true, faseAtualKey: true, status: { select: { faseCode: true } } },
+      select: { id: true, pais: true, arvoreId: true, faseAtualKey: true },
     })
     if (!processo) return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
 
@@ -66,7 +66,7 @@ export async function GET(
     })
 
     if (!pasta) {
-      if ((processo.status?.faseCode ?? phaseKeyToFaseCode(processo.faseAtualKey)) !== "APOSTILAMENTO") {
+      if (phaseKeyToFaseCode(processo.faseAtualKey) !== "APOSTILAMENTO") {
         return NextResponse.json({ pasta: null })
       }
 

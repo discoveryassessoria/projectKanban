@@ -24,7 +24,7 @@ export async function POST(
 
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { id: true, pais: true, faseAtualKey: true, workflowRuntime: true, status: { select: { faseCode: true } } },
+      select: { id: true, pais: true, faseAtualKey: true, workflowRuntime: true },
     })
     if (!processo) return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
 
@@ -38,27 +38,18 @@ export async function POST(
       return NextResponse.json(r, { status })
     }
 
-    // ✅ E5 — fase REAL = faseAtualKey (fonte de verdade). Fallback p/ a coluna
-    // legada só se faseAtualKey estiver vazio. Antes lia SÓ status.faseCode.
-    const faseAtual =
-      (phaseKeyToFaseCode(processo.faseAtualKey) ?? processo.status?.faseCode ?? null)
+    // Fase REAL = faseAtualKey (fonte de verdade). O legado Processo.statusId /
+    // Status.faseCode foi removido — a fase não tem mais fallback por status.
+    const faseAtual = phaseKeyToFaseCode(processo.faseAtualKey) ?? null
     if (!faseAtual) return NextResponse.json({ error: "O processo não tem fase definida." }, { status: 422 })
 
     const proximaFase = getNextFase(faseAtual)
     if (!proximaFase) return NextResponse.json({ error: "Esta já é a última fase." }, { status: 422 })
 
-    // coluna legada é OPCIONAL: o card é posicionado pela faseAtualKey.
-    const colunaDestino = await prisma.status.findFirst({
-      where: { pais: processo.pais, faseCode: proximaFase },
-      select: { id: true },
-    })
-
-    // ✅ E5 — move o card: faseAtualKey SEMPRE; statusId só se houver coluna.
-    // Antes atualizava só o statusId → o card ficava DESSINCRONIZADO (a fase
-    // real, faseAtualKey, não mudava).
+    // O card é posicionado exclusivamente pela faseAtualKey.
     await prisma.processo.update({
       where: { id },
-      data: { faseAtualKey: faseCodeToPhaseKey(proximaFase) as string, ...(colunaDestino ? { statusId: colunaDestino.id } : {}) },
+      data: { faseAtualKey: faseCodeToPhaseKey(proximaFase) as string },
     })
 
     // MOTOR — gatilho automático (best-effort; não derruba o avanço).

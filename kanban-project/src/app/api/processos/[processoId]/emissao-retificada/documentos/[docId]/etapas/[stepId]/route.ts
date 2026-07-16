@@ -5,14 +5,11 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { moverStatusIdLegacy } from "@/src/lib/motor/runtime-guard"
 import {
   applyStep, allValidated, reProgress,
   type ReWorkflow,
 } from "@/src/lib/process-stage/emissao-retificada-engine"
 import { dispararMotorNaFaseAtual } from "@/src/lib/motor/executor"
-
-const PROXIMA_FASE = "TRADUCAO_JURAMENTADA" // FaseCode
 
 export async function POST(
   req: Request,
@@ -54,24 +51,10 @@ export async function POST(
       select: { status: true },
     })
     if (allValidated(todos)) {
-      const processo = await prisma.processo.findUnique({ where: { id: processoId } })
-      if (processo) {
-        const destino = await prisma.status.findFirst({
-          where: { pais: processo.pais, faseCode: PROXIMA_FASE as never },
-        })
-        if (destino) {
-          await prisma.$transaction(
-            async (tx) => {
-              await moverStatusIdLegacy(tx, processoId, destino.id)
-            },
-            { timeout: 30000, maxWait: 10000 },
-          )
-          completePhase = true
+      completePhase = true
 
-          // MOTOR — a fase avançou; dispara o motor (best-effort)
-          await dispararMotorNaFaseAtual(processoId)
-        }
-      }
+      // MOTOR — a fase avançou; dispara o motor (best-effort)
+      await dispararMotorNaFaseAtual(processoId)
     }
   }
 

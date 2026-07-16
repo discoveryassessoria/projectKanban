@@ -95,11 +95,7 @@ export async function GET(
       include: {
         processos: {
           include: {
-            processo: {
-              include: {
-                status: true,
-              }
-            }
+            processo: true
           }
         },
       },

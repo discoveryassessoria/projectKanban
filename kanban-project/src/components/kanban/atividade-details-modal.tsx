@@ -44,10 +44,9 @@ import {
   Trash2,
   FileText
 } from "lucide-react"
-import { 
-  Pais, 
-  PAISES_CONFIG, 
-  type Status,
+import {
+  Pais,
+  PAISES_CONFIG,
   type ProcessoWithStatus,
   type Processo,
   type Contratante,
@@ -75,7 +74,6 @@ interface ProcessoDetailsModalProps {
   isOpen: boolean
   onClose: () => void
   onSave?: () => void
-  statusList?: Status[]
   contratantes?: Contratante[]
   requerentes?: Requerente[]
   initialTab?: string
@@ -90,7 +88,6 @@ export function ProcessoDetailsModal({
   isOpen, 
   onClose, 
   onSave,
-  statusList = [],
   contratantes: contratantesProp = [],
   requerentes: requerentesProp = [],
   initialTab,
@@ -102,8 +99,6 @@ export function ProcessoDetailsModal({
   // ✅ ATUALIZADO: Adicionado "informacoes" como possível aba
   const { pode } = usePermissoes()
   const [activeTab, setActiveTab] = useState<"geral" | "central" | "documentos" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos">("geral")
-  const [etapas, setEtapas] = useState<Status[]>([])
-  const [statusIdAtual, setStatusIdAtual] = useState(processo?.statusId)
 
   // ✅ NOVO: força refetch do PhaseProgressHeader quando algo muda
   const [phaseRefreshKey, setPhaseRefreshKey] = useState(0)
@@ -145,14 +140,6 @@ export function ProcessoDetailsModal({
 
   // Classes padrão para formulários
   const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm h-[42px]"
-  
-  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm h-[42px] appearance-none cursor-pointer"
-  
-  const selectStyle = {
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'right 12px center'
-  }
 
   // ✅ Verificar se o processo é da Espanha ou Itália
   const isEspanha = processo?.pais === "ESPANHA"
@@ -307,7 +294,6 @@ export function ProcessoDetailsModal({
   }, [isOpen])
 
   useEffect(() => {
-    setStatusIdAtual(processo?.statusId)
     setNomeEditado(processo?.nome || "")
     setContratantesSelecionados(processo?.contratantes || [])
     setRequerentesSelecionados(processo?.requerentes || [])
@@ -355,23 +341,6 @@ export function ProcessoDetailsModal({
   }
 
   useEffect(() => {
-    if (isOpen && processo?.pais) {
-      if (statusList.length > 0) {
-        setEtapas(statusList)
-      } else {
-        fetch(`/api/status?pais=${processo.pais}`)
-          .then(res => res.json())
-          .then(data => {
-            if (data.status) {
-              setEtapas(data.status)
-            }
-          })
-          .catch(console.error)
-      }
-    }
-  }, [isOpen, processo?.pais, statusList])
-
-  useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') handleClose()
     }
@@ -397,7 +366,6 @@ export function ProcessoDetailsModal({
         },
         body: JSON.stringify({
           nome: nomeEditado,
-          statusId: statusIdAtual,
           contratanteIds: contratantesSelecionados.map(c => c.id),
           requerenteIds: requerentesSelecionados.map(r => r.id)
         })
@@ -489,18 +457,6 @@ export function ProcessoDetailsModal({
   if (!isOpen || !processo) return null
 
   const paisConfig = PAISES_CONFIG[processo.pais as keyof typeof PAISES_CONFIG] || { label: processo.pais, bandeira: "🏳" }
-  const sortedEtapas = [...etapas].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
-  const etapaAtualIndex = sortedEtapas.findIndex(e => e.id === statusIdAtual)
-  const etapaAtual = sortedEtapas.find(e => e.id === statusIdAtual)
-
-  const getEtapaCor = (index: number) => {
-    const cores = [
-      "bg-blue-500", "bg-blue-400", "bg-cyan-500", "bg-teal-500",
-      "bg-green-500", "bg-emerald-500", "bg-yellow-500", "bg-orange-500",
-      "bg-red-500", "bg-purple-500", "bg-pink-500",
-    ]
-    return cores[index % cores.length]
-  }
 
   const dataCriacao = processo.createdAt
   const dataFormatada = dataCriacao ? new Date(dataCriacao).toLocaleDateString('pt-BR') : ""
@@ -573,60 +529,6 @@ export function ProcessoDetailsModal({
           </div>
         </div>
 
-        {/* Barra de Etapas */}
-        <div className="flex border-b bg-gray-50 overflow-x-auto flex-shrink-0">
-          {sortedEtapas.length > 0 ? (
-            sortedEtapas.map((etapa, index) => {
-              const isActive = etapa.id === statusIdAtual
-              const isPast = index < etapaAtualIndex
-              const cor = getEtapaCor(index)
-              return (
-                <button
-                  key={etapa.id}
-                  onClick={async () => {
-                    if (etapa.id === statusIdAtual) return
-                    // 🔒 Mover de fase na mão exige permissão.
-                    if (!pode('processos.editar_status')) {
-                      alert("As fases avançam automaticamente conforme os documentos são validados. Você não tem permissão para mover o processo de fase manualmente.")
-                      return
-                    }
-                    try {
-                      const response = await fetch(`/api/processos/${processo.id}`, {
-                        method: 'PUT',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'Authorization': `Bearer ${localStorage.getItem("authToken")}`
-                        },
-                        body: JSON.stringify({ statusId: etapa.id })
-                      })
-                      if (response.ok) {
-                        setStatusIdAtual(etapa.id)
-                        setPhaseRefreshKey((k) => k + 1)
-                        onSave?.()
-                      } else {
-                        const data = await response.json().catch(() => ({}))
-                        alert(data.error || 'Não foi possível mover o processo.')
-                      }
-                    } catch (error) {
-                      console.error('Erro ao mover processo:', error)
-                      alert('Não foi possível mover o processo.')
-                    }
-                  }}
-                  className={`
-                    flex-shrink-0 px-4 py-3 text-sm font-medium transition-colors relative
-                    ${!pode('processos.editar_status') ? 'cursor-default' : etapa.id === statusIdAtual ? 'cursor-default' : 'cursor-pointer'}
-                    ${isActive ? `${cor} text-white` : isPast ? `bg-gray-200 text-gray-600 ${pode('processos.editar_status') ? 'hover:bg-gray-300' : ''}` : `bg-gray-100 text-gray-500 ${pode('processos.editar_status') ? 'hover:bg-gray-200' : ''}`}
-                  `}
-                >
-                  {etapa.nome}
-                </button>
-              )
-            })
-          ) : (
-            <div className="px-4 py-3 text-sm text-gray-500">Carregando etapas...</div>
-          )}
-        </div>
-
         {/* Abas principais - dinâmicas */}
         <div className="flex border-b bg-white px-6 flex-shrink-0">
           {tabs.map((tab) => (
@@ -679,7 +581,7 @@ export function ProcessoDetailsModal({
                     <div className="mb-6">
                       <label className="text-xs text-gray-500 uppercase">Etapa</label>
                       <p className="text-gray-900 font-medium">
-                        {etapaAtual?.nome || processo.status?.nome || "Não definida"}
+                        {processo.faseAtualKey ?? "—"}
                       </p>
                     </div>
 
@@ -829,22 +731,6 @@ export function ProcessoDetailsModal({
                         onChange={(e) => setNomeEditado(e.target.value)}
                         className="w-full"
                       />
-                    </div>
-
-                    {/* Etapa (select) */}
-                    <div className="mb-6">
-                      <label className="text-xs text-gray-500 uppercase mb-1 block">Etapa</label>
-                      <select
-                        value={statusIdAtual ?? ""}
-                        onChange={(e) => setStatusIdAtual(Number(e.target.value))}
-                        className={selectClass}
-                        style={selectStyle}
-                        disabled={!pode('processos.editar_status')}
-                      >
-                        {sortedEtapas.map((etapa) => (
-                          <option key={etapa.id} value={etapa.id}>{etapa.nome}</option>
-                        ))}
-                      </select>
                     </div>
 
                     {/* Contratantes (busca múltipla) - ✅ ORDENADOS ALFABETICAMENTE */}

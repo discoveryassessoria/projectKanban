@@ -6,8 +6,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { moverStatusIdLegacy } from "@/src/lib/motor/runtime-guard"
-import type { FaseCode, Prisma } from "@prisma/client"
+import type { Prisma } from "@prisma/client"
 import {
   applyStep,
   calcProgress,
@@ -104,21 +103,6 @@ export async function POST(
     if (f.receivedAt) pastaData.receivedAt = parseBR(f.receivedAt)
     if (result.completePhase) pastaData.validatedAt = now
 
-    let colunaDestinoId: number | null = null
-    if (result.completePhase) {
-      const coluna = await prisma.status.findFirst({
-        where: { pais: processo.pais, faseCode: "AGUARDANDO_PROTOCOLO" as FaseCode },
-        select: { id: true },
-      })
-      if (!coluna) {
-        return NextResponse.json(
-          { error: `Não há coluna para AGUARDANDO_PROTOCOLO no país ${processo.pais}.` },
-          { status: 422 }
-        )
-      }
-      colunaDestinoId = coluna.id
-    }
-
     await prisma.$transaction(
       async (tx) => {
         await tx.pastaApostilamento.update({ where: { id: pasta.id }, data: pastaData })
@@ -138,13 +122,12 @@ export async function POST(
           })
         }
 
-        if (result.completePhase && colunaDestinoId) {
+        if (result.completePhase) {
           const ids = result.docs!.map((d) => d.documentoId)
           await tx.documento.updateMany({
             where: { id: { in: ids } },
             data: { apostilado: true },
           })
-          await moverStatusIdLegacy(tx, id, colunaDestinoId)
         }
       },
       { timeout: 30000, maxWait: 10000 }

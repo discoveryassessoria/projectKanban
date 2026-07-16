@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { reconcileDocsForPessoa } from "@/src/lib/document-generator"
-import { recalculateByPessoaId } from "@/src/lib/process-stage/recalculate"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -164,11 +163,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           },
         })
       : pessoaAtualizada
-
-    // ✅ NOVO: recalcula fase do processo após atualizar pessoa
-    if (pessoaFinal) {
-      await recalculateByPessoaId(prisma, pessoaFinal.id)
-    }
 
     return NextResponse.json(pessoaFinal)
   } catch (error) {

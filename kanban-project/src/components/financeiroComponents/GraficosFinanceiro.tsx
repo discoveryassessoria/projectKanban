@@ -29,7 +29,7 @@ interface Fatura {
   parcelas: number
   dataEmissao: string
   dataVencimento: string | null
-  processo: { id: number; nome: string; pais: string; statusNome: string } | null
+  processo: { id: number; nome: string; pais: string } | null
   destinatarios: { id: number; nome: string }[]
   pagamentos: any[]
   parcelasBoleto: any[]

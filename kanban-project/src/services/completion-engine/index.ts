@@ -64,7 +64,6 @@ async function carregarFaseEDocs(processoId: number): Promise<{
     where: { id: processoId },
     select: {
       faseAtualKey: true,
-      status: { select: { faseCode: true } },
       arvore: {
         select: {
           pessoas: {
@@ -83,10 +82,7 @@ async function carregarFaseEDocs(processoId: number): Promise<{
       },
     },
   })
-  const faseCode =
-    phaseKeyToFaseCode(processo?.faseAtualKey) ??
-    processo?.status?.faseCode ??
-    null
+  const faseCode = phaseKeyToFaseCode(processo?.faseAtualKey) ?? null
   const docs: DocForStage[] = (processo?.arvore?.pessoas ?? []).flatMap((p) =>
     p.documentos.map((d) => ({ status: d.status, required: true, workflows: [] } as unknown as DocForStage)),
   )

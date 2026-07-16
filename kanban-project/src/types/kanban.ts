@@ -182,8 +182,6 @@ export interface Processo {
   pais: string                        // countryKey ("italia")
   faseAtualKey?: string | null        // fase do motor = coluna atual
   tipoProcessoMotorId?: number | null // vínculo com o tipo do motor
-  statusId?: number | null            // LEGADO
-  status?: Status | null              // LEGADO
   contratantes?: Contratante[]
   arvoreId?: number | null
   arvore?: {
@@ -203,10 +201,9 @@ export interface Processo {
   }
 }
 
-/** @deprecated LEGADO — o kanban novo usa Processo direto (agrupa por faseAtualKey) */
-export interface ProcessoWithStatus extends Processo {
-  status: Status
-}
+/** @deprecated LEGADO — alias de Processo (o kanban novo agrupa por faseAtualKey).
+ * Mantido só porque muitos arquivos importam esse nome. */
+export type ProcessoWithStatus = Processo
 
 // =====================================================
 // DADOS AGREGADOS POR PAÍS (para o Kanban)

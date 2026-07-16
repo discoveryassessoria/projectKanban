@@ -22,7 +22,6 @@ import {
   type PaisKanban,
   type TipoKanban,
   type Processo,
-  type Status,
   type Contratante,
   type Requerente
 } from "@/src/types/kanban"
@@ -57,7 +56,6 @@ export function KanbanContent() {
   const [tipoSelecionadoId, setTipoSelecionadoId] = useState<number | null>(null)
 
   const [processos, setProcessos] = useState<Processo[]>([])
-  const [statusList, setStatusList] = useState<Status[]>([]) // LEGADO — só pro modal
   const [contratantes, setContratantes] = useState<Contratante[]>([])
   const [requerentes, setRequerentes] = useState<Requerente[]>([])
   const [arvores, setArvores] = useState<any[]>([])
@@ -73,7 +71,6 @@ export function KanbanContent() {
   // Modal de processo na aba Clientes
   const [clientesProcessoModal, setClientesProcessoModal] = useState<Processo | null>(null)
   const [isClientesProcessoModalOpen, setIsClientesProcessoModalOpen] = useState(false)
-  const [clientesStatusList, setClientesStatusList] = useState<Status[]>([])
 
   const { pode } = usePermissoes()
 
@@ -172,40 +169,19 @@ export function KanbanContent() {
   }, [])
 
   // Abrir processo a partir da aba Clientes (abre modal sem mudar de aba)
-  const handleOpenProcessoFromClientes = useCallback(async (processoId: number, pais: string) => {
+  const handleOpenProcessoFromClientes = useCallback(async (processoId: number) => {
     try {
-      // Buscar processo E status em paralelo para ser mais rápido
-      const [processoResponse, statusResponse] = await Promise.all([
-        fetch(`/api/processos/${processoId}`),
-        fetch(`/api/status?pais=${pais}`)
-      ])
+      const processoResponse = await fetch(`/api/processos/${processoId}`)
 
       if (!processoResponse.ok) throw new Error("Erro ao buscar processo")
 
-      const [processoData, statusData] = await Promise.all([
-        processoResponse.json(),
-        statusResponse.ok ? statusResponse.json() : { status: [] }
-      ])
+      const processoData = await processoResponse.json()
 
-      setClientesStatusList(statusData.status || [])
       setClientesProcessoModal(processoData.processo)
       setIsClientesProcessoModalOpen(true)
     } catch (error) {
       console.error("Erro ao abrir processo:", error)
       alert("Não foi possível abrir o processo.")
-    }
-  }, [])
-
-  // LEGADO — status só pro modal de detalhes
-  const buscarStatus = useCallback(async (pais: string) => {
-    try {
-      const response = await fetch(`/api/status?pais=${pais}`)
-      if (response.ok) {
-        const data = await response.json()
-        setStatusList(data.status || [])
-      }
-    } catch (error) {
-      console.error("Erro ao buscar status:", error)
     }
   }, [])
 
@@ -285,21 +261,19 @@ export function KanbanContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router])
 
-  // Efeito quando país muda - buscar processos (e status legado) do país
+  // Efeito quando país muda - buscar processos do país
   useEffect(() => {
     if (!paisSelecionado) return
-    buscarStatus(paisSelecionado)
     buscarProcessos(paisSelecionado)
-  }, [paisSelecionado, buscarStatus, buscarProcessos])
+  }, [paisSelecionado, buscarProcessos])
 
   // Refresh apenas do país atual
   const handleRefresh = useCallback(() => {
     if (paisSelecionado) {
-      buscarStatus(paisSelecionado)
       buscarProcessos(paisSelecionado)
     }
     buscarContratantes()
-  }, [paisSelecionado, buscarStatus, buscarProcessos])
+  }, [paisSelecionado, buscarProcessos])
 
   if (loading) {
     return (
@@ -467,7 +441,6 @@ export function KanbanContent() {
                     pais={paisObj}
                     tipo={tipoSelecionado}
                     processos={processosDoTipo}
-                    statusList={statusList}
                     contratantes={contratantes}
                     requerentes={requerentes}
                     onRefresh={handleRefresh}
@@ -494,7 +467,6 @@ export function KanbanContent() {
               pode('processos.ver') ? (
                 <ProcessosLista
                   processos={processos as any}
-                  statusList={statusList}
                   contratantes={contratantes}
                   onRefresh={handleRefresh}
                 />
@@ -537,7 +509,6 @@ export function KanbanContent() {
           buscarContratantes()
           buscarRequerentes()
         }}
-        statusList={clientesStatusList}
       />
     </div>
   )

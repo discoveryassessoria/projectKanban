@@ -28,15 +28,3 @@ export async function processoEmRuntimeV2Com(db: PrismaLike, processoId: number)
 export async function processoEmRuntimeV2(processoId: number): Promise<boolean> {
   return processoEmRuntimeV2Com(prisma, processoId)
 }
-
-/**
- * Auditoria item 2 — escrita FAIL-CLOSED de Processo.statusId (board legado).
- * Em runtime v2 o board NÃO é movido por caminhos legados (só o PhaseAdvanceService
- * controla a fase). Retorna true se escreveu (legacy), false se virou no-op (v2).
- * Lê o runtime pelo MESMO client (tx-consistente quando dentro de $transaction).
- */
-export async function moverStatusIdLegacy(db: PrismaLike, processoId: number, statusId: number): Promise<boolean> {
-  if (await processoEmRuntimeV2Com(db, processoId)) return false
-  await db.processo.update({ where: { id: processoId }, data: { statusId } })
-  return true
-}

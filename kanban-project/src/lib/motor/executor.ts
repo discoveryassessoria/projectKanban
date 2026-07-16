@@ -381,15 +381,12 @@ export async function dispararMotorNaFaseAtual(processoId: number): Promise<void
       select: {
         tipoProcessoMotorId: true,
         faseAtualKey: true,
-        status: { select: { faseCode: true } },
       },
     })
     if (!proc?.tipoProcessoMotorId) return
 
-    // ✅ E5 — fase REAL = faseAtualKey (fonte de verdade pós-E2). Fallback p/ a
-    // coluna legada só se faseAtualKey estiver vazio.
-    const faseAtual =
-      (phaseKeyToFaseCode(proc.faseAtualKey) ?? proc.status?.faseCode ?? null)
+    // ✅ E5 — fase REAL = faseAtualKey (fonte de verdade pós-E2).
+    const faseAtual = phaseKeyToFaseCode(proc.faseAtualKey) ?? null
     if (!faseAtual) return
 
     const phaseKey = await resolvePhaseKey(proc.tipoProcessoMotorId, faseAtual)

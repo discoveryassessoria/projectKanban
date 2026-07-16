@@ -34,7 +34,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ process
   // só materializa/lista quando o processo está nesta fase
   const processo = await prisma.processo.findUnique({
     where: { id: processoId },
-    include: { status: true },
   })
   if (!processo) return NextResponse.json({ error: "Processo não encontrado." }, { status: 404 })
 

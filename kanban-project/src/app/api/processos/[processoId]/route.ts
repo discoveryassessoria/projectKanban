@@ -4,7 +4,6 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { logProcesso } from "@/lib/auditoria"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
-import { processoEmRuntimeV2 } from "@/src/lib/motor/runtime-guard"
 
 // GET - Buscar processo por ID
 export async function GET(
@@ -25,7 +24,6 @@ export async function GET(
     const processo = await prisma.processo.findUnique({
       where: { id },
       include: {
-        status: true,
         contratantes: {
           include: {
             contratante: true
@@ -101,10 +99,9 @@ export async function PUT(
 
     const body = await request.json()
     const { 
-      nome, 
-      descricao, 
+      nome,
+      descricao,
       observacoes,
-      statusId, 
       contratanteIds,
       arvoreId,
       previsaoTermino,
@@ -112,10 +109,9 @@ export async function PUT(
       requerenteIds
     } = body
 
-    // Verificar se o processo existe e pegar status atual
+    // Verificar se o processo existe
     const processoExistente = await prisma.processo.findUnique({
       where: { id },
-      include: { status: true }
     })
 
     if (!processoExistente) {
@@ -125,42 +121,9 @@ export async function PUT(
       )
     }
 
-    // Auditoria item 2 (item J) — em runtime v2 o board (statusId) NÃO é movido por
-    // edição manual: o card segue faseAtualKey (só o PhaseAdvanceService controla a
-    // fase). Neutraliza o statusId do body p/ todo o restante do handler (validação,
-    // persistência e auditoria). Demais campos seguem editáveis normalmente.
-    const emRuntimeV2 = await processoEmRuntimeV2(id)
-    const statusIdEfetivo = emRuntimeV2 ? undefined : statusId
-
-    // 🔒 Mudança de fase manual exige a permissão específica (default: só admin).
-    // O motor automático mexe no statusId direto no servidor e NÃO passa por aqui,
-    // então isto não atrapalha o avanço automático.
-    if (statusIdEfetivo && statusIdEfetivo !== processoExistente.statusId) {
-      const erroStatus = await verificarPermissao(request, 'processos.editar_status')
-      if (erroStatus) return erroStatus
-    }
-
-    // Se statusId foi fornecido, verificar se pertence ao mesmo país
-    let statusNovo = null
-    if (statusIdEfetivo && statusIdEfetivo !== processoExistente.statusId) {
-      statusNovo = await prisma.status.findUnique({
-        where: { id: statusIdEfetivo }
-      })
-
-      if (!statusNovo) {
-        return NextResponse.json(
-          { error: "Status não encontrado" },
-          { status: 404 }
-        )
-      }
-
-      if (statusNovo.pais !== processoExistente.pais) {
-        return NextResponse.json(
-          { error: "Status não pertence a este país" },
-          { status: 400 }
-        )
-      }
-    }
+    // A fase do processo NÃO é editável por esta rota genérica: ela é controlada
+    // exclusivamente pelo PhaseAdvanceService (faseAtualKey). O legado
+    // Processo.statusId foi removido — não há mais "mudar de fase" na edição.
 
     // Atualizar contratantes se fornecidos
     if (contratanteIds !== undefined) {
@@ -201,7 +164,6 @@ export async function PUT(
         nome: nome !== undefined ? nome : undefined,
         descricao: descricao !== undefined ? descricao : undefined,
         observacoes: observacoes !== undefined ? observacoes : undefined,
-        statusId: statusIdEfetivo !== undefined ? statusIdEfetivo : undefined,
         arvoreId: arvoreId !== undefined ? arvoreId : undefined,
         previsaoTermino: previsaoTermino !== undefined 
           ? (previsaoTermino ? new Date(previsaoTermino) : null) 
@@ -212,25 +174,13 @@ export async function PUT(
       }
     })
 
-    // ✅ REGISTRAR LOG
-    if (statusNovo && processoExistente.status) {
-      // Se mudou de status, registrar como "moveu"
-      await logProcesso.mover(
-        processoExistente.nome,
-        id,
-        processoExistente.status.nome,
-        statusNovo.nome
-      )
-    } else {
-      // Se só editou dados, registrar como "editou"
-      await logProcesso.editar(processoExistente.nome, id)
-    }
+    // ✅ REGISTRAR LOG (edição de dados; a fase é registrada pelo PhaseAdvanceService)
+    await logProcesso.editar(processoExistente.nome, id)
 
     // Buscar processo atualizado
     const processoAtualizado = await prisma.processo.findUnique({
       where: { id },
       include: {
-        status: true,
         contratantes: {
           include: {
             contratante: true

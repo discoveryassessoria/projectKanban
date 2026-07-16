@@ -16,7 +16,7 @@ export async function GET(request: Request) {
       orderBy: { ordem: "asc" },
       include: {
         _count: {
-          select: { processos: true }
+          select: { tarefas: true }
         }
       }
     })
