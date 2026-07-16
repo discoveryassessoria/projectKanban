@@ -7,7 +7,7 @@
 // — cada item é { countryKey, countryLabel, flag }. França e países novos
 // aparecem sozinhos no filtro.
 
-import { useEffect, useState, useCallback, useMemo } from "react"
+import { useEffect, useState, useCallback, useMemo, Suspense } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, Filter, ChevronDown } from "lucide-react"
 import RelatorioButton from "@/src/components/activitiesComponents/RelatorioButton"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import ListaActivities from "@/src/components/activitiesComponents/listaActivities"
 import PrazoActivities from "@/src/components/activitiesComponents/prazoActivities"
 import CalendarioActivities from "@/src/components/activitiesComponents/calendarioActivities"
@@ -51,7 +51,7 @@ interface ActivityFormData {
   status_id: string
 }
 
-export default function ActivitiesPage() {
+function ActivitiesPageInner() {
   const router = useRouter()
   const [searchModalOpen, setSearchModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -65,6 +65,30 @@ export default function ActivitiesPage() {
   })
   const [mounted, setMounted] = useState(false)
   const [user, setUser] = useState<UserData>({ nome: "Usuário" })
+  // Aba controlada — permite deep-link vindo da Central Operacional (?tab=).
+  const [tabValue, setTabValue] = useState("list")
+  const searchParams = useSearchParams()
+
+  // Seed ADITIVO de filtros/aba a partir da URL (deep-link da Home). Só altera
+  // o que veio na querystring; sem params, o comportamento padrão é idêntico.
+  useEffect(() => {
+    if (!searchParams) return
+    const status = searchParams.get("status")
+    const responsavel = searchParams.get("responsavel")
+    const pais = searchParams.get("pais")
+    const tab = searchParams.get("tab")
+    setFilters((f) => {
+      const next = { ...f }
+      if (status === "vencidas") next.status = "pendente"
+      else if (status === "pendente" || status === "concluida") next.status = status
+      if (responsavel) next.responsavel = responsavel
+      if (pais) next.pais = pais
+      return next
+    })
+    if (tab === "list" || tab === "deadline" || tab === "calendar") setTabValue(tab)
+    else if (status === "vencidas") setTabValue("deadline")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   // Estados para árvores e processos (para o HeaderBar)
   const [arvores, setArvores] = useState<any[]>([])
@@ -192,7 +216,7 @@ export default function ActivitiesPage() {
         </div>
 
         {/* Tabs de visualização */}
-        <Tabs defaultValue="list" className="space-y-4">
+        <Tabs value={tabValue} onValueChange={setTabValue} className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <TabsList className="bg-transparent border border-white/30">
               <TabsTrigger value="list" className="data-[state=active]:bg-white/20 text-white">Lista</TabsTrigger>
@@ -608,5 +632,14 @@ function CreateActivityModal() {
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// Wrapper com Suspense — exigido pelo Next para useSearchParams (deep-link ?tab/status/responsavel).
+export default function ActivitiesPage() {
+  return (
+    <Suspense fallback={null}>
+      <ActivitiesPageInner />
+    </Suspense>
   )
 }
