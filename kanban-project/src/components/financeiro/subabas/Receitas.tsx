@@ -29,7 +29,9 @@ import {
   type ParcelaLancavel,
   type EntidadeLancavel,
 } from '@/src/components/financeiro/paginas/LancarParcelaPagina'
-import { SeletorTemplate } from '@/src/components/financeiro/SeletorTemplate'
+// ARQUITETURA NOVA — aplicação MANUAL de template financeiro REMOVIDA. Lançamentos
+// financeiros nascem apenas via Automações por Fase (evento do Workflow Interno).
+// O modal SeletorTemplate e o botão "Template" foram retirados desta tela.
 import { DetalhesReceitaPagina } from '@/src/components/financeiro/paginas/DetalhesReceitaPagina'
 
 // ============================================================================
@@ -181,7 +183,6 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
   const [erro, setErro] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<Filter>('todas')
   const [excluindoId, setExcluindoId] = useState<number | null>(null)
-  const [templateAberto, setTemplateAberto] = useState(false)
   const [pastaAberta, setPastaAberta] = useState(true) // Pasta Documental expandida por padrão
 
   // ---- Load ----
@@ -507,30 +508,12 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
   // ---- View 'lista' ----
   return (
     <div className="fpag-page">
-      {templateAberto && (
-        <SeletorTemplate
-          processoId={processoId}
-          fxHoje={fxHoje}
-          onFechar={() => setTemplateAberto(false)}
-          onAplicado={() => {
-            recarregar()
-            onUpdate?.()
-          }}
-        />
-      )}
       <div className="page-header">
         <div>
           <h1 className="page-title">Receitas</h1>
           <div className="page-subtitle">Honorários e demais entradas do processo</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            type="button"
-            className="btn-outline"
-            onClick={() => setTemplateAberto(true)}
-          >
-            ⚡ Template
-          </button>
           <button
             type="button"
             className="btn-primary"

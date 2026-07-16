@@ -30,7 +30,9 @@ import {
 
 import { TabelaCustos } from '@/src/components/kanban/TabelaCustos'
 import { parseLista } from '@/src/lib/financeiro/parseLista'
-import { SeletorTemplate } from '@/src/components/financeiro/SeletorTemplate'
+// ARQUITETURA NOVA — aplicação MANUAL de template financeiro REMOVIDA. Lançamentos
+// financeiros nascem apenas via Automações por Fase (evento do Workflow Interno).
+// O modal SeletorTemplate e o botão "Template" foram retirados desta tela.
 import { DetalhesCustoPagina } from '@/src/components/financeiro/paginas/DetalhesCustoPagina'
 
 // ============================================================================
@@ -204,7 +206,6 @@ export function Custos({
   const [erro, setErro] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<Filter>('todos')
   const [excluindoId, setExcluindoId] = useState<number | null>(null)
-  const [templateAberto, setTemplateAberto] = useState(false)
   const [pastaAberta, setPastaAberta] = useState(true) // Pasta Documental expandida por padrão
 
   // ---- Load ----
@@ -597,17 +598,6 @@ export function Custos({
   // ---- View 'lista' ----
   return (
     <div className="fpag-page">
-      {templateAberto && (
-        <SeletorTemplate
-          processoId={processoId}
-          fxHoje={fxHoje}
-          onFechar={() => setTemplateAberto(false)}
-          onAplicado={() => {
-            recarregar()
-            onUpdate?.()
-          }}
-        />
-      )}
       {/* === Section 1: Pasta Documental === */}
       <section style={{ marginBottom: 32 }}>
         <div className="page-header">
@@ -631,13 +621,6 @@ export function Custos({
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              type="button"
-              className="btn-outline"
-              onClick={() => setTemplateAberto(true)}
-            >
-              ⚡ Template
-            </button>
             <button
               type="button"
               className="btn-primary"
