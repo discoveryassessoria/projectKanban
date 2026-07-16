@@ -114,6 +114,13 @@ interface CentralOperacionalResponse {
   queue: QueueRow[]
   queueTitle: string
   faseProgress: FaseProgress
+  // LEGADO_INATIVO (desativação Genealogia): quando a fase atual é GENEALOGIA, as
+  // métricas documentais antigas (Obrigatórios/validados/percentual, derivadas de
+  // Documento + Pessoa.linhaReta + STATUS_VALIDADOS) foram NEUTRALIZADAS. O front
+  // usa este flag para exibir estado neutro em vez de apresentar cálculo antigo
+  // como verdade de negócio.
+  genealogiaReestruturacao: boolean
+  mensagemReestruturacao: string | null
   schemaCapabilities: {
     hasResponsavel: boolean
     hasPrazoOperacao: boolean
@@ -550,7 +557,7 @@ export async function GET(
         }
       })
 
-    const matrix: MatrixResponse = {
+    const matrixLegado: MatrixResponse = {
       percentage: totalDocs > 0 ? Math.round((validados / totalDocs) * 100) : 0,
       completed: validados,
       total: totalDocs,
@@ -560,6 +567,33 @@ export async function GET(
       byPerson: matrixByPerson,
       missing,
     }
+
+    // ============================================================
+    // LEGADO_INATIVO (desativação Genealogia): neutraliza as métricas antigas
+    // ------------------------------------------------------------
+    // Na fase GENEALOGIA, "Obrigatórios/validados/percentual" derivavam de
+    // Documento + Pessoa.linhaReta + STATUS_VALIDADOS (RECEBIDO contado como
+    // validado) — cálculo enganoso. Enquanto a arquitetura documental definitiva
+    // não for aprovada, ZERAMOS os agregados e sinalizamos reestruturação. A lista
+    // de pessoas (byPerson: nomes/geração) permanece como dado estrutural; suas
+    // contagens de completude vão a zero para não afirmar validação.
+    const genealogiaReestruturacao = faseAtualCode === "GENEALOGIA"
+    const mensagemReestruturacao = genealogiaReestruturacao
+      ? "A definição documental da Genealogia está em reestruturação. Nenhum progresso automático é calculado nesta etapa."
+      : null
+
+    const matrix: MatrixResponse = genealogiaReestruturacao
+      ? {
+          percentage: 0,
+          completed: 0,
+          total: 0,
+          directPeopleCount: pessoasNaLinha.length,
+          missingCount: 0,
+          nameVariationsCount: 0,
+          byPerson: matrixByPerson.map((p) => ({ ...p, completed: 0, total: 0, percentage: 0 })),
+          missing: [],
+        }
+      : matrixLegado
 
     // ============================================================
     // 9) ✅ NOVO: Estado REAL dos passos da fase atual
@@ -636,6 +670,8 @@ export async function GET(
       queue,
       queueTitle,
       faseProgress,
+      genealogiaReestruturacao,
+      mensagemReestruturacao,
       schemaCapabilities,
     }
 

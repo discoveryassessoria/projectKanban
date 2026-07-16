@@ -108,6 +108,9 @@ interface CentralOpData {
   }>
   queueTitle: string
   faseProgress?: FaseProgress // ✅ NOVO (opcional: fallback cobre ausência)
+  // LEGADO_INATIVO (desativação Genealogia): flag+mensagem de reestruturação.
+  genealogiaReestruturacao?: boolean
+  mensagemReestruturacao?: string | null
   schemaCapabilities: {
     hasResponsavel: boolean
     hasPrazoOperacao: boolean
@@ -489,7 +492,7 @@ export function ProcessoCentralOperacional({
         <div className="min-w-0">
           <PainelDaFase
             faseNome={faseAtualNome}
-            faseSub={meta.sub}
+            faseSub={data.genealogiaReestruturacao ? "" : meta.sub}
             faseTabs={meta.tabs}
             steps={painel.steps}
             kpis={painel.kpis}
@@ -500,6 +503,8 @@ export function ProcessoCentralOperacional({
             linhaPrincipal={painel.linhaPrincipal}
             foraDaLinha={painel.foraDaLinha}
             onAbrirOperacao={(docId) => setDrawerDocId(docId)}
+            modoReestruturacao={!!data.genealogiaReestruturacao}
+            avisoReestruturacao={data.mensagemReestruturacao ?? undefined}
           />
 
           <DocumentoOperationalDrawer

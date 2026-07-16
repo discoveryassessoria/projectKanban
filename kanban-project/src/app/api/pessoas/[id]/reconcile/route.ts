@@ -1,58 +1,25 @@
 // src/app/api/pessoas/[id]/reconcile/route.ts
 //
-// Endpoint manual de reconciliação de documentos auto-gerados de UMA pessoa.
-//   GET    → dry-run (mostra o que SERIA criado, sem persistir)
-//   POST   → reconcilia de verdade (cria docs faltantes)
-//
-// Útil pra testar a engine antes de plugar no fluxo CRUD oficial.
+// ⚠️ LEGADO_INATIVO — DESATIVADO na tarefa de desativação da lógica antiga da
+// Genealogia. Este endpoint disparava manualmente a reconciliação de documentos
+// auto-gerados (reconcileDocsForPessoa / DOCUMENT_RULES), que criava Documento
+// inconsistente (origem="automatica", necessidadeId=null). A geração automática
+// foi desligada; enquanto a arquitetura documental definitiva não é aprovada,
+// GET e POST respondem 410 Gone e NÃO executam nenhum gerador.
 
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
-import {
-  reconcileDocsForPessoa,
-  dryRunReconcile,
-} from "@/src/lib/document-generator"
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
-    const pessoaId = parseInt(id)
-    if (isNaN(pessoaId)) {
-      return NextResponse.json({ error: "ID inválido" }, { status: 400 })
-    }
-    const result = await dryRunReconcile(pessoaId, prisma)
-    return NextResponse.json(result)
-  } catch (error) {
-    console.error("[GET /api/pessoas/[id]/reconcile]", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erro" },
-      { status: 500 }
-    )
-  }
+const RESPOSTA_DESATIVADO = {
+  error: "Endpoint desativado (LEGADO_INATIVO)",
+  motivo:
+    "A geração/reconciliação automática de documentos da Genealogia foi desativada. " +
+    "A arquitetura documental definitiva ainda não foi configurada.",
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
-    const pessoaId = parseInt(id)
-    if (isNaN(pessoaId)) {
-      return NextResponse.json({ error: "ID inválido" }, { status: 400 })
-    }
-    const result = await prisma.$transaction(async (tx) => {
-      return reconcileDocsForPessoa(pessoaId, tx)
-    })
-    return NextResponse.json(result)
-  } catch (error) {
-    console.error("[POST /api/pessoas/[id]/reconcile]", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erro" },
-      { status: 500 }
-    )
-  }
+export async function GET() {
+  return NextResponse.json(RESPOSTA_DESATIVADO, { status: 410 })
+}
+
+export async function POST() {
+  return NextResponse.json(RESPOSTA_DESATIVADO, { status: 410 })
 }

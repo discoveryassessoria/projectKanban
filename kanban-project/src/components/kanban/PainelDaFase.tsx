@@ -92,6 +92,13 @@ export interface PainelDaFaseProps {
   foraDaLinha: FasePersonRow[]
   onAbrirOperacao: (docId: number) => void
   onAbrirPainelCompleto?: () => void
+  // LEGADO_INATIVO (desativação Genealogia): em modo reestruturação, o painel NÃO
+  // exibe as etapas/KPIs/progresso/"validados" antigos (derivados de
+  // Documento.status + linhaReta). Mostra apenas um aviso neutro + a lista de
+  // pessoas. Os documentos existentes aparecem como "registros operacionais
+  // existentes", sem rótulo de obrigatório/validado.
+  modoReestruturacao?: boolean
+  avisoReestruturacao?: string
 }
 
 // ============================================================
@@ -112,6 +119,8 @@ export function PainelDaFase({
   foraDaLinha,
   onAbrirOperacao,
   onAbrirPainelCompleto,
+  modoReestruturacao = false,
+  avisoReestruturacao,
 }: PainelDaFaseProps) {
   const [abaAtiva, setAbaAtiva] = useState("Resumo")
 
@@ -157,6 +166,23 @@ export function PainelDaFase({
       {/* ============== CORPO DA FASE ============== */}
       <div className="bg-white border border-gray-200 border-t-0 rounded-b-2xl px-5 py-5">
 
+        {modoReestruturacao ? (
+          /* --- LEGADO_INATIVO: aviso neutro de reestruturação --- */
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 mb-5">
+            <div className="text-[13px] font-bold text-amber-800 mb-1">
+              Fase em reestruturação
+            </div>
+            <div className="text-[12.5px] text-amber-700 leading-relaxed">
+              {avisoReestruturacao ||
+                "A definição documental da Genealogia está em reestruturação. Nenhum progresso automático é calculado nesta etapa."}
+            </div>
+            <div className="text-[11.5px] text-amber-600/80 mt-2">
+              A árvore e os dados civis continuam disponíveis. Documentos exibidos são
+              registros operacionais existentes — não representam obrigatoriedade nem validação.
+            </div>
+          </div>
+        ) : (
+        <>
         {/* --- 5 ETAPAS EM LINHA --- */}
         <div className="flex items-center mb-5 overflow-x-auto pb-1">
           {steps.map((s, i) => {
@@ -233,6 +259,8 @@ export function PainelDaFase({
           </div>
           <div className="text-center text-[12.5px] text-gray-400 mt-3">{progressoTexto}</div>
         </div>
+        </>
+        )}
 
         {/* --- TABELA POR PESSOA --- */}
         <div className="border border-gray-200 rounded-xl overflow-hidden">
@@ -258,7 +286,7 @@ export function PainelDaFase({
             tone="linha"
           />
           {linhaPrincipal.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} />
+            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} ocultarValidacao={modoReestruturacao} />
           ))}
 
           {/* Grupo Fora da linhagem */}
@@ -269,7 +297,7 @@ export function PainelDaFase({
             tone="fora"
           />
           {foraDaLinha.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} />
+            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} ocultarValidacao={modoReestruturacao} />
           ))}
         </div>
       </div>
@@ -308,9 +336,11 @@ function GroupBar({
 function PersonRow({
   p,
   onAbrirOperacao,
+  ocultarValidacao = false,
 }: {
   p: FasePersonRow
   onAbrirOperacao: (docId: number) => void
+  ocultarValidacao?: boolean
 }) {
   const [exp, setExp] = useState(false)
 
@@ -390,12 +420,14 @@ function PersonRow({
               </div>
             ))
           )}
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className="text-[11px] font-bold text-gray-500">{p.validados} / {p.total}</span>
-            <div className="w-24 h-1 rounded bg-gray-100 overflow-hidden">
-              <div className="h-full bg-blue-600" style={{ width: `${pctVal}%` }} />
+          {!ocultarValidacao && (
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className="text-[11px] font-bold text-gray-500">{p.validados} / {p.total}</span>
+              <div className="w-24 h-1 rounded bg-gray-100 overflow-hidden">
+                <div className="h-full bg-blue-600" style={{ width: `${pctVal}%` }} />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Responsável */}

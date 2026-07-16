@@ -2,7 +2,9 @@
 
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { reconcileDocsForPessoa } from "@/src/lib/document-generator"
+// LEGADO_INATIVO (desativação Genealogia): a auto-geração de Documento ao criar
+// Pessoa foi DESLIGADA. Criar Pessoa NÃO gera mais Documento silenciosamente.
+// Import de reconcileDocsForPessoa removido de propósito — não reintroduzir.
 
 // GET - Listar pessoas (com filtros opcionais)
 export async function GET(request: NextRequest) {
@@ -202,25 +204,14 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================================
-    // ✅ NOVO (rodada 3): AUTO-GERAÇÃO DE DOCUMENTOS
+    // LEGADO_INATIVO (desativação da lógica antiga da Genealogia)
     // ============================================================
-    // Roda a engine pra criar os 3 docs canônicos baseado em casado/vivo.
-    // Se falhar, a pessoa já foi criada — só logamos e seguimos.
-    if (pessoa.documentacao !== false) {
-      try {
-        const result = await reconcileDocsForPessoa(pessoa.id, prisma)
-        console.log("[POST /api/pessoas] auto-gen docs:", {
-          pessoaId: pessoa.id,
-          createdCount: result.createdCount,
-          rules: result.createdRules,
-        })
-      } catch (genError) {
-        console.error("[POST /api/pessoas] falha na auto-geração:", genError)
-        // não derruba a request — pessoa está criada
-      }
-    }
+    // A auto-geração de Documento (reconcileDocsForPessoa / DOCUMENT_RULES) foi
+    // DESATIVADA. Criar Pessoa não cria mais Documento automaticamente. A
+    // arquitetura documental definitiva ainda não foi aprovada — não religar
+    // aqui nenhum gerador. Documento passa a ser criado apenas manualmente.
 
-    // Recarrega a pessoa COM os docs gerados
+    // Recarrega a pessoa (documentos existentes, se houver — nada é gerado aqui)
     const pessoaFinal = await prisma.pessoa.findUnique({
       where: { id: pessoa.id },
       include: {

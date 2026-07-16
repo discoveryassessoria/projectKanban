@@ -1,18 +1,37 @@
 // src/lib/document-generator.ts
 //
-// Engine de auto-geração de documentos para pessoas da árvore genealógica.
-// Espelha §1.7 (Document Rule Engine) + §1.8 (Generator) do mockup HTML.
+// ⚠️ LEGADO_INATIVO — DESATIVADO na tarefa de desativação da lógica antiga da
+// Genealogia. Este módulo criava Documento AUTOMATICAMENTE (origem="automatica",
+// necessidadeId=null) a partir de regras hardcoded (DOCUMENT_RULES), o que gerava
+// dados inconsistentes. As funções que PERSISTEM Documento
+// (reconcileDocsForPessoa, reconcileAllForArvore) foram DESLIGADAS do runtime e
+// agora LANÇAM erro se chamadas, para impedir reativação acidental. NÃO religar
+// sem uma arquitetura documental aprovada.
 //
-// REGRA SIMPLES:
-//   Toda pessoa cadastrada ganha automaticamente:
-//   • Certidão de Nascimento (IT)  — SEMPRE (todo mundo nasceu)
-//   • Certidão de Casamento (IT)   — se casado=true
-//   • Certidão de Óbito (IT)       — se vivo=false
-//
-// A decisão de NÃO precisar de um desses documentos é tomada DEPOIS, no
-// momento de iniciar operação, via "Marcar como desnecessário" (já implementado).
+// Ainda exportado como LEITURA PURA (não cria nada), pois a camada canônica
+// PRESERVADA de NecessidadeDocumental (src/services/necessidade-documental.ts) e o
+// cálculo da matriz econômica (src/lib/motor/matriz-economica.ts) consomem
+// analyzePessoa/DOCUMENT_RULES apenas para LER flags — sem gerar Documento.
 
 import type { Prisma, TipoDocumento } from "@prisma/client"
+
+// ============================================================
+// GUARD — geração automática de Documento DESATIVADA
+// ============================================================
+// Qualquer caminho que tente PERSISTIR Documento automaticamente passa por aqui
+// e falha explicitamente. Removê-lo religa o legado inconsistente — não fazer.
+const LEGADO_INATIVO_MSG =
+  "[document-generator] LEGADO_INATIVO: a geração automática de Documento " +
+  "(reconcileDocsForPessoa/reconcileAllForArvore/DOCUMENT_RULES) está DESATIVADA. " +
+  "Criar/editar Pessoa não gera mais Documento. Reativar exige arquitetura documental aprovada."
+
+// Retorna `void` (não `never`) DE PROPÓSITO: o corpo legado abaixo permanece
+// "alcançável" para o type-checker (sem warnings de unreachable), mas em runtime
+// esta barreira sempre lança ANTES de qualquer escrita no banco.
+/** @internal Barreira anti-reativação da geração automática de Documento. */
+function __assertGeracaoDocumentalDesativada(): void {
+  throw new Error(LEGADO_INATIVO_MSG)
+}
 
 // ============================================================
 // REGRAS — espelha DOCUMENT_RULES do §1.7 do mockup
@@ -129,13 +148,15 @@ export interface ReconcileResult {
 }
 
 /**
- * Cria os docs faltantes da pessoa. NUNCA apaga existentes.
- * Idempotente: pode rodar quantas vezes quiser.
+ * @deprecated LEGADO_INATIVO — DESATIVADA. Criava Documento automaticamente a
+ * partir de DOCUMENT_RULES. Agora lança erro (guard anti-reativação). Não religar.
  */
 export async function reconcileDocsForPessoa(
   pessoaId: number,
   tx: Prisma.TransactionClient | typeof import("@/lib/prisma").prisma,
 ): Promise<ReconcileResult> {
+  // GUARD: geração automática de Documento está desligada (lança em runtime).
+  __assertGeracaoDocumentalDesativada()
   const pessoa = await tx.pessoa.findUnique({
     where: { id: pessoaId },
     select: {
@@ -200,12 +221,15 @@ export async function reconcileDocsForPessoa(
 }
 
 /**
- * Reconcilia todas as pessoas de uma árvore.
+ * @deprecated LEGADO_INATIVO — DESATIVADA. Reconciliava Documento de toda a árvore.
+ * Agora lança erro (guard anti-reativação). Sem callers no runtime. Não religar.
  */
 export async function reconcileAllForArvore(
   arvoreId: number,
   tx: Prisma.TransactionClient | typeof import("@/lib/prisma").prisma,
 ): Promise<{ totalCreated: number; perPessoa: ReconcileResult[] }> {
+  // GUARD: geração automática de Documento está desligada (lança em runtime).
+  __assertGeracaoDocumentalDesativada()
   const pessoas = await tx.pessoa.findMany({
     where: { arvoreId },
     select: { id: true },

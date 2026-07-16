@@ -4,7 +4,8 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
-import { reconcileDocsForPessoa } from "@/src/lib/document-generator"
+// LEGADO_INATIVO (desativação Genealogia): editar Pessoa (casado/vivo/documentacao)
+// NÃO reconcilia mais Documento. Import de reconcileDocsForPessoa removido — não reintroduzir.
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -117,10 +118,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // ✅ NOVO (rodada 3): flag de casado pra engine
     if (body.casado !== undefined) dataToUpdate.casado = body.casado === true
 
-    // Detecta se mudou algo que afeta a engine
-    const triggerReconcile =
-      body.casado !== undefined || body.vivo !== undefined || body.documentacao !== undefined
-
     const pessoaAtualizada = await prisma.pessoa.update({
       where: { id },
       data: dataToUpdate,
@@ -128,43 +125,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         pai: true,
         mae: true,
         arvore: true,
-        documentos: true,
+        documentos: { orderBy: { createdAt: 'desc' } },
       },
     })
 
     // ============================================================
-    // ✅ NOVO (rodada 3): AUTO-GERAÇÃO DE DOCUMENTOS
+    // LEGADO_INATIVO (desativação da lógica antiga da Genealogia)
     // ============================================================
-    // Se mudou `casado` ou `vivo`, roda a engine pra criar docs faltantes.
-    // É idempotente — nunca apaga e nunca duplica.
-    if (triggerReconcile && pessoaAtualizada.documentacao !== false) {
-      try {
-        const result = await reconcileDocsForPessoa(id, prisma)
-        console.log("[PUT /api/pessoas/[id]] auto-gen docs:", {
-          pessoaId: id,
-          createdCount: result.createdCount,
-          rules: result.createdRules,
-        })
-      } catch (genError) {
-        console.error("[PUT /api/pessoas/[id]] falha na auto-geração:", genError)
-        // não derruba a request — pessoa já está atualizada
-      }
-    }
+    // Editar casado/vivo/documentacao NÃO reconcilia mais Documento. A
+    // auto-geração baseada em DOCUMENT_RULES foi desligada; a arquitetura
+    // documental definitiva ainda não foi aprovada. Não religar gerador aqui.
 
-    // Recarrega pra retornar com os docs novos (se houve geração)
-    const pessoaFinal = triggerReconcile
-      ? await prisma.pessoa.findUnique({
-          where: { id },
-          include: {
-            pai: true,
-            mae: true,
-            arvore: true,
-            documentos: { orderBy: { createdAt: 'desc' } },
-          },
-        })
-      : pessoaAtualizada
-
-    return NextResponse.json(pessoaFinal)
+    return NextResponse.json(pessoaAtualizada)
   } catch (error) {
     console.error("Erro ao atualizar pessoa:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
