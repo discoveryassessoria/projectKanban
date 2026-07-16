@@ -25,7 +25,25 @@ export const PUBLICO_ALVO_LABEL: Record<PublicoAlvo, string> = {
   PESSOA_DA_ARVORE_COM_DOCUMENTACAO: "Pessoa da árvore com documentação",
   PESSOA_DA_LINHA_RETA: "Pessoa da linha reta",
   PESSOA_FORA_DA_LINHA_RETA: "Pessoa fora da linha reta",
-  TODAS_AS_PESSOAS_DA_ARVORE: "Todas as pessoas da árvore",
+  TODAS_AS_PESSOAS_DA_ARVORE: "Pessoa da árvore",
+}
+
+// Públicos PRINCIPAIS oferecidos na tela (multiselect). "Linha reta"/"fora"
+// deixaram de ser público — viram CONDIÇÃO (linhaReta). Os legados seguem no enum
+// só para leitura/compatibilidade.
+export const PUBLICOS_ALVO_PRINCIPAIS: PublicoAlvo[] = [
+  "REQUERENTE",
+  "CONTRATANTE",
+  "PESSOA_DA_ARVORE_COM_DOCUMENTACAO",
+  "TODAS_AS_PESSOAS_DA_ARVORE",
+]
+
+// modo de satisfação do requisito por seus documentos aceitos
+export const MODOS_SATISFACAO = ["QUALQUER_UM_ATENDE", "TODOS_SAO_EXIGIDOS"] as const
+export type ModoSatisfacao = (typeof MODOS_SATISFACAO)[number]
+export const MODO_SATISFACAO_LABEL: Record<ModoSatisfacao, string> = {
+  QUALQUER_UM_ATENDE: "Qualquer um dos documentos selecionados atende",
+  TODOS_SAO_EXIGIDOS: "Todos os documentos são exigidos",
 }
 
 export const OPERADORES = [
@@ -69,6 +87,7 @@ export const CAMPOS_CONDICAO = [
   "falecido",
   "vivo",
   "possuiConjuge",
+  "modalidade",
   "geracao",
   "nacionalidade",
   "paisRegistro",
@@ -84,6 +103,7 @@ export const CAMPO_CONDICAO_LABEL: Record<CampoCondicao, string> = {
   falecido: "É falecido",
   vivo: "Está vivo",
   possuiConjuge: "Possui cônjuge",
+  modalidade: "Modalidade do processo",
   geracao: "Geração",
   nacionalidade: "Nacionalidade",
   paisRegistro: "País do registro",
@@ -115,18 +135,24 @@ export interface RegraDocumental {
   prioridade: number
   vigenciaInicio: string | null // ISO
   vigenciaFim: string | null // ISO
-  // APLICABILIDADE
-  tipoProcessoId: number
-  modalidadeId: number | null
-  paisCode: string | null
-  regiaoCode: string | null
+  // APLICABILIDADE — múltiplos tipos de processo (ou todos)
+  aplicaTodosProcessos: boolean
+  tipoProcessoIds: number[]
+  tipoProcessoId: number // primário (1º item) — dual-read
+  modalidadeId: number | null // legado
+  paisCode: string | null // legado
+  regiaoCode: string | null // legado
   tipoProcessoVersao: number | null
-  // DOCUMENTO
-  documentTypeCode: string
-  categoriaCode: string | null
+  // REQUISITO + DOCUMENTOS ACEITOS
+  requisitoNome: string | null
+  documentosAceitos: string[]
+  modoSatisfacao: ModoSatisfacao
+  documentTypeCode: string // primário (1º item) — dual-read
+  categoriaCode: string | null // legado (derivada do documento)
   obrigatoriedade: Obrigatoriedade
-  // PÚBLICO-ALVO
-  publicoAlvo: PublicoAlvo
+  // PÚBLICO-ALVO — múltiplo
+  publicosAlvo: PublicoAlvo[]
+  publicoAlvo: PublicoAlvo // primário — dual-read
   // CONDIÇÕES
   condicoes: ConjuntoCondicoes | null
   // FASE E BLOQUEIO
@@ -158,6 +184,7 @@ export interface SujeitoContexto {
   vivo?: boolean
   falecido?: boolean
   possuiConjuge?: boolean
+  modalidade?: string | number | null // modalidade do processo (para condição)
   geracao?: number | null
   nacionalidade?: string | null
   paisRegistro?: string | null
@@ -193,8 +220,12 @@ export interface ValidadeCalculada {
 export interface ResultadoRegra {
   regraId: number
   regraNome: string | null
+  requisitoNome: string | null
   documentTypeCode: string
+  documentosAceitos: string[]
+  modoSatisfacao: ModoSatisfacao
   publicoAlvo: PublicoAlvo
+  publicosAlvo: PublicoAlvo[]
   aplicavel: boolean
   obrigatoriedade: Obrigatoriedade
   faseExigencia: string | null

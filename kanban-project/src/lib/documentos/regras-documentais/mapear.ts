@@ -7,9 +7,24 @@
 import type { MatrizDocumental, Prisma } from "@prisma/client"
 import {
   type RegraDocumental, type ConjuntoCondicoes, type PublicoAlvo, type Obrigatoriedade,
-  type StatusRegra, type Combinador, type Operador, type CampoCondicao,
-  PUBLICOS_ALVO, OPERADORES, CAMPOS_CONDICAO, STATUS_REGRA,
+  type StatusRegra, type Combinador, type Operador, type CampoCondicao, type ModoSatisfacao,
+  PUBLICOS_ALVO, OPERADORES, CAMPOS_CONDICAO, STATUS_REGRA, MODOS_SATISFACAO,
 } from "./tipos"
+
+function parseIntArray(json: unknown): number[] | null {
+  if (!Array.isArray(json)) return null
+  const out = json.map((x) => Number(x)).filter((n) => !isNaN(n))
+  return out
+}
+function parseStrArray(json: unknown): string[] | null {
+  if (!Array.isArray(json)) return null
+  return json.map((x) => String(x)).filter(Boolean)
+}
+function parsePublicoArray(json: unknown): PublicoAlvo[] | null {
+  const arr = parseStrArray(json)
+  if (!arr) return null
+  return arr.filter((x): x is PublicoAlvo => (PUBLICOS_ALVO as readonly string[]).includes(x))
+}
 
 function parseCondicoes(json: Prisma.JsonValue | null | undefined): ConjuntoCondicoes | null {
   if (!json || typeof json !== "object" || Array.isArray(json)) return null
@@ -49,14 +64,20 @@ export function matrizParaRegra(row: MatrizDocumental): RegraDocumental {
     prioridade: row.prioridade ?? 0,
     vigenciaInicio: iso(row.vigenciaInicio),
     vigenciaFim: iso(row.vigenciaFim),
+    aplicaTodosProcessos: !!row.aplicaTodosProcessos,
+    tipoProcessoIds: parseIntArray(row.tipoProcessoIds) ?? [row.tipoProcessoId],
     tipoProcessoId: row.tipoProcessoId,
     modalidadeId: row.modalidadeId ?? null,
     paisCode: row.paisCode ?? null,
     regiaoCode: row.regiaoCode ?? null,
     tipoProcessoVersao: row.tipoProcessoVersao ?? null,
+    requisitoNome: row.requisitoNome ?? row.nome ?? null,
+    documentosAceitos: parseStrArray(row.documentosAceitos) ?? [row.documentTypeCode],
+    modoSatisfacao: ((MODOS_SATISFACAO as readonly string[]).includes(row.modoSatisfacao) ? row.modoSatisfacao : "QUALQUER_UM_ATENDE") as ModoSatisfacao,
     documentTypeCode: row.documentTypeCode,
     categoriaCode: row.categoriaCode ?? null,
     obrigatoriedade,
+    publicosAlvo: parsePublicoArray(row.publicosAlvo) ?? [publicoAlvo],
     publicoAlvo,
     condicoes: parseCondicoes(row.condicoes),
     // dual-read: novos campos caem para os legados quando ausentes
@@ -80,14 +101,20 @@ export function matrizParaRegra(row: MatrizDocumental): RegraDocumental {
 export interface RegraInput {
   nome?: string | null
   descricao?: string | null
+  aplicaTodosProcessos?: boolean
+  tipoProcessoIds?: number[]
   tipoProcessoId?: number
   modalidadeId?: number | null
   paisCode?: string | null
   regiaoCode?: string | null
   tipoProcessoVersao?: number | null
+  requisitoNome?: string | null
+  documentosAceitos?: string[]
+  modoSatisfacao?: ModoSatisfacao
   documentTypeCode?: string
   categoriaCode?: string | null
   obrigatoriedade?: Obrigatoriedade
+  publicosAlvo?: PublicoAlvo[]
   publicoAlvo?: PublicoAlvo
   condicoes?: ConjuntoCondicoes | null
   faseExigencia?: string | null
@@ -112,15 +139,40 @@ export function regraInputParaData(input: RegraInput): Record<string, unknown> {
 
   set("nome", input.nome)
   set("descricao", input.descricao)
-  set("tipoProcessoId", input.tipoProcessoId)
+  set("aplicaTodosProcessos", input.aplicaTodosProcessos)
   set("modalidadeId", input.modalidadeId)
   set("paisCode", input.paisCode)
   set("regiaoCode", input.regiaoCode)
   set("tipoProcessoVersao", input.tipoProcessoVersao)
-  set("documentTypeCode", input.documentTypeCode)
+  set("requisitoNome", input.requisitoNome)
+  set("modoSatisfacao", input.modoSatisfacao)
   set("categoriaCode", input.categoriaCode)
-  set("publicoAlvo", input.publicoAlvo)
   set("prioridade", input.prioridade)
+
+  // APLICABILIDADE múltipla — grava a coleção e o primário (dual-write)
+  if (input.tipoProcessoIds !== undefined) {
+    data.tipoProcessoIds = input.tipoProcessoIds as unknown
+    if (input.tipoProcessoIds.length) data.tipoProcessoId = input.tipoProcessoIds[0]
+  } else if (input.tipoProcessoId !== undefined) {
+    data.tipoProcessoId = input.tipoProcessoId
+    data.tipoProcessoIds = [input.tipoProcessoId] as unknown
+  }
+  // REQUISITO — documentos aceitos + primário
+  if (input.documentosAceitos !== undefined) {
+    data.documentosAceitos = input.documentosAceitos as unknown
+    if (input.documentosAceitos.length) data.documentTypeCode = input.documentosAceitos[0]
+  } else if (input.documentTypeCode !== undefined) {
+    data.documentTypeCode = input.documentTypeCode
+    data.documentosAceitos = [input.documentTypeCode] as unknown
+  }
+  // PÚBLICO-ALVO — coleção + primário
+  if (input.publicosAlvo !== undefined) {
+    data.publicosAlvo = input.publicosAlvo as unknown
+    if (input.publicosAlvo.length) data.publicoAlvo = input.publicosAlvo[0]
+  } else if (input.publicoAlvo !== undefined) {
+    data.publicoAlvo = input.publicoAlvo
+    data.publicosAlvo = [input.publicoAlvo] as unknown
+  }
   set("faseExigencia", input.faseExigencia)
   set("faseBloqueio", input.faseBloqueio)
   set("continuaObrigatorioNasFasesSeguintes", input.continuaObrigatorioNasFasesSeguintes)

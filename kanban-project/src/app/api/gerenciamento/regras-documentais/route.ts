@@ -40,13 +40,16 @@ export async function POST(request: NextRequest) {
 
     const usuarioId = await usuarioIdDe(request)
     const data = regraInputParaData(input)
-    const codigo = novoCodigoRegra(input.tipoProcessoId!, input.documentTypeCode!)
+    // primários (dual-write) derivados das coleções
+    const primeiroProc = input.tipoProcessoIds?.[0] ?? input.tipoProcessoId ?? 0
+    const primeiroDoc = input.documentosAceitos?.[0] ?? input.documentTypeCode ?? ""
+    const codigo = novoCodigoRegra(primeiroProc, primeiroDoc)
 
     const row = await prisma.matrizDocumental.create({
       data: {
         ...(data as object),
-        tipoProcessoId: input.tipoProcessoId!,
-        documentTypeCode: input.documentTypeCode!,
+        tipoProcessoId: primeiroProc,
+        documentTypeCode: primeiroDoc,
         codigo,
         versao: 1,
         status: "RASCUNHO",

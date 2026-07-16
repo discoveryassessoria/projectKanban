@@ -16,6 +16,9 @@ async function achar(id: number) {
   return prisma.matrizDocumental.findUnique({ where: { id } })
 }
 
+// JsonValue (pode ser null) → InputJsonValue | undefined (Prisma não aceita null cru)
+const j = (v: unknown): Prisma.InputJsonValue | undefined => (v === null || v === undefined ? undefined : (v as Prisma.InputJsonValue))
+
 // GET — regra + suas versões (siblings por codigo)
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const erro = await verificarPermissao(request, "usuarios.gerenciar")
@@ -101,10 +104,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     switch (acao) {
       case "duplicar": {
         const codigo = novoCodigoRegra(atual.tipoProcessoId, atual.documentTypeCode)
-        const { id: _i, criadoEm: _c, atualizadoEm: _a, publicadoEm: _pe, publicadoPor: _pp, condicoes: _cond, ...resto } = atual
+        const { id: _i, criadoEm: _c, atualizadoEm: _a, publicadoEm: _pe, publicadoPor: _pp, condicoes: _cond, tipoProcessoIds: _tpi, documentosAceitos: _da, publicosAlvo: _pa, ...resto } = atual
         void _i; void _c; void _a; void _pe; void _pp
         const row = await prisma.matrizDocumental.create({
-          data: { ...resto, condicoes: _cond === null ? undefined : (_cond as Prisma.InputJsonValue), codigo, versao: 1, status: "RASCUNHO", arquivado: false, usedByCount: 0, nome: `${atual.nome ?? atual.documentTypeCode} (cópia)`, criadoPor: usuarioId ?? undefined, atualizadoPor: usuarioId ?? undefined },
+          data: { ...resto, condicoes: j(_cond), tipoProcessoIds: j(_tpi), documentosAceitos: j(_da), publicosAlvo: j(_pa), codigo, versao: 1, status: "RASCUNHO", arquivado: false, usedByCount: 0, nome: `${atual.nome ?? atual.documentTypeCode} (cópia)`, criadoPor: usuarioId ?? undefined, atualizadoPor: usuarioId ?? undefined },
         })
         await auditar(prisma, { acao: "REGRA_DUPLICADA", entidadeId: row.id, descricao: `Regra duplicada de #${atual.id}`, detalhes: { origem: atual.id, codigo }, usuarioId })
         return NextResponse.json({ regra: row }, { status: 201 })
@@ -113,10 +116,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const maxV = atual.codigo
           ? (await prisma.matrizDocumental.aggregate({ where: { codigo: atual.codigo }, _max: { versao: true } }))._max.versao ?? atual.versao
           : atual.versao
-        const { id: _i, criadoEm: _c, atualizadoEm: _a, publicadoEm: _pe, publicadoPor: _pp, condicoes: _cond, ...resto } = atual
+        const { id: _i, criadoEm: _c, atualizadoEm: _a, publicadoEm: _pe, publicadoPor: _pp, condicoes: _cond, tipoProcessoIds: _tpi, documentosAceitos: _da, publicosAlvo: _pa, ...resto } = atual
         void _i; void _c; void _a; void _pe; void _pp
         const row = await prisma.matrizDocumental.create({
-          data: { ...resto, condicoes: _cond === null ? undefined : (_cond as Prisma.InputJsonValue), versao: maxV + 1, status: "RASCUNHO", arquivado: false, criadoPor: usuarioId ?? undefined, atualizadoPor: usuarioId ?? undefined },
+          data: { ...resto, condicoes: j(_cond), tipoProcessoIds: j(_tpi), documentosAceitos: j(_da), publicosAlvo: j(_pa), versao: maxV + 1, status: "RASCUNHO", arquivado: false, criadoPor: usuarioId ?? undefined, atualizadoPor: usuarioId ?? undefined },
         })
         await auditar(prisma, { acao: "REGRA_NOVA_VERSAO", entidadeId: row.id, descricao: `Nova versão v${row.versao} de ${atual.nome ?? atual.documentTypeCode}`, detalhes: { origem: atual.id, codigo: atual.codigo, versao: row.versao }, usuarioId })
         return NextResponse.json({ regra: row }, { status: 201 })

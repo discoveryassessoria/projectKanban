@@ -12,7 +12,7 @@ import {
   type RegraInput, matrizParaRegra,
 } from "./mapear"
 import {
-  PUBLICOS_ALVO, type PublicoAlvo, type Obrigatoriedade, type ConjuntoCondicoes,
+  PUBLICOS_ALVO, MODOS_SATISFACAO, type PublicoAlvo, type Obrigatoriedade, type ConjuntoCondicoes, type ModoSatisfacao,
 } from "./tipos"
 import { validarConjunto } from "./condicoes"
 
@@ -68,11 +68,18 @@ export interface ErroValidacao { campo: string; mensagem: string }
 export function validarRegraInput(input: RegraInput, obrigatorioProcessoEDoc = true): ErroValidacao[] {
   const erros: ErroValidacao[] = []
   if (obrigatorioProcessoEDoc) {
-    if (!input.tipoProcessoId) erros.push({ campo: "tipoProcessoId", mensagem: "Selecione o tipo de processo." })
-    if (!input.documentTypeCode) erros.push({ campo: "documentTypeCode", mensagem: "Selecione o tipo de documento." })
+    const temEscopo = input.aplicaTodosProcessos || (input.tipoProcessoIds && input.tipoProcessoIds.length > 0) || input.tipoProcessoId
+    if (!temEscopo) erros.push({ campo: "tipoProcessoIds", mensagem: "Selecione ao menos um tipo de processo (ou marque 'todos')." })
+    const temDoc = (input.documentosAceitos && input.documentosAceitos.length > 0) || input.documentTypeCode
+    if (!temDoc) erros.push({ campo: "documentosAceitos", mensagem: "Selecione ao menos um documento que atende o requisito." })
+    const temPublico = (input.publicosAlvo && input.publicosAlvo.length > 0) || input.publicoAlvo
+    if (!temPublico) erros.push({ campo: "publicosAlvo", mensagem: "Selecione ao menos um público-alvo." })
   }
-  if (input.publicoAlvo && !(PUBLICOS_ALVO as readonly string[]).includes(input.publicoAlvo)) {
-    erros.push({ campo: "publicoAlvo", mensagem: "Público-alvo inválido." })
+  for (const p of input.publicosAlvo ?? []) {
+    if (!(PUBLICOS_ALVO as readonly string[]).includes(p)) erros.push({ campo: "publicosAlvo", mensagem: `Público-alvo inválido: ${p}.` })
+  }
+  if (input.modoSatisfacao && !(MODOS_SATISFACAO as readonly string[]).includes(input.modoSatisfacao)) {
+    erros.push({ campo: "modoSatisfacao", mensagem: "Modo de satisfação inválido." })
   }
   if (input.obrigatoriedade && !["OBRIGATORIA", "OPCIONAL"].includes(input.obrigatoriedade)) {
     erros.push({ campo: "obrigatoriedade", mensagem: "Obrigatoriedade inválida." })
@@ -100,17 +107,25 @@ export function normalizarInput(b: Record<string, unknown>): RegraInput {
   const asIntN = (v: unknown) => (v === undefined || v === null || v === "" ? (v === null ? null : undefined) : Number(v))
   const asStrN = (v: unknown) => (v === undefined ? undefined : v === null || v === "" ? null : String(v))
   const cond = b.condicoes as ConjuntoCondicoes | null | undefined
+  const intArr = (v: unknown) => (Array.isArray(v) ? v.map((x) => Number(x)).filter((n) => !isNaN(n)) : undefined)
+  const strArr = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : undefined)
   return {
     nome: asStrN(b.nome),
     descricao: asStrN(b.descricao),
+    aplicaTodosProcessos: b.aplicaTodosProcessos === undefined ? undefined : !!b.aplicaTodosProcessos,
+    tipoProcessoIds: intArr(b.tipoProcessoIds),
     tipoProcessoId: b.tipoProcessoId !== undefined ? Number(b.tipoProcessoId) : undefined,
     modalidadeId: asIntN(b.modalidadeId) as number | null | undefined,
     paisCode: asStrN(b.paisCode),
     regiaoCode: asStrN(b.regiaoCode),
     tipoProcessoVersao: asIntN(b.tipoProcessoVersao) as number | null | undefined,
+    requisitoNome: asStrN(b.requisitoNome),
+    documentosAceitos: strArr(b.documentosAceitos),
+    modoSatisfacao: b.modoSatisfacao as ModoSatisfacao | undefined,
     documentTypeCode: b.documentTypeCode !== undefined ? String(b.documentTypeCode) : undefined,
     categoriaCode: asStrN(b.categoriaCode),
     obrigatoriedade: b.obrigatoriedade as Obrigatoriedade | undefined,
+    publicosAlvo: strArr(b.publicosAlvo) as PublicoAlvo[] | undefined,
     publicoAlvo: b.publicoAlvo as PublicoAlvo | undefined,
     condicoes: cond === undefined ? undefined : cond,
     faseExigencia: asStrN(b.faseExigencia),

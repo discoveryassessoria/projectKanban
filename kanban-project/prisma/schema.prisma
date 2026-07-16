@@ -2293,36 +2293,46 @@ model MatrizDocumental {
   // (dual-read) até a migração completa da tela. Nada aqui executa runtime.
   // ============================================================
   // IDENTIFICAÇÃO
-  codigo                               String?               @db.VarChar(60) // código estável (compartilhado entre versões)
-  nome                                 String?               @db.VarChar(200)
-  descricao                            String?               @db.Text
-  status                               RegraDocumentalStatus @default(RASCUNHO)
-  prioridade                           Int                   @default(0)
+  codigo                               String?                 @db.VarChar(60) // código estável (compartilhado entre versões)
+  nome                                 String?                 @db.VarChar(200)
+  descricao                            String?                 @db.Text
+  status                               RegraDocumentalStatus   @default(RASCUNHO)
+  prioridade                           Int                     @default(0)
   vigenciaInicio                       DateTime?
   vigenciaFim                          DateTime?
-  // APLICABILIDADE
-  modalidadeId                         Int? // → ModalidadePais (solto)
-  paisCode                             String?               @db.VarChar(8)
-  regiaoCode                           String?               @db.VarChar(16)
+  // APLICABILIDADE — múltiplos tipos de processo (ou todos). tipoProcessoId legado
+  // permanece como "primário" (1º item) para dual-read. modalidade/país/região
+  // saíram do ESCOPO (viram condição da regra quando necessário).
+  aplicaTodosProcessos                 Boolean                 @default(false)
+  tipoProcessoIds                      Json? // [Int] — coleção; legado: [tipoProcessoId]
+  modalidadeId                         Int? // LEGADO (não usado no escopo; modalidade vira condição)
+  paisCode                             String?                 @db.VarChar(8) // LEGADO
+  regiaoCode                           String?                 @db.VarChar(16) // LEGADO
   tipoProcessoVersao                   Int?
-  // DOCUMENTO
-  categoriaCode                        String?               @db.VarChar(40) // → CategoriaDocumental.code (solto)
-  obrigatoriedade                      ObrigatoriedadeRegra  @default(OBRIGATORIA)
-  // PÚBLICO-ALVO
-  publicoAlvo                          PublicoAlvoRegra      @default(PESSOA_DA_LINHA_RETA)
+  // REQUISITO + DOCUMENTOS ACEITOS (o requisito pode ser atendido por 1+ documentos)
+  requisitoNome                        String?                 @db.VarChar(200)
+  documentosAceitos                    Json? // [String] códigos de TipoDocumento; legado: [documentTypeCode]
+  modoSatisfacao                       ModoSatisfacaoRequisito @default(QUALQUER_UM_ATENDE)
+  // categoriaCode é LEGADO: a categoria é derivada do Tipo de Documento, nunca
+  // redefinida pela regra (a tela não grava mais este campo).
+  categoriaCode                        String?                 @db.VarChar(40)
+  obrigatoriedade                      ObrigatoriedadeRegra    @default(OBRIGATORIA)
+  // PÚBLICO-ALVO — múltiplo. publicoAlvo (singular) permanece como primário (dual-read).
+  publicoAlvo                          PublicoAlvoRegra        @default(PESSOA_DA_LINHA_RETA)
+  publicosAlvo                         Json? // [PublicoAlvoRegra] — coleção
   // CONDIÇÕES estruturadas: { combinador: TODAS|QUALQUER, regras: [{campo,operador,valor}] }
   condicoes                            Json?
   // FASE E BLOQUEIO
-  faseExigencia                        String?               @db.VarChar(60) // fase em que passa a ser exigido
-  faseBloqueio                         String?               @db.VarChar(60) // fase que bloqueia
-  continuaObrigatorioNasFasesSeguintes Boolean               @default(false)
-  faseFinalExigencia                   String?               @db.VarChar(60)
-  obrigatorioAteFinalProcesso          Boolean               @default(false)
+  faseExigencia                        String?                 @db.VarChar(60) // fase em que passa a ser exigido
+  faseBloqueio                         String?                 @db.VarChar(60) // fase que bloqueia
+  continuaObrigatorioNasFasesSeguintes Boolean                 @default(false)
+  faseFinalExigencia                   String?                 @db.VarChar(60)
+  obrigatorioAteFinalProcesso          Boolean                 @default(false)
   // VALIDADE
-  possuiValidade                       Boolean               @default(false)
+  possuiValidade                       Boolean                 @default(false)
   validadeDias                         Int?
-  exigeDataEmissao                     Boolean               @default(false)
-  renovarQuandoExpirado                Boolean               @default(false)
+  exigeDataEmissao                     Boolean                 @default(false)
+  renovarQuandoExpirado                Boolean                 @default(false)
   antecedenciaRenovacaoDias            Int?
   // AUDITORIA de versão
   criadoPor                            Int?
@@ -2349,6 +2359,11 @@ enum RegraDocumentalStatus {
 enum ObrigatoriedadeRegra {
   OBRIGATORIA
   OPCIONAL
+}
+
+enum ModoSatisfacaoRequisito {
+  QUALQUER_UM_ATENDE
+  TODOS_SAO_EXIGIDOS
 }
 
 enum PublicoAlvoRegra {

@@ -5,7 +5,7 @@
  * Puro (sem banco). Cobre os cenários exigidos. A simulação NÃO grava nada — só
  * calcula. Nenhuma lógica antiga da Genealogia é reativada (guard separado).
  */
-import { avaliarRegrasDocumentais } from "../src/lib/documentos/regras-documentais/avaliador"
+import { avaliarRegrasDocumentais, avaliarSatisfacaoRequisito } from "../src/lib/documentos/regras-documentais/avaliador"
 import { detectarConflitos } from "../src/lib/documentos/regras-documentais/conflitos"
 import { validarConjunto } from "../src/lib/documentos/regras-documentais/condicoes"
 import { podeEditarEmLugar, proximaVersao } from "../src/lib/documentos/regras-documentais/versionamento"
@@ -16,16 +16,17 @@ const falhas: string[] = []
 function ok(cond: boolean, nome: string) { if (cond) { passed++; console.log(`  ✅ ${nome}`) } else { failed++; falhas.push(nome); console.log(`  ❌ ${nome}`) } }
 
 const HOJE = "2026-07-16T12:00:00.000Z"
-const base: Omit<RegraDocumental, "id" | "documentTypeCode" | "publicoAlvo"> = {
+const base: Omit<RegraDocumental, "id" | "documentTypeCode" | "publicoAlvo" | "documentosAceitos" | "publicosAlvo" | "tipoProcessoIds"> = {
   codigo: null, nome: null, descricao: null, status: "PUBLICADA", versao: 1, prioridade: 0,
-  vigenciaInicio: null, vigenciaFim: null, tipoProcessoId: 1, modalidadeId: null, paisCode: null, regiaoCode: null, tipoProcessoVersao: null,
-  categoriaCode: null, obrigatoriedade: "OBRIGATORIA", condicoes: null,
+  vigenciaInicio: null, vigenciaFim: null, aplicaTodosProcessos: false, tipoProcessoId: 1,
+  modalidadeId: null, paisCode: null, regiaoCode: null, tipoProcessoVersao: null,
+  requisitoNome: null, modoSatisfacao: "QUALQUER_UM_ATENDE", categoriaCode: null, obrigatoriedade: "OBRIGATORIA", condicoes: null,
   faseExigencia: null, faseBloqueio: null, bloqueiaConclusaoFase: false, continuaObrigatorioNasFasesSeguintes: false,
   faseFinalExigencia: null, obrigatorioAteFinalProcesso: false,
   possuiValidade: false, validadeDias: null, exigeDataEmissao: false, renovarQuandoExpirado: false, antecedenciaRenovacaoDias: null,
 }
 const mk = (id: number, doc: string, publico: RegraDocumental["publicoAlvo"], extra: Partial<RegraDocumental> = {}): RegraDocumental =>
-  ({ ...base, id, documentTypeCode: doc, publicoAlvo: publico, ...extra })
+  ({ ...base, id, documentTypeCode: doc, documentosAceitos: [doc], publicoAlvo: publico, publicosAlvo: [publico], tipoProcessoIds: [base.tipoProcessoId], ...extra })
 
 // ---- conjunto canônico (cadastrável, sem hardcode no motor) ----
 const R_NASC = mk(1, "CERTIDAO_NASCIMENTO_IT", "PESSOA_DA_ARVORE_COM_DOCUMENTACAO", {
@@ -83,7 +84,7 @@ ok(docsAplicaveis({ ehPessoaArvore: false, requerente: true }).includes("IDENTID
 // 7
 ok(!docsAplicaveis(pessoaArvore({ requerente: false, precisaDeDocumentacao: true })).includes("IDENTIDADE"), "7) ascendente não requerente → sem identidade")
 // 8
-ok(R_ID.faseBloqueio === "protocolado" && R_ID.faseBloqueio !== "genealogia", "8) identidade bloqueia Protocolo, NÃO Genealogia")
+ok(R_ID.faseBloqueio === "protocolado" && (R_ID.faseBloqueio as string) !== "genealogia", "8) identidade bloqueia Protocolo, NÃO Genealogia")
 // 9
 {
   const nasc = avaliarRegrasDocumentais(ctx(pessoaArvore({ precisaDeDocumentacao: true }), CERTIDOES)).aplicaveis.find((a) => a.documentTypeCode === "CERTIDAO_NASCIMENTO_IT")
@@ -144,6 +145,45 @@ console.log("\nPureza / condições")
 }
 // condição incompatível detectada (vivo=Sim e falecido=Sim)
 ok(validarConjunto({ combinador: "TODAS", regras: [{ campo: "vivo", operador: "igual", valor: true }, { campo: "falecido", operador: "igual", valor: true }] }).some((p) => p.tipo === "contradicao"), "condição incompatível (vivo+falecido) é alertada")
+
+console.log("\nAjustes desta rodada")
+// A) aplica a TODOS os tipos de processo
+{
+  const rTodos = mk(20, "DOC_TODOS", "REQUERENTE", { nome: "Todos", aplicaTodosProcessos: true })
+  const em7 = avaliarRegrasDocumentais({ ...ctx({ ehPessoaArvore: false, requerente: true }, [rTodos]), tipoProcessoId: 7 }).aplicaveis
+  const em99 = avaliarRegrasDocumentais({ ...ctx({ ehPessoaArvore: false, requerente: true }, [rTodos]), tipoProcessoId: 99 }).aplicaveis
+  ok(em7.length === 1 && em99.length === 1, "A) 'todos os tipos de processo' aplica a qualquer processo")
+}
+// B) vários tipos de processo selecionados
+{
+  const rMulti = mk(21, "DOC_MULTI", "REQUERENTE", { nome: "Multi", tipoProcessoIds: [2, 5] })
+  const em2 = avaliarRegrasDocumentais({ ...ctx({ ehPessoaArvore: false, requerente: true }, [rMulti]), tipoProcessoId: 2 }).aplicaveis
+  const em3 = avaliarRegrasDocumentais({ ...ctx({ ehPessoaArvore: false, requerente: true }, [rMulti]), tipoProcessoId: 3 }).aplicaveis
+  ok(em2.length === 1 && em3.length === 0, "B) múltiplos tipos: aplica aos selecionados, não aos demais")
+}
+// C) requisito aceita vários documentos + modos de satisfação
+ok(avaliarSatisfacaoRequisito("QUALQUER_UM_ATENDE", ["RG", "CNH", "PASSAPORTE"], ["CNH"]) === true, "C) QUALQUER_UM_ATENDE: um documento presente satisfaz")
+ok(avaliarSatisfacaoRequisito("TODOS_SAO_EXIGIDOS", ["RG", "CNH"], ["RG"]) === false &&
+   avaliarSatisfacaoRequisito("TODOS_SAO_EXIGIDOS", ["RG", "CNH"], ["RG", "CNH"]) === true, "D) TODOS_SAO_EXIGIDOS: exige todos presentes")
+{
+  const rReq = mk(22, "RG", "REQUERENTE", { nome: "Identidade", requisitoNome: "Documento de Identidade", documentosAceitos: ["RG", "CNH", "PASSAPORTE"] })
+  const r = avaliarRegrasDocumentais(ctx({ ehPessoaArvore: false, requerente: true }, [rReq])).aplicaveis[0]
+  ok(!!r && r.documentosAceitos.length === 3 && r.requisitoNome === "Documento de Identidade", "E) requisito carrega vários documentos aceitos")
+}
+// F) público-alvo múltiplo
+{
+  const rPub = mk(23, "DOC_PUB", "REQUERENTE", { nome: "Pub", publicosAlvo: ["REQUERENTE", "CONTRATANTE"] })
+  const contratante = avaliarRegrasDocumentais(ctx({ ehPessoaArvore: false, requerente: false, contratante: true }, [rPub])).aplicaveis
+  const nenhum = avaliarRegrasDocumentais(ctx({ ehPessoaArvore: false, requerente: false, contratante: false }, [rPub])).aplicaveis
+  ok(contratante.length === 1 && nenhum.length === 0, "F) público-alvo múltiplo: contratante OU requerente")
+}
+// G) linha reta funciona como CONDIÇÃO (público = Pessoa da árvore)
+{
+  const rLinha = mk(24, "DOC_LINHA", "TODAS_AS_PESSOAS_DA_ARVORE", { nome: "Linha", condicoes: { combinador: "TODAS", regras: [{ campo: "linhaReta", operador: "igual", valor: true }] } })
+  const naLinha = avaliarRegrasDocumentais(ctx({ ehPessoaArvore: true, linhaReta: true }, [rLinha])).aplicaveis
+  const fora = avaliarRegrasDocumentais(ctx({ ehPessoaArvore: true, linhaReta: false }, [rLinha])).aplicaveis
+  ok(naLinha.length === 1 && fora.length === 0, "G) linha reta como condição (público = pessoa da árvore)")
+}
 
 console.log(`\n${failed === 0 ? "✅" : "❌"} REGRAS DOCUMENTAIS — ${passed} ok, ${failed} falhas`)
 if (failed > 0) { console.log("Falhas: " + falhas.join("; ")); process.exit(1) }

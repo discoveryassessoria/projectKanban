@@ -21,6 +21,7 @@ export function valorDoSujeito(campo: CampoCondicao, s: SujeitoContexto): ValorC
     case "falecido": return s.falecido ?? (s.vivo === undefined ? undefined : !s.vivo)
     case "vivo": return s.vivo ?? (s.falecido === undefined ? undefined : !s.falecido)
     case "possuiConjuge": return s.possuiConjuge ?? s.casado
+    case "modalidade": return (s.modalidade ?? undefined) as ValorCondicao | undefined
     case "geracao": return s.geracao ?? undefined
     case "nacionalidade": return s.nacionalidade ?? undefined
     case "paisRegistro": return s.paisRegistro ?? undefined

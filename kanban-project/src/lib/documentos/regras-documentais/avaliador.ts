@@ -8,6 +8,7 @@
 import {
   type RegraDocumental, type ContextoAvaliacao, type SujeitoContexto,
   type PublicoAlvo, type ResultadoRegra, type ResultadoAvaliacao, type ValidadeCalculada,
+  type ModoSatisfacao, PUBLICO_ALVO_LABEL,
 } from "./tipos"
 import { avaliarConjunto, justificativaDoConjunto } from "./condicoes"
 
@@ -34,6 +35,23 @@ export function publicoAlvoAplica(publico: PublicoAlvo, s: SujeitoContexto): { a
     default:
       return { aplica: false, motivo: "público-alvo desconhecido" }
   }
+}
+
+// múltiplos públicos: aplica se QUALQUER um casar (com o motivo do que casou/faltou)
+export function publicoAlvoMultiploAplica(publicos: PublicoAlvo[], s: SujeitoContexto): { aplica: boolean; motivo: string } {
+  const lista = publicos.length ? publicos : []
+  if (lista.length === 0) return { aplica: false, motivo: "nenhum público-alvo definido" }
+  const resultados = lista.map((p) => ({ p, r: publicoAlvoAplica(p, s) }))
+  const casou = resultados.find((x) => x.r.aplica)
+  if (casou) return { aplica: true, motivo: casou.r.motivo }
+  return { aplica: false, motivo: resultados.map((x) => `${PUBLICO_ALVO_LABEL[x.p]}: ${x.r.motivo}`).join(" / ") }
+}
+
+// ---- satisfação do requisito por seus documentos aceitos ----
+export function avaliarSatisfacaoRequisito(modo: ModoSatisfacao, aceitos: string[], presentes: string[]): boolean {
+  const set = new Set(presentes)
+  if (aceitos.length === 0) return false
+  return modo === "TODOS_SAO_EXIGIDOS" ? aceitos.every((c) => set.has(c)) : aceitos.some((c) => set.has(c))
 }
 
 // ---- validade / vencimento ----
@@ -86,25 +104,30 @@ function regraVigenteEStatus(regra: RegraDocumental, dataReferenciaISO: string):
 }
 
 function aplicabilidadeProcesso(regra: RegraDocumental, ctx: ContextoAvaliacao): { ok: boolean; motivo: string | null } {
-  if (regra.tipoProcessoId !== ctx.tipoProcessoId) return { ok: false, motivo: "outro tipo de processo" }
-  if (regra.modalidadeId != null && ctx.modalidadeId != null && regra.modalidadeId !== ctx.modalidadeId) {
-    return { ok: false, motivo: "outra modalidade" }
-  }
-  if (regra.paisCode && ctx.paisCode && regra.paisCode !== ctx.paisCode) return { ok: false, motivo: "outro país" }
-  if (regra.regiaoCode && ctx.regiaoCode && regra.regiaoCode !== ctx.regiaoCode) return { ok: false, motivo: "outra região" }
+  // aplica a TODOS os processos, ou o processo do contexto está na coleção
+  if (regra.aplicaTodosProcessos) return { ok: true, motivo: null }
+  const ids = regra.tipoProcessoIds.length ? regra.tipoProcessoIds : [regra.tipoProcessoId]
+  if (!ids.includes(ctx.tipoProcessoId)) return { ok: false, motivo: "tipo de processo fora do escopo da regra" }
   return { ok: true, motivo: null }
+  // modalidade/país/região saíram do ESCOPO — quando necessários, viram condição.
 }
 
 // ---- avaliação de UMA regra contra o contexto ----
 
 export function avaliarRegra(regra: RegraDocumental, ctx: ContextoAvaliacao): ResultadoRegra {
-  const s = ctx.sujeito
+  // injeta a modalidade do contexto no sujeito (para condição "modalidade")
+  const s: SujeitoContexto = { ...ctx.sujeito, modalidade: ctx.sujeito.modalidade ?? ctx.modalidadeId ?? null }
   const validade = calcularValidade(regra, s, ctx.dataReferencia)
+  const publicos = regra.publicosAlvo.length ? regra.publicosAlvo : [regra.publicoAlvo]
   const base: Omit<ResultadoRegra, "aplicavel" | "motivoNaoAplicavel" | "justificativa" | "condicoesSatisfeitas" | "condicoesNaoSatisfeitas"> = {
     regraId: regra.id,
     regraNome: regra.nome,
+    requisitoNome: regra.requisitoNome ?? regra.nome,
     documentTypeCode: regra.documentTypeCode,
+    documentosAceitos: regra.documentosAceitos.length ? regra.documentosAceitos : [regra.documentTypeCode],
+    modoSatisfacao: regra.modoSatisfacao,
     publicoAlvo: regra.publicoAlvo,
+    publicosAlvo: publicos,
     obrigatoriedade: regra.obrigatoriedade,
     faseExigencia: regra.faseExigencia,
     faseBloqueio: regra.faseBloqueio,
@@ -118,13 +141,13 @@ export function avaliarRegra(regra: RegraDocumental, ctx: ContextoAvaliacao): Re
   if (!vig.ok) {
     return { ...base, aplicavel: false, motivoNaoAplicavel: vig.motivo, justificativa: "", condicoesSatisfeitas: [], condicoesNaoSatisfeitas: [] }
   }
-  // 2) aplicabilidade do processo/modalidade/país
+  // 2) aplicabilidade do processo (lista/todos)
   const proc = aplicabilidadeProcesso(regra, ctx)
   if (!proc.ok) {
     return { ...base, aplicavel: false, motivoNaoAplicavel: proc.motivo, justificativa: "", condicoesSatisfeitas: [], condicoesNaoSatisfeitas: [] }
   }
-  // 3) público-alvo
-  const pub = publicoAlvoAplica(regra.publicoAlvo, s)
+  // 3) público-alvo (múltiplo — aplica se qualquer um casar)
+  const pub = publicoAlvoMultiploAplica(publicos, s)
   if (!pub.aplica) {
     return { ...base, aplicavel: false, motivoNaoAplicavel: pub.motivo, justificativa: "", condicoesSatisfeitas: [], condicoesNaoSatisfeitas: [] }
   }
