@@ -107,6 +107,7 @@ export default function ProdutosTab() {
   const [loading, setLoading] = useState(true)
   const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
+  const [mostrarInativos, setMostrarInativos] = useState(false)
 
   const [modalAberto, setModalAberto] = useState(false)
   const [editando, setEditando] = useState<Produto | null>(null)
@@ -145,13 +146,16 @@ export default function ProdutosTab() {
   useEffect(() => { carregar() }, [carregar])
 
   const filtrados = useMemo(() => {
+    const base = mostrarInativos ? produtos : produtos.filter((p) => p.ativo)
     const q = busca.trim().toLowerCase()
-    if (!q) return produtos
-    return produtos.filter((p) =>
+    if (!q) return base
+    return base.filter((p) =>
       (p.mestre?.nome ?? p.nome).toLowerCase().includes(q) ||
       (p.mestre?.codigo ?? '').toLowerCase().includes(q)
     )
-  }, [produtos, busca])
+  }, [produtos, busca, mostrarInativos])
+
+  const qtdInativos = useMemo(() => produtos.filter((p) => !p.ativo).length, [produtos])
 
   const masterFiltrado = useMemo(() => {
     const arr = mestres[form.origem as keyof Mestres] ?? []
@@ -225,10 +229,11 @@ export default function ProdutosTab() {
 
   async function excluir(p: Produto) {
     const nome = p.mestre?.nome || p.nome
-    if (!confirm(`Excluir a Configuração Financeira de "${nome}"?\n\nIsto remove a configuração INTEIRA (custo e receita), nunca só um deles.`)) return
+    if (!confirm(`Excluir a Configuração Financeira de "${nome}"?\n\nSe nada estiver usando esta configuração (preço, regra ou vínculo de serviço), ela é apagada de vez. Caso contrário, é inativada para preservar o histórico.`)) return
     try {
-      await jsonFetch(`/api/gerenciamento/produtos/${p.id}`, { method: 'DELETE' })
+      const r: any = await jsonFetch(`/api/gerenciamento/produtos/${p.id}`, { method: 'DELETE' })
       await carregar()
+      if (r?.inativado && r?.motivo) alert(r.motivo)
     } catch (e: any) {
       alert(e.message || 'Não foi possível excluir.')
     }
@@ -248,12 +253,23 @@ export default function ProdutosTab() {
         </button>
       </div>
 
-      <input
-        value={busca}
-        onChange={(e) => setBusca(e.target.value)}
-        placeholder="Buscar (cadastro mestre ou código)..."
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
-      />
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          placeholder="Buscar (cadastro mestre ou código)..."
+          className="min-w-[220px] flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
+        />
+        <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-white/60 select-none">
+          <input
+            type="checkbox"
+            checked={mostrarInativos}
+            onChange={(e) => setMostrarInativos(e.target.checked)}
+            className="h-4 w-4 accent-blue-500"
+          />
+          Mostrar inativos{qtdInativos > 0 ? ` (${qtdInativos})` : ''}
+        </label>
+      </div>
 
       {loading && <div className="py-12 text-center text-sm text-white/40">Carregando...</div>}
 

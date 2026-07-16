@@ -3,7 +3,8 @@
 // DELETE - Excluir produto financeiro
 //
 // ✅ Next 15: params é Promise → await params.
-// Nada referencia ProdutoFinanceiro → delete livre.
+// DELETE: hard-delete quando a config não tem NENHUMA referência (preço, regra
+// econômica, automação de fase, vínculo de serviço); caso contrário arquiva (R19).
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -112,21 +113,47 @@ export async function DELETE(
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
     }
 
-    const atual = await prisma.produtoFinanceiro.findUnique({ where: { id } })
+    // Conta TODAS as referências reais à config antes de decidir apagar.
+    const atual = await prisma.produtoFinanceiro.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        _count: {
+          select: {
+            precosConfig: true,      // TabelaValor (preços) — @relation("PrecoConfig")
+            econRulesCusto: true,    // PhaseEconomicRule (custo) — @relation("EconCustoConfig")
+            econRulesReceita: true,  // PhaseEconomicRule (receita) — @relation("EconReceitaConfig")
+            triggerRules: true,      // PhaseTriggerRule — @relation("TriggerConfig")
+            servicos: true,          // ServicoProduto (m2n) — @relation("ServicoProdutoItens")
+          },
+        },
+      },
+    })
     if (!atual) {
       return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 })
     }
 
-    // R19 — não excluir fisicamente configuração com PREÇOS vinculados (perderia
-    // histórico e órfãos por SetNull). Inativa (arquiva) preservando o vínculo.
-    const precos = await prisma.tabelaValor.count({ where: { configuracaoFinanceiraItemId: id } })
-    if (precos > 0) {
-      await prisma.produtoFinanceiro.update({ where: { id }, data: { ativo: false } })
-      return NextResponse.json({ ok: true, inativado: true, motivo: `Configuração possui ${precos} preço(s) vinculado(s); foi inativada (não excluída) para preservar histórico.` })
+    const c = atual._count
+    const vinculos: string[] = []
+    if (c.precosConfig > 0) vinculos.push(`${c.precosConfig} preço(s)`)
+    if (c.econRulesCusto + c.econRulesReceita > 0) vinculos.push(`${c.econRulesCusto + c.econRulesReceita} regra(s) de aplicabilidade econômica`)
+    if (c.triggerRules > 0) vinculos.push(`${c.triggerRules} regra(s) de automação de fase`)
+    if (c.servicos > 0) vinculos.push(`${c.servicos} vínculo(s) de serviço`)
+
+    // Sem NENHUM uso/histórico → exclusão física de verdade.
+    if (vinculos.length === 0) {
+      await prisma.produtoFinanceiro.delete({ where: { id } })
+      return NextResponse.json({ ok: true, excluido: true })
     }
-    // sem preços vinculados: inativa também (padrão de arquivamento, não hard-delete).
+
+    // R19 — com uso/histórico: arquiva (não apaga) pra preservar histórico e evitar
+    // órfãos por SetNull. Informa o que precisa ser desvinculado para excluir de vez.
     await prisma.produtoFinanceiro.update({ where: { id }, data: { ativo: false } })
-    return NextResponse.json({ ok: true, inativado: true })
+    return NextResponse.json({
+      ok: true,
+      inativado: true,
+      motivo: `Esta configuração tem ${vinculos.join(', ')} vinculado(s), então foi inativada (não excluída) para preservar histórico. Remova esses vínculos para excluí-la definitivamente.`,
+    })
   } catch (error) {
     console.error('Erro ao excluir produto:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
