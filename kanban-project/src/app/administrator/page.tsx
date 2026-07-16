@@ -125,6 +125,7 @@ const CategoriasDocumentaisTab = dynamic(() => import("@/src/components/gerencia
 const RuntimeWorkflowDiagnostics = dynamic(() => import("@/src/components/gerenciamentoComponents/RuntimeWorkflowDiagnostics"), { ssr: false, loading: () => <CarregandoTela /> })
 const OrgaosProtocoloTab = dynamic(() => import("@/src/components/gerenciamentoComponents/OrgaosProtocoloTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const MatrizDocumentalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MatrizDocumentalTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const RegrasDocumentaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasDocumentaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const LogAuditoriaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/LogAuditoriaTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const SimulacaoFaseTab = dynamic(() => import("@/src/components/gerenciamentoComponents/SimulacaoFaseTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ExecutorMotorTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ExecutorMotorTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -145,7 +146,7 @@ const TELAS: Record<string, React.ComponentType> = {
   // catálogos (genérico CatalogTab)
   doctypes: TiposDocumentoTab,
   doccats: CategoriasDocumentaisTab,
-  docrules: cat("op_docrules"),
+  docrules: RegrasDocumentaisTab, // fonte única de Regras Documentais (absorve a Matriz)
   // certtypes NÃO tem tela própria: consolidado em doctypes (Tipos de Documento).
   // O deep-link ?screen=certtypes é resolvido por ALIAS_TELAS → doctypes (abaixo).
   currencies: MoedasTab,

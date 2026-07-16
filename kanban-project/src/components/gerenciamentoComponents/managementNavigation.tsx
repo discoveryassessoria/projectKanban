@@ -146,10 +146,12 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       // CONSOLIDADO em "Tipos de Documento" (cadastro mestre). Removido da sidebar;
       // a rota ?screen=certtypes vira alias/redirect para doctypes (page.tsx).
       h(20, "certtypes", "Tipos de Certidão"),
-      a(30, "docmatrix", "Matriz Documental", ["matriz", "documento", "obrigatorio"], "Regras"),
-      // Renomeado de "Aplicabilidade" → "Regras Documentais" (evita colisão com
-      // "Aplicabilidade Econômica" do Financeiro). Keywords preservadas p/ busca.
-      a(40, "docrules", "Regras Documentais", ["aplicabilidade", "regra", "documento", "documental"], "Regras"),
+      // "Matriz Documental" foi ABSORVIDA por "Regras Documentais" (fonte única,
+      // mesma tabela MatrizDocumental ampliada). O docmatrix permanece OCULTO como
+      // visão técnica (deep-link), sem ser uma segunda tela de edição na navegação.
+      h(30, "docmatrix", "Matriz Documental (técnica)"),
+      // "Regras Documentais" é a ÚNICA tela de configuração de regras documentais.
+      a(40, "docrules", "Regras Documentais", ["aplicabilidade", "regra", "documento", "documental", "matriz", "obrigatorio", "obrigatório"], "Regras"),
       // Tipos de Protocolo: configuração operacional (tipos/modalidades de protocolo
       // usados nos processos) — pertence a Documentos e Protocolos, não ao Workflow.
       // (Cartórios/Órgãos, por serem ENTIDADES, seguem em Pessoas e Organizações.)

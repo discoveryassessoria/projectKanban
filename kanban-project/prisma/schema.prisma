@@ -9,20 +9,20 @@ datasource db {
 }
 
 model Usuario {
-  id                     Int                @id @default(autoincrement())
-  nome                   String             @db.VarChar(100)
-  email                  String             @unique @db.VarChar(100)
-  senha                  String             @db.VarChar(255)
-  tipo                   String             @db.VarChar(20)
-  perfilId               Int?
-  permissoesCustom       Json?
-  eventosFinanceiros     EventoFinanceiro[] @relation("EventoFinanceiroUsuario")
-  logs                   LogAuditoria[]
-  mensagens              Mensagem[]
-  recibosEmitidos        Recibo[]           @relation("ReciboEmitente")
-  tarefas                Tarefa[]
-  historicoTarefas       TarefaHistorico[]
-  perfil                 Perfil?            @relation(fields: [perfilId], references: [id])
+  id                 Int                @id @default(autoincrement())
+  nome               String             @db.VarChar(100)
+  email              String             @unique @db.VarChar(100)
+  senha              String             @db.VarChar(255)
+  tipo               String             @db.VarChar(20)
+  perfilId           Int?
+  permissoesCustom   Json?
+  eventosFinanceiros EventoFinanceiro[] @relation("EventoFinanceiroUsuario")
+  logs               LogAuditoria[]
+  mensagens          Mensagem[]
+  recibosEmitidos    Recibo[]           @relation("ReciboEmitente")
+  tarefas            Tarefa[]
+  historicoTarefas   TarefaHistorico[]
+  perfil             Perfil?            @relation(fields: [perfilId], references: [id])
 
   documentosResponsavel Documento[] @relation("DocumentoResponsavel")
 
@@ -326,13 +326,13 @@ model Processo {
   // Runtime de workflow do processo. CUTOVER V2 CONCLUÍDO: todo processo NOVO
   // nasce "v2" (default). O campo permanece só para leitura técnica/histórica;
   // a UI comum não cria processo legado e a API rejeita "legacy" vindo da interface.
-  workflowRuntime        String                  @default("v2") @db.VarChar(20)
-  lockVersion            Int                     @default(0) // CP-4F — CAS na mudança de fase (v2)
+  workflowRuntime          String                  @default("v2") @db.VarChar(20)
+  lockVersion              Int                     @default(0) // CP-4F — CAS na mudança de fase (v2)
   // Criação V2-nativa: idempotência (evita processo duplicado em duplo clique/retry)
   // e snapshot imutável da versão do Workflow Macro aplicada no nascimento.
-  chaveIdempotenciaCriacao String?               @unique @db.VarChar(200)
+  chaveIdempotenciaCriacao String?                 @unique @db.VarChar(200)
   macroWorkflowVersion     Int?
-  phaseWorkflowInstances PhaseWorkflowInstance[]
+  phaseWorkflowInstances   PhaseWorkflowInstance[]
 
   tipoProcessoMotorId Int?
   tipoProcessoMotor   TipoProcessoNacionalidade? @relation("ProcessoTipoMotor", fields: [tipoProcessoMotorId], references: [id], onDelete: SetNull)
@@ -780,16 +780,22 @@ model CategoriaFinanceira {
   // redigita/duplica a entidade. Exatamente UM destes é preenchido (CHECK na migration).
   // `nome` passa a ser DERIVADO do mestre (system-owned na criação); linhas legadas
   // sem FK permanecem válidas (nullable) até o backfill.
-  origem              OrigemCategoria       @default(LEGADO)
-  tipoDocumentoId     Int?
-  tipoDocumento       TipoDocumentoCadastro?     @relation("CatFinTipoDocumento", fields: [tipoDocumentoId], references: [id])
-  honorarioId         Int?
-  honorario           Honorario?                 @relation("CatFinHonorario", fields: [honorarioId], references: [id])
-  tipoProcessoId      Int?
-  tipoProcesso        TipoProcessoNacionalidade? @relation("CatFinTipoProcesso", fields: [tipoProcessoId], references: [id])
-  itemCatalogoId      Int?
-  itemCatalogo        ItemCatalogo?              @relation("CatFinItemCatalogo", fields: [itemCatalogoId], references: [id])
+  origem          OrigemCategoria            @default(LEGADO)
+  tipoDocumentoId Int?
+  tipoDocumento   TipoDocumentoCadastro?     @relation("CatFinTipoDocumento", fields: [tipoDocumentoId], references: [id])
+  honorarioId     Int?
+  honorario       Honorario?                 @relation("CatFinHonorario", fields: [honorarioId], references: [id])
+  tipoProcessoId  Int?
+  tipoProcesso    TipoProcessoNacionalidade? @relation("CatFinTipoProcesso", fields: [tipoProcessoId], references: [id])
+  itemCatalogoId  Int?
+  itemCatalogo    ItemCatalogo?              @relation("CatFinItemCatalogo", fields: [itemCatalogoId], references: [id])
 
+  // anti-duplicação: 1 categoria por (mestre × tipo). NULL é distinto no Postgres,
+  // logo só restringe quando a FK está preenchida (legado sem FK não é afetado).
+  @@unique([tipoDocumentoId, tipo])
+  @@unique([honorarioId, tipo])
+  @@unique([tipoProcessoId, tipo])
+  @@unique([itemCatalogoId, tipo])
   @@index([tipo])
   @@index([categoriaPaiId])
   @@index([origem])
@@ -797,12 +803,6 @@ model CategoriaFinanceira {
   @@index([honorarioId])
   @@index([tipoProcessoId])
   @@index([itemCatalogoId])
-  // anti-duplicação: 1 categoria por (mestre × tipo). NULL é distinto no Postgres,
-  // logo só restringe quando a FK está preenchida (legado sem FK não é afetado).
-  @@unique([tipoDocumentoId, tipo])
-  @@unique([honorarioId, tipo])
-  @@unique([tipoProcessoId, tipo])
-  @@unique([itemCatalogoId, tipo])
 }
 
 model ContaBancaria {
@@ -839,34 +839,34 @@ model ContaBancaria {
 }
 
 model Fornecedor {
-  id                 Int           @id @default(autoincrement())
-  nome               String        @db.VarChar(150)
-  nomeFantasia       String?       @db.VarChar(150)
-  tipo               String        @db.VarChar(20)
-  cpfCnpj            String?       @db.VarChar(20)
-  inscricaoEstadual  String?       @db.VarChar(20)
-  inscricaoMunicipal String?       @db.VarChar(20)
-  telefone           String?       @db.VarChar(20)
-  celular            String?       @db.VarChar(20)
-  email              String?       @db.VarChar(100)
-  website            String?       @db.VarChar(200)
-  cep                String?       @db.VarChar(10)
-  endereco           String?       @db.VarChar(200)
-  numero             String?       @db.VarChar(20)
-  complemento        String?       @db.VarChar(100)
-  bairro             String?       @db.VarChar(100)
-  cidade             String?       @db.VarChar(100)
-  estado             String?       @db.VarChar(2)
-  banco              String?       @db.VarChar(100)
-  agencia            String?       @db.VarChar(20)
-  conta              String?       @db.VarChar(30)
-  tipoConta          String?       @db.VarChar(20)
-  chavePix           String?       @db.VarChar(100)
-  tipoChavePix       String?       @db.VarChar(20)
+  id                 Int                 @id @default(autoincrement())
+  nome               String              @db.VarChar(150)
+  nomeFantasia       String?             @db.VarChar(150)
+  tipo               String              @db.VarChar(20)
+  cpfCnpj            String?             @db.VarChar(20)
+  inscricaoEstadual  String?             @db.VarChar(20)
+  inscricaoMunicipal String?             @db.VarChar(20)
+  telefone           String?             @db.VarChar(20)
+  celular            String?             @db.VarChar(20)
+  email              String?             @db.VarChar(100)
+  website            String?             @db.VarChar(200)
+  cep                String?             @db.VarChar(10)
+  endereco           String?             @db.VarChar(200)
+  numero             String?             @db.VarChar(20)
+  complemento        String?             @db.VarChar(100)
+  bairro             String?             @db.VarChar(100)
+  cidade             String?             @db.VarChar(100)
+  estado             String?             @db.VarChar(2)
+  banco              String?             @db.VarChar(100)
+  agencia            String?             @db.VarChar(20)
+  conta              String?             @db.VarChar(30)
+  tipoConta          String?             @db.VarChar(20)
+  chavePix           String?             @db.VarChar(100)
+  tipoChavePix       String?             @db.VarChar(20)
   observacoes        String?
-  ativo              Boolean       @default(true)
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  ativo              Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
   contasPagar        ContaPagar[]
   tabelasValor       TabelaValor[]
   configFinanceiras  ProdutoFinanceiro[] @relation("ConfigFinFornecedor")
@@ -1345,7 +1345,6 @@ model EventoFinanceiro {
   @@index([createdAt])
 }
 
-
 // ============================================================
 // ANÁLISE DOCUMENTAL (fase de PROCESSO — compara árvore × documentos)
 // ============================================================
@@ -1701,6 +1700,9 @@ model ProdutoFinanceiro {
   triggerRules       PhaseTriggerRule[]         @relation("TriggerConfig")
   precosConfig       TabelaValor[]              @relation("PrecoConfig")
 
+  // M-UNIFICA — anti-duplicação: UMA configuração por item mestre (pivô).
+  // itemCatalogoId nulo é distinto no Postgres (não restringe configs sem pivô).
+  @@unique([itemCatalogoId])
   @@index([itemCatalogoId])
   @@index([categoriaId])
   @@index([planoContaId])
@@ -1708,47 +1710,44 @@ model ProdutoFinanceiro {
   @@index([honorarioId])
   @@index([tipoProcessoId])
   @@index([fornecedorPadraoId])
-  // M-UNIFICA — anti-duplicação: UMA configuração por item mestre (pivô).
-  // itemCatalogoId nulo é distinto no Postgres (não restringe configs sem pivô).
-  @@unique([itemCatalogoId])
 }
 
 // ── Tabela de Valores (fin_values) ──
 model TabelaValor {
-  id               Int            @id @default(autoincrement())
-  name             String         @db.VarChar(200)
+  id                           Int                @id @default(autoincrement())
+  name                         String             @db.VarChar(200)
   // soltos por ora (viram FK quando o motor/serviços existirem)
-  processoTipoId   String?        @db.VarChar(60)
-  faseKey          String?        @db.VarChar(60)
-  produtoServicoId String?        @db.VarChar(60)
+  processoTipoId               String?            @db.VarChar(60)
+  faseKey                      String?            @db.VarChar(60)
+  produtoServicoId             String?            @db.VarChar(60)
   // FK real
-  fornecedorId     Int?
-  fornecedor       Fornecedor?    @relation(fields: [fornecedorId], references: [id])
-  moeda            Moeda          @default(EUR)
-  valor            Decimal        @default(0) @db.Decimal(12, 2)
-  modoCalculo      String         @default("fixed") @db.VarChar(20)
-  condicao         String?        @db.VarChar(200)
-  vigenciaInicio   String?        @db.VarChar(10)
-  vigenciaFim      String?        @db.VarChar(10)
-  arquivado        Boolean        @default(false)
-  criadoEm         DateTime       @default(now())
-  atualizadoEm     DateTime       @updatedAt
-  itemCatalogoId   Int? // → ItemCatalogo (o QUE está sendo precificado)
-  itemCatalogo     ItemCatalogo?  @relation(fields: [itemCatalogoId], references: [id])
-  natureza         NaturezaPreco? // CUSTO ou RECEITA (independentes!). null = legado/ambíguo
-  regiao           String?        @db.VarChar(60) // nível país/região da precedência
-  processoId       Int? // preço específico de UM processo (nível + específico)
+  fornecedorId                 Int?
+  fornecedor                   Fornecedor?        @relation(fields: [fornecedorId], references: [id])
+  moeda                        Moeda              @default(EUR)
+  valor                        Decimal            @default(0) @db.Decimal(12, 2)
+  modoCalculo                  String             @default("fixed") @db.VarChar(20)
+  condicao                     String?            @db.VarChar(200)
+  vigenciaInicio               String?            @db.VarChar(10)
+  vigenciaFim                  String?            @db.VarChar(10)
+  arquivado                    Boolean            @default(false)
+  criadoEm                     DateTime           @default(now())
+  atualizadoEm                 DateTime           @updatedAt
+  itemCatalogoId               Int? // → ItemCatalogo (o QUE está sendo precificado)
+  itemCatalogo                 ItemCatalogo?      @relation(fields: [itemCatalogoId], references: [id])
+  natureza                     NaturezaPreco? // CUSTO ou RECEITA (independentes!). null = legado/ambíguo
+  regiao                       String?            @db.VarChar(60) // nível país/região da precedência
+  processoId                   Int? // preço específico de UM processo (nível + específico)
   // F4 — CHAVE PRINCIPAL canônica: o preço pertence a uma Configuração Financeira
   // (papel financeiro de uma entidade mestre). itemCatalogoId/natureza ficam só como legado.
   configuracaoFinanceiraItemId Int?
   configuracaoFinanceiraItem   ProdutoFinanceiro? @relation("PrecoConfig", fields: [configuracaoFinanceiraItemId], references: [id])
-  modalidadeId     Int?
-  modalidade       ModalidadePais? @relation(fields: [modalidadeId], references: [id])
-  prioridade       Int            @default(0)
-  unidade          String?        @db.VarChar(20)
-  quantidadeMinima Decimal?       @db.Decimal(12, 2)
-  quantidadeMaxima Decimal?       @db.Decimal(12, 2)
-  legadoPendente   Boolean        @default(false) // sem vínculo canônico seguro → fora da tela/resolver
+  modalidadeId                 Int?
+  modalidade                   ModalidadePais?    @relation(fields: [modalidadeId], references: [id])
+  prioridade                   Int                @default(0)
+  unidade                      String?            @db.VarChar(20)
+  quantidadeMinima             Decimal?           @db.Decimal(12, 2)
+  quantidadeMaxima             Decimal?           @db.Decimal(12, 2)
+  legadoPendente               Boolean            @default(false) // sem vínculo canônico seguro → fora da tela/resolver
 
   @@index([fornecedorId])
   @@index([itemCatalogoId])
@@ -1779,17 +1778,17 @@ model CondicaoPagamento {
 
 // ── Honorários (fin_honorariums) ──
 model Honorario {
-  id              Int      @id @default(autoincrement())
-  code            String   @db.VarChar(40)
-  name            String   @db.VarChar(200)
-  tipo            String   @default("main") @db.VarChar(30)
-  servico         String?  @db.VarChar(200) // vira FK p/ Serviços quando existir
-  moeda           Moeda    @default(EUR)
-  valorPadrao     Decimal? @db.Decimal(12, 2)
-  momentoCobranca String   @default("contract_signed") @db.VarChar(30)
-  ativo           Boolean  @default(true)
-  criadoEm        DateTime @default(now())
-  atualizadoEm    DateTime @updatedAt
+  id                Int                   @id @default(autoincrement())
+  code              String                @db.VarChar(40)
+  name              String                @db.VarChar(200)
+  tipo              String                @default("main") @db.VarChar(30)
+  servico           String?               @db.VarChar(200) // vira FK p/ Serviços quando existir
+  moeda             Moeda                 @default(EUR)
+  valorPadrao       Decimal?              @db.Decimal(12, 2)
+  momentoCobranca   String                @default("contract_signed") @db.VarChar(30)
+  ativo             Boolean               @default(true)
+  criadoEm          DateTime              @default(now())
+  atualizadoEm      DateTime              @updatedAt
   configFinanceiras ProdutoFinanceiro[]   @relation("ConfigFinHonorario")
   categoriasFin     CategoriaFinanceira[] @relation("CatFinHonorario")
 }
@@ -1881,23 +1880,23 @@ model TaxaPagamento {
 // MOTOR — Fase 1A: Tipos de Processo (Processos de Nacionalidade)
 // ============================================================
 model TipoProcessoNacionalidade {
-  id                  Int            @id @default(autoincrement())
-  code                String         @unique @db.VarChar(40)
-  name                String         @db.VarChar(200)
-  countryKey          String         @db.VarChar(40)
-  countryLabel        String         @db.VarChar(80)
-  nationalityKey      String         @db.VarChar(40)
-  nationalityLabel    String         @db.VarChar(80)
-  modalityKey         String         @db.VarChar(40)
-  modalityLabel       String         @db.VarChar(80)
-  processFamily       String         @default("cidadania") @db.VarChar(40)
-  serviceNature       String         @default("main_process") @db.VarChar(40)
-  ativo               Boolean        @default(true)
-  arquivado           Boolean        @default(false)
-  criadoEm            DateTime       @default(now())
-  atualizadoEm        DateTime       @updatedAt
+  id                  Int                   @id @default(autoincrement())
+  code                String                @unique @db.VarChar(40)
+  name                String                @db.VarChar(200)
+  countryKey          String                @db.VarChar(40)
+  countryLabel        String                @db.VarChar(80)
+  nationalityKey      String                @db.VarChar(40)
+  nationalityLabel    String                @db.VarChar(80)
+  modalityKey         String                @db.VarChar(40)
+  modalityLabel       String                @db.VarChar(80)
+  processFamily       String                @default("cidadania") @db.VarChar(40)
+  serviceNature       String                @default("main_process") @db.VarChar(40)
+  ativo               Boolean               @default(true)
+  arquivado           Boolean               @default(false)
+  criadoEm            DateTime              @default(now())
+  atualizadoEm        DateTime              @updatedAt
   macroWorkflow       MacroWorkflow?
-  processosVinculados Processo[]     @relation("ProcessoTipoMotor")
+  processosVinculados Processo[]            @relation("ProcessoTipoMotor")
   configFinanceiras   ProdutoFinanceiro[]   @relation("ConfigFinTipoProcesso")
   categoriasFin       CategoriaFinanceira[] @relation("CatFinTipoProcesso")
 
@@ -1921,15 +1920,15 @@ model CatalogoPais {
 }
 
 model ModalidadePais {
-  id            Int      @id @default(autoincrement())
-  countryKey    String   @db.VarChar(40)
-  modalityKey   String   @db.VarChar(40)
-  modalityLabel String   @db.VarChar(80)
-  codeSuffix    String?  @db.VarChar(20)
-  ordem         Int      @default(0)
-  ativo         Boolean  @default(true)
-  criadoEm      DateTime @default(now())
-  atualizadoEm  DateTime @updatedAt
+  id            Int           @id @default(autoincrement())
+  countryKey    String        @db.VarChar(40)
+  modalityKey   String        @db.VarChar(40)
+  modalityLabel String        @db.VarChar(80)
+  codeSuffix    String?       @db.VarChar(20)
+  ordem         Int           @default(0)
+  ativo         Boolean       @default(true)
+  criadoEm      DateTime      @default(now())
+  atualizadoEm  DateTime      @updatedAt
   precos        TabelaValor[]
 
   @@unique([countryKey, modalityKey])
@@ -2182,8 +2181,8 @@ model PhaseTriggerRule {
   atualizadoEm             DateTime @updatedAt
 
   // F2 — FK real p/ a Configuração Financeira (dual-read com itemCode/financialItemId)
-  configItemId             Int?
-  configItem               ProdutoFinanceiro? @relation("TriggerConfig", fields: [configItemId], references: [id])
+  configItemId Int?
+  configItem   ProdutoFinanceiro? @relation("TriggerConfig", fields: [configItemId], references: [id])
 
   @@index([phaseKey])
   @@index([itemCode])
@@ -2217,31 +2216,31 @@ model OrgaoProtocolo {
 
 // Tipos de Documento (op_doctypes) — tipos documentais usados nos processos
 model TipoDocumentoCadastro {
-  id                Int           @id @default(autoincrement())
-  code              String?       @db.VarChar(40)
-  name              String        @db.VarChar(200)
-  category          String?       @db.VarChar(30) // civil_registry|identity|judicial|consular|translation|apostille|other
-  ativo             Boolean       @default(true)
-  criadoEm          DateTime      @default(now())
-  atualizadoEm      DateTime      @updatedAt
-  itemCatalogoId    Int?
-  itemCatalogo      ItemCatalogo? @relation(fields: [itemCatalogoId], references: [id])
-  legacyEnumKey     String?       @unique @db.VarChar(60) // ← valor do enum TipoDocumento (ponte)
-  nature            String?       @db.VarChar(30) // documento|certidao|identidade|... (config futura)
-  countryCode       String?       @db.VarChar(8) // opcional (país)
-  description       String?       @db.Text
-  documentos        Documento[] // back-relation (docs que apontam pra este tipo)
-  configFinanceiras ProdutoFinanceiro[] @relation("ConfigFinTipoDocumento")
-  categoriasFin     CategoriaFinanceira[] @relation("CatFinTipoDocumento")
-  econRules         PhaseEconomicRule[] @relation("EconTipoDocumento")
-  participaPlanilha Boolean       @default(false)
+  id                    Int                   @id @default(autoincrement())
+  code                  String?               @db.VarChar(40)
+  name                  String                @db.VarChar(200)
+  category              String?               @db.VarChar(30) // civil_registry|identity|judicial|consular|translation|apostille|other
+  ativo                 Boolean               @default(true)
+  criadoEm              DateTime              @default(now())
+  atualizadoEm          DateTime              @updatedAt
+  itemCatalogoId        Int?
+  itemCatalogo          ItemCatalogo?         @relation(fields: [itemCatalogoId], references: [id])
+  legacyEnumKey         String?               @unique @db.VarChar(60) // ← valor do enum TipoDocumento (ponte)
+  nature                String?               @db.VarChar(30) // documento|certidao|identidade|... (config futura)
+  countryCode           String?               @db.VarChar(8) // opcional (país)
+  description           String?               @db.Text
+  documentos            Documento[] // back-relation (docs que apontam pra este tipo)
+  configFinanceiras     ProdutoFinanceiro[]   @relation("ConfigFinTipoDocumento")
+  categoriasFin         CategoriaFinanceira[] @relation("CatFinTipoDocumento")
+  econRules             PhaseEconomicRule[]   @relation("EconTipoDocumento")
+  participaPlanilha     Boolean               @default(false)
   // LOTE A — categoriaDocumentalId é a CLASSIFICAÇÃO CANÔNICA (consumida por ID).
   // FK nullable p/ backfill seguro. A coluna `category` (String) permanece SÓ como
   // compatibilidade transitória (dual-read/dual-write). Não remover neste lote.
   // onDelete: Restrict — a API já proíbe excluir categoria em uso; a FK impede
   // desclassificação silenciosa via SQL cru (alinha DB e regra de negócio).
   categoriaDocumentalId Int?
-  categoriaDocumental   CategoriaDocumental? @relation(fields: [categoriaDocumentalId], references: [id], onDelete: Restrict)
+  categoriaDocumental   CategoriaDocumental?  @relation(fields: [categoriaDocumentalId], references: [id], onDelete: Restrict)
 
   @@index([itemCatalogoId])
   @@index([categoriaDocumentalId])
@@ -2269,7 +2268,7 @@ model CategoriaDocumental {
 model MatrizDocumental {
   id                    Int      @id @default(autoincrement())
   tipoProcessoId        Int // → TipoProcessoNacionalidade (solto)
-  phaseKey              String?  @db.VarChar(60) // null = qualquer fase
+  phaseKey              String?  @db.VarChar(60) // null = qualquer fase (LEGADO; ver faseExigencia)
   documentTypeCode      String   @db.VarChar(40) // → TipoDocumentoCadastro.code (solto)
   target                String   @default("direct_line_person") @db.VarChar(40)
   generationRule        String   @default("all_direct_line") @db.VarChar(40)
@@ -2288,8 +2287,77 @@ model MatrizDocumental {
   criadoEm              DateTime @default(now())
   atualizadoEm          DateTime @updatedAt
 
+  // ============================================================
+  // REGRAS DOCUMENTAIS (estrutura canônica ampliada) — base dos workflows
+  // futuros. Campos ADITIVOS; os campos legados acima permanecem para leitura
+  // (dual-read) até a migração completa da tela. Nada aqui executa runtime.
+  // ============================================================
+  // IDENTIFICAÇÃO
+  codigo                               String?               @db.VarChar(60) // código estável (compartilhado entre versões)
+  nome                                 String?               @db.VarChar(200)
+  descricao                            String?               @db.Text
+  status                               RegraDocumentalStatus @default(RASCUNHO)
+  prioridade                           Int                   @default(0)
+  vigenciaInicio                       DateTime?
+  vigenciaFim                          DateTime?
+  // APLICABILIDADE
+  modalidadeId                         Int? // → ModalidadePais (solto)
+  paisCode                             String?               @db.VarChar(8)
+  regiaoCode                           String?               @db.VarChar(16)
+  tipoProcessoVersao                   Int?
+  // DOCUMENTO
+  categoriaCode                        String?               @db.VarChar(40) // → CategoriaDocumental.code (solto)
+  obrigatoriedade                      ObrigatoriedadeRegra  @default(OBRIGATORIA)
+  // PÚBLICO-ALVO
+  publicoAlvo                          PublicoAlvoRegra      @default(PESSOA_DA_LINHA_RETA)
+  // CONDIÇÕES estruturadas: { combinador: TODAS|QUALQUER, regras: [{campo,operador,valor}] }
+  condicoes                            Json?
+  // FASE E BLOQUEIO
+  faseExigencia                        String?               @db.VarChar(60) // fase em que passa a ser exigido
+  faseBloqueio                         String?               @db.VarChar(60) // fase que bloqueia
+  continuaObrigatorioNasFasesSeguintes Boolean               @default(false)
+  faseFinalExigencia                   String?               @db.VarChar(60)
+  obrigatorioAteFinalProcesso          Boolean               @default(false)
+  // VALIDADE
+  possuiValidade                       Boolean               @default(false)
+  validadeDias                         Int?
+  exigeDataEmissao                     Boolean               @default(false)
+  renovarQuandoExpirado                Boolean               @default(false)
+  antecedenciaRenovacaoDias            Int?
+  // AUDITORIA de versão
+  criadoPor                            Int?
+  atualizadoPor                        Int?
+  publicadoEm                          DateTime?
+  publicadoPor                         Int?
+
+  @@unique([codigo, versao])
   @@index([tipoProcessoId])
   @@index([phaseKey])
+  @@index([status])
+  @@index([codigo])
+  @@index([publicoAlvo])
+}
+
+// ---- enums das Regras Documentais ----
+enum RegraDocumentalStatus {
+  RASCUNHO
+  PUBLICADA
+  INATIVA
+  ARQUIVADA
+}
+
+enum ObrigatoriedadeRegra {
+  OBRIGATORIA
+  OPCIONAL
+}
+
+enum PublicoAlvoRegra {
+  REQUERENTE
+  CONTRATANTE
+  PESSOA_DA_ARVORE_COM_DOCUMENTACAO
+  PESSOA_DA_LINHA_RETA
+  PESSOA_FORA_DA_LINHA_RETA
+  TODAS_AS_PESSOAS_DA_ARVORE
 }
 
 model MotorArtefato {

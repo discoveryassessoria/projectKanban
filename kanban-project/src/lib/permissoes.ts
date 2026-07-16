@@ -71,6 +71,15 @@ export const PERMISSOES = {
   'usuarios.editar': 'Editar usuários',
   'usuarios.excluir': 'Excluir usuários',
 
+  // Regras Documentais (base configurável dos workflows futuros)
+  'regras_documentais.ver': 'Ver regras documentais',
+  'regras_documentais.criar': 'Criar regra documental (rascunho)',
+  'regras_documentais.editar': 'Editar rascunho de regra documental',
+  'regras_documentais.publicar': 'Publicar versão de regra documental',
+  'regras_documentais.arquivar': 'Arquivar/inativar regra documental',
+  'regras_documentais.simular': 'Simular regras documentais',
+  'regras_documentais.excluir': 'Excluir regra documental nunca utilizada',
+
   // CP-4A — Motor de Workflow/Avanço (catálogo; enforcement nos subcheckpoints)
   'workflow.avancar': 'Avançar de fase (Motor de Avanço)',
   'workflow.gerarTarefa': 'Gerar tarefa a partir de passo do workflow', // CP-4C
