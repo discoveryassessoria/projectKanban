@@ -100,7 +100,10 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(10, "macrokanban", "Workflow Macro / Kanban", ["workflow", "macro", "kanban", "fase", "coluna"], "Estrutura"),
       a(20, "phaseiwf", "Workflow Interno das Fases", ["workflow", "interno", "passo", "fase"], "Estrutura"),
       a(30, "phasemodes", "Modos Internos", ["modo", "interno", "fase"], "Estrutura"),
-      a(40, "workflowsphases", "Hub de Workflows das Fases", ["workflow", "hub", "fase"], "Estrutura"),
+      // OCULTO: o "Hub" apenas reagrupava Workflow Macro + Interno + Modelos IW +
+      // Modos — telas que já são itens próprios acima. Item redundante removido da
+      // sidebar (tela segue acessível por ?screen=workflowsphases, sem menu duplo).
+      h(40, "workflowsphases", "Hub de Workflows das Fases"),
       a(50, "iwtemplates", "Modelos de Workflow Interno", ["modelo", "template", "workflow", "interno"], "Modelos"),
       a(70, "crossrules", "Tarefas Transversais", ["tarefa", "transversal", "regra"], "Modelos"),
       a(75, "prottypes", "Tipos de Protocolo", ["protocolo", "orgao", "órgão", "tipo"], "Modelos"),
@@ -123,7 +126,9 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       // a rota ?screen=certtypes vira alias/redirect para doctypes (page.tsx).
       h(20, "certtypes", "Tipos de Certidão"),
       a(30, "docmatrix", "Matriz Documental", ["matriz", "documento", "obrigatorio"], "Regras"),
-      a(40, "docrules", "Aplicabilidade", ["aplicabilidade", "regra", "documento"], "Regras"),
+      // Renomeado de "Aplicabilidade" → "Regras Documentais" (evita colisão com
+      // "Aplicabilidade Econômica" do Financeiro). Keywords preservadas p/ busca.
+      a(40, "docrules", "Regras Documentais", ["aplicabilidade", "regra", "documento", "documental"], "Regras"),
       h(50, "doc_categorias", "Categorias Documentais"),
       h(60, "doc_estados", "Estados Documentais"),
       h(70, "mod_documento", "Modelos de Documento"),
@@ -218,7 +223,10 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(10, "opauto", "Regras de Automação", ["automacao", "automação", "regra", "fase"], "Regras"),
       a(15, "phasemap", "Regras por Fase", ["regra", "fase", "gatilho", "disparo", "trigger"], "Regras"),
       a(20, "amtemplates", "Presets", ["preset", "modelo", "automacao"], "Regras"),
-      a(30, "finauto", "Automações Financeiras", ["automacao", "financeiro"], "Regras"),
+      // OCULTO: "Automações Financeiras" era um scaffold vazio (FinAutomationsTab,
+      // sem feature). O efeito financeiro por fase é coberto por "Regras por Fase"
+      // (phasemap) e pelo kind=financial de "Regras de Automação" (opauto).
+      h(30, "finauto", "Automações Financeiras"),
       a(35, "simfase", "Simulação", ["simulacao", "simulação", "fase", "teste"], "Execução"),
       a(40, "execmatrix", "Histórico de Execuções", ["historico", "histórico", "execucao", "execução", "log"], "Execução"),
       h(50, "auto_eventos", "Eventos e Gatilhos"),

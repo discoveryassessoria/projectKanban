@@ -122,6 +122,13 @@ ok(/mestre/i.test(tdTab), "Tipos de Documento marcado como cadastro mestre")
 // LOTE A — cadastro mestre de Categorias Documentais aparece em Documentos
 ok(itemDe("doccats")?.status === "active" && grupoDe("doccats") === "grp_documentos", "LOTE A: 'Categorias Documentais' (doccats) ativo em Documentos")
 
+// 11) Cleanups de dedup (reorg 16/07) — sem reverter D1-D9
+console.log("\nCleanups de dedup:")
+ok(itemDe("workflowsphases")?.status === "hidden", "Hub de Workflows (workflowsphases) oculto — item redundante c/ Macro/Interno/Modos")
+ok(itemDe("finauto")?.status === "hidden", "'Automações Financeiras' (finauto, scaffold vazio) oculto")
+ok(itemDe("docrules")?.label === "Regras Documentais", "docrules renomeado 'Aplicabilidade' → 'Regras Documentais' (sem colidir c/ Aplicabilidade Econômica)")
+ok(matchesKeyword("workflow").length >= 2, "busca 'workflow' segue com ≥2 itens após ocultar o Hub")
+
 console.log(`\n${passed} passaram, ${failed} falharam`)
 if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }
 console.log("Sidebar: config declarativa validada ✅")
