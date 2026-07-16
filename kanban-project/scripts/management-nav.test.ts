@@ -2,7 +2,7 @@
  * Sidebar do Gerenciamento — testes estruturais da config declarativa.
  * Rodar: npm run test:nav
  */
-import { MANAGEMENT_NAVIGATION, GESTAO_PERMISSION } from "../src/components/gerenciamentoComponents/managementNavigation"
+import { MANAGEMENT_NAVIGATION } from "../src/components/gerenciamentoComponents/managementNavigation"
 import { readFileSync } from "fs"
 import { fileURLToPath } from "url"
 import { dirname, join } from "path"
@@ -40,9 +40,7 @@ const catalog = todosItens.find((i) => i.key === "catalog")
 ok(catalog?.label === "Configurações Financeiras", 'catalog renomeado para "Configurações Financeiras" (F3)')
 ok(!todosItens.some((i) => i.label === "Produtos Financeiros"), 'nenhum item "Produtos Financeiros" restante')
 
-// 5) grupo técnico (16) exige permissão técnica (não exposto sem permissão)
-const motor = MANAGEMENT_NAVIGATION.find((g) => g.key === "grp_motor")
-ok(motor?.technicalOnly === true && motor?.permission === GESTAO_PERMISSION, "grupo Motor Técnico gated por regra de admin do Gerenciamento")
+// 5) Motor Técnico foi REMOVIDO da navegação (escopo definitivo 16/07) — ver bloco 15.
 
 // 6) busca por keywords cobre os exemplos da spec
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
@@ -71,11 +69,9 @@ ok(!emProcessos("phasemap"), "D1: phasemap removido de Processos")
 ok(grupoDe("simfase") === "grp_workflow" && itemDe("simfase")?.label === "Simulação", "D2: simfase em Workflow como 'Simulação'")
 ok(!emProcessos("simfase"), "D2: simfase removido de Processos")
 ok(grupoDe("execmatrix") === "grp_workflow", "D3: execmatrix em Workflow (não no Motor Técnico)")
-ok(itemDe("syshealth")?.label === "Saúde do Sistema", "D4: syshealth = 'Saúde do Sistema'")
 ok(todosItens.filter((i) => i.key === "suppliers").some((i) => i.label === "Fornecedores"), "D5: suppliers = 'Fornecedores' (cadastro mestre)")
 ok(itemDe("fornecedoresconc")?.label === "Concentradoras e Adquirentes", "D5: fornecedoresconc = 'Concentradoras e Adquirentes'")
 ok(itemDe("roles")?.label === "Perfis e Permissões" && !itemDe("permprofiles"), "D6: item único 'Perfis e Permissões' (permprofiles vira alias)")
-ok(motor?.permission === GESTAO_PERMISSION && GESTAO_PERMISSION === "usuarios.gerenciar", "D7: Motor Técnico usa a MESMA regra dos demais módulos (usuarios.gerenciar)")
 ok(grupoDe("crossrules") === "grp_workflow" && itemDe("crossrules")?.label === "Regras Transversais", "D8: Regras Transversais em Workflow")
 ok(grupoDe("imtemplates") === "grp_workflow", "D8: Modelos de Variações da Fase em Workflow → Biblioteca de Modelos")
 ok(grupoDe("prottypes") === "grp_documentos" && itemDe("prottypes")?.status === "active" && itemDe("prottypes")?.label === "Tipos de Protocolo", "D9: 'Tipos de Protocolo' ATIVO em Documentos e Protocolos")
@@ -89,14 +85,11 @@ const curtos: Array<[string, string, string]> = [
   ["grp_visao", "Painel", "Visão Geral"],
   ["grp_documentos", "Documentos", "Documentos e Protocolos"],
   ["grp_pessoas", "Pessoas", "Pessoas e Organizações"],
-  ["grp_biblioteca", "Biblioteca", "Biblioteca Operacional"],
   ["grp_relatorios", "Relatórios", "Relatórios e Indicadores"],
   ["grp_usuarios", "Usuários", "Usuários e Acessos"],
-  ["grp_governanca", "Sistema", "Governança e Sistema"],
-  ["grp_motor", "Motor", "Motor Técnico"],
 ]
 ok(curtos.every(([k, short, full]) => gLabel(k)?.label === short && gLabel(k)?.fullLabel === full), "labels curtos aplicados com fullLabel completo")
-ok(["grp_processos", "grp_workflow", "grp_financeiro", "grp_comunicacao", "grp_integracoes"].every((k) => !gLabel(k)?.fullLabel), "grupos mantidos ficaram com label inalterado")
+ok(["grp_processos", "grp_workflow", "grp_financeiro"].every((k) => !gLabel(k)?.fullLabel), "grupos mantidos ficaram com label inalterado")
 // só os grupos que RENDERIZAM (têm ≥1 item active) — Agenda/IA ficam ocultos e não aparecem
 const gruposVisiveis = MANAGEMENT_NAVIGATION.filter((g) => (g.children ?? []).some((c) => c.status === "active"))
 ok(gruposVisiveis.every((g) => g.label.length <= 12), "labels de grupo VISÍVEIS curtos (sem risco de ellipsis)")
@@ -163,6 +156,19 @@ ok(docsAtivos.indexOf("Tipos de Protocolo") === docsAtivos.indexOf("Regras Docum
 ok(!(MANAGEMENT_NAVIGATION.find((g) => g.key === "grp_workflow")?.children ?? []).some((c) => c.key === "prottypes"), "prottypes REMOVIDO do Workflow (nem oculto)")
 // sem duplicação: prottypes aparece só uma vez em toda a navegação
 ok(todosItens.filter((i) => i.key === "prottypes").length === 1, "prottypes sem duplicação no menu (1 ocorrência)")
+
+// 15) ESCOPO DEFINITIVO — só 8 módulos visíveis; 7 grupos removidos (16/07)
+console.log("\nEscopo definitivo — 8 módulos:")
+for (const k of ["grp_comunicacao", "grp_integracoes", "grp_governanca", "grp_motor", "grp_biblioteca", "grp_agenda", "grp_ia"]) {
+  ok(!MANAGEMENT_NAVIGATION.some((g) => g.key === k), `módulo ${k} REMOVIDO da navegação (não existe mais)`)
+}
+// árvore VISÍVEL = mesma lógica do page.tsx (!hiddenAsModule + tem item ativo)
+const visiveis = MANAGEMENT_NAVIGATION
+  .filter((g) => !g.hiddenAsModule && (g.children ?? []).some((c) => c.status === "active"))
+  .sort((a, b) => a.order - b.order)
+  .map((g) => g.key)
+const ESPERADO_8 = ["grp_processos", "grp_workflow", "grp_documentos", "grp_servicos", "grp_financeiro", "grp_pessoas", "grp_relatorios", "grp_usuarios"]
+ok(JSON.stringify(visiveis) === JSON.stringify(ESPERADO_8), `árvore visível = exatamente os 8 módulos aprovados, na ordem (got: ${visiveis.join(", ")})`)
 
 console.log(`\n${passed} passaram, ${failed} falharam`)
 if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }

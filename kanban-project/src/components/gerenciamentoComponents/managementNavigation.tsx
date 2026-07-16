@@ -26,8 +26,7 @@
 import type { ComponentType } from "react"
 import {
   LayoutDashboard, GitBranch, Workflow, FileText, DollarSign, Users2,
-  Library, MessageSquare, CalendarClock, Brain, BarChart3, Plug,
-  ShieldCheck, Cpu, Briefcase,
+  BarChart3, Briefcase,
 } from "lucide-react"
 
 export type NavStatus = "active" | "coming_soon" | "hidden"
@@ -218,71 +217,11 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       h(100, "tipos_relacionamento", "Tipos de Relacionamento"),
     ],
   },
-  {
-    key: "grp_biblioteca", label: "Biblioteca", fullLabel: "Biblioteca Operacional", icon: Library, order: 70, status: "active",
-    description: "Modelos, SLAs e templates operacionais.",
-    children: [
-      // Modelos de Regras Transversais (crosstpl) e Modelos de Variações da Fase
-      // (imtemplates) migraram para Workflow → Biblioteca de Modelos.
-      a(30, "templates", "Templates Diversos", ["template", "modelo"], "Modelos"),
-      a(20, "sla", "SLAs", ["sla", "prazo", "acordo"], "Prazos"),
-      h(40, "bib_prioridades", "Prioridades"),
-      h(50, "bib_prazos", "Prazos"),
-      h(60, "bib_followups", "Follow-ups"),
-      h(70, "bib_tipos_evento", "Tipos de Evento"),
-      h(80, "bib_estrategias", "Estratégias de Responsável"),
-      h(90, "bib_filas", "Filas e Distribuição"),
-      h(100, "bib_motivos", "Motivos Padronizados"),
-      h(110, "bib_tags", "Tags Operacionais"),
-    ],
-  },
-  // MÓDULO "Automações" REMOVIDO: todo o seu conteúdo migrou para o Workflow
-  // (Automações por Fase, Regras Transversais, Simulação, Histórico de Execuções,
-  // Biblioteca de Modelos). "phasemap" virou "Regras Financeiras por Fase" no
-  // Financeiro. "finauto" (scaffold vazio) foi descartado. Filas/outbox/executor/
-  // retentativas/diagnósticos ficam no Motor Técnico (grp_motor), restrito.
-  {
-    key: "grp_comunicacao", label: "Comunicação", icon: MessageSquare, order: 90, status: "active",
-    description: "Notificações e canais de comunicação.",
-    children: [
-      a(10, "notifications", "Notificações", ["notificacao", "aviso", "email", "whatsapp"], "Canais"),
-      h(20, "com_emails", "E-mails"),
-      h(30, "com_whatsapp", "WhatsApp e Mensagens"),
-      h(40, "com_sms", "SMS"),
-      h(50, "mod_email", "Modelos de E-mail"),
-      h(60, "mod_mensagem", "Modelos de Mensagem"),
-      h(70, "com_assinaturas", "Assinaturas"),
-      h(80, "com_regras", "Regras de Comunicação"),
-    ],
-  },
-  {
-    key: "grp_agenda", label: "Agenda e Prazos", icon: CalendarClock, order: 100, status: "active",
-    description: "Calendários, feriados e regras de prazo.",
-    children: [
-      // Tipos de Evento tem dono canônico na Biblioteca Operacional (não duplicar).
-      h(10, "agenda_calendarios", "Calendários"),
-      h(20, "agenda_feriados", "Feriados"),
-      h(30, "agenda_horarios", "Horários Úteis"),
-      h(40, "agenda_lembretes", "Lembretes"),
-      h(50, "agenda_regras_prazo", "Regras de Prazo"),
-      h(60, "agenda_escalonamentos", "Escalonamentos"),
-      h(70, "agenda_disponibilidade", "Disponibilidade"),
-    ],
-  },
-  {
-    key: "grp_ia", label: "Inteligência Artificial", icon: Brain, order: 110, status: "active",
-    description: "Prompts, OCR e regras de revisão humana.",
-    children: [
-      h(10, "ia_config", "Configurações Gerais"),
-      h(20, "ia_prompts", "Prompts"),
-      h(30, "ia_ocr", "OCR"),
-      h(40, "ia_extracao", "Extração de Dados"),
-      h(50, "ia_classificacao", "Classificação"),
-      h(60, "ia_analise", "Análise Documental"),
-      h(70, "ia_revisao", "Regras de Revisão Humana"),
-      h(80, "ia_modelos", "Modelos e Provedores"),
-    ],
-  },
+  // ESCOPO DEFINITIVO (16/07): módulos "Comunicação", "Integrações", "Governança e
+  // Sistema", "Motor Técnico" e "Biblioteca Operacional" foram REMOVIDOS da navegação
+  // (serão redesenhados em outra etapa). As telas permanecem apenas tecnicamente
+  // acessíveis por ?screen=<key> (mantidas no mapa screen→component em page.tsx),
+  // sem exposição na navegação comum. Grupos vazios "Agenda" e "IA" também removidos.
   {
     key: "grp_relatorios", label: "Relatórios", fullLabel: "Relatórios e Indicadores", icon: BarChart3, order: 120, status: "active",
     description: "Diagnósticos e indicadores executivos.",
@@ -295,21 +234,6 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       h(60, "rel_relatorios", "Relatórios"),
       h(70, "rel_exportacoes", "Exportações"),
       h(80, "rel_agendados", "Relatórios Agendados"),
-    ],
-  },
-  {
-    key: "grp_integracoes", label: "Integrações", icon: Plug, order: 130, status: "active",
-    description: "Importações, exportações e serviços externos.",
-    children: [
-      a(10, "impexp", "Importações e Exportações", ["importacao", "exportacao", "csv", "excel"], "Dados"),
-      h(20, "integ_painel", "Painel de Integrações"),
-      h(30, "integ_apis", "APIs"),
-      h(40, "integ_webhooks", "Webhooks"),
-      h(50, "integ_armazenamento", "Armazenamento"),
-      h(60, "integ_assinatura", "Assinatura Digital"),
-      h(70, "integ_ocr", "OCR e Extração"),
-      h(80, "integ_externos", "Serviços Externos"),
-      h(90, "integ_monitoramento", "Monitoramento"),
     ],
   },
   {
@@ -328,43 +252,6 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       h(90, "acc_filas", "Filas"),
       h(100, "acc_delegacoes", "Delegações"),
       h(110, "acc_alcadas", "Alçadas"),
-    ],
-  },
-  {
-    key: "grp_governanca", label: "Sistema", fullLabel: "Governança e Sistema", icon: ShieldCheck, order: 150, status: "active",
-    description: "Configurações gerais, auditoria, saúde e backup.",
-    children: [
-      a(10, "settings", "Configurações Gerais", ["config", "configuracao", "sistema", "geral"], "Configuração"),
-      a(20, "audit", "Auditoria Geral", ["auditoria", "log", "historico"], "Operação"),
-      a(30, "syshealth", "Saúde do Sistema", ["saude", "saúde", "sistema", "health", "log"], "Operação"),
-      a(40, "backup", "Backup", ["backup", "restauracao"], "Operação"),
-      h(50, "gov_aprovacoes", "Aprovações"),
-      h(60, "gov_politicas_aprov", "Políticas de Aprovação"),
-      h(70, "gov_versionamento", "Versionamento"),
-      h(80, "gov_publicacoes", "Publicações"),
-      h(90, "gov_overrides", "Overrides e Exceções"),
-      h(100, "adm_featureflags", "Feature Flags"),
-      h(110, "gov_migracao", "Migração do Legado"),
-    ],
-  },
-  {
-    key: "grp_motor", label: "Motor", fullLabel: "Motor Técnico", icon: Cpu, order: 160, status: "active",
-    technicalOnly: true, permission: GESTAO_PERMISSION,
-    description: "Diagnóstico técnico do motor e do runtime.",
-    children: [
-      { key: "execmotor", label: "Visão Geral do Motor", keywords: ["motor", "executor", "tecnico"], section: "Diagnóstico", status: "active", technicalOnly: true, order: 10 },
-      { key: "runtimediag", label: "Diagnóstico do Runtime", keywords: ["runtime", "diagnostico", "diagnóstico", "v2", "readiness", "gate", "workflow"], section: "Diagnóstico", status: "active", technicalOnly: true, order: 15 },
-      h(20, "mt_eventos", "Eventos"),
-      h(30, "mt_execucoes", "Execuções"),
-      h(40, "mt_efeitos", "Efeitos Executados"),
-      h(50, "mt_outbox", "Outbox"),
-      h(60, "mt_idempotencia", "Idempotência"),
-      h(70, "mt_conflitos", "Conflitos"),
-      h(80, "mt_retry", "Retry"),
-      h(90, "mt_deadletter", "Dead Letter"),
-      h(100, "mt_reconciliacao", "Reconciliação"),
-      h(110, "mt_logs", "Logs Técnicos"),
-      h(120, "mt_metricas", "Métricas"),
     ],
   },
 ]
