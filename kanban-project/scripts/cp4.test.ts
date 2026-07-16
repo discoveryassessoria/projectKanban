@@ -54,7 +54,9 @@ async function run() {
   for (const m of ["PhaseWorkflowInstance", "PhaseWorkflowStepInstance", "WorkflowEvento", "DomainOutbox"]) {
     ok(new RegExp(`model ${m} \\{`).test(schema), `schema tem model ${m}`)
   }
-  ok(/workflowRuntime\s+String\s+@default\("legacy"\)/.test(schema), "Processo.workflowRuntime default \"legacy\"")
+  // Criação V2-nativa: todo processo NOVO nasce "v2" (default trocado de "legacy").
+  // O kill switch (resolveWorkflowRuntime) segue gatekeeper — ver casos acima.
+  ok(/workflowRuntime\s+String\s+@default\("v2"\)/.test(schema), "Processo.workflowRuntime default \"v2\" (criação V2-nativa)")
   ok(/runtimeV2Habilitado\s+Boolean\s+@default\(false\)/.test(schema), "MotorConfig.runtimeV2Habilitado default false (kill switch)")
   ok((schema.match(/versao\s+Int\s+@default\(1\)/g) || []).length >= 4, "versionamento com default 1 (>=4 definições)")
   ok((schema.match(/chaveIdempotencia\s+String\s+@unique/g) || []).length >= 3, "chaveIdempotencia @unique (instância/passo/tarefa)")
