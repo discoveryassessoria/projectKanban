@@ -31,6 +31,7 @@ import {
 import dynamic from "next/dynamic"
 import {
   MANAGEMENT_NAVIGATION,
+  toggleAccordion,
   type ManagementNavigationItem,
 } from "@/src/components/gerenciamentoComponents/managementNavigation"
 
@@ -305,6 +306,24 @@ export default function GerenciamentoPage() {
     return g ? primeiraTelaDoModulo(g, pode) ?? null : null
   }, [pode])
 
+  // Entrada SEM ?screen=: abre a ÚLTIMA tela usada (se ainda válida/permitida) ou a
+  // 1ª tela permitida do 1º módulo visível. Nunca renderiza home de cards.
+  const telaInicialPadrao = useCallback((): string | null => {
+    if (typeof window !== "undefined") {
+      const last = localStorage.getItem("gerenciamento:lastScreen")
+      if (last && TELAS[last]) {
+        const g = grupoDaKey(last)
+        if (g && !g.hiddenAsModule && (!g.permission || pode(g.permission))) return last
+      }
+    }
+    for (const g of MANAGEMENT_NAVIGATION) {
+      if (g.hiddenAsModule || (g.permission && !pode(g.permission))) continue
+      const first = primeiraTelaDoModulo(g, pode)
+      if (first) return first
+    }
+    return null
+  }, [pode])
+
   // lê a view atual a partir da URL (deep-link ?screen= ; ?module= legado → 1ª tela)
   const sincronizarDaURL = useCallback(() => {
     if (typeof window === "undefined") return
@@ -328,9 +347,18 @@ export default function GerenciamentoPage() {
         setView("home"); setActiveModule(null); setActiveScreen(null)
       }
     } else {
-      setView("home"); setActiveModule(null); setActiveScreen(null)
+      // SEM tela na URL → entra direto na última/1ª tela (nunca home de cards).
+      const alvo = telaInicialPadrao()
+      if (alvo) {
+        const g = grupoDaKey(alvo)
+        const url = new URL(window.location.href); url.searchParams.set("screen", alvo)
+        window.history.replaceState({}, "", url.toString())
+        setActiveScreen(alvo); setActiveModule(g?.key ?? null); setExpandedModule(g?.key ?? null); setView("screen")
+      } else {
+        setView("home"); setActiveModule(null); setActiveScreen(null)
+      }
     }
-  }, [pode, resolverTela])
+  }, [pode, resolverTela, telaInicialPadrao])
 
   // navegação: atualiza URL (pushState → botão voltar do browser funciona) + estado
   const pushURL = (params: { screen?: string }) => {
@@ -341,7 +369,10 @@ export default function GerenciamentoPage() {
     window.history.pushState({}, "", url.toString())
   }
 
+  // "Gerenciamento" (raiz do breadcrumb) → 1ª/última tela útil, nunca home de cards.
   const irParaHome = () => {
+    const alvo = telaInicialPadrao()
+    if (alvo) { irParaTela(alvo); return }
     pushURL({}); setView("home"); setActiveModule(null); setActiveScreen(null); setBusca(""); setMobileNav(false)
   }
   // clique no TÍTULO do módulo (árvore ou card da home): abre a 1ª tela útil + expande.
@@ -355,12 +386,13 @@ export default function GerenciamentoPage() {
     const k = resolverTela(key)
     const g = grupoDaKey(k)
     pushURL({ screen: k })
+    if (typeof window !== "undefined") localStorage.setItem("gerenciamento:lastScreen", k)
     setActiveScreen(k); setActiveModule(g?.key ?? null); setExpandedModule(g?.key ?? null)
     setView("screen"); setBusca(""); setMobileNav(false)
   }
   // árvore: expandir/recolher um módulo SEM navegar (peek). Accordion — 1 por vez.
   const toggleModulo = (gkey: string) => {
-    setExpandedModule((prev) => (prev === gkey ? null : gkey))
+    setExpandedModule((prev) => toggleAccordion(prev, gkey))
   }
 
   const handleLogout = () => {
@@ -642,13 +674,7 @@ export default function GerenciamentoPage() {
                               }`}
                             >
                               <button
-                                onClick={() => {
-                                  // acordeão: aberto → recolhe; fechado-mas-ativo → só expande
-                                  // (sem re-navegar); outro módulo → abre + vai à 1ª tela útil.
-                                  if (moduloAberto) toggleModulo(g.key)
-                                  else if (moduloEhAtivo) setExpandedModule(g.key)
-                                  else irParaModulo(g.key)
-                                }}
+                                onClick={() => toggleModulo(g.key)}
                                 aria-current={moduloEhAtivo ? "true" : undefined}
                                 aria-expanded={moduloAberto}
                                 aria-controls={painelId}

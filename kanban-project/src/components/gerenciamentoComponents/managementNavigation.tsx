@@ -60,6 +60,12 @@ export interface ManagementNavigationItem {
 // Nenhuma permissão nova; nenhum papel/auth/backend alterado.
 export const GESTAO_PERMISSION = "usuarios.gerenciar"
 
+// Accordion da sidebar (regra ÚNICA): 1 grupo aberto por vez, clicar no grupo
+// aberto fecha, clicar em outro troca, todos podem ficar fechados. Puro/testável.
+//   clicar em grupo fechado → abre; clicar no mesmo aberto → fecha; outro → troca.
+export const toggleAccordion = (current: string | null, clicked: string): string | null =>
+  current === clicked ? null : clicked
+
 // item ATIVO: a(order, key, label, keywords?, section?)
 const a = (
   order: number, key: string, label: string, keywords?: string[], section?: string,
