@@ -87,6 +87,13 @@ export interface FaseOrdenada {
   ordem: number
 }
 
+/** Primeira fase pela ORDEM do Workflow Macro (menor ordem), nunca por label/nome.
+ *  Regra estrutural de fase inicial usada na criação V2-nativa do processo. */
+export function primeiraFasePorOrdem(fases: FaseOrdenada[]): string | null {
+  if (fases.length === 0) return null
+  return [...fases].sort((a, b) => a.ordem - b.ordem)[0].phaseKey
+}
+
 /** Próxima fase pela ORDEM do Workflow Macro (definição), não por label. */
 export function proximaFasePorOrdem(fases: FaseOrdenada[], faseAtualKey: string): string | null {
   const ord = [...fases].sort((a, b) => a.ordem - b.ordem)
@@ -139,6 +146,9 @@ export interface EventoFasePayloadInput {
   correlationId: string
   /** ISO string — injetado pelo motor (mantém o helper puro/determinístico). */
   occurredAt: string
+  /** Override do motivo da transição no payload. Default = operacao. A criação
+   *  V2-nativa usa "initial_phase" (nascimento do processo na 1ª fase). */
+  transitionReason?: string
 }
 
 export interface EventoCanonico {
@@ -169,7 +179,7 @@ export function montarEventoEntered(i: EventoFasePayloadInput): EventoCanonico {
       occurredAt: i.occurredAt,
       source: i.origem,
       requestedBy: i.solicitadoPorId ?? null,
-      transitionReason: i.operacao,
+      transitionReason: i.transitionReason ?? i.operacao,
       correlationId: i.correlationId,
     },
   }

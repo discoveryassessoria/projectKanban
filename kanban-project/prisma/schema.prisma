@@ -323,10 +323,15 @@ model Processo {
   // CP-3 — necessidades documentais do processo
   necessidades NecessidadeDocumental[]
 
-  // CP-4A — feature flag por processo (default "legacy"; v2 nunca automático)
-  // + instâncias do runtime de workflow v2.
-  workflowRuntime        String                  @default("legacy") @db.VarChar(20)
+  // Runtime de workflow do processo. CUTOVER V2 CONCLUÍDO: todo processo NOVO
+  // nasce "v2" (default). O campo permanece só para leitura técnica/histórica;
+  // a UI comum não cria processo legado e a API rejeita "legacy" vindo da interface.
+  workflowRuntime        String                  @default("v2") @db.VarChar(20)
   lockVersion            Int                     @default(0) // CP-4F — CAS na mudança de fase (v2)
+  // Criação V2-nativa: idempotência (evita processo duplicado em duplo clique/retry)
+  // e snapshot imutável da versão do Workflow Macro aplicada no nascimento.
+  chaveIdempotenciaCriacao String?               @unique @db.VarChar(200)
+  macroWorkflowVersion     Int?
   phaseWorkflowInstances PhaseWorkflowInstance[]
 
   tipoProcessoMotorId Int?

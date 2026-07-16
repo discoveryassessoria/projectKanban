@@ -117,20 +117,24 @@ export async function instanciarWorkflowDaFase(
     success: false, code, errors, correlationId,
   })
 
+  // Leituras via txExterno quando fornecido: permite compor DENTRO de uma transação
+  // já aberta e enxergar o Processo recém-criado (criação V2-nativa) ou recém-mudado.
+  const db = txExterno ?? prisma
+
   // 1) runtime + feature flag (só escreve com v2 permitido)
-  const processo = await prisma.processo.findUnique({
+  const processo = await db.processo.findUnique({
     where: { id: input.processoId },
     select: { id: true, workflowRuntime: true, tipoProcessoMotorId: true },
   })
   if (!processo) return fail("CONFIGURACAO_INVALIDA", [{ code: "PROCESSO_NAO_ENCONTRADO", message: "Processo inexistente" }])
 
-  const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 }, select: { runtimeV2Habilitado: true } })
+  const cfg = await db.motorConfig.findUnique({ where: { id: 1 }, select: { runtimeV2Habilitado: true } })
   const runtime = resolveWorkflowRuntime(processo.workflowRuntime, cfg?.runtimeV2Habilitado ?? false)
   if (!(cfg?.runtimeV2Habilitado ?? false)) return fail("RUNTIME_V2_DESABILITADO")
   if (runtime !== "v2") return fail("PROCESSO_LEGACY")
 
   // 2) fase macro (identidade estável + versão)
-  const fase = await prisma.faseMacro.findFirst({
+  const fase = await db.faseMacro.findFirst({
     where: { phaseKey: input.faseMacroKey, macroWorkflow: { tipoProcessoId: processo.tipoProcessoMotorId ?? -1 } },
     select: { id: true, versao: true, macroWorkflow: { select: { id: true, versao: true } } },
   })

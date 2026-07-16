@@ -8,10 +8,10 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { logProcesso } from "@/lib/auditoria"
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
-import { executarMotorNaFase } from '@/src/lib/motor/executor'
+import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { garantirFamiliaParaProcesso } from '@/src/services/familia'
+import { criarProcessoV2 } from '@/src/services/criar-processo'
+import { processarOutbox } from '@/src/services/outbox-dispatcher'
 
 // GET - Buscar processos (filtrado por país, requerente ou contratante)
 export async function GET(request: Request) {
@@ -108,135 +108,86 @@ export async function POST(request: Request) {
     const erro = await verificarPermissao(request, 'processos.criar')
     if (erro) return erro
 
-    const body = await request.json()
-    const {
-      nome,
-      descricao,
-      observacoes,
-      pais,
-      contratanteIds,
-      arvoreId,
-      previsaoTermino,
-      requerenteIds,
-      tipoProcessoMotorId,
-    } = body
+    const usuario = await extrairUsuarioComPermissoes(request)
+    const body = await request.json().catch(() => ({}))
 
-    if (!nome) {
+    // Idempotência da criação: header (preferido) ou body. Mesma chave ⇒ mesmo processo.
+    const idempotencyKey =
+      request.headers.get("idempotency-key") || body.idempotencyKey || undefined
+
+    // Toda a decisão (runtime v2, fase inicial, Workflow Interno, tarefas, evento)
+    // é do serviço de domínio. A API NÃO aceita faseAtualKey/statusId/targetPhaseKey/
+    // workflowRuntime/tarefas do cliente — apenas os dados de negócio.
+    const resultado = await criarProcessoV2({
+      nome: body.nome,
+      pais: body.pais,
+      tipoProcessoMotorId: body.tipoProcessoMotorId,
+      descricao: body.descricao ?? null,
+      observacoes: body.observacoes ?? null,
+      arvoreId: body.arvoreId ?? null,
+      previsaoTermino: body.previsaoTermino ?? null,
+      contratanteIds: body.contratanteIds,
+      requerenteIds: body.requerenteIds,
+      idempotencyKey,
+      solicitadoPorId: usuario?.userId,
+    })
+
+    if (!resultado.success) {
+      const status =
+        resultado.code === "RUNTIME_V2_DESABILITADO" ? 503 :
+        resultado.code === "INSTANCIACAO_FALHOU" ? 422 :
+        resultado.code === "SEM_MACRO_PUBLICADO" || resultado.code === "MACRO_SEM_FASE_INICIAL" || resultado.code === "SEM_WORKFLOW_INTERNO" ? 422 :
+        400
       return NextResponse.json(
-        { error: "Nome é obrigatório" },
-        { status: 400 }
+        { error: resultado.message, code: resultado.code, correlationId: resultado.correlationId },
+        { status },
       )
     }
 
-    if (!pais) {
-      return NextResponse.json(
-        { error: "País é obrigatório" },
-        { status: 400 }
-      )
-    }
+    // CP-1 — forward-fill da Família (best-effort; nunca bloqueia a criação).
+    try { await garantirFamiliaParaProcesso(resultado.processId) }
+    catch (e) { console.error("CP-1 forward-fill de família falhou (criar processo):", e) }
 
-    const paisCat = await prisma.catalogoPais.findFirst({ where: { countryKey: pais, ativo: true } })
-    if (!paisCat) return NextResponse.json({ error: "País inválido ou inativo." }, { status: 400 })
+    // Drena os efeitos do phase.entered inicial (idempotente; best-effort — as
+    // tarefas já nasceram na transação; aqui só marca o evento como processado).
+    try { await processarOutbox({ tipos: ["phase.entered"], limite: 20 }) }
+    catch (e) { console.error("Dispatcher outbox (criar processo) falhou:", e) }
 
-    if (!tipoProcessoMotorId) return NextResponse.json({ error: "Escolha o tipo de processo." }, { status: 400 })
-    const tipoMotor = await prisma.tipoProcessoNacionalidade.findUnique({ where: { id: tipoProcessoMotorId } })
-    if (!tipoMotor || tipoMotor.countryKey !== pais) {
-      return NextResponse.json({ error: "Tipo de processo inválido para este país." }, { status: 400 })
-    }
-
-    const wf = await prisma.macroWorkflow.findUnique({
-      where: { tipoProcessoId: tipoMotor.id },
-      include: { fases: { where: { showInKanban: true }, orderBy: { ordem: "asc" } } },
-    })
-    if (!wf || wf.fases.length === 0) {
-      return NextResponse.json({ error: "Este tipo ainda não tem fases. Monte o workflow em Gerenciamento → Workflows e Fases." }, { status: 400 })
-    }
-
-    const primeiraFase = wf.fases[0].phaseKey
-
-    // Criar o processo — nasce na 1ª fase do motor.
-    const processo = await prisma.processo.create({
-      data: {
-        nome,
-        descricao: descricao || null,
-        observacoes: observacoes || null,
-        pais,
-        faseAtualKey: primeiraFase,
-        arvoreId: arvoreId || null,
-        previsaoTermino: previsaoTermino ? new Date(previsaoTermino) : null,
-        tipoProcessoMotorId,   // ✅ nasce ligado ao motor
-      }
-    })
-
-    // Criar relacionamentos com contratantes se fornecidos
-    if (contratanteIds?.length > 0) {
-      await prisma.processoContratante.createMany({
-        data: contratanteIds.map((contratanteId: number) => ({
-          processoId: processo.id,
-          contratanteId
-        }))
-      })
-    }
-
-    // Criar relacionamentos com requerentes se fornecidos
-    if (requerenteIds?.length > 0) {
-      await prisma.processoRequerente.createMany({
-        data: requerenteIds.map((requerenteId: number) => ({
-          processoId: processo.id,
-          requerenteId
-        }))
-      })
-    }
-
-    // CP-1 — forward-fill: garantir a Família do processo (Regra 11).
-    // Best-effort: nunca bloqueia a criação do processo.
-    try {
-      await garantirFamiliaParaProcesso(processo.id)
-    } catch (e) {
-      console.error("CP-1 forward-fill de família falhou (criar processo):", e)
-    }
-
-    // ✅ REGISTRAR LOG
-    await logProcesso.criar(processo.nome, processo.id)
-
-    // ✅ GATILHO AUTOMÁTICO: roda as automações "ao entrar na fase" da 1ª fase
-    let motor: unknown = null
-    try {
-      const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 } })
-      if (cfg?.autoExecutarAoAvancar) {
-        motor = await executarMotorNaFase(processo.id, tipoProcessoMotorId, primeiraFase, "entered")
-      }
-    } catch (e) {
-      console.error("Gatilho automático do motor falhou (criar processo):", e)
-    }
-
-    // Buscar processo completo com relacionamentos
+    // Processo completo p/ a UI abrir direto na 1ª fase.
     const processoCompleto = await prisma.processo.findUnique({
-      where: { id: processo.id },
+      where: { id: resultado.processId },
       include: {
-        contratantes: {
-          include: {
-            contratante: true
-          }
-        },
+        contratantes: { include: { contratante: true } },
         arvore: true,
         familia: { select: { id: true, nome: true } }, // CP-1 dual-read
-        requerentes: {
-          include: {
-            requerente: true
-          }
-        }
-      }
+        requerentes: { include: { requerente: true } },
+      },
     })
 
-    // Formatar resposta
     const processoFormatado = {
       ...processoCompleto,
       contratantes: processoCompleto?.contratantes.map(c => c.contratante) || [],
-      requerentes: processoCompleto?.requerentes.map(r => r.requerente) || []
+      requerentes: processoCompleto?.requerentes.map(r => r.requerente) || [],
     }
 
-    return NextResponse.json({ processo: processoFormatado, motor }, { status: 201 })
+    return NextResponse.json(
+      {
+        processo: processoFormatado,
+        criacao: {
+          processId: resultado.processId,
+          processCode: resultado.processCode,
+          workflowRuntime: resultado.workflowRuntime,
+          currentPhaseKey: resultado.currentPhaseKey,
+          currentPhaseInstanceId: resultado.currentPhaseInstanceId,
+          workflowMacroVersionId: resultado.workflowMacroVersionId,
+          phaseEnteredEventId: resultado.phaseEnteredEventId,
+          tarefasIniciais: resultado.tarefasIniciais,
+          initializationStatus: resultado.initializationStatus,
+          idempotent: !resultado.created,
+        },
+      },
+      { status: resultado.created ? 201 : 200 },
+    )
   } catch (error) {
     console.error("Erro ao criar processo:", error)
     return NextResponse.json(
