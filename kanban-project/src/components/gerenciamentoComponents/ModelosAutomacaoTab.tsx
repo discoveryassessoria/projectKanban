@@ -36,9 +36,26 @@ const TYPE_LABELS: Record<string, string> = {
   document: 'Documento',
   event: 'Evento / Agenda',
   protocol: 'Protocolo',
-  phase_transition: 'Avanço de fase',
+  // DESCONTINUADO: avanço de fase agora é exclusivo do PhaseAdvanceService
+  // (Workflow Interno conclui + Workflow Macro define a próxima fase).
+  // Mantido apenas para rotular modelos LEGADOS já existentes na listagem.
+  phase_transition: 'Avanço de fase (legado)',
   alert: 'Alerta',
 }
+
+// Tipos de EFEITO que o usuário pode ESCOLHER ao criar/editar/duplicar um modelo.
+// NÃO inclui `phase_transition` (descontinuado — a API rejeita com 422).
+const SELECTABLE_TYPE_LABELS: Record<string, string> = {
+  task: TYPE_LABELS.task,
+  financial: TYPE_LABELS.financial,
+  document: TYPE_LABELS.document,
+  event: TYPE_LABELS.event,
+  protocol: TYPE_LABELS.protocol,
+  alert: TYPE_LABELS.alert,
+}
+
+// Modelo legado descontinuado: não pode ser editado, duplicado nem reativado/executado.
+const isLegacyType = (type: string) => type === 'phase_transition'
 
 const TRIGGER_LABELS: Record<string, string> = {
   phase_entered: 'Quando a fase iniciar',
@@ -385,8 +402,9 @@ export default function ModelosAutomacaoTab() {
         <div>
           <h2 className="text-xl font-semibold text-white">Modelos de Automação</h2>
           <p className="max-w-2xl text-sm text-white/50">
-            Biblioteca mestre de modelos de automação reutilizáveis. Cadastre aqui os modelos que depois
-            serão aplicados nas fases dos Processos de Nacionalidade.
+            Biblioteca mestre de modelos de automação reutilizáveis. Os modelos descrevem apenas EFEITOS
+            que reagem a eventos da fase (criar tarefas, gerar documentos, lançar financeiro, alertas etc.).
+            Eles NÃO avançam fase: a conclusão é do Workflow Interno e a próxima fase é definida pelo Workflow Macro.
           </p>
         </div>
         <button
@@ -474,6 +492,7 @@ export default function ModelosAutomacaoTab() {
             <tbody>
               {filtrados.map((m) => {
                 const podeExcluir = (m.usedByCount || 0) === 0
+                const legado = isLegacyType(m.type)
                 const phs = (m.recommendedPhases || []).map(faseLabel).join(', ') || (m.category ? faseLabel(m.category) : '—')
                 return (
                   <tr key={m.id} className="border-b border-white/5 align-top last:border-0 hover:bg-white/[0.03]">
@@ -482,6 +501,14 @@ export default function ModelosAutomacaoTab() {
                         <span className="font-medium text-white">{m.name}</span>
                         {m.isSystemTemplate && (
                           <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/60">padrão</span>
+                        )}
+                        {legado && (
+                          <span
+                            title="Tipo descontinuado. O avanço de fase é feito pelo Workflow Interno + Workflow Macro. Este modelo não é executado."
+                            className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300"
+                          >
+                            Legado — não executa
+                          </span>
                         )}
                       </div>
                       {m.description && <div className="text-[11px] text-white/40">{m.description}</div>}
@@ -503,13 +530,13 @@ export default function ModelosAutomacaoTab() {
                     <td className="px-4 py-2.5">
                       <div className="flex flex-col items-end gap-1">
                         <div className="flex items-center gap-1">
-                          <button onClick={() => abrirEditar(m)} title="Editar" aria-label="Editar" className="rounded-md border border-white/10 p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white"><IcoEdit /></button>
-                          <button onClick={() => duplicar(m)} title="Duplicar" aria-label="Duplicar" className="rounded-md border border-white/10 p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white"><IcoCopy /></button>
+                          <button onClick={() => abrirEditar(m)} disabled={legado} title={legado ? 'Modelo legado descontinuado: não pode ser editado.' : 'Editar'} aria-label="Editar" className="rounded-md border border-white/10 p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-white/60"><IcoEdit /></button>
+                          <button onClick={() => duplicar(m)} disabled={legado} title={legado ? 'Modelo legado descontinuado: não pode ser duplicado.' : 'Duplicar'} aria-label="Duplicar" className="rounded-md border border-white/10 p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-white/60"><IcoCopy /></button>
                           <button onClick={aplicarEmFase} title="Aplicar em fase (disponível na Fase 3)" aria-label="Aplicar em fase" className="rounded-md border border-white/10 p-1.5 text-white/35 transition hover:bg-white/10 hover:text-white/60"><IcoApply /></button>
                         </div>
                         <div className="flex items-center gap-1">
                           {m.arquivado ? (
-                            <button onClick={() => alternarArquivo(m)} title="Reativar" aria-label="Reativar" className="rounded-md border border-white/10 p-1.5 text-green-300/70 transition hover:bg-white/10 hover:text-green-200"><IcoRestore /></button>
+                            <button onClick={() => alternarArquivo(m)} disabled={legado} title={legado ? 'Modelo legado descontinuado: não pode ser reativado.' : 'Reativar'} aria-label="Reativar" className="rounded-md border border-white/10 p-1.5 text-green-300/70 transition hover:bg-white/10 hover:text-green-200 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-green-300/70"><IcoRestore /></button>
                           ) : (
                             <button onClick={() => alternarArquivo(m)} title="Arquivar" aria-label="Arquivar" className="rounded-md border border-white/10 p-1.5 text-amber-300/70 transition hover:bg-white/10 hover:text-amber-200"><IcoArchive /></button>
                           )}
@@ -561,7 +588,7 @@ export default function ModelosAutomacaoTab() {
                 <div>
                   <label className={labelCls}>Tipo do modelo</label>
                   <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))} className={inputCls}>
-                    {Object.entries(TYPE_LABELS).map(([k, v]) => (
+                    {Object.entries(SELECTABLE_TYPE_LABELS).map(([k, v]) => (
                       <option key={k} value={k} className="bg-zinc-900">{v}</option>
                     ))}
                   </select>

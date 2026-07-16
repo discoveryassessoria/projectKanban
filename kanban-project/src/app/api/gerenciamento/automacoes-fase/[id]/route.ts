@@ -16,6 +16,23 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const atual = await prisma.phaseAutomationRule.findUnique({ where: { id } })
     if (!atual) return NextResponse.json({ error: 'Automação não encontrada.' }, { status: 404 })
 
+    // CONSOLIDAÇÃO DO AVANÇO DE FASE — automação não avança fase.
+    // (1) não pode mudar o kind para phase_advance/phase_transition;
+    // (2) regra legada kind=phase_advance é somente-leitura/arquivável: só
+    //     permitimos arquivar/desativar, nunca reativar como executável.
+    const MSG = 'Automações não avançam fase. O avanço é exclusivo do PhaseAdvanceService (Workflow Interno + Workflow Macro). Regras legadas de avanço permanecem apenas para histórico.'
+    const novoKind = body.kind !== undefined ? String(body.kind) : atual.kind
+    if (novoKind === 'phase_advance' || novoKind === 'phase_transition') {
+      return NextResponse.json({ error: MSG, code: 'PHASE_ADVANCE_PROIBIDO' }, { status: 422 })
+    }
+    if (atual.kind === 'phase_advance') {
+      // Só se permite arquivar/desativar uma regra legada de avanço.
+      const querReativar = body.active === true || body.arquivado === false
+      if (querReativar) {
+        return NextResponse.json({ error: MSG, code: 'PHASE_ADVANCE_LEGADO' }, { status: 422 })
+      }
+    }
+
     const data: Prisma.PhaseAutomationRuleUpdateInput = {}
     if (body.name !== undefined) data.name = String(body.name)
     if (body.description !== undefined) data.description = body.description ? String(body.description) : null

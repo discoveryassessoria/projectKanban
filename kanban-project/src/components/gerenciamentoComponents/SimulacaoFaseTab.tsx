@@ -21,7 +21,9 @@ const EVENT_LABELS: Record<string, string> = {
   entered: "Ao entrar na fase", completed: "Ao concluir a fase", reopened: "Ao reabrir a fase", blocked: "Ao bloquear a fase",
 }
 const KIND_LABELS: Record<string, string> = {
-  task: "Tarefa", document: "Documento", event: "Evento / Agenda", protocol: "Protocolo", phase_advance: "Avanço de fase", alert: "Alerta",
+  // "phase_advance" é LEGADO: avanço de fase não é mais um tipo de automação (o avanço é
+  // exclusivo do PhaseAdvanceService). Mantido só como rótulo de leitura para dados antigos.
+  task: "Tarefa", document: "Documento", event: "Evento / Agenda", protocol: "Protocolo", phase_advance: "Avanço de fase (legado)", alert: "Alerta",
 }
 
 function authHeaders(): HeadersInit {

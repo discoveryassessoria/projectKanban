@@ -155,12 +155,12 @@ export async function iniciarOperacaoDocumentoV2(documentoId: number, opts: Inic
   if (await temOperacaoV2(documentoId)) return { ok: false, error: "Operação já existe para este documento", status: 409 }
   const doc = await prisma.documento.findUnique({
     where: { id: documentoId },
-    select: { pessoa: { select: { arvore: { select: { processos: { select: { id: true, faseAtualKey: true, status: { select: { faseCode: true } } } } } } } } },
+    select: { pessoa: { select: { arvore: { select: { processos: { select: { id: true, faseAtualKey: true } } } } } } },
   })
   const processos = doc?.pessoa?.arvore?.processos ?? []
   if (processos.length === 0) return { ok: false, error: "Documento não está ligado a nenhum processo", status: 422 }
   const processo = processos[0]
-  const faseCode = (phaseKeyToFaseCode(processo.faseAtualKey) ?? processo.status?.faseCode ?? null) as FaseCode | null
+  const faseCode = (phaseKeyToFaseCode(processo.faseAtualKey) ?? null) as FaseCode | null
   if (!faseCode) return { ok: false, error: "Processo sem fase definida", status: 422 }
   if (!isFaseReady(faseCode)) return { ok: false, error: `A fase "${faseCode}" não tem etapas no catálogo`, status: 422 }
   const faseMacroKey = faseCodeToPhaseKey(faseCode) as string

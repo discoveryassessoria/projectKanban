@@ -46,20 +46,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       // upsert cada uma na ordem recebida (entryRule derivado da posição)
       for (let i = 0; i < incoming.length; i++) {
         const f = incoming[i]
+        // CONSOLIDAÇÃO DO AVANÇO DE FASE — o Workflow Macro define APENAS a
+        // sequência (ordem/entryRule estrutural). exitRule foi descontinuada como
+        // condição de conclusão (isso é do Workflow Interno + BlockingEngine):
+        // não gravamos novos valores. A coluna permanece só p/ leitura de legado
+        // (o update não a toca; a criação nasce sem exitRule).
         const dados = {
           label: String(f.label || f.phaseKey),
           ordem: i + 1,
           required: f.required !== false,
           conditional: !!f.conditional,
           entryRule: i === 0 ? 'process_created' : 'previous_phase_completed',
-          exitRule: f.exitRule ? String(f.exitRule) : null,
           slaDays: Number.isFinite(Number(f.slaDays)) ? Math.trunc(Number(f.slaDays)) : 30,
           showInKanban: f.showInKanban !== false,
         }
         await tx.faseMacro.upsert({
           where: { macroWorkflowId_phaseKey: { macroWorkflowId: mw.id, phaseKey: String(f.phaseKey) } },
           update: dados,
-          create: { macroWorkflowId: mw.id, phaseKey: String(f.phaseKey), ...dados },
+          create: { macroWorkflowId: mw.id, phaseKey: String(f.phaseKey), exitRule: null, ...dados },
         })
       }
     })

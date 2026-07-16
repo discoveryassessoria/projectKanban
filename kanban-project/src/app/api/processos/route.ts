@@ -55,7 +55,6 @@ export async function GET(request: Request) {
     const processos = await prisma.processo.findMany({
       where,
       include: {
-        status: true,
         contratantes: {
           include: {
             contratante: true
@@ -114,7 +113,6 @@ export async function POST(request: Request) {
       nome,
       descricao,
       observacoes,
-      statusId,
       pais,
       contratanteIds,
       arvoreId,
@@ -157,7 +155,6 @@ export async function POST(request: Request) {
     const primeiraFase = wf.fases[0].phaseKey
 
     // Criar o processo — nasce na 1ª fase do motor.
-    // statusId legado só é salvo se alguma tela antiga ainda mandar (opcional).
     const processo = await prisma.processo.create({
       data: {
         nome,
@@ -165,7 +162,6 @@ export async function POST(request: Request) {
         observacoes: observacoes || null,
         pais,
         faseAtualKey: primeiraFase,
-        statusId: statusId ?? null,
         arvoreId: arvoreId || null,
         previsaoTermino: previsaoTermino ? new Date(previsaoTermino) : null,
         tipoProcessoMotorId,   // ✅ nasce ligado ao motor
@@ -218,7 +214,6 @@ export async function POST(request: Request) {
     const processoCompleto = await prisma.processo.findUnique({
       where: { id: processo.id },
       include: {
-        status: true,
         contratantes: {
           include: {
             contratante: true

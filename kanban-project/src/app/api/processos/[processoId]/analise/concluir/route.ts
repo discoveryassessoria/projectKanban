@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { moverStatusIdLegacy } from "@/src/lib/motor/runtime-guard"
 import type { FaseCode } from "@prisma/client"
 import { dispararMotorNaFaseAtual } from "@/src/lib/motor/executor"
 
@@ -43,17 +42,6 @@ export async function POST(
     const decisaoJuridica = comRetificacao ? "com_retificacao" : "sem_retificacao"
     const proximaFase: FaseCode = comRetificacao ? "RETIFICACAO_REGISTROS" : "TRADUCAO_JURAMENTADA"
 
-    const colunaDestino = await prisma.status.findFirst({
-      where: { pais: processo.pais, faseCode: proximaFase },
-      select: { id: true },
-    })
-    if (!colunaDestino) {
-      return NextResponse.json(
-        { error: `Não há coluna para ${proximaFase} no país ${processo.pais}.` },
-        { status: 422 }
-      )
-    }
-
     const now = new Date()
     await prisma.$transaction(async (tx) => {
       await tx.analiseDocumental.update({
@@ -63,7 +51,6 @@ export async function POST(
           decisaoJuridica, requerRetificacao: comRetificacao, completedAt: now,
         },
       })
-      await moverStatusIdLegacy(tx, id, colunaDestino.id)
     }, { timeout: 30000, maxWait: 10000 })
 
     // MOTOR — a fase avançou; dispara o motor (best-effort)

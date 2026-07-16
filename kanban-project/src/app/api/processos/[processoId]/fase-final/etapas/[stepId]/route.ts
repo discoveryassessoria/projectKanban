@@ -8,8 +8,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { moverStatusIdLegacy } from "@/src/lib/motor/runtime-guard"
-import type { FaseCode, Prisma } from "@prisma/client"
+import type { Prisma } from "@prisma/client"
 import {
   applyStep, calcProgress, keyFromFaseCode,
   type FinalState,
@@ -28,11 +27,11 @@ export async function POST(
 
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { id: true, pais: true, status: { select: { faseCode: true } }, faseAtualKey: true },
+      select: { id: true, pais: true, faseAtualKey: true },
     })
     if (!processo) return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
 
-    const key = (processo.faseAtualKey ?? keyFromFaseCode(processo.status?.faseCode ?? null)) as ReturnType<typeof keyFromFaseCode>
+    const key = keyFromFaseCode(processo.faseAtualKey)
     if (!key) return NextResponse.json({ error: "O processo não está numa fase final." }, { status: 422 })
 
     const fase = await prisma.faseFinal.findUnique({
@@ -60,21 +59,8 @@ export async function POST(
       data: s.data as Prisma.InputJsonValue,
     }
 
-    // coluna destino, se a fase concluiu e há próxima
-    let colunaDestinoId: number | null = null
-    if (result.completePhase && result.advanceToFaseCode) {
-      const coluna = await prisma.status.findFirst({
-        where: { pais: processo.pais, faseCode: result.advanceToFaseCode as FaseCode },
-        select: { id: true },
-      })
-      if (!coluna) {
-        return NextResponse.json(
-          { error: `Não há coluna para ${result.advanceToFaseCode} no país ${processo.pais}.` },
-          { status: 422 }
-        )
-      }
-      colunaDestinoId = coluna.id
-    }
+    // a fase avança quando concluiu e há próxima fase
+    const avancouFase = !!(result.completePhase && result.advanceToFaseCode)
 
     await prisma.$transaction(
       async (tx) => {
@@ -82,15 +68,12 @@ export async function POST(
           where: { processoId_faseKey: { processoId: id, faseKey: key } },
           data: faseData,
         })
-        if (colunaDestinoId) {
-          await moverStatusIdLegacy(tx, id, colunaDestinoId)
-        }
       },
       { timeout: 30000, maxWait: 10000 }
     )
 
     // MOTOR — se o card avançou de fase, dispara o motor (best-effort)
-    if (colunaDestinoId) {
+    if (avancouFase) {
       await dispararMotorNaFaseAtual(id)
     }
 
@@ -98,7 +81,7 @@ export async function POST(
       ok: true,
       completePhase: !!result.completePhase,
       recordedOnly: !!result.recordedOnly,
-      advanced: !!colunaDestinoId,
+      advanced: avancouFase,
       progress: calcProgress(s.workflow),
     })
   } catch (error) {

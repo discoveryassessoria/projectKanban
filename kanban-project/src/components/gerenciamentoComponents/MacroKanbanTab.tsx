@@ -10,7 +10,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 
 type Tipo = { id: number; code: string; name: string; countryKey: string; countryLabel: string; modalityLabel: string; ativo: boolean; temWorkflow: boolean }
 type CatFase = { id: number; phaseKey: string; label: string; ordemPadrao: number; requiredPadrao: boolean; conditionalPadrao: boolean; slaDiasPadrao: number }
-type Fase = { phaseKey: string; label: string; ordem: number; required: boolean; conditional: boolean; entryRule: string; exitRule: string | null; slaDays: number; showInKanban: boolean }
+// exitRule DESCONTINUADO como condição de avanço: a condição de conclusão de fase é do Workflow Interno + BlockingEngine.
+// Mantido opcional só p/ LEITURA de legado — o backend não grava mais exitRule novos e a UI não o edita nem o reenvia.
+type Fase = { phaseKey: string; label: string; ordem: number; required: boolean; conditional: boolean; entryRule: string; exitRule?: string | null; slaDays: number; showInKanban: boolean }
 type MacroWf = { id: number; tipoProcessoId: number; name: string; ativo: boolean; fases: Fase[] }
 
 async function jsonFetch(url: string, options: RequestInit = {}) {
@@ -105,7 +107,8 @@ export default function MacroKanbanTab() {
       phaseKey: c.phaseKey, label: c.label, ordem: prev.length + 1,
       required: c.requiredPadrao, conditional: c.conditionalPadrao,
       entryRule: prev.length === 0 ? 'process_created' : 'previous_phase_completed',
-      exitRule: null, slaDays: c.slaDiasPadrao, showInKanban: true,
+      // sem exitRule: a condição de conclusão vem do Workflow Interno, não desta tela.
+      slaDays: c.slaDiasPadrao, showInKanban: true,
     }])
     setAddKey(''); setDirty(true)
   }
@@ -134,7 +137,13 @@ export default function MacroKanbanTab() {
     const nome = tipoSel?.name || 'processo'
     setSalvando(true)
     try {
-      await jsonFetch(`/api/gerenciamento/workflow-macro/${tipoId}`, { method: 'PUT', body: JSON.stringify({ fases }) })
+      // Payload NÃO inclui exitRule (descontinuado): só a sequência/estrutura das fases é enviada.
+      const fasesPayload = fases.map((f) => ({
+        phaseKey: f.phaseKey, label: f.label, ordem: f.ordem,
+        required: f.required, conditional: f.conditional,
+        entryRule: f.entryRule, slaDays: f.slaDays, showInKanban: f.showInKanban,
+      }))
+      await jsonFetch(`/api/gerenciamento/workflow-macro/${tipoId}`, { method: 'PUT', body: JSON.stringify({ fases: fasesPayload }) })
       // salvou → fecha o editor e volta pro seletor, com aviso de confirmação
       setTipoId(null); setWf(null); setFases([]); setDirty(false); setAddKey('')
       setSalvoMsg(`Workflow de ${nome} salvo.`)
@@ -163,6 +172,10 @@ export default function MacroKanbanTab() {
       <div>
         <h2 className="text-xl font-semibold text-white">Workflow Macro / Kanban</h2>
         <p className="text-sm text-white/50">As fases de cada processo — adicione, remova e reordene. As colunas do kanban saem daqui.</p>
+      </div>
+
+      <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-2.5 text-sm text-blue-200">
+        O Workflow Macro define a <span className="font-medium">SEQUÊNCIA</span> das fases. Os requisitos para <span className="font-medium">CONCLUIR</span> cada fase são definidos no Workflow Interno; o avanço é executado pelo PhaseAdvanceService.
       </div>
 
       {salvoMsg && (
@@ -271,6 +284,11 @@ export default function MacroKanbanTab() {
                         <input type="number" min="0" value={f.slaDays} onChange={(e) => patch(idx, { slaDays: Number(e.target.value) })} className="w-16 rounded border border-white/10 bg-white/5 px-2 py-1 text-white outline-none focus:border-white/20" />
                         dias
                       </span>
+                      {f.exitRule && (
+                        <span className="text-[11px] text-white/30" title="Campo descontinuado — somente leitura. A condição de conclusão vem do Workflow Interno.">
+                          Regra de saída (legado): {f.exitRule}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}

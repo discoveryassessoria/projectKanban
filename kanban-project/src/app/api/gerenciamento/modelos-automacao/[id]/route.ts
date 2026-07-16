@@ -16,6 +16,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const atual = await prisma.modeloAutomacao.findUnique({ where: { id: modeloId } });
     if (!atual) return NextResponse.json({ error: 'Modelo não encontrado.' }, { status: 404 });
 
+    // CONSOLIDAÇÃO DO AVANÇO DE FASE — não se edita um modelo PARA phase_transition,
+    // e um modelo legado phase_transition não pode ser reativado (desarquivado):
+    // fica somente-leitura/arquivado para histórico.
+    const MSG = 'Modelos de automação descrevem apenas EFEITOS. "Avanço de fase" (phase_transition) foi descontinuado — o avanço é do PhaseAdvanceService (Workflow Interno + Workflow Macro).';
+    const novoTipo = b.type !== undefined ? String(b.type) : atual.type;
+    if (novoTipo === 'phase_transition') {
+      return NextResponse.json({ error: MSG, code: 'PHASE_TRANSITION_PROIBIDO' }, { status: 422 });
+    }
+    if (atual.type === 'phase_transition' && b.arquivado === false) {
+      return NextResponse.json({ error: MSG, code: 'PHASE_TRANSITION_LEGADO' }, { status: 422 });
+    }
+
     const modelo = await prisma.modeloAutomacao.update({
       where: { id: modeloId },
       data: {

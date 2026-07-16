@@ -33,7 +33,6 @@ import {
   type PaisKanban,
   type TipoKanban,
   type Processo,
-  type Status,
   type Contratante,
   type Requerente,
 } from "@/src/types/kanban"
@@ -43,7 +42,6 @@ interface KanbanBoardProps {
   pais: PaisKanban
   tipo: TipoKanban                    // tipo selecionado — as fases dele são as colunas
   processos: Processo[]
-  statusList?: Status[]               // LEGADO — só repassado ao modal de detalhes
   contratantes?: Contratante[]
   requerentes?: Requerente[]
   onRefresh: () => void
@@ -77,7 +75,6 @@ export function KanbanBoard({
   pais,
   tipo,
   processos: processosFromProps,
-  statusList = [],
   contratantes = [],
   requerentes = [],
   onRefresh,
@@ -425,7 +422,6 @@ export function KanbanBoard({
         isOpen={isDetailsModalOpen}
         onClose={handleModalClose}
         onSave={handleProcessoSave}
-        statusList={statusList}
         initialTab={modalInitialTab}
         initialPessoaId={modalInitialPessoaId}
         initialSidebarTab={modalInitialSidebarTab}

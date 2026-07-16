@@ -234,14 +234,14 @@ export default function CustomStatusManager({ onStatusCreated }: CustomStatusMan
         </ul>
       </Card>
 
-      {/* Nota sobre Status de Processos */}
+      {/* Nota sobre Fases de Processos */}
       <Card className="p-4 bg-white/5 backdrop-blur-xl border-white/10">
         <div className="flex items-start gap-3">
           <Info className="h-5 w-5 text-white/50 mt-0.5" />
           <div>
             <p className="text-sm text-white/70">
-              <strong className="text-white">Nota:</strong> Os status de processos (etapas como "Busca Documental", "Emissão de Documentos", etc.) 
-              são gerenciados na página de <strong className="text-white">Processos</strong> e são diferentes dos status de tarefas.
+              <strong className="text-white">Nota:</strong> As fases dos processos (etapas como "Busca Documental", "Emissão de Documentos", etc.)
+              avançam automaticamente na página de <strong className="text-white">Processos</strong> e são diferentes dos status de tarefas geridos aqui.
             </p>
           </div>
         </div>

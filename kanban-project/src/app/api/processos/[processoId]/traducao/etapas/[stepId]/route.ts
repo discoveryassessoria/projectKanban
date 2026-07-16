@@ -9,8 +9,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { moverStatusIdLegacy } from "@/src/lib/motor/runtime-guard"
-import type { FaseCode, Prisma } from "@prisma/client"
+import type { Prisma } from "@prisma/client"
 import {
   applyStep,
   calcProgress,
@@ -109,22 +108,6 @@ export async function POST(
       // validatedById: ligar à sessão quando vocês passarem o usuário às rotas
     }
 
-    // Coluna destino (Apostilamento) só quando aprovado.
-    let colunaDestinoId: number | null = null
-    if (result.completePhase) {
-      const coluna = await prisma.status.findFirst({
-        where: { pais: processo.pais, faseCode: "APOSTILAMENTO" as FaseCode },
-        select: { id: true },
-      })
-      if (!coluna) {
-        return NextResponse.json(
-          { error: `Não há coluna para APOSTILAMENTO no país ${processo.pais}.` },
-          { status: 422 }
-        )
-      }
-      colunaDestinoId = coluna.id
-    }
-
     await prisma.$transaction(
       async (tx) => {
         await tx.pastaTraducao.update({ where: { id: pasta.id }, data: pastaData })
@@ -141,13 +124,12 @@ export async function POST(
           })
         }
 
-        if (result.completePhase && colunaDestinoId) {
+        if (result.completePhase) {
           const ids = result.docs!.map((d) => d.documentoId)
           await tx.documento.updateMany({
             where: { id: { in: ids } },
             data: { traduzido: true },
           })
-          await moverStatusIdLegacy(tx, id, colunaDestinoId)
         }
       },
       { timeout: 30000, maxWait: 10000 }

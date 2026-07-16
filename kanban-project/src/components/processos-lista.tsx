@@ -20,20 +20,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ProcessoDetailsModal } from "./kanban/atividade-details-modal"
-import type { ProcessoWithStatus, Status, Contratante } from "@/src/types/kanban"
+import type { ProcessoWithStatus, Contratante } from "@/src/types/kanban"
 
 interface ProcessosListaProps {
   processos: ProcessoWithStatus[]
-  statusList: Status[]
   contratantes: Contratante[]
   onRefresh: () => void
 }
 
-export function ProcessosLista({ 
-  processos, 
-  statusList, 
+export function ProcessosLista({
+  processos,
   contratantes,
-  onRefresh 
+  onRefresh
 }: ProcessosListaProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
@@ -66,32 +64,6 @@ export function ProcessosLista({
   const totalPages = Math.ceil(filteredProcessos.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const paginatedProcessos = filteredProcessos.slice(startIndex, startIndex + itemsPerPage)
-
-  // Função para obter nome do status
-  const getStatusNome = (statusId: number) => {
-    return statusList.find(s => s.id === statusId)?.nome || "Desconhecido"
-  }
-
-  // Função para obter cor do status (baseado na posição)
-  const getStatusColor = (statusId: number) => {
-    const index = statusList.findIndex(s => s.id === statusId)
-    const colors = [
-      "bg-blue-500",
-      "bg-yellow-500", 
-      "bg-orange-500",
-      "bg-purple-500",
-      "bg-pink-500",
-      "bg-green-500"
-    ]
-    return colors[index % colors.length]
-  }
-
-  // Calcular progresso baseado na posição do status
-  const getProgress = (statusId: number) => {
-    const index = statusList.findIndex(s => s.id === statusId)
-    if (index === -1) return 0
-    return Math.round(((index + 1) / statusList.length) * 100)
-  }
 
   const handleDelete = async (id: number) => {
     if (!confirm("Tem certeza que deseja excluir este processo?")) return
@@ -165,18 +137,9 @@ export function ProcessosLista({
                     </div>
                   </td>
                   <td className="py-3 px-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <div className={`h-2 w-2 rounded-full ${getStatusColor(processo.statusId ?? 0)}`} />
-                        <span className="text-white/80 text-sm">{getStatusNome(processo.statusId ?? 0)}</span>
-                      </div>
-                      {/* Barra de progresso */}
-                      <div className="w-32 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full ${getStatusColor(processo.statusId ?? 0)} transition-all duration-300`}
-                          style={{ width: `${getProgress(processo.statusId ?? 0)}%` }}
-                        />
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-indigo-500" />
+                      <span className="text-white/80 text-sm">{processo.faseAtualKey ?? "—"}</span>
                     </div>
                   </td>
                   <td className="py-3 px-4">
@@ -299,7 +262,6 @@ export function ProcessosLista({
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onSave={onRefresh}
-        statusList={statusList}
       />
     </div>
   )

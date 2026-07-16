@@ -5,6 +5,16 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 function amtTypeToKind(t?: string) { return t === 'phase_transition' ? 'phase_advance' : (t || 'task') }
 
+// CONSOLIDAÇÃO DO AVANÇO DE FASE — kinds de EFEITO permitidos numa automação de
+// fase. "phase_advance" (e o type de modelo "phase_transition") ficam PROIBIDOS:
+// o avanço é exclusivo do PhaseAdvanceService (Workflow Interno conclui +
+// BlockingEngine libera + ordem do Workflow Macro decide a próxima fase).
+// Registros legados permanecem legíveis, mas não podem ser criados/reativados.
+const KINDS_EFEITO_PERMITIDOS = new Set(['task', 'financial', 'document', 'event', 'protocol', 'alert'])
+const MSG_PHASE_ADVANCE_PROIBIDO =
+  'Automações não avançam fase. O avanço é controlado pelo Workflow Interno (conclusão) + Workflow Macro (ordem) via PhaseAdvanceService. Use um efeito (tarefa, documento, evento, protocolo, notificação).'
+function kindDeAvanco(kind?: string) { return kind === 'phase_advance' || kind === 'phase_transition' }
+
 // GET — dados da tela: processos+fases, regras aplicadas, biblioteca 2C
 export async function GET(request: NextRequest) {
   const erro = await verificarPermissao(request, 'usuarios.gerenciar')
@@ -62,6 +72,10 @@ export async function POST(request: NextRequest) {
       if (!modelo) return NextResponse.json({ error: 'Modelo não encontrado.' }, { status: 404 })
 
       const kind = amtTypeToKind(modelo.type)
+      // Modelo legado de transição de fase não pode ser aplicado a processos.
+      if (kindDeAvanco(modelo.type) || kindDeAvanco(kind) || !KINDS_EFEITO_PERMITIDOS.has(kind)) {
+        return NextResponse.json({ error: MSG_PHASE_ADVANCE_PROIBIDO, code: 'PHASE_ADVANCE_PROIBIDO' }, { status: 422 })
+      }
       const dp = (modelo.defaultParams as Record<string, unknown>) || {}
 
       const rule = await prisma.phaseAutomationRule.create({
@@ -87,6 +101,9 @@ export async function POST(request: NextRequest) {
     const name = String(body.name || '').trim()
     if (!tipoProcessoId || !phaseKey) return NextResponse.json({ error: 'Selecione o processo e a fase.' }, { status: 400 })
     if (!name) return NextResponse.json({ error: 'Dê um nome à automação.' }, { status: 400 })
+    if (kindDeAvanco(kind) || !KINDS_EFEITO_PERMITIDOS.has(kind)) {
+      return NextResponse.json({ error: MSG_PHASE_ADVANCE_PROIBIDO, code: 'PHASE_ADVANCE_PROIBIDO' }, { status: 422 })
+    }
 
     const rule = await prisma.phaseAutomationRule.create({
       data: {

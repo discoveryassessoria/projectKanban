@@ -109,3 +109,93 @@ export function faseAlvoEhAnterior(fases: FaseOrdenada[], faseAtual: string, fas
   if (a == null || b == null) return false
   return b < a
 }
+
+// --------------------------------------------------------------------------
+// Eventos canônicos de fase (phase.completed / phase.entered)
+// --------------------------------------------------------------------------
+// Fonte ÚNICA e confiável do evento de entrada em fase, para o financeiro (e
+// demais efeitos) serem reconstruídos DEPOIS sobre um contrato estável.
+// PUROS: recebem occurredAt já materializado (o motor injeta new Date()), então
+// permanecem determinísticos e testáveis por tsx sem DB.
+//
+// A chaveIdempotencia deriva da chave da transição (@unique no DomainOutbox):
+// reprocessar/retry/clique-duplo colidem no @unique → o evento é gravado UMA vez.
+
+export type EventoCanonicoTipo = "phase.completed" | "phase.entered"
+
+export interface EventoFasePayloadInput {
+  processoId: number
+  faseAnteriorKey: string
+  faseAnteriorInstanceId: number | null
+  faseNovaKey: string
+  faseNovaInstanceId: number
+  ciclo: number
+  operacao: AdvanceOperacao
+  origem: string
+  solicitadoPorId?: number | null
+  macroVersion?: number | null
+  /** chave idempotente da transição (montarChaveAdvance) — âncora dos eventos. */
+  chaveTransicao: string
+  correlationId: string
+  /** ISO string — injetado pelo motor (mantém o helper puro/determinístico). */
+  occurredAt: string
+}
+
+export interface EventoCanonico {
+  tipo: EventoCanonicoTipo
+  chaveIdempotencia: string
+  eventId: string
+  payload: Record<string, unknown>
+}
+
+/** phase.entered — SEMPRE emitido após uma transição bem-sucedida. */
+export function montarEventoEntered(i: EventoFasePayloadInput): EventoCanonico {
+  const eventId = `evt|entered|${i.chaveTransicao}`
+  return {
+    tipo: "phase.entered",
+    chaveIdempotencia: `outbox|entered|${i.chaveTransicao}`,
+    eventId,
+    payload: {
+      eventId,
+      idempotencyKey: i.chaveTransicao,
+      processId: i.processoId,
+      previousPhaseId: i.faseAnteriorKey || null,
+      previousPhaseInstanceId: i.faseAnteriorInstanceId,
+      newPhaseId: i.faseNovaKey,
+      newPhaseInstanceId: i.faseNovaInstanceId,
+      newPhaseKey: i.faseNovaKey,
+      workflowMacroVersionId: i.macroVersion ?? null,
+      ciclo: i.ciclo,
+      occurredAt: i.occurredAt,
+      source: i.origem,
+      requestedBy: i.solicitadoPorId ?? null,
+      transitionReason: i.operacao,
+      correlationId: i.correlationId,
+    },
+  }
+}
+
+/** phase.completed — emitido quando a fase de ORIGEM foi de fato CONCLUÍDA. */
+export function montarEventoCompleted(i: EventoFasePayloadInput): EventoCanonico {
+  const eventId = `evt|completed|${i.chaveTransicao}`
+  return {
+    tipo: "phase.completed",
+    chaveIdempotencia: `outbox|completed|${i.chaveTransicao}`,
+    eventId,
+    payload: {
+      eventId,
+      idempotencyKey: i.chaveTransicao,
+      processId: i.processoId,
+      phaseId: i.faseAnteriorKey || null,
+      phaseInstanceId: i.faseAnteriorInstanceId,
+      newPhaseId: i.faseNovaKey,
+      newPhaseKey: i.faseNovaKey,
+      ciclo: i.ciclo,
+      occurredAt: i.occurredAt,
+      source: i.origem,
+      requestedBy: i.solicitadoPorId ?? null,
+      transitionReason: i.operacao,
+      correlationId: i.correlationId,
+    },
+  }
+}

@@ -36,10 +36,10 @@ export default function StatusModal({ open, onOpenChange, status, onSuccess }: S
   const [error, setError] = useState<string | null>(null)
 
   const isEditing = !!status?.id
-  const title = isEditing ? "Editar Status" : "Novo Status"
-  const description = isEditing 
-    ? "Edite as informações do status." 
-    : "Crie um novo status para organizar suas atividades."
+  const title = isEditing ? "Editar Status de Tarefa" : "Novo Status de Tarefa"
+  const description = isEditing
+    ? "Edite as informações do status de tarefa."
+    : "Crie um novo status de tarefa para organizar suas atividades."
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -115,7 +115,7 @@ export default function StatusModal({ open, onOpenChange, status, onSuccess }: S
             )}
 
             <div className="grid gap-2">
-              <Label htmlFor="nome">Nome do Status</Label>
+              <Label htmlFor="nome">Nome do Status de Tarefa</Label>
               <Input
                 id="nome"
                 placeholder="Ex: Em andamento, Concluído..."

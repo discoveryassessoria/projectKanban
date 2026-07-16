@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       include: {
         _count: {
           select: {
-            processos: true
+            tarefas: true
           }
         }
       }
@@ -91,7 +91,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       include: {
         _count: {
           select: {
-            processos: true
+            tarefas: true
           }
         }
       }
@@ -123,7 +123,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       include: {
         _count: {
           select: {
-            processos: true
+            tarefas: true
           }
         }
       }
@@ -133,39 +133,24 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: "Status não encontrado" }, { status: 404 })
     }
 
-    // Usar transaction para garantir consistência
-    await prisma.$transaction(async (tx) => {
-      // Se houver processos neste status, deletar em cascata
-      if (statusExists._count.processos > 0) {
-        // Buscar todos os processos deste status
-        const processos = await tx.processo.findMany({
-          where: { statusId: parsedStatusId },
-          select: { id: true }
-        })
-
-        const processoIds = processos.map(p => p.id)
-
-        // Deletar tarefas dos processos
-        await tx.tarefa.deleteMany({
-          where: {
-            processoId: { in: processoIds }
-          }
-        })
-
-        // Deletar os processos
-        await tx.processo.deleteMany({
-          where: {
-            statusId: parsedStatusId,
-          },
-        })
-      }
-
-      // Finalmente deletar o status
-      await tx.status.delete({
-        where: {
-          id: parsedStatusId,
+    // Status é domínio de TAREFA. Exclusão NUNCA apaga processos (o legado
+    // Processo.statusId foi removido). Restrição segura: se houver tarefas
+    // vinculadas, bloqueia — o usuário deve reatribuí-las antes.
+    if (statusExists._count.tarefas > 0) {
+      return NextResponse.json(
+        {
+          error: `Este status está em uso por ${statusExists._count.tarefas} tarefa(s). Reatribua-as antes de excluir.`,
+          blocked: true,
+          tarefasVinculadas: statusExists._count.tarefas,
         },
-      })
+        { status: 409 },
+      )
+    }
+
+    await prisma.status.delete({
+      where: {
+        id: parsedStatusId,
+      },
     })
 
     return NextResponse.json({ message: "Status excluído com sucesso" }, { status: 200 })

@@ -243,6 +243,11 @@ export default function PhaseWorkflowsFasesTab() {
 
   return (
     <div className="space-y-5">
+      {/* aviso — escopo desta área */}
+      <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+        Aqui você define os <strong>PASSOS</strong> e a <strong>CONDIÇÃO DE CONCLUSÃO</strong> da fase. Quando todos os requisitos obrigatórios forem atendidos e não houver bloqueios, o sistema conclui a fase e segue a <strong>ORDEM</strong> do Workflow Macro. Esta área <strong>NÃO</strong> escolhe a próxima fase.
+      </div>
+
       {flash && (
         <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>
       )}

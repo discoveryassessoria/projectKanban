@@ -111,8 +111,14 @@ export async function POST(request: NextRequest) {
         if (r.financialType === 'revenue' || r.financialType === 'honorarium') receitas.push(row); else custos.push(row)
       } else if (r.kind === 'alert') {
         alertas.push({ name: r.name, condicional, condicaoNota })
+      } else if (r.kind === 'phase_advance') {
+        // LEGADO: 'phase_advance' NÃO é mais um tipo de automação e NÃO executa.
+        // O avanço de fase é exclusivo do PhaseAdvanceService (Workflow Interno conclui +
+        // ordem do Workflow Macro define a próxima fase). A simulação nunca trata isto como
+        // uma transição real — apenas registra como ignorado.
+        ignoradas.push({ name: r.name, reason: 'avanço de fase é legado — não executa (o avanço segue o Workflow Interno + ordem do Macro)' })
       } else {
-        // task | document | event | protocol | phase_advance
+        // task | document | event | protocol
         operacional.push({ name: r.name, kind: r.kind, acao: r.action || null, condicional, condicaoNota })
       }
     }

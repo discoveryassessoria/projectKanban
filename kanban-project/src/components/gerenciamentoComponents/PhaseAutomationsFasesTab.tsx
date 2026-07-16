@@ -37,11 +37,16 @@ interface Data { tiposProcesso: TipoProcesso[]; regras: Rule[]; modelosAutomacao
 // ============================================================
 const KIND_LABELS: Record<string, string> = {
   task: "Tarefa", financial: "Financeiro", document: "Documento",
-  event: "Evento", protocol: "Protocolo", phase_advance: "Avanço de fase", alert: "Alerta",
+  event: "Evento", protocol: "Protocolo", alert: "Alerta",
+  // Legado — não executa mais. Mantido só para rotular registros antigos.
+  phase_advance: "Avanço de fase (legado)",
 }
+// CONSOLIDAÇÃO DO AVANÇO DE FASE — "Avanço de fase" NÃO é mais um tipo de
+// automação. O avanço é do PhaseAdvanceService (Workflow Interno + Workflow
+// Macro). Só EFEITOS são configuráveis aqui.
 const KIND_TABS: [string, string][] = [
   ["task", "Tarefas"], ["financial", "Financeiro"], ["document", "Documentos"],
-  ["event", "Eventos"], ["protocol", "Protocolo"], ["phase_advance", "Avanço de fase"],
+  ["event", "Eventos"], ["protocol", "Protocolo"],
 ]
 const TRIGGER_LABELS: Record<string, string> = {
   phase_entered: "Quando a fase começa", phase_exited: "Quando a fase termina",
@@ -80,7 +85,7 @@ type Form = {
   condField: string; condOp: string; condVal: string; idempotent: boolean; active: boolean
   owner: string; priority: string; slaDays: number; checklist: string
   financialType: string; amount: number; currency: string; financialItemCode: string
-  targetPhaseKey: string; autoAdvance: boolean; alertSeverity: string; documentRequired: boolean
+  alertSeverity: string; documentRequired: boolean
   eventType: string; eventOffsetDays: number
 }
 function blankForm(kind: string): Form {
@@ -89,7 +94,7 @@ function blankForm(kind: string): Form {
     condField: "", condOp: "eq", condVal: "", idempotent: true, active: true,
     owner: "", priority: "medium", slaDays: 0, checklist: "",
     financialType: "cost", amount: 0, currency: "EUR", financialItemCode: "",
-    targetPhaseKey: "", autoAdvance: false, alertSeverity: "info", documentRequired: true,
+    alertSeverity: "info", documentRequired: true,
     eventType: "", eventOffsetDays: 0,
   }
 }
@@ -163,7 +168,6 @@ export default function PhaseAutomationsFasesTab() {
       checklist: Array.isArray(p.checklist) ? (p.checklist as string[]).join("\n") : "",
       financialType: r.financialType || (p.financialType as string) || "cost", amount: Number(p.amount) || 0,
       currency: (p.currency as string) || "EUR", financialItemCode: (p.financialItemCode as string) || "",
-      targetPhaseKey: (p.targetPhaseKey as string) || "", autoAdvance: p.autoAdvance === true,
       alertSeverity: (p.alertSeverity as string) || "info", documentRequired: p.documentRequired !== false,
       eventType: (p.eventType as string) || "", eventOffsetDays: Number(p.eventOffsetDays) || 0,
     })
@@ -172,7 +176,6 @@ export default function PhaseAutomationsFasesTab() {
   function buildParams(f: Form): Record<string, unknown> {
     if (f.kind === "task") return { owner: f.owner, priority: f.priority, slaDays: f.slaDays, checklist: f.checklist ? f.checklist.split("\n").map(s => s.trim()).filter(Boolean) : [] }
     if (f.kind === "financial") return { financialType: f.financialType, amount: f.amount, currency: f.currency, financialItemCode: f.financialItemCode }
-    if (f.kind === "phase_advance") return { targetPhaseKey: f.targetPhaseKey, autoAdvance: f.autoAdvance }
     if (f.kind === "alert") return { alertSeverity: f.alertSeverity }
     if (f.kind === "document") return { documentRequired: f.documentRequired }
     if (f.kind === "event") return { eventType: f.eventType, eventOffsetDays: f.eventOffsetDays }
@@ -263,10 +266,13 @@ export default function PhaseAutomationsFasesTab() {
 
       {/* cabeçalho */}
       <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
-        <h2 className="text-lg font-semibold text-white">Automações por Fase</h2>
+        <h2 className="text-lg font-semibold text-white">Automações e efeitos da fase</h2>
         <p className="mt-1 text-sm text-white/60">
-          Aplica os Modelos de Automação (2C) às fases do processo. Cada regra tem um gatilho, uma condição e uma ação. Para os modelos reutilizáveis, use a biblioteca <span className="text-blue-300">“Modelos de Automação”</span>. <span className="text-white/40">A execução real das regras vem na Fase 4.</span>
+          Aqui você configura os <b className="text-white/80">efeitos</b> disparados por eventos da fase: criar tarefa, documento, evento, protocolo, notificação ou lançamento (futuro). Modelos reutilizáveis ficam na biblioteca <span className="text-blue-300">“Modelos de Automação”</span>.
         </p>
+        <div className="mt-3 rounded-xl border border-sky-400/20 bg-sky-500/10 px-4 py-2.5 text-xs text-sky-200">
+          As automações desta área <b>reagem</b> aos eventos da fase. A <b>conclusão</b> é determinada pelo <b>Workflow Interno</b> (+ BlockingEngine) e a <b>próxima fase</b> pela ordem do <b>Workflow Macro</b>. Nenhuma automação avança ou escolhe a fase.
+        </div>
         <div className="mt-4 flex flex-wrap gap-3">
           <div className="min-w-[240px] flex-1">
             <label className={labelCls}>Processo de Nacionalidade</label>
@@ -475,10 +481,6 @@ export default function PhaseAutomationsFasesTab() {
                 <div><label className={labelCls}>Item financeiro (código)</label><input value={form.financialItemCode} onChange={e => setForm(f => f && { ...f, financialItemCode: e.target.value })} className={inputCls} placeholder="opcional (senão valor fixo)" /></div>
                 <div><label className={labelCls}>Valor (se sem item)</label><input type="number" value={form.amount} onChange={e => setForm(f => f && { ...f, amount: Number(e.target.value) || 0 })} className={inputCls} /></div>
                 <div><label className={labelCls}>Moeda</label><select value={form.currency} onChange={e => setForm(f => f && { ...f, currency: e.target.value })} className={inputCls}><option value="EUR" className={opt}>EUR</option><option value="BRL" className={opt}>BRL</option><option value="USD" className={opt}>USD</option></select></div>
-              </>)}
-              {form.kind === "phase_advance" && (<>
-                <div className="col-span-2"><label className={labelCls}>Liberar/ir para a fase</label><select value={form.targetPhaseKey} onChange={e => setForm(f => f && { ...f, targetPhaseKey: e.target.value })} className={inputCls}><option value="" className={opt}>—</option>{fases.map(p => <option key={p.phaseKey} value={p.phaseKey} className={opt}>[{p.order}] {p.label}</option>)}</select></div>
-                <div><label className={labelCls}>Efetivar automaticamente</label><select value={form.autoAdvance ? "1" : "0"} onChange={e => setForm(f => f && { ...f, autoAdvance: e.target.value === "1" })} className={inputCls}><option value="0" className={opt}>não (só sugerir)</option><option value="1" className={opt}>sim</option></select></div>
               </>)}
               {form.kind === "alert" && (
                 <div><label className={labelCls}>Severidade</label><select value={form.alertSeverity} onChange={e => setForm(f => f && { ...f, alertSeverity: e.target.value })} className={inputCls}><option value="info" className={opt}>info</option><option value="warning" className={opt}>atenção</option><option value="critical" className={opt}>crítico</option></select></div>

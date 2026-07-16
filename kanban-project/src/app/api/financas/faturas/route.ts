@@ -58,7 +58,6 @@ export async function GET(request: NextRequest) {
             id: true,
             nome: true,
             pais: true,
-            status: { select: { nome: true } }
           }
         },
         pagamentos: {
@@ -160,7 +159,6 @@ export async function GET(request: NextRequest) {
           id: fatura.processo.id,
           nome: fatura.processo.nome,
           pais: fatura.processo.pais,
-          statusNome: fatura.processo.status?.nome || '-'
         } : null,
         destinatarios: fatura.destinatarios.map(d => d.requerente),
         pagamentos: fatura.pagamentos.map(p => ({

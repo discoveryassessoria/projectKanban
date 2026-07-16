@@ -34,6 +34,8 @@ import {
   montarChaveAdvanceBloqueio,
   proximaFasePorOrdem,
   faseAlvoEhAnterior,
+  montarEventoEntered,
+  montarEventoCompleted,
 } from "@/src/lib/motor/phase-advance-helpers"
 
 // --------------------------------------------------------------------------
@@ -285,15 +287,48 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
         },
       })
 
-      // 7) outbox transacional (sem worker neste checkpoint)
+      // 7) EVENTOS CANÔNICOS no outbox transacional (contrato estável p/ efeitos
+      //    futuros — inclusive o financeiro — reagirem à ENTRADA em fase).
+      //    - phase.completed: só quando a fase de origem foi de fato CONCLUÍDA
+      //      (avanço normal/forçado); reabertura/retorno SUPERSEDEM, não concluem.
+      //    - phase.entered: SEMPRE. Ambos idempotentes por chaveIdempotencia @unique
+      //      (mesma transição reprocessada não duplica o evento).
+      const occurredAt = new Date().toISOString()
+      const eventoBase = {
+        processoId: p.processoId,
+        faseAnteriorKey: p.faseAtual,
+        faseAnteriorInstanceId: previousInstanceId,
+        faseNovaKey: p.faseDestino,
+        faseNovaInstanceId: inst.workflowInstance.id,
+        ciclo: p.cicloAlvo,
+        operacao: p.operacao,
+        origem: p.origemLog,
+        solicitadoPorId: p.solicitadoPorId ?? null,
+        macroVersion: inst.workflowInstance.macroVersion ?? null,
+        chaveTransicao: chave,
+        correlationId: p.correlationId,
+        occurredAt,
+      }
+
+      if (p.encerramento === "CONCLUIR") {
+        const evtCompleted = montarEventoCompleted(eventoBase)
+        await tx.domainOutbox.create({
+          data: {
+            tipo: evtCompleted.tipo, aggregateType: "Processo", aggregateId: p.processoId,
+            correlationId: p.correlationId, causationId: chave,
+            chaveIdempotencia: evtCompleted.chaveIdempotencia,
+            payload: evtCompleted.payload as Prisma.InputJsonValue,
+          },
+        })
+      }
+
+      const evtEntered = montarEventoEntered(eventoBase)
       await tx.domainOutbox.create({
         data: {
-          tipo: `phase.${resultadoEnum.toLowerCase()}`, aggregateType: "Processo", aggregateId: p.processoId,
-          correlationId: p.correlationId, causationId: chave, chaveIdempotencia: `outbox|${chave}`,
-          payload: {
-            processoId: p.processoId, de: p.faseAtual, para: p.novaFaseAtualKey,
-            ciclo: p.cicloAlvo, workflowInstanceId: inst.workflowInstance.id, tarefasCriadas,
-          },
+          tipo: evtEntered.tipo, aggregateType: "Processo", aggregateId: p.processoId,
+          correlationId: p.correlationId, causationId: chave,
+          chaveIdempotencia: evtEntered.chaveIdempotencia,
+          payload: evtEntered.payload as Prisma.InputJsonValue,
         },
       })
 

@@ -26,11 +26,7 @@ export async function GET(
       include: {
         processos: {
           include: {
-            processo: {
-              include: {
-                status: true
-              }
-            }
+            processo: true
           }
         }
       }
@@ -122,11 +118,7 @@ export async function PUT(
       include: {
         processos: {
           include: {
-            processo: {
-              include: {
-                status: true
-              }
-            }
+            processo: true
           }
         }
       }

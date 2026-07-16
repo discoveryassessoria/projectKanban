@@ -25,7 +25,6 @@ import * as G from "../prisma/backfill-cp4-helpers"
 import * as A from "../src/services/workflow-activation-helpers"
 import * as OW from "../src/services/operational-workflow-helpers"
 import * as OB from "../src/lib/motor/observability-helpers"
-import { moverStatusIdLegacy } from "../src/lib/motor/runtime-guard"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 
@@ -422,9 +421,11 @@ async function run() {
   ok(/temPermissao\(usuario\.permissoes, "workflow\.retornarFase"\)/.test(rReturn), "return gated por workflow.retornarFase")
   const rAvancarLegacy = readFileSync(join(ROOT, "src/app/api/processos/[processoId]/avancar-fase/route.ts"), "utf8")
   const rFaseLegacy = readFileSync(join(ROOT, "src/app/api/processos/[processoId]/fase/route.ts"), "utf8")
-  ok(/resolveWorkflowRuntime/.test(rAvancarLegacy) && /advance\(id\)/.test(rAvancarLegacy), "avancar-fase delega ao serviço canônico quando v2")
-  ok(/Mudança direta de fase não é permitida/.test(rFaseLegacy), "fase (drag) bloqueia mudança direta sob v2")
-  ok(/getNextFase/.test(rAvancarLegacy), "caminho legado preservado (dual-read, sem remoção)")
+  // CONSOLIDAÇÃO DO AVANÇO DE FASE — avancar-fase e /fase (drag) NÃO escrevem
+  // faseAtualKey: são adaptadores finos sobre o PhaseAdvanceService.
+  ok(/resolveWorkflowRuntime/.test(rAvancarLegacy) && /advance\(id/.test(rAvancarLegacy), "avancar-fase delega ao serviço canônico (advance)")
+  ok(/advance\(processoId/.test(rFaseLegacy) && !/data:\s*\{\s*faseAtualKey/.test(rFaseLegacy), "fase (drag) delega ao serviço e não escreve faseAtualKey direto")
+  ok(!/getNextFase/.test(rAvancarLegacy) && !/data:\s*\{\s*faseAtualKey/.test(rAvancarLegacy), "avancar-fase: caminho legado de escrita direta REMOVIDO")
 
   // 37) Permissão workflow.retornarFase no catálogo
   console.log("\n37) Permissões CP-4F:")
@@ -569,53 +570,11 @@ async function run() {
   const rec = readFileSync(join(ROOT, "src/lib/process-stage/recalcular-fase.ts"), "utf8")
   ok(/from "@\/src\/lib\/motor\/phase-advance"/.test(rec) && /await advance\(processo\.id\)/.test(rec) && !/\.workflow\.(create|update|updateMany)\b/.test(rec), "recalcularFaseDoProcesso delega ao PhaseAdvanceService V2 (sem escrita de fase legada)")
 
-  // ============== Auditoria item 2 — fail-closed de Processo.statusId ==============
-  console.log("\n--- Auditoria item 2 (statusId fail-closed) ---")
-
-  // 51) Teste FUNCIONAL do helper moverStatusIdLegacy (db falso; sem DB real)
-  console.log("\n51) Helper moverStatusIdLegacy (funcional):")
-  const fakeDb = (runtime: string, killSwitch: boolean, sink: unknown[]) => ({
-    processo: {
-      findUnique: async () => ({ workflowRuntime: runtime }),
-      update: async (arg: unknown) => { sink.push(arg); return {} },
-    },
-    motorConfig: { findUnique: async () => ({ runtimeV2Habilitado: killSwitch }) },
-  }) as never
-
-  const wLegacy: any[] = []
-  const escreveuLegacy = await moverStatusIdLegacy(fakeDb("legacy", true, wLegacy), 1, 42)
-  ok(escreveuLegacy === true && wLegacy.length === 1 && wLegacy[0].data.statusId === 42, "legacy: escreve statusId (update chamado com o valor certo)")
-
-  const wV2: any[] = []
-  const escreveuV2 = await moverStatusIdLegacy(fakeDb("v2", true, wV2), 1, 42)
-  ok(escreveuV2 === false && wV2.length === 0, "v2 + kill switch ON: NO-OP (não escreve statusId)")
-
-  const wKsOff: any[] = []
-  const escreveuKsOff = await moverStatusIdLegacy(fakeDb("v2", false, wKsOff), 1, 42)
-  ok(escreveuKsOff === true && wKsOff.length === 1, "kill switch OFF: escreve mesmo com processo v2 (legacy intacto)")
-
-  // 52) Estrutural — guards nos escritores de statusId
-  console.log("\n52) Guards de statusId (estrutural):")
-  const rgg = readFileSync(join(ROOT, "src/lib/motor/runtime-guard.ts"), "utf8")
-  ok(/export async function moverStatusIdLegacy/.test(rgg) && /if \(await processoEmRuntimeV2Com\(db, processoId\)\) return false/.test(rgg), "runtime-guard exporta moverStatusIdLegacy com no-op em v2")
-  const recF = readFileSync(join(ROOT, "src/lib/process-stage/recalculate.ts"), "utf8")
-  ok(/if \(await processoEmRuntimeV2Com\(prisma, processoId\)\)/.test(recF) && /moved: false/.test(recF), "recalculateProcessStage: guard fail-closed no topo (não move statusId em v2)")
-
-  const rotasPasta = [
-    "analise/concluir",
-    "apostilamento/etapas/[stepId]",
-    "traducao/etapas/[stepId]",
-    "fase-final/etapas/[stepId]",
-    "retificacao/pacotes/[pkgId]/etapas/[stepId]",
-    "emissao-retificada/documentos/[docId]/etapas/[stepId]",
-  ]
-  for (const r of rotasPasta) {
-    const src = readFileSync(join(ROOT, `src/app/api/processos/[processoId]/${r}/route.ts`), "utf8")
-    ok(/moverStatusIdLegacy\(tx,/.test(src) && !/\.processo\.update\([^)]*statusId/.test(src), `${r}: usa moverStatusIdLegacy (sem update cru de statusId)`)
-  }
-
-  const patch = readFileSync(join(ROOT, "src/app/api/processos/[processoId]/route.ts"), "utf8")
-  ok(/const emRuntimeV2 = await processoEmRuntimeV2\(id\)/.test(patch) && /statusIdEfetivo = emRuntimeV2 \? undefined : statusId/.test(patch) && /statusId: statusIdEfetivo/.test(patch), "PATCH processos/[id]: statusId do body não persiste em v2")
+  // NOTA: O legado Processo.statusId foi REMOVIDO por completo (schema, banco,
+  // código). Os antigos testes de "fail-closed do statusId" (moverStatusIdLegacy,
+  // recalculate por statusId, statusIdEfetivo no PATCH) foram removidos porque o
+  // conceito não existe mais — a fase do processo é só faseAtualKey. Ver a guarda
+  // dedicada scripts/status-legacy-guard.test.ts.
 
   console.log(`\n${passed} passaram, ${failed} falharam`)
   if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }

@@ -61,7 +61,6 @@ export async function GET(
       include: {
         requerentes: { include: { requerente: true } },
         contratantes: { include: { contratante: true } },
-        status: true,
       }
     })
 
@@ -87,7 +86,7 @@ export async function GET(
     return NextResponse.json({
       pais: processo.pais,
       nomeProcesso: processo.nome,
-      etapaAtual: processo.status?.nome || "",
+      etapaAtual: processo.faseAtualKey ?? "",
       pessoas,
       pastaTotal,
       pastaPago,

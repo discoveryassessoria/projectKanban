@@ -266,18 +266,18 @@ model Documento {
   @@index([ruleCode])
 }
 
+// Status = coluna/estado de TAREFA (domínio de Tarefa). NÃO representa fase de
+// Processo — a fase do processo é Processo.faseAtualKey (Workflow Macro/Interno).
+// O legado Processo.statusId foi removido definitivamente.
 model Status {
-  id        Int        @id @default(autoincrement())
-  nome      String     @db.VarChar(50)
-  ordem     Int        @default(0)
-  pais      String
-  faseCode  FaseCode?
-  processos Processo[]
-  tarefas   Tarefa[]
+  id      Int      @id @default(autoincrement())
+  nome    String   @db.VarChar(50)
+  ordem   Int      @default(0)
+  pais    String
+  tarefas Tarefa[]
 
   @@unique([nome, pais])
   @@index([pais])
-  @@index([faseCode])
 }
 
 model Processo {
@@ -286,7 +286,6 @@ model Processo {
   descricao           String?               @db.VarChar(500)
   observacoes         String?
   pais                String
-  statusId            Int?
   arvoreId            Int?
   familiaId           Int?
   dataInicio          DateTime              @default(now())
@@ -306,7 +305,6 @@ model Processo {
   outrosCustos        OutroCusto[]
   arvore              Arvore?               @relation(fields: [arvoreId], references: [id])
   familia             Familia?              @relation(fields: [familiaId], references: [id], onDelete: SetNull)
-  status              Status?               @relation(fields: [statusId], references: [id], onDelete: SetNull)
   analise             AnaliseDocumental?
   faseAtualKey        String?
   contratantes        ProcessoContratante[]
@@ -336,7 +334,6 @@ model Processo {
   motorArtefatos      MotorArtefato[]            @relation("ProcessoMotorArtefatos")
 
   @@index([pais])
-  @@index([statusId])
   @@index([arvoreId])
   @@index([familiaId])
   @@index([tipoProcessoMotorId])

@@ -7,8 +7,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { moverStatusIdLegacy } from "@/src/lib/motor/runtime-guard"
-import type { FaseCode, Prisma } from "@prisma/client"
+import type { Prisma } from "@prisma/client"
 import { applyStep, allValidated, type RetPkg } from "@/src/lib/process-stage/retificacao-engine"
 
 export async function POST(
@@ -67,26 +66,12 @@ export async function POST(
 
     // descobre se, com este pacote validado, TODOS ficam validados
     let phaseComplete = false
-    let colunaDestinoId: number | null = null
     if (result.validated) {
       const outros = await prisma.retificacaoPacote.findMany({
         where: { processoId: id, id: { not: pid } },
         select: { status: true },
       })
       phaseComplete = allValidated([...outros, { status: "validado" }])
-      if (phaseComplete) {
-        const coluna = await prisma.status.findFirst({
-          where: { pais: processo.pais, faseCode: "EMISSAO_DOCUMENTAL_RETIFICADA" as FaseCode },
-          select: { id: true },
-        })
-        if (!coluna) {
-          return NextResponse.json(
-            { error: `Não há coluna para EMISSAO_DOCUMENTAL_RETIFICADA no país ${processo.pais}.` },
-            { status: 422 }
-          )
-        }
-        colunaDestinoId = coluna.id
-      }
     }
 
     await prisma.$transaction(
@@ -95,9 +80,6 @@ export async function POST(
           where: { id: pid },
           data: result.patch as Prisma.RetificacaoPacoteUpdateInput,
         })
-        if (colunaDestinoId) {
-          await moverStatusIdLegacy(tx, id, colunaDestinoId)
-        }
       },
       { timeout: 30000, maxWait: 10000 }
     )
@@ -106,7 +88,7 @@ export async function POST(
       ok: true,
       validated: !!result.validated,
       phaseComplete,
-      advanced: !!colunaDestinoId,
+      advanced: phaseComplete,
     })
   } catch (error) {
     console.error("[POST .../retificacao/pacotes/etapas]", error)

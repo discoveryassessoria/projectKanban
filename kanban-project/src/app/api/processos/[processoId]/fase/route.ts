@@ -1,18 +1,14 @@
-// ESTE ARQUIVO SUBSTITUI: src/app/api/processos/[processoId]/fase/route.ts
+// src/app/api/processos/[processoId]/fase/route.ts
 //
-// Move o processo de FASE (arrastar o card no kanban).
-// Valida que a fase de destino pertence ao Workflow Macro do TIPO do processo.
-//
-// NOVO (6/jul): GATILHO AUTOMÁTICO — se a chave MotorConfig.autoExecutarAoAvancar
-// estiver LIGADA (Gerenciamento → Executor do Motor), ao mover de fase o motor
-// roda sozinho as automações "ao entrar na fase" da fase de destino.
-// O executor já evita duplicar (idempotência por automaticKey).
-// Se o motor falhar, a mudança de fase NÃO é desfeita — só loga o erro.
+// Arrastar o card no Kanban = SOLICITAÇÃO de avanço (não escrita direta de fase).
+// Aceita apenas mover para a PRÓXIMA fase (ordem do Workflow Macro), delegando ao
+// PhaseAdvanceService (que valida Workflow Interno + BlockingEngine). Qualquer
+// outro destino é rejeitado — o card volta à coluna de origem no cliente.
+// faseAtualKey NUNCA é escrita aqui.
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
-import { executarMotorNaFase } from "@/src/lib/motor/executor"
 import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import { advance } from "@/src/lib/motor/phase-advance"
 
@@ -49,50 +45,39 @@ export async function PUT(request: Request, { params }: { params: Promise<{ proc
       return NextResponse.json({ error: "Fase inválida para o tipo deste processo." }, { status: 400 })
     }
 
-    // CP-4F — sob runtime v2, faseAtualKey NÃO pode ser escrita diretamente (regra
-    // suprema: só o PhaseAdvanceService escreve). Arrastar o card só é aceito quando
-    // o destino é EXATAMENTE a próxima fase (delega ao avanço normal); qualquer outra
-    // mudança (pular fases / voltar) deve usar os endpoints canônicos.
+    // CONSOLIDAÇÃO DO AVANÇO DE FASE — faseAtualKey NUNCA é escrita diretamente
+    // (regra suprema: só o PhaseAdvanceService escreve). Arrastar o card é apenas
+    // uma SOLICITAÇÃO de avanço: só é aceita quando o destino é EXATAMENTE a
+    // próxima fase pela ordem do Workflow Macro (delega ao avanço normal, que
+    // valida Workflow Interno + BlockingEngine). Pular/voltar fases usa os
+    // endpoints canônicos (/advance/force, /phase/return, /phase/reopen).
     const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 }, select: { runtimeV2Habilitado: true } })
-    if (resolveWorkflowRuntime(processo.workflowRuntime, cfg?.runtimeV2Habilitado ?? false) === "v2") {
-      const ordenadas = await prisma.macroWorkflow.findUnique({
-        where: { tipoProcessoId: processo.tipoProcessoMotorId },
-        include: { fases: { orderBy: { ordem: "asc" }, select: { phaseKey: true, ordem: true } } },
-      })
-      const fases = ordenadas?.fases ?? []
-      const idxAtual = fases.findIndex((f) => f.phaseKey === (processo.faseAtualKey ?? ""))
-      const proxima = idxAtual >= 0 && idxAtual + 1 < fases.length ? fases[idxAtual + 1].phaseKey : null
-      if (faseAtualKey === proxima) {
-        const r = await advance(processoId)
-        const status = r.success ? 200 : r.resultado === "CONFLITO" ? 409 : r.resultado === "BLOQUEADO" ? 422 : 400
-        return NextResponse.json(r, { status })
-      }
+    if (resolveWorkflowRuntime(processo.workflowRuntime, cfg?.runtimeV2Habilitado ?? false) !== "v2") {
       return NextResponse.json(
-        {
-          error: "Sob runtime v2, use os endpoints canônicos (/advance, /advance/force, /phase/return). Mudança direta de fase não é permitida.",
-          runtime: "v2", faseAtual: processo.faseAtualKey, destinoSolicitado: faseAtualKey, proximaFase: proxima,
-        },
+        { error: "Runtime legado descontinuado. O avanço de fase é exclusivo do PhaseAdvanceService (runtime v2).", runtime: "legacy" },
         { status: 409 },
       )
     }
 
-    const atualizado = await prisma.processo.update({
-      where: { id: processoId },
-      data: { faseAtualKey },
+    const ordenadas = await prisma.macroWorkflow.findUnique({
+      where: { tipoProcessoId: processo.tipoProcessoMotorId },
+      include: { fases: { orderBy: { ordem: "asc" }, select: { phaseKey: true, ordem: true } } },
     })
-
-    // ✅ GATILHO AUTOMÁTICO: roda as automações "ao entrar na fase" de destino
-    let motor: unknown = null
-    try {
-      const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 } })
-      if (cfg?.autoExecutarAoAvancar) {
-        motor = await executarMotorNaFase(processoId, processo.tipoProcessoMotorId, faseAtualKey, "entered")
-      }
-    } catch (e) {
-      console.error("Gatilho automático do motor falhou (mover fase):", e)
+    const fases = ordenadas?.fases ?? []
+    const idxAtual = fases.findIndex((f) => f.phaseKey === (processo.faseAtualKey ?? ""))
+    const proxima = idxAtual >= 0 && idxAtual + 1 < fases.length ? fases[idxAtual + 1].phaseKey : null
+    if (faseAtualKey === proxima) {
+      const r = await advance(processoId, { origem: "kanban-drag" })
+      const status = r.success ? 200 : r.resultado === "CONFLITO" ? 409 : r.resultado === "BLOQUEADO" ? 422 : 400
+      return NextResponse.json(r, { status })
     }
-
-    return NextResponse.json({ processo: atualizado, motor })
+    return NextResponse.json(
+      {
+        error: "Só é possível mover o card para a PRÓXIMA fase (a ordem é do Workflow Macro). Para pular/voltar, use as ações canônicas do processo.",
+        runtime: "v2", faseAtual: processo.faseAtualKey, destinoSolicitado: faseAtualKey, proximaFase: proxima,
+      },
+      { status: 409 },
+    )
   } catch (error) {
     console.error("Erro ao mover processo de fase:", error)
     return NextResponse.json({ error: "Erro ao mover processo de fase" }, { status: 500 })

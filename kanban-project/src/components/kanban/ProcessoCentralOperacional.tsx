@@ -393,7 +393,6 @@ export function ProcessoCentralOperacional({
   const faseKey = phaseKeyToFaseCode((processo as { faseAtualKey?: string | null }).faseAtualKey) ?? undefined
   const faseAtualNome =
     (faseKey ? FASES[faseKey]?.label : undefined) ??
-    processo.status?.nome ??
     "Genealogia"
   const idxAtual = PROCESS_PHASES.indexOf(faseAtualNome as (typeof PROCESS_PHASES)[number])
   const fasesConcluidas = idxAtual > 0 ? PROCESS_PHASES.slice(0, idxAtual) : []

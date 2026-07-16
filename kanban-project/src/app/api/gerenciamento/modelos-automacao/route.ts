@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verificarPermissao } from '@/src/lib/verificar-permissao';
 
+// CONSOLIDAÇÃO DO AVANÇO DE FASE — type=phase_transition não é mais criável.
+// O avanço de fase é exclusivo do PhaseAdvanceService; modelos só descrevem
+// EFEITOS. Modelos legados desse tipo permanecem legíveis (histórico), mas não
+// podem ser criados nem editados de volta para esse tipo.
+const TIPOS_EFEITO_PERMITIDOS = new Set(['task', 'financial', 'document', 'event', 'protocol', 'alert'])
+const MSG_TIPO_AVANCO_PROIBIDO =
+  'Modelos de automação descrevem apenas EFEITOS. "Avanço de fase" (phase_transition) foi descontinuado: o avanço é controlado pelo Workflow Interno + Workflow Macro via PhaseAdvanceService.'
+
 function slug(s: string) {
   return String(s || '')
     .normalize('NFD')
@@ -43,6 +51,10 @@ export async function POST(request: NextRequest) {
     if (!b?.name || !String(b.name).trim()) {
       return NextResponse.json({ error: 'Dê um nome ao modelo.' }, { status: 400 });
     }
+    const tipo = b.type ? String(b.type) : 'task';
+    if (tipo === 'phase_transition' || !TIPOS_EFEITO_PERMITIDOS.has(tipo)) {
+      return NextResponse.json({ error: MSG_TIPO_AVANCO_PROIBIDO, code: 'PHASE_TRANSITION_PROIBIDO' }, { status: 422 });
+    }
     const name = String(b.name).trim();
     const templateKey = `${slug(name) || 'auto_tpl'}-${Date.now().toString(36)}`;
 
@@ -51,7 +63,7 @@ export async function POST(request: NextRequest) {
         templateKey,
         name,
         description: b.description ? String(b.description) : null,
-        type: b.type ? String(b.type) : 'task',
+        type: tipo,
         category: b.category ? String(b.category) : null,
         recommendedPhases: Array.isArray(b.recommendedPhases) ? b.recommendedPhases : [],
         scope: b.scope ? String(b.scope) : 'phase',

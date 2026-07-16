@@ -91,7 +91,7 @@ interface ProcessoVinculado {
   id: number
   numero: string
   pais: string
-  status: string
+  fase: string
   etapaAtual?: string | null
 }
 
@@ -152,7 +152,7 @@ function ProcessosTooltip({
           id: p.id,
           numero: p.numero || p.nome || `#${p.id}`,
           pais: p.pais || 'N/A',
-          status: p.status?.nome || 'Em andamento',
+          fase: p.faseAtualKey || 'Em andamento',
           etapaAtual: p.etapaAtual
         })) || [])
         setLoaded(true)
@@ -291,7 +291,7 @@ function ProcessosTooltip({
                     {processo.numero}
                   </div>
                   <div className="text-[10px] text-gray-500">
-                    {processo.etapaAtual || processo.status}
+                    {processo.etapaAtual || processo.fase}
                   </div>
                 </div>
               </div>

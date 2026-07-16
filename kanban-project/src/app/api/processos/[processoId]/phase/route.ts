@@ -36,9 +36,6 @@ export async function GET(
   const processo = await prisma.processo.findUnique({
     where: { id: processoId },
     include: {
-      // fase REAL do card (a coluna). Se a relation tiver outro nome no
-      // seu schema (ex.: "coluna"/"etapa"), troque aqui e no acesso abaixo.
-      status: { select: { faseCode: true } },
       arvore: {
         include: {
           pessoas: {
@@ -76,7 +73,7 @@ export async function GET(
   // legada (status.faseCode). Sob v2, statusId costuma ser null → antes caía no
   // derive por documentos e exibia a fase ERRADA (ex.: "Análise Documental" quando a
   // fase real é "Emissão Documental"). Ordem: faseAtualKey → status.faseCode → derive.
-  const faseCanonica = phaseKeyToFaseCode(processo.faseAtualKey) ?? processo.status?.faseCode ?? null
+  const faseCanonica = phaseKeyToFaseCode(processo.faseAtualKey) ?? null
   const stageOverride = stageFromFaseCode(faseCanonica ?? undefined)
   const progress = computePhaseProgress(docs, stageOverride, faseCanonica)
 

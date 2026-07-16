@@ -209,7 +209,7 @@ export async function GET(
     // ============================================================
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { id: true, arvoreId: true, faseAtualKey: true, status: { select: { faseCode: true } } },
+      select: { id: true, arvoreId: true, faseAtualKey: true },
     })
 
     if (!processo) {
@@ -217,7 +217,7 @@ export async function GET(
     }
 
     const faseAtualCode =
-      (phaseKeyToFaseCode(processo.faseAtualKey) ?? processo.status?.faseCode ?? null)
+      (phaseKeyToFaseCode(processo.faseAtualKey) ?? null)
 
     // pessoas e documentos não dependem um do outro (ambos só precisam do
     // arvoreId) → busca os dois EM PARALELO, economizando um round-trip ao banco.
