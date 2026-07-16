@@ -28,6 +28,7 @@
     "test:home": "tsx scripts/home-logic.test.ts && tsx scripts/home-guard.test.ts",
     "test:status-legacy-guard": "tsx scripts/status-legacy-guard.test.ts",
     "test:genealogia-guard": "tsx scripts/genealogia-legado-guard.test.ts",
+    "test:automacoes-guard": "tsx scripts/automacoes-legado-guard.test.ts",
     "backfill:document-categories:dry": "tsx prisma/backfill-document-categories.ts --dry-run",
     "backfill:document-categories": "tsx prisma/backfill-document-categories.ts --execute",
     "backfill:lote-b:dry": "tsx prisma/backfill-lote-b-catalogo.ts --dry-run",

@@ -17,6 +17,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (!atual) return NextResponse.json({ error: "Regra não encontrada" }, { status: 404 })
 
     const b = await request.json()
+    // ARQUITETURA NOVA — regra transversal descontinuada: só se permite
+    // arquivar/desativar, nunca REATIVAR (desarquivar). Criação de tarefas
+    // obrigatórias é exclusiva do Workflow Interno.
+    if (b.arquivado === false && atual.arquivado === true) {
+      return NextResponse.json({
+        error: "Regras de Tarefa Transversal foram descontinuadas e não podem ser reativadas — a criação de tarefas obrigatórias é exclusiva do Workflow Interno.",
+        code: "TRANSVERSAL_DESATIVADO",
+      }, { status: 422 })
+    }
     const data: Prisma.RegraTarefaTransversalUpdateInput = {
       name: b.name !== undefined ? b.name : atual.name,
       tipoProcessoId: b.tipoProcessoId !== undefined ? b.tipoProcessoId : atual.tipoProcessoId,

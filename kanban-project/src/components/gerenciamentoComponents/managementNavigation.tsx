@@ -110,9 +110,12 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(10, "macrokanban", "Workflow Macro", ["workflow", "macro", "kanban", "fase", "coluna"], "Fases"),
       a(20, "phaseiwf", "Workflow Interno", ["workflow", "interno", "passo", "fase"], "Fases"),
       a(30, "phasemodes", "Variações da Fase", ["variacao", "variação", "modo", "interno", "fase"], "Fases"),
-      // Automações e regras (ex-módulo "Automações", agora dentro do Workflow)
+      // Automações e regras (ex-módulo "Automações", agora dentro do Workflow).
+      // ARQUITETURA NOVA: automações só configuram EFEITOS ADICIONAIS (financeiro,
+      // evento, protocolo, notificação). "Regras Transversais" (criavam tarefas
+      // nativas da operação) foram REMOVIDAS da interface — tarefa obrigatória da
+      // fase é exclusiva do Workflow Interno.
       a(40, "opauto", "Automações por Fase", ["automacao", "automação", "efeito", "fase", "regra", "gatilho", "workflow"], "Automações e regras"),
-      a(50, "crossrules", "Regras Transversais", ["regra", "transversal", "tarefa"], "Automações e regras"),
       a(60, "simfase", "Simulação", ["simulacao", "simulação", "fase", "teste"], "Automações e regras"),
       a(70, "execmatrix", "Histórico de Execuções", ["historico", "histórico", "execucao", "execução", "log"], "Automações e regras"),
       // "Tipos de Protocolo" NÃO pertence ao Workflow → mudou para o módulo
@@ -121,7 +124,8 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(100, "iwtemplates", "Modelos de Workflow Interno", ["modelo", "template", "workflow", "interno"], "Biblioteca de Modelos"),
       a(110, "imtemplates", "Modelos de Variações da Fase", ["modelo", "variacao", "variação", "fase", "passo", "step"], "Biblioteca de Modelos"),
       a(120, "amtemplates", "Modelos de Automação", ["modelo", "automacao", "automação", "preset"], "Biblioteca de Modelos"),
-      a(130, "crosstpl", "Modelos de Regras Transversais", ["modelo", "transversal", "tarefa", "regra"], "Biblioteca de Modelos"),
+      // "Modelos de Regras Transversais" REMOVIDO da interface (criava tarefas
+      // nativas da operação — agora exclusivo do Workflow Interno).
       // OCULTO: Hub redundante (as telas já são itens próprios acima).
       h(200, "workflowsphases", "Hub de Workflows das Fases"),
       h(210, "mod_wfmacro", "Modelos de Workflow Macro"),

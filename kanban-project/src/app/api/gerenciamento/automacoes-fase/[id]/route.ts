@@ -16,20 +16,25 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const atual = await prisma.phaseAutomationRule.findUnique({ where: { id } })
     if (!atual) return NextResponse.json({ error: 'Automação não encontrada.' }, { status: 404 })
 
-    // CONSOLIDAÇÃO DO AVANÇO DE FASE — automação não avança fase.
-    // (1) não pode mudar o kind para phase_advance/phase_transition;
-    // (2) regra legada kind=phase_advance é somente-leitura/arquivável: só
-    //     permitimos arquivar/desativar, nunca reativar como executável.
-    const MSG = 'Automações não avançam fase. O avanço é exclusivo do PhaseAdvanceService (Workflow Interno + Workflow Macro). Regras legadas de avanço permanecem apenas para histórico.'
+    // ARQUITETURA NOVA — automação não avança fase NEM cria trabalho obrigatório.
+    // Bloqueado: kind phase_advance/phase_transition (avanço = PhaseAdvanceService)
+    // e task/document (tarefa/documento obrigatório = Workflow Interno).
+    // (1) não pode mudar o kind para nenhum desses;
+    // (2) regra legada desses kinds é somente-leitura/arquivável: só se permite
+    //     arquivar/desativar, nunca reativar como executável.
+    const MSG_AVANCO = 'Automações não avançam fase. O avanço é exclusivo do PhaseAdvanceService (Workflow Interno + Workflow Macro). Regras legadas permanecem apenas para histórico.'
+    const MSG_TRABALHO = 'Automações não criam tarefas/documentos obrigatórios da fase — isso é exclusivo do Workflow Interno. Regras legadas permanecem apenas para histórico.'
+    const kindProibido = (k?: string) => k === 'phase_advance' || k === 'phase_transition' || k === 'task' || k === 'document'
+    const msgDe = (k?: string) => (k === 'task' || k === 'document' ? MSG_TRABALHO : MSG_AVANCO)
     const novoKind = body.kind !== undefined ? String(body.kind) : atual.kind
-    if (novoKind === 'phase_advance' || novoKind === 'phase_transition') {
-      return NextResponse.json({ error: MSG, code: 'PHASE_ADVANCE_PROIBIDO' }, { status: 422 })
+    if (kindProibido(novoKind)) {
+      return NextResponse.json({ error: msgDe(novoKind), code: 'AUTOMACAO_PROIBIDA' }, { status: 422 })
     }
-    if (atual.kind === 'phase_advance') {
-      // Só se permite arquivar/desativar uma regra legada de avanço.
+    if (kindProibido(atual.kind)) {
+      // Só se permite arquivar/desativar uma regra legada desses kinds.
       const querReativar = body.active === true || body.arquivado === false
       if (querReativar) {
-        return NextResponse.json({ error: MSG, code: 'PHASE_ADVANCE_LEGADO' }, { status: 422 })
+        return NextResponse.json({ error: msgDe(atual.kind), code: 'AUTOMACAO_LEGADA' }, { status: 422 })
       }
     }
 

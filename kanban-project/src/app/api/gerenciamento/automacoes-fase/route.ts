@@ -5,15 +5,20 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 function amtTypeToKind(t?: string) { return t === 'phase_transition' ? 'phase_advance' : (t || 'task') }
 
-// CONSOLIDAÇÃO DO AVANÇO DE FASE — kinds de EFEITO permitidos numa automação de
-// fase. "phase_advance" (e o type de modelo "phase_transition") ficam PROIBIDOS:
-// o avanço é exclusivo do PhaseAdvanceService (Workflow Interno conclui +
-// BlockingEngine libera + ordem do Workflow Macro decide a próxima fase).
+// ARQUITETURA NOVA — automações só descrevem EFEITOS ADICIONAIS. PROIBIDO:
+//  - 'phase_advance'/'phase_transition' → avanço é exclusivo do PhaseAdvanceService;
+//  - 'task'/'document' → trabalho OBRIGATÓRIO da fase (criar tarefa/documento) é
+//    exclusivo do Workflow Interno de cada Fase Macro.
+// Permitidos = efeitos adicionais (financeiro, evento, protocolo, notificação).
 // Registros legados permanecem legíveis, mas não podem ser criados/reativados.
-const KINDS_EFEITO_PERMITIDOS = new Set(['task', 'financial', 'document', 'event', 'protocol', 'alert'])
+const KINDS_EFEITO_PERMITIDOS = new Set(['financial', 'event', 'protocol', 'alert'])
 const MSG_PHASE_ADVANCE_PROIBIDO =
-  'Automações não avançam fase. O avanço é controlado pelo Workflow Interno (conclusão) + Workflow Macro (ordem) via PhaseAdvanceService. Use um efeito (tarefa, documento, evento, protocolo, notificação).'
+  'Automações não avançam fase. O avanço é controlado pelo Workflow Interno (conclusão) + Workflow Macro (ordem) via PhaseAdvanceService.'
+const MSG_TRABALHO_OBRIGATORIO_PROIBIDO =
+  'Automações não criam tarefas nem documentos obrigatórios da fase. Isso é responsabilidade exclusiva do Workflow Interno da Fase Macro. Automações só configuram efeitos adicionais (financeiro, evento, protocolo, notificação).'
 function kindDeAvanco(kind?: string) { return kind === 'phase_advance' || kind === 'phase_transition' }
+function kindDeTrabalhoObrigatorio(kind?: string) { return kind === 'task' || kind === 'document' }
+function msgProibido(kind?: string) { return kindDeTrabalhoObrigatorio(kind) ? MSG_TRABALHO_OBRIGATORIO_PROIBIDO : MSG_PHASE_ADVANCE_PROIBIDO }
 
 // GET — dados da tela: processos+fases, regras aplicadas, biblioteca 2C
 export async function GET(request: NextRequest) {
@@ -72,9 +77,10 @@ export async function POST(request: NextRequest) {
       if (!modelo) return NextResponse.json({ error: 'Modelo não encontrado.' }, { status: 404 })
 
       const kind = amtTypeToKind(modelo.type)
-      // Modelo legado de transição de fase não pode ser aplicado a processos.
-      if (kindDeAvanco(modelo.type) || kindDeAvanco(kind) || !KINDS_EFEITO_PERMITIDOS.has(kind)) {
-        return NextResponse.json({ error: MSG_PHASE_ADVANCE_PROIBIDO, code: 'PHASE_ADVANCE_PROIBIDO' }, { status: 422 })
+      // Modelo de trabalho obrigatório (task/document) ou de avanço não pode ser
+      // aplicado a processos — só efeitos adicionais.
+      if (kindDeAvanco(modelo.type) || kindDeAvanco(kind) || kindDeTrabalhoObrigatorio(kind) || !KINDS_EFEITO_PERMITIDOS.has(kind)) {
+        return NextResponse.json({ error: msgProibido(kind), code: 'AUTOMACAO_PROIBIDA' }, { status: 422 })
       }
       const dp = (modelo.defaultParams as Record<string, unknown>) || {}
 
@@ -101,8 +107,8 @@ export async function POST(request: NextRequest) {
     const name = String(body.name || '').trim()
     if (!tipoProcessoId || !phaseKey) return NextResponse.json({ error: 'Selecione o processo e a fase.' }, { status: 400 })
     if (!name) return NextResponse.json({ error: 'Dê um nome à automação.' }, { status: 400 })
-    if (kindDeAvanco(kind) || !KINDS_EFEITO_PERMITIDOS.has(kind)) {
-      return NextResponse.json({ error: MSG_PHASE_ADVANCE_PROIBIDO, code: 'PHASE_ADVANCE_PROIBIDO' }, { status: 422 })
+    if (kindDeAvanco(kind) || kindDeTrabalhoObrigatorio(kind) || !KINDS_EFEITO_PERMITIDOS.has(kind)) {
+      return NextResponse.json({ error: msgProibido(kind), code: 'AUTOMACAO_PROIBIDA' }, { status: 422 })
     }
 
     const rule = await prisma.phaseAutomationRule.create({

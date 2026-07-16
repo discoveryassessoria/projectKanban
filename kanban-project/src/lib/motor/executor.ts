@@ -228,6 +228,12 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
     return { created: [], skipped: [{ name: "motor-legado", reason: "processo em runtime v2 — motor legado inativo" }], errors: [], totalCriado: 0 }
   }
   const wantTrigger = opautoTriggerFor(event)
+  // ARQUITETURA NOVA (neutralização das automações antigas): automações NÃO criam
+  // mais tarefas obrigatórias da fase. Tarefas passam a ser responsabilidade
+  // EXCLUSIVA do Workflow Interno de cada Fase Macro. Ainda LEMOS as regras
+  // kind=task existentes só para REPORTá-las como neutralizadas (transparência na
+  // simulação/histórico) — mas nenhuma Tarefa é criada aqui. Efeitos adicionais
+  // (financeiro/evento/protocolo/trigger) seguem funcionando.
   const [taskRules, finAutoRules, eventRules, protocolRules, triggerRules, produtos] = await Promise.all([
     prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'task', active: true, arquivado: false } }),
     prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'financial', active: true, arquivado: false } }),
@@ -261,33 +267,14 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
     }
   }
 
-  // TAREFAS
+  // TAREFAS — NEUTRALIZADO (arquitetura nova).
+  // Automações não criam mais tarefas obrigatórias da fase: isso é exclusivo do
+  // Workflow Interno. Regras kind=task existentes são apenas REPORTADAS como
+  // neutralizadas; nenhuma Tarefa é criada aqui. (Os helpers de criação de tarefa
+  // — criarTarefaDeSpec/mapPrio/resolverResponsavelDaRegra — ficaram sem uso de
+  // propósito; mantidos para minimizar churn até a nova arquitetura.)
   for (const rule of taskRules) {
-    if (wantTrigger == null || rule.trigger !== wantTrigger) { skipped.push({ name: rule.name, reason: `gatilho não corresponde (dispara em "${rule.trigger}")` }); continue }
-    const cond = await avaliarCondicoes(rule.conditions, processoId)
-    if (cond.decisao === 'bloqueia') { skipped.push({ name: rule.name, reason: cond.motivo || 'condição não satisfeita' }); continue }
-    const naoVerificada = cond.decisao === 'nao_verificada'
-    const akey = `${processoId}::${phaseKey}::automation::${rule.id}`
-    const prio = mapPrio(pstr(rule.params, 'priority'))
-    const slaDays = pnum(rule.params, 'slaDays')
-    const followUpDias = pnum(rule.params, 'followUpDays')
-    const responsavelId = await resolverResponsavelDaRegra(rule.params)
-    await fazer(akey, 'Tarefa', 'task', 'automation', rule.id, rule.name,
-      { prioridade: prio, ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
-      async () => {
-        const t = await criarTarefaDeSpec({
-          titulo: rule.name,
-          descricao: rule.description || null,
-          processoId,
-          responsavelId,
-          prioridade: prio,
-          slaDays,
-          followUp: followUpDias != null ? { prazoCobranca: followUpDias } : null,
-          observacoes: `Criada automaticamente pelo motor · fase "${phaseKey}" · regra "${rule.name}"${naoVerificada ? ' · ⚠ condição não verificada' : ''}`,
-        })
-        return t.id
-      },
-      (id) => created.push({ kind: 'task', targetTable: 'Tarefa', targetId: id, name: rule.name, condicaoNaoVerificada: naoVerificada || undefined }))
+    skipped.push({ name: rule.name, reason: 'automação de tarefa NEUTRALIZADA — tarefas obrigatórias da fase são exclusivas do Workflow Interno' })
   }
 
   // FINANCEIRO — Regras de Disparo (PhaseTriggerRule) — sem conditions Json;

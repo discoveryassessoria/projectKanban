@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verificarPermissao } from '@/src/lib/verificar-permissao';
 
-// CONSOLIDAÇÃO DO AVANÇO DE FASE — type=phase_transition não é mais criável.
-// O avanço de fase é exclusivo do PhaseAdvanceService; modelos só descrevem
-// EFEITOS. Modelos legados desse tipo permanecem legíveis (histórico), mas não
-// podem ser criados nem editados de volta para esse tipo.
-const TIPOS_EFEITO_PERMITIDOS = new Set(['task', 'financial', 'document', 'event', 'protocol', 'alert'])
+// ARQUITETURA NOVA — modelos de automação descrevem apenas EFEITOS ADICIONAIS.
+// PROIBIDO criar/reativar: 'phase_transition' (avanço = PhaseAdvanceService) e
+// 'task'/'document' (tarefa/documento obrigatório da fase = Workflow Interno).
+// Modelos legados desses tipos permanecem legíveis (histórico), mas não podem
+// ser criados nem editados de volta para esses tipos.
+const TIPOS_EFEITO_PERMITIDOS = new Set(['financial', 'event', 'protocol', 'alert'])
+const TIPOS_TRABALHO_OBRIGATORIO = new Set(['task', 'document'])
 const MSG_TIPO_AVANCO_PROIBIDO =
-  'Modelos de automação descrevem apenas EFEITOS. "Avanço de fase" (phase_transition) foi descontinuado: o avanço é controlado pelo Workflow Interno + Workflow Macro via PhaseAdvanceService.'
+  'Modelos de automação descrevem apenas EFEITOS ADICIONAIS (financeiro, evento, protocolo, notificação). "Avanço de fase" é do PhaseAdvanceService; "tarefa"/"documento" obrigatório da fase é do Workflow Interno.'
 
 function slug(s: string) {
   return String(s || '')
@@ -51,9 +53,9 @@ export async function POST(request: NextRequest) {
     if (!b?.name || !String(b.name).trim()) {
       return NextResponse.json({ error: 'Dê um nome ao modelo.' }, { status: 400 });
     }
-    const tipo = b.type ? String(b.type) : 'task';
-    if (tipo === 'phase_transition' || !TIPOS_EFEITO_PERMITIDOS.has(tipo)) {
-      return NextResponse.json({ error: MSG_TIPO_AVANCO_PROIBIDO, code: 'PHASE_TRANSITION_PROIBIDO' }, { status: 422 });
+    const tipo = b.type ? String(b.type) : 'financial';
+    if (tipo === 'phase_transition' || TIPOS_TRABALHO_OBRIGATORIO.has(tipo) || !TIPOS_EFEITO_PERMITIDOS.has(tipo)) {
+      return NextResponse.json({ error: MSG_TIPO_AVANCO_PROIBIDO, code: 'AUTOMACAO_PROIBIDA' }, { status: 422 });
     }
     const name = String(b.name).trim();
     const templateKey = `${slug(name) || 'auto_tpl'}-${Date.now().toString(36)}`;

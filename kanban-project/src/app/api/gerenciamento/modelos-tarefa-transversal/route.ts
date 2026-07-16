@@ -2,10 +2,15 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { Prisma } from "@prisma/client"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 
-// GET — lista os modelos de tarefa transversal
+// ARQUITETURA NOVA — Modelos de Tarefa Transversal alimentavam a criação de
+// TAREFAS NATIVAS da operação (via Regras Transversais), papel agora EXCLUSIVO
+// do Workflow Interno. A CRIAÇÃO está DESATIVADA; dados existentes permanecem (GET).
+const MSG_TRANSVERSAL_DESATIVADO =
+  "Modelos de Tarefa Transversal foram descontinuados: a criação de tarefas obrigatórias é exclusiva do Workflow Interno da Fase Macro. Registros existentes permanecem apenas para histórico."
+
+// GET — lista os modelos de tarefa transversal (preservado para histórico)
 export async function GET() {
   try {
     const modelos = await prisma.modeloTarefaTransversal.findMany({
@@ -18,40 +23,9 @@ export async function GET() {
   }
 }
 
-// POST — cria um modelo
+// POST — DESATIVADO (não cria mais modelo transversal). 410 Gone.
 export async function POST(request: Request) {
-  try {
-    const erro = await verificarPermissao(request, "usuarios.gerenciar")
-    if (erro) return erro
-
-    const b = await request.json()
-    if (!b?.name) return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 })
-    if (!b?.templateKey) return NextResponse.json({ error: "templateKey é obrigatório" }, { status: 400 })
-    if (!b?.defaultOperationalPhase) return NextResponse.json({ error: "Fase operacional é obrigatória" }, { status: 400 })
-
-    const modelo = await prisma.modeloTarefaTransversal.create({
-      data: {
-        templateKey: b.templateKey,
-        name: b.name,
-        type: b.type || "custom",
-        description: b.description ?? null,
-        defaultOriginPhase: b.defaultOriginPhase ?? null,
-        defaultOperationalPhase: b.defaultOperationalPhase,
-        defaultMandatory: b.defaultMandatory ?? true,
-        defaultResultAction: b.defaultResultAction || "apply_back_to_origin_phase",
-        recommendedForOriginPhases: (b.recommendedForOriginPhases ?? undefined) as Prisma.InputJsonValue,
-        operationalWorkflow: (b.operationalWorkflow ?? undefined) as Prisma.InputJsonValue,
-        originLinkConfig: (b.originLinkConfig ?? undefined) as Prisma.InputJsonValue,
-        defaultEffects: (b.defaultEffects ?? undefined) as Prisma.InputJsonValue,
-        duplicatePolicy: (b.duplicatePolicy ?? undefined) as Prisma.InputJsonValue,
-        defaultOriginLinkType: b.defaultOriginLinkType || "document",
-        isSystemTemplate: b.isSystemTemplate ?? false,
-        arquivado: b.arquivado ?? false,
-      },
-    })
-    return NextResponse.json({ modelo }, { status: 201 })
-  } catch (error) {
-    console.error("Erro ao criar modelo de tarefa transversal:", error)
-    return NextResponse.json({ error: "Erro ao criar modelo" }, { status: 500 })
-  }
+  const erro = await verificarPermissao(request, "usuarios.gerenciar")
+  if (erro) return erro
+  return NextResponse.json({ error: MSG_TRANSVERSAL_DESATIVADO, code: "TRANSVERSAL_DESATIVADO" }, { status: 410 })
 }

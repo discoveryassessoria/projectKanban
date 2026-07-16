@@ -17,6 +17,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (!atual) return NextResponse.json({ error: "Modelo não encontrado" }, { status: 404 })
 
     const b = await request.json()
+    // ARQUITETURA NOVA — modelo transversal descontinuado: só se permite
+    // arquivar/desativar, nunca REATIVAR (desarquivar).
+    if (b.arquivado === false && atual.arquivado === true) {
+      return NextResponse.json({
+        error: "Modelos de Tarefa Transversal foram descontinuados e não podem ser reativados — a criação de tarefas obrigatórias é exclusiva do Workflow Interno.",
+        code: "TRANSVERSAL_DESATIVADO",
+      }, { status: 422 })
+    }
     const data: Prisma.ModeloTarefaTransversalUpdateInput = {
       name: b.name !== undefined ? b.name : atual.name,
       type: b.type !== undefined ? b.type : atual.type,

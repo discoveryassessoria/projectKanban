@@ -2,10 +2,16 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { Prisma } from "@prisma/client"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 
-// GET — lista as regras de tarefa transversal
+// ARQUITETURA NOVA — Regras de Tarefa Transversal criavam TAREFAS NATIVAS da
+// operação, papel que passou a ser EXCLUSIVO do Workflow Interno de cada Fase
+// Macro. A CRIAÇÃO está DESATIVADA. Os dados existentes permanecem (GET) e podem
+// ser arquivados (PUT), mas nenhuma regra nova é criada.
+const MSG_TRANSVERSAL_DESATIVADO =
+  "Regras de Tarefa Transversal foram descontinuadas: a criação de tarefas obrigatórias é exclusiva do Workflow Interno da Fase Macro. Registros existentes permanecem apenas para histórico."
+
+// GET — lista as regras de tarefa transversal (preservado para histórico)
 export async function GET() {
   try {
     const regras = await prisma.regraTarefaTransversal.findMany({
@@ -18,40 +24,9 @@ export async function GET() {
   }
 }
 
-// POST — cria uma regra
+// POST — DESATIVADO (não cria mais regra transversal). 410 Gone.
 export async function POST(request: Request) {
-  try {
-    const erro = await verificarPermissao(request, "usuarios.gerenciar")
-    if (erro) return erro
-
-    const b = await request.json()
-    if (!b?.name) return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 })
-    if (!b?.originPhase) return NextResponse.json({ error: "Fase de origem é obrigatória" }, { status: 400 })
-    if (!b?.operationalPhase) return NextResponse.json({ error: "Operação usada é obrigatória" }, { status: 400 })
-
-    const regra = await prisma.regraTarefaTransversal.create({
-      data: {
-        ruleKey: b.ruleKey ?? null,
-        name: b.name,
-        tipoProcessoId: b.tipoProcessoId ?? null,
-        originPhase: b.originPhase,
-        operationalPhase: b.operationalPhase,
-        templateId: b.templateId ?? null,
-        trigger: (b.trigger ?? undefined) as Prisma.InputJsonValue,
-        creation: (b.creation ?? undefined) as Prisma.InputJsonValue,
-        originLink: (b.originLink ?? undefined) as Prisma.InputJsonValue,
-        duplicatePolicy: (b.duplicatePolicy ?? undefined) as Prisma.InputJsonValue,
-        applyResult: (b.applyResult ?? undefined) as Prisma.InputJsonValue,
-        autoCreate: b.autoCreate ?? false,
-        suggested: b.suggested ?? true,
-        mandatory: b.mandatory ?? true,
-        isSystemTemplate: b.isSystemTemplate ?? false,
-        arquivado: b.arquivado ?? false,
-      },
-    })
-    return NextResponse.json({ regra }, { status: 201 })
-  } catch (error) {
-    console.error("Erro ao criar regra de tarefa transversal:", error)
-    return NextResponse.json({ error: "Erro ao criar regra" }, { status: 500 })
-  }
+  const erro = await verificarPermissao(request, "usuarios.gerenciar")
+  if (erro) return erro
+  return NextResponse.json({ error: MSG_TRANSVERSAL_DESATIVADO, code: "TRANSVERSAL_DESATIVADO" }, { status: 410 })
 }

@@ -72,7 +72,9 @@ ok(grupoDe("execmatrix") === "grp_workflow", "D3: execmatrix em Workflow (não n
 ok(todosItens.filter((i) => i.key === "suppliers").some((i) => i.label === "Fornecedores"), "D5: suppliers = 'Fornecedores' (cadastro mestre)")
 ok(itemDe("fornecedoresconc")?.label === "Concentradoras e Adquirentes", "D5: fornecedoresconc = 'Concentradoras e Adquirentes'")
 ok(itemDe("roles")?.label === "Perfis e Permissões" && !itemDe("permprofiles"), "D6: item único 'Perfis e Permissões' (permprofiles vira alias)")
-ok(grupoDe("crossrules") === "grp_workflow" && itemDe("crossrules")?.label === "Regras Transversais", "D8: Regras Transversais em Workflow")
+// ARQUITETURA NOVA — "Regras Transversais" (crossrules) REMOVIDA da navegação:
+// criava tarefas nativas da operação, agora exclusivo do Workflow Interno.
+ok(!itemDe("crossrules"), "Regras Transversais REMOVIDA da navegação (não é mais criável na UI)")
 ok(grupoDe("imtemplates") === "grp_workflow", "D8: Modelos de Variações da Fase em Workflow → Biblioteca de Modelos")
 ok(grupoDe("prottypes") === "grp_documentos" && itemDe("prottypes")?.status === "active" && itemDe("prottypes")?.label === "Tipos de Protocolo", "D9: 'Tipos de Protocolo' ATIVO em Documentos e Protocolos")
 ok(grupoDe("prottypes") !== "grp_workflow", "D9: 'Tipos de Protocolo' NÃO está em Workflow")
@@ -129,23 +131,25 @@ console.log("\nAutomações dentro do Workflow:")
 ok(!MANAGEMENT_NAVIGATION.some((g) => g.key === "grp_automacoes"), "módulo 'Automações' NÃO existe mais")
 ok(grupoDe("opauto") === "grp_workflow" && itemDe("opauto")?.label === "Automações por Fase", "opauto em Workflow como 'Automações por Fase'")
 ok(grupoDe("amtemplates") === "grp_workflow" && itemDe("amtemplates")?.label === "Modelos de Automação", "amtemplates em Workflow → Biblioteca de Modelos ('Modelos de Automação')")
-ok(grupoDe("crosstpl") === "grp_workflow", "crosstpl (Modelos de Regras Transversais) em Workflow → Biblioteca de Modelos")
+ok(!itemDe("crosstpl"), "Modelos de Regras Transversais (crosstpl) REMOVIDO da navegação")
 ok(itemDe("phasemodes")?.label === "Variações da Fase", "phasemodes renomeado 'Modos Internos' → 'Variações da Fase'")
 // Biblioteca de Modelos como sub-seção do Workflow (via section)
 const bibWf = (MANAGEMENT_NAVIGATION.find((g) => g.key === "grp_workflow")?.children ?? []).filter((c) => c.section === "Biblioteca de Modelos" && c.status === "active")
-ok(bibWf.length === 4 && ["iwtemplates", "imtemplates", "amtemplates", "crosstpl"].every((k) => bibWf.some((c) => c.key === k)), "Workflow → 'Biblioteca de Modelos' tem os 4 modelos (IW, Variações, Automação, Transversais)")
+ok(bibWf.length === 3 && ["iwtemplates", "imtemplates", "amtemplates"].every((k) => bibWf.some((c) => c.key === k)) && !bibWf.some((c) => c.key === "crosstpl"), "Workflow → 'Biblioteca de Modelos' tem 3 modelos (IW, Variações, Automação) — Transversais removido")
 // screen→component não deve mais mapear finauto (scaffold removido do menu)
 ok(!/\bfinauto:\s*FinAutomationsTab/.test(pageSrc), "screen map não mapeia mais 'finauto'")
 
-// 13) Workflow = árvore APROVADA exata (11 itens ativos, na ordem, sem extras)
+// 13) Workflow = árvore APROVADA exata (9 itens ativos, na ordem, sem extras).
+// ARQUITETURA NOVA: "Regras Transversais" e "Modelos de Regras Transversais"
+// foram removidas (criavam tarefas nativas → agora Workflow Interno).
 console.log("\nWorkflow = árvore aprovada:")
 const wfAtivos = (MANAGEMENT_NAVIGATION.find((g) => g.key === "grp_workflow")?.children ?? []).filter((c) => c.status === "active").map((c) => c.label)
 const wfAprovado = [
   "Workflow Macro", "Workflow Interno", "Variações da Fase",
-  "Automações por Fase", "Regras Transversais", "Simulação", "Histórico de Execuções",
-  "Modelos de Workflow Interno", "Modelos de Variações da Fase", "Modelos de Automação", "Modelos de Regras Transversais",
+  "Automações por Fase", "Simulação", "Histórico de Execuções",
+  "Modelos de Workflow Interno", "Modelos de Variações da Fase", "Modelos de Automação",
 ]
-ok(JSON.stringify(wfAtivos) === JSON.stringify(wfAprovado), "Workflow: itens ativos batem EXATAMENTE a árvore aprovada (11, na ordem, sem extras)")
+ok(JSON.stringify(wfAtivos) === JSON.stringify(wfAprovado), "Workflow: itens ativos batem EXATAMENTE a árvore aprovada (9, na ordem, sem extras)")
 
 // 14) Tipos de Protocolo movido p/ Documentos e Protocolos (16/07)
 console.log("\nTipos de Protocolo → Documentos e Protocolos:")

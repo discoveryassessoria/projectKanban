@@ -41,12 +41,12 @@ const KIND_LABELS: Record<string, string> = {
   // Legado — não executa mais. Mantido só para rotular registros antigos.
   phase_advance: "Avanço de fase (legado)",
 }
-// CONSOLIDAÇÃO DO AVANÇO DE FASE — "Avanço de fase" NÃO é mais um tipo de
-// automação. O avanço é do PhaseAdvanceService (Workflow Interno + Workflow
-// Macro). Só EFEITOS são configuráveis aqui.
+// ARQUITETURA NOVA — automações só configuram EFEITOS ADICIONAIS. "Avanço de
+// fase" é do PhaseAdvanceService; "Tarefa"/"Documento" obrigatório da fase é
+// exclusivo do Workflow Interno — por isso essas abas foram REMOVIDAS. Sobram
+// apenas os efeitos adicionais (financeiro, evento, protocolo).
 const KIND_TABS: [string, string][] = [
-  ["task", "Tarefas"], ["financial", "Financeiro"], ["document", "Documentos"],
-  ["event", "Eventos"], ["protocol", "Protocolo"],
+  ["financial", "Financeiro"], ["event", "Eventos"], ["protocol", "Protocolo"],
 ]
 const TRIGGER_LABELS: Record<string, string> = {
   phase_entered: "Quando a fase começa", phase_exited: "Quando a fase termina",
@@ -110,7 +110,7 @@ export default function PhaseAutomationsFasesTab() {
 
   const [ptId, setPtId] = useState<string>("")
   const [phase, setPhase] = useState<string>("all") // 'all' ou phaseKey
-  const [tab, setTab] = useState<string>("task")
+  const [tab, setTab] = useState<string>("financial")
   const [showArchived, setShowArchived] = useState(false)
 
   const [applyOpen, setApplyOpen] = useState(false)
@@ -268,7 +268,7 @@ export default function PhaseAutomationsFasesTab() {
       <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Automações e efeitos da fase</h2>
         <p className="mt-1 text-sm text-white/60">
-          Aqui você configura os <b className="text-white/80">efeitos</b> disparados por eventos da fase: criar tarefa, documento, evento, protocolo, notificação ou lançamento (futuro). Modelos reutilizáveis ficam na biblioteca <span className="text-blue-300">“Modelos de Automação”</span>.
+          Aqui você configura os <b className="text-white/80">efeitos adicionais</b> disparados por eventos da fase: lançamento financeiro, evento/agenda, protocolo e notificação. Tarefas obrigatórias e avanço de fase NÃO são automação — pertencem ao <span className="text-blue-300">Workflow Interno</span>. Modelos reutilizáveis ficam na biblioteca <span className="text-blue-300">“Modelos de Automação”</span>.
         </p>
         <div className="mt-3 rounded-xl border border-sky-400/20 bg-sky-500/10 px-4 py-2.5 text-xs text-sky-200">
           As automações desta área <b>reagem</b> aos eventos da fase. A <b>conclusão</b> é determinada pelo <b>Workflow Interno</b> (+ BlockingEngine) e a <b>próxima fase</b> pela ordem do <b>Workflow Macro</b>. Nenhuma automação avança ou escolhe a fase.
@@ -312,7 +312,7 @@ export default function PhaseAutomationsFasesTab() {
                     </div>
                     <div className="mt-0.5 text-xs text-white/50">{byKind.length ? byKind.map(([l, n]) => `${n} ${l.toLowerCase()}`).join(" · ") : "nenhuma automação aplicada"}</div>
                   </div>
-                  <button onClick={() => { setPhase(f.phaseKey); setTab("task") }} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">Gerenciar</button>
+                  <button onClick={() => { setPhase(f.phaseKey); setTab("financial") }} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">Gerenciar</button>
                 </div>
               </div>
             )

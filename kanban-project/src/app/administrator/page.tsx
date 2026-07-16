@@ -128,8 +128,8 @@ const MatrizDocumentalTab = dynamic(() => import("@/src/components/gerenciamento
 const LogAuditoriaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/LogAuditoriaTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const SimulacaoFaseTab = dynamic(() => import("@/src/components/gerenciamentoComponents/SimulacaoFaseTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ExecutorMotorTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ExecutorMotorTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const ModelosTarefaTransversalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosTarefaTransversalTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const RegrasTarefaTransversalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasTarefaTransversalTab"), { ssr: false, loading: () => <CarregandoTela /> })
+// ARQUITETURA NOVA — imports das telas de Tarefa Transversal removidos (telas
+// retiradas da navegação; criavam tarefas nativas, agora do Workflow Interno).
 const WorkflowsFasesHubTab = dynamic(() => import("@/src/components/gerenciamentoComponents/WorkflowsFasesHubTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PerfisPermissaoMotorTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PerfisPermissaoMotorTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
@@ -203,8 +203,9 @@ const TELAS: Record<string, React.ComponentType> = {
   discrules: RegrasDescontoTab,
   pricing: AplicabilidadeEconomicaTab,
   phasemap: PhaseTriggerRulesTab,
-  crosstpl: ModelosTarefaTransversalTab,
-  crossrules: RegrasTarefaTransversalTab,
+  // ARQUITETURA NOVA — telas de Regras/Modelos de Tarefa Transversal REMOVIDAS da
+  // interface (criavam tarefas nativas da operação; agora exclusivo do Workflow
+  // Interno). Componentes e dados preservados, apenas inacessíveis pela navegação.
   simfase: SimulacaoFaseTab,
   execmotor: ExecutorMotorTab,
   runtimediag: RuntimeWorkflowDiagnostics,
