@@ -20,7 +20,7 @@
 
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { HeaderBar } from "@/src/components/header-bar"
@@ -407,12 +407,21 @@ export default function GerenciamentoPage() {
     } catch { /* silencioso */ }
   }, [])
 
-  // montagem: deep-link + sincronização com botão voltar/avançar do browser
+  // montagem: deep-link + sincronização com botão voltar/avançar do browser.
+  // CRÍTICO (accordion): este sync SÓ pode rodar no MOUNT e no POPSTATE — nunca a
+  // cada render. `pode` (usePermissoes) não é memoizado → sincronizarDaURL muda de
+  // identidade a cada render; se este effect dependesse dela, re-rodaria sempre e
+  // RESETARIA expandedModule para o grupo da tela ativa, desfazendo o toggle do
+  // usuário (abria-e-reabria / não fechava). Usamos um ref p/ manter a versão
+  // atual e deps [] para o effect não re-executar em re-renders.
+  const sincronizarRef = useRef(sincronizarDaURL)
+  useEffect(() => { sincronizarRef.current = sincronizarDaURL }, [sincronizarDaURL])
   useEffect(() => {
-    sincronizarDaURL()
-    window.addEventListener("popstate", sincronizarDaURL)
-    return () => window.removeEventListener("popstate", sincronizarDaURL)
-  }, [sincronizarDaURL])
+    sincronizarRef.current()
+    const onPop = () => sincronizarRef.current()
+    window.addEventListener("popstate", onPop)
+    return () => window.removeEventListener("popstate", onPop)
+  }, [])
 
   useEffect(() => {
     if (typeof window !== "undefined") {
