@@ -36,7 +36,7 @@ import {
 
 // Lote 1 — 12 telas bespoke
 import {
-  TeamsTab, FinAutomationsTab, OpAutomationsTab, ProductsTab, ProtocolsTab,
+  TeamsTab, ProductsTab, ProtocolsTab,
   SLATab, TemplatesTab, NotificationsTab, AuditTab, ImportExportTab,
   BackupTab, SettingsTab,
 } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds"
@@ -172,7 +172,6 @@ const TELAS: Record<string, React.ComponentType> = {
 
   // bespoke (lote 1)
   teams: TeamsTab,
-  finauto: FinAutomationsTab,
   opauto: PhaseAutomationsFasesTab,
   workflowsphases: WorkflowsFasesHubTab,
   protocols: ProtocolsTab,

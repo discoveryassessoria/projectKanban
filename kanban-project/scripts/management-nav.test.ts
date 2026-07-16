@@ -66,18 +66,18 @@ const grupoDe = (key: string) => MANAGEMENT_NAVIGATION.find((g) => (g.children ?
 const itemDe = (key: string) => todosItens.find((i) => i.key === key)
 const emProcessos = (key: string) => !!MANAGEMENT_NAVIGATION.find((g) => g.key === "grp_processos")?.children?.some((c) => c.key === key)
 console.log("\nDecisões aprovadas:")
-ok(grupoDe("phasemap") === "grp_automacoes" && itemDe("phasemap")?.label === "Regras por Fase", "D1: phasemap em Automações como 'Regras por Fase'")
+ok(grupoDe("phasemap") === "grp_financeiro" && itemDe("phasemap")?.label === "Regras Financeiras por Fase", "D1: phasemap em Financeiro como 'Regras Financeiras por Fase' (reusa motor do Workflow)")
 ok(!emProcessos("phasemap"), "D1: phasemap removido de Processos")
-ok(grupoDe("simfase") === "grp_automacoes" && itemDe("simfase")?.label === "Simulação", "D2: simfase em Automações como 'Simulação'")
+ok(grupoDe("simfase") === "grp_workflow" && itemDe("simfase")?.label === "Simulação", "D2: simfase em Workflow como 'Simulação'")
 ok(!emProcessos("simfase"), "D2: simfase removido de Processos")
-ok(grupoDe("execmatrix") === "grp_automacoes", "D3: execmatrix só em Automações (não no Motor Técnico)")
+ok(grupoDe("execmatrix") === "grp_workflow", "D3: execmatrix em Workflow (não no Motor Técnico)")
 ok(itemDe("syshealth")?.label === "Saúde do Sistema", "D4: syshealth = 'Saúde do Sistema'")
 ok(todosItens.filter((i) => i.key === "suppliers").some((i) => i.label === "Fornecedores"), "D5: suppliers = 'Fornecedores' (cadastro mestre)")
 ok(itemDe("fornecedoresconc")?.label === "Concentradoras e Adquirentes", "D5: fornecedoresconc = 'Concentradoras e Adquirentes'")
 ok(itemDe("roles")?.label === "Perfis e Permissões" && !itemDe("permprofiles"), "D6: item único 'Perfis e Permissões' (permprofiles vira alias)")
 ok(motor?.permission === GESTAO_PERMISSION && GESTAO_PERMISSION === "usuarios.gerenciar", "D7: Motor Técnico usa a MESMA regra dos demais módulos (usuarios.gerenciar)")
-ok(grupoDe("crossrules") === "grp_workflow", "D8: Tarefas Transversais em Workflow")
-ok(grupoDe("imtemplates") === "grp_biblioteca", "D8: Modelos de Passos em Biblioteca Operacional")
+ok(grupoDe("crossrules") === "grp_workflow" && itemDe("crossrules")?.label === "Regras Transversais", "D8: Regras Transversais em Workflow")
+ok(grupoDe("imtemplates") === "grp_workflow", "D8: Modelos de Variações da Fase em Workflow → Biblioteca de Modelos")
 ok(grupoDe("prottypes") === "grp_workflow" && itemDe("prottypes")?.label === "Tipos de Protocolo", "D9: prottypes em Workflow como 'Tipos de Protocolo'")
 ok(!itemDe("protocols"), "D9: protocols NÃO está na sidebar do Gerenciamento")
 
@@ -94,7 +94,7 @@ const curtos: Array<[string, string, string]> = [
   ["grp_motor", "Motor", "Motor Técnico"],
 ]
 ok(curtos.every(([k, short, full]) => gLabel(k)?.label === short && gLabel(k)?.fullLabel === full), "labels curtos aplicados com fullLabel completo")
-ok(["grp_processos", "grp_workflow", "grp_documentos", "grp_financeiro", "grp_automacoes", "grp_comunicacao", "grp_integracoes"].every((k) => !gLabel(k)?.fullLabel), "grupos mantidos ficaram com label inalterado")
+ok(["grp_processos", "grp_workflow", "grp_documentos", "grp_financeiro", "grp_comunicacao", "grp_integracoes"].every((k) => !gLabel(k)?.fullLabel), "grupos mantidos ficaram com label inalterado")
 // só os grupos que RENDERIZAM (têm ≥1 item active) — Agenda/IA ficam ocultos e não aparecem
 const gruposVisiveis = MANAGEMENT_NAVIGATION.filter((g) => (g.children ?? []).some((c) => c.status === "active"))
 ok(gruposVisiveis.every((g) => g.label.length <= 12), "labels de grupo VISÍVEIS curtos (sem risco de ellipsis)")
@@ -125,9 +125,22 @@ ok(itemDe("doccats")?.status === "active" && grupoDe("doccats") === "grp_documen
 // 11) Cleanups de dedup (reorg 16/07) — sem reverter D1-D9
 console.log("\nCleanups de dedup:")
 ok(itemDe("workflowsphases")?.status === "hidden", "Hub de Workflows (workflowsphases) oculto — item redundante c/ Macro/Interno/Modos")
-ok(itemDe("finauto")?.status === "hidden", "'Automações Financeiras' (finauto, scaffold vazio) oculto")
+ok(!itemDe("finauto"), "'Automações Financeiras' (finauto, scaffold vazio) REMOVIDO")
 ok(itemDe("docrules")?.label === "Regras Documentais", "docrules renomeado 'Aplicabilidade' → 'Regras Documentais' (sem colidir c/ Aplicabilidade Econômica)")
-ok(matchesKeyword("workflow").length >= 2, "busca 'workflow' segue com ≥2 itens após ocultar o Hub")
+ok(matchesKeyword("workflow").length >= 2, "busca 'workflow' segue com ≥2 itens")
+
+// 12) Automações deixou de ser módulo → tudo dentro do Workflow (correção 16/07)
+console.log("\nAutomações dentro do Workflow:")
+ok(!MANAGEMENT_NAVIGATION.some((g) => g.key === "grp_automacoes"), "módulo 'Automações' NÃO existe mais")
+ok(grupoDe("opauto") === "grp_workflow" && itemDe("opauto")?.label === "Automações por Fase", "opauto em Workflow como 'Automações por Fase'")
+ok(grupoDe("amtemplates") === "grp_workflow" && itemDe("amtemplates")?.label === "Modelos de Automação", "amtemplates em Workflow → Biblioteca de Modelos ('Modelos de Automação')")
+ok(grupoDe("crosstpl") === "grp_workflow", "crosstpl (Modelos de Regras Transversais) em Workflow → Biblioteca de Modelos")
+ok(itemDe("phasemodes")?.label === "Variações da Fase", "phasemodes renomeado 'Modos Internos' → 'Variações da Fase'")
+// Biblioteca de Modelos como sub-seção do Workflow (via section)
+const bibWf = (MANAGEMENT_NAVIGATION.find((g) => g.key === "grp_workflow")?.children ?? []).filter((c) => c.section === "Biblioteca de Modelos" && c.status === "active")
+ok(bibWf.length === 4 && ["iwtemplates", "imtemplates", "amtemplates", "crosstpl"].every((k) => bibWf.some((c) => c.key === k)), "Workflow → 'Biblioteca de Modelos' tem os 4 modelos (IW, Variações, Automação, Transversais)")
+// screen→component não deve mais mapear finauto (scaffold removido do menu)
+ok(!/\bfinauto:\s*FinAutomationsTab/.test(pageSrc), "screen map não mapeia mais 'finauto'")
 
 console.log(`\n${passed} passaram, ${failed} falharam`)
 if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }

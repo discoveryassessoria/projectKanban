@@ -26,7 +26,7 @@
 import type { ComponentType } from "react"
 import {
   LayoutDashboard, GitBranch, Workflow, FileText, DollarSign, Users2,
-  Library, Zap, MessageSquare, CalendarClock, Brain, BarChart3, Plug,
+  Library, MessageSquare, CalendarClock, Brain, BarChart3, Plug,
   ShieldCheck, Cpu, Briefcase,
 } from "lucide-react"
 
@@ -94,26 +94,38 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     ],
   },
   {
+    // ARQUITETURA: "Automações" NÃO é módulo. Toda a automação de fase (regras,
+    // simulação, histórico) e as bibliotecas de modelos vivem DENTRO do Workflow —
+    // é o mesmo motor de eventos/efeitos. O Financeiro tem sua própria vitrine
+    // ("Regras Financeiras por Fase") reutilizando este mesmo motor.
     key: "grp_workflow", label: "Workflow", icon: Workflow, order: 30, status: "active",
-    description: "Estrutura de fases, modelos e regras de workflow.",
+    description: "Fases, automações, regras e modelos do workflow.",
     children: [
-      a(10, "macrokanban", "Workflow Macro / Kanban", ["workflow", "macro", "kanban", "fase", "coluna"], "Estrutura"),
-      a(20, "phaseiwf", "Workflow Interno das Fases", ["workflow", "interno", "passo", "fase"], "Estrutura"),
-      a(30, "phasemodes", "Modos Internos", ["modo", "interno", "fase"], "Estrutura"),
-      // OCULTO: o "Hub" apenas reagrupava Workflow Macro + Interno + Modelos IW +
-      // Modos — telas que já são itens próprios acima. Item redundante removido da
-      // sidebar (tela segue acessível por ?screen=workflowsphases, sem menu duplo).
-      h(40, "workflowsphases", "Hub de Workflows das Fases"),
-      a(50, "iwtemplates", "Modelos de Workflow Interno", ["modelo", "template", "workflow", "interno"], "Modelos"),
-      a(70, "crossrules", "Tarefas Transversais", ["tarefa", "transversal", "regra"], "Modelos"),
-      a(75, "prottypes", "Tipos de Protocolo", ["protocolo", "orgao", "órgão", "tipo"], "Modelos"),
-      h(80, "mod_wfmacro", "Modelos de Workflow Macro"),
-      h(90, "wf_conclusao", "Regras de Conclusão"),
-      h(100, "wf_dependencias", "Dependências e Paralelismo"),
-      h(110, "wf_blockers", "Blockers"),
-      h(120, "wf_politicas", "Políticas de Entrada e Saída"),
-      h(130, "wf_avanco", "Avanço, Exceção e Reabertura"),
-      h(140, "wf_pacotes", "Pacotes Operacionais"),
+      // Fases
+      a(10, "macrokanban", "Workflow Macro / Kanban", ["workflow", "macro", "kanban", "fase", "coluna"], "Fases"),
+      a(20, "phaseiwf", "Workflow Interno", ["workflow", "interno", "passo", "fase"], "Fases"),
+      a(30, "phasemodes", "Variações da Fase", ["variacao", "variação", "modo", "interno", "fase"], "Fases"),
+      // Automações e regras (ex-módulo "Automações", agora dentro do Workflow)
+      a(40, "opauto", "Automações por Fase", ["automacao", "automação", "efeito", "fase", "regra", "gatilho", "workflow"], "Automações e regras"),
+      a(50, "crossrules", "Regras Transversais", ["regra", "transversal", "tarefa"], "Automações e regras"),
+      a(60, "simfase", "Simulação", ["simulacao", "simulação", "fase", "teste"], "Automações e regras"),
+      a(70, "execmatrix", "Histórico de Execuções", ["historico", "histórico", "execucao", "execução", "log"], "Automações e regras"),
+      // Cadastros do workflow
+      a(80, "prottypes", "Tipos de Protocolo", ["protocolo", "orgao", "órgão", "tipo"], "Cadastros"),
+      // Biblioteca de Modelos (sub-seção do Workflow)
+      a(100, "iwtemplates", "Modelos de Workflow Interno", ["modelo", "template", "workflow", "interno"], "Biblioteca de Modelos"),
+      a(110, "imtemplates", "Modelos de Variações da Fase", ["modelo", "variacao", "variação", "fase", "passo", "step"], "Biblioteca de Modelos"),
+      a(120, "amtemplates", "Modelos de Automação", ["modelo", "automacao", "automação", "preset"], "Biblioteca de Modelos"),
+      a(130, "crosstpl", "Modelos de Regras Transversais", ["modelo", "transversal", "tarefa", "regra"], "Biblioteca de Modelos"),
+      // OCULTO: Hub redundante (as telas já são itens próprios acima).
+      h(200, "workflowsphases", "Hub de Workflows das Fases"),
+      h(210, "mod_wfmacro", "Modelos de Workflow Macro"),
+      h(220, "wf_conclusao", "Regras de Conclusão"),
+      h(230, "wf_dependencias", "Dependências e Paralelismo"),
+      h(240, "wf_blockers", "Blockers"),
+      h(250, "wf_politicas", "Políticas de Entrada e Saída"),
+      h(260, "wf_avanco", "Avanço, Exceção e Reabertura"),
+      h(270, "wf_pacotes", "Pacotes Operacionais"),
     ],
   },
   {
@@ -149,7 +161,8 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     key: "grp_financeiro", label: "Financeiro", icon: DollarSign, order: 50, status: "active",
     description: "Cadastros, precificação, bancos, pagamentos e configurações financeiras.",
     children: [
-      // MENU FINAL do Financeiro (arquitetura canônica) — exatamente estes 18 itens.
+      // MENU FINAL do Financeiro (arquitetura canônica) — os 18 cadastros/config +
+      // "Regras Financeiras por Fase" (vitrine do motor de efeitos do Workflow).
       a(10, "catalog", "Configurações Financeiras", ["configuracao", "config", "produto", "financeiro", "catalogo", "preco", "preço", "papel", "custo", "receita"], "Configuração"),
       a(60, "categories", "Categorias Financeiras", ["categoria", "financeiro"], "Configuração"),
       a(70, "coa", "Plano de Contas", ["plano", "conta", "contabil"], "Configuração"),
@@ -158,6 +171,9 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(20, "pricingtable", "Tabelas de Preços", ["preco", "preço", "tabela", "valor"], "Precificação"),
       a(40, "discrules", "Regras de Precificação", ["preco", "preço", "regra", "desconto", "economica"], "Precificação"),
       a(30, "pricing", "Aplicabilidade Econômica", ["preco", "preço", "aplicabilidade", "economica"], "Precificação"),
+      // Vitrine financeira do MESMO motor de eventos/efeitos do Workflow: as regras
+      // que geram receita/custo ao entrar numa fase moram aqui (não em Automações).
+      a(45, "phasemap", "Regras Financeiras por Fase", ["regra", "fase", "financeiro", "gatilho", "disparo", "receita", "custo"], "Regras por fase"),
       a(90, "accounts", "Contas Bancárias", ["conta", "banco", "bancaria"], "Bancos e moedas"),
       a(100, "banks", "Bancos", ["banco"], "Bancos e moedas"),
       a(110, "wallets", "Carteiras de Recebimento", ["carteira", "recebimento"], "Bancos e moedas"),
@@ -202,8 +218,8 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     key: "grp_biblioteca", label: "Biblioteca", fullLabel: "Biblioteca Operacional", icon: Library, order: 70, status: "active",
     description: "Modelos, SLAs e templates operacionais.",
     children: [
-      a(10, "crosstpl", "Modelos de Tarefas", ["modelo", "tarefa", "template"], "Modelos"),
-      a(15, "imtemplates", "Modelos de Passos", ["modelo", "passo", "step", "template"], "Modelos"),
+      // Modelos de Regras Transversais (crosstpl) e Modelos de Variações da Fase
+      // (imtemplates) migraram para Workflow → Biblioteca de Modelos.
       a(30, "templates", "Templates Diversos", ["template", "modelo"], "Modelos"),
       a(20, "sla", "SLAs", ["sla", "prazo", "acordo"], "Prazos"),
       h(40, "bib_prioridades", "Prioridades"),
@@ -216,27 +232,11 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       h(110, "bib_tags", "Tags Operacionais"),
     ],
   },
-  {
-    key: "grp_automacoes", label: "Automações", icon: Zap, order: 80, status: "active",
-    description: "Regras, presets e execuções de automação.",
-    children: [
-      a(10, "opauto", "Regras de Automação", ["automacao", "automação", "regra", "fase"], "Regras"),
-      a(15, "phasemap", "Regras por Fase", ["regra", "fase", "gatilho", "disparo", "trigger"], "Regras"),
-      a(20, "amtemplates", "Presets", ["preset", "modelo", "automacao"], "Regras"),
-      // OCULTO: "Automações Financeiras" era um scaffold vazio (FinAutomationsTab,
-      // sem feature). O efeito financeiro por fase é coberto por "Regras por Fase"
-      // (phasemap) e pelo kind=financial de "Regras de Automação" (opauto).
-      h(30, "finauto", "Automações Financeiras"),
-      a(35, "simfase", "Simulação", ["simulacao", "simulação", "fase", "teste"], "Execução"),
-      a(40, "execmatrix", "Histórico de Execuções", ["historico", "histórico", "execucao", "execução", "log"], "Execução"),
-      h(50, "auto_eventos", "Eventos e Gatilhos"),
-      h(60, "auto_condicoes", "Condições"),
-      h(70, "auto_acoes", "Ações e Efeitos"),
-      h(80, "auto_aplicadas", "Regras Aplicadas"),
-      h(100, "auto_conflitos", "Conflitos"),
-      h(110, "auto_filas", "Filas"),
-    ],
-  },
+  // MÓDULO "Automações" REMOVIDO: todo o seu conteúdo migrou para o Workflow
+  // (Automações por Fase, Regras Transversais, Simulação, Histórico de Execuções,
+  // Biblioteca de Modelos). "phasemap" virou "Regras Financeiras por Fase" no
+  // Financeiro. "finauto" (scaffold vazio) foi descartado. Filas/outbox/executor/
+  // retentativas/diagnósticos ficam no Motor Técnico (grp_motor), restrito.
   {
     key: "grp_comunicacao", label: "Comunicação", icon: MessageSquare, order: 90, status: "active",
     description: "Notificações e canais de comunicação.",
