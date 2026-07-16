@@ -107,6 +107,9 @@ export function KanbanBoard({
   const [criarNome, setCriarNome] = useState("")
   const [salvandoCriar, setSalvandoCriar] = useState(false)
   const [erroCriar, setErroCriar] = useState<string | null>(null)
+  // Idempotência da criação: 1 chave por abertura do modal. Retry/duplo clique/
+  // timeout com a MESMA chave ⇒ o backend devolve o MESMO processo (sem duplicar).
+  const [criarIdemKey, setCriarIdemKey] = useState<string>("")
 
   const [initialParamsProcessed, setInitialParamsProcessed] = useState(false)
 
@@ -189,6 +192,7 @@ export function KanbanBoard({
   const abrirCriar = () => {
     setCriarNome("")
     setErroCriar(null)
+    setCriarIdemKey(crypto.randomUUID())
     setCriarModal(true)
   }
 
@@ -201,7 +205,8 @@ export function KanbanBoard({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem("authToken")}`
+          'Authorization': `Bearer ${localStorage.getItem("authToken")}`,
+          'Idempotency-Key': criarIdemKey || crypto.randomUUID(),
         },
         body: JSON.stringify({
           nome: criarNome.trim(),

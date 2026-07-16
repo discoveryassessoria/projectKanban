@@ -24,14 +24,16 @@ const SRC = join(ROOT, "src")
 // --------------------------------------------------------------------------
 // (1) Escritores permitidos de faseAtualKey (a lista SÓ ENCOLHE)
 // --------------------------------------------------------------------------
-//  - motor/phase-advance.ts  → o ÚNICO escritor canônico (CAS transacional).
-//  - api/processos/route.ts   → criação do processo grava a FASE INICIAL (não é
-//                               transição; é o estado inicial do agregado).
+//  - motor/phase-advance.ts   → o ÚNICO escritor canônico das TRANSIÇÕES (CAS).
+//  - services/criar-processo.ts → criação V2-nativa grava a FASE INICIAL (não é
+//                               transição; é o estado inicial do agregado, dentro
+//                               da transação de nascimento). Antes na rota; migrou
+//                               para o serviço de domínio único de criação.
 //  - components/kanban-board-novo.tsx → estado local otimista do React + corpo
 //                               da requisição (NÃO é escrita em banco).
 const ALLOWLIST_FASE_WRITE = new Set<string>([
   "src/lib/motor/phase-advance.ts",
-  "src/app/api/processos/route.ts",
+  "src/services/criar-processo.ts",
   "src/components/kanban-board-novo.tsx",
 ])
 
