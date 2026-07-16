@@ -110,9 +110,8 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(50, "crossrules", "Regras Transversais", ["regra", "transversal", "tarefa"], "Automações e regras"),
       a(60, "simfase", "Simulação", ["simulacao", "simulação", "fase", "teste"], "Automações e regras"),
       a(70, "execmatrix", "Histórico de Execuções", ["historico", "histórico", "execucao", "execução", "log"], "Automações e regras"),
-      // OCULTO: "Tipos de Protocolo" não faz parte da árvore aprovada do Workflow.
-      // Tela segue acessível por ?screen=prottypes (sem exibir como item de menu).
-      h(80, "prottypes", "Tipos de Protocolo"),
+      // "Tipos de Protocolo" NÃO pertence ao Workflow → mudou para o módulo
+      // "Documentos e Protocolos" (é configuração operacional, não estrutura de fase).
       // Biblioteca de Modelos (sub-seção do Workflow)
       a(100, "iwtemplates", "Modelos de Workflow Interno", ["modelo", "template", "workflow", "interno"], "Biblioteca de Modelos"),
       a(110, "imtemplates", "Modelos de Variações da Fase", ["modelo", "variacao", "variação", "fase", "passo", "step"], "Biblioteca de Modelos"),
@@ -130,8 +129,8 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     ],
   },
   {
-    key: "grp_documentos", label: "Documentos", icon: FileText, order: 40, status: "active",
-    description: "Tipos, categorias, matriz e regras documentais.",
+    key: "grp_documentos", label: "Documentos", fullLabel: "Documentos e Protocolos", icon: FileText, order: 40, status: "active",
+    description: "Tipos e categorias de documento, matriz, regras e tipos de protocolo.",
     children: [
       a(10, "doctypes", "Tipos de Documento", ["documento", "certidao", "certidão", "tipo", "nascimento", "casamento", "obito"], "Cadastros"),
       a(15, "doccats", "Categorias Documentais", ["categoria", "categorias", "documental", "classificacao", "classificação"], "Cadastros"),
@@ -142,6 +141,10 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       // Renomeado de "Aplicabilidade" → "Regras Documentais" (evita colisão com
       // "Aplicabilidade Econômica" do Financeiro). Keywords preservadas p/ busca.
       a(40, "docrules", "Regras Documentais", ["aplicabilidade", "regra", "documento", "documental"], "Regras"),
+      // Tipos de Protocolo: configuração operacional (tipos/modalidades de protocolo
+      // usados nos processos) — pertence a Documentos e Protocolos, não ao Workflow.
+      // (Cartórios/Órgãos, por serem ENTIDADES, seguem em Pessoas e Organizações.)
+      a(45, "prottypes", "Tipos de Protocolo", ["protocolo", "orgao", "órgão", "tipo", "modalidade"], "Protocolos"),
       h(50, "doc_categorias", "Categorias Documentais"),
       h(60, "doc_estados", "Estados Documentais"),
       h(70, "mod_documento", "Modelos de Documento"),

@@ -78,7 +78,8 @@ ok(itemDe("roles")?.label === "Perfis e Permissões" && !itemDe("permprofiles"),
 ok(motor?.permission === GESTAO_PERMISSION && GESTAO_PERMISSION === "usuarios.gerenciar", "D7: Motor Técnico usa a MESMA regra dos demais módulos (usuarios.gerenciar)")
 ok(grupoDe("crossrules") === "grp_workflow" && itemDe("crossrules")?.label === "Regras Transversais", "D8: Regras Transversais em Workflow")
 ok(grupoDe("imtemplates") === "grp_workflow", "D8: Modelos de Variações da Fase em Workflow → Biblioteca de Modelos")
-ok(itemDe("prottypes")?.status === "hidden", "D9: 'Tipos de Protocolo' (prottypes) oculto — fora da árvore aprovada do Workflow (tela por URL)")
+ok(grupoDe("prottypes") === "grp_documentos" && itemDe("prottypes")?.status === "active" && itemDe("prottypes")?.label === "Tipos de Protocolo", "D9: 'Tipos de Protocolo' ATIVO em Documentos e Protocolos")
+ok(grupoDe("prottypes") !== "grp_workflow", "D9: 'Tipos de Protocolo' NÃO está em Workflow")
 ok(!itemDe("protocols"), "D9: protocols NÃO está na sidebar do Gerenciamento")
 
 // 9) Refinamento visual 10/10 (labels curtos + fullLabel + ordem + a11y)
@@ -86,6 +87,7 @@ console.log("\nRefinamento visual:")
 const gLabel = (k: string) => MANAGEMENT_NAVIGATION.find((g) => g.key === k)
 const curtos: Array<[string, string, string]> = [
   ["grp_visao", "Painel", "Visão Geral"],
+  ["grp_documentos", "Documentos", "Documentos e Protocolos"],
   ["grp_pessoas", "Pessoas", "Pessoas e Organizações"],
   ["grp_biblioteca", "Biblioteca", "Biblioteca Operacional"],
   ["grp_relatorios", "Relatórios", "Relatórios e Indicadores"],
@@ -94,7 +96,7 @@ const curtos: Array<[string, string, string]> = [
   ["grp_motor", "Motor", "Motor Técnico"],
 ]
 ok(curtos.every(([k, short, full]) => gLabel(k)?.label === short && gLabel(k)?.fullLabel === full), "labels curtos aplicados com fullLabel completo")
-ok(["grp_processos", "grp_workflow", "grp_documentos", "grp_financeiro", "grp_comunicacao", "grp_integracoes"].every((k) => !gLabel(k)?.fullLabel), "grupos mantidos ficaram com label inalterado")
+ok(["grp_processos", "grp_workflow", "grp_financeiro", "grp_comunicacao", "grp_integracoes"].every((k) => !gLabel(k)?.fullLabel), "grupos mantidos ficaram com label inalterado")
 // só os grupos que RENDERIZAM (têm ≥1 item active) — Agenda/IA ficam ocultos e não aparecem
 const gruposVisiveis = MANAGEMENT_NAVIGATION.filter((g) => (g.children ?? []).some((c) => c.status === "active"))
 ok(gruposVisiveis.every((g) => g.label.length <= 12), "labels de grupo VISÍVEIS curtos (sem risco de ellipsis)")
@@ -151,6 +153,16 @@ const wfAprovado = [
   "Modelos de Workflow Interno", "Modelos de Variações da Fase", "Modelos de Automação", "Modelos de Regras Transversais",
 ]
 ok(JSON.stringify(wfAtivos) === JSON.stringify(wfAprovado), "Workflow: itens ativos batem EXATAMENTE a árvore aprovada (11, na ordem, sem extras)")
+
+// 14) Tipos de Protocolo movido p/ Documentos e Protocolos (16/07)
+console.log("\nTipos de Protocolo → Documentos e Protocolos:")
+ok(gLabel("grp_documentos")?.fullLabel === "Documentos e Protocolos", "módulo renomeado p/ 'Documentos e Protocolos' (fullLabel; breadcrumb usa fullLabel)")
+ok(/prottypes:\s*cat\(|prottypes:\s*\w+Tab/.test(pageSrc), "?screen=prottypes mapeia p/ tela (deep-link antigo funciona, sem duplicar componente)")
+const docsAtivos = (MANAGEMENT_NAVIGATION.find((g) => g.key === "grp_documentos")?.children ?? []).filter((c) => c.status === "active").map((c) => c.label)
+ok(docsAtivos.indexOf("Tipos de Protocolo") === docsAtivos.indexOf("Regras Documentais") + 1, "'Tipos de Protocolo' logo após 'Regras Documentais' em Documentos e Protocolos")
+ok(!(MANAGEMENT_NAVIGATION.find((g) => g.key === "grp_workflow")?.children ?? []).some((c) => c.key === "prottypes"), "prottypes REMOVIDO do Workflow (nem oculto)")
+// sem duplicação: prottypes aparece só uma vez em toda a navegação
+ok(todosItens.filter((i) => i.key === "prottypes").length === 1, "prottypes sem duplicação no menu (1 ocorrência)")
 
 console.log(`\n${passed} passaram, ${failed} falharam`)
 if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }
