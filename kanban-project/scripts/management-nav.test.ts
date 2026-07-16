@@ -78,7 +78,7 @@ ok(itemDe("roles")?.label === "Perfis e Permissões" && !itemDe("permprofiles"),
 ok(motor?.permission === GESTAO_PERMISSION && GESTAO_PERMISSION === "usuarios.gerenciar", "D7: Motor Técnico usa a MESMA regra dos demais módulos (usuarios.gerenciar)")
 ok(grupoDe("crossrules") === "grp_workflow" && itemDe("crossrules")?.label === "Regras Transversais", "D8: Regras Transversais em Workflow")
 ok(grupoDe("imtemplates") === "grp_workflow", "D8: Modelos de Variações da Fase em Workflow → Biblioteca de Modelos")
-ok(grupoDe("prottypes") === "grp_workflow" && itemDe("prottypes")?.label === "Tipos de Protocolo", "D9: prottypes em Workflow como 'Tipos de Protocolo'")
+ok(itemDe("prottypes")?.status === "hidden", "D9: 'Tipos de Protocolo' (prottypes) oculto — fora da árvore aprovada do Workflow (tela por URL)")
 ok(!itemDe("protocols"), "D9: protocols NÃO está na sidebar do Gerenciamento")
 
 // 9) Refinamento visual 10/10 (labels curtos + fullLabel + ordem + a11y)
@@ -141,6 +141,16 @@ const bibWf = (MANAGEMENT_NAVIGATION.find((g) => g.key === "grp_workflow")?.chil
 ok(bibWf.length === 4 && ["iwtemplates", "imtemplates", "amtemplates", "crosstpl"].every((k) => bibWf.some((c) => c.key === k)), "Workflow → 'Biblioteca de Modelos' tem os 4 modelos (IW, Variações, Automação, Transversais)")
 // screen→component não deve mais mapear finauto (scaffold removido do menu)
 ok(!/\bfinauto:\s*FinAutomationsTab/.test(pageSrc), "screen map não mapeia mais 'finauto'")
+
+// 13) Workflow = árvore APROVADA exata (11 itens ativos, na ordem, sem extras)
+console.log("\nWorkflow = árvore aprovada:")
+const wfAtivos = (MANAGEMENT_NAVIGATION.find((g) => g.key === "grp_workflow")?.children ?? []).filter((c) => c.status === "active").map((c) => c.label)
+const wfAprovado = [
+  "Workflow Macro", "Workflow Interno", "Variações da Fase",
+  "Automações por Fase", "Regras Transversais", "Simulação", "Histórico de Execuções",
+  "Modelos de Workflow Interno", "Modelos de Variações da Fase", "Modelos de Automação", "Modelos de Regras Transversais",
+]
+ok(JSON.stringify(wfAtivos) === JSON.stringify(wfAprovado), "Workflow: itens ativos batem EXATAMENTE a árvore aprovada (11, na ordem, sem extras)")
 
 console.log(`\n${passed} passaram, ${failed} falharam`)
 if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }

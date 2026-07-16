@@ -101,8 +101,8 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     key: "grp_workflow", label: "Workflow", icon: Workflow, order: 30, status: "active",
     description: "Fases, automações, regras e modelos do workflow.",
     children: [
-      // Fases
-      a(10, "macrokanban", "Workflow Macro / Kanban", ["workflow", "macro", "kanban", "fase", "coluna"], "Fases"),
+      // Fases (nomes exatamente como a árvore aprovada)
+      a(10, "macrokanban", "Workflow Macro", ["workflow", "macro", "kanban", "fase", "coluna"], "Fases"),
       a(20, "phaseiwf", "Workflow Interno", ["workflow", "interno", "passo", "fase"], "Fases"),
       a(30, "phasemodes", "Variações da Fase", ["variacao", "variação", "modo", "interno", "fase"], "Fases"),
       // Automações e regras (ex-módulo "Automações", agora dentro do Workflow)
@@ -110,8 +110,9 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(50, "crossrules", "Regras Transversais", ["regra", "transversal", "tarefa"], "Automações e regras"),
       a(60, "simfase", "Simulação", ["simulacao", "simulação", "fase", "teste"], "Automações e regras"),
       a(70, "execmatrix", "Histórico de Execuções", ["historico", "histórico", "execucao", "execução", "log"], "Automações e regras"),
-      // Cadastros do workflow
-      a(80, "prottypes", "Tipos de Protocolo", ["protocolo", "orgao", "órgão", "tipo"], "Cadastros"),
+      // OCULTO: "Tipos de Protocolo" não faz parte da árvore aprovada do Workflow.
+      // Tela segue acessível por ?screen=prottypes (sem exibir como item de menu).
+      h(80, "prottypes", "Tipos de Protocolo"),
       // Biblioteca de Modelos (sub-seção do Workflow)
       a(100, "iwtemplates", "Modelos de Workflow Interno", ["modelo", "template", "workflow", "interno"], "Biblioteca de Modelos"),
       a(110, "imtemplates", "Modelos de Variações da Fase", ["modelo", "variacao", "variação", "fase", "passo", "step"], "Biblioteca de Modelos"),
