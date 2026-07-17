@@ -3,7 +3,7 @@
 // FATIA 2 — Materialização das Regras Documentais na Genealogia (V2).
 // Regras Documentais PUBLICADAS exigidas na Genealogia → avaliação por Pessoa →
 // NecessidadeDocumental (canônica, idempotente, com snapshot da regra) + passo
-// operacional "Buscar documento" (PhaseWorkflowStepInstance) vinculado à
+// operacional "Localizar registro" (PhaseWorkflowStepInstance) vinculado à
 // necessidade. ADITIVO, IDEMPOTENTE, REVERSÍVEL. NÃO avança fase, NÃO conclui, NÃO
 // cria tarefa, NÃO usa document-generator/DOCUMENT_RULES/reconcileDocsForPessoa.
 //
@@ -20,7 +20,11 @@ import type { RegraDocumental, SujeitoContexto } from "@/src/lib/documentos/regr
 type DB = typeof prisma | Prisma.TransactionClient
 
 const FASE_GENEALOGIA = "genealogia" // phaseKey canônica (minúscula)
-const STEP_BUSCAR = "buscar_documento" // stepKey canônico unificado (Fatia 1)
+// stepKey canônico ÚNICO da Genealogia. "Localizar registro" (não "buscar
+// documento"/"certidão"): aqui só se LOCALIZA o registro civil e preenchem-se os
+// dados registrais. A solicitação/obtenção da certidão é da Emissão Documental.
+const STEP_LOCALIZAR = "localizar_registro"
+const STEP_LABEL = "Localizar registro da certidão"
 
 export interface MaterializarResultado {
   processoId: number
@@ -69,7 +73,7 @@ export async function regrasGenealogiaDoProcesso(tipoProcessoId: number | null, 
 }
 
 function chaveStep(necessidadeId: number, ciclo: number): string {
-  return `matdoc|${STEP_BUSCAR}|nec${necessidadeId}|c${ciclo}`
+  return `matdoc|${STEP_LOCALIZAR}|nec${necessidadeId}|c${ciclo}`
 }
 
 // ---- núcleo: materializa a Genealogia de UM processo (idempotente) ----
@@ -148,7 +152,7 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
         res.reativadas++
       }
 
-      // passo operacional "Buscar documento" vinculado à necessidade (idempotente)
+      // passo operacional "Localizar registro" vinculado à necessidade (idempotente)
       if (instancia) {
         const chave = chaveStep(necessidade.id, instancia.ciclo)
         const existente = await db.phaseWorkflowStepInstance.findUnique({ where: { chaveIdempotencia: chave }, select: { id: true } })
@@ -156,12 +160,12 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
         else {
           await db.phaseWorkflowStepInstance.create({
             data: {
-              workflowInstanceId: instancia.id, stepKey: STEP_BUSCAR, processoId,
+              workflowInstanceId: instancia.id, stepKey: STEP_LOCALIZAR, processoId,
               faseMacroKey: FASE_GENEALOGIA, ordem: 1, tipo: "HUMANO",
               obrigatorio: ap.obrigatoriedade === "OBRIGATORIA", geraTarefa: false, ciclo: instancia.ciclo,
               status: "DISPONIVEL", necessidadeId: necessidade.id, papel: "equipe_documental", slaDays: 5,
               chaveIdempotencia: chave,
-              snapshot: { stepKey: STEP_BUSCAR, label: "Buscar documento", requisito: snapshot } as Prisma.InputJsonValue,
+              snapshot: { stepKey: STEP_LOCALIZAR, label: STEP_LABEL, requisito: snapshot } as Prisma.InputJsonValue,
               snapshotSchemaVersion: 1,
             },
           })

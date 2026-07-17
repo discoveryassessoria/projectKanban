@@ -3,7 +3,7 @@
  * Rodar: tsx scripts/genealogia-fatia1-guard.test.ts
  *
  * 1. Casing do gate: blocking-engine compara normalizado (não o literal cru).
- * 2. Catálogo unificado: passo canônico "buscar_documento"; sem alias de genealogia;
+ * 2. Catálogo unificado: passo canônico "localizar_registro"; sem alias de genealogia;
  *    seed do workflow interno = passo único; sem "buscar_certidao" no runtime.
  * 3. Regra de conclusão unificada (= front): cartório + (livro|folha|termo),
  *    exclusiva (sem fallback por status em "localizado").
@@ -24,13 +24,13 @@ const be = ler("src/lib/motor/blocking-engine.ts")
 ok(/toUpperCase\(\)\s*===\s*"GENEALOGIA"/.test(be), "blocking-engine normaliza casing (toUpperCase === GENEALOGIA)")
 ok(!/faseMacroKey\s*===\s*"GENEALOGIA"/.test(be), "sem comparação literal crua faseMacroKey === \"GENEALOGIA\"")
 
-console.log("\n2) Catálogo de passos unificado (buscar_documento canônico)")
+console.log("\n2) Catálogo de passos unificado (localizar_registro canônico)")
 const fc = ler("src/lib/process-stage/fases-catalog.ts")
-// alias de genealogia removido; fases-catalog usa buscar_documento
-ok(!/genealogia:\s*\{[\s\S]*?buscar_documento:\s*"buscar_certidao"/.test(fc), "STEP_KEY_ALIASES SEM entrada genealogia (alias removido)")
-ok(/stepKey:\s*"buscar_documento"/.test(fc), "fases-catalog GENEALOGIA usa stepKey buscar_documento")
+// alias de genealogia removido; fases-catalog usa localizar_registro (canônico)
+ok(!/genealogia:\s*\{[\s\S]*?"buscar_certidao"/.test(fc), "STEP_KEY_ALIASES SEM entrada genealogia (alias removido)")
+ok(/stepKey:\s*"localizar_registro"/.test(fc) && !/buscar_documento/.test(fc), "fases-catalog GENEALOGIA usa stepKey localizar_registro (não buscar_documento)")
 const seed = ler("prisma/seed-workflows-fase.ts")
-ok(/genealogia:\s*\['Buscar documento'\]/.test(seed), "seed do workflow interno: genealogia = passo único 'Buscar documento'")
+ok(/genealogia:\s*\['Localizar registro da certidão'\]/.test(seed), "seed do workflow interno: genealogia = passo único 'Localizar registro da certidão'")
 // nenhum runtime keyeando buscar_certidao (fora de comentários) em código-fonte de motor/execução
 for (const rel of ["src/services/processEngine/stepCompletionResolver.ts", "src/services/documento-operacao.ts", "src/lib/process-stage/fases-catalog.ts"]) {
   const semComentario = ler(rel).split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n")

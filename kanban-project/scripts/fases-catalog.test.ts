@@ -53,7 +53,8 @@ ok(new Set(pks).size === pks.length, "8. phaseKeys únicos")
 
 // 5b) Alias de stepKey (compatibilidade legado → publicado)
 console.log("\nAlias de stepKey (compat migração v2):")
-ok(resolveStepKeyCompat("genealogia", "buscar_documento") === "buscar_certidao", "A1. genealogia: buscar_documento → buscar_certidao")
+// Genealogia UNIFICADA: passo canônico "localizar_registro", SEM alias.
+ok(FASES.GENEALOGIA.steps[0].stepKey === "localizar_registro" && resolveStepKeyCompat("genealogia", "localizar_registro") === "localizar_registro", "A1. genealogia: passo único localizar_registro, sem alias")
 ok(resolveStepKeyCompat("emissao_documental", "aguardar_retorno") === "aguardar_retorno_do_cartorio", "A2. emissao: aguardar_retorno → aguardar_retorno_do_cartorio")
 ok(resolveStepKeyCompat("emissao_documental", "receber_certidao") === "receber_certidao", "A3. sem alias → identidade (não adivinha)")
 ok(resolveStepKeyCompat(null, "x") === "x" && resolveStepKeyCompat("fase_inexistente", "y") === "y", "A4. phaseKey nulo/desconhecido → passo inalterado")

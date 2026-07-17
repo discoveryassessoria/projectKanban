@@ -44,8 +44,8 @@ export const FASES: Record<FaseCode, FaseDef> = {
     code: "GENEALOGIA", phaseKey: "genealogia", ordem: 0, label: "Genealogia", kind: "documento",
     next: "EMISSAO_DOCUMENTAL",
     steps: [
-      { ordem: 1, stepKey: "buscar_documento", title: "Buscar documento",
-        description: "Localizar o ato no cartório e preencher os dados registrais completos.",
+      { ordem: 1, stepKey: "localizar_registro", title: "Localizar registro da certidão",
+        description: "Localizar o registro civil e preencher os dados registrais necessários.",
         weight: 100, ownerKey: "equipe_documental", slaDays: 5 },
     ],
   },
@@ -206,7 +206,7 @@ export function phaseKeyToFaseCode(phaseKey: string | null | undefined): FaseCod
 // por texto/similaridade. Renomear passo ou limpar junk = ajustar SÓ este mapa.
 // Não altera dados legados nem publicados — é só a ponte de resolução do backfill.
 const STEP_KEY_ALIASES: Record<string, Record<string, string>> = {
-  // Genealogia UNIFICADA: o passo canônico é "buscar_documento" (sem alias). O
+  // Genealogia UNIFICADA: o passo canônico é "localizar_registro" (sem alias). O
   // workflow interno publicado, o editor e a execução usam exatamente este stepKey.
   emissao_documental: {
     aguardar_retorno: "aguardar_retorno_do_cartorio", // rename do mesmo passo

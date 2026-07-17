@@ -29,10 +29,17 @@ const PHASE_LABELS: Record<string, string> = {
 }
 
 // passos padrão (idêntico ao _IWF_TEMPLATES do mockup)
+// stepKey explícito quando o slug do label NÃO é a chave canônica desejada.
+const STEP_KEY_OVERRIDE: Record<string, Record<string, string>> = {
+  // Genealogia: passo único canônico "localizar_registro" (o registro civil é
+  // LOCALIZADO aqui; a certidão física é solicitada só na Emissão Documental).
+  genealogia: { 'Localizar registro da certidão': 'localizar_registro' },
+}
+
 const IWF_TEMPLATES: Record<string, string[]> = {
-  // Genealogia UNIFICADA: passo único canônico "Buscar documento" (stepKey
-  // buscar_documento) — mesma chave usada por runtime, editor e execução.
-  genealogia: ['Buscar documento'],
+  // Genealogia UNIFICADA: passo único canônico "Localizar registro da certidão"
+  // (stepKey localizar_registro) — mesma chave usada por runtime, editor e execução.
+  genealogia: ['Localizar registro da certidão'],
   emissao_documental: ['Solicitar certidão', 'Aguardar retorno do cartório', 'Receber certidão', 'Conferir certidão', 'Validar certidão'],
   analise_documental: ['Preparar pacote de análise', 'Comparar nomes, datas, locais e filiação', 'Registrar divergências', 'Classificar criticidade', 'Concluir necessidade de retificação'],
   retificacao: ['Definir modo de retificação', 'Preparar requerimento/petição', 'Protocolar retificação', 'Acompanhar decisão', 'Registrar averbação', 'Validar retificação'],
@@ -63,7 +70,7 @@ async function main() {
         await prisma.phaseInternalWorkflowStep.createMany({
           data: labels.map((label, i) => ({
             workflowId: existente.id,
-            key: slug(label),
+            key: STEP_KEY_OVERRIDE[phaseKey]?.[label] ?? slug(label),
             label,
             ordem: i + 1,
             createsTask: true,
@@ -84,7 +91,7 @@ async function main() {
         name,
         passos: {
           create: labels.map((label, i) => ({
-            key: slug(label),
+            key: STEP_KEY_OVERRIDE[phaseKey]?.[label] ?? slug(label),
             label,
             ordem: i + 1,
             createsTask: true,

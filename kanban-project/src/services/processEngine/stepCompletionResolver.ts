@@ -26,10 +26,10 @@ export type { CompletionPolicy } from "@/src/services/completion-engine/policies
 // ── Política autoritativa por stepKey conhecido ─────────────────────────────
 // Enquanto o Gerenciamento não grava política por passo, o stepKey manda para
 // os passos conhecidos da Genealogia/Emissão (inclusive corrige passos já
-// gravados com o default antigo). "buscar_documento" agora é agregado
+// gravados com o default antigo). "localizar_registro" agora é agregado
 // (ALL_REQUIRED_DOCUMENTS_LOCATED) — nunca TASK_COMPLETED por padrão (regra 7).
 const KNOWN_STEP_POLICY: Record<string, CompletionPolicy> = {
-  buscar_documento: "ALL_REQUIRED_DOCUMENTS_LOCATED", // FIX (regra 7)
+  localizar_registro: "ALL_REQUIRED_DOCUMENTS_LOCATED", // FIX (regra 7)
   receber_certidao: "DOCUMENT_RECEIVED",
   conferir_certidao: "DOCUMENT_RECEIVED",
   validar_certidao: "DOCUMENT_VALIDATED",
@@ -97,7 +97,7 @@ const temDadosRegistrais = (d: DocRegistral) =>
   naoVazio(d.cartorio) && (naoVazio(d.livro) || naoVazio(d.folha) || naoVazio(d.termo))
 
 function docFact(id: number, d: DocRegistral): DocumentFact {
-  // "localizado" (Genealogia/buscar_documento) usa EXCLUSIVAMENTE a regra registral
+  // "localizado" (Genealogia/localizar_registro) usa EXCLUSIVAMENTE a regra registral
   // oficial (cartório + livro/folha/termo). received/validated seguem por arquivo.
   const located = temDadosRegistrais(d)
   const received = !!d.arquivo_url || STATUS_LOCALIZADO.has(d.status)

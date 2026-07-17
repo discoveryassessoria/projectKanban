@@ -752,7 +752,7 @@ export function CentralDaEtapaDrawer({
       </div>
 
       {/* ============== EDITORES DE ETAPA (3º nível, empilhados) ============== */}
-      {step && step.stepKey === "buscar_documento" && (
+      {step && step.stepKey === "localizar_registro" && (
         <EditorRegistralModal
           documentoId={documentoId}
           stepKey={step.stepKey}
@@ -767,7 +767,7 @@ export function CentralDaEtapaDrawer({
         />
       )}
 
-      {step && step.stepKey !== "buscar_documento" && (
+      {step && step.stepKey !== "localizar_registro" && (
         <StepEditorRouter
           stepKey={step.stepKey}
           documentoId={documentoId}
@@ -805,7 +805,7 @@ function TabCampos({
     string,
     { titulo: string; descricao: string }
   > = {
-    buscar_documento: {
+    localizar_registro: {
       titulo: "Editor registral completo",
       descricao:
         "Preencha os 23 campos canônicos da certidão (identificação, evento, localidade, referência, rastreamento). Ao salvar, a etapa é concluída automaticamente e as divergências são recalculadas.",

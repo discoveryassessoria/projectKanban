@@ -68,7 +68,7 @@ interface Documento {
 export interface EditorRegistralModalProps {
   documentoId: number | null
   /** Quando passado, o modal sabe que está sendo aberto a partir de uma etapa
-   *  do workflow. Se for "buscar_documento", mostra banner amarelo + valida
+   *  do workflow. Se for "localizar_registro", mostra banner amarelo + valida
    *  cartório + (livro OR folha OR termo) antes de salvar. */
   stepKey?: string | null
   /** Se passado, ao salvar com sucesso o modal chama PATCH de conclusão da etapa. */
@@ -239,8 +239,8 @@ export function EditorRegistralModal({
     observacoes: false,
   })
 
-  // Modo "Buscar documento" = banner amarelo + esconde campos extras
-  const isModoBuscar = stepKey === "buscar_documento"
+  // Modo "Localizar registro" = banner amarelo + esconde campos extras
+  const isModoBuscar = stepKey === "localizar_registro"
 
   // -- Carrega documento
   const carregar = useCallback(async () => {
@@ -284,7 +284,7 @@ export function EditorRegistralModal({
     }
   }, [isOpen, onClose])
 
-  // -- Validação pra "Buscar documento"
+  // -- Validação pra "Localizar registro"
   // Marco define: cartório obrigatório + pelo menos um de livro/folha/termo
   const cartorioOk = form.cartorio.trim().length > 0
   const referenciaOk =
@@ -298,7 +298,7 @@ export function EditorRegistralModal({
     // Em modo buscar, valida antes
     if (isModoBuscar && !podeConcluirEtapa) {
       alert(
-        "Para concluir a etapa Buscar documento, preencha:\n" +
+        "Para concluir a etapa Localizar registro da certidão, preencha:\n" +
           "• Cartório\n" +
           "• Pelo menos um de: Livro, Folha ou Termo",
       )
@@ -355,7 +355,7 @@ export function EditorRegistralModal({
       })
       if (!resDoc.ok) throw new Error(`PUT documento HTTP ${resDoc.status}`)
 
-      // 2. Se veio de uma etapa "buscar_documento", conclui a etapa
+      // 2. Se veio de uma etapa "localizar_registro", conclui a etapa
       if (isModoBuscar && stepId && podeConcluirEtapa) {
         const resStep = await fetch(
           `/api/documentos/${documentoId}/workflow/steps/${stepId}`,
@@ -442,7 +442,7 @@ export function EditorRegistralModal({
                     <div className="text-[13px] text-white/70 leading-snug">
                       {pessoaNome} ·{" "}
                       {isModoBuscar
-                        ? "Preencha cartório + livro/folha/termo para concluir a etapa Buscar documento."
+                        ? "Preencha cartório + livro/folha/termo para concluir a etapa Localizar registro da certidão."
                         : "Toda alteração é registrada em auditoria."}
                     </div>
                   </div>
@@ -483,7 +483,7 @@ export function EditorRegistralModal({
                       <AlertTriangle className="w-3.5 h-3.5" />
                       {podeConcluirEtapa
                         ? "Pronto para concluir a etapa"
-                        : 'Para concluir a etapa "Buscar documento":'}
+                        : 'Para concluir a etapa "Localizar registro da certidão":'}
                     </div>
                     <div className="text-[11.5px] text-white/75 leading-relaxed">
                       preencha{" "}
