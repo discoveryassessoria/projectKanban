@@ -2,7 +2,7 @@
 
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Loader2 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import type { ProcessoWithStatus, Processo } from "@/src/types/kanban"
@@ -308,6 +308,23 @@ export function ProcessoCentralOperacional({
   const [abrindoOperacao, setAbrindoOperacao] = useState(false)
   const [erroOperacao, setErroOperacao] = useState<string | null>(null)
 
+  // TROCA DE CONTEXTO NO AVANÇO DE FASE: quando a fase da Central muda (avanço/retorno),
+  // qualquer drawer aberto está exibindo o contexto da fase ANTIGA (ex.: o passo
+  // localizar_registro da Genealogia). Fecha tudo — a Central já re-renderiza com a
+  // fase nova e o drawer reabre no contexto da fase atual. Sem estado residual.
+  const faseCodeRef = useRef<string | null | undefined>(undefined)
+  useEffect(() => {
+    const fc = data?.faseProgress?.faseCode
+    if (fc === undefined) return // ainda carregando
+    if (faseCodeRef.current !== undefined && faseCodeRef.current !== fc) {
+      setDrawerDocId(null)
+      setInitModalDocId(null)
+      setAbrindoOperacao(false)
+      setErroOperacao(null)
+    }
+    faseCodeRef.current = fc
+  }, [data?.faseProgress?.faseCode])
+
   // Abre a operação. Se já há Documento (docId>0) abre direto; se for uma
   // necessidade da Genealogia V2 ainda sem Documento (docId=0), garante o
   // registro operacional no back e abre com o id real — em vez de abrir o
@@ -482,7 +499,15 @@ export function ProcessoCentralOperacional({
   if (!data) return null
 
   // ====== CÁLCULOS (ordem importa: declarar ANTES de usar) ======
-  const faseKey = phaseKeyToFaseCode((processo as { faseAtualKey?: string | null }).faseAtualKey) ?? undefined
+  // FONTE DA FASE = a resposta FRESCA da rota (data.faseProgress.faseCode), que lê
+  // processo.faseAtualKey do banco a cada fetch. O prop `processo` é estático e NÃO
+  // reflete o avanço — usá-lo mantinha a Central presa na Genealogia após avançar.
+  // Fallback ao prop só cobre o 1º render antes de `data` chegar.
+  const faseCodeData = (data?.faseProgress?.faseCode ?? undefined) as FaseCode | undefined
+  const faseKey =
+    faseCodeData ??
+    phaseKeyToFaseCode((processo as { faseAtualKey?: string | null }).faseAtualKey) ??
+    undefined
   const faseAtualNome =
     (faseKey ? FASES[faseKey]?.label : undefined) ??
     "Genealogia"
