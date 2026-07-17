@@ -30,7 +30,9 @@ const PHASE_LABELS: Record<string, string> = {
 
 // passos padrão (idêntico ao _IWF_TEMPLATES do mockup)
 const IWF_TEMPLATES: Record<string, string[]> = {
-  genealogia: ['Buscar certidão', 'Registrar tentativa', 'Marcar documento localizado', 'Marcar documento desnecessário', 'Validar localização de todos os documentos necessários'],
+  // Genealogia UNIFICADA: passo único canônico "Buscar documento" (stepKey
+  // buscar_documento) — mesma chave usada por runtime, editor e execução.
+  genealogia: ['Buscar documento'],
   emissao_documental: ['Solicitar certidão', 'Aguardar retorno do cartório', 'Receber certidão', 'Conferir certidão', 'Validar certidão'],
   analise_documental: ['Preparar pacote de análise', 'Comparar nomes, datas, locais e filiação', 'Registrar divergências', 'Classificar criticidade', 'Concluir necessidade de retificação'],
   retificacao: ['Definir modo de retificação', 'Preparar requerimento/petição', 'Protocolar retificação', 'Acompanhar decisão', 'Registrar averbação', 'Validar retificação'],

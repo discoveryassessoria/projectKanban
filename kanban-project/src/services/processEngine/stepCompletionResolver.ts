@@ -89,11 +89,17 @@ type DocRegistral = {
   arquivo_url: string | null
 }
 
+// REGRA OFICIAL de "documento localizado" (unificada com o front, EditorRegistralModal):
+// Cartório obrigatório E pelo menos um entre Livro, Folha ou Termo. Back-end,
+// BlockingEngine e Workflow usam EXCLUSIVAMENTE esta regra.
+const naoVazio = (v: string | null | undefined) => !!(v && String(v).trim())
 const temDadosRegistrais = (d: DocRegistral) =>
-  !!(d.cartorio || d.numero_registro || d.livro || d.folha || d.termo || d.data_registro)
+  naoVazio(d.cartorio) && (naoVazio(d.livro) || naoVazio(d.folha) || naoVazio(d.termo))
 
 function docFact(id: number, d: DocRegistral): DocumentFact {
-  const located = temDadosRegistrais(d) || STATUS_LOCALIZADO.has(d.status)
+  // "localizado" (Genealogia/buscar_documento) usa EXCLUSIVAMENTE a regra registral
+  // oficial (cartório + livro/folha/termo). received/validated seguem por arquivo.
+  const located = temDadosRegistrais(d)
   const received = !!d.arquivo_url || STATUS_LOCALIZADO.has(d.status)
   return {
     ref: String(id),

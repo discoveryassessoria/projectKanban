@@ -206,9 +206,8 @@ export function phaseKeyToFaseCode(phaseKey: string | null | undefined): FaseCod
 // por texto/similaridade. Renomear passo ou limpar junk = ajustar SÓ este mapa.
 // Não altera dados legados nem publicados — é só a ponte de resolução do backfill.
 const STEP_KEY_ALIASES: Record<string, Record<string, string>> = {
-  genealogia: {
-    buscar_documento: "buscar_certidao", // redesenho 1→5 passos (decisão do dono)
-  },
+  // Genealogia UNIFICADA: o passo canônico é "buscar_documento" (sem alias). O
+  // workflow interno publicado, o editor e a execução usam exatamente este stepKey.
   emissao_documental: {
     aguardar_retorno: "aguardar_retorno_do_cartorio", // rename do mesmo passo
   },

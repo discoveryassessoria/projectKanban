@@ -32,7 +32,10 @@ export async function calcularPendencias(
   const correlationId = ctx.correlationId ?? randomUUID()
   const policy: Policy = "ALL_REQUIRED_COMPLETED"
   const issues: BlockingIssue[] = []
-  const isGenealogia = faseMacroKey === "GENEALOGIA"
+  // Gate da Genealogia: normaliza o casing. Em runtime a faseMacroKey/faseAtualKey
+  // é a phaseKey minúscula ("genealogia"); em outros pontos vem o FaseCode
+  // ("GENEALOGIA"). Comparar normalizado cobre ambos (bug de casing eliminado).
+  const isGenealogia = String(faseMacroKey).toUpperCase() === "GENEALOGIA"
 
   const processo = await prisma.processo.findUnique({
     where: { id: processoId },

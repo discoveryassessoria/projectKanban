@@ -32,6 +32,7 @@
     "test:template-manual-guard": "tsx scripts/financeiro-template-manual-guard.test.ts",
     "test:regras-documentais": "tsx scripts/regras-documentais.test.ts",
     "test:regras-documentais-guard": "tsx scripts/regras-documentais-guard.test.ts",
+    "test:genealogia-fatia1": "tsx scripts/genealogia-fatia1-guard.test.ts",
     "backfill:document-categories:dry": "tsx prisma/backfill-document-categories.ts --dry-run",
     "backfill:document-categories": "tsx prisma/backfill-document-categories.ts --execute",
     "backfill:lote-b:dry": "tsx prisma/backfill-lote-b-catalogo.ts --dry-run",
