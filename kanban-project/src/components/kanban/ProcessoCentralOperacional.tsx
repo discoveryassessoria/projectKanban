@@ -105,6 +105,7 @@ interface CentralOpData {
     proximoPasso: string | null
     generation: number
     isLinhaReta: boolean
+    necessidadeId?: number | null
   }>
   queueTitle: string
   faseProgress?: FaseProgress // ✅ NOVO (opcional: fallback cobre ausência)
@@ -247,6 +248,7 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
     if (cls === "recebido") row.validados += 1
     row.docs.push({
       id: q.docId,
+      necessidadeId: q.necessidadeId ?? null,
       tipoLabel: q.docTypeLabel,
       subtitulo: "Inteiro teor",
       statusLabel: q.status.toUpperCase(),
@@ -301,6 +303,37 @@ export function ProcessoCentralOperacional({
 
   const [drawerDocId, setDrawerDocId] = useState<number | null>(null)
   const [initModalDocId, setInitModalDocId] = useState<number | null>(null)
+  const [abrindoOperacao, setAbrindoOperacao] = useState(false)
+
+  // Abre a operação. Se já há Documento (docId>0) abre direto; se for uma
+  // necessidade da Genealogia V2 ainda sem Documento (docId=0), garante o
+  // registro operacional no back e abre com o id real — em vez de abrir o
+  // drawer com id inválido (backdrop vazio, tela travada).
+  const abrirOperacao = useCallback(
+    async (docId: number, necessidadeId?: number | null) => {
+      if (docId && docId > 0) { setDrawerDocId(docId); return }
+      if (!necessidadeId) { setErro("Operação sem documento associado. Recarregue a fase e tente novamente."); return }
+      setAbrindoOperacao(true)
+      try {
+        const res = await fetch(`/api/processos/${processo.id}/genealogia/operacao`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ necessidadeId }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || !json?.documentoId) {
+          setErro(json?.error || "Não foi possível abrir a operação.")
+          return
+        }
+        setDrawerDocId(json.documentoId)
+      } catch {
+        setErro("Falha de rede ao abrir a operação.")
+      } finally {
+        setAbrindoOperacao(false)
+      }
+    },
+    [processo.id]
+  )
 
   const getUserId = (): number | null => {
     try {
@@ -504,10 +537,16 @@ export function ProcessoCentralOperacional({
             progressoTexto={painel.progressoTexto}
             linhaPrincipal={painel.linhaPrincipal}
             foraDaLinha={painel.foraDaLinha}
-            onAbrirOperacao={(docId) => setDrawerDocId(docId)}
+            onAbrirOperacao={(docId, necessidadeId) => { void abrirOperacao(docId, necessidadeId) }}
             modoReestruturacao={!!data.genealogiaReestruturacao}
             avisoReestruturacao={data.mensagemReestruturacao ?? undefined}
           />
+
+          {abrindoOperacao && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20">
+              <div className="rounded-md bg-white px-4 py-2 text-sm text-gray-700 shadow">Abrindo operação…</div>
+            </div>
+          )}
 
           <DocumentoOperationalDrawer
             documentoId={drawerDocId}

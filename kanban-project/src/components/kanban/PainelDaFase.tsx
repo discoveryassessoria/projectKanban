@@ -48,6 +48,9 @@ export interface FaseKpi {
 
 export interface FaseDocRow {
   id: number
+  // Genealogia V2: necessidade da certidão (usada p/ garantir o registro
+  // operacional ao abrir a operação quando ainda não há Documento, id=0).
+  necessidadeId?: number | null
   tipoLabel: string        // "Certidão de Nascimento"
   subtitulo?: string       // "Inteiro teor"
   statusLabel: string      // "A SOLICITAR"
@@ -90,7 +93,7 @@ export interface PainelDaFaseProps {
   progressoTexto: string           // "Solicite, receba... Falta 1 documento..."
   linhaPrincipal: FasePersonRow[]
   foraDaLinha: FasePersonRow[]
-  onAbrirOperacao: (docId: number) => void
+  onAbrirOperacao: (docId: number, necessidadeId?: number | null) => void
   onAbrirPainelCompleto?: () => void
   // LEGADO_INATIVO (desativação Genealogia): em modo reestruturação, o painel NÃO
   // exibe as etapas/KPIs/progresso/"validados" antigos (derivados de
@@ -339,7 +342,7 @@ function PersonRow({
   ocultarValidacao = false,
 }: {
   p: FasePersonRow
-  onAbrirOperacao: (docId: number) => void
+  onAbrirOperacao: (docId: number, necessidadeId?: number | null) => void
   ocultarValidacao?: boolean
 }) {
   const [exp, setExp] = useState(false)
@@ -516,7 +519,7 @@ function PersonRow({
             {/* Botão */}
             <div className="flex justify-end">
               <button
-                onClick={() => onAbrirOperacao(d.id)}
+                onClick={() => onAbrirOperacao(d.id, d.necessidadeId)}
                 className={`text-[12px] font-bold px-3 py-2 rounded-lg transition-colors ${
                   d.emissaoConcluida
                     ? "border border-gray-200 text-gray-700 bg-white hover:bg-gray-50"

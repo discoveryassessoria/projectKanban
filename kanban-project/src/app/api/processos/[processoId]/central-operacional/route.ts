@@ -79,6 +79,9 @@ interface QueueRow {
   proximoPasso: string | null
   generation: number
   isLinhaReta: boolean
+  // Genealogia V2: necessidade da certidão. Quando não há Documento (docId=0),
+  // a UI usa este id para garantir o registro operacional ao abrir a operação.
+  necessidadeId?: number | null
 }
 
 // ============================================================
@@ -739,6 +742,7 @@ export async function GET(
           proximoPasso: ok ? "normal" : "Localizar registro",
           generation: n.pessoaId != null ? generationOf(n.pessoaId) : 99,
           isLinhaReta: pessoa?.linhaReta ?? false,
+          necessidadeId: n.id,
         }
       })
 
