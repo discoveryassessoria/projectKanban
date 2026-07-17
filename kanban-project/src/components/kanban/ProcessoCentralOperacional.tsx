@@ -304,31 +304,48 @@ export function ProcessoCentralOperacional({
   const [drawerDocId, setDrawerDocId] = useState<number | null>(null)
   const [initModalDocId, setInitModalDocId] = useState<number | null>(null)
   const [abrindoOperacao, setAbrindoOperacao] = useState(false)
+  const [erroOperacao, setErroOperacao] = useState<string | null>(null)
 
   // Abre a operação. Se já há Documento (docId>0) abre direto; se for uma
   // necessidade da Genealogia V2 ainda sem Documento (docId=0), garante o
   // registro operacional no back e abre com o id real — em vez de abrir o
-  // drawer com id inválido (backdrop vazio, tela travada).
+  // drawer com id inválido (backdrop vazio, tela travada). O loading SEMPRE
+  // termina (finally) e o erro é sempre visível/fechável (nunca backdrop órfão).
   const abrirOperacao = useCallback(
     async (docId: number, necessidadeId?: number | null) => {
       if (docId && docId > 0) { setDrawerDocId(docId); return }
-      if (!necessidadeId) { setErro("Operação sem documento associado. Recarregue a fase e tente novamente."); return }
+      if (!necessidadeId) { setErroOperacao("Operação sem documento associado. Recarregue a fase e tente novamente."); return }
       setAbrindoOperacao(true)
+      setErroOperacao(null)
+      // Timeout defensivo: o loading SEMPRE termina, mesmo se o servidor pendurar.
+      const ctrl = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), 15000)
       try {
         const res = await fetch(`/api/processos/${processo.id}/genealogia/operacao`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            // MESMA autenticação usada por toda a app (Bearer authToken). Sem isso
+            // o endpoint responde 401 para o usuário logado e a operação nunca abre.
+            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+          },
           body: JSON.stringify({ necessidadeId }),
+          signal: ctrl.signal,
         })
         const json = await res.json().catch(() => ({}))
         if (!res.ok || !json?.documentoId) {
-          setErro(json?.error || "Não foi possível abrir a operação.")
+          setErroOperacao(json?.error || `Não foi possível abrir a operação (HTTP ${res.status}).`)
           return
         }
         setDrawerDocId(json.documentoId)
-      } catch {
-        setErro("Falha de rede ao abrir a operação.")
+      } catch (e) {
+        setErroOperacao(
+          (e as Error)?.name === "AbortError"
+            ? "A abertura da operação excedeu 15 segundos. Tente novamente."
+            : "Falha de rede ao abrir a operação."
+        )
       } finally {
+        clearTimeout(timer)
         setAbrindoOperacao(false)
       }
     },
@@ -545,6 +562,18 @@ export function ProcessoCentralOperacional({
           {abrindoOperacao && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20">
               <div className="rounded-md bg-white px-4 py-2 text-sm text-gray-700 shadow">Abrindo operação…</div>
+            </div>
+          )}
+
+          {erroOperacao && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30" onClick={() => setErroOperacao(null)}>
+              <div className="max-w-sm rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <div className="text-sm font-semibold text-gray-900 mb-1">Não foi possível abrir a operação</div>
+                <div className="text-sm text-gray-600 mb-4">{erroOperacao}</div>
+                <div className="flex justify-end">
+                  <button onClick={() => setErroOperacao(null)} className="px-3 py-1.5 text-sm font-medium rounded-md bg-gray-100 hover:bg-gray-200 text-gray-800">Fechar</button>
+                </div>
+              </div>
             </div>
           )}
 

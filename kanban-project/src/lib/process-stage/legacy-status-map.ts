@@ -20,7 +20,11 @@ export function stepInstanceStatusToLegacy(s: StepInstanceStatus): string {
     case "SUPERSEDIDO": return "cancelada"
     case "DISPENSADO": return "cancelada"
     case "PENDENTE": return "bloqueada"
-    case "DISPONIVEL": return "nao_iniciada"
+    // DISPONIVEL = liberado para trabalhar (não "futuro/travado"). Na aba Workflow
+    // um passo "em_andamento" é acionável ("Central da Etapa →"); "nao_iniciada"
+    // aparece bloqueado sem botão. O passo materializado da Genealogia
+    // (localizar_registro) nasce DISPONIVEL e precisa ser clicável.
+    case "DISPONIVEL": return "em_andamento"
     default: return "nao_iniciada"
   }
 }

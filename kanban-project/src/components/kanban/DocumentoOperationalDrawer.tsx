@@ -219,7 +219,13 @@ export function DocumentoOperationalDrawer({
   const [workflow, setWorkflow] = useState<any | null>(null)
 
   const carregar = useCallback(async () => {
-    if (!documentoId) return
+    // NUNCA sair em silêncio: sem documentoId, o backdrop já está na tela e ficaria
+    // preso com painel vazio. Sinaliza erro fechável em vez de travar.
+    if (!documentoId) {
+      setErro("Operação sem documento associado.")
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setErro(null)
     try {
@@ -317,7 +323,7 @@ export function DocumentoOperationalDrawer({
   const tipoLabel = doc ? (TIPO_LABELS[doc.tipo] || doc.tipo) : ""
   const statusLabel = doc ? (STATUS_LABELS[doc.status] || doc.status) : ""
 
-  const tabs: Array<{ id: TabId; label: string; count?: number; danger?: boolean }> = [
+  const tabsAll: Array<{ id: TabId; label: string; count?: number; danger?: boolean }> = [
     { id: "operation", label: "Operação" },
     { id: "workflow", label: "Workflow" },
     { id: "registry", label: "Dados Registrais" },
@@ -330,6 +336,13 @@ export function DocumentoOperationalDrawer({
     { id: "attempts", label: "Tentativas" },
     { id: "audit", label: "Auditoria" },
   ]
+  // A Central não depende de lista fixa por fase: recebe a fase (workflow.faseCode)
+  // e ajusta as abas. Na Genealogia, abas de outra natureza (Divergências, Anexos,
+  // Tentativas, Auditoria) ficam fora — preservando Operação, Workflow, Dados
+  // Registrais, Histórico, Observações, Protocolo e Devoluções.
+  const ehGenealogia = String((workflow as { faseCode?: string } | null)?.faseCode ?? "").toUpperCase() === "GENEALOGIA"
+  const OCULTAS_GENEALOGIA = new Set<TabId>(["divergences", "attach", "attempts", "audit"])
+  const tabs = ehGenealogia ? tabsAll.filter((t) => !OCULTAS_GENEALOGIA.has(t.id)) : tabsAll
 
   const drawerContent = (
     <>
@@ -351,10 +364,13 @@ export function DocumentoOperationalDrawer({
           </div>
         )}
 
-        {erro && !doc && (
+        {/* Estado terminal fechável: cobre erro E o caso "sem doc e sem loading"
+            (ex.: documentoId inválido). Impede backdrop preso com painel vazio.
+            Condicionado a (erro || !documentoId) para não piscar antes do 1º load. */}
+        {!doc && !loading && (erro || !documentoId) && (
           <div className="flex-1 flex flex-col items-center justify-center text-white/60 gap-3 p-6">
             <AlertTriangle className="w-8 h-8 text-amber-400" />
-            <p className="text-sm">{erro}</p>
+            <p className="text-sm">{erro || "Não foi possível abrir a operação."}</p>
             <button
               onClick={onClose}
               className="px-3 py-1.5 text-xs bg-white/10 hover:bg-white/15 rounded-md"
