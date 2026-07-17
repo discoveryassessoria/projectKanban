@@ -8,6 +8,7 @@
  */
 import { avaliarRegrasDocumentais } from "../src/lib/documentos/regras-documentais/avaliador"
 import { exigidaNaGenealogia, aplicaAoProcesso, contextoDaPessoa } from "../src/services/genealogia/materializar-genealogia"
+import { ehNaturezaCertidao, NATUREZA_CERTIDAO } from "../src/lib/documentos/natureza-certidao"
 import type { RegraDocumental } from "../src/lib/documentos/regras-documentais/tipos"
 
 let passed = 0, failed = 0
@@ -87,6 +88,14 @@ ok(!aplicar(P({ documentacao: true, casado: false })).includes("Certidão de cas
 
 // contexto: requerente string "sim"/"nao"
 ok(P({ requerente: "sim" }).requerente === true && P({ requerente: "nao" }).requerente === false, "contexto: requerente string → boolean")
+
+console.log("\nElegibilidade estrutural (natureza CERTIDÃO, sem texto)")
+ok(NATUREZA_CERTIDAO === "certidao", "natureza estruturada = 'certidao'")
+ok(ehNaturezaCertidao("certidao") && ehNaturezaCertidao("CERTIDAO") && ehNaturezaCertidao(" Certidao "), "certidão reconhecida pela natureza (case/trim)")
+ok(!ehNaturezaCertidao("identidade") && !ehNaturezaCertidao("documento") && !ehNaturezaCertidao("apostila") && !ehNaturezaCertidao("traducao") && !ehNaturezaCertidao(null), "identidade/documento/apostila/tradução/null NÃO são certidão")
+// estrutural, não textual: um documento chamado "Certidão de X" mas com natureza
+// != certidao NÃO passa (a elegibilidade é pela natureza, não pelo nome).
+ok(!ehNaturezaCertidao("documento"), "não usa fallback por nome — só a natureza estruturada decide")
 
 console.log(`\n${failed === 0 ? "✅" : "❌"} MATERIALIZAÇÃO GENEALOGIA — ${passed} ok, ${failed} falhas`)
 if (failed > 0) { console.log("Falhas: " + falhas.join("; ")); process.exit(1) }

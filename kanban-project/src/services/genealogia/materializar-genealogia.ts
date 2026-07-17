@@ -16,6 +16,7 @@ import { garantirNecessidade } from "@/src/services/necessidade-documental"
 import { matrizParaRegra } from "@/src/lib/documentos/regras-documentais/mapear"
 import { avaliarRegrasDocumentais } from "@/src/lib/documentos/regras-documentais/avaliador"
 import type { RegraDocumental, SujeitoContexto } from "@/src/lib/documentos/regras-documentais/tipos"
+import { ehNaturezaCertidao } from "@/src/lib/documentos/natureza-certidao"
 
 type DB = typeof prisma | Prisma.TransactionClient
 
@@ -97,12 +98,11 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
     select: { id: true, nome: true, sobrenome: true, documentacao: true, casado: true, vivo: true, linhaReta: true, requerente: true },
   })
 
-  // mapa code → itemCatalogoId (necessidade exige itemCatalogoId NOT NULL)
-  const docTypes = await db.tipoDocumentoCadastro.findMany({ select: { id: true, code: true, itemCatalogoId: true } })
-  const itemCatalogoDeCode = (code: string): number | null => {
-    const d = docTypes.find((x) => x.code === code)
-    return d?.itemCatalogoId ?? null
-  }
+  // mapa code → itemCatalogoId + NATUREZA estruturada (Genealogia só materializa
+  // CERTIDÃO — nunca identidade/comprovante/apostila/tradução/outros; sem texto).
+  const docTypes = await db.tipoDocumentoCadastro.findMany({ select: { id: true, code: true, itemCatalogoId: true, nature: true } })
+  const itemCatalogoDeCode = (code: string): number | null => docTypes.find((x) => x.code === code)?.itemCatalogoId ?? null
+  const ehCertidaoCode = (code: string): boolean => ehNaturezaCertidao(docTypes.find((x) => x.code === code)?.nature)
 
   // instância ativa do Workflow Interno da Genealogia (para pendurar o passo)
   const instancia = await db.phaseWorkflowInstance.findFirst({
@@ -123,6 +123,10 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
     })
     for (const ap of av.aplicaveis) {
       res.aplicaveis++
+      // ELEGIBILIDADE ESTRUTURAL: na Genealogia só existem CERTIDÕES. Se o requisito
+      // aplicável apontar para um TipoDocumental que NÃO é certidão (natureza), NÃO
+      // materializa (nem necessidade, nem passo localizar_registro).
+      if (!ehCertidaoCode(ap.documentTypeCode)) { res.pendencias.push(`"${ap.documentTypeCode}" não é CERTIDÃO (natureza estruturada) — Genealogia não materializa`); continue }
       const regra = regras.find((r) => r.id === ap.regraId)!
       const codigo = regra.codigo ?? `MDX_${regra.id}`
       const varianteKey = `rd:${codigo}:v${regra.versao}`

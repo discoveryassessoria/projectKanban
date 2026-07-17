@@ -11,6 +11,7 @@ import {
   type BlockingIssue, type Policy,
   classificarNecessidade, classificarPasso, classificarTarefa, avaliarPolitica, separar,
 } from "@/src/lib/motor/blocking-helpers"
+import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 
 export interface PhaseBlockingResult {
   issues: BlockingIssue[]
@@ -47,12 +48,19 @@ export async function calcularPendencias(
   }
 
   // ---- A. NecessidadesDocumentais ----
-  const necessidades = await prisma.necessidadeDocumental.findMany({
+  const necessidadesRaw = await prisma.necessidadeDocumental.findMany({
     where: { processoId },
-    select: { id: true, status: true, obrigatoriedade: true },
+    select: { id: true, status: true, obrigatoriedade: true, itemCatalogoId: true },
   })
+  // ELEGIBILIDADE ESTRUTURAL: a Genealogia trabalha EXCLUSIVAMENTE com CERTIDÕES.
+  // Qualquer NecessidadeDocumental cuja natureza (do TipoDocumental) não seja
+  // CERTIDÃO é IGNORADA aqui — pela classificação estruturada, nunca por texto.
+  const certidaoItens = isGenealogia ? await itemCatalogosDeCertidao(prisma) : null
+  const necessidades = certidaoItens
+    ? necessidadesRaw.filter((n) => certidaoItens.has(n.itemCatalogoId))
+    : necessidadesRaw
   if (isGenealogia && necessidades.length === 0) {
-    issues.push({ code: "NECESSIDADE_NAO_GERADA", category: "NECESSIDADE_DOCUMENTAL", severity: "BLOCKING", entityType: "Processo", entityId: processoId, message: "Nenhuma NecessidadeDocumental foi gerada na Genealogia", resolutionHint: "Gerar necessidades (árvore/matriz) antes de avançar" })
+    issues.push({ code: "NECESSIDADE_NAO_GERADA", category: "NECESSIDADE_DOCUMENTAL", severity: "BLOCKING", entityType: "Processo", entityId: processoId, message: "Nenhuma NecessidadeDocumental de CERTIDÃO foi gerada na Genealogia", resolutionHint: "Materializar as certidões obrigatórias aplicáveis antes de avançar" })
   }
   for (const n of necessidades) {
     const issue = classificarNecessidade(n.status, n.obrigatoriedade === "OBRIGATORIA", isGenealogia, n.id)
