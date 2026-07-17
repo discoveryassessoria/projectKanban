@@ -180,8 +180,30 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: "Pessoa não encontrada" }, { status: 404 })
     }
 
+    const uniaoIds = [
+      ...pessoa.unioesComoPessoa1.map((u) => u.id),
+      ...pessoa.unioesComoPessoa2.map((u) => u.id),
+    ]
+
     // Executar deleção dentro de uma transação
     await prisma.$transaction(async (tx) => {
+      // 0. Remover NecessidadeDocumental (materializadas pela Genealogia V2) da
+      //    pessoa E das uniões que serão excluídas — ANTES de excluir pessoa/uniões.
+      //    Necessário porque o sujeito tem CHECK (pessoaId XOR uniaoId) e as FKs são
+      //    onDelete: SetNull: sem isto, a exclusão setaria o sujeito para NULL e
+      //    violaria o CHECK (0 ≠ 1), travando a exclusão da pessoa. Passos operacionais
+      //    vinculados (localizar_registro) saem junto (a necessidade é reproduzível
+      //    pela materialização; eventos caem em cascata).
+      const necsAlvo = await tx.necessidadeDocumental.findMany({
+        where: { OR: [{ pessoaId: id }, ...(uniaoIds.length ? [{ uniaoId: { in: uniaoIds } }] : [])] },
+        select: { id: true },
+      })
+      if (necsAlvo.length > 0) {
+        const necIds = necsAlvo.map((n) => n.id)
+        await tx.phaseWorkflowStepInstance.deleteMany({ where: { necessidadeId: { in: necIds } } })
+        await tx.necessidadeDocumental.deleteMany({ where: { id: { in: necIds } } })
+      }
+
       // 1. Deletar documentos da pessoa
       if (pessoa.documentos.length > 0) {
         await tx.documento.deleteMany({
