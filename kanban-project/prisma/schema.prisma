@@ -2751,7 +2751,7 @@ model PhaseWorkflowInstance {
   origem            OrigemInstancia        @default(MOTOR)
   instanciadoPor    String?                @db.VarChar(60) // userId ou "MOTOR"
   correlationId     String?                @db.VarChar(60)
-  causationId       String?                @db.VarChar(60) // CP-4B — causa imediata
+  causationId       String?                @db.VarChar(200) // CP-4B — causa imediata (chave do advance chega a ~74 chars)
   chaveIdempotencia String                 @unique @db.VarChar(200)
 
   previousInstanceId    Int?
@@ -2820,7 +2820,7 @@ model PhaseWorkflowStepInstance {
   dependeDeStepKeys Json? // por stepKey/definitionId — nunca label
   chaveIdempotencia String  @unique @db.VarChar(200)
   correlationId     String? @db.VarChar(60)
-  causationId       String? @db.VarChar(60) // CP-4B — causa imediata
+  causationId       String? @db.VarChar(200) // CP-4B — causa imediata (chave do advance chega a ~74 chars)
 
   previousStepInstanceId Int?
   previousStepInstance   PhaseWorkflowStepInstance?  @relation("StepInstanceSupersessao", fields: [previousStepInstanceId], references: [id], onDelete: SetNull)
@@ -2854,7 +2854,7 @@ model WorkflowEvento {
   stepInstanceId     Int?
   tarefaId           Int?
   correlationId      String?            @db.VarChar(60)
-  causationId        String?            @db.VarChar(60) // CP-4B — causa imediata
+  causationId        String?            @db.VarChar(200) // CP-4B — causa imediata (chave do advance chega a ~74 chars)
   chaveIdempotencia  String?            @unique @db.VarChar(200) // CP-4B — dedup de evento
   dados              Json?
   criadoEm           DateTime           @default(now())
@@ -2897,7 +2897,7 @@ model PhaseAdvanceLog {
   motivoCodigo            String?          @db.VarChar(40)
   forcado                 Boolean          @default(false)
   correlationId           String           @db.VarChar(60)
-  causationId             String?          @db.VarChar(60)
+  causationId             String?          @db.VarChar(200)
   chaveIdempotencia       String           @unique @db.VarChar(200)
   criadoEm                DateTime         @default(now())
 
@@ -2915,7 +2915,7 @@ model DomainOutbox {
   aggregateId       Int?
   payload           Json
   correlationId     String?      @db.VarChar(60)
-  causationId       String?      @db.VarChar(60) // CP-4B — causa imediata
+  causationId       String?      @db.VarChar(200) // CP-4B — causa imediata (chave do advance chega a ~74 chars)
   chaveIdempotencia String?      @unique @db.VarChar(200) // CP-4B — dedup de outbox
   status            OutboxStatus @default(PENDENTE)
   tentativas        Int          @default(0)

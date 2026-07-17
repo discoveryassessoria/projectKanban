@@ -339,6 +339,13 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
         tarefasCriadas, correlationId: p.correlationId, logId: log.id,
       }
       return ok
+    }, {
+      // A transação do avanço cria a instância da próxima fase + passos + tarefas +
+      // eventos + logs + outbox (muitas escritas sequenciais). O default de 5000ms
+      // estourava (P2028) na transição genealogia→emissao_documental sob latência de
+      // pool. Só amplia a janela; nenhuma mudança de lógica.
+      timeout: 20000,
+      maxWait: 15000,
     })
     return out
   } catch (e) {
