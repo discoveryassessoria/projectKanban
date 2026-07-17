@@ -32,7 +32,7 @@ ok(existsSync(join(ROOT, "src/app/api/processos/[processoId]/genealogia/operacao
 ok(/verificarPermissao\(request, "processos\.editar"\)/.test(endpoint), "exige permissão processos.editar")
 ok(/necessidadeDocumental\.findUnique/.test(endpoint) && /nec\.processoId !== procId/.test(endpoint), "valida a necessidade pertence ao processo")
 ok(/documento\.findFirst\(\{ where: \{ necessidadeId: nec\.id \}/.test(endpoint), "reusa Documento existente da necessidade (idempotência)")
-ok(/documento\.create/.test(endpoint) && /origem: "regra_documental"/.test(endpoint), "cria Documento (origem regra_documental) quando não há")
+ok(/documento\.create/.test(endpoint) && /origem: "automatica"/.test(endpoint), "cria Documento (origem 'automatica', válida no CHECK) quando não há")
 ok(/phaseWorkflowStepInstance\.updateMany\(\{[\s\S]*?stepKey: "localizar_registro"[\s\S]*?documentoId: null[\s\S]*?data: \{ documentoId: d\.id \}/.test(endpoint), "liga o passo localizar_registro (só se documentoId null) ao Documento")
 ok(!/buscar_documento|buscar_certidao/.test(endpoint), "endpoint não referencia stepKeys legados")
 

@@ -47,7 +47,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             documentTypeId: tipoDoc?.id ?? null,
             tipo: tipoEnum,
             status: "PENDENTE",
-            origem: "regra_documental",
+            // CHECK Documento_origem_check em prod só admite 'manual'|'automatica'.
+            // Registro operacional gerado pelo sistema (regra documental) = automatica.
+            origem: "automatica",
           },
           select: { id: true },
         })
