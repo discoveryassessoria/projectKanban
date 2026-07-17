@@ -4,8 +4,10 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
-// LEGADO_INATIVO (desativação Genealogia): editar Pessoa (casado/vivo/documentacao)
-// NÃO reconcilia mais Documento. Import de reconcileDocsForPessoa removido — não reintroduzir.
+import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
+// LEGADO_INATIVO (desativação Genealogia): editar Pessoa NÃO reconcilia mais
+// Documento (reconcileDocsForPessoa removido). A materialização V2 (Fatia 2) é
+// aditiva/idempotente e não cria Documento.
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -130,11 +132,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     })
 
     // ============================================================
-    // LEGADO_INATIVO (desativação da lógica antiga da Genealogia)
+    // LEGADO_INATIVO: editar Pessoa NÃO reconcilia mais Documento (DOCUMENT_RULES
+    // desligado). ARQUITETURA NOVA (Fatia 2): ao mudar atributos relevantes
+    // (documentacao/casado/vivo/requerente/linhaReta), reavalia as Regras
+    // Documentais e reconcilia as NecessidadeDocumental da Genealogia (best-effort,
+    // idempotente, sem criar Documento, sem avançar fase). Nunca quebra a edição.
     // ============================================================
-    // Editar casado/vivo/documentacao NÃO reconcilia mais Documento. A
-    // auto-geração baseada em DOCUMENT_RULES foi desligada; a arquitetura
-    // documental definitiva ainda não foi aprovada. Não religar gerador aqui.
+    await dispararMaterializacaoPorArvore(pessoaAtualizada.arvoreId)
 
     return NextResponse.json(pessoaAtualizada)
   } catch (error) {

@@ -2,6 +2,7 @@
 
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
 // LEGADO_INATIVO (desativação Genealogia): a auto-geração de Documento ao criar
 // Pessoa foi DESLIGADA. Criar Pessoa NÃO gera mais Documento silenciosamente.
 // Import de reconcileDocsForPessoa removido de propósito — não reintroduzir.
@@ -204,12 +205,13 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================================
-    // LEGADO_INATIVO (desativação da lógica antiga da Genealogia)
+    // LEGADO_INATIVO: a auto-geração de Documento (reconcileDocsForPessoa /
+    // DOCUMENT_RULES) segue DESATIVADA — criar Pessoa NÃO cria Documento.
+    // ARQUITETURA NOVA (Fatia 2): reavalia as Regras Documentais publicadas e
+    // materializa as NecessidadeDocumental da Genealogia (best-effort, idempotente,
+    // não cria Documento, não avança fase). Nunca quebra o cadastro da Pessoa.
     // ============================================================
-    // A auto-geração de Documento (reconcileDocsForPessoa / DOCUMENT_RULES) foi
-    // DESATIVADA. Criar Pessoa não cria mais Documento automaticamente. A
-    // arquitetura documental definitiva ainda não foi aprovada — não religar
-    // aqui nenhum gerador. Documento passa a ser criado apenas manualmente.
+    await dispararMaterializacaoPorArvore(pessoa.arvoreId)
 
     // Recarrega a pessoa (documentos existentes, se houver — nada é gerado aqui)
     const pessoaFinal = await prisma.pessoa.findUnique({
