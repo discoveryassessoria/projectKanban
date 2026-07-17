@@ -82,6 +82,8 @@ interface QueueRow {
   // Genealogia V2: necessidade da certidão. Quando não há Documento (docId=0),
   // a UI usa este id para garantir o registro operacional ao abrir a operação.
   necessidadeId?: number | null
+  // Responsável atual do passo (para o seletor "Delegar" na linha da fila).
+  responsavelId?: number | null
 }
 
 // ============================================================
@@ -731,6 +733,7 @@ export async function GET(
           status: ok ? "Registro localizado" : "A localizar",
           statusRaw: ok ? "LOCALIZADO" : "A_LOCALIZAR",
           responsavelNome: s?.responsavelId != null ? respNomes.get(s.responsavelId) ?? null : null,
+          responsavelId: s?.responsavelId ?? null,
           prazo: s?.prazo?.toISOString() ?? null,
           diasParaPrazo: dias,
           motivoBloqueio: null,

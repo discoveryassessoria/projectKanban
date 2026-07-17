@@ -51,6 +51,7 @@ export interface FaseDocRow {
   // Genealogia V2: necessidade da certidão (usada p/ garantir o registro
   // operacional ao abrir a operação quando ainda não há Documento, id=0).
   necessidadeId?: number | null
+  responsavelId?: number | null   // responsável atual do passo (seletor "Delegar")
   tipoLabel: string        // "Certidão de Nascimento"
   subtitulo?: string       // "Inteiro teor"
   statusLabel: string      // "A SOLICITAR"
@@ -95,6 +96,9 @@ export interface PainelDaFaseProps {
   foraDaLinha: FasePersonRow[]
   onAbrirOperacao: (docId: number, necessidadeId?: number | null) => void
   onAbrirPainelCompleto?: () => void
+  // Delegação direto na fila (Genealogia): lista de funcionários + callback.
+  usuarios?: Array<{ id: number; nome: string }>
+  onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
   // LEGADO_INATIVO (desativação Genealogia): em modo reestruturação, o painel NÃO
   // exibe as etapas/KPIs/progresso/"validados" antigos (derivados de
   // Documento.status + linhaReta). Mostra apenas um aviso neutro + a lista de
@@ -122,6 +126,8 @@ export function PainelDaFase({
   foraDaLinha,
   onAbrirOperacao,
   onAbrirPainelCompleto,
+  usuarios,
+  onDelegar,
   modoReestruturacao = false,
   avisoReestruturacao,
 }: PainelDaFaseProps) {
@@ -289,7 +295,7 @@ export function PainelDaFase({
             tone="linha"
           />
           {linhaPrincipal.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} ocultarValidacao={modoReestruturacao} />
+            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} ocultarValidacao={modoReestruturacao} />
           ))}
 
           {/* Grupo Fora da linhagem */}
@@ -300,7 +306,7 @@ export function PainelDaFase({
             tone="fora"
           />
           {foraDaLinha.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} ocultarValidacao={modoReestruturacao} />
+            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} ocultarValidacao={modoReestruturacao} />
           ))}
         </div>
       </div>
@@ -339,10 +345,14 @@ function GroupBar({
 function PersonRow({
   p,
   onAbrirOperacao,
+  usuarios,
+  onDelegar,
   ocultarValidacao = false,
 }: {
   p: FasePersonRow
   onAbrirOperacao: (docId: number, necessidadeId?: number | null) => void
+  usuarios?: Array<{ id: number; nome: string }>
+  onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
   ocultarValidacao?: boolean
 }) {
   const [exp, setExp] = useState(false)
@@ -503,10 +513,25 @@ function PersonRow({
               </span>
             </div>
 
-            {/* Responsável */}
-            <span className={`text-[12px] ${d.responsavel ? "text-gray-700" : "text-gray-300"}`}>
-              {d.responsavel || "—"}
-            </span>
+            {/* Responsável — seletor de delegação quando disponível */}
+            {onDelegar && usuarios && usuarios.length > 0 && d.necessidadeId != null ? (
+              <select
+                value={d.responsavelId ?? ""}
+                onChange={(e) => onDelegar(d.necessidadeId as number, e.target.value ? Number(e.target.value) : null)}
+                onClick={(e) => e.stopPropagation()}
+                className={`text-[12px] rounded-md border px-1.5 py-1 bg-white max-w-[150px] focus:outline-none focus:border-blue-400 ${d.responsavelId ? "text-gray-700 border-gray-200" : "text-gray-400 border-dashed border-gray-300"}`}
+                title="Delegar responsável"
+              >
+                <option value="">Delegar…</option>
+                {usuarios.map((u) => (
+                  <option key={u.id} value={u.id}>{u.nome}</option>
+                ))}
+              </select>
+            ) : (
+              <span className={`text-[12px] ${d.responsavel ? "text-gray-700" : "text-gray-300"}`}>
+                {d.responsavel || "—"}
+              </span>
+            )}
 
             {/* SLA */}
             <span className={`text-[12px] ${d.sla ? "text-gray-700" : "text-gray-300"}`}>

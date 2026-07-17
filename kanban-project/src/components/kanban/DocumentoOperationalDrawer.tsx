@@ -294,6 +294,26 @@ export function DocumentoOperationalDrawer({
     return () => document.removeEventListener("keydown", onEsc)
   }, [isOpen, onClose])
 
+  // Atribui/troca o responsável do passo (mesmo endpoint do "Transferir" da Central
+  // da Etapa). Reusa o contrato existente; recarrega o drawer ao concluir.
+  const atribuirResponsavel = async (stepId: number, responsavelId: number | null) => {
+    if (!documentoId) return
+    try {
+      await fetch(`/api/documentos/${documentoId}/workflow/steps/${stepId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify({ assigneeId: responsavelId }),
+      })
+      await carregar()
+      onSave?.()
+    } catch (e) {
+      console.error("[DocumentoOperationalDrawer] atribuir:", e)
+    }
+  }
+
   // Salva via PUT (usa o endpoint que já existe)
   const putDoc = async (patch: Record<string, any>) => {
     if (!documentoId) return
@@ -502,6 +522,8 @@ export function DocumentoOperationalDrawer({
                   doc={doc as any}
                   workflow={workflow}
                   documentoId={documentoId}
+                  usuarios={usuarios}
+                  onAtribuir={atribuirResponsavel}
                   onAbrirIniciar={() => setInitModalOpen(true)}
                   onTrocarAba={(tab) => setActiveTab(tab as TabId)}
                   onAbrirCentralDaEtapa={() => {

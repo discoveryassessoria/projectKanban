@@ -67,6 +67,8 @@ interface Props {
   onAbrirIniciar: () => void                          // abre o InitOperationModal
   onTrocarAba: (tab: "registry" | "history" | "workflow") => void  // troca pra aba interna
   onAbrirCentralDaEtapa: (stepId: number) => void     // abre o editor inline da etapa (na aba Workflow)
+  usuarios?: Array<{ id: number; nome: string }>       // p/ delegar o responsável do passo ativo
+  onAtribuir?: (stepId: number, responsavelId: number | null) => void | Promise<void>
 }
 
 // ============================================================
@@ -165,6 +167,8 @@ export function TabOperationCockpit({
   onAbrirIniciar,
   onTrocarAba,
   onAbrirCentralDaEtapa,
+  usuarios,
+  onAtribuir,
 }: Props) {
   if (!doc || !documentoId) {
     return (
@@ -285,7 +289,21 @@ export function TabOperationCockpit({
             <span className="text-white text-[13px] font-medium">{activeStep.title}</span>
           </Cell>
           <Cell label="Responsável">
-            <span className="text-white/85 text-[13px]">{ownerLabel}</span>
+            {onAtribuir && usuarios && usuarios.length > 0 ? (
+              <select
+                value={activeStep.assignee?.id ?? ""}
+                onChange={(e) => onAtribuir(activeStep.id, e.target.value ? Number(e.target.value) : null)}
+                className="w-full bg-white/5 border border-white/10 rounded px-1.5 py-1 text-[12.5px] text-white focus:outline-none focus:border-blue-500/50"
+                title="Delegar responsável"
+              >
+                <option value="" className="bg-slate-800">Delegar…</option>
+                {usuarios.map((u) => (
+                  <option key={u.id} value={u.id} className="bg-slate-800">{u.nome}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-white/85 text-[13px]">{ownerLabel}</span>
+            )}
           </Cell>
           <Cell label="SLA" sub={formatDateTime(activeStep.dueAt)}>
             <span className={`text-[13px] ${sla.cls}`}>{sla.text}</span>

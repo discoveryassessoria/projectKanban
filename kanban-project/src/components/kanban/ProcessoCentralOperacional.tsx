@@ -106,6 +106,7 @@ interface CentralOpData {
     generation: number
     isLinhaReta: boolean
     necessidadeId?: number | null
+    responsavelId?: number | null
   }>
   queueTitle: string
   faseProgress?: FaseProgress // ✅ NOVO (opcional: fallback cobre ausência)
@@ -249,6 +250,7 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
     row.docs.push({
       id: q.docId,
       necessidadeId: q.necessidadeId ?? null,
+      responsavelId: q.responsavelId ?? null,
       tipoLabel: q.docTypeLabel,
       subtitulo: "Inteiro teor",
       statusLabel: q.status.toUpperCase(),
@@ -347,6 +349,41 @@ export function ProcessoCentralOperacional({
       } finally {
         clearTimeout(timer)
         setAbrindoOperacao(false)
+      }
+    },
+    [processo.id]
+  )
+
+  // Lista de funcionários para os seletores "Delegar" (carrega uma vez).
+  const [usuarios, setUsuarios] = useState<Array<{ id: number; nome: string }>>([])
+  useEffect(() => {
+    fetch("/api/usuarios", { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } })
+      .then((r) => r.json())
+      .then((d) => setUsuarios((d.usuarios || d || []).map((u: { id: number; nome: string }) => ({ id: u.id, nome: u.nome }))))
+      .catch(() => {})
+  }, [])
+
+  // Delega o passo localizar_registro de uma necessidade (fila) SEM abrir a operação
+  // nem criar Documento. Grava o responsável direto no passo.
+  const delegar = useCallback(
+    async (necessidadeId: number, responsavelId: number | null) => {
+      try {
+        const res = await fetch(`/api/processos/${processo.id}/genealogia/delegar`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+          },
+          body: JSON.stringify({ necessidadeId, responsavelId }),
+        })
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}))
+          setErroOperacao(j?.error || `Não foi possível delegar (HTTP ${res.status}).`)
+          return
+        }
+        carregar(true)
+      } catch {
+        setErroOperacao("Falha de rede ao delegar.")
       }
     },
     [processo.id]
@@ -555,6 +592,8 @@ export function ProcessoCentralOperacional({
             linhaPrincipal={painel.linhaPrincipal}
             foraDaLinha={painel.foraDaLinha}
             onAbrirOperacao={(docId, necessidadeId) => { void abrirOperacao(docId, necessidadeId) }}
+            usuarios={usuarios}
+            onDelegar={(necessidadeId, responsavelId) => { void delegar(necessidadeId, responsavelId) }}
             modoReestruturacao={!!data.genealogiaReestruturacao}
             avisoReestruturacao={data.mensagemReestruturacao ?? undefined}
           />
