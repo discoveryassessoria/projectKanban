@@ -90,10 +90,26 @@ export async function calcularPendencias(
     },
   })
 
+  // Mapa necessidadeId → status (fonte oficial da elegibilidade da Genealogia).
+  const necStatusById = new Map(necessidadesRaw.map((n) => [n.id, n.status]))
+
   if (instancia) {
     const stepKeys = new Set(instancia.steps.map((s) => s.stepKey))
     for (const step of instancia.steps) {
       const snap = (step.snapshot as SnapshotPasso | null) ?? {}
+
+      // GENEALOGIA — alinhamento com a Central (fonte oficial de progresso): um passo
+      // localizar_registro NÃO é obrigação aberta quando:
+      //   (a) é órfão (necessidadeId=null) — passo genérico do WF Interno da fase que
+      //       fica sem par após a materialização por-necessidade (não representa doc);
+      //   (b) sua necessidade está DISPENSADA — o requisito deixou de ser exigido.
+      // Sem isto, dispensar uma necessidade (ou o passo genérico órfão) deixa um passo
+      // ativo travando o avanço para sempre, embora a Central mostre 100%. As tarefas
+      // do passo saem junto (continue). Não altera o restante do motor.
+      if (isGenealogia && step.stepKey === "localizar_registro") {
+        const ns = step.necessidadeId == null ? null : necStatusById.get(step.necessidadeId)
+        if (step.necessidadeId == null || ns === "DISPENSADA") continue
+      }
 
       // Passo
       const pIssue = classificarPasso(step.status, step.obrigatorio, step.stepKey, step.id)
