@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { getOrdemFase, getStepsForFase, getFase, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
+import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 import type { FaseCode } from "@prisma/client"
 
 // ============================================================
@@ -664,14 +665,103 @@ export async function GET(
       },
     }
 
+    // ============================================================
+    // GENEALOGIA V2 — LIGAÇÃO da Central com a arquitetura nova. Substitui a
+    // visualização legada/neutra. Fonte: NecessidadeDocumental de CERTIDÃO +
+    // passos localizar_registro (NÃO Documento.status / linhaReta / STATUS_VALIDADOS).
+    // Progresso = passos obrigatórios localizar_registro concluídos / aplicáveis.
+    // Não altera regras nem motor — só monta a resposta da UI a partir do V2.
+    // ============================================================
+    let genealogiaV2: { matrix: MatrixResponse; queue: QueueRow[]; faseProgress: FaseProgress } | null = null
+    if (faseAtualCode === "GENEALOGIA") {
+      const certItens = await itemCatalogosDeCertidao(prisma)
+      const necsRaw = await prisma.necessidadeDocumental.findMany({
+        where: { processoId: id },
+        select: { id: true, pessoaId: true, obrigatoriedade: true, status: true, matrizSnapshot: true, itemCatalogoId: true },
+      })
+      // só CERTIDÕES (natureza estruturada) e não dispensadas
+      const necs = necsRaw.filter((n) => certItens.has(n.itemCatalogoId) && n.status !== "DISPENSADA")
+      const stepsLR = await prisma.phaseWorkflowStepInstance.findMany({
+        where: { processoId: id, faseMacroKey: "genealogia", stepKey: "localizar_registro" },
+        select: { id: true, necessidadeId: true, status: true, obrigatorio: true, documentoId: true, prazo: true, responsavelId: true, updatedAt: true, motivo: true },
+      })
+      // responsavelId é ref solta a Usuario (sem relation) → resolve o nome em lote
+      const respIds = [...new Set(stepsLR.map((s) => s.responsavelId).filter((x): x is number => x != null))]
+      const respNomes = respIds.length
+        ? new Map((await prisma.usuario.findMany({ where: { id: { in: respIds } }, select: { id: true, nome: true } })).map((u) => [u.id, u.nome]))
+        : new Map<number, string>()
+      const stepByNec = new Map<number, (typeof stepsLR)[number]>()
+      for (const s of stepsLR) if (s.necessidadeId != null && !stepByNec.has(s.necessidadeId)) stepByNec.set(s.necessidadeId, s)
+      const CONCLUIDO = new Set(["CONCLUIDO", "DISPENSADO", "SUPERSEDIDO"])
+      const localizado = (necId: number) => { const s = stepByNec.get(necId); return !!s && CONCLUIDO.has(s.status) }
+      const requisitoDe = (snap: unknown) => (snap && typeof snap === "object" && "requisito" in snap ? String((snap as { requisito: unknown }).requisito) : "Certidão")
+
+      // progresso = passos OBRIGATÓRIOS localizar_registro concluídos / aplicáveis
+      const obrig = necs.filter((n) => n.obrigatoriedade === "OBRIGATORIA")
+      const totalObrig = obrig.length
+      const obrigDone = obrig.filter((n) => localizado(n.id)).length
+      const percentage = totalObrig > 0 ? Math.round((obrigDone / totalObrig) * 100) : 0
+
+      const byP = new Map<number, { completed: number; total: number; generation: number }>()
+      for (const n of necs) {
+        if (n.pessoaId == null) continue
+        const cur = byP.get(n.pessoaId) ?? { completed: 0, total: 0, generation: generationOf(n.pessoaId) }
+        cur.total += 1
+        if (localizado(n.id)) cur.completed += 1
+        byP.set(n.pessoaId, cur)
+      }
+      const byPersonV2 = Array.from(byP.entries())
+        .filter(([pid]) => pessoasMap.get(pid)?.linhaReta)
+        .map(([pid, v]) => { const p = pessoasMap.get(pid)!; return { pessoaId: pid, nome: nomeCompleto(p), generation: v.generation, completed: v.completed, total: v.total, percentage: v.total > 0 ? Math.round((v.completed / v.total) * 100) : 0 } })
+        .sort((a, b) => a.generation - b.generation)
+
+      const queueV2: QueueRow[] = necs.map((n) => {
+        const s = stepByNec.get(n.id)
+        const ok = localizado(n.id)
+        const pessoa = n.pessoaId != null ? pessoasMap.get(n.pessoaId) : undefined
+        const dias = s?.prazo ? diffDays(s.prazo, now) : null
+        return {
+          docId: s?.documentoId ?? 0,
+          pessoaNome: pessoa ? nomeCompleto(pessoa) : "—",
+          docType: requisitoDe(n.matrizSnapshot),
+          docTypeLabel: requisitoDe(n.matrizSnapshot),
+          status: ok ? "Registro localizado" : "A localizar",
+          statusRaw: ok ? "LOCALIZADO" : "A_LOCALIZAR",
+          responsavelNome: s?.responsavelId != null ? respNomes.get(s.responsavelId) ?? null : null,
+          prazo: s?.prazo?.toISOString() ?? null,
+          diasParaPrazo: dias,
+          motivoBloqueio: null,
+          ultimaMovimentacao: s?.updatedAt?.toISOString() ?? null,
+          isCritical: false,
+          isOverdue: !ok && dias != null && dias < 0,
+          isBlocked: false,
+          noOwner: !s?.responsavelId,
+          proximoPasso: ok ? "normal" : "Localizar registro",
+          generation: n.pessoaId != null ? generationOf(n.pessoaId) : 99,
+          isLinhaReta: pessoa?.linhaReta ?? false,
+        }
+      })
+
+      genealogiaV2 = {
+        matrix: { percentage, completed: obrigDone, total: totalObrig, directPeopleCount: pessoasNaLinha.length, missingCount: totalObrig - obrigDone, nameVariationsCount: 0, byPerson: byPersonV2, missing: [] },
+        queue: queueV2,
+        faseProgress: {
+          faseCode: faseAtualCode ?? null, kind: "documento", docsNaFase: necs.length,
+          steps: [{ ordem: 1, stepKey: "localizar_registro", title: "Localizar registro da certidão", status: totalObrig > 0 && obrigDone >= totalObrig ? "concluida" : "em_andamento", concluidos: obrigDone, total: totalObrig }],
+          counts: { solicitados: 0, aguardando: Math.max(0, totalObrig - obrigDone), recebidos: obrigDone, conferidos: 0, validados: obrigDone },
+        },
+      }
+    }
+
     const response: CentralOperacionalResponse = {
-      matrix,
+      matrix: genealogiaV2 ? genealogiaV2.matrix : matrix,
       cards,
-      queue,
+      queue: genealogiaV2 ? genealogiaV2.queue : queue,
       queueTitle,
-      faseProgress,
-      genealogiaReestruturacao,
-      mensagemReestruturacao,
+      faseProgress: genealogiaV2 ? genealogiaV2.faseProgress : faseProgress,
+      // Genealogia agora tem visualização V2 real — sai o estado neutro de reestruturação.
+      genealogiaReestruturacao: genealogiaV2 ? false : genealogiaReestruturacao,
+      mensagemReestruturacao: genealogiaV2 ? null : mensagemReestruturacao,
       schemaCapabilities,
     }
 

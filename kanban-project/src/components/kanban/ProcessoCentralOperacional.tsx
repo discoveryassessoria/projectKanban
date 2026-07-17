@@ -129,7 +129,9 @@ interface ProcessoCentralOperacionalProps {
 
 function statusParaCls(statusLabel: string): string {
   const s = statusLabel.toLowerCase()
-  if (s.includes("recebid") || s.includes("entregue") || s.includes("validad")) return "recebido"
+  // Genealogia V2: "Registro localizado" = concluído (verde, conta no progresso).
+  if (s.includes("recebid") || s.includes("entregue") || s.includes("validad") || s.includes("localizado")) return "recebido"
+  if (s.includes("a localizar")) return "pendente"
   if (s.includes("solicit")) return "solicitado"
   if (s.includes("busca")) return "em_busca"
   if (s.includes("invál") || s.includes("inval") || s.includes("não enc") || s.includes("nao enc")) return "bloqueado"
