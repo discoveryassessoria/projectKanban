@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { sincronizarItemDeServico } from '@/src/services/catalogo-sync'
+import { garantirConfigFinanceiraDeServico } from '@/src/services/config-financeira-auto'
 
 function toStrOrNull(v: any): string | null {
   if (v === undefined || v === null) return null
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     // dual-write: ItemCatalogo (mestre, natureza SERVICO) — é o que o Financeiro referencia.
     const servico = await prisma.$transaction(async (tx) => {
       const itemCatalogoId = await sincronizarItemDeServico(tx, { code, name, category })
-      return tx.servicoProduto.create({
+      const s = await tx.servicoProduto.create({
         data: {
           code,
           name,
@@ -57,6 +58,10 @@ export async function POST(request: NextRequest) {
           itemCatalogoId,
         },
       })
+      // FLUXO: Cadastro Mestre (Serviço) → Configuração Financeira criada AUTOMATICAMENTE
+      // (vínculo estrutural itemCatalogoId; idempotente). Não cria preço — só a config.
+      await garantirConfigFinanceiraDeServico(tx, { itemCatalogoId, nome: name })
+      return s
     })
 
     return NextResponse.json({ servico })

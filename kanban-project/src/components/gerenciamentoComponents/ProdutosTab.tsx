@@ -54,6 +54,9 @@ type MestreRef = { id: number; label: string; code: string | null }
 type Mestres = { documento: MestreRef[]; servico: MestreRef[]; honorario: MestreRef[]; processo: MestreRef[] }
 type FornecedorRef = { id: number; nome: string }
 const MESTRES_VAZIO: Mestres = { documento: [], servico: [], honorario: [], processo: [] }
+// Rótulo da ORIGEM estrutural do mestre (Documento/Serviço/...). Usado na coluna e busca.
+const ORIGEM_LABEL: Record<string, string> = { documento: 'Documento', servico: 'Serviço', honorario: 'Honorário', processo: 'Processo', item: 'Item' }
+const origemLabel = (o?: string | null) => (o ? (ORIGEM_LABEL[o] ?? o) : '—')
 // mapeia origem → campo FK enviado no POST
 const FK_POR_ORIGEM: Record<string, 'tipoDocumentoId' | 'honorarioId' | 'tipoProcessoId' | 'itemCatalogoId'> = {
   documento: 'tipoDocumentoId', honorario: 'honorarioId', processo: 'tipoProcessoId', servico: 'itemCatalogoId',
@@ -165,7 +168,9 @@ export default function ProdutosTab() {
     if (!q) return base
     return base.filter((p) =>
       (p.mestre?.nome ?? p.nome).toLowerCase().includes(q) ||
-      (p.mestre?.codigo ?? '').toLowerCase().includes(q)
+      (p.mestre?.codigo ?? '').toLowerCase().includes(q) ||
+      (p.mestre?.origem ?? '').toLowerCase().includes(q) ||
+      origemLabel(p.mestre?.origem).toLowerCase().includes(q)
     )
   }, [produtos, busca, mostrarInativos])
 
@@ -287,7 +292,7 @@ export default function ProdutosTab() {
         <input
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar (cadastro mestre ou código)..."
+          placeholder="Buscar (cadastro mestre, código ou origem)..."
           className="min-w-[220px] flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
         />
         <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-white/60 select-none">
@@ -322,6 +327,7 @@ export default function ProdutosTab() {
             <thead>
               <tr className="bg-white/5">
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Cadastro mestre</th>
+                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Origem</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Natureza financeira</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
@@ -333,6 +339,9 @@ export default function ProdutosTab() {
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-white">{p.mestre?.nome || p.nome}</div>
                     <div className="text-[11px] text-white/40">{p.mestre?.codigo ? `Cód. ${p.mestre.codigo}` : 'sem código de mestre'}</div>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.mestre?.origem === 'servico' ? 'bg-sky-500/15 text-sky-300' : p.mestre?.origem === 'documento' ? 'bg-indigo-500/15 text-indigo-300' : 'bg-white/10 text-white/60'}`}>{origemLabel(p.mestre?.origem)}</span>
                   </td>
                   <td className="px-4 py-2.5 text-white/80">{lbl(NATUREZA_FIN, natFinDe(p.possuiCusto, p.possuiReceita))}</td>
                   <td className="px-4 py-2.5">

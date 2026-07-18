@@ -45,6 +45,8 @@
     "backfill:precos-legado": "tsx prisma/backfill-precos-legado-tabelavalor.ts --execute",
     "backfill:origem-financeiro:dry": "tsx prisma/backfill-origem-financeiro.ts",
     "backfill:origem-financeiro": "tsx prisma/backfill-origem-financeiro.ts --execute",
+    "backfill:config-servicos:dry": "tsx prisma/backfill-config-servicos.ts",
+    "backfill:config-servicos": "tsx prisma/backfill-config-servicos.ts --execute",
     "test:preco-fonte-unica": "tsx scripts/preco-fonte-unica.test.ts",
     "test:resolver-preco": "tsx scripts/resolver-preco-financeiro.test.ts",
     "test:financeiro-geral": "tsx scripts/financeiro-geral.test.ts",

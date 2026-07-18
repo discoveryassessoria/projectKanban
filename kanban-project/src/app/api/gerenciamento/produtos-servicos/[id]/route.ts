@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { sincronizarItemDeServico } from '@/src/services/catalogo-sync'
+import { garantirConfigFinanceiraDeServico, refletirEstadoNaConfigDeServico } from '@/src/services/config-financeira-auto'
 
 function toStrOrNull(v: any): string | null {
   if (v === undefined || v === null) return null
@@ -35,10 +36,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // ex.: Configuração Financeira) — editar o CÓDIGO do serviço não quebra o vínculo.
     const servico = await prisma.$transaction(async (tx) => {
       const itemCatalogoId = await sincronizarItemDeServico(tx, { code: data.code, name: data.name, category: data.category }, atual.itemCatalogoId)
-      return tx.servicoProduto.update({
+      const s = await tx.servicoProduto.update({
         where: { id },
         data: { ...data, itemCatalogoId },
       })
+      // Renomear NÃO cria nova config (mesmo itemCatalogoId → mesmo vínculo). Self-heal:
+      // garante a config se faltar (legado); reflete nome/ativo sem apagar preços/histórico.
+      await garantirConfigFinanceiraDeServico(tx, { itemCatalogoId, nome: data.name })
+      await refletirEstadoNaConfigDeServico(tx, { itemCatalogoId, nome: data.name, ativo: data.ativo })
+      return s
     })
 
     return NextResponse.json({ servico })
