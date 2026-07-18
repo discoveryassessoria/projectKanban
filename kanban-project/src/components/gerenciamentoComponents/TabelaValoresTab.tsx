@@ -172,21 +172,26 @@ export default function TabelaValoresTab() {
     }
     setSalvando(true); setErroModal(null)
     try {
-      // `categoria` e os campos por-natureza são só da UI: enviamos os parâmetros
-      // COMPARTILHADOS + o(s) registro(s) em `linhas`. Sem "AMBOS" — só CUSTO/VENDA.
+      // NOVO CONTRATO: envia os CHECKBOXES + blocos custo/venda. A natureza é derivada no
+      // backend (fonte única `naturezasDeSelecao`) — o componente NÃO decide natureza nem
+      // envia o campo legado `natureza` no cadastro novo.
       const { categoria: _c, precoCusto: _pc, precoVenda: _pv, moeda: _m, valor: _v, fornecedorId: _f, moedaVenda: _mv, valorVenda: _vv, ...compartilhados } = form
-      const linhas: Array<{ natureza: string; moeda: string; valor: number; fornecedorId: number | null }> = []
-      if (form.precoCusto) linhas.push({ natureza: 'CUSTO', moeda: form.moeda, valor: Number(form.valor), fornecedorId: form.fornecedorId ? Number(form.fornecedorId) : null })
-      // Venda NÃO leva fornecedor (sem justificativa estrutural para vinculá-lo à venda).
-      if (form.precoVenda) linhas.push({ natureza: 'VENDA', moeda: form.moedaVenda, valor: Number(form.valorVenda), fornecedorId: null })
+      // Edição = UM registro individual já existente (natureza imutável): payload single.
+      const editPayload = form.precoCusto
+        ? { natureza: 'CUSTO', moeda: form.moeda, valor: Number(form.valor), fornecedorId: form.fornecedorId ? Number(form.fornecedorId) : null }
+        : { natureza: 'VENDA', moeda: form.moedaVenda, valor: Number(form.valorVenda), fornecedorId: null }
       const body = JSON.stringify({
         ...compartilhados,
         configuracaoFinanceiraItemId: Number(form.configuracaoFinanceiraItemId),
         prioridade: Number(form.prioridade) || 0,
-        // Edição = UM registro individual (uma natureza); criação = 1 ou 2 linhas.
         ...(editando
-          ? { natureza: linhas[0].natureza, moeda: linhas[0].moeda, valor: linhas[0].valor, fornecedorId: linhas[0].fornecedorId }
-          : { linhas }),
+          ? editPayload
+          : {
+              precoCusto: form.precoCusto,
+              precoVenda: form.precoVenda,
+              custo: form.precoCusto ? { moeda: form.moeda, valor: Number(form.valor), fornecedorId: form.fornecedorId ? Number(form.fornecedorId) : null } : undefined,
+              venda: form.precoVenda ? { moeda: form.moedaVenda, valor: Number(form.valorVenda) } : undefined,
+            }),
       })
       if (editando) await jsonFetch(`/api/gerenciamento/tabela-valores/${editando.id}`, { method: 'PUT', body })
       else await jsonFetch('/api/gerenciamento/tabela-valores', { method: 'POST', body })

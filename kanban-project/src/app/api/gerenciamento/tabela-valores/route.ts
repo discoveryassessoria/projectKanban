@@ -4,6 +4,7 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { deriveNaturezaFinanceira, validarNaturezaPreco, canonicalNaturezaPreco, admiteCusto, admiteVenda, type NaturezaPrecoRaw } from '@/lib/financeiro/natureza-financeira'
 import { detectarConflitoPreco, type PrecoRegistro } from '@/lib/financeiro/conflito-preco'
 import { modoCalculoValido, unidadeDoModo, modoUsaQuantidade } from '@/lib/financeiro/modo-calculo'
+import { naturezasDeSelecao, usaNovoModeloSelecao } from '@/lib/financeiro/selecao-natureza'
 
 function toAmount(v: any): number {
   if (v === undefined || v === null || v === '') return 0
@@ -141,9 +142,26 @@ export async function POST(request: NextRequest) {
     // LINHAS a criar. Modo CONJUNTO ("Custo e Venda"): b.linhas = [{natureza,moeda,valor,
     // fornecedorId}, ...]. Modo SIMPLES: uma linha derivada dos campos de topo. Cada linha
     // vira UM registro (1 natureza + 1 valor) — o modelo NÃO comporta dois valores por linha.
-    const linhasRaw: any[] = Array.isArray(b.linhas) && b.linhas.length > 0
-      ? b.linhas
-      : [{ natureza: b.natureza, moeda: b.moeda, valor: b.valor, fornecedorId: b.fornecedorId }]
+    // CONTRATO NOVO (fonte única): checkboxes precoCusto/precoVenda + blocos custo/venda.
+    // A natureza é DERIVADA das flags — o novo modelo NÃO envia/exige o campo `natureza`.
+    // Legado (linhas[] com natureza, ou natureza/moeda/valor soltos) é aceito só p/ compat.
+    let linhasRaw: any[]
+    if (usaNovoModeloSelecao(b)) {
+      const naturezas = naturezasDeSelecao({ custo: !!b.precoCusto, venda: !!b.precoVenda })
+      if (naturezas.length === 0)
+        return NextResponse.json({ error: 'Selecione ao menos uma natureza: Preço de Custo e/ou Preço de Venda.' }, { status: 400 })
+      linhasRaw = naturezas.map((nat) => {
+        const src = (nat === 'CUSTO' ? b.custo : b.venda) ?? {}
+        // Venda NÃO leva fornecedor (sem justificativa estrutural para vinculá-lo à venda).
+        return { natureza: nat, moeda: src.moeda, valor: src.valor, fornecedorId: nat === 'CUSTO' ? src.fornecedorId : null }
+      })
+    } else if (Array.isArray(b.linhas) && b.linhas.length > 0) {
+      linhasRaw = b.linhas // LEGADO: linhas com natureza explícita
+    } else if (toStrOrNull(b.natureza)) {
+      linhasRaw = [{ natureza: b.natureza, moeda: b.moeda, valor: b.valor, fornecedorId: b.fornecedorId }] // LEGADO
+    } else {
+      return NextResponse.json({ error: 'Selecione ao menos uma natureza: Preço de Custo e/ou Preço de Venda.' }, { status: 400 })
+    }
 
     // §3 — barreira de DUPLICIDADE (uma leitura; cada linha valida contra o banco E contra
     // as linhas já preparadas nesta mesma operação — custo e venda não colidem entre si).
