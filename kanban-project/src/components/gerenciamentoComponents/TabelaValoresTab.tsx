@@ -42,6 +42,15 @@ const MODOS_CALCULO: [string, string][] = [
 const MOEDAS: [string, string][] = [['EUR', 'EUR'], ['BRL', 'BRL'], ['USD', 'USD']]
 const modoLabel = (v: string) => MODOS_CALCULO.find(([k]) => k === v)?.[1] || v || '—'
 
+// CATEGORIA = origem ESTRUTURAL da Configuração Financeira (config.origem, derivada da FK
+// tipoDocumento/honorario/tipoProcesso/itemCatalogo no backend). NUNCA inferida por texto do nome.
+// É só um filtro de navegação da UI — não é gravada na Tabela de Preços.
+const CATEGORIA_LABEL: Record<string, string> = {
+  Documento: 'Documentos', 'Serviço': 'Serviços', 'Honorário': 'Honorários', Processo: 'Processos', Item: 'Itens',
+}
+const categoriaLabel = (origem: string) => CATEGORIA_LABEL[origem] ?? origem
+const ORDEM_CATEGORIA = ['Documento', 'Serviço'] // as demais origens vêm depois, em ordem alfabética
+
 function origemMestre(cfg?: CfgEmbed | null): { origem: string; mestre: string } {
   if (!cfg) return { origem: '—', mestre: '—' }
   const origem = cfg.tipoDocumento ? 'Documento' : cfg.honorario ? 'Honorário' : cfg.tipoProcesso ? 'Processo' : (cfg.itemCatalogo?.natureza === 'SERVICO' ? 'Serviço' : 'Item')
@@ -62,6 +71,7 @@ const fmtMoeda = (v: any, moeda: string) => {
 }
 
 const EMPTY = {
+  categoria: '', // filtro de navegação (origem estrutural) — NÃO enviado no payload
   configuracaoFinanceiraItemId: '', natureza: '', fornecedorId: '',
   moeda: '', valor: '', modoCalculo: 'fixed', unidade: '', quantidadeMinima: '', quantidadeMaxima: '',
   vigenciaInicio: '', vigenciaFim: '', prioridade: '0', arquivado: false,
@@ -79,7 +89,6 @@ export default function TabelaValoresTab() {
   const [modalAberto, setModalAberto] = useState(false)
   const [editando, setEditando] = useState<Item | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY)
-  const [cfgBusca, setCfgBusca] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [erroModal, setErroModal] = useState<string | null>(null)
   const set = (k: keyof FormState, v: any) => setForm((f) => ({ ...f, [k]: v }))
@@ -106,16 +115,29 @@ export default function TabelaValoresTab() {
   }, [itens, busca])
 
   const cfgSelecionada = configs.find((c) => String(c.id) === form.configuracaoFinanceiraItemId) || null
-  const cfgFiltradas = useMemo(() => {
-    const q = cfgBusca.trim().toLowerCase()
-    const arr = q ? configs.filter((c) => c.label.toLowerCase().includes(q)) : configs
-    return arr.slice(0, 60)
-  }, [configs, cfgBusca])
+  // Categorias = origens ESTRUTURAIS distintas presentes nas configs (dinâmico, sem categorias fictícias).
+  // Documentos/Serviços primeiro; demais origens reais depois, em ordem alfabética.
+  const categorias = useMemo(() => {
+    const origens = Array.from(new Set(configs.map((c) => c.origem)))
+    return origens.sort((a, b) => {
+      const ia = ORDEM_CATEGORIA.indexOf(a), ib = ORDEM_CATEGORIA.indexOf(b)
+      if (ia !== -1 || ib !== -1) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
+      return categoriaLabel(a).localeCompare(categoriaLabel(b))
+    })
+  }, [configs])
+  // Itens da categoria selecionada (ordenados pelo nome do cadastro mestre).
+  const itensDaCategoria = useMemo(() => {
+    if (!form.categoria) return []
+    return configs.filter((c) => c.origem === form.categoria).sort((a, b) => a.mestre.localeCompare(b.mestre))
+  }, [configs, form.categoria])
 
-  function abrirNovo() { setEditando(null); setForm(EMPTY); setCfgBusca(''); setErroModal(null); setModalAberto(true) }
+  function abrirNovo() { setEditando(null); setForm(EMPTY); setErroModal(null); setModalAberto(true) }
   function abrirEditar(i: Item) {
     setEditando(i)
+    // Categoria derivada da ORIGEM estrutural da config vinculada (nunca por texto).
+    const categoria = configs.find((c) => c.id === i.configuracaoFinanceiraItemId)?.origem ?? ''
     setForm({
+      categoria,
       configuracaoFinanceiraItemId: i.configuracaoFinanceiraItemId ? String(i.configuracaoFinanceiraItemId) : '',
       natureza: i.natureza === 'RECEITA' ? 'VENDA' : (i.natureza || ''), // RECEITA legado ≡ VENDA
       fornecedorId: i.fornecedorId ? String(i.fornecedorId) : '', moeda: i.moeda || '',
@@ -125,17 +147,20 @@ export default function TabelaValoresTab() {
       vigenciaInicio: i.vigenciaInicio || '', vigenciaFim: i.vigenciaFim || '',
       prioridade: String(i.prioridade ?? 0), arquivado: i.arquivado,
     })
-    setCfgBusca(''); setErroModal(null); setModalAberto(true)
+    setErroModal(null); setModalAberto(true)
   }
 
   async function salvar() {
-    if (!form.configuracaoFinanceiraItemId) { setErroModal('Selecione a Configuração Financeira.'); return }
+    if (!form.categoria) { setErroModal('Selecione a categoria.'); return }
+    if (!form.configuracaoFinanceiraItemId) { setErroModal('Selecione o item.'); return }
     if (!form.natureza) { setErroModal('Selecione a natureza do preço (Custo ou Venda).'); return }
     if (form.valor === '' || Number(form.valor) <= 0) { setErroModal('Valor deve ser maior que zero.'); return }
     setSalvando(true); setErroModal(null)
     try {
+      // `categoria` é só navegação da UI — NÃO vai no payload (origem já vem da própria config).
+      const { categoria: _categoria, ...rest } = form
       const body = JSON.stringify({
-        ...form,
+        ...rest,
         configuracaoFinanceiraItemId: Number(form.configuracaoFinanceiraItemId),
         fornecedorId: form.fornecedorId || null,
         valor: Number(form.valor),
@@ -214,40 +239,50 @@ export default function TabelaValoresTab() {
               <button onClick={() => setModalAberto(false)} className="text-white/40 transition hover:text-white">✕</button>
             </div>
             <div className="space-y-4 px-6 py-4">
-              <div>
-                <label className="mb-1 block text-xs text-white/60">Configuração Financeira *</label>
-                {editando && cfgSelecionada ? (
-                  <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white opacity-70">{cfgSelecionada.label}</div>
-                ) : cfgSelecionada ? (
-                  <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm">
-                    <span className="text-white">{cfgSelecionada.label}</span>
-                    <button onClick={() => set('configuracaoFinanceiraItemId', '')} className="text-xs text-white/50 hover:text-white">trocar</button>
-                  </div>
-                ) : (
-                  <>
-                    <input value={cfgBusca} onChange={(e) => setCfgBusca(e.target.value)} autoFocus placeholder="Buscar: Origem · Cadastro mestre..." className={inputCls} />
-                    {cfgBusca && (
-                      <div className="mt-1 max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-zinc-900">
-                        {cfgFiltradas.length === 0 && <div className="px-3 py-2 text-xs text-white/40">Nenhuma configuração. Cadastre em Configurações Financeiras.</div>}
-                        {cfgFiltradas.map((c) => (
-                          <button key={c.id} onClick={() => {
-                            setForm((f) => ({
-                              ...f,
-                              configuracaoFinanceiraItemId: String(c.id),
-                              moeda: f.moeda || c.moedaPadrao,
-                              // natureza padrão quando a config só habilita uma
-                              natureza: c.possuiCusto && !c.possuiReceita ? 'CUSTO' : c.possuiReceita && !c.possuiCusto ? 'VENDA' : '',
-                            }))
-                            setCfgBusca('')
-                          }} className="block w-full px-3 py-1.5 text-left text-sm text-white/80 hover:bg-white/10">
-                            {c.label}
-                            <span className="text-white/40">{c.possuiCusto ? ' · custo' : ''}{c.possuiReceita ? ' · venda' : ''}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
+              {/* Configuração Financeira via dois selects DEPENDENTES (sem digitação livre).
+                  Categoria = origem estrutural (filtro de navegação); Item = a config em si. */}
+              <div className="grid grid-cols-[35fr_65fr] gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-white/60">Categoria *</label>
+                  <select
+                    value={form.categoria}
+                    disabled={!!editando}
+                    onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value, configuracaoFinanceiraItemId: '' }))}
+                    className={inputCls + (editando ? ' cursor-not-allowed opacity-60' : '')}
+                  >
+                    <option value="" className="bg-zinc-900">Selecione uma categoria</option>
+                    {categorias.map((o) => <option key={o} value={o} className="bg-zinc-900">{categoriaLabel(o)}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-white/60">Item *</label>
+                  <select
+                    value={form.configuracaoFinanceiraItemId}
+                    disabled={!form.categoria || !!editando}
+                    onChange={(e) => {
+                      const id = e.target.value
+                      const c = configs.find((x) => String(x.id) === id)
+                      setForm((f) => ({
+                        ...f,
+                        configuracaoFinanceiraItemId: id,
+                        moeda: f.moeda || (c?.moedaPadrao ?? ''),
+                        // natureza padrão quando a config só habilita uma; ambas → exige escolha
+                        natureza: c ? (c.possuiCusto && !c.possuiReceita ? 'CUSTO' : c.possuiReceita && !c.possuiCusto ? 'VENDA' : '') : f.natureza,
+                      }))
+                    }}
+                    className={inputCls + ((!form.categoria || editando) ? ' cursor-not-allowed opacity-60' : '')}
+                  >
+                    <option value="" className="bg-zinc-900">{form.categoria ? 'Selecione um item' : 'Selecione uma categoria primeiro'}</option>
+                    {itensDaCategoria.map((c) => (
+                      <option key={c.id} value={c.id} className="bg-zinc-900">
+                        {c.mestre}{c.possuiCusto ? ' · custo' : ''}{c.possuiReceita ? ' · venda' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {form.categoria && itensDaCategoria.length === 0 && (
+                    <p className="mt-1 text-[11px] text-white/40">Nenhum item nesta categoria. Cadastre a Configuração Financeira do mestre.</p>
+                  )}
+                </div>
               </div>
 
               {/* §11 — natureza do PREÇO: Custo ou Venda, dentre as que a config habilita. */}
