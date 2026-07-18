@@ -12,6 +12,7 @@ import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verif
 import { garantirFamiliaParaProcesso } from '@/src/services/familia'
 import { criarProcessoV2 } from '@/src/services/criar-processo'
 import { processarOutbox } from '@/src/services/outbox-dispatcher'
+import { resolveOperationalProjectionBatch } from '@/src/lib/process-stage/operational-projection'
 
 // GET - Buscar processos (filtrado por país, requerente ou contratante)
 export async function GET(request: Request) {
@@ -85,11 +86,19 @@ export async function GET(request: Request) {
       orderBy: { createdAt: "desc" }
     })
 
+    // PROJEÇÃO OPERACIONAL OFICIAL por processo — em LOTE (poucas queries agregadas,
+    // sem N+1). O Kanban Macro consome projection.progress.percentage; NÃO conta
+    // tarefas/documentos/necessidades/steps.
+    const ids = processos.map((p) => p.id)
+    const projecoes = await resolveOperationalProjectionBatch(ids)
+    const projByProc = new Map(projecoes.map((pr) => [Number(pr.processId), pr]))
+
     // Formatar para incluir contratantes e requerentes como arrays simples
     const processosFormatados = processos.map(p => ({
       ...p,
       contratantes: p.contratantes.map(c => c.contratante),
-      requerentes: p.requerentes.map(r => r.requerente)
+      requerentes: p.requerentes.map(r => r.requerente),
+      projection: projByProc.get(p.id) ?? null,
     }))
 
     return NextResponse.json({ processos: processosFormatados })

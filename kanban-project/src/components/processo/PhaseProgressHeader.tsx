@@ -20,6 +20,8 @@ import { Loader2 } from "lucide-react"
  * incrementa após salvar algum documento, criar pessoa, etc).
  */
 
+import type { OperationalProjection } from "@/src/types/kanban"
+
 interface PhaseProgress {
   stage: string
   label: string
@@ -27,6 +29,8 @@ interface PhaseProgress {
   total: number
   percent: number
   reason: string
+  /** Projeção operacional oficial (fonte única). */
+  projection?: OperationalProjection | null
 }
 
 export interface PhaseProgressHeaderProps {
@@ -107,39 +111,46 @@ export function PhaseProgressHeader({
   const countsCls = isDark ? "text-white/50" : "text-gray-500"
   const trackCls = isDark ? "bg-white/10" : "bg-gray-200"
 
-  // Cor da barra de progresso baseada no percent
-  const fillBg =
-    data.percent === 100
-      ? "#10b981"
-      : data.percent >= 50
-      ? "#f59e0b"
-      : isDark
-      ? "#3b82f6"
-      : "#1e293b"
+  // FONTE ÚNICA: projeção oficial (percentual, label e métricas). Sem recálculo local.
+  const proj = data.projection ?? null
+  const pct = proj?.progress.percentage ?? data.percent
+  const label = proj?.activePhase?.name ?? data.label
+  const required = proj?.metrics.required ?? data.total
+  const completed = proj?.metrics.completed ?? data.done
+  const blocked = proj?.status.blocked ?? false
+
+  // Cor da barra: bloqueada (âmbar) · concluída (verde) · em andamento (azul/escuro)
+  const fillBg = blocked
+    ? "#f59e0b"
+    : pct >= 100
+    ? "#10b981"
+    : isDark
+    ? "#3b82f6"
+    : "#1e293b"
 
   return (
     <div className="flex flex-col gap-1 min-w-[220px] max-w-[400px]">
       {/* Linha superior: label + percent */}
       <div className="flex items-center justify-between gap-3">
         <span className={`text-[10px] ${labelCls}`} title={data.reason}>
-          {data.label}
+          {label}
         </span>
-        <span className={`text-[11px] font-bold ${pctCls}`}>{data.percent}%</span>
+        <span className={`text-[11px] font-bold ${pctCls}`}>{pct}%</span>
       </div>
 
       {/* Barra de progresso */}
       <div className={`h-1 ${trackCls} rounded-full overflow-hidden`}>
         <div
           className="h-full transition-all duration-500"
-          style={{ width: `${data.percent}%`, background: fillBg }}
+          style={{ width: `${pct}%`, background: fillBg }}
         />
       </div>
 
-      {/* Linha inferior: contagem */}
+      {/* Linha inferior: métrica detalhada da projeção (metrics) — sem recalcular */}
       <div className={`text-[10px] ${countsCls}`}>
-        {data.total === 0
-          ? "Sem documentos obrigatórios"
-          : `${data.done} / ${data.total} doc(s) nesta fase`}
+        {required === 0
+          ? blocked ? "Pendências obrigatórias em aberto" : "Sem itens obrigatórios nesta fase"
+          : `${completed} / ${required} concluído(s) nesta fase`}
       </div>
     </div>
   )

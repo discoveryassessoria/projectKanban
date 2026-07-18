@@ -9,7 +9,7 @@
 import type React from "react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { Phone, Mail, MessageCircle, Users, CheckSquare } from "lucide-react"
+import { Phone, Mail, MessageCircle, Users } from "lucide-react"
 import type { Processo } from "@/src/types/kanban"
 
 interface KanbanCardProps {
@@ -24,8 +24,7 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
     nome,
     contratantes = [], // Array de contratantes
     requerentes = [],
-    tarefas = [],
-    _count
+    projection,
   } = processo
 
   // Pegar o primeiro contratante para exibir dados de contato
@@ -60,24 +59,19 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
   const telefone = contratante?.telefone
   const email = contratante?.email
 
-  // Contagem de tarefas
-  // Verifica se tarefa está efetivamente concluída (campo direto OU todas filhas concluídas)
-  const isTarefaEfetivamenteConcluida = (tarefa: any, todasTarefas: any[]): boolean => {
-    if (tarefa.concluida) return true
-    const filhas = todasTarefas.filter((t: any) => t.tarefaPaiId === tarefa.id)
-    if (filhas.length === 0) return false
-    return filhas.every((f: any) => isTarefaEfetivamenteConcluida(f, todasTarefas))
-  }
-
-  const todasTarefas = tarefas ?? []
-  const tarefasReais = todasTarefas.filter((t: any) => t.tarefaPaiId != null)
-  const tarefasCount = _count?.tarefas ?? tarefasReais.length
-  const tarefasConcluidas = tarefasReais.filter((t: any) =>
-    isTarefaEfetivamenteConcluida(t, todasTarefas)
-  ).length
-
-  // Contagem de requerentes
+  // Contagem de requerentes (identidade do processo — não é contador operacional)
   const requerentesCount = requerentes?.length ?? 0
+
+  // PROGRESSO DA FASE — fonte ÚNICA: projeção operacional oficial. O card NUNCA
+  // calcula progresso nem conta tarefas/documentos/necessidades/steps; apenas
+  // consome a projeção e exibe barra + percentual.
+  const activePhase = projection?.activePhase ?? null
+  const pct = projection?.progress.percentage ?? 0
+  const opState = projection?.status.operationalState ?? ""
+  const barColor =
+    opState === "BLOQUEADA" ? "#f59e0b"
+    : pct >= 100 ? "#10b981"
+    : "#3b82f6"
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (!isDragging && onClick) {
@@ -133,21 +127,35 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
             </p>
           )}
 
-          {/* Badges: Requerentes e Tarefas */}
-          <div className="flex items-center gap-2 mb-2">
-            {requerentesCount > 0 && (
+          {/* Badge: Requerentes (identidade — não é contador operacional) */}
+          {requerentesCount > 0 && (
+            <div className="flex items-center gap-2 mb-2">
               <span className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-600 text-xs font-medium rounded">
                 <Users className="h-3 w-3" />
                 {requerentesCount}
               </span>
-            )}
-            {tarefasCount > 0 && (
-              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-600 text-xs font-medium rounded">
-                <CheckSquare className="h-3 w-3" />
-                {tarefasConcluidas}/{tarefasCount}
-              </span>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Progresso da fase — barra + percentual OFICIAL (projeção). Sem contadores. */}
+          {activePhase && (
+            <div className="mb-2">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="text-[11px] text-gray-500 truncate" title={activePhase.name}>
+                  {activePhase.name}
+                </span>
+                <span className="text-[11px] font-semibold text-gray-700 tabular-nums flex-shrink-0">
+                  {pct}%
+                </span>
+              </div>
+              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${pct}%`, background: barColor }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Ícones de ação */}
           <div className="flex items-center justify-end gap-1">

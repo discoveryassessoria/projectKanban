@@ -18,6 +18,7 @@ import {
 } from "@/src/lib/process-stage/fases-catalog"
 import { mapLegacyStepStatus, stepInstanceStatusToLegacy } from "@/src/lib/process-stage/legacy-status-map"
 import { montarChavePasso } from "@/src/services/phase-workflow-helpers"
+import { evoluirNecessidadePorPasso } from "@/src/services/necessidade-documental"
 
 // Passos que NÃO contam como operação ativa do documento.
 const INATIVOS: StepInstanceStatus[] = ["SUPERSEDIDO", "CANCELADO"]
@@ -270,7 +271,7 @@ export async function atualizarPassoV2(
 ): Promise<OpResult> {
   const p = await prisma.phaseWorkflowStepInstance.findUnique({
     where: { id: stepInstanceId },
-    select: { id: true, documentoId: true, processoId: true, faseMacroKey: true, ordem: true, status: true, ciclo: true, metadata: true, stepKey: true },
+    select: { id: true, documentoId: true, necessidadeId: true, processoId: true, faseMacroKey: true, ordem: true, status: true, ciclo: true, metadata: true, stepKey: true },
   })
   if (!p || p.documentoId !== documentoId) return { ok: false, error: "Passo não encontrado", status: 404 }
   const now = new Date()
@@ -301,6 +302,14 @@ export async function atualizarPassoV2(
     ...(vaiReabrir ? { completedAt: null } : {}),
   }
   await prisma.phaseWorkflowStepInstance.update({ where: { id: p.id }, data })
+
+  // CICLO DE VIDA DA NECESSIDADE (fluxo operacional oficial): a evolução do passo vinculado
+  // a uma NecessidadeDocumental evolui o ESTADO CANÔNICO da necessidade — conclusão do passo
+  // → ATENDIDA; início → EM_ATENDIMENTO. Único gatilho, via o serviço de domínio (nenhuma
+  // tela/rota escreve status direto). O resolver canônico consome esse estado.
+  if (p.necessidadeId != null) {
+    await evoluirNecessidadePorPasso(p.necessidadeId, novo)
+  }
 
   // PROGRESSÃO POR-DOCUMENTO: ao concluir uma etapa, a PRÓXIMA etapa DO MESMO documento
   // é liberada imediatamente (EM_ANDAMENTO). Cada certidão flui pelo seu workflow interno

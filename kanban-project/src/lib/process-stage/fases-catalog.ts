@@ -5,6 +5,20 @@
 
 import type { FaseCode } from "@prisma/client"
 
+/**
+ * ESCOPO OPERACIONAL DECLARADO da fase (fonte da verdade do progresso/gate).
+ * É uma propriedade do WORKFLOW da fase — NUNCA derivada do nome/label. O resolver
+ * canônico (resolveOperationalProjection) e o BlockingEngine usam este escopo para
+ * decidir sobre QUAIS entidades calcular progresso e bloqueio:
+ *   • PROCESSO    — a esteira operacional é do processo (passos genéricos legítimos).
+ *   • NECESSIDADE — opera sobre NecessidadeDocumental e suas instâncias (ex.: Genealogia).
+ *   • DOCUMENTO   — opera sobre Documento e suas instâncias (ex.: Emissão documental).
+ * A classificação data-driven de resolve-passos-bloqueantes.ts continua sendo usada
+ * para FILTRAR passos genéricos órfãos quando há passos por-entidade; ela NÃO substitui
+ * o escopo declarado (que também vale antes da materialização dos passos).
+ */
+export type WorkflowScope = "PROCESSO" | "NECESSIDADE" | "DOCUMENTO"
+
 /** Step do workflow POR-DOCUMENTO (Genealogia, Emissão). */
 export interface FaseStep {
   ordem: number
@@ -32,6 +46,8 @@ export interface FaseDef {
   label: string
   /** "documento" = workflow por doc (gate automático). "processo" = checklist + avanço manual. */
   kind: "documento" | "processo"
+  /** ESCOPO OPERACIONAL declarado — fonte da verdade do progresso/gate (ver WorkflowScope). */
+  scope: WorkflowScope
   steps: FaseStep[]
   /** Checklist quando kind === "processo". */
   processSteps?: ProcessFaseStep[]
@@ -41,7 +57,7 @@ export interface FaseDef {
 
 export const FASES: Record<FaseCode, FaseDef> = {
   GENEALOGIA: {
-    code: "GENEALOGIA", phaseKey: "genealogia", ordem: 0, label: "Genealogia", kind: "documento",
+    code: "GENEALOGIA", phaseKey: "genealogia", ordem: 0, label: "Genealogia", kind: "documento", scope: "NECESSIDADE",
     next: "EMISSAO_DOCUMENTAL",
     steps: [
       { ordem: 1, stepKey: "localizar_registro", title: "Localizar registro da certidão",
@@ -51,7 +67,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   EMISSAO_DOCUMENTAL: {
-    code: "EMISSAO_DOCUMENTAL", phaseKey: "emissao_documental", ordem: 1, label: "Emissão documental", kind: "documento",
+    code: "EMISSAO_DOCUMENTAL", phaseKey: "emissao_documental", ordem: 1, label: "Emissão documental", kind: "documento", scope: "DOCUMENTO",
     next: "ANALISE_DOCUMENTAL",
     steps: [
       { ordem: 1, stepKey: "solicitar_certidao", title: "Solicitar certidão",
@@ -74,12 +90,12 @@ export const FASES: Record<FaseCode, FaseDef> = {
 
   // ANÁLISE — por-processo, mas com painel PRÓPRIO (ProcessoAnalise). Não usa processSteps.
   ANALISE_DOCUMENTAL: {
-    code: "ANALISE_DOCUMENTAL", phaseKey: "analise_documental", ordem: 2, label: "Análise Documental", kind: "processo",
+    code: "ANALISE_DOCUMENTAL", phaseKey: "analise_documental", ordem: 2, label: "Análise Documental", kind: "processo", scope: "PROCESSO",
     next: null, steps: [],
   },
 
   RETIFICACAO_REGISTROS: {
-    code: "RETIFICACAO_REGISTROS", phaseKey: "retificacao_registros", ordem: 3, label: "Retificação de registros", kind: "processo",
+    code: "RETIFICACAO_REGISTROS", phaseKey: "retificacao_registros", ordem: 3, label: "Retificação de registros", kind: "processo", scope: "PROCESSO",
     next: "EMISSAO_DOCUMENTAL_RETIFICADA", steps: [],
     processSteps: [
       { stepKey: "definir_estrategia", title: "Definir estratégia", description: "Definir a via (judicial ou administrativa) e a estratégia da retificação." },
@@ -92,7 +108,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   EMISSAO_DOCUMENTAL_RETIFICADA: {
-    code: "EMISSAO_DOCUMENTAL_RETIFICADA", phaseKey: "emissao_documental_retificada", ordem: 4, label: "Emissão documental retificada", kind: "processo",
+    code: "EMISSAO_DOCUMENTAL_RETIFICADA", phaseKey: "emissao_documental_retificada", ordem: 4, label: "Emissão documental retificada", kind: "processo", scope: "PROCESSO",
     next: "TRADUCAO_JURAMENTADA", steps: [],
     processSteps: [
       { stepKey: "enviar_pedido_averbacao", title: "Enviar pedido de averbação ao cartório", description: "Enviar ao cartório a decisão/mandado para lançar a averbação no registro." },
@@ -105,7 +121,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   TRADUCAO_JURAMENTADA: {
-    code: "TRADUCAO_JURAMENTADA", phaseKey: "traducao_juramentada", ordem: 5, label: "Tradução juramentada", kind: "processo",
+    code: "TRADUCAO_JURAMENTADA", phaseKey: "traducao_juramentada", ordem: 5, label: "Tradução juramentada", kind: "processo", scope: "PROCESSO",
     next: "APOSTILAMENTO", steps: [],
     processSteps: [
       { stepKey: "montar_pasta_traducao", title: "Montar pasta de tradução", description: "Reunir os documentos que vão para tradução numa pasta única." },
@@ -118,7 +134,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   APOSTILAMENTO: {
-    code: "APOSTILAMENTO", phaseKey: "apostilamento", ordem: 6, label: "Apostilamento", kind: "processo",
+    code: "APOSTILAMENTO", phaseKey: "apostilamento", ordem: 6, label: "Apostilamento", kind: "processo", scope: "PROCESSO",
     next: "AGUARDANDO_PROTOCOLO", steps: [],
     processSteps: [
       { stepKey: "montar_pasta_apostilamento", title: "Montar pasta de apostilamento", description: "Reunir os documentos finais numa pasta para apostila." },
@@ -131,7 +147,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   AGUARDANDO_PROTOCOLO: {
-    code: "AGUARDANDO_PROTOCOLO", phaseKey: "aguardando_protocolo", ordem: 7, label: "Aguardando protocolo", kind: "processo",
+    code: "AGUARDANDO_PROTOCOLO", phaseKey: "aguardando_protocolo", ordem: 7, label: "Aguardando protocolo", kind: "processo", scope: "PROCESSO",
     next: "PROTOCOLADO", steps: [],
     processSteps: [
       { stepKey: "montar_dossie_final", title: "Montar dossiê final", description: "Reúna todos os documentos apostilados e traduzidos em um dossiê único." },
@@ -141,7 +157,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   PROTOCOLADO: {
-    code: "PROTOCOLADO", phaseKey: "protocolado", ordem: 8, label: "Protocolado", kind: "processo",
+    code: "PROTOCOLADO", phaseKey: "protocolado", ordem: 8, label: "Protocolado", kind: "processo", scope: "PROCESSO",
     next: "FINALIZADO", steps: [],
     processSteps: [
       { stepKey: "registrar_protocolo", title: "Registrar nº do protocolo", description: "Confirme o número/recibo e a data de entrada no órgão." },
@@ -151,7 +167,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   FINALIZADO: {
-    code: "FINALIZADO", phaseKey: "finalizado", ordem: 9, label: "Finalizado", kind: "processo",
+    code: "FINALIZADO", phaseKey: "finalizado", ordem: 9, label: "Finalizado", kind: "processo", scope: "PROCESSO",
     next: null, steps: [],
     processSteps: [
       { stepKey: "confirmar_deferimento", title: "Confirmar deferimento", description: "Confirme o reconhecimento da cidadania / deferimento do pedido." },

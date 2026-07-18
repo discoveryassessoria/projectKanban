@@ -159,6 +159,87 @@ export async function reabrir(necessidadeId: number, db: DB = prisma) {
 }
 
 // ============================================================
+// CICLO DE VIDA CANÔNICO da NecessidadeDocumental (serviço ÚNICO do domínio)
+// ------------------------------------------------------------
+// Estados: PENDENTE → EM_ATENDIMENTO → ATENDIDA. DISPENSADA e NAO_LOCALIZADA são
+// desvios explícitos. A evolução ocorre EXCLUSIVAMENTE por aqui (nenhum componente
+// escreve o status direto) e é disparada por EVENTOS do Workflow (conclusão/início do
+// passo operacional vinculado à necessidade), nunca por cálculo de tela. Idempotente,
+// append-only (emite NecessidadeDocumentalEvento), sem regressão silenciosa.
+// ============================================================
+
+const passoConcluido = (statusPasso: string) => /^(CONCLUIDO|DISPENSADO|SUPERSEDIDO)$/i.test(statusPasso) || /conclu|finaliz/i.test(statusPasso)
+const passoAtivo = (statusPasso: string) => /^(EM_ANDAMENTO|DISPONIVEL|AGUARDANDO)$/i.test(statusPasso) || /andamento|execu/i.test(statusPasso)
+
+/** PENDENTE → EM_ATENDIMENTO (só a partir de PENDENTE; idempotente). */
+export async function iniciarAtendimentoNecessidade(necessidadeId: number, db: DB = prisma) {
+  const n = await db.necessidadeDocumental.findUnique({ where: { id: necessidadeId }, select: { status: true } })
+  if (!n || n.status !== "PENDENTE") return
+  await db.necessidadeDocumental.update({ where: { id: necessidadeId }, data: { status: "EM_ATENDIMENTO" } })
+  await evento(db, necessidadeId, "EM_ATENDIMENTO")
+}
+
+/** → ATENDIDA (de PENDENTE/EM_ATENDIMENTO; DISPENSADA não é sobrescrita por passo). */
+export async function atenderNecessidade(necessidadeId: number, db: DB = prisma) {
+  const n = await db.necessidadeDocumental.findUnique({ where: { id: necessidadeId }, select: { status: true } })
+  if (!n || n.status === "ATENDIDA" || n.status === "DISPENSADA") return
+  await db.necessidadeDocumental.update({ where: { id: necessidadeId }, data: { status: "ATENDIDA" } })
+  await evento(db, necessidadeId, "ATENDIDA")
+}
+
+/** → DISPENSADA (requisito deixou de ser exigido). Idempotente. */
+export async function dispensarNecessidade(necessidadeId: number, motivo?: string, db: DB = prisma) {
+  const n = await db.necessidadeDocumental.findUnique({ where: { id: necessidadeId }, select: { status: true } })
+  if (!n || n.status === "DISPENSADA") return
+  await db.necessidadeDocumental.update({ where: { id: necessidadeId }, data: { status: "DISPENSADA" } })
+  await evento(db, necessidadeId, "DISPENSADA", motivo ? { motivo } : undefined)
+}
+
+/** Reativa uma necessidade DISPENSADA (voltou a ser aplicável) → PENDENTE. */
+export async function reativarNecessidade(necessidadeId: number, db: DB = prisma) {
+  const n = await db.necessidadeDocumental.findUnique({ where: { id: necessidadeId }, select: { status: true } })
+  if (!n || n.status !== "DISPENSADA") return
+  await db.necessidadeDocumental.update({ where: { id: necessidadeId }, data: { status: "PENDENTE" } })
+  await evento(db, necessidadeId, "CRIADA", { reativada: true })
+}
+
+/**
+ * DRIVER OFICIAL — evolui a necessidade a partir do estado do PASSO operacional vinculado.
+ * Chamado pelo fluxo do Workflow (ex.: atualizarPassoV2). Escopo NECESSIDADE:
+ *   passo concluído → ATENDIDA; passo ativo → EM_ATENDIMENTO. Sem exceção por fase.
+ */
+export async function evoluirNecessidadePorPasso(necessidadeId: number, statusPasso: string, db: DB = prisma) {
+  if (passoConcluido(statusPasso)) return atenderNecessidade(necessidadeId, db)
+  if (passoAtivo(statusPasso)) return iniciarAtendimentoNecessidade(necessidadeId, db)
+}
+
+/**
+ * RECONCILIAÇÃO (compatibilidade, idempotente, append-only, NÃO destrutiva): evolui as
+ * necessidades cujo passo operacional já está CONCLUIDO mas cujo status ficou defasado em
+ * PENDENTE/EM_ATENDIMENTO — trazendo o estado oficial ao mesmo ponto do fluxo de eventos.
+ * Preserva histórico (só emite eventos + atualiza status pelo serviço). Reprocessar é seguro.
+ */
+export async function reconciliarNecessidadesPorPassos(
+  filtro: { processoId?: number } = {},
+  db: DB = prisma,
+): Promise<{ atendidas: number; avaliadas: number }> {
+  const steps = await db.phaseWorkflowStepInstance.findMany({
+    where: { necessidadeId: { not: null }, status: "CONCLUIDO", ...(filtro.processoId ? { processoId: filtro.processoId } : {}) },
+    select: { necessidadeId: true },
+  })
+  const necIds = [...new Set(steps.map((s) => s.necessidadeId).filter((x): x is number => x != null))]
+  let atendidas = 0
+  for (const id of necIds) {
+    const n = await db.necessidadeDocumental.findUnique({ where: { id }, select: { status: true } })
+    if (n && n.status !== "ATENDIDA" && n.status !== "DISPENSADA") {
+      await atenderNecessidade(id, db)
+      atendidas++
+    }
+  }
+  return { atendidas, avaliadas: necIds.length }
+}
+
+// ============================================================
 // Geração idempotente — ÁRVORE e MATRIZ
 // ============================================================
 

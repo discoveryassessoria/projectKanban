@@ -2,17 +2,26 @@
 // CP-4E — PhaseBlockingService / BlockingEngine: SOMENTE LEITURA.
 // Calcula, de forma determinística, todas as pendências que impedem o avanço.
 // NÃO altera Processo/fase/Passo/Tarefa/Necessidade/Documento; não financeiro;
-// não ativa runtime. Usa snapshot da instância + estado persistido (não relê o
-// template para reinterpretar instâncias já criadas).
+// não ativa runtime.
+//
+// REFATORADO: o BlockingEngine NÃO possui mais lógica própria de gate nem exceção
+// por NOME de fase (isGenealogia) ou lista hardcoded de stepKey. Ele apenas CARREGA
+// o snapshot e delega à FUNÇÃO-BASE ÚNICA `computeGate` (operational-projection-core),
+// a mesma consumida pelo resolver canônico da projeção operacional. O bloqueio é
+// orientado pelo ESCOPO DECLARADO da fase (PROCESSO/NECESSIDADE/DOCUMENTO). Não
+// recalcula progresso.
 
 import { randomUUID } from "crypto"
 import { prisma } from "@/lib/prisma"
+import { WorkflowInstanceStatus } from "@prisma/client"
 import {
   type BlockingIssue, type Policy,
-  classificarNecessidade, classificarPasso, classificarTarefa, avaliarPolitica, separar,
+  avaliarPolitica, separar,
 } from "@/src/lib/motor/blocking-helpers"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
-import { resolvePassosBloqueantesDaFase } from "@/src/lib/motor/resolve-passos-bloqueantes"
+import { computeGate, type ProjectionInput, type NecessidadeData } from "@/src/lib/motor/operational-projection-core"
+import { getFase, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
+import { mapStepToGate } from "@/src/lib/process-stage/operational-projection"
 
 export interface PhaseBlockingResult {
   issues: BlockingIssue[]
@@ -24,7 +33,11 @@ export interface PhaseBlockingResult {
   correlationId: string
 }
 
-interface SnapshotPasso { exigeEvidencia?: boolean; exigeResponsavel?: boolean; dependencias?: string[] }
+const INSTANCIA_ATIVA: WorkflowInstanceStatus[] = [
+  WorkflowInstanceStatus.ATIVO,
+  WorkflowInstanceStatus.AGUARDANDO,
+  WorkflowInstanceStatus.BLOQUEADO,
+]
 
 export async function calcularPendencias(
   processoId: number,
@@ -33,128 +46,71 @@ export async function calcularPendencias(
 ): Promise<PhaseBlockingResult> {
   const correlationId = ctx.correlationId ?? randomUUID()
   const policy: Policy = "ALL_REQUIRED_COMPLETED"
-  const issues: BlockingIssue[] = []
-  // Gate da Genealogia: normaliza o casing. Em runtime a faseMacroKey/faseAtualKey
-  // é a phaseKey minúscula ("genealogia"); em outros pontos vem o FaseCode
-  // ("GENEALOGIA"). Comparar normalizado cobre ambos (bug de casing eliminado).
-  const isGenealogia = String(faseMacroKey).toUpperCase() === "GENEALOGIA"
 
   const processo = await prisma.processo.findUnique({
     where: { id: processoId },
     select: { id: true, arvoreId: true },
   })
   if (!processo) {
-    issues.push({ code: "PROCESSO_NAO_ENCONTRADO", category: "INCIDENTE", severity: "BLOCKING", message: "Processo inexistente" })
+    const issues = computeGate(inexistente(processoId, faseMacroKey))
     return finalizar(issues, policy, faseMacroKey, correlationId)
   }
 
-  // ---- A. NecessidadesDocumentais ----
-  const necessidadesRaw = await prisma.necessidadeDocumental.findMany({
-    where: { processoId },
-    select: { id: true, status: true, obrigatoriedade: true, itemCatalogoId: true },
-  })
-  // ELEGIBILIDADE ESTRUTURAL: a Genealogia trabalha EXCLUSIVAMENTE com CERTIDÕES.
-  // Qualquer NecessidadeDocumental cuja natureza (do TipoDocumental) não seja
-  // CERTIDÃO é IGNORADA aqui — pela classificação estruturada, nunca por texto.
-  const certidaoItens = isGenealogia ? await itemCatalogosDeCertidao(prisma) : null
-  const necessidades = certidaoItens
-    ? necessidadesRaw.filter((n) => certidaoItens.has(n.itemCatalogoId))
-    : necessidadesRaw
-  if (isGenealogia && necessidades.length === 0) {
-    issues.push({ code: "NECESSIDADE_NAO_GERADA", category: "NECESSIDADE_DOCUMENTAL", severity: "BLOCKING", entityType: "Processo", entityId: processoId, message: "Nenhuma NecessidadeDocumental de CERTIDÃO foi gerada na Genealogia", resolutionHint: "Materializar as certidões obrigatórias aplicáveis antes de avançar" })
-  }
-  // ESCOPO OPERACIONAL da fase: se a fase é operada por DOCUMENTO (há passo vinculado a
-  // documentoId na instância ativa), o GATE é o documento — o status da NecessidadeDocumental
-  // (escopo NECESSIDADE, cujo ciclo é a Genealogia) NÃO bloqueia esta fase. Consistente com o
-  // resolver de passos: nenhuma entidade bloqueia uma fase fora do seu escopo operacional.
-  // Sem passo por-documento ainda (fase recém-ativada), a necessidade continua gatando
-  // (evita avançar antes de qualquer documento ser trabalhado). Sem hardcode de fase.
-  const faseDocumentoScoped = (await prisma.phaseWorkflowStepInstance.count({
-    where: { processoId, faseMacroKey, documentoId: { not: null }, status: { notIn: ["SUPERSEDIDO", "CANCELADO"] } },
-  })) > 0
-  if (!faseDocumentoScoped) {
-    for (const n of necessidades) {
-      const issue = classificarNecessidade(n.status, n.obrigatoriedade === "OBRIGATORIA", isGenealogia, n.id)
-      if (issue) issues.push(issue)
-    }
-  }
+  const faseCode = phaseKeyToFaseCode(faseMacroKey)
+  const faseDef = faseCode ? getFase(faseCode) : null
 
-  // ---- Genealogia: estrutura mínima ----
-  if (isGenealogia) {
-    if (!processo.arvoreId) {
-      issues.push({ code: "GENEALOGIA_SEM_ARVORE", category: "INCIDENTE", severity: "BLOCKING", entityType: "Processo", entityId: processoId, message: "Genealogia sem árvore vinculada" })
-    }
-    const reqs = await prisma.processoRequerente.count({ where: { processoId } })
-    if (reqs === 0) {
-      issues.push({ code: "GENEALOGIA_SEM_REQUERENTE", category: "REGRA", severity: "BLOCKING", entityType: "Processo", entityId: processoId, message: "Nenhum requerente definido" })
-    }
-  }
-
-  // ---- B/C/E/F/G/H. Instância v2 da fase + passos + tarefas ----
-  const instancia = await prisma.phaseWorkflowInstance.findFirst({
-    where: { processoId, faseMacroKey, status: { in: ["ATIVO", "AGUARDANDO", "BLOQUEADO"] } },
-    orderBy: { ciclo: "desc" },
-    include: {
-      steps: {
-        include: { tarefas: { where: { chaveIdempotencia: { not: null } } } },
-        orderBy: { ordem: "asc" },
+  // Snapshot carregado (mesma origem que o resolver canônico) — em paralelo.
+  const [necsRaw, certidaoItens, instancia, reqCount] = await Promise.all([
+    prisma.necessidadeDocumental.findMany({
+      where: { processoId },
+      select: { id: true, status: true, obrigatoriedade: true, itemCatalogoId: true },
+    }),
+    itemCatalogosDeCertidao(prisma),
+    prisma.phaseWorkflowInstance.findFirst({
+      where: { processoId, faseMacroKey, status: { in: INSTANCIA_ATIVA } },
+      orderBy: { ciclo: "desc" },
+      include: {
+        steps: {
+          include: { tarefas: { where: { chaveIdempotencia: { not: null } }, select: { id: true, statusTarefa: true, responsavelId: true } } },
+          orderBy: { ordem: "asc" },
+        },
       },
-    },
-  })
+    }),
+    prisma.processoRequerente.count({ where: { processoId } }),
+  ])
 
-  // Mapa necessidadeId → status (fonte oficial da elegibilidade da Genealogia).
-  const necStatusById = new Map(necessidadesRaw.map((n) => [n.id, n.status]))
+  const necessidades: NecessidadeData[] = necsRaw.map((n) => ({
+    id: n.id,
+    status: n.status,
+    obrigatoria: n.obrigatoriedade === "OBRIGATORIA",
+    ehCertidao: certidaoItens.has(n.itemCatalogoId),
+  }))
 
-  if (instancia) {
-    const stepKeys = new Set(instancia.steps.map((s) => s.stepKey))
-    // RESOLVER CANÔNICO por ESCOPO OPERACIONAL (sem hardcode de fase/stepKey): quando a
-    // fase é operada por ENTIDADE (há passos com documentoId/necessidadeId), os passos
-    // GENÉRICOS (sem entidade) são cópia do template e NÃO bloqueiam. Quando é operada por
-    // PROCESSO (todos genéricos), os genéricos SÃO o gate legítimo e bloqueiam.
-    const passosGate = resolvePassosBloqueantesDaFase(instancia.steps)
-    for (const step of passosGate) {
-      const snap = (step.snapshot as SnapshotPasso | null) ?? {}
-
-      // Entidade DISPENSADA não bloqueia (o requisito deixou de ser exigido). Cobre a
-      // necessidade DISPENSADA na Genealogia; genérico já foi excluído pelo resolver.
-      if (step.necessidadeId != null && necStatusById.get(step.necessidadeId) === "DISPENSADA") continue
-
-      // Passo
-      const pIssue = classificarPasso(step.status, step.obrigatorio, step.stepKey, step.id)
-      if (pIssue) issues.push(pIssue)
-
-      // Bloqueio manual
-      if (step.bloqueadoManual) {
-        issues.push({ code: "BLOQUEIO_MANUAL_ATIVO", category: "BLOQUEIO_MANUAL", severity: "BLOCKING", entityType: "step_instance", entityId: step.id, message: `Bloqueio manual ativo no passo ${step.stepKey}`, metadata: { motivo: step.motivo ?? null } })
-      }
-
-      // Evidência exigida ausente (sem sistema documental paralelo — usa documentoId)
-      if (snap.exigeEvidencia === true && step.documentoId == null && !["CONCLUIDO", "DISPENSADO", "SUPERSEDIDO"].includes(step.status)) {
-        issues.push({ code: "EVIDENCIA_OBRIGATORIA_AUSENTE", category: "EVIDENCIA", severity: "BLOCKING", entityType: "step_instance", entityId: step.id, message: `Passo ${step.stepKey} exige evidência ausente` })
-      }
-
-      // Dependência quebrada (referencia stepKey inexistente na instância)
-      const deps = (step.dependeDeStepKeys as string[] | null) ?? snap.dependencias ?? []
-      for (const dep of deps) {
-        if (!stepKeys.has(dep)) {
-          issues.push({ code: "DEPENDENCIA_QUEBRADA", category: "INCIDENTE", severity: "BLOCKING", entityType: "step_instance", entityId: step.id, message: `Passo ${step.stepKey} depende de stepKey inexistente: ${dep}` })
-        }
-      }
-
-      // Passo obrigatório humano que deveria ter Tarefa e não tem
-      if (step.obrigatorio && step.geraTarefa && step.tipo === "HUMANO" && step.status === "DISPONIVEL" && step.tarefas.length === 0) {
-        issues.push({ code: "PASSO_SEM_TAREFA_ESPERADA", category: "INCIDENTE", severity: "WARNING", entityType: "step_instance", entityId: step.id, message: `Passo ${step.stepKey} deveria ter Tarefa e não tem` })
-      }
-
-      // Tarefas do passo
-      for (const t of step.tarefas) {
-        const exigeResp = snap.exigeResponsavel === true
-        issues.push(...classificarTarefa(t.statusTarefa, step.obrigatorio, t.responsavelId != null, exigeResp, t.id))
-      }
-    }
+  const input: ProjectionInput = {
+    processId: processoId,
+    faseCode,
+    faseMacroKey,
+    phaseName: faseDef?.label ?? faseMacroKey,
+    scope: faseDef?.scope ?? null,
+    processoExists: true,
+    hasActiveInstance: !!instancia,
+    steps: (instancia?.steps ?? []).map(mapStepToGate),
+    necessidades,
+    documentos: [], // gate não usa documentos (progresso DOCUMENTO usa; aqui é só bloqueio)
+    hasArvore: processo.arvoreId != null,
+    requerentesCount: reqCount,
   }
 
+  const issues = computeGate(input)
   return finalizar(issues, policy, faseMacroKey, correlationId)
+}
+
+function inexistente(processoId: number, faseMacroKey: string): ProjectionInput {
+  return {
+    processId: processoId, faseCode: null, faseMacroKey, phaseName: faseMacroKey, scope: null,
+    processoExists: false, hasActiveInstance: false, steps: [], necessidades: [], documentos: [],
+    hasArvore: false, requerentesCount: 0,
+  }
 }
 
 function finalizar(issues: BlockingIssue[], policy: Policy, faseMacroKey: string, correlationId: string): PhaseBlockingResult {

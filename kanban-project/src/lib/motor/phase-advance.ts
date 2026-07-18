@@ -418,8 +418,12 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
     return { success: false, resultado: "REJEITADO", code: "SEM_PROXIMA_FASE", message: "Não há próxima fase (última fase do macro)", faseAtual: c.processo.faseAtual, correlationId }
   }
 
+  // GATE canônico: decide pelo `canAdvance` da FUNÇÃO-BASE ÚNICA (computeGate), a MESMA
+  // consumida pela OperationalProjection. Sem cálculo paralelo — calcularPendencias é só
+  // o adaptador que carrega o snapshot e delega ao gate compartilhado; `blocking` é usado
+  // apenas para a auditoria da tentativa.
   const snap = await snapshotPendencias(processoId, c.processo.faseAtual, correlationId)
-  if (snap.pend.blocking.length > 0) {
+  if (!snap.pend.canAdvance) {
     // Auditoria da tentativa BLOQUEADA (uma por correlação) — sem mutação.
     const log = await prisma.phaseAdvanceLog.create({
       data: {

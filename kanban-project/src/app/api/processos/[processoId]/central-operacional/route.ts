@@ -6,6 +6,7 @@ import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { getOrdemFase, getStepsForFase, getFase, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 import { resolveProgressoFaseDocumento } from "@/src/lib/process-stage/resolve-fase-progresso"
+import { resolveOperationalProjection, type OperationalProjection } from "@/src/lib/process-stage/operational-projection"
 import type { FaseCode } from "@prisma/client"
 
 // ============================================================
@@ -116,6 +117,9 @@ interface FaseProgress {
 }
 
 interface CentralOperacionalResponse {
+  // Projeção operacional OFICIAL da fase (fonte única de progresso/estado). A Central
+  // mantém KPIs detalhados, mas o PERCENTUAL da fase vem daqui — idêntico ao Kanban/Header.
+  projection: OperationalProjection
   matrix: MatrixResponse
   cards: CardCounts
   queue: QueueRow[]
@@ -280,6 +284,12 @@ export async function GET(
     // (/api/processos/[id]/phase) e demais consumidores. Nada de cálculo paralelo aqui.
     const prog = await resolveProgressoFaseDocumento(id)
     const workflowsRaw = Array.from(prog.wfPorDoc.values())
+
+    // PROJEÇÃO OPERACIONAL OFICIAL (scope-aware) — o percentual/estado da fase exibido
+    // na Central (barra, trilha macro, KPI headline) vem DAQUI, garantindo o MESMO
+    // número do Kanban e do Header. Os KPIs detalhados (byPerson, counts, fila) seguem
+    // como dado operacional, mas o headline de progresso é a projeção.
+    const projection = await resolveOperationalProjection(id)
 
     const generationOf = (pessoaId: number): number => {
       const p = pessoasMap.get(pessoaId)
@@ -706,8 +716,21 @@ export async function GET(
       }
     }
 
+    // Headline de progresso vem da PROJEÇÃO OFICIAL (mesmo % do Kanban/Header). O
+    // detalhamento por pessoa (byPerson) e a lista de faltantes seguem como dado
+    // operacional detalhado da Central.
+    const matrixBase = genealogiaV2 ? genealogiaV2.matrix : matrix
+    const matrixOficial: MatrixResponse = {
+      ...matrixBase,
+      percentage: projection.progress.percentage,
+      completed: projection.metrics.completed,
+      total: projection.metrics.required,
+      missingCount: Math.max(0, projection.metrics.required - projection.metrics.completed),
+    }
+
     const response: CentralOperacionalResponse = {
-      matrix: genealogiaV2 ? genealogiaV2.matrix : matrix,
+      projection,
+      matrix: matrixOficial,
       cards,
       queue: genealogiaV2 ? genealogiaV2.queue : queue,
       queueTitle,

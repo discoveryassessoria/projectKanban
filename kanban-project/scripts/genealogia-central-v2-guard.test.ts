@@ -29,7 +29,10 @@ ok(/mensagemReestruturacao:\s*genealogiaV2\s*\?\s*null\s*:/.test(route), "respon
 
 console.log("\n3) Progresso da Genealogia vem dos passos obrigatórios (não Documento.status)")
 ok(/obrig\.filter\(\(n\) => localizado\(n\.id\)\)/.test(route), "progresso = passos localizar_registro obrigatórios concluídos")
-ok(/matrix: genealogiaV2 \? genealogiaV2\.matrix : matrix/.test(route) && /queue: genealogiaV2 \? genealogiaV2\.queue : queue/.test(route), "matrix/queue da Genealogia vêm do V2")
+// matrix BASE vem do V2 (byPerson/faltantes detalhados); o headline de progresso
+// (percentage/completed/total) é sobrescrito pela PROJEÇÃO OFICIAL (mesmo % do Kanban).
+ok(/matrixBase = genealogiaV2 \? genealogiaV2\.matrix : matrix/.test(route) && /queue: genealogiaV2 \? genealogiaV2\.queue : queue/.test(route), "matrix (base) e queue da Genealogia vêm do V2")
+ok(/percentage: projection\.progress\.percentage/.test(route), "headline de progresso vem da projeção oficial (matrixOficial)")
 
 console.log("\n4) Front reconhece 'localizado' como concluído")
 const front = ler("src/components/kanban/ProcessoCentralOperacional.tsx")

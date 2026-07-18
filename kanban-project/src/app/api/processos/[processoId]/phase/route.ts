@@ -3,21 +3,21 @@
 /**
  * GET /api/processos/[processoId]/phase
  *
- * Retorna a fase atual do processo + progresso na fase.
+ * Retorna a PROJEÇÃO OPERACIONAL OFICIAL da fase atual (resolveOperationalProjection):
+ * progresso (percentage/completedWeight/totalWeight), status (blocked/canAdvance/
+ * operationalState), nextAction e metrics. Fonte ÚNICA — nenhum consumidor recalcula.
  *
- * A fase vem do `faseCode` da coluna onde o card está (fonte da verdade,
- * igual ao motor de avanço). O progresso (done/total) é contado pelos
- * documentos da LINHA RETA. Se o processo ainda não tiver faseCode, cai
- * no derive pelos status dos documentos (fallback).
+ * Mantém campos de compatibilidade (stage/label/done/total/percent/reason) para os
+ * consumidores atuais enquanto migram para `projection`.
  *
- * Usado pelo componente <PhaseProgressHeader /> no header do processo.
- * Não move o card aqui — apenas LÊ.
+ * Usado pelo <PhaseProgressHeader /> e demais consumidores. Não move o card — só LÊ.
  */
 
 import { NextRequest, NextResponse } from "next/server"
 import { stageFromFaseCode } from "@/src/lib/process-stage/compute-phase-progress"
 import { STAGE_LABELS } from "@/src/lib/process-stage/derive-stage"
-import { resolveProgressoFaseDocumento } from "@/src/lib/process-stage/resolve-fase-progresso"
+import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
+import { resolveOperationalProjection } from "@/src/lib/process-stage/operational-projection"
 
 export async function GET(
   _req: NextRequest,
@@ -30,20 +30,26 @@ export async function GET(
     return NextResponse.json({ error: "id inválido" }, { status: 400 })
   }
 
-  // FONTE OFICIAL ÚNICA (mesma da Central Operacional): done/total/percent vêm da
-  // conclusão real do Workflow Interno por documento na fase atual. Elimina a fonte
-  // paralela antiga (calculava com workflows:[] → status mestre → 0/4 falso).
-  const prog = await resolveProgressoFaseDocumento(processoId)
-  const stage = stageFromFaseCode(prog.faseCode ?? undefined) ?? "GENEALOGIA"
+  // FONTE OFICIAL ÚNICA: resolver canônico da projeção operacional (scope-aware).
+  const projection = await resolveOperationalProjection(processoId)
+
+  const faseCode = phaseKeyToFaseCode(projection.activePhase?.id ?? undefined)
+  const stage = stageFromFaseCode(faseCode ?? undefined) ?? "GENEALOGIA"
+  const done = projection.metrics.completed
+  const total = projection.metrics.required
+  const percent = projection.progress.percentage
 
   return NextResponse.json({
+    // Contrato definitivo (preferir este objeto).
+    projection,
+    // Compat (consumidores atuais).
     stage,
-    label: STAGE_LABELS[stage],
-    done: prog.done,
-    total: prog.total,
-    percent: prog.percent,
-    reason: prog.total === 0
-      ? "Sem documentos obrigatórios nesta fase"
-      : `${prog.done} de ${prog.total} doc(s) concluídos nesta fase`,
+    label: projection.activePhase?.name ?? STAGE_LABELS[stage],
+    done,
+    total,
+    percent,
+    reason: total === 0
+      ? "Sem itens obrigatórios nesta fase"
+      : `${done} de ${total} concluído(s) nesta fase`,
   })
 }

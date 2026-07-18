@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Loader2 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
-import type { ProcessoWithStatus, Processo } from "@/src/types/kanban"
+import type { ProcessoWithStatus, Processo, OperationalProjection } from "@/src/types/kanban"
 import { DocumentoOperationalDrawer } from "./DocumentoOperationalDrawer"
 import { InitOperationModal } from "./InitOperationModal"
 import { WorkflowMacroTrilha, ResumoDoProcesso, PROCESS_PHASES } from "./WorkflowMacroTrilha"
@@ -17,8 +17,14 @@ import { ProcessoApostilamento } from "./ProcessoApostilamento"
 import { ProcessoFaseFinal } from "./ProcessoFaseFinal"
 import { ProcessoRetificacao } from "./ProcessoRetificacao"
 import { ProcessoEmissaoRetificada } from "./ProcessoEmissaoRetificada"
+import { HistoricalPhasePanel, type PhaseMeta } from "./HistoricalPhasePanel"
 import type { FaseCode } from "@prisma/client"
-import { FASES, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
+import { FASES, phaseKeyToFaseCode, faseCodeToPhaseKey } from "@/src/lib/process-stage/fases-catalog"
+
+// Mapa label → phaseKey (a trilha emite o LABEL exato do catálogo).
+const LABEL_TO_PHASEKEY: Record<string, string> = Object.fromEntries(
+  Object.values(FASES).map((f) => [f.label, f.phaseKey]),
+)
 
 // ============================================================
 // TIPOS (espelho do endpoint)
@@ -65,6 +71,8 @@ interface FaseProgress {
 }
 
 interface CentralOpData {
+  // Projeção operacional oficial (fonte única do percentual/estado da fase).
+  projection?: OperationalProjection | null
   matrix: {
     percentage: number
     completed: number
@@ -123,6 +131,9 @@ interface CentralOpData {
 
 interface ProcessoCentralOperacionalProps {
   processo: ProcessoWithStatus | Processo
+  /** Chamado quando a fase ATIVA do processo muda aqui (ex.: retorno de fase),
+   *  para o container (modal) invalidar Header/Drawer/Kanban. */
+  onProcessoMudou?: () => void
 }
 
 // ============================================================
@@ -296,6 +307,7 @@ const FASE_META: Record<string, { sub: string; tabs: string[] }> = {
 
 export function ProcessoCentralOperacional({
   processo,
+  onProcessoMudou,
 }: ProcessoCentralOperacionalProps) {
   const { pode } = usePermissoes()
   const [data, setData] = useState<CentralOpData | null>(null)
@@ -307,6 +319,12 @@ export function ProcessoCentralOperacional({
   const [initModalDocId, setInitModalDocId] = useState<number | null>(null)
   const [abrindoOperacao, setAbrindoOperacao] = useState(false)
   const [erroOperacao, setErroOperacao] = useState<string | null>(null)
+
+  // NAVEGAÇÃO ENTRE FASES (OPERATE|VIEW). activePhaseKey = fase OPERADA (do processo);
+  // selectedPhaseKey = fase CONSULTADA (clique na trilha). Independentes: consultar
+  // NUNCA altera a fase ativa. selectedPhaseKey=null ⇒ segue a ativa (modo OPERATE).
+  const [phases, setPhases] = useState<PhaseMeta[]>([])
+  const [selectedPhaseKey, setSelectedPhaseKey] = useState<string | null>(null)
 
   // TROCA DE CONTEXTO NO AVANÇO DE FASE: quando a fase da Central muda (avanço/retorno),
   // qualquer drawer aberto está exibindo o contexto da fase ANTIGA (ex.: o passo
@@ -456,6 +474,22 @@ export function ProcessoCentralOperacional({
     [processo.id]
   )
 
+  // Lista de fases materializadas (para clicabilidade + navegação por instância).
+  // Leitura pura; NUNCA materializa. Recarregada junto com a Central.
+  const carregarFases = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/processos/${processo.id}/phases`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      })
+      if (res.ok) {
+        const j = await res.json()
+        setPhases((j.phases ?? []) as PhaseMeta[])
+      }
+    } catch { /* silencioso: a trilha degrada para não-clicável */ }
+  }, [processo.id])
+
+  useEffect(() => { carregarFases() }, [carregarFases])
+
   // Otimista: marca o doc recém-mexido como "Atualizando…" na fila enquanto
   // a Central recarrega em 2º plano — evita a sensação de "concluí e nada mudou".
   const marcarAtualizando = useCallback((docId: number | null) => {
@@ -513,10 +547,13 @@ export function ProcessoCentralOperacional({
     "Genealogia"
   const idxAtual = PROCESS_PHASES.indexOf(faseAtualNome as (typeof PROCESS_PHASES)[number])
   const fasesConcluidas = idxAtual > 0 ? PROCESS_PHASES.slice(0, idxAtual) : []
+  // Percentual da fase ATUAL = projeção oficial (mesmo % do Kanban/Header). Fases
+  // concluídas = 100, futuras = 0. Nenhum recálculo local.
+  const pctFaseAtual = data.projection?.progress.percentage ?? data.matrix?.percentage ?? 0
   const progressoPorFase: Record<string, number> = {}
   PROCESS_PHASES.forEach((ph, i) => {
     if (i < idxAtual) progressoPorFase[ph] = 100
-    else if (i === idxAtual) progressoPorFase[ph] = data.matrix?.percentage ?? 0
+    else if (i === idxAtual) progressoPorFase[ph] = pctFaseAtual
     else progressoPorFase[ph] = 0
   })
 
@@ -555,6 +592,35 @@ export function ProcessoCentralOperacional({
   const ehRetificacao = faseNorm.includes("retificacao de registros")
   const ehEmissaoRetificada = faseNorm.includes("emissao documental retificada")
 
+  // ====== NAVEGA\u00c7\u00c3O DE FASES (OPERATE|VIEW) ======
+  // activePhaseKey = fase operada; selectedKey = fase visualizada (default = ativa).
+  // isView quando a fase visualizada N\u00c3O \u00e9 a ativa \u2014 a Central troca o corpo, sem
+  // alterar o processo. A trilha continua clic\u00e1vel para qualquer fase.
+  const activePhaseKey = faseKey ? faseCodeToPhaseKey(faseKey) : null
+  const selectedKey = selectedPhaseKey ?? activePhaseKey
+  const isView = selectedKey != null && activePhaseKey != null && selectedKey !== activePhaseKey
+  const selectedFaseCode = selectedKey ? phaseKeyToFaseCode(selectedKey) : null
+  const selectedLabel = selectedFaseCode ? FASES[selectedFaseCode].label : undefined
+  const selectedPhaseMeta: PhaseMeta | null =
+    (isView && selectedKey)
+      ? (phases.find((p) => p.phaseKey === selectedKey) ?? {
+          // Fallback quando a rota /phases ainda n\u00e3o respondeu: metadados m\u00ednimos,
+          // com estado derivado da ordem (n\u00e3o materializa nada).
+          phaseKey: selectedKey, faseCode: selectedFaseCode, label: selectedLabel ?? selectedKey,
+          ordem: selectedFaseCode ? FASES[selectedFaseCode].ordem : 0,
+          state: (selectedFaseCode && faseKey && FASES[selectedFaseCode].ordem < FASES[faseKey].ordem
+            ? "COMPLETED" : "FUTURE") as PhaseMeta["state"],
+          materialized: false, workflowInstanceId: null, ciclo: null, status: null,
+        })
+      : null
+
+  const onSelectPhase = (label: string) => {
+    const pk = LABEL_TO_PHASEKEY[label]
+    if (!pk) return
+    // Selecionar a fase ativa volta para OPERATE; qualquer outra entra em VIEW.
+    setSelectedPhaseKey(pk === activePhaseKey ? null : pk)
+  }
+
   return (
     <div className="h-full overflow-y-auto bg-gray-50/30">
       <div className="px-6 py-5">
@@ -569,6 +635,8 @@ export function ProcessoCentralOperacional({
               currentPhase={faseAtualNome}
               completedPhases={fasesConcluidas}
               phaseProgress={progressoPorFase}
+              selectedPhase={selectedLabel}
+              onSelectPhase={onSelectPhase}
             />
           </div>
           <ResumoDoProcesso
@@ -578,7 +646,22 @@ export function ProcessoCentralOperacional({
           />
         </div>
 
-        {ehAnalise ? (
+        {isView && selectedPhaseMeta ? (
+          <HistoricalPhasePanel
+            processoId={processo.id}
+            phaseMeta={selectedPhaseMeta}
+            podeRetornar={pode("workflow.retornarFase")}
+            onVoltarAtiva={() => setSelectedPhaseKey(null)}
+            onRetornou={() => {
+              // Cascata pós-retorno: volta à ativa + recarrega Central e fases; o
+              // Header/Kanban do modal são invalidados via onProcessoMudou.
+              setSelectedPhaseKey(null)
+              carregar(true)
+              carregarFases()
+              onProcessoMudou?.()
+            }}
+          />
+        ) : ehAnalise ? (
           <ProcessoAnalise processoId={processo.id} onConcluido={() => carregar(true)} />
         ) : ehTraducao ? (
           <ProcessoTraducao processoId={processo.id} onConcluido={() => carregar(true)} />

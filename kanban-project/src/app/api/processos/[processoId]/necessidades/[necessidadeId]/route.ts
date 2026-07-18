@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
-import { marcarNaoLocalizada, reabrir, retornoGenealogia } from "@/src/services/necessidade-documental"
+import { marcarNaoLocalizada, reabrir, retornoGenealogia, dispensarNecessidade, atenderNecessidade, iniciarAtendimentoNecessidade } from "@/src/services/necessidade-documental"
 
 // GET - detalhe da necessidade + histórico (eventos) + documentos que a atendem
 export async function GET(
@@ -56,19 +56,17 @@ export async function PATCH(
       case "retorno_genealogia":
         return NextResponse.json({ necessidade: await retornoGenealogia(id, body.motivo) })
       case "dispensar": {
-        const n = await prisma.necessidadeDocumental.update({ where: { id }, data: { status: "DISPENSADA" } })
-        await prisma.necessidadeDocumentalEvento.create({ data: { necessidadeId: id, tipo: "DISPENSADA" } })
-        return NextResponse.json({ necessidade: n })
+        // Transição CANÔNICA pelo serviço de domínio (nenhuma escrita direta de status).
+        await dispensarNecessidade(id, typeof body.motivo === "string" ? body.motivo : undefined)
+        return NextResponse.json({ necessidade: await prisma.necessidadeDocumental.findUnique({ where: { id } }) })
       }
       case "em_atendimento": {
-        const n = await prisma.necessidadeDocumental.update({ where: { id }, data: { status: "EM_ATENDIMENTO" } })
-        await prisma.necessidadeDocumentalEvento.create({ data: { necessidadeId: id, tipo: "EM_ATENDIMENTO" } })
-        return NextResponse.json({ necessidade: n })
+        await iniciarAtendimentoNecessidade(id)
+        return NextResponse.json({ necessidade: await prisma.necessidadeDocumental.findUnique({ where: { id } }) })
       }
       case "atender": {
-        const n = await prisma.necessidadeDocumental.update({ where: { id }, data: { status: "ATENDIDA" } })
-        await prisma.necessidadeDocumentalEvento.create({ data: { necessidadeId: id, tipo: "ATENDIDA" } })
-        return NextResponse.json({ necessidade: n })
+        await atenderNecessidade(id)
+        return NextResponse.json({ necessidade: await prisma.necessidadeDocumental.findUnique({ where: { id } }) })
       }
       default:
         return NextResponse.json({ error: "Ação inválida" }, { status: 400 })

@@ -909,7 +909,15 @@ export function ProcessoDetailsModal({
             // (header/abas fixos; só o conteúdo rola). Diagnóstico técnico do Runtime
             // fica em Gerenciamento → Motor → Diagnóstico do Runtime.
             <div className="h-full min-h-0 overflow-y-auto">
-              <ProcessoCentralOperacional processo={processo} />
+              <ProcessoCentralOperacional
+                processo={processo}
+                onProcessoMudou={() => {
+                  // Retorno de fase (ou outra mudança da fase ATIVA): invalida a
+                  // projeção — Header (refreshKey) + Kanban/Drawer (onSave).
+                  setPhaseRefreshKey((k) => k + 1)
+                  onSave?.()
+                }}
+              />
             </div>
           )}
 

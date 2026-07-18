@@ -174,6 +174,19 @@ export interface Tarefa {
 // =====================================================
 // PROCESSO - CARD DO KANBAN (FAMÍLIA)
 // =====================================================
+// Projeção operacional oficial (espelho do contrato de operational-projection-core).
+// Fonte ÚNICA de progresso/estado da fase para toda a UI. Nenhum componente recalcula.
+export type WorkflowScope = "PROCESSO" | "NECESSIDADE" | "DOCUMENTO"
+
+export interface OperationalProjection {
+  processId: string
+  activePhase: { id: string; name: string; scope: WorkflowScope } | null
+  progress: { percentage: number; completedWeight: number; totalWeight: number }
+  status: { blocked: boolean; canAdvance: boolean; operationalState: string }
+  nextAction: { key: string; label: string } | null
+  metrics: { required: number; completed: number; blocked: number }
+}
+
 export interface Processo {
   id: number
   nome: string
@@ -199,6 +212,8 @@ export interface Processo {
     tarefas: number
     anexos: number
   }
+  /** Projeção operacional oficial da fase atual (vinda do GET /api/processos em lote). */
+  projection?: OperationalProjection | null
 }
 
 /** @deprecated LEGADO — alias de Processo (o kanban novo agrupa por faseAtualKey).

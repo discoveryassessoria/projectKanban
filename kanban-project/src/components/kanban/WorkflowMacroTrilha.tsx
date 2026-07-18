@@ -198,6 +198,9 @@ export function WorkflowMacroTrilha({
             ? (getPhaseStatus(PROCESS_PHASES[i + 1], currentPhase, completedPhases, path, needsRectification) === "concluida" || st === "concluida")
             : false
 
+          const clicavel = !!onSelectPhase
+          const consultando = !!selectedPhase && selectedPhase === title && selectedPhase !== currentPhase
+
           return (
             <div
               key={title}
@@ -205,7 +208,11 @@ export function WorkflowMacroTrilha({
             >
               <button
                 onClick={() => onSelectPhase?.(title)}
-                className="flex flex-col items-center gap-1 w-full bg-transparent border-none py-1.5 px-1 rounded-[10px] cursor-default"
+                disabled={!clicavel}
+                title={clicavel ? "Ver esta fase" : undefined}
+                className={`flex flex-col items-center gap-1 w-full bg-transparent border-none py-1.5 px-1 rounded-[10px] transition-colors ${
+                  clicavel ? "cursor-pointer hover:bg-gray-50" : "cursor-default"
+                } ${consultando ? "ring-2 ring-blue-400 bg-blue-50/60" : ""}`}
               >
                 {/* dot + conector */}
                 <div className="flex items-center w-full justify-center relative">

@@ -12,7 +12,7 @@
 
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
-import { garantirNecessidade } from "@/src/services/necessidade-documental"
+import { garantirNecessidade, dispensarNecessidade, reativarNecessidade } from "@/src/services/necessidade-documental"
 import { matrizParaRegra } from "@/src/lib/documentos/regras-documentais/mapear"
 import { avaliarRegrasDocumentais } from "@/src/lib/documentos/regras-documentais/avaliador"
 import type { RegraDocumental, SujeitoContexto } from "@/src/lib/documentos/regras-documentais/tipos"
@@ -149,10 +149,9 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
       }, db)
       criada ? res.necessidadesCriadas++ : res.necessidadesReusadas++
 
-      // reativa se estava DISPENSADA (voltou a ser aplicável)
+      // reativa se estava DISPENSADA (voltou a ser aplicável) — via serviço canônico.
       if (!criada && necessidade.status === "DISPENSADA") {
-        await db.necessidadeDocumental.update({ where: { id: necessidade.id }, data: { status: "PENDENTE" } })
-        await db.necessidadeDocumentalEvento.create({ data: { necessidadeId: necessidade.id, tipo: "REABERTA", descricao: "Regra voltou a ser aplicável (reconciliação)" } })
+        await reativarNecessidade(necessidade.id, db)
         res.reativadas++
       }
 
@@ -194,8 +193,7 @@ async function reconciliarEfinalizar(res: MaterializarResultado, processoId: num
     // deixou de ser aplicável: se ainda não começou (PENDENTE), DISPENSA (reversível);
     // se já em atendimento/atendida/não localizada → preserva histórico, não mexe.
     if (n.status === "PENDENTE") {
-      await db.necessidadeDocumental.update({ where: { id: n.id }, data: { status: "DISPENSADA" } })
-      await db.necessidadeDocumentalEvento.create({ data: { necessidadeId: n.id, tipo: "DISPENSADA", descricao: "Regra deixou de ser aplicável (reconciliação) — fora do bloqueio, sem apagar histórico" } })
+      await dispensarNecessidade(n.id, "Regra deixou de ser aplicável (reconciliação)", db)
       res.dispensadas++
     }
   }

@@ -19,10 +19,16 @@ const viol: string[] = []
 function ok(c: boolean, n: string) { if (c) { passed++; console.log(`  ✅ ${n}`) } else { failed++; viol.push(n); console.log(`  ❌ ${n}`) } }
 const ler = (rel: string) => (existsSync(join(ROOT, rel)) ? readFileSync(join(ROOT, rel), "utf8") : "")
 
-console.log("\n1) Casing do gate da Genealogia")
+console.log("\n1) Gate da Genealogia por ESCOPO DECLARADO (casing tratado no catálogo)")
 const be = ler("src/lib/motor/blocking-engine.ts")
-ok(/toUpperCase\(\)\s*===\s*"GENEALOGIA"/.test(be), "blocking-engine normaliza casing (toUpperCase === GENEALOGIA)")
+// O gate não compara mais o NOME da fase: resolve o escopo pelo catálogo
+// (phaseKeyToFaseCode normaliza o casing) e delega à função-base computeGate.
+ok(/phaseKeyToFaseCode\(faseMacroKey\)/.test(be) && /getFase\(faseCode\)/.test(be), "blocking-engine resolve fase/escopo pelo catálogo (casing canônico)")
+ok(/computeGate\(/.test(be), "blocking-engine delega o gate à função-base computeGate")
+ok(!/toUpperCase\(\)\s*===\s*"GENEALOGIA"/.test(be), "sem exceção por NOME de fase (toUpperCase === GENEALOGIA)")
 ok(!/faseMacroKey\s*===\s*"GENEALOGIA"/.test(be), "sem comparação literal crua faseMacroKey === \"GENEALOGIA\"")
+const fcGeneal = ler("src/lib/process-stage/fases-catalog.ts")
+ok(/code: "GENEALOGIA"[\s\S]*?scope: "NECESSIDADE"/.test(fcGeneal), "catálogo declara GENEALOGIA scope=NECESSIDADE (fonte do gate)")
 
 console.log("\n2) Catálogo de passos unificado (localizar_registro canônico)")
 const fc = ler("src/lib/process-stage/fases-catalog.ts")
