@@ -358,30 +358,10 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
       continue
     }
 
-    // ── FLUXO LEGADO (configItemId null) — mantido só para regras antigas já existentes.
-    const code = pstr(r.params, 'financialItemCode')
-    const prod = code ? prodByCode.get(code) : undefined
-    const honorario = r.financialType === 'honorarium'
-    const isReceita = r.financialType === 'revenue' || honorario
-    // `amount` explícito = override manual legítimo. Sem ele, resolve pela Tabela de
-    // Preços da config (§5) — nunca valorPadrao. Sem preço válido → PULA (não lança zero).
-    const amount = pnum(r.params, 'amount')
-    let valor: number | null = amount ?? null
-    let moeda = toMoeda(pstr(r.params, 'currency'), (prod?.moedaPadrao as Moeda) || 'EUR')
-    let tabelaValorId: number | null = null
-    if (valor == null) {
-      const preco = await precoDaConfig(prod?.id ?? null, isReceita ? NaturezaPreco.VENDA : NaturezaPreco.CUSTO, processoId, tipoProcessoId)
-      if (!preco) { skipped.push({ name: r.name, reason: 'sem valor (amount) e sem Configuração Financeira vinculada' }); continue }
-      if ('erro' in preco) { skipped.push({ name: r.name, reason: `sem preço válido na Tabela de Preços — ${preco.erro}` }); continue }
-      valor = preco.valor; moeda = preco.moeda; tabelaValorId = preco.tabelaValorId
-    }
-    const fx = await fxParaBRL(moeda, fxCache)
-    const akey = `${processoId}::${phaseKey}::automation::${r.id}`
-    const fz: FreezeExec = { tabelaValorId, configId: prod?.id ?? null, regraId: r.id, naturezaPreco: isReceita ? 'VENDA' : 'CUSTO', contexto: { fonte: 'automation', ruleId: r.id, phaseKey, amountOverride: amount != null } }
-    await fazer(akey, isReceita ? 'Receita' : 'Custo', 'financial', 'automation', r.id, r.name,
-      { valor, moeda, condicional: naoVerificada, ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
-      async () => (isReceita ? criarReceita(processoId, r.name, valor, moeda, fx, honorario, fz) : criarCusto(processoId, r.name, valor, moeda, fx, fz)),
-      (id) => created.push({ kind: 'financial', targetTable: isReceita ? 'Receita' : 'Custo', targetId: id, name: r.name, amount: valor, currency: moeda, condicional: naoVerificada, condicaoNaoVerificada: naoVerificada || undefined }))
+    // SEM configItemId = regra LEGADA (valor/moeda/código manual). O formato legado foi
+    // DESCONTINUADO: não executa mais (nada de valor manual). Migre-a para uma
+    // Configuração Financeira (o preço passa a vir da Tabela de Preços).
+    skipped.push({ name: r.name, reason: 'Regra financeira LEGADA (valor/moeda manual) — descontinuada. Migre para uma Configuração Financeira; o preço vem da Tabela de Preços.' })
   }
 
   // EVENTO / AGENDA
