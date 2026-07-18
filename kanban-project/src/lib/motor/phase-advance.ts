@@ -26,6 +26,8 @@ import { instanciarWorkflowDaFase, type OrigemInstanciaStr } from "@/src/service
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
 import { captureOperationalSnapshot } from "@/src/lib/motor/historical-operational-projection"
 import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
+import { resolveOperationalProjection } from "@/src/lib/process-stage/operational-projection"
+import type { OperationalProjection } from "@/src/lib/motor/operational-projection-core"
 import {
   type AdvanceOperacao,
   type AdvanceFailureCode,
@@ -174,6 +176,9 @@ interface Plano {
   regrasAvaliadas: Prisma.InputJsonValue
   pendencias: Prisma.InputJsonValue
   warnings: Prisma.InputJsonValue
+  // Projeção operacional OFICIAL da fase de ORIGEM (capturada ANTES da conclusão, pelo
+  // MESMO resolver do OPERATE) para persistir no snapshot imutável. Só nas conclusões.
+  projecaoOrigem?: OperationalProjection | null
 }
 
 async function executarPlano(p: Plano): Promise<AdvanceResult> {
@@ -216,13 +221,20 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
           // captura, IMUTÁVEL, o payload que a Central renderizava para esta fase/ciclo.
           // Só na conclusão real (não em supersessão/retorno). Idempotente (não reescreve).
           if (concluir) {
-            await captureOperationalSnapshot(tx, {
-              instanceId: atual.id,
-              faseCode: phaseKeyToFaseCode(p.faseAtual),
-              faseMacroKey: p.faseAtual,
-              ciclo: atual.ciclo,
-              capturedAt: new Date().toISOString(),
-            })
+            // Defensivo: a captura do snapshot NUNCA pode abortar o avanço de fase.
+            // Falha aqui = ciclo fica sem snapshot (available:false), nunca quebra o motor.
+            try {
+              await captureOperationalSnapshot(tx, {
+                instanceId: atual.id,
+                faseCode: phaseKeyToFaseCode(p.faseAtual),
+                faseMacroKey: p.faseAtual,
+                ciclo: atual.ciclo,
+                capturedAt: new Date().toISOString(),
+                officialProjection: p.projecaoOrigem ?? null,
+              })
+            } catch (e) {
+              console.error("[phase-advance] captura de snapshot falhou (não fatal):", e)
+            }
           }
         }
       }
@@ -457,13 +469,17 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
     }
   }
 
+  // Projeção operacional OFICIAL da fase de origem, ANTES de concluir (mesmo resolver do
+  // OPERATE). Leitura fora da transação; não fatal (snapshot é best-effort).
+  const projecaoOrigem = await resolveOperationalProjection(processoId).catch(() => null)
+
   return executarPlano({
     operacao: "AVANCAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
     faseDestino: proxima, novaFaseAtualKey: proxima, cicloAlvo: 1, origemInstancia: "MOTOR",
     encerramento: "CONCLUIR", eventoFaseTipo: "FASE_AVANCADA", correlationId,
     causationId: ctx.causationId ?? null, solicitadoPorId: ctx.solicitadoPorId, forcado: false,
     origemLog: ctx.origem ?? "advance", regrasAvaliadas: snap.regrasAvaliadas,
-    pendencias: snap.pendencias, warnings: snap.warnings,
+    pendencias: snap.pendencias, warnings: snap.warnings, projecaoOrigem,
   })
 }
 
@@ -488,6 +504,7 @@ export async function forceAdvance(processoId: number, input: ForceInput): Promi
 
   // pendências são apenas SNAPSHOT para auditoria (ignoradas no forçado)
   const snap = await snapshotPendencias(processoId, c.processo.faseAtual, correlationId)
+  const projecaoOrigem = await resolveOperationalProjection(processoId).catch(() => null)
 
   return executarPlano({
     operacao: "FORCAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
@@ -496,7 +513,7 @@ export async function forceAdvance(processoId: number, input: ForceInput): Promi
     causationId: input.causationId ?? null, solicitadoPorId: input.solicitadoPorId, forcado: true,
     justificativa: input.justificativa, motivoCodigo: input.motivoCodigo,
     origemLog: input.origem ?? "force", regrasAvaliadas: snap.regrasAvaliadas,
-    pendencias: snap.pendencias, warnings: snap.warnings,
+    pendencias: snap.pendencias, warnings: snap.warnings, projecaoOrigem,
   })
 }
 

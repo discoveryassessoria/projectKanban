@@ -13,8 +13,9 @@
 // domínio é migrada; nesta fundação capturamos workflow/documents/needs/metrics).
 
 import type { Prisma, PrismaClient } from "@prisma/client"
+import type { OperationalProjection } from "@/src/lib/motor/operational-projection-core"
 
-export const OPERATIONAL_SNAPSHOT_SCHEMA_VERSION = 1
+export const OPERATIONAL_SNAPSHOT_SCHEMA_VERSION = 2
 
 // Estados terminais "feitos" de um passo (métrica de progresso materializada).
 const STEP_DONE = new Set(["CONCLUIDO", "EXECUTADO", "DISPENSADO"])
@@ -62,6 +63,10 @@ export interface HistoricalOperationalProjection {
   faseMacroKey: string
   ciclo: number
   capturedAt: string
+  // Projeção operacional OFICIAL (o MESMO resolver do modo OPERATE) — fonte autoritativa
+  // de progresso/estado/próxima-ação/métricas. null quando o resolver falhou na captura
+  // (não fatal — o snapshot ainda guarda os fatos materializados abaixo).
+  officialProjection: OperationalProjection | null
   metrics: { percentage: number; completedWeight: number; totalWeight: number }
   workflow: { steps: HistoricalWorkflowStep[] }
   documents: HistoricalDocRef[]
@@ -105,6 +110,7 @@ export function buildOperationalSnapshot(input: {
   ciclo: number
   capturedAt: string
   steps: StepForSnapshot[]
+  officialProjection?: OperationalProjection | null
 }): HistoricalOperationalProjection {
   const steps: HistoricalWorkflowStep[] = input.steps.map((s) => ({
     id: s.id,
@@ -142,6 +148,7 @@ export function buildOperationalSnapshot(input: {
     faseMacroKey: input.faseMacroKey,
     ciclo: input.ciclo,
     capturedAt: input.capturedAt,
+    officialProjection: input.officialProjection ?? null,
     metrics: { percentage, completedWeight, totalWeight },
     workflow: { steps },
     documents,
@@ -164,7 +171,10 @@ type Db = PrismaClient | Prisma.TransactionClient
  */
 export async function captureOperationalSnapshot(
   db: Db,
-  args: { instanceId: number; faseCode: string | null; faseMacroKey: string; ciclo: number; capturedAt: string },
+  args: {
+    instanceId: number; faseCode: string | null; faseMacroKey: string; ciclo: number; capturedAt: string
+    officialProjection?: OperationalProjection | null
+  },
 ): Promise<boolean> {
   const inst = await db.phaseWorkflowInstance.findUnique({
     where: { id: args.instanceId },
@@ -189,6 +199,7 @@ export async function captureOperationalSnapshot(
     ciclo: args.ciclo,
     capturedAt: args.capturedAt,
     steps: inst.steps,
+    officialProjection: args.officialProjection ?? null,
   })
 
   await db.phaseWorkflowInstance.update({
