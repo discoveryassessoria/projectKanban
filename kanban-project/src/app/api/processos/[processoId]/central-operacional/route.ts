@@ -234,7 +234,7 @@ export async function GET(
 
     // pessoas e documentos não dependem um do outro (ambos só precisam do
     // arvoreId) → busca os dois EM PARALELO, economizando um round-trip ao banco.
-    const [pessoas, docsRaw, workflowsRaw] = await Promise.all([
+    const [pessoas, docsRaw, stepInstancesRaw] = await Promise.all([
       processo.arvoreId
         ? prisma.pessoa.findMany({
             where: { arvoreId: processo.arvoreId },
@@ -267,10 +267,26 @@ export async function GET(
             },
           })
         : [],
-      // CUTOVER V2: workflowsRaw legado eliminado. O dono do documento vem do
-      // mestre (Documento.responsavelId). TODO: enriquecer com o responsável do
-      // passo ATIVO via PhaseWorkflowStepInstance (responsavelId é ref solta a Usuario).
-      [] as Array<{ documentoId: number; faseCode: string | null; steps: Array<{ ordem: number; stepKey: string; status: string; assigneeId: number | null; assignee: { nome: string } | null }> }>,
+      // FONTE REAL do workflow (V2): passos operacionais por-documento da FASE ATUAL do
+      // processo (PhaseWorkflowStepInstance). Escopo por faseMacroKey = fase atual persistida
+      // (NÃO mistura fases anteriores) e status ATIVO (exclui SUPERSEDIDO/CANCELADO
+      // históricos). Agrupado logo abaixo. Substitui o array vazio do cutover — sem o qual
+      // faseProgress/matrix/próxima ação/responsável do passo ficavam zerados.
+      processo.faseAtualKey
+        ? prisma.phaseWorkflowStepInstance.findMany({
+            where: {
+              processoId: processo.id,
+              faseMacroKey: processo.faseAtualKey,
+              documentoId: { not: null },
+              status: { notIn: ["SUPERSEDIDO", "CANCELADO"] },
+            },
+            select: {
+              documentoId: true, faseMacroKey: true, workflowInstanceId: true,
+              stepKey: true, ordem: true, status: true, responsavelId: true, ciclo: true, updatedAt: true,
+            },
+            orderBy: [{ documentoId: "asc" }, { ordem: "asc" }],
+          })
+        : [],
     ])
 
     const nomeCompleto = (p: { nome: string; sobrenome: string | null }) =>
@@ -278,6 +294,39 @@ export async function GET(
 
     const pessoasMap = new Map(pessoas.map((p) => [p.id, p]))
     const pessoasNaLinha = pessoas.filter((p) => p.linhaReta)
+
+    // ── workflowsRaw = LEITURA REAL das instâncias V2 da FASE ATUAL (agrupada por doc).
+    //    Dedup: uma instância por (documento, stepKey) — a mais recente (maior ciclo, depois
+    //    updatedAt) — para nunca contar passo em duplicidade caso existam instâncias antigas.
+    //    Responsáveis resolvidos em LOTE (responsavelId é ref solta a Usuario, sem relation).
+    const respIdsWf = [...new Set(stepInstancesRaw.map((s) => s.responsavelId).filter((x): x is number => x != null))]
+    const respNomesWf = respIdsWf.length
+      ? new Map((await prisma.usuario.findMany({ where: { id: { in: respIdsWf } }, select: { id: true, nome: true } })).map((u) => [u.id, u.nome]))
+      : new Map<number, string>()
+
+    const melhorPorDocStep = new Map<string, (typeof stepInstancesRaw)[number]>()
+    for (const s of stepInstancesRaw) {
+      if (s.documentoId == null) continue
+      const k = `${s.documentoId}|${s.stepKey}`
+      const prev = melhorPorDocStep.get(k)
+      const maisRecente = !prev
+        || (s.ciclo ?? 0) > (prev.ciclo ?? 0)
+        || ((s.ciclo ?? 0) === (prev.ciclo ?? 0) && (s.updatedAt?.getTime() ?? 0) >= (prev.updatedAt?.getTime() ?? 0))
+      if (maisRecente) melhorPorDocStep.set(k, s)
+    }
+    const wfPorDoc = new Map<number, { documentoId: number; faseCode: string | null; steps: Array<{ ordem: number; stepKey: string; status: string; assigneeId: number | null; assignee: { nome: string } | null }> }>()
+    for (const s of melhorPorDocStep.values()) {
+      const docId = s.documentoId as number
+      let entry = wfPorDoc.get(docId)
+      if (!entry) { entry = { documentoId: docId, faseCode: phaseKeyToFaseCode(s.faseMacroKey), steps: [] }; wfPorDoc.set(docId, entry) }
+      entry.steps.push({
+        ordem: s.ordem, stepKey: s.stepKey, status: s.status,
+        assigneeId: s.responsavelId,
+        assignee: s.responsavelId != null ? { nome: respNomesWf.get(s.responsavelId) ?? "" } : null,
+      })
+    }
+    for (const e of wfPorDoc.values()) e.steps.sort((a, b) => a.ordem - b.ordem)
+    const workflowsRaw = Array.from(wfPorDoc.values())
 
     const generationOf = (pessoaId: number): number => {
       const p = pessoasMap.get(pessoaId)

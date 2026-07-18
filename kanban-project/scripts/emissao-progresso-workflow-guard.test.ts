@@ -36,5 +36,13 @@ ok(/proximoPasso = proximaAcaoDoc\(d\.id\) \?\? "normal"/.test(route), "queue us
 console.log("\n3) Passos lidos do cadastro (sem lista fixa como regra)")
 ok(/getStepsForFase\(faseAtualCode\)/.test(route), "títulos/ordem vêm do catálogo da fase (persistido)")
 
+console.log("\n4) workflowsRaw = LEITURA REAL das instâncias V2 (não mais [] hardcoded)")
+ok(!/\[\] as Array<\{ documentoId: number; faseCode: string \| null; steps:/.test(route), "array vazio hardcoded do cutover REMOVIDO")
+ok(/phaseWorkflowStepInstance\.findMany\(\{[\s\S]*?processoId: processo\.id,[\s\S]*?faseMacroKey: processo\.faseAtualKey,/.test(route), "consulta PhaseWorkflowStepInstance escopada a processoId + fase atual")
+ok(/status: \{ notIn: \["SUPERSEDIDO", "CANCELADO"\] \}/.test(route), "ignora instâncias históricas inativas (SUPERSEDIDO/CANCELADO)")
+ok(/const workflowsRaw = Array\.from\(wfPorDoc\.values\(\)\)/.test(route), "workflowsRaw agrupado por documento")
+ok(/melhorPorDocStep|maisRecente/.test(route), "dedup por (documento, stepKey) — instância mais recente (sem duplicidade)")
+ok(/respNomesWf[\s\S]*?usuario\.findMany\(\{ where: \{ id: \{ in: respIdsWf \}/.test(route), "responsáveis resolvidos em LOTE (sem N+1)")
+
 console.log(`\n${failed === 0 ? "✅" : "❌"} GUARDA PROGRESSO-WORKFLOW — ${passed} ok, ${failed} falhas`)
 if (failed > 0) { console.log("Falhas: " + viol.join("; ")); process.exit(1) }
