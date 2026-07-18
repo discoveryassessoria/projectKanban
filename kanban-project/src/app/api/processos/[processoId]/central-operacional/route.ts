@@ -468,19 +468,49 @@ export async function GET(
     })
 
     // ============================================================
+    // FONTE OFICIAL de CONCLUSÃO e PRÓXIMA AÇÃO = passos do Workflow Interno da FASE
+    // ATUAL (persistidos), NÃO o status mestre do documento. Um doc só "concluiu a fase"
+    // quando a ÚLTIMA etapa (maior ordem) do seu workflow está concluída (ex.: Emissão =
+    // validar_certidao); RECEBIDO/status isolado não conclui. A próxima ação é a 1ª etapa
+    // (na ordem) ainda não concluída. Lê os passos cadastrados — sem lista fixa.
+    // ============================================================
+    const stepConcluidoRe = (status: string) => /conclu|finaliz/i.test(String(status))
+    const catStepsFase = faseAtualCode ? getStepsForFase(faseAtualCode) : []
+    const tituloStep = (k: string) => catStepsFase.find((c) => c.stepKey === k)?.title ?? k
+    const wfDoDoc = new Map<number, { steps: Array<{ ordem: number; stepKey: string; status: string }> }>()
+    for (const wf of workflowsRaw as Array<{ documentoId: number; faseCode: string | null; steps: Array<{ ordem: number; stepKey: string; status: string }> }>) {
+      if (wf.faseCode !== faseAtualCode) continue
+      wfDoDoc.set(wf.documentoId, { steps: wf.steps })
+    }
+    const docConcluiuFase = (docId: number): boolean => {
+      const steps = wfDoDoc.get(docId)?.steps ?? []
+      if (steps.length === 0) return false
+      const ultima = steps.reduce((a, b) => (b.ordem > a.ordem ? b : a))
+      return stepConcluidoRe(ultima.status)
+    }
+    const proximaAcaoDoc = (docId: number): string | null => {
+      const steps = [...(wfDoDoc.get(docId)?.steps ?? [])].sort((a, b) => a.ordem - b.ordem)
+      if (steps.length === 0) return null // sem operação materializada ainda
+      const prox = steps.find((s) => !stepConcluidoRe(s.status))
+      return prox ? tituloStep(prox.stepKey) : "Concluído"
+    }
+
+    // ============================================================
     // 7) Linhas da tabela
     // ============================================================
     const queue: QueueRow[] = filtered.map((d) => {
       const pessoa = pessoasMap.get(d.pessoaId)
       const dias = d.dataPrazoOperacao ? diffDays(d.dataPrazoOperacao, now) : null
 
+      // PRÓXIMA AÇÃO derivada do workflow (1ª etapa não concluída), não de texto fixo.
+      // Estados excepcionais (crítico/atrasado/bloqueado/sem responsável) continuam
+      // prevalecendo; caso contrário, mostra a etapa real (ex.: "Conferir certidão").
       let proximoPasso: string | null = null
       if (isCritical(d)) proximoPasso = "crítico"
       else if (isOverdue(d)) proximoPasso = "atrasado"
       else if (isBlocked(d)) proximoPasso = d.motivoBloqueio ?? null
       else if (isNoOwner(d)) proximoPasso = "sem responsável"
-      else if (isPendente(d)) proximoPasso = "aguarda decisão do operador"
-      else proximoPasso = "normal"
+      else proximoPasso = proximaAcaoDoc(d.id) ?? "normal"
 
       return {
         docId: d.id,
@@ -517,7 +547,7 @@ export async function GET(
         generation: generationOf(pid),
       }
       cur.total += 1
-      if (STATUS_VALIDADOS.includes(d.status)) cur.completed += 1
+      if (docConcluiuFase(d.id)) cur.completed += 1 // conclusão REAL do workflow, não status
       byPersonAgg.set(pid, cur)
     }
 
@@ -541,14 +571,15 @@ export async function GET(
     const linhaRetaDocs = docs.filter((d) => pessoasMap.get(d.pessoaId)?.linhaReta)
     const totalDocs = linhaRetaDocs.length
 
-    // CUTOVER V2: "concluiu a fase atual" deriva do STATUS mestre do documento
-    // (não lê mais Workflow legado). Status validado = documento passou da fase.
-    const concluiuFaseAtual = (d: DocFull): boolean => STATUS_VALIDADOS.includes(d.status)
+    // FONTE OFICIAL: "concluiu a fase atual" = última etapa obrigatória do Workflow
+    // Interno concluída (validar_certidao na Emissão) — NÃO o status mestre do documento
+    // (RECEBIDO não conclui). Alinha matrix/barra/macro/header ao faseProgress.
+    const concluiuFaseAtual = (d: DocFull): boolean => docConcluiuFase(d.id)
 
     const validados = linhaRetaDocs.filter(concluiuFaseAtual).length
 
     const missing = docs
-      .filter((d) => !STATUS_VALIDADOS.includes(d.status))
+      .filter((d) => !concluiuFaseAtual(d))
       .filter((d) => pessoasMap.get(d.pessoaId)?.linhaReta)
       .slice(0, 50)
       .map((d) => {
