@@ -134,8 +134,9 @@ const STATUS_LABEL: Record<StatusStep, string> = {
 export function WorkflowTab({ documentoId, onChange }: WorkflowTabProps) {
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  // fase atual não tem Workflow Interno configurado (nunca cai no de outra fase)
+  const [semWorkflowInterno, setSemWorkflowInterno] = useState(false)
 
   // ✅ NOVO: stepId aberto na Central da Etapa (drawer empilhado)
   const [centralStepId, setCentralStepId] = useState<number | null>(null)
@@ -153,6 +154,7 @@ export function WorkflowTab({ documentoId, onChange }: WorkflowTabProps) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = await res.json()
       setWorkflow(json.workflow)
+      setSemWorkflowInterno(json.semWorkflowInterno === true)
     } catch (e) {
       console.warn("[WorkflowTab] falha:", e)
       setErro("Erro ao carregar workflow.")
@@ -165,28 +167,8 @@ export function WorkflowTab({ documentoId, onChange }: WorkflowTabProps) {
     carregar()
   }, [carregar])
 
-  // -- Cria o workflow padrão
-  const iniciarOperacao = async () => {
-    setCreating(true)
-    try {
-      const res = await fetch(`/api/documentos/${documentoId}/workflow`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-        },
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json()
-      setWorkflow(json.workflow)
-      onChange?.()
-    } catch (e) {
-      console.warn("[WorkflowTab] criar:", e)
-      alert("Erro ao iniciar operação.")
-    } finally {
-      setCreating(false)
-    }
-  }
+  // "Iniciar operação" manual foi removido do fluxo: o backend materializa a operação
+  // da fase atual automaticamente ao carregar o workflow (garantirOperacaoDocumentoV2).
 
   // -- Render
 
@@ -208,30 +190,39 @@ export function WorkflowTab({ documentoId, onChange }: WorkflowTabProps) {
     )
   }
 
-  // -- Empty state
+  // -- Sem workflow (o backend já materializa automaticamente ao abrir; se ainda assim
+  //    não há workflow, é porque a FASE ATUAL não tem Workflow Interno configurado —
+  //    mensagem controlada, NUNCA workflow de outra fase, sem "Iniciar operação").
   if (!workflow) {
+    if (semWorkflowInterno) {
+      return (
+        <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+          <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mb-4">
+            <Circle className="w-5 h-5 text-slate-500" />
+          </div>
+          <h4 className="text-white font-semibold text-sm mb-1.5">Sem Workflow Interno</h4>
+          <p className="text-xs text-slate-400 max-w-xs">
+            Não existe Workflow Interno configurado para esta fase.
+          </p>
+        </div>
+      )
+    }
+    // Estado transitório/edge (materialização não retornou workflow por outro motivo):
+    // recarregar, sem reiniciar operação nem usar fallback de outra fase.
     return (
       <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
         <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mb-4">
           <Circle className="w-5 h-5 text-slate-500" />
         </div>
-        <h4 className="text-white font-semibold text-sm mb-1.5">Sem workflow iniciado</h4>
+        <h4 className="text-white font-semibold text-sm mb-1.5">Não foi possível carregar as etapas</h4>
         <p className="text-xs text-slate-400 max-w-xs mb-5">
-          Para criar as etapas operacionais deste documento, inicie uma operação.
+          Recarregue para tentar montar a operação desta fase.
         </p>
         <button
-          onClick={iniciarOperacao}
-          disabled={creating}
-          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-800 disabled:opacity-60 text-white text-xs font-semibold rounded-md inline-flex items-center gap-1.5"
+          onClick={carregar}
+          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded-md inline-flex items-center gap-1.5"
         >
-          {creating ? (
-            <>
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Criando...
-            </>
-          ) : (
-            <>▸ Iniciar operação</>
-          )}
+          ↻ Recarregar
         </button>
       </div>
     )

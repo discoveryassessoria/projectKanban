@@ -226,6 +226,35 @@ export async function iniciarOperacaoDocumentoV2(documentoId: number, opts: Inic
   return { ok: true, workflow: await montarWorkflowV2(documentoId) }
 }
 
+/**
+ * GARANTE a operação da FASE ATUAL do documento (materialização automática idempotente).
+ * Fluxo oficial ao abrir o drawer: se já há operação na fase atual, reusa; senão,
+ * materializa os passos do Workflow Interno cadastrado (mesma rotina do "Iniciar operação",
+ * upsert por chaveIdempotencia → 2 cliques/2 requisições NÃO duplicam). Genérico p/ qualquer
+ * fase por-documento com catálogo (Genealogia/Emissão/Emissão Retificada); fases de pacote
+ * (Tradução/Apostilamento) e as com tela própria (Análise/Retificação/Protocolo) NÃO usam
+ * este drawer, então não materializam aqui. Retorna semWorkflowInterno quando a fase atual
+ * não tem workflow configurado (nunca cai no workflow de outra fase).
+ */
+export async function garantirOperacaoDocumentoV2(
+  documentoId: number,
+): Promise<{ workflow: WorkflowV2Shape | null; semWorkflowInterno?: boolean }> {
+  // 1) já existe operação na fase atual? (montarWorkflowV2 já é escopado à fase atual)
+  const existente = await montarWorkflowV2(documentoId)
+  if (existente) return { workflow: existente }
+
+  // 2) materializa (idempotente). iniciarOperacaoDocumentoV2 valida fase/instância/catálogo.
+  const r = await iniciarOperacaoDocumentoV2(documentoId)
+  if (r.ok) return { workflow: r.workflow }
+
+  // 3) corrida: outra requisição materializou em paralelo → re-lê e reusa
+  if (r.status === 409) return { workflow: await montarWorkflowV2(documentoId) }
+
+  // 4) fase atual SEM workflow configurado (sem catálogo/instância) → mensagem controlada,
+  //    NUNCA workflow de outra fase.
+  return { workflow: null, semWorkflowInterno: true }
+}
+
 // Campos de DOMÍNIO aceitos no PATCH do passo (vão para metadata.operacao).
 const CAMPOS_OPERACAO = [
   "trackingCode", "externalProtocol", "requestChannel", "reviewResult", "validationResult",

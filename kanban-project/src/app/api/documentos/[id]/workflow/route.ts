@@ -7,19 +7,20 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import {
-  montarWorkflowV2,
+  garantirOperacaoDocumentoV2,
   iniciarOperacaoDocumentoV2,
   controlarOperacaoV2,
 } from "@/src/services/documento-operacao"
 
-// GET — workflow (V2) do documento no formato antigo
+// GET — workflow (V2) do documento no formato antigo. MATERIALIZA automaticamente a
+// operação da fase atual (idempotente) — o fluxo normal não depende de "Iniciar operação".
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const documentoId = parseInt(id)
     if (isNaN(documentoId)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })
-    const workflow = await montarWorkflowV2(documentoId)
-    return NextResponse.json({ workflow })
+    const { workflow, semWorkflowInterno } = await garantirOperacaoDocumentoV2(documentoId)
+    return NextResponse.json({ workflow, semWorkflowInterno: semWorkflowInterno ?? false })
   } catch (error) {
     console.error("[GET /api/documentos/[id]/workflow]", error)
     return NextResponse.json({ error: "Erro ao buscar workflow" }, { status: 500 })
