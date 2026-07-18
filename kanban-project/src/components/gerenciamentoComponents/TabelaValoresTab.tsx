@@ -9,8 +9,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 
 type ConfigRef = { id: number; possuiCusto: boolean; possuiReceita: boolean; origem: string; mestre: string; label: string; moedaPadrao: string }
 type FornecedorRef = { id: number; nome: string }
-type ProcRef = { id: number; name: string }
-type ModRef = { id: number; modalityLabel: string }
 type CfgEmbed = {
   id: number; possuiCusto: boolean; possuiReceita: boolean
   tipoDocumento?: { name: string } | null; honorario?: { name: string } | null
@@ -22,8 +20,6 @@ type Item = {
   natureza: string | null
   configuracaoFinanceiraItemId: number | null
   configuracaoFinanceiraItem?: CfgEmbed | null
-  processoTipoId: string | null
-  modalidadeId: number | null
   fornecedorId: number | null
   moeda: string
   valor: string | number | null
@@ -36,7 +32,6 @@ type Item = {
   prioridade: number
   arquivado: boolean
   fornecedor?: FornecedorRef | null
-  modalidade?: { id: number; modalityLabel: string } | null
 }
 
 const MODOS_CALCULO: [string, string][] = [
@@ -67,7 +62,7 @@ const fmtMoeda = (v: any, moeda: string) => {
 }
 
 const EMPTY = {
-  configuracaoFinanceiraItemId: '', natureza: '', processoTipoId: '', modalidadeId: '', fornecedorId: '',
+  configuracaoFinanceiraItemId: '', natureza: '', fornecedorId: '',
   moeda: '', valor: '', modoCalculo: 'fixed', unidade: '', quantidadeMinima: '', quantidadeMaxima: '',
   vigenciaInicio: '', vigenciaFim: '', prioridade: '0', arquivado: false,
 }
@@ -77,8 +72,6 @@ export default function TabelaValoresTab() {
   const [itens, setItens] = useState<Item[]>([])
   const [configs, setConfigs] = useState<ConfigRef[]>([])
   const [fornecedores, setFornecedores] = useState<FornecedorRef[]>([])
-  const [tiposProcesso, setTiposProcesso] = useState<ProcRef[]>([])
-  const [modalidades, setModalidades] = useState<ModRef[]>([])
   const [loading, setLoading] = useState(true)
   const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
@@ -98,8 +91,6 @@ export default function TabelaValoresTab() {
       setItens((d as any).tabelaValores || [])
       setConfigs((d as any).configs || [])
       setFornecedores((d as any).fornecedores || [])
-      setTiposProcesso((d as any).tiposProcesso || [])
-      setModalidades((d as any).modalidades || [])
     } catch (e: any) { setErroLista(e.message || 'Não foi possível carregar os preços.') }
     finally { setLoading(false) }
   }, [])
@@ -127,8 +118,6 @@ export default function TabelaValoresTab() {
     setForm({
       configuracaoFinanceiraItemId: i.configuracaoFinanceiraItemId ? String(i.configuracaoFinanceiraItemId) : '',
       natureza: i.natureza === 'RECEITA' ? 'VENDA' : (i.natureza || ''), // RECEITA legado ≡ VENDA
-
-      processoTipoId: i.processoTipoId || '', modalidadeId: i.modalidadeId ? String(i.modalidadeId) : '',
       fornecedorId: i.fornecedorId ? String(i.fornecedorId) : '', moeda: i.moeda || '',
       valor: i.valor != null ? String(i.valor) : '', modoCalculo: i.modoCalculo || 'fixed',
       unidade: i.unidade || '', quantidadeMinima: i.quantidadeMinima != null ? String(i.quantidadeMinima) : '',
@@ -148,9 +137,7 @@ export default function TabelaValoresTab() {
       const body = JSON.stringify({
         ...form,
         configuracaoFinanceiraItemId: Number(form.configuracaoFinanceiraItemId),
-        modalidadeId: form.modalidadeId || null,
         fornecedorId: form.fornecedorId || null,
-        processoTipoId: form.processoTipoId || null,
         valor: Number(form.valor),
         prioridade: Number(form.prioridade) || 0,
       })
@@ -174,7 +161,7 @@ export default function TabelaValoresTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Tabelas de Preços</h2>
-          <p className="text-sm text-white/50">Quanto vale cada Configuração Financeira em cada contexto. Custo/venda por fornecedor, nacionalidade e modalidade.</p>
+          <p className="text-sm text-white/50">Repositório de valores: quanto vale cada Configuração Financeira. Custo/venda por fornecedor e vigência — a decisão de onde aplicar cada preço é da Regra Financeira.</p>
         </div>
         <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500">+ Novo valor</button>
       </div>
@@ -189,21 +176,18 @@ export default function TabelaValoresTab() {
         <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5 backdrop-blur">
           <table className="w-full text-[13px]">
             <thead><tr className="bg-white/5">
-              {['Cadastro mestre', 'Origem', 'Papel', 'Processo / Modalidade', 'Fornecedor', 'Modo', 'Valor', 'Vigência', 'Prio.', 'Status', ''].map((h, idx) => (
-                <th key={idx} className={`border-b border-white/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${idx === 6 || idx === 10 ? 'text-right' : 'text-left'}`}>{h}</th>
+              {['Cadastro mestre', 'Origem', 'Papel', 'Fornecedor', 'Modo', 'Valor', 'Vigência', 'Prio.', 'Status', ''].map((h, idx) => (
+                <th key={idx} className={`border-b border-white/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${idx === 5 || idx === 9 ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
               {filtrados.map((i) => {
                 const om = origemMestre(i.configuracaoFinanceiraItem)
-                const proc = tiposProcesso.find((t) => String(t.id) === i.processoTipoId)?.name || i.processoTipoId || '—'
-                const mod = i.modalidade?.modalityLabel
                 return (
                   <tr key={i.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
                     <td className="px-3 py-2.5 font-medium text-white">{om.mestre}</td>
                     <td className="px-3 py-2.5 text-white/60">{om.origem}</td>
                     <td className="px-3 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${i.natureza === 'CUSTO' ? 'bg-amber-500/15 text-amber-300' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-white/50'}`}>{i.natureza === 'CUSTO' ? 'Custo' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'Venda' : '—'}</span></td>
-                    <td className="px-3 py-2.5 text-white/70">{proc}{mod ? ` · ${mod}` : ''}</td>
                     <td className="px-3 py-2.5 text-white/70">{i.fornecedor?.nome || '—'}</td>
                     <td className="px-3 py-2.5 text-white/60">{modoLabel(i.modoCalculo)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-white/90">{fmtMoeda(i.valor, i.moeda)}</td>
@@ -284,23 +268,6 @@ export default function TabelaValoresTab() {
                 {cfgSelecionada && !cfgSelecionada.possuiCusto && !cfgSelecionada.possuiReceita && (
                   <p className="mt-1 text-[11px] text-amber-300/80">Esta configuração não habilita custo nem venda. Ajuste a Natureza Financeira em Configurações Financeiras.</p>
                 )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs text-white/60">Processo / Nacionalidade</label>
-                  <select value={form.processoTipoId} onChange={(e) => set('processoTipoId', e.target.value)} className={inputCls}>
-                    <option value="" className="bg-zinc-900">— Qualquer —</option>
-                    {tiposProcesso.map((t) => <option key={t.id} value={t.id} className="bg-zinc-900">{t.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-white/60">Modalidade</label>
-                  <select value={form.modalidadeId} onChange={(e) => set('modalidadeId', e.target.value)} className={inputCls}>
-                    <option value="" className="bg-zinc-900">— Qualquer —</option>
-                    {modalidades.map((m) => <option key={m.id} value={m.id} className="bg-zinc-900">{m.modalityLabel}</option>)}
-                  </select>
-                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
