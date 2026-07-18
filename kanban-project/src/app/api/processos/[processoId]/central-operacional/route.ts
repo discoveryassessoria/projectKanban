@@ -684,7 +684,9 @@ export async function GET(
           isOverdue: !ok && dias != null && dias < 0,
           isBlocked: false,
           noOwner: !s?.responsavelId,
-          proximoPasso: ok ? "normal" : "Localizar registro",
+          // NÃO usar "normal" (o front mapeia "normal"→"Solicitar certidão", que é ação da
+          // Emissão). Na Genealogia a ação é localizar; localizado → "Concluído".
+          proximoPasso: ok ? "Concluído" : "Localizar registro",
           generation: n.pessoaId != null ? generationOf(n.pessoaId) : 99,
           isLinhaReta: pessoa?.linhaReta ?? false,
           necessidadeId: n.id,
@@ -692,7 +694,9 @@ export async function GET(
       })
 
       genealogiaV2 = {
-        matrix: { percentage, completed: obrigDone, total: totalObrig, directPeopleCount: pessoasNaLinha.length, missingCount: totalObrig - obrigDone, nameVariationsCount: 0, byPerson: byPersonV2, missing: [] },
+        // FONTE ÚNICA: percentual/total/done vêm da projeção canônica (prog) — idênticos ao
+        // cabeçalho (/phase). byPerson permanece (detalhe por pessoa da própria fila).
+        matrix: { percentage: prog.percent, completed: prog.done, total: prog.total, directPeopleCount: pessoasNaLinha.length, missingCount: Math.max(0, prog.total - prog.done), nameVariationsCount: 0, byPerson: byPersonV2, missing: [] },
         queue: queueV2,
         faseProgress: {
           faseCode: faseAtualCode ?? null, kind: "documento", docsNaFase: necs.length,

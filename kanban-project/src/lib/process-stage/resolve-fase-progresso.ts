@@ -9,6 +9,8 @@
 
 import { prisma } from "@/lib/prisma"
 import { phaseKeyToFaseCode, getStepsForFase } from "./fases-catalog"
+import { escopoDaFase } from "@/src/lib/motor/resolve-passos-bloqueantes"
+import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 import type { FaseCode } from "@prisma/client"
 
 const stepConcluidoRe = (status: string) => /conclu|finaliz/i.test(String(status))
@@ -50,10 +52,11 @@ export async function resolveProgressoFaseDocumento(processoId: number): Promise
         where: {
           processoId,
           faseMacroKey,
-          documentoId: { not: null },
+          // passos vinculados a ENTIDADE (documento OU necessidade) — genéricos ficam de fora.
+          OR: [{ documentoId: { not: null } }, { necessidadeId: { not: null } }],
           status: { notIn: ["SUPERSEDIDO", "CANCELADO"] },
         },
-        select: { documentoId: true, faseMacroKey: true, stepKey: true, ordem: true, status: true, responsavelId: true, ciclo: true, updatedAt: true },
+        select: { documentoId: true, necessidadeId: true, faseMacroKey: true, stepKey: true, ordem: true, status: true, responsavelId: true, ciclo: true, updatedAt: true },
         orderBy: [{ documentoId: "asc" }, { ordem: "asc" }],
       })
     : []
@@ -163,8 +166,34 @@ export async function resolveProgressoFaseDocumento(processoId: number): Promise
     return { ordem: sc.ordem, stepKey: sc.stepKey, title: sc.title, status, concluidos: c, total: t }
   })
 
-  const total = linhaRetaDocIds.length
-  const done = concluidosPorDoc.size
+  // ESCOPO OPERACIONAL define numerador/denominador (fonte canônica única):
+  //  - NECESSIDADE (Genealogia): denominador = necessidades OBRIGATÓRIAS de CERTIDÃO NÃO
+  //    dispensadas; numerador = as com localizar_registro concluído. NUNCA conta documentos
+  //    (evita 3/6 quando há certidões duplicadas por pessoa) — dá 3/3 = 100% quando as 3
+  //    obrigatórias foram validadas.
+  //  - DOCUMENTO (Emissão) / PROCESSO: documentos obrigatórios da linha reta concluídos.
+  let total: number
+  let done: number
+  if (escopoDaFase(stepInstancesRaw) === "NECESSIDADE") {
+    const certItens = await itemCatalogosDeCertidao(prisma)
+    const necsAll = await prisma.necessidadeDocumental.findMany({
+      where: { processoId },
+      select: { id: true, status: true, obrigatoriedade: true, itemCatalogoId: true },
+    })
+    const obrig = necsAll.filter(
+      (n) => n.obrigatoriedade === "OBRIGATORIA" && certItens.has(n.itemCatalogoId) && n.status !== "DISPENSADA",
+    )
+    const concluidoPorNec = new Map<number, boolean>()
+    for (const s of stepInstancesRaw) {
+      if (s.necessidadeId == null) continue
+      concluidoPorNec.set(s.necessidadeId, (concluidoPorNec.get(s.necessidadeId) ?? false) || stepConcluidoRe(s.status))
+    }
+    total = obrig.length
+    done = obrig.filter((n) => concluidoPorNec.get(n.id) === true).length
+  } else {
+    total = linhaRetaDocIds.length
+    done = concluidosPorDoc.size
+  }
   const percent = total > 0 ? Math.round((done / total) * 100) : 0
 
   return {

@@ -37,11 +37,29 @@ export function faseOperadaPorEntidade(passos: PassoEscopo[]): boolean {
 }
 
 /**
- * Subconjunto de passos que efetivamente participam do GATE da fase.
- * - Fase por-entidade: só os passos com entidade (genéricos = template, ignorados).
- * - Fase por-processo: todos os passos (genéricos são a esteira legítima).
+ * ESCOPO OPERACIONAL da fase, inferido dos passos persistidos (precedência
+ * NECESSIDADE > DOCUMENTO > PROCESSO):
+ *  - Se há passo com necessidadeId → a fase é operada por NECESSIDADE (ex.: Genealogia).
+ *  - Senão, se há passo com documentoId → por DOCUMENTO (ex.: Emissão).
+ *  - Senão → por PROCESSO (só genéricos; ex.: Análise/Retificação/…).
+ */
+export function escopoDaFase(passos: PassoEscopo[]): EscopoOperacao {
+  if (passos.some((p) => p.necessidadeId != null)) return "NECESSIDADE"
+  if (passos.some((p) => p.documentoId != null)) return "DOCUMENTO"
+  return "PROCESSO"
+}
+
+/**
+ * Subconjunto de passos que efetivamente participam do GATE da fase, pelo ESCOPO:
+ * - NECESSIDADE: só os passos com necessidadeId (passo com documentoId mas SEM necessidade —
+ *   ex.: documento duplicado sem requisito — NÃO bloqueia; genéricos também não).
+ * - DOCUMENTO: só os passos com documentoId (genéricos não bloqueiam).
+ * - PROCESSO: todos os passos (genéricos são a esteira legítima).
  */
 export function resolvePassosBloqueantesDaFase<T extends PassoEscopo>(passos: T[]): T[] {
-  if (!faseOperadaPorEntidade(passos)) return passos
-  return passos.filter((p) => p.documentoId != null || p.necessidadeId != null)
+  switch (escopoDaFase(passos)) {
+    case "NECESSIDADE": return passos.filter((p) => p.necessidadeId != null)
+    case "DOCUMENTO": return passos.filter((p) => p.documentoId != null)
+    default: return passos
+  }
 }
