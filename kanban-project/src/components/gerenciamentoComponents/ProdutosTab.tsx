@@ -60,9 +60,20 @@ const lbl = (arr: [string, string][], v: string | null) => arr.find(([k]) => k =
 const fmtMoney = (v: any, moeda?: string) =>
   v == null || v === '' ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: moeda || 'BRL' })
 
+// PREÇO-FONTE-ÚNICA — Natureza Financeira estrutural (o QUE o item gera). Os valores
+// (preço) NÃO vivem mais na Configuração Financeira: vão para a Tabela de Preços.
+const NATUREZA_FIN: [string, string][] = [
+  ['SOMENTE_CUSTO', 'Somente custo'],
+  ['SOMENTE_RECEITA', 'Somente receita'],
+  ['CUSTO_E_RECEITA', 'Custo e receita'],
+]
+const natFinDe = (possuiCusto: boolean, possuiReceita: boolean) =>
+  possuiCusto && possuiReceita ? 'CUSTO_E_RECEITA' : possuiCusto ? 'SOMENTE_CUSTO' : 'SOMENTE_RECEITA'
+
 const EMPTY = {
   origem: 'documento', masterId: '',
   possuiCusto: false, possuiReceita: true,
+  naturezaFin: 'SOMENTE_RECEITA',
   valorCustoPadrao: '', valorReceitaPadrao: '',
   codigo: '', nome: '', naturezaFinanceira: 'revenue',
   categoriaId: '', planoContaId: '', moedaPadrao: 'BRL', fornecedorPadraoId: '',
@@ -185,6 +196,7 @@ export default function ProdutosTab() {
     setForm({
       origem, masterId: masterId ? String(masterId) : '',
       possuiCusto: p.possuiCusto, possuiReceita: p.possuiReceita,
+      naturezaFin: natFinDe(p.possuiCusto, p.possuiReceita),
       valorCustoPadrao: p.valorCustoPadrao != null ? String(p.valorCustoPadrao) : '',
       valorReceitaPadrao: p.valorReceitaPadrao != null ? String(p.valorReceitaPadrao) : '',
       codigo: '', nome: p.mestre?.nome || p.nome,
@@ -200,18 +212,24 @@ export default function ProdutosTab() {
 
   async function salvar() {
     if (!form.masterId) { setErroModal('Selecione a entidade mestre (origem). O nome/código vêm dela.'); return }
-    if (!form.possuiCusto && !form.possuiReceita) { setErroModal('A configuração deve possuir custo, receita, ou ambos.'); return }
+    if (!form.naturezaFin) { setErroModal('Selecione a Natureza Financeira.'); return }
     setSalvando(true); setErroModal(null)
     try {
       const fkField = FK_POR_ORIGEM[form.origem]
+      // PREÇO-FONTE-ÚNICA — envia a Natureza Financeira (estrutural); o backend deriva
+      // possuiCusto/possuiReceita. Valores de preço NÃO são enviados: vivem na Tabela de
+      // Preços e os campos legado são preservados (o PUT mantém o que for omitido).
+      const { valorCustoPadrao: _vc, valorReceitaPadrao: _vr, ...rest } = form
+      void _vc; void _vr
       const body = JSON.stringify({
-        ...form,
+        ...rest,
         [fkField]: Number(form.masterId),
+        naturezaFin: form.naturezaFin,
+        possuiCusto: form.naturezaFin !== 'SOMENTE_RECEITA',
+        possuiReceita: form.naturezaFin !== 'SOMENTE_CUSTO',
         categoriaId: form.categoriaId || null,
         planoContaId: form.planoContaId || null,
         fornecedorPadraoId: form.fornecedorPadraoId || null,
-        valorCustoPadrao: form.valorCustoPadrao === '' ? null : Number(form.valorCustoPadrao),
-        valorReceitaPadrao: form.valorReceitaPadrao === '' ? null : Number(form.valorReceitaPadrao),
       })
       if (editando) {
         await jsonFetch(`/api/gerenciamento/produtos/${editando.id}`, { method: 'PUT', body })
@@ -292,10 +310,7 @@ export default function ProdutosTab() {
             <thead>
               <tr className="bg-white/5">
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Cadastro mestre</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-white/50">Possui custo</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-white/50">Possui receita</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Valor custo padrão</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Valor receita padrão</th>
+                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Natureza financeira</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
               </tr>
@@ -307,10 +322,7 @@ export default function ProdutosTab() {
                     <div className="font-medium text-white">{p.mestre?.nome || p.nome}</div>
                     <div className="text-[11px] text-white/40">{p.mestre?.codigo ? `Cód. ${p.mestre.codigo}` : 'sem código de mestre'}</div>
                   </td>
-                  <td className="px-4 py-2.5 text-center"><Check ok={p.possuiCusto} /></td>
-                  <td className="px-4 py-2.5 text-center"><Check ok={p.possuiReceita} /></td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-white/80">{p.possuiCusto ? fmtMoney(p.valorCustoPadrao, p.moedaPadrao) : '—'}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-white/80">{p.possuiReceita ? fmtMoney(p.valorReceitaPadrao, p.moedaPadrao) : '—'}</td>
+                  <td className="px-4 py-2.5 text-white/80">{lbl(NATUREZA_FIN, natFinDe(p.possuiCusto, p.possuiReceita))}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.ativo ? 'bg-green-500/15 text-green-300' : 'bg-white/10 text-white/50'}`}>
@@ -386,29 +398,13 @@ export default function ProdutosTab() {
                     {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                    <label className="flex items-center gap-2 text-sm text-white/80">
-                      <input type="checkbox" checked={form.possuiCusto} onChange={(e) => set('possuiCusto', e.target.checked)} className="h-4 w-4 accent-amber-500" />
-                      Possui custo
-                    </label>
-                    <label className="mt-3 mb-1 block text-xs text-white/60">Valor custo padrão</label>
-                    <input type="number" step="0.01" value={form.valorCustoPadrao} disabled={!form.possuiCusto}
-                      onChange={(e) => set('valorCustoPadrao', e.target.value)} placeholder="0,00"
-                      className={inputCls + (form.possuiCusto ? '' : ' opacity-50')} />
-                  </div>
-                  <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                    <label className="flex items-center gap-2 text-sm text-white/80">
-                      <input type="checkbox" checked={form.possuiReceita} onChange={(e) => set('possuiReceita', e.target.checked)} className="h-4 w-4 accent-emerald-500" />
-                      Possui receita
-                    </label>
-                    <label className="mt-3 mb-1 block text-xs text-white/60">Valor receita padrão</label>
-                    <input type="number" step="0.01" value={form.valorReceitaPadrao} disabled={!form.possuiReceita}
-                      onChange={(e) => set('valorReceitaPadrao', e.target.value)} placeholder="0,00"
-                      className={inputCls + (form.possuiReceita ? '' : ' opacity-50')} />
-                  </div>
+                <div>
+                  <label className="mb-1 block text-xs text-white/60">Natureza financeira</label>
+                  <select value={form.naturezaFin} onChange={(e) => set('naturezaFin', e.target.value)} className={inputCls}>
+                    {NATUREZA_FIN.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
+                  </select>
                 </div>
-                <p className="text-[11px] text-white/40">Estes são os valores padrão (fallback). Preços por contexto ficam na Tabela de Preços.</p>
+                <p className="text-[11px] text-white/40">A Configuração Financeira define <b>o que</b> é o item. Os <b>preços</b> (custo/venda) vivem na Tabela de Preços — cadastre-os lá conforme a natureza escolhida.</p>
               </Secao>
 
               {/* Classificação */}

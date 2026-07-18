@@ -9,8 +9,9 @@
 import { useEffect, useState } from "react"
 import {
   CreditCard, FileText, AlertTriangle, Clock, CheckCircle, RefreshCw,
-  Landmark, Upload, Plus, Loader2, Check, MoreHorizontal,
+  Landmark, Upload, Plus, Loader2, Check, Ban, RotateCcw,
 } from "lucide-react"
+import { OrigemBadge, StatusBadge, VerOrigemLink, LancamentoDetalheModal, CancelarEstornarModal } from "@/src/components/financeiro/shared/FinanceiroGeralShared"
 
 function fmtBRL(v: number): string { return `R$ ${(v ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }
 function fmtBRLshort(v: number): string {
@@ -32,10 +33,12 @@ function dueText(d: string | Date | null): string {
 }
 
 interface Conta {
-  id: number; fornecedor: string; descricao: string; categoria: string; categoriaCor: string | null
+  id: string; fornecedor: string; descricao: string; categoria: string; categoriaCor: string | null
   conta: string | null; valor: number; vencimento: string; dataPagamento: string | null; status: string
   numeroParcela: number | null; totalParcelas: number | null
   pago: boolean; cancelado: boolean; aberto: boolean; vencido: boolean; diasParaVencer: number
+  // §1/§3/§5 — canônico
+  origem?: string; lancamentoOrigem?: { tipo: "custo" | "contaPagar"; id: number }; editavelEstrutural?: boolean; estorno?: boolean
 }
 interface PagarData {
   kpis: { aPagar: number; qtdAbertos: number; vencidosTotal: number; qtdVencidos: number; agendadosTotal: number; qtdAgendados: number; pagosMes: number; qtdPagosMes: number; qtdPendentes: number }
@@ -56,24 +59,24 @@ const CHIPS = [
   { key: "pagos", label: "✓ Pagos" },
 ] as const
 
-function statusBadge(c: Conta) {
-  if (c.vencido) return <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">Vencido</span>
-  if (c.pago) return <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">Pago</span>
-  if (c.cancelado) return <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white/50 border border-white/20">Cancelado</span>
-  if (c.status === "AGENDADO") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">Agendado</span>
-  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">Pendente</span>
+function statusEntrada(c: Conta) {
+  return { statusBruto: c.status, estorno: c.estorno ?? false, vencida: c.vencido, liquidada: c.pago, canceladoEm: c.cancelado ? new Date() : null }
 }
 
 export default function PagarTab() {
   const [data, setData] = useState<PagarData | null>(null)
   const [loading, setLoading] = useState(true)
   const [chip, setChip] = useState<string>("todos")
+  const [detalhe, setDetalhe] = useState<{ tipo: "receita" | "custo"; id: number } | null>(null)
+  const [acao, setAcao] = useState<{ acao: "cancelar" | "estornar"; tipo: "receita" | "custo"; id: number; resumo: { item: string; valor: string; processo: string | null } } | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
 
-  useEffect(() => {
+  function carregar() {
     const token = localStorage.getItem("authToken")
     fetch("/api/financas/pagar", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : null).then(d => setData(d)).catch(e => console.error(e)).finally(() => setLoading(false))
-  }, [])
+  }
+  useEffect(() => { carregar() }, [])
 
   if (loading || !data) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
 
@@ -171,10 +174,11 @@ export default function PagarTab() {
               <tbody>
                 {contasFiltradas.map(c => (
                   <tr key={c.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
-                    <td className="py-2 text-white/90 font-medium">{c.fornecedor}</td>
+                    <td className="py-2 text-white/90 font-medium"><div className="flex items-center gap-1.5">{c.fornecedor}<OrigemBadge origem={c.origem} /></div></td>
                     <td className="py-2">
                       <div className="text-white/80">{c.descricao}</div>
                       {c.totalParcelas && c.totalParcelas > 1 && c.numeroParcela && <div className="text-[11px] text-white/40">Parcela {c.numeroParcela} de {c.totalParcelas}</div>}
+                      {c.lancamentoOrigem?.tipo === "custo" && <VerOrigemLink tipo="custo" id={c.lancamentoOrigem.id} onOpen={(t, id) => setDetalhe({ tipo: t, id })} />}
                     </td>
                     <td className="py-2">
                       <span className="text-[11px] px-2 py-0.5 rounded" style={{ background: c.categoriaCor ? `${c.categoriaCor}33` : "rgba(255,255,255,0.1)", color: c.categoriaCor || "rgba(255,255,255,0.7)" }}>{c.categoria}</span>
@@ -185,17 +189,28 @@ export default function PagarTab() {
                       <div className={`text-[10px] ${c.vencido ? "text-red-400" : "text-white/40"}`}>{c.pago ? "pago " + fmtDate(c.dataPagamento) : dueText(c.vencimento)}</div>
                     </td>
                     <td className="py-2 text-right text-white font-medium tabular-nums">{fmtBRL(c.valor)}</td>
-                    <td className="py-2 text-center">{statusBadge(c)}</td>
+                    <td className="py-2 text-center"><StatusBadge e={statusEntrada(c)} /></td>
                     <td className="py-2 text-center">
-                      {c.status === "AGENDADO" && !c.pago ? (
-                        <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-green-600/80 hover:bg-green-600 text-white"><Check className="h-3 w-3" /> Pagar</button>
-                      ) : (c.status === "PENDENTE" || c.vencido) && !c.pago ? (
-                        <button className="px-2 py-1 text-[11px] rounded border border-white/20 text-white/80 hover:bg-white/10">Agendar</button>
-                      ) : c.pago ? (
-                        <span className="text-[11px] text-green-300">✓ Pago</span>
-                      ) : (
-                        <button className="text-white/40 hover:text-white"><MoreHorizontal className="h-4 w-4" /></button>
-                      )}
+                      <div className="inline-flex items-center gap-1.5 justify-center">
+                        {/* Corporativa: fluxo operacional atual (pagar/agendar). */}
+                        {c.origem !== "PROCESSO" && c.status === "AGENDADO" && !c.pago && (
+                          <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-green-600/80 hover:bg-green-600 text-white"><Check className="h-3 w-3" /> Pagar</button>
+                        )}
+                        {c.origem !== "PROCESSO" && (c.status === "PENDENTE" || c.vencido) && !c.pago && (
+                          <button className="px-2 py-1 text-[11px] rounded border border-white/20 text-white/80 hover:bg-white/10">Agendar</button>
+                        )}
+                        {/* §5/§6 — custo de PROCESSO: só ações canônicas (cancelar aberto / estornar pago). */}
+                        {c.lancamentoOrigem?.tipo === "custo" && !c.cancelado && !c.estorno && (
+                          c.pago ? (
+                            <button onClick={() => setAcao({ acao: "estornar", tipo: "custo", id: c.lancamentoOrigem!.id, resumo: { item: c.descricao, valor: fmtBRL(c.valor), processo: c.fornecedor } })}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-purple-500/30 text-purple-300 hover:bg-purple-500/10"><RotateCcw className="h-3 w-3" /> Estornar</button>
+                          ) : (
+                            <button onClick={() => setAcao({ acao: "cancelar", tipo: "custo", id: c.lancamentoOrigem!.id, resumo: { item: c.descricao, valor: fmtBRL(c.valor), processo: c.fornecedor } })}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-red-500/30 text-red-300 hover:bg-red-500/10"><Ban className="h-3 w-3" /> Cancelar</button>
+                          )
+                        )}
+                        {c.pago && c.origem !== "PROCESSO" && <span className="text-[11px] text-green-300">✓ Pago</span>}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -234,6 +249,10 @@ export default function PagarTab() {
           </SidePanel>
         </div>
       </div>
+
+      {detalhe && <LancamentoDetalheModal tipo={detalhe.tipo} id={detalhe.id} onClose={() => setDetalhe(null)} />}
+      {acao && <CancelarEstornarModal {...acao} onClose={() => setAcao(null)} onDone={(m) => { setAcao(null); setToast(m); carregar() }} />}
+      {toast && <div className="fixed bottom-4 right-4 z-50 rounded-lg bg-zinc-800 border border-white/10 px-4 py-2 text-sm text-white shadow-xl" onClick={() => setToast(null)}>{toast}</div>}
     </div>
   )
 }

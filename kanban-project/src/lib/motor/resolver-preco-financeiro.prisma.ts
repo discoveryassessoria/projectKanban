@@ -35,10 +35,14 @@ export async function resolverPrecoPorConfigDB(
   })
   const linhas: LinhaPreco[] = rows.map((r) => ({
     id: r.id, valor: Number(r.valor), moeda: r.moeda, modoCalculo: r.modoCalculo, natureza: r.natureza,
-    arquivado: r.arquivado, processoId: r.processoId ?? null, processoTipoId: r.processoTipoId ?? null,
-    regiao: r.regiao ?? null, fornecedorId: r.fornecedorId ?? null, vigenciaInicio: r.vigenciaInicio ?? null, vigenciaFim: r.vigenciaFim ?? null,
+    arquivado: r.arquivado, prioridade: r.prioridade, processoId: r.processoId ?? null, processoTipoId: r.processoTipoId ?? null,
+    modalidadeId: r.modalidadeId ?? null, regiao: r.regiao ?? null, fornecedorId: r.fornecedorId ?? null,
+    quantidadeMinima: r.quantidadeMinima == null ? null : Number(r.quantidadeMinima), quantidadeMaxima: r.quantidadeMaxima == null ? null : Number(r.quantidadeMaxima),
+    vigenciaInicio: r.vigenciaInicio ?? null, vigenciaFim: r.vigenciaFim ?? null,
   }))
-  return resolverPrecoCore(linhas, { ...ctx, itemCatalogoId: configId, natureza: null, dataEvento: ctx.dataEvento ?? new Date() } as ContextoPrecoFinanceiro)
+  // §5 — a natureza É critério: uma config CUSTO_E_RECEITA tem preços das duas
+  // naturezas; resolver sem filtrar misturaria custo e venda. Passa a natureza pedida.
+  return resolverPrecoCore(linhas, { ...ctx, itemCatalogoId: configId, natureza: ctx.natureza ?? null, dataEvento: ctx.dataEvento ?? new Date() } as ContextoPrecoFinanceiro)
 }
 
 /** Carrega as linhas de preço ATIVAS de um item+natureza (findMany, sem escrita). */
@@ -54,10 +58,14 @@ export const carregarLinhasPrisma: CarregadorLinhasPreco = async (itemCatalogoId
       modoCalculo: r.modoCalculo,
       natureza: r.natureza,
       arquivado: r.arquivado,
+      prioridade: r.prioridade,
       processoId: r.processoId ?? null,
       processoTipoId: r.processoTipoId ?? null,
+      modalidadeId: r.modalidadeId ?? null,
       regiao: r.regiao ?? null,
       fornecedorId: r.fornecedorId ?? null,
+      quantidadeMinima: r.quantidadeMinima == null ? null : Number(r.quantidadeMinima),
+      quantidadeMaxima: r.quantidadeMaxima == null ? null : Number(r.quantidadeMaxima),
       vigenciaInicio: r.vigenciaInicio ?? null,
       vigenciaFim: r.vigenciaFim ?? null,
     }),

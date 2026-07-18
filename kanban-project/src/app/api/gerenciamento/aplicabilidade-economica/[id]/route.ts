@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { validarConfigGeraLancamento } from '@/lib/financeiro/regra-financeira-validacao'
 
 function toStrOrNull(v: any): string | null { if (v === undefined || v === null) return null; const s = String(v).trim(); return s === '' ? null : s }
 function toIntOrNull(v: any): number | null { if (v === undefined || v === null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? Math.trunc(n) : null }
@@ -31,6 +32,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     else if (b.receitaProdutoCode !== undefined) data.receitaConfigId = data.receitaProdutoCode ? (await prisma.produtoFinanceiro.findFirst({ where: { codigo: data.receitaProdutoCode, ativo: true }, select: { id: true } }))?.id ?? null : null
     if (b.tipoDocumentoId !== undefined) data.tipoDocumentoId = toIntOrNull(b.tipoDocumentoId)
     else if (b.documentTypeCode !== undefined) data.tipoDocumentoId = data.documentTypeCode ? (await prisma.tipoDocumentoCadastro.findFirst({ where: { code: data.documentTypeCode }, select: { id: true } }))?.id ?? null : null
+    // §3 — valida natureza vs config quando os vínculos mudam (backend).
+    if (data.custoConfigId !== undefined) {
+      const v = await validarConfigGeraLancamento(data.custoConfigId, 'CUSTO')
+      if (!v.ok) return NextResponse.json({ error: v.motivo }, { status: 400 })
+    }
+    if (data.receitaConfigId !== undefined) {
+      const v = await validarConfigGeraLancamento(data.receitaConfigId, 'RECEITA')
+      if (!v.ok) return NextResponse.json({ error: v.motivo }, { status: 400 })
+    }
     const regra = await prisma.phaseEconomicRule.update({ where: { id: parseInt(id) }, data })
     return NextResponse.json(regra)
   } catch (error) {

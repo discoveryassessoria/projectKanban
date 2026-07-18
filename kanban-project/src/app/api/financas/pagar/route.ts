@@ -38,7 +38,20 @@ export async function GET(_req: NextRequest) {
       },
     })
 
-    const itens = contas.map((c) => {
+    // §6 — Contas a Pagar também PROJETA os custos de PROCESSO (model Custo), sem
+    // recriar lançamento (fonte única). Cada custo aparece UMA vez, tagueado
+    // origem=PROCESSO; as ContaPagar são origem=CORPORATIVA. Cancelados fora.
+    const custosProcesso = await prisma.custo.findMany({
+      where: { canceladoEm: null, status: { not: "CANCELADA" }, cancelado: false },
+      orderBy: { vencimento: "asc" },
+      select: {
+        id: true, descricao: true, valor: true, moeda: true, status: true, vencimento: true, fornecedor: true,
+        processoId: true, estornoDeId: true,
+        parcelas: { select: { status: true } },
+      },
+    })
+
+    const itensCorp = contas.map((c) => {
       const valor = Number(c.valor)
       const d = dias(c.dataVencimento)
       const pago = c.status === "PAGO"
@@ -46,7 +59,7 @@ export async function GET(_req: NextRequest) {
       const aberto = !pago && !cancelado
       const vencido = aberto && (c.status === "VENCIDO" || c.dataVencimento < agora)
       return {
-        id: c.id,
+        id: String(c.id),
         fornecedor: c.fornecedor?.nome ?? "—",
         descricao: c.descricao,
         categoria: c.categoria?.nome ?? "Outros",
@@ -54,14 +67,51 @@ export async function GET(_req: NextRequest) {
         conta: c.contaBancaria?.nome ?? null,
         valor,
         vencimento: c.dataVencimento,
-        dataPagamento: c.dataPagamento,
-        status: c.status,
-        numeroParcela: c.numeroParcela,
-        totalParcelas: c.totalParcelas,
+        dataPagamento: c.dataPagamento as Date | null,
+        status: c.status as string,
+        numeroParcela: c.numeroParcela as number | null,
+        totalParcelas: c.totalParcelas as number | null,
         pago, cancelado, aberto, vencido,
         diasParaVencer: d,
+        origem: "CORPORATIVA" as const,
+        lancamentoOrigem: { tipo: "contaPagar" as const, id: c.id },
+        editavelEstrutural: true, // §14 — corporativa é editável no Geral
+        estorno: false,
       }
     })
+
+    // §6/§7/§14 — custos de PROCESSO projetados (não editáveis no Geral).
+    const itensProcesso = custosProcesso.map((c) => {
+      const valor = Number(c.valor)
+      const d = dias(c.vencimento)
+      const totalP = c.parcelas.length
+      const pagas = c.parcelas.filter((p) => p.status === "PAGA").length
+      const pago = totalP > 0 && pagas === totalP
+      const aberto = !pago
+      const vencido = aberto && c.vencimento < agora
+      return {
+        id: `custo-${c.id}`,
+        fornecedor: c.fornecedor ?? "—",
+        descricao: c.descricao,
+        categoria: "Processo",
+        categoriaCor: null as string | null,
+        conta: null as string | null,
+        valor,
+        vencimento: c.vencimento,
+        dataPagamento: null as Date | null,
+        status: (pago ? "PAGO" : vencido ? "VENCIDO" : "PENDENTE") as string,
+        numeroParcela: null as number | null,
+        totalParcelas: (totalP || null) as number | null,
+        pago, cancelado: false, aberto, vencido,
+        diasParaVencer: d,
+        origem: "PROCESSO" as const,
+        lancamentoOrigem: { tipo: "custo" as const, id: c.id },
+        editavelEstrutural: false,
+        estorno: c.estornoDeId != null,
+      }
+    })
+
+    const itens = [...itensCorp, ...itensProcesso]
 
     const abertos = itens.filter((i) => i.aberto)
     const aPagar = abertos.reduce((a, i) => a + i.valor, 0)

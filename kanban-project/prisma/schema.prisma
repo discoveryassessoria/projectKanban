@@ -337,6 +337,7 @@ model Processo {
   tipoProcessoMotorId Int?
   tipoProcessoMotor   TipoProcessoNacionalidade? @relation("ProcessoTipoMotor", fields: [tipoProcessoMotorId], references: [id], onDelete: SetNull)
   motorArtefatos      MotorArtefato[]            @relation("ProcessoMotorArtefatos")
+  pendenciasFinanceiras PendenciaFinanceira[]    @relation("ProcessoPendenciasFinanceiras")
 
   @@index([pais])
   @@index([arvoreId])
@@ -907,6 +908,11 @@ model ContaPagar {
   numeroParcela   Int?
   totalParcelas   Int?
   processoId      Int?
+  // §7 — origem do lançamento corporativo. CORPORATIVA = lançado direto no Financeiro
+  // Geral (aluguel, salários…). PROCESSO = espelha um Custo de processo (evitar!) —
+  // o custo do processo é projetado a partir do model Custo, não recriado aqui.
+  origem          String               @default("CORPORATIVA") @db.VarChar(20)
+  custoOrigemId   Int? // → Custo.id quando esta linha reflete um custo de processo (backfill/vínculo §15)
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
   categoria       CategoriaFinanceira? @relation(fields: [categoriaId], references: [id])
@@ -920,6 +926,7 @@ model ContaPagar {
   @@index([dataVencimento])
   @@index([processoId])
   @@index([contaBancariaId])
+  @@index([origem])
 }
 
 model Transacao {
@@ -1212,11 +1219,44 @@ model Receita {
   origem           String       @default("manual") @db.VarChar(20) // manual | motor | migration
 
   phaseCycle    Int? // ciclo da fase (reemissão)
-  pricingRuleId Int? // qual regra de preço resolveu o valor
+  pricingRuleId Int? // qual regra de preço (TabelaValor.id) resolveu o valor — congelado
+
+  // PREÇO-FONTE-ÚNICA — CONGELAMENTO (§6) + RASTREABILIDADE (§8). Snapshot imutável
+  // do preço/contexto no momento da criação; mudar a TabelaValor depois NÃO altera isto.
+  valorUnitario       Decimal?           @db.Decimal(12, 2)
+  quantidade          Decimal?           @db.Decimal(12, 2)
+  valorTotalCongelado Decimal?           @db.Decimal(12, 2)
+  modoCalculoAplicado String?            @db.VarChar(20)
+  naturezaPreco       NaturezaPreco? // CUSTO | VENDA (a Receita é o lançamento; a natureza do PREÇO usado)
+  configFinanceiraId  Int? // → ProdutoFinanceiro.id (Configuração Financeira; solto/snapshot)
+  regraFinanceiraId   Int? // → PhaseEconomicRule/PhaseTriggerRule.id que decidiu a criação (solto/snapshot)
+  contextoAplicado    Json? // dimensões usadas na resolução (tipoProcesso/fornecedor/regiao/qtd…)
+  dataReferencia      DateTime? // data de referência do preço aplicado
+  chaveIdempotencia   String?            @db.VarChar(200) // = MotorArtefato.automaticKey (unicidade vive lá)
+
+  // §5/§7 — origem e competência do lançamento canônico do PROCESSO.
+  origemLancamento    String             @default("PROCESSO") @db.VarChar(20) // PROCESSO (Receita nasce de processo)
+  naturezaLancamento  String             @default("RECEITA") @db.VarChar(10) // §1 — natureza do LANÇAMENTO (Receita ⇒ RECEITA)
+  eventoOperacionalId String?            @db.VarChar(120) // evento operacional que originou (rastreabilidade §5/§8)
+  dataCompetencia     DateTime? // competência contábil (Fluxo de Caixa projetado / DRE)
+  // §10 CANCELAMENTO (preserva histórico) — cancelada/status seguem como flag/estado.
+  canceladoEm         DateTime?
+  canceladoMotivo     String?            @db.VarChar(500)
+  canceladoPorId      Int? // → Usuario.id (ator; solto/snapshot)
+  canceladoEventoRef  String?            @db.VarChar(120) // evento de origem do cancelamento
+  chaveCancelamento   String?            @unique @db.VarChar(220) // §12 idempotência do cancelamento
+  // §11 ESTORNO — este lançamento é o movimento INVERSO de estornoDeId (self-relation).
+  estornadoEm         DateTime? // setado no lançamento ORIGINAL quando estornado
+  estornoMotivo       String?            @db.VarChar(500)
+  estornoDeId         Int?               @unique // um estorno por original (§12)
+  estornoDe           Receita?           @relation("ReceitaEstorno", fields: [estornoDeId], references: [id])
+  estornos            Receita[]          @relation("ReceitaEstorno")
+  chaveEstorno        String?            @unique @db.VarChar(220) // §12 idempotência do estorno
 
   @@index([processoId])
   @@index([categoria])
   @@index([cancelada])
+  @@index([origemLancamento])
   @@index([codigo])
   @@index([personId])
   @@index([documentoId])
@@ -1264,12 +1304,44 @@ model Custo {
   origem           String       @default("manual") @db.VarChar(20) // manual | motor | migration
 
   phaseCycle    Int? // ciclo da fase (reemissão)
-  pricingRuleId Int? // qual regra de preço resolveu o valor
+  pricingRuleId Int? // qual regra de preço (TabelaValor.id) resolveu o valor — congelado
+
+  // PREÇO-FONTE-ÚNICA — CONGELAMENTO (§6) + RASTREABILIDADE (§8). Snapshot imutável.
+  valorUnitario       Decimal?           @db.Decimal(12, 2)
+  quantidade          Decimal?           @db.Decimal(12, 2)
+  valorTotalCongelado Decimal?           @db.Decimal(12, 2)
+  modoCalculoAplicado String?            @db.VarChar(20)
+  naturezaPreco       NaturezaPreco? // CUSTO | VENDA (natureza do PREÇO usado)
+  configFinanceiraId  Int? // → ProdutoFinanceiro.id (Configuração Financeira; solto/snapshot)
+  regraFinanceiraId   Int? // → PhaseEconomicRule/PhaseTriggerRule.id que decidiu a criação (solto/snapshot)
+  contextoAplicado    Json? // dimensões usadas na resolução
+  dataReferencia      DateTime?
+  chaveIdempotencia   String?            @db.VarChar(200) // = MotorArtefato.automaticKey
+
+  // §5/§7 — origem e competência do lançamento canônico do PROCESSO.
+  origemLancamento    String             @default("PROCESSO") @db.VarChar(20)
+  naturezaLancamento  String             @default("CUSTO") @db.VarChar(10) // §1 — Custo ⇒ CUSTO
+  eventoOperacionalId String?            @db.VarChar(120)
+  dataCompetencia     DateTime?
+  // §10 CANCELAMENTO
+  canceladoEm         DateTime?
+  canceladoMotivo     String?            @db.VarChar(500)
+  canceladoPorId      Int?
+  canceladoEventoRef  String?            @db.VarChar(120)
+  chaveCancelamento   String?            @unique @db.VarChar(220)
+  // §11 ESTORNO — movimento inverso (self-relation)
+  estornadoEm         DateTime?
+  estornoMotivo       String?            @db.VarChar(500)
+  estornoDeId         Int?               @unique
+  estornoDe           Custo?             @relation("CustoEstorno", fields: [estornoDeId], references: [id])
+  estornos            Custo[]            @relation("CustoEstorno")
+  chaveEstorno        String?            @unique @db.VarChar(220)
 
   @@index([processoId])
   @@index([tipo])
   @@index([categoria])
   @@index([cancelado])
+  @@index([origemLancamento])
   @@index([codigo])
   @@index([personId])
   @@index([documentoId])
@@ -1662,13 +1734,19 @@ model ProdutoFinanceiro {
   planoContaId       Int?
   planoConta         PlanoConta?          @relation(fields: [planoContaId], references: [id])
   moedaPadrao        Moeda                @default(BRL)
-  valorPadrao        Decimal?             @db.Decimal(12, 2) // legado: fallback único (pré-unificação)
-  // M-UNIFICA — UMA config por mestre: custo e receita são VALORES desta config,
-  // não mais registros independentes. O papel financeiro vive só em TabelaValor.natureza.
+  valorPadrao        Decimal?             @db.Decimal(12, 2) // LEGADO: fallback único (pré-unificação). NÃO é preço — migrar p/ TabelaValor.
+  // M-UNIFICA — UMA config por mestre. possuiCusto/possuiReceita seguem sendo a
+  // fonte de "o QUE o item pode gerar" (derivam naturezaFin abaixo).
   possuiCusto        Boolean              @default(false)
   possuiReceita      Boolean              @default(false)
-  valorCustoPadrao   Decimal?             @db.Decimal(12, 2)
-  valorReceitaPadrao Decimal?             @db.Decimal(12, 2)
+  // PREÇO-FONTE-ÚNICA (aditivo): a Configuração Financeira NÃO guarda mais preço.
+  // Estes campos viram LEGADO — migrados p/ TabelaValor (CUSTO/VENDA) pelo backfill
+  // `backfill-precos-legado-tabelavalor.ts`. Preservados até a migration de remoção.
+  valorCustoPadrao   Decimal?             @db.Decimal(12, 2) // LEGADO → TabelaValor(natureza=CUSTO)
+  valorReceitaPadrao Decimal?             @db.Decimal(12, 2) // LEGADO → TabelaValor(natureza=VENDA)
+  // Natureza financeira canônica (o QUE é o item). Nullable durante a transição;
+  // deriva de possuiCusto/possuiReceita quando ausente (deriveNaturezaFinanceira).
+  naturezaFin        NaturezaFinanceira?
   aplicaA            String?              @db.VarChar(20) // appliesTo
   cobravelDoCliente  Boolean              @default(false)
   ativo              Boolean              @default(true)
@@ -1748,12 +1826,44 @@ model TabelaValor {
   quantidadeMinima             Decimal?           @db.Decimal(12, 2)
   quantidadeMaxima             Decimal?           @db.Decimal(12, 2)
   legadoPendente               Boolean            @default(false) // sem vínculo canônico seguro → fora da tela/resolver
+  // PREÇO-FONTE-ÚNICA: preço originado da migração dos campos legado de valor da
+  // Configuração Financeira (valorCustoPadrao/valorReceitaPadrao). Rastreabilidade.
+  migradoDeCampoLegado         Boolean            @default(false)
 
   @@index([fornecedorId])
   @@index([itemCatalogoId])
   @@index([natureza])
   @@index([configuracaoFinanceiraItemId])
   @@index([modalidadeId])
+}
+
+// PREÇO-FONTE-ÚNICA (§5/§6) — pendência financeira RASTREÁVEL. Registrada quando o
+// motor NÃO consegue resolver um preço válido (sem regra vigente, ou conflito de
+// mesma precedência). NUNCA cria lançamento com valor incorreto/zero: registra aqui
+// para revisão. Idempotente por chaveIdempotencia (mesma do MotorArtefato do lançamento).
+model PendenciaFinanceira {
+  id                Int       @id @default(autoincrement())
+  processoId        Int
+  processo          Processo  @relation("ProcessoPendenciasFinanceiras", fields: [processoId], references: [id], onDelete: Cascade)
+  tipoProcessoId    Int?
+  phaseKey          String    @db.VarChar(60)
+  phaseCycle        Int       @default(1)
+  configFinanceiraId Int? // → ProdutoFinanceiro.id (Configuração Financeira; solto/snapshot)
+  regraFinanceiraId Int? // → PhaseEconomicRule/PhaseTriggerRule.id (solto/snapshot)
+  natureza          NaturezaPreco? // CUSTO | VENDA que faltou resolver
+  motivo            String    @db.VarChar(40) // SEM_PRECO | CONFLITO_PRECO | NENHUMA_LINHA | SEM_PRECO_VALIDO
+  detalhe           String    @db.VarChar(500)
+  contexto          Json? // dimensões/alternativas descartadas (auditoria)
+  chaveIdempotencia String    @unique @db.VarChar(220) // anti-duplicação no banco
+  resolvida         Boolean   @default(false)
+  resolvidaEm       DateTime?
+  resolucao         String?   @db.VarChar(300) // §13 — o que foi feito p/ resolver
+  criadoEm          DateTime  @default(now())
+
+  @@index([processoId])
+  @@index([phaseKey])
+  @@index([resolvida])
+  @@index([configFinanceiraId])
 }
 
 // ── Condições de Pagamento (fin_paycond) ──
@@ -2941,7 +3051,17 @@ enum PapelFinanceiro {
 
 enum NaturezaPreco {
   CUSTO
-  RECEITA
+  RECEITA // legado — equivalente a VENDA (ver VENDA). Mantido p/ retrocompat de dados.
+  VENDA // canônico na Tabela de Preços: "quanto o item é VENDIDO" (a RECEITA é o lançamento gerado depois)
+}
+
+// Natureza financeira da Configuração Financeira (o QUE o item pode gerar).
+// Uma ÚNICA config por item; define quais preços/regras/lançamentos são válidos.
+// Deriva de possuiCusto/possuiReceita (legado) — ver deriveNaturezaFinanceira().
+enum NaturezaFinanceira {
+  SOMENTE_CUSTO
+  SOMENTE_RECEITA
+  CUSTO_E_RECEITA
 }
 
 enum NaturezaItem {

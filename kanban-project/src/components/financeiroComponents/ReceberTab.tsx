@@ -9,8 +9,10 @@
 import { useEffect, useState } from "react"
 import {
   Inbox, FileText, AlertTriangle, Calendar, TrendingUp, BarChart3,
-  MessageSquare, Upload, Plus, Loader2, Check, MoreHorizontal,
+  MessageSquare, Upload, Plus, Loader2, Check, Ban, RotateCcw,
 } from "lucide-react"
+import { OrigemBadge, StatusBadge, VerOrigemLink, LancamentoDetalheModal, CancelarEstornarModal } from "@/src/components/financeiro/shared/FinanceiroGeralShared"
+import PendenciasFinanceirasPanel from "@/src/components/financeiro/shared/PendenciasFinanceirasPanel"
 
 function fmtBRL(v: number): string { return `R$ ${(v ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }
 function fmtBRLshort(v: number): string {
@@ -39,6 +41,10 @@ interface Parcela {
   pais: string | null; descricao: string; categoria: string; valorBRL: number
   vencimento: string; dataPagamento: string | null; status: string
   recebida: boolean; cancelada: boolean; atrasada: boolean; diasParaVencer: number
+  // §1/§3/§5 — canônico
+  lancamentoOrigemTipo?: "receita"; lancamentoOrigemId?: number | null; origem?: string
+  natureza?: string; editavelEstrutural?: boolean; estorno?: boolean
+  canceladoEm?: string | null; estornadoEm?: string | null
 }
 interface ReceberData {
   kpis: { aReceber: number; vencido: number; aVencer7: number; aVencer30: number; inadimplencia: number; ticketMedio: number; qtdAberto: number; qtdAtrasadas: number; qtdAVencer7: number; processosAtivos: number }
@@ -59,23 +65,24 @@ const CHIPS = [
   { key: "recebidas", label: "✓ Recebidos" },
 ] as const
 
-function statusBadge(p: Parcela) {
-  if (p.atrasada) return <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">Atrasado</span>
-  if (p.recebida) return <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">Recebido</span>
-  if (p.cancelada) return <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white/50 border border-white/20">Cancelado</span>
-  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">Em aberto</span>
+function statusEntrada(p: Parcela) {
+  return { statusBruto: p.status, canceladoEm: p.canceladoEm ?? null, estornadoEm: p.estornadoEm ?? null, estorno: p.estorno ?? false, vencida: p.atrasada, liquidada: p.recebida }
 }
 
 export default function ReceberTab() {
   const [data, setData] = useState<ReceberData | null>(null)
   const [loading, setLoading] = useState(true)
   const [chip, setChip] = useState<string>("todos")
+  const [detalhe, setDetalhe] = useState<{ tipo: "receita" | "custo"; id: number } | null>(null)
+  const [acao, setAcao] = useState<{ acao: "cancelar" | "estornar"; tipo: "receita" | "custo"; id: number; resumo: { item: string; valor: string; processo: string | null } } | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
 
-  useEffect(() => {
+  function carregar() {
     const token = localStorage.getItem("authToken")
     fetch("/api/financas/receber", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : null).then(d => setData(d)).catch(e => console.error(e)).finally(() => setLoading(false))
-  }, [])
+  }
+  useEffect(() => { carregar() }, [])
 
   if (loading || !data) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
 
@@ -185,8 +192,11 @@ export default function ReceberTab() {
                 {parcelasFiltradas.map(p => (
                   <tr key={p.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
                     <td className="py-2">
-                      <div className="text-white/90 font-medium">{p.pais ? PAIS_FLAG[p.pais] + " " : ""}{p.cliente}</div>
-                      <div className="text-[11px] text-white/40">{p.pais ? PAIS_LABEL[p.pais] : "— sem vínculo —"}</div>
+                      <div className="text-white/90 font-medium flex items-center gap-1.5">{p.pais ? PAIS_FLAG[p.pais] + " " : ""}{p.cliente}<OrigemBadge origem={p.origem} /></div>
+                      <div className="text-[11px] text-white/40 flex items-center gap-2">
+                        {p.pais ? PAIS_LABEL[p.pais] : "— sem vínculo —"}
+                        {p.lancamentoOrigemId != null && <VerOrigemLink tipo="receita" id={p.lancamentoOrigemId} onOpen={(t, id) => setDetalhe({ tipo: t, id })} />}
+                      </div>
                     </td>
                     <td className="py-2">
                       <div className="text-white/80">{p.descricao}</div>
@@ -198,15 +208,23 @@ export default function ReceberTab() {
                       <div className={`text-[10px] ${p.atrasada ? "text-red-400" : "text-white/40"}`}>{p.recebida ? "em " + fmtDate(p.dataPagamento) : dueText(p.vencimento)}</div>
                     </td>
                     <td className="py-2 text-right text-white font-medium tabular-nums">{fmtBRL(p.valorBRL)}</td>
-                    <td className="py-2 text-center">{statusBadge(p)}</td>
+                    <td className="py-2 text-center"><StatusBadge e={statusEntrada(p)} /></td>
                     <td className="py-2 text-center">
-                      {!p.recebida && !p.cancelada ? (
-                        <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-green-600/80 hover:bg-green-600 text-white"><Check className="h-3 w-3" /> Receber</button>
-                      ) : p.recebida ? (
-                        <span className="text-[11px] text-green-300">✓ Pago</span>
-                      ) : (
-                        <button className="text-white/40 hover:text-white"><MoreHorizontal className="h-4 w-4" /></button>
-                      )}
+                      <div className="inline-flex items-center gap-1.5 justify-center">
+                        {!p.recebida && !p.cancelada && !p.estorno && (
+                          <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-green-600/80 hover:bg-green-600 text-white"><Check className="h-3 w-3" /> Receber</button>
+                        )}
+                        {/* §5/§6 — ações canônicas: cancelar (aberto) / estornar (recebido). Projeção de PROCESSO só tem ação operacional. */}
+                        {p.lancamentoOrigemId != null && !p.cancelada && !p.estorno && !p.estornadoEm && (
+                          p.recebida ? (
+                            <button onClick={() => setAcao({ acao: "estornar", tipo: "receita", id: p.lancamentoOrigemId!, resumo: { item: p.descricao, valor: fmtBRL(p.valorBRL), processo: p.cliente } })}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-purple-500/30 text-purple-300 hover:bg-purple-500/10"><RotateCcw className="h-3 w-3" /> Estornar</button>
+                          ) : (
+                            <button onClick={() => setAcao({ acao: "cancelar", tipo: "receita", id: p.lancamentoOrigemId!, resumo: { item: p.descricao, valor: fmtBRL(p.valorBRL), processo: p.cliente } })}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-red-500/30 text-red-300 hover:bg-red-500/10"><Ban className="h-3 w-3" /> Cancelar</button>
+                          )
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -235,8 +253,13 @@ export default function ReceberTab() {
               <Row key={t.processoId} label={`${t.pais ? PAIS_FLAG[t.pais] + " " : ""}${t.nome}`} value={fmtBRLshort(t.total)} />
             ))}
           </SidePanel>
+          <PendenciasFinanceirasPanel compact />
         </div>
       </div>
+
+      {detalhe && <LancamentoDetalheModal tipo={detalhe.tipo} id={detalhe.id} onClose={() => setDetalhe(null)} />}
+      {acao && <CancelarEstornarModal {...acao} onClose={() => setAcao(null)} onDone={(m) => { setAcao(null); setToast(m); carregar() }} />}
+      {toast && <div className="fixed bottom-4 right-4 z-50 rounded-lg bg-zinc-800 border border-white/10 px-4 py-2 text-sm text-white shadow-xl" onClick={() => setToast(null)}>{toast}</div>}
     </div>
   )
 }

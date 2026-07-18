@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { validarConfigGeraLancamento } from '@/lib/financeiro/regra-financeira-validacao'
 
 const PHASE_LABELS: Record<string, string> = {
   genealogia: 'Genealogia', emissao_documental: 'Emissão Documental', analise_documental: 'Análise Documental',
@@ -25,6 +26,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const phaseKey = body.phaseKey !== undefined ? String(body.phaseKey) : atual.phaseKey
     const produto = await prisma.produtoFinanceiro.findFirst({ where: { codigo: itemCode } })
     const name = `${produto?.nome || itemCode} · ${PHASE_LABELS[phaseKey] || phaseKey}`
+
+    // §3 — natureza vs config (backend)
+    const entryType = body.entryType ?? atual.entryType
+    const valNat = await validarConfigGeraLancamento(produto?.id ?? null, entryType === 'cost' ? 'CUSTO' : 'RECEITA')
+    if (!valNat.ok) return NextResponse.json({ error: valNat.motivo }, { status: 400 })
 
     const trigger = await prisma.phaseTriggerRule.update({
       where: { id },

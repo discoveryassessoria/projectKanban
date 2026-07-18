@@ -22,7 +22,21 @@ import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
 // executor clássico, atrás da MESMA trava (autoExecutarAoAvancar). Import
 // relativo porque os dois arquivos vivem em src/lib/motor/.
 import { gerarEconomicoDaMatriz } from './matriz-economica'
+import { resolverPrecoPorConfigDB } from './resolver-preco-financeiro.prisma'
+import { NaturezaPreco } from '@prisma/client'
 import { processoEmRuntimeV2 } from './runtime-guard' // CP-4H
+
+// PREÇO-FONTE-ÚNICA (§5): resolve o valor SÓ pela Tabela de Preços de uma
+// Configuração Financeira. NÃO usa valorPadrao da config como preço; sem preço
+// válido → null (o caller PULA, nunca lança zero). `amount` explícito na automação
+// é override manual legítimo e tem prioridade.
+async function precoDaConfig(configId: number | null | undefined, natureza: NaturezaPreco, processoId: number, tipoProcessoId: number): Promise<{ valor: number; moeda: Moeda; tabelaValorId: number | null } | { erro: string } | null> {
+  if (configId == null) return null
+  const r = await resolverPrecoPorConfigDB(configId, { processoId, tipoProcessoId: String(tipoProcessoId), natureza })
+  if (!r.ok) return { erro: r.razao }
+  if (r.conflito) return { erro: r.conflito.nota }
+  return { valor: r.valor, moeda: r.moeda, tabelaValorId: r.tabelaValorId }
+}
 
 // ---- tipos de saída ----
 export interface CreatedItem { kind: string; targetTable: string; targetId: number; name: string; amount?: number; currency?: string; condicional?: boolean; condicaoNaoVerificada?: boolean }
@@ -159,7 +173,10 @@ async function avaliarCondicoes(
 }
 
 // ---- criadores de artefato (idênticos ao route manual) ----
-async function criarReceita(pid: number, descricao: string, valor: number, moeda: Moeda, fx: number, honorario: boolean): Promise<number> {
+// §4 — congelamento também no path de automação/gatilho. tabelaValorId vem do
+// resolvedor central (precoDaConfig); manual (amount) não tem regra de preço.
+type FreezeExec = { tabelaValorId?: number | null; configId?: number | null; regraId?: number | null; naturezaPreco?: 'CUSTO' | 'VENDA' | null; contexto?: Prisma.InputJsonValue }
+async function criarReceita(pid: number, descricao: string, valor: number, moeda: Moeda, fx: number, honorario: boolean, fz: FreezeExec = {}): Promise<number> {
   const codigo = await gerarCodigoReceita()
   const data1 = new Date()
   const parcelas = gerarParcelas(valor, 1, data1)
@@ -170,13 +187,17 @@ async function criarReceita(pid: number, descricao: string, valor: number, moeda
       categoria: honorario ? CategoriaReceita.HONORARIOS : CategoriaReceita.OUTROS,
       descricao: descricao.slice(0, 300), moeda, valor,
       fxEstimado: fx, fxRule: FxRule.VARIAVEL, nParcelas: 1, data1, periodicidade: 'Mensal', status: ReceitaStatus.ATIVA,
+      origem: 'motor', origemLancamento: 'PROCESSO', naturezaLancamento: 'RECEITA',
+      pricingRuleId: fz.tabelaValorId ?? null, valorUnitario: valor, quantidade: 1, valorTotalCongelado: valor,
+      modoCalculoAplicado: fz.tabelaValorId != null ? 'fixed' : 'manual', naturezaPreco: fz.naturezaPreco ?? 'VENDA',
+      configFinanceiraId: fz.configId ?? null, regraFinanceiraId: fz.regraId ?? null, contextoAplicado: fz.contexto ?? undefined, dataReferencia: data1,
       parcelas: { create: parcelas.map((p) => ({ numero: p.numero, vencimento: p.vencimento, valor: p.valor, status: 'PENDENTE' as const })) },
       eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Receita criada pelo motor: ${descricao}`.slice(0, 500), valor, cambio: fx, valorBrl: valorBrlRef } },
     },
   })
   return rec.id
 }
-async function criarCusto(pid: number, descricao: string, valor: number, moeda: Moeda, fx: number): Promise<number> {
+async function criarCusto(pid: number, descricao: string, valor: number, moeda: Moeda, fx: number, fz: FreezeExec = {}): Promise<number> {
   const codigo = await gerarCodigoCusto()
   const vencimento = new Date()
   const parcelas = gerarParcelas(valor, 1, vencimento)
@@ -186,6 +207,10 @@ async function criarCusto(pid: number, descricao: string, valor: number, moeda: 
       codigo, processoId: pid, tipo: TipoCusto.SERVICO, categoria: CategoriaCusto.OUTROS,
       descricao: descricao.slice(0, 300), moeda, valor,
       fxEstimado: fx, fxRule: FxRule.VARIAVEL, nParcelas: 1, vencimento, custoOperacional: false, status: CustoStatus.ATIVA,
+      origem: 'motor', origemLancamento: 'PROCESSO', naturezaLancamento: 'CUSTO',
+      pricingRuleId: fz.tabelaValorId ?? null, valorUnitario: valor, quantidade: 1, valorTotalCongelado: valor,
+      modoCalculoAplicado: fz.tabelaValorId != null ? 'fixed' : 'manual', naturezaPreco: fz.naturezaPreco ?? 'CUSTO',
+      configFinanceiraId: fz.configId ?? null, regraFinanceiraId: fz.regraId ?? null, contextoAplicado: fz.contexto ?? undefined, dataReferencia: vencimento,
       parcelas: { create: parcelas.map((p) => ({ numero: p.numero, vencimento: p.vencimento, valor: p.valor, status: 'PENDENTE' as const })) },
       eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Custo criado pelo motor: ${descricao}`.slice(0, 500), valor, cambio: fx, valorBrl: valorBrlRef } },
     },
@@ -240,7 +265,7 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
     prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'event', active: true, arquivado: false } }),
     prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'protocol', active: true, arquivado: false } }),
     prisma.phaseTriggerRule.findMany({ where: { phaseKey, arquivado: false } }),
-    prisma.produtoFinanceiro.findMany({ where: { ativo: true }, select: { codigo: true, nome: true, valorPadrao: true, moedaPadrao: true } }),
+    prisma.produtoFinanceiro.findMany({ where: { ativo: true }, select: { id: true, codigo: true, nome: true, valorPadrao: true, moedaPadrao: true } }),
   ])
   const prodByCode = new Map(produtos.map(p => [p.codigo, p]))
   const fxCache = new Map<string, number>()
@@ -283,16 +308,20 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
     if (t.phaseEvent !== event) { skipped.push({ name: t.name, reason: `gatilho não corresponde (dispara em "${t.phaseEvent}")` }); continue }
     if (!t.active) { skipped.push({ name: t.name, reason: 'inativa' }); continue }
     const prod = prodByCode.get(t.itemCode)
-    const valor = prod?.valorPadrao != null ? Number(prod.valorPadrao) : null
     const nome = prod?.nome || t.itemCode
-    if (valor == null) { skipped.push({ name: nome, reason: 'sem valor configurado (defina no Catálogo)' }); continue }
-    const moeda = (prod?.moedaPadrao as Moeda) || 'EUR'
     const isReceita = t.entryType !== 'cost'
+    // §5 — preço vem da Tabela de Preços da Configuração Financeira, nunca do valorPadrao.
+    const preco = await precoDaConfig(t.configItemId ?? prod?.id ?? null, isReceita ? NaturezaPreco.VENDA : NaturezaPreco.CUSTO, processoId, tipoProcessoId)
+    if (!preco) { skipped.push({ name: nome, reason: 'sem Configuração Financeira vinculada — cadastre a Regra de Preço' }); continue }
+    if ('erro' in preco) { skipped.push({ name: nome, reason: `sem preço válido na Tabela de Preços — ${preco.erro}` }); continue }
+    const valor = preco.valor
+    const moeda = preco.moeda
     const condicional = t.requiresContractSigned || t.requiresProposalApproved
     const fx = await fxParaBRL(moeda, fxCache)
     const akey = `${processoId}::${phaseKey}::trigger::${t.id}`
+    const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: t.configItemId ?? prod?.id ?? null, regraId: t.id, naturezaPreco: isReceita ? 'VENDA' : 'CUSTO', contexto: { fonte: 'trigger', triggerId: t.id, phaseKey } }
     await fazer(akey, isReceita ? 'Receita' : 'Custo', 'financial', 'trigger', t.id, nome, { valor, moeda, condicional },
-      async () => (isReceita ? criarReceita(processoId, nome, valor, moeda, fx, false) : criarCusto(processoId, nome, valor, moeda, fx)),
+      async () => (isReceita ? criarReceita(processoId, nome, valor, moeda, fx, false, fz) : criarCusto(processoId, nome, valor, moeda, fx, fz)),
       (id) => created.push({ kind: 'financial', targetTable: isReceita ? 'Receita' : 'Custo', targetId: id, name: nome, amount: valor, currency: moeda, condicional }))
   }
 
@@ -304,16 +333,26 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
     const naoVerificada = cond.decisao === 'nao_verificada'
     const code = pstr(r.params, 'financialItemCode')
     const prod = code ? prodByCode.get(code) : undefined
-    const valor = pnum(r.params, 'amount') ?? (prod?.valorPadrao != null ? Number(prod.valorPadrao) : null)
-    if (valor == null) { skipped.push({ name: r.name, reason: 'sem valor configurado' }); continue }
-    const moeda = toMoeda(pstr(r.params, 'currency'), (prod?.moedaPadrao as Moeda) || 'EUR')
     const honorario = r.financialType === 'honorarium'
     const isReceita = r.financialType === 'revenue' || honorario
+    // `amount` explícito = override manual legítimo. Sem ele, resolve pela Tabela de
+    // Preços da config (§5) — nunca valorPadrao. Sem preço válido → PULA (não lança zero).
+    const amount = pnum(r.params, 'amount')
+    let valor: number | null = amount ?? null
+    let moeda = toMoeda(pstr(r.params, 'currency'), (prod?.moedaPadrao as Moeda) || 'EUR')
+    let tabelaValorId: number | null = null
+    if (valor == null) {
+      const preco = await precoDaConfig(prod?.id ?? null, isReceita ? NaturezaPreco.VENDA : NaturezaPreco.CUSTO, processoId, tipoProcessoId)
+      if (!preco) { skipped.push({ name: r.name, reason: 'sem valor (amount) e sem Configuração Financeira vinculada' }); continue }
+      if ('erro' in preco) { skipped.push({ name: r.name, reason: `sem preço válido na Tabela de Preços — ${preco.erro}` }); continue }
+      valor = preco.valor; moeda = preco.moeda; tabelaValorId = preco.tabelaValorId
+    }
     const fx = await fxParaBRL(moeda, fxCache)
     const akey = `${processoId}::${phaseKey}::automation::${r.id}`
+    const fz: FreezeExec = { tabelaValorId, configId: prod?.id ?? null, regraId: r.id, naturezaPreco: isReceita ? 'VENDA' : 'CUSTO', contexto: { fonte: 'automation', ruleId: r.id, phaseKey, amountOverride: amount != null } }
     await fazer(akey, isReceita ? 'Receita' : 'Custo', 'financial', 'automation', r.id, r.name,
       { valor, moeda, condicional: naoVerificada, ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
-      async () => (isReceita ? criarReceita(processoId, r.name, valor, moeda, fx, honorario) : criarCusto(processoId, r.name, valor, moeda, fx)),
+      async () => (isReceita ? criarReceita(processoId, r.name, valor, moeda, fx, honorario, fz) : criarCusto(processoId, r.name, valor, moeda, fx, fz)),
       (id) => created.push({ kind: 'financial', targetTable: isReceita ? 'Receita' : 'Custo', targetId: id, name: r.name, amount: valor, currency: moeda, condicional: naoVerificada, condicaoNaoVerificada: naoVerificada || undefined }))
   }
 

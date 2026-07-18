@@ -102,8 +102,10 @@ export async function POST(request: NextRequest) {
     // A configuração REFERENCIA um cadastro mestre por FK. Nome e código de negócio
     // são resolvidos do mestre — o cliente NÃO envia código/nome (nada é derivado aqui).
     // UMA config por mestre: custo e receita são VALORES desta config (flags + valores).
-    const possuiCusto = !!b.possuiCusto || parseDecimal(b.valorCustoPadrao) != null
-    const possuiReceita = !!b.possuiReceita || parseDecimal(b.valorReceitaPadrao) != null
+    // PREÇO-FONTE-ÚNICA — Natureza Financeira (estrutural) deriva as flags quando enviada.
+    const natFinReq = typeof b.naturezaFin === 'string' && ['SOMENTE_CUSTO', 'SOMENTE_RECEITA', 'CUSTO_E_RECEITA'].includes(b.naturezaFin) ? b.naturezaFin : undefined
+    const possuiCusto = natFinReq ? natFinReq !== 'SOMENTE_RECEITA' : (!!b.possuiCusto || parseDecimal(b.valorCustoPadrao) != null)
+    const possuiReceita = natFinReq ? natFinReq !== 'SOMENTE_CUSTO' : (!!b.possuiReceita || parseDecimal(b.valorReceitaPadrao) != null)
 
     let origem: string
     let masterFkId: number
@@ -163,6 +165,7 @@ export async function POST(request: NextRequest) {
           // VALORES desta config (papel só em TabelaValor.natureza). FKs diretas ao mestre.
           possuiCusto,
           possuiReceita,
+          naturezaFin: (natFinReq ?? (possuiCusto && possuiReceita ? 'CUSTO_E_RECEITA' : possuiCusto ? 'SOMENTE_CUSTO' : 'SOMENTE_RECEITA')) as never,
           valorCustoPadrao: parseDecimal(b.valorCustoPadrao),
           valorReceitaPadrao: parseDecimal(b.valorReceitaPadrao),
           tipoDocumentoId: b.tipoDocumentoId ? Number(b.tipoDocumentoId) : null,

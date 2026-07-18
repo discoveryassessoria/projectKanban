@@ -126,7 +126,8 @@ export default function TabelaValoresTab() {
     setEditando(i)
     setForm({
       configuracaoFinanceiraItemId: i.configuracaoFinanceiraItemId ? String(i.configuracaoFinanceiraItemId) : '',
-      natureza: i.natureza || '',
+      natureza: i.natureza === 'RECEITA' ? 'VENDA' : (i.natureza || ''), // RECEITA legado ≡ VENDA
+
       processoTipoId: i.processoTipoId || '', modalidadeId: i.modalidadeId ? String(i.modalidadeId) : '',
       fornecedorId: i.fornecedorId ? String(i.fornecedorId) : '', moeda: i.moeda || '',
       valor: i.valor != null ? String(i.valor) : '', modoCalculo: i.modoCalculo || 'fixed',
@@ -140,7 +141,7 @@ export default function TabelaValoresTab() {
 
   async function salvar() {
     if (!form.configuracaoFinanceiraItemId) { setErroModal('Selecione a Configuração Financeira.'); return }
-    if (!form.natureza) { setErroModal('Selecione a natureza do preço (custo ou receita).'); return }
+    if (!form.natureza) { setErroModal('Selecione a natureza do preço (Custo ou Venda).'); return }
     if (form.valor === '' || Number(form.valor) <= 0) { setErroModal('Valor deve ser maior que zero.'); return }
     setSalvando(true); setErroModal(null)
     try {
@@ -201,7 +202,7 @@ export default function TabelaValoresTab() {
                   <tr key={i.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
                     <td className="px-3 py-2.5 font-medium text-white">{om.mestre}</td>
                     <td className="px-3 py-2.5 text-white/60">{om.origem}</td>
-                    <td className="px-3 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${i.natureza === 'CUSTO' ? 'bg-amber-500/15 text-amber-300' : i.natureza === 'RECEITA' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-white/50'}`}>{i.natureza ?? '—'}</span></td>
+                    <td className="px-3 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${i.natureza === 'CUSTO' ? 'bg-amber-500/15 text-amber-300' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-white/50'}`}>{i.natureza === 'CUSTO' ? 'Custo' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'Venda' : '—'}</span></td>
                     <td className="px-3 py-2.5 text-white/70">{proc}{mod ? ` · ${mod}` : ''}</td>
                     <td className="px-3 py-2.5 text-white/70">{i.fornecedor?.nome || '—'}</td>
                     <td className="px-3 py-2.5 text-white/60">{modoLabel(i.modoCalculo)}</td>
@@ -251,12 +252,12 @@ export default function TabelaValoresTab() {
                               configuracaoFinanceiraItemId: String(c.id),
                               moeda: f.moeda || c.moedaPadrao,
                               // natureza padrão quando a config só habilita uma
-                              natureza: c.possuiCusto && !c.possuiReceita ? 'CUSTO' : c.possuiReceita && !c.possuiCusto ? 'RECEITA' : '',
+                              natureza: c.possuiCusto && !c.possuiReceita ? 'CUSTO' : c.possuiReceita && !c.possuiCusto ? 'VENDA' : '',
                             }))
                             setCfgBusca('')
                           }} className="block w-full px-3 py-1.5 text-left text-sm text-white/80 hover:bg-white/10">
                             {c.label}
-                            <span className="text-white/40">{c.possuiCusto ? ' · custo' : ''}{c.possuiReceita ? ' · receita' : ''}</span>
+                            <span className="text-white/40">{c.possuiCusto ? ' · custo' : ''}{c.possuiReceita ? ' · venda' : ''}</span>
                           </button>
                         ))}
                       </div>
@@ -265,23 +266,23 @@ export default function TabelaValoresTab() {
                 )}
               </div>
 
-              {/* Natureza do preço — CUSTO ou RECEITA, dentre as que a config habilita. */}
+              {/* §11 — natureza do PREÇO: Custo ou Venda, dentre as que a config habilita. */}
               <div>
                 <label className="mb-1 block text-xs text-white/60">Natureza do preço *</label>
                 <div className="flex gap-2">
-                  {(['CUSTO', 'RECEITA'] as const).map((nat) => {
+                  {(['CUSTO', 'VENDA'] as const).map((nat) => {
                     const habilitada = !cfgSelecionada || (nat === 'CUSTO' ? cfgSelecionada.possuiCusto : cfgSelecionada.possuiReceita)
                     const ativo = form.natureza === nat
                     return (
                       <button key={nat} type="button" disabled={!habilitada} onClick={() => set('natureza', nat)}
                         className={`flex-1 rounded-lg border px-3 py-2 text-sm transition ${ativo ? (nat === 'CUSTO' ? 'border-amber-400/40 bg-amber-500/15 text-amber-200' : 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200') : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'} ${habilitada ? '' : 'cursor-not-allowed opacity-40'}`}>
-                        {nat === 'CUSTO' ? 'Custo' : 'Receita'}
+                        {nat === 'CUSTO' ? 'Preço de Custo' : 'Preço de Venda'}
                       </button>
                     )
                   })}
                 </div>
                 {cfgSelecionada && !cfgSelecionada.possuiCusto && !cfgSelecionada.possuiReceita && (
-                  <p className="mt-1 text-[11px] text-amber-300/80">Esta configuração não habilita custo nem receita. Ajuste-a em Configurações Financeiras.</p>
+                  <p className="mt-1 text-[11px] text-amber-300/80">Esta configuração não habilita custo nem venda. Ajuste a Natureza Financeira em Configurações Financeiras.</p>
                 )}
               </div>
 
