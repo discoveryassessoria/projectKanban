@@ -72,8 +72,13 @@ const fmtMoeda = (v: any, moeda: string) => {
 
 const EMPTY = {
   categoria: '', // filtro de navegação (origem estrutural) — NÃO enviado no payload
-  configuracaoFinanceiraItemId: '', natureza: '', fornecedorId: '',
-  moeda: '', valor: '', modoCalculo: 'fixed', unidade: '', quantidadeMinima: '', quantidadeMaxima: '',
+  configuracaoFinanceiraItemId: '',
+  // Naturezas do domínio (apenas duas). Cada uma marcada = 1 registro; ambas = 2 registros.
+  precoCusto: false, precoVenda: false,
+  // Custo: fornecedor + moeda + valor. Venda: moeda + valor (registros independentes).
+  fornecedorId: '', moeda: '', valor: '',
+  moedaVenda: '', valorVenda: '',
+  modoCalculo: 'fixed', unidade: '', quantidadeMinima: '', quantidadeMaxima: '',
   vigenciaInicio: '', vigenciaFim: '', prioridade: '0', arquivado: false,
 }
 type FormState = typeof EMPTY
@@ -136,12 +141,18 @@ export default function TabelaValoresTab() {
     setEditando(i)
     // Categoria derivada da ORIGEM estrutural da config vinculada (nunca por texto).
     const categoria = configs.find((c) => c.id === i.configuracaoFinanceiraItemId)?.origem ?? ''
+    // Edição é sempre de UM registro individual: exatamente uma natureza (RECEITA legado ≡ VENDA).
+    const ehVenda = i.natureza === 'VENDA' || i.natureza === 'RECEITA'
+    const valorStr = i.valor != null ? String(i.valor) : ''
     setForm({
       categoria,
       configuracaoFinanceiraItemId: i.configuracaoFinanceiraItemId ? String(i.configuracaoFinanceiraItemId) : '',
-      natureza: i.natureza === 'RECEITA' ? 'VENDA' : (i.natureza || ''), // RECEITA legado ≡ VENDA
-      fornecedorId: i.fornecedorId ? String(i.fornecedorId) : '', moeda: i.moeda || '',
-      valor: i.valor != null ? String(i.valor) : '', modoCalculo: i.modoCalculo || 'fixed',
+      precoCusto: i.natureza === 'CUSTO', precoVenda: ehVenda,
+      // Custo usa fornecedor/moeda/valor; Venda usa moedaVenda/valorVenda.
+      fornecedorId: i.fornecedorId ? String(i.fornecedorId) : '',
+      moeda: ehVenda ? '' : (i.moeda || ''), valor: ehVenda ? '' : valorStr,
+      moedaVenda: ehVenda ? (i.moeda || '') : '', valorVenda: ehVenda ? valorStr : '',
+      modoCalculo: i.modoCalculo || 'fixed',
       unidade: i.unidade || '', quantidadeMinima: i.quantidadeMinima != null ? String(i.quantidadeMinima) : '',
       quantidadeMaxima: i.quantidadeMaxima != null ? String(i.quantidadeMaxima) : '',
       vigenciaInicio: i.vigenciaInicio || '', vigenciaFim: i.vigenciaFim || '',
@@ -153,18 +164,32 @@ export default function TabelaValoresTab() {
   async function salvar() {
     if (!form.categoria) { setErroModal('Selecione a categoria.'); return }
     if (!form.configuracaoFinanceiraItemId) { setErroModal('Selecione o item.'); return }
-    if (!form.natureza) { setErroModal('Selecione a natureza do preço (Custo ou Venda).'); return }
-    if (form.valor === '' || Number(form.valor) <= 0) { setErroModal('Valor deve ser maior que zero.'); return }
+    if (!form.precoCusto && !form.precoVenda) { setErroModal('Marque pelo menos uma natureza: Preço de Custo e/ou Preço de Venda.'); return }
+    if (form.precoCusto) {
+      if (!form.moeda) { setErroModal('Selecione a moeda do custo.'); return }
+      if (form.valor === '' || Number(form.valor) <= 0) { setErroModal('Valor de custo deve ser maior que zero.'); return }
+    }
+    if (form.precoVenda) {
+      if (!form.moedaVenda) { setErroModal('Selecione a moeda da venda.'); return }
+      if (form.valorVenda === '' || Number(form.valorVenda) <= 0) { setErroModal('Valor de venda deve ser maior que zero.'); return }
+    }
     setSalvando(true); setErroModal(null)
     try {
-      // `categoria` é só navegação da UI — NÃO vai no payload (origem já vem da própria config).
-      const { categoria: _categoria, ...rest } = form
+      // `categoria` e os campos por-natureza são só da UI: enviamos os parâmetros
+      // COMPARTILHADOS + o(s) registro(s) em `linhas`. Sem "AMBOS" — só CUSTO/VENDA.
+      const { categoria: _c, precoCusto: _pc, precoVenda: _pv, moeda: _m, valor: _v, fornecedorId: _f, moedaVenda: _mv, valorVenda: _vv, ...compartilhados } = form
+      const linhas: Array<{ natureza: string; moeda: string; valor: number; fornecedorId: number | null }> = []
+      if (form.precoCusto) linhas.push({ natureza: 'CUSTO', moeda: form.moeda, valor: Number(form.valor), fornecedorId: form.fornecedorId ? Number(form.fornecedorId) : null })
+      // Venda NÃO leva fornecedor (sem justificativa estrutural para vinculá-lo à venda).
+      if (form.precoVenda) linhas.push({ natureza: 'VENDA', moeda: form.moedaVenda, valor: Number(form.valorVenda), fornecedorId: null })
       const body = JSON.stringify({
-        ...rest,
+        ...compartilhados,
         configuracaoFinanceiraItemId: Number(form.configuracaoFinanceiraItemId),
-        fornecedorId: form.fornecedorId || null,
-        valor: Number(form.valor),
         prioridade: Number(form.prioridade) || 0,
+        // Edição = UM registro individual (uma natureza); criação = 1 ou 2 linhas.
+        ...(editando
+          ? { natureza: linhas[0].natureza, moeda: linhas[0].moeda, valor: linhas[0].valor, fornecedorId: linhas[0].fornecedorId }
+          : { linhas }),
       })
       if (editando) await jsonFetch(`/api/gerenciamento/tabela-valores/${editando.id}`, { method: 'PUT', body })
       else await jsonFetch('/api/gerenciamento/tabela-valores', { method: 'POST', body })
@@ -266,8 +291,11 @@ export default function TabelaValoresTab() {
                         ...f,
                         configuracaoFinanceiraItemId: id,
                         moeda: f.moeda || (c?.moedaPadrao ?? ''),
-                        // natureza padrão quando a config só habilita uma; ambas → exige escolha
-                        natureza: c ? (c.possuiCusto && !c.possuiReceita ? 'CUSTO' : c.possuiReceita && !c.possuiCusto ? 'VENDA' : '') : f.natureza,
+                        moedaVenda: f.moedaVenda || (c?.moedaPadrao ?? ''),
+                        // marca por padrão as naturezas que a config habilita quando só uma;
+                        // ambas habilitadas → deixa o usuário escolher os checkboxes.
+                        precoCusto: c ? (c.possuiCusto && !c.possuiReceita) : f.precoCusto,
+                        precoVenda: c ? (c.possuiReceita && !c.possuiCusto) : f.precoVenda,
                       }))
                     }}
                     className={inputCls + ((!form.categoria || editando) ? ' cursor-not-allowed opacity-60' : '')}
@@ -285,53 +313,84 @@ export default function TabelaValoresTab() {
                 </div>
               </div>
 
-              {/* §11 — natureza do PREÇO: Custo ou Venda, dentre as que a config habilita. */}
+              {/* Naturezas do preço — DUAS independentes (não existe "AMBOS"). Marcar as duas
+                  apenas cria dois registros (CUSTO e VENDA) na mesma transação atômica. */}
               <div>
                 <label className="mb-1 block text-xs text-white/60">Natureza do preço *</label>
-                <div className="flex gap-2">
-                  {(['CUSTO', 'VENDA'] as const).map((nat) => {
-                    const habilitada = !cfgSelecionada || (nat === 'CUSTO' ? cfgSelecionada.possuiCusto : cfgSelecionada.possuiReceita)
-                    const ativo = form.natureza === nat
-                    return (
-                      <button key={nat} type="button" disabled={!habilitada} onClick={() => set('natureza', nat)}
-                        className={`flex-1 rounded-lg border px-3 py-2 text-sm transition ${ativo ? (nat === 'CUSTO' ? 'border-amber-400/40 bg-amber-500/15 text-amber-200' : 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200') : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'} ${habilitada ? '' : 'cursor-not-allowed opacity-40'}`}>
-                        {nat === 'CUSTO' ? 'Preço de Custo' : 'Preço de Venda'}
-                      </button>
-                    )
-                  })}
+                <div className="flex flex-wrap gap-x-6 gap-y-2">
+                  <label className={`flex items-center gap-2 text-sm ${(!cfgSelecionada || editando || (cfgSelecionada && !cfgSelecionada.possuiCusto)) ? 'cursor-not-allowed text-white/30' : 'text-white/80'}`}>
+                    <input type="checkbox" checked={form.precoCusto}
+                      disabled={!cfgSelecionada || !!editando || (!!cfgSelecionada && !cfgSelecionada.possuiCusto)}
+                      onChange={(e) => set('precoCusto', e.target.checked)} className="h-4 w-4 accent-amber-500" />
+                    Preço de Custo
+                  </label>
+                  <label className={`flex items-center gap-2 text-sm ${(!cfgSelecionada || editando || (cfgSelecionada && !cfgSelecionada.possuiReceita)) ? 'cursor-not-allowed text-white/30' : 'text-white/80'}`}>
+                    <input type="checkbox" checked={form.precoVenda}
+                      disabled={!cfgSelecionada || !!editando || (!!cfgSelecionada && !cfgSelecionada.possuiReceita)}
+                      onChange={(e) => set('precoVenda', e.target.checked)} className="h-4 w-4 accent-emerald-500" />
+                    Preço de Venda
+                  </label>
                 </div>
+                {!cfgSelecionada && <p className="mt-1 text-[11px] text-white/40">Selecione um item para escolher as naturezas.</p>}
                 {cfgSelecionada && !cfgSelecionada.possuiCusto && !cfgSelecionada.possuiReceita && (
                   <p className="mt-1 text-[11px] text-amber-300/80">Esta configuração não habilita custo nem venda. Ajuste a Natureza Financeira em Configurações Financeiras.</p>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs text-white/60">Fornecedor</label>
-                  <select value={form.fornecedorId} onChange={(e) => set('fornecedorId', e.target.value)} className={inputCls}>
-                    <option value="" className="bg-zinc-900">— Nenhum —</option>
-                    {fornecedores.map((f) => <option key={f.id} value={f.id} className="bg-zinc-900">{f.nome}</option>)}
-                  </select>
+              {/* Bloco PREÇO DE CUSTO — Fornecedor + Moeda + Valor */}
+              {form.precoCusto && (
+                <div className="rounded-lg border border-amber-400/20 bg-amber-500/[0.04] p-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-300/80">Preço de Custo</div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="mb-1 block text-xs text-white/60">Fornecedor</label>
+                      <select value={form.fornecedorId} onChange={(e) => set('fornecedorId', e.target.value)} className={inputCls}>
+                        <option value="" className="bg-zinc-900">— Nenhum —</option>
+                        {fornecedores.map((f) => <option key={f.id} value={f.id} className="bg-zinc-900">{f.nome}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-white/60">Moeda do custo *</label>
+                      <select value={form.moeda} onChange={(e) => set('moeda', e.target.value)} className={inputCls}>
+                        <option value="" className="bg-zinc-900">—</option>
+                        {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-white/60">Valor do custo *</label>
+                      <input type="number" min="0" step="0.01" value={form.valor} onChange={(e) => set('valor', e.target.value)} placeholder="0,00" className={inputCls} />
+                    </div>
+                  </div>
                 </div>
+              )}
+
+              {/* Bloco PREÇO DE VENDA — Moeda + Valor (sem fornecedor) */}
+              {form.precoVenda && (
+                <div className="rounded-lg border border-emerald-400/20 bg-emerald-500/[0.04] p-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-300/80">Preço de Venda</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1 block text-xs text-white/60">Moeda da venda *</label>
+                      <select value={form.moedaVenda} onChange={(e) => set('moedaVenda', e.target.value)} className={inputCls}>
+                        <option value="" className="bg-zinc-900">—</option>
+                        {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-white/60">Valor da venda *</label>
+                      <input type="number" min="0" step="0.01" value={form.valorVenda} onChange={(e) => set('valorVenda', e.target.value)} placeholder="0,00" className={inputCls} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Parâmetros COMPARTILHADOS (uma vez só) */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs text-white/60">Modo de cálculo *</label>
                   <select value={form.modoCalculo} onChange={(e) => set('modoCalculo', e.target.value)} className={inputCls}>
                     {MODOS_CALCULO.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs text-white/60">Moeda *</label>
-                  <select value={form.moeda} onChange={(e) => set('moeda', e.target.value)} className={inputCls}>
-                    <option value="" className="bg-zinc-900">—</option>
-                    {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-white/60">Valor *</label>
-                  <input type="number" step="0.01" value={form.valor} onChange={(e) => set('valor', e.target.value)} placeholder="0,00" className={inputCls} />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-white/60">Unidade</label>
