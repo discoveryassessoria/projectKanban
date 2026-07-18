@@ -186,9 +186,9 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(20, "pricingtable", "Tabelas de Preços", ["preco", "preço", "tabela", "valor"], "Precificação"),
       a(40, "discrules", "Regras de Precificação", ["preco", "preço", "regra", "desconto", "economica"], "Precificação"),
       a(30, "pricing", "Aplicabilidade Econômica", ["preco", "preço", "aplicabilidade", "economica"], "Precificação"),
-      // Vitrine financeira do MESMO motor de eventos/efeitos do Workflow: as regras
-      // que geram receita/custo ao entrar numa fase moram aqui (não em Automações).
-      a(45, "phasemap", "Regras Financeiras por Fase", ["regra", "fase", "financeiro", "gatilho", "disparo", "receita", "custo"], "Regras por fase"),
+      // LEGADO DESCONTINUADO: "Regras Financeiras por Fase" (PhaseTriggerRule, item por
+      // código) saiu do menu — automações financeiras vivem em "Automações por Fase →
+      // Financeiro" (vínculo por Configuração Financeira + preço da Tabela de Preços).
       a(90, "accounts", "Contas Bancárias", ["conta", "banco", "bancaria"], "Bancos e moedas"),
       a(100, "banks", "Bancos", ["banco"], "Bancos e moedas"),
       a(110, "wallets", "Carteiras de Recebimento", ["carteira", "recebimento"], "Bancos e moedas"),

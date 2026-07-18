@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
-import { validarConfigGeraLancamento } from '@/lib/financeiro/regra-financeira-validacao'
 
-const PHASE_LABELS: Record<string, string> = {
-  genealogia: 'Genealogia', emissao_documental: 'Emissão Documental', analise_documental: 'Análise Documental',
-  retificacao: 'Retificação', emissao_documental_retificada: 'Emissão Documental Retificada', traducao: 'Tradução',
-  apostilamento: 'Apostilamento', aguardando_protocolo: 'Aguardando Protocolo', protocolado: 'Protocolado', finalizado: 'Finalizado',
-}
-
-// GET — regras de disparo + catálogo financeiro (dropdown)
+// GET — regras de disparo (LEGADO, somente leitura para histórico) + catálogo
 export async function GET(request: NextRequest) {
   const erro = await verificarPermissao(request, 'usuarios.gerenciar')
   if (erro) return erro
@@ -30,40 +23,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST — cria regra de disparo
+// POST — DESCONTINUADO. Regras de Disparo (item por CÓDIGO) foram substituídas por
+// automações financeiras (PhaseAutomationRule) com vínculo estrutural (configItemId) e
+// preço da Tabela de Preços. Não se cria mais nesse formato.
 export async function POST(request: NextRequest) {
   const erro = await verificarPermissao(request, 'usuarios.gerenciar')
   if (erro) return erro
-
-  try {
-    const body = await request.json()
-    const itemCode = String(body.itemCode || '')
-    const phaseKey = String(body.phaseKey || '')
-    if (!itemCode) return NextResponse.json({ error: 'Escolha o item financeiro.' }, { status: 400 })
-    if (!phaseKey) return NextResponse.json({ error: 'Escolha a fase.' }, { status: 400 })
-
-    const produto = await prisma.produtoFinanceiro.findFirst({ where: { codigo: itemCode } })
-    const name = `${produto?.nome || itemCode} · ${PHASE_LABELS[phaseKey] || phaseKey}`
-
-    // §3 — entryType (cost/revenue) → lançamento CUSTO/RECEITA deve ser compatível com a config.
-    const entryType = body.entryType || 'revenue'
-    const valNat = await validarConfigGeraLancamento(produto?.id ?? null, entryType === 'cost' ? 'CUSTO' : 'RECEITA')
-    if (!valNat.ok) return NextResponse.json({ error: valNat.motivo }, { status: 400 })
-
-    const trigger = await prisma.phaseTriggerRule.create({
-      data: {
-        itemCode, financialItemId: produto?.id ?? null, configItemId: produto?.id ?? null, name, phaseKey,
-        phaseEvent: body.phaseEvent || 'entered',
-        entryType,
-        automatic: body.automatic !== false,
-        requiresContractSigned: !!body.requiresContractSigned,
-        requiresProposalApproved: !!body.requiresProposalApproved,
-        allowRepeat: !!body.allowRepeat,
-      },
-    })
-    return NextResponse.json({ trigger }, { status: 201 })
-  } catch (e) {
-    console.error('POST disparo-fase', e)
-    return NextResponse.json({ error: 'Erro ao criar a regra de disparo.' }, { status: 500 })
-  }
+  return NextResponse.json({ error: 'Regras de Disparo (formato legado por código) foram descontinuadas. Crie uma automação financeira em "Automações por Fase → Financeiro" selecionando a Configuração Financeira — o preço vem da Tabela de Preços.', code: 'DISPARO_LEGADO_DESCONTINUADO' }, { status: 410 })
 }

@@ -72,10 +72,6 @@ function mapPrio(v: string | null): PrioridadeTarefa {
     default: return 'MEDIA'
   }
 }
-function toMoeda(s: string | null, fallback: Moeda): Moeda {
-  if (s === 'BRL' || s === 'EUR' || s === 'USD') return s
-  return fallback
-}
 function toTipoEvento(s: string | null): TipoEvento {
   const up = (s || '').toUpperCase()
   const ok: TipoEvento[] = ['CONSULADO', 'CARTORIO', 'REUNIAO', 'PRAZO', 'AUDIENCIA', 'ENTREGA_DOCUMENTO', 'OUTRO']
@@ -260,15 +256,13 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
   // kind=task existentes só para REPORTá-las como neutralizadas (transparência na
   // simulação/histórico) — mas nenhuma Tarefa é criada aqui. Efeitos adicionais
   // (financeiro/evento/protocolo/trigger) seguem funcionando.
-  const [taskRules, finAutoRules, eventRules, protocolRules, triggerRules, produtos] = await Promise.all([
+  const [taskRules, finAutoRules, eventRules, protocolRules, triggerRules] = await Promise.all([
     prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'task', active: true, arquivado: false } }),
     prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'financial', active: true, arquivado: false } }),
     prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'event', active: true, arquivado: false } }),
     prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'protocol', active: true, arquivado: false } }),
     prisma.phaseTriggerRule.findMany({ where: { phaseKey, arquivado: false } }),
-    prisma.produtoFinanceiro.findMany({ where: { ativo: true }, select: { id: true, codigo: true, nome: true, valorPadrao: true, moedaPadrao: true } }),
   ])
-  const prodByCode = new Map(produtos.map(p => [p.codigo, p]))
   const fxCache = new Map<string, number>()
 
   const created: CreatedItem[] = []
@@ -303,27 +297,11 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
     skipped.push({ name: rule.name, reason: 'automação de tarefa NEUTRALIZADA — tarefas obrigatórias da fase são exclusivas do Workflow Interno' })
   }
 
-  // FINANCEIRO — Regras de Disparo (PhaseTriggerRule) — sem conditions Json;
-  // usa os flags requiresContractSigned/requiresProposalApproved (marca condicional).
+  // FINANCEIRO LEGADO — Regras de Disparo (PhaseTriggerRule, item por CÓDIGO) foram
+  // DESCONTINUADAS: substituídas por automações financeiras (PhaseAutomationRule) com
+  // vínculo estrutural (configItemId) + preço da Tabela de Preços. Não executam mais.
   for (const t of triggerRules) {
-    if (t.phaseEvent !== event) { skipped.push({ name: t.name, reason: `gatilho não corresponde (dispara em "${t.phaseEvent}")` }); continue }
-    if (!t.active) { skipped.push({ name: t.name, reason: 'inativa' }); continue }
-    const prod = prodByCode.get(t.itemCode)
-    const nome = prod?.nome || t.itemCode
-    const isReceita = t.entryType !== 'cost'
-    // §5 — preço vem da Tabela de Preços da Configuração Financeira, nunca do valorPadrao.
-    const preco = await precoDaConfig(t.configItemId ?? prod?.id ?? null, isReceita ? NaturezaPreco.VENDA : NaturezaPreco.CUSTO, processoId, tipoProcessoId)
-    if (!preco) { skipped.push({ name: nome, reason: 'sem Configuração Financeira vinculada — cadastre a Regra de Preço' }); continue }
-    if ('erro' in preco) { skipped.push({ name: nome, reason: `sem preço válido na Tabela de Preços — ${preco.erro}` }); continue }
-    const valor = preco.valor
-    const moeda = preco.moeda
-    const condicional = t.requiresContractSigned || t.requiresProposalApproved
-    const fx = await fxParaBRL(moeda, fxCache)
-    const akey = `${processoId}::${phaseKey}::trigger::${t.id}`
-    const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: t.configItemId ?? prod?.id ?? null, regraId: t.id, naturezaPreco: isReceita ? 'VENDA' : 'CUSTO', contexto: { fonte: 'trigger', triggerId: t.id, phaseKey } }
-    await fazer(akey, isReceita ? 'Receita' : 'Custo', 'financial', 'trigger', t.id, nome, { valor, moeda, condicional },
-      async () => (isReceita ? criarReceita(processoId, nome, valor, moeda, fx, false, fz) : criarCusto(processoId, nome, valor, moeda, fx, fz)),
-      (id) => created.push({ kind: 'financial', targetTable: isReceita ? 'Receita' : 'Custo', targetId: id, name: nome, amount: valor, currency: moeda, condicional }))
+    skipped.push({ name: t.name, reason: 'Regra de Disparo (formato legado por código) descontinuada — use automação financeira com Configuração Financeira.' })
   }
 
   // FINANCEIRO — Automações kind=financial
