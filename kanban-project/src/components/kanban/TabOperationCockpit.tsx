@@ -69,6 +69,11 @@ interface Props {
   onAbrirCentralDaEtapa: (stepId: number) => void     // abre o editor inline da etapa (na aba Workflow)
   usuarios?: Array<{ id: number; nome: string }>       // p/ delegar o responsável do passo ativo
   onAtribuir?: (stepId: number, responsavelId: number | null) => void | Promise<void>
+  // Estado CONFIRMADO pela projeção operacional (fonte única). O empty-state "sem operação"
+  // só é renderizado quando o Drawer já resolveu NOT_MATERIALIZED — nunca durante o LOADING.
+  notMaterialized?: boolean
+  canStart?: boolean
+  nextActionLabel?: string | null
 }
 
 // ============================================================
@@ -169,6 +174,8 @@ export function TabOperationCockpit({
   onAbrirCentralDaEtapa,
   usuarios,
   onAtribuir,
+  canStart = false,
+  nextActionLabel = null,
 }: Props) {
   if (!doc || !documentoId) {
     return (
@@ -179,24 +186,33 @@ export function TabOperationCockpit({
   }
 
   // ============================================================
-  // 1) EMPTY STATE: sem workflow
+  // 1) EMPTY STATE: operação NÃO materializada (estado CONFIRMADO pela projeção).
+  //    Nunca renderizado durante LOADING (o Drawer mostra skeleton). O botão de início
+  //    só aparece quando canStart e usa a AÇÃO INICIAL do Workflow Interno (nextActionLabel),
+  //    nunca uma escolha da UI (buscar/solicitar/…).
   // ============================================================
   if (!workflow) {
     return (
       <div className="p-5 space-y-4">
         <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-center">
           <Play className="w-8 h-8 text-white/30 mx-auto mb-3" />
-          <h4 className="text-sm font-bold text-white mb-1">Sem operação ativa</h4>
+          <h4 className="text-sm font-bold text-white mb-1">
+            {canStart ? "Operação não iniciada" : "Sem operação nesta fase"}
+          </h4>
           <p className="text-[12px] text-white/50 mb-4">
-            Este documento ainda não tem fluxo iniciado.
+            {canStart
+              ? "Este documento ainda não tem operação materializada na fase atual."
+              : "Este documento não é operado por workflow de documento na fase atual."}
           </p>
-          <button
-            onClick={onAbrirIniciar}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-md transition-colors"
-          >
-            <Play className="w-4 h-4" />
-            Iniciar operação
-          </button>
+          {canStart && (
+            <button
+              onClick={onAbrirIniciar}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-md transition-colors"
+            >
+              <Play className="w-4 h-4" />
+              {nextActionLabel ? `Iniciar: ${nextActionLabel}` : "Iniciar operação"}
+            </button>
+          )}
         </div>
 
         <ShortcutsBlock doc={doc} workflow={null} onTrocarAba={onTrocarAba} />
