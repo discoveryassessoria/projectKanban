@@ -28,6 +28,7 @@ import { captureOperationalSnapshot } from "@/src/lib/motor/historical-operation
 import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import { resolveOperationalProjection } from "@/src/lib/process-stage/operational-projection"
 import type { OperationalProjection } from "@/src/lib/motor/operational-projection-core"
+import { buildCentralOperacionalPayload } from "@/src/app/api/processos/[processoId]/central-operacional/route"
 import {
   type AdvanceOperacao,
   type AdvanceFailureCode,
@@ -179,6 +180,8 @@ interface Plano {
   // Projeção operacional OFICIAL da fase de ORIGEM (capturada ANTES da conclusão, pelo
   // MESMO resolver do OPERATE) para persistir no snapshot imutável. Só nas conclusões.
   projecaoOrigem?: OperationalProjection | null
+  // Payload COMPLETO da Central da fase de origem (mesma lógica do GET) para o snapshot.
+  centralPayload?: unknown | null
 }
 
 async function executarPlano(p: Plano): Promise<AdvanceResult> {
@@ -231,6 +234,7 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
                 ciclo: atual.ciclo,
                 capturedAt: new Date().toISOString(),
                 officialProjection: p.projecaoOrigem ?? null,
+                central: p.centralPayload ?? null,
               })
             } catch (e) {
               console.error("[phase-advance] captura de snapshot falhou (não fatal):", e)
@@ -469,9 +473,10 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
     }
   }
 
-  // Projeção operacional OFICIAL da fase de origem, ANTES de concluir (mesmo resolver do
-  // OPERATE). Leitura fora da transação; não fatal (snapshot é best-effort).
+  // Projeção + payload COMPLETO da Central da fase de origem, ANTES de concluir (MESMO
+  // resolver/lógica do OPERATE). Leitura fora da transação; não fatal (snapshot best-effort).
   const projecaoOrigem = await resolveOperationalProjection(processoId).catch(() => null)
+  const centralPayload = await buildCentralOperacionalPayload(processoId).then((r) => (r.ok ? r.data : null)).catch(() => null)
 
   return executarPlano({
     operacao: "AVANCAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
@@ -479,7 +484,7 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
     encerramento: "CONCLUIR", eventoFaseTipo: "FASE_AVANCADA", correlationId,
     causationId: ctx.causationId ?? null, solicitadoPorId: ctx.solicitadoPorId, forcado: false,
     origemLog: ctx.origem ?? "advance", regrasAvaliadas: snap.regrasAvaliadas,
-    pendencias: snap.pendencias, warnings: snap.warnings, projecaoOrigem,
+    pendencias: snap.pendencias, warnings: snap.warnings, projecaoOrigem, centralPayload,
   })
 }
 
@@ -505,6 +510,7 @@ export async function forceAdvance(processoId: number, input: ForceInput): Promi
   // pendências são apenas SNAPSHOT para auditoria (ignoradas no forçado)
   const snap = await snapshotPendencias(processoId, c.processo.faseAtual, correlationId)
   const projecaoOrigem = await resolveOperationalProjection(processoId).catch(() => null)
+  const centralPayload = await buildCentralOperacionalPayload(processoId).then((r) => (r.ok ? r.data : null)).catch(() => null)
 
   return executarPlano({
     operacao: "FORCAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
@@ -513,7 +519,7 @@ export async function forceAdvance(processoId: number, input: ForceInput): Promi
     causationId: input.causationId ?? null, solicitadoPorId: input.solicitadoPorId, forcado: true,
     justificativa: input.justificativa, motivoCodigo: input.motivoCodigo,
     origemLog: input.origem ?? "force", regrasAvaliadas: snap.regrasAvaliadas,
-    pendencias: snap.pendencias, warnings: snap.warnings, projecaoOrigem,
+    pendencias: snap.pendencias, warnings: snap.warnings, projecaoOrigem, centralPayload,
   })
 }
 

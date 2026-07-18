@@ -222,6 +222,32 @@ export async function GET(
     const userIdParam = searchParams.get("userId")
     const userId = userIdParam ? parseInt(userIdParam) : null
 
+    const built = await buildCentralOperacionalPayload(id, { queueFilter, sortBy, userId })
+    if (!built.ok) return NextResponse.json({ error: built.error }, { status: built.status })
+    return NextResponse.json(built.data)
+  } catch (error) {
+    console.error("[GET /api/processos/[processoId]/central-operacional]", error)
+    return NextResponse.json({ error: "Erro ao buscar Central Operacional" }, { status: 500 })
+  }
+}
+
+export type CentralPayloadResult =
+  | { ok: true; data: CentralOperacionalResponse }
+  | { ok: false; status: number; error: string }
+
+/**
+ * Monta o payload da Central Operacional (EXATAMENTE a mesma lógica do GET). Reutilizado
+ * pela captura do snapshot histórico — a Central em modo VIEW consome este mesmo payload,
+ * garantindo tela idêntica ao OPERATE (sem contrato/resolver paralelo).
+ */
+export async function buildCentralOperacionalPayload(
+  id: number,
+  opts: { queueFilter?: QueueId; sortBy?: "priority" | "sla" | "lineage"; userId?: number | null } = {},
+): Promise<CentralPayloadResult> {
+  const queueFilter = opts.queueFilter ?? "all"
+  const sortBy = opts.sortBy ?? "priority"
+  const userId = opts.userId ?? null
+
     // ============================================================
     // 1) Carrega processo e pessoas da árvore
     // ============================================================
@@ -231,7 +257,7 @@ export async function GET(
     })
 
     if (!processo) {
-      return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
+      return { ok: false, status: 404, error: "Processo não encontrado" }
     }
 
     const faseAtualCode =
@@ -741,12 +767,5 @@ export async function GET(
       schemaCapabilities,
     }
 
-    return NextResponse.json(response)
-  } catch (error) {
-    console.error("[GET /api/processos/[processoId]/central-operacional]", error)
-    return NextResponse.json(
-      { error: "Erro ao buscar Central Operacional" },
-      { status: 500 }
-    )
-  }
+    return { ok: true, data: response }
 }

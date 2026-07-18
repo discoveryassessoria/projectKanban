@@ -67,6 +67,10 @@ export interface HistoricalOperationalProjection {
   // de progresso/estado/próxima-ação/métricas. null quando o resolver falhou na captura
   // (não fatal — o snapshot ainda guarda os fatos materializados abaixo).
   officialProjection: OperationalProjection | null
+  // Payload COMPLETO da Central (matrix/cards/queue/faseProgress/…) — EXATAMENTE o que a
+  // rota central-operacional retorna. A Central em VIEW desserializa e renderiza os MESMOS
+  // componentes do OPERATE a partir daqui. null se a captura falhou (best-effort).
+  central: unknown | null
   metrics: { percentage: number; completedWeight: number; totalWeight: number }
   workflow: { steps: HistoricalWorkflowStep[] }
   documents: HistoricalDocRef[]
@@ -111,6 +115,7 @@ export function buildOperationalSnapshot(input: {
   capturedAt: string
   steps: StepForSnapshot[]
   officialProjection?: OperationalProjection | null
+  central?: unknown | null
 }): HistoricalOperationalProjection {
   const steps: HistoricalWorkflowStep[] = input.steps.map((s) => ({
     id: s.id,
@@ -149,6 +154,7 @@ export function buildOperationalSnapshot(input: {
     ciclo: input.ciclo,
     capturedAt: input.capturedAt,
     officialProjection: input.officialProjection ?? null,
+    central: input.central ?? null,
     metrics: { percentage, completedWeight, totalWeight },
     workflow: { steps },
     documents,
@@ -174,6 +180,7 @@ export async function captureOperationalSnapshot(
   args: {
     instanceId: number; faseCode: string | null; faseMacroKey: string; ciclo: number; capturedAt: string
     officialProjection?: OperationalProjection | null
+    central?: unknown | null
   },
 ): Promise<boolean> {
   const inst = await db.phaseWorkflowInstance.findUnique({
@@ -200,6 +207,7 @@ export async function captureOperationalSnapshot(
     capturedAt: args.capturedAt,
     steps: inst.steps,
     officialProjection: args.officialProjection ?? null,
+    central: args.central ?? null,
   })
 
   await db.phaseWorkflowInstance.update({
