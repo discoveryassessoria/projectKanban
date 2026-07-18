@@ -12,6 +12,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
+import { executarFinanceirasNaFaseV2 } from "@/src/lib/motor/executor"
 
 const MAX_TENTATIVAS = 5
 
@@ -42,6 +43,17 @@ async function aplicarPhaseEntered(payload: PhaseEnteredPayload, correlationId: 
       stepInstanceId: step.id, correlationId: correlationId ?? undefined, origem: "outbox_dispatcher",
     })
     if (g.success && g.created) criadas++
+  }
+
+  // EFEITO ADICIONAL — automações FINANCEIRAS da fase (fluxo novo): o preço vem da
+  // Tabela de Preços e o lançamento cai no Financeiro do Processo. Idempotente
+  // (MotorArtefato). Isolado: uma falha aqui não impede a convergência das tarefas.
+  if (payload.processId && payload.newPhaseKey) {
+    try {
+      await executarFinanceirasNaFaseV2(payload.processId, payload.newPhaseKey)
+    } catch (e) {
+      console.error("[outbox] automações financeiras da fase falharam (tarefas seguem):", e)
+    }
   }
   return criadas
 }

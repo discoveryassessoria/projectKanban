@@ -446,3 +446,68 @@ export async function dispararMotorNaFaseAtual(processoId: number): Promise<void
     console.error('[motor] disparo automático falhou (a fase mudou normalmente):', e)
   }
 }
+
+// ============================================================
+// V2 — automações FINANCEIRAS na entrada da fase (chamado pela outbox phase.entered).
+// Processos V2 não passam pelo motor clássico; este é o ponto de execução das
+// automações financeiras (fluxo NOVO: configItemId + aplicacaoFinanceira). Roda SÓ
+// financeiro (tarefas são do Workflow Interno). Preço vem da Tabela de Preços;
+// idempotência via MotorArtefato (automaticKey @unique). Reprocessável (não duplica).
+// ============================================================
+export async function executarFinanceirasNaFaseV2(
+  processoId: number, phaseKey: string,
+): Promise<{ criadas: number; skipped: { name: string; reason: string }[]; erros: string[] }> {
+  const skipped: { name: string; reason: string }[] = []
+  const erros: string[] = []
+  let criadas = 0
+
+  const proc = await prisma.processo.findUnique({ where: { id: processoId }, select: { tipoProcessoMotorId: true } })
+  const tipoProcessoId = proc?.tipoProcessoMotorId
+  if (!tipoProcessoId) return { criadas, skipped, erros }
+
+  const regras = await prisma.phaseAutomationRule.findMany({
+    where: { kind: 'financial', tipoProcessoId, phaseKey, trigger: 'phase_entered', active: true, arquivado: false, configItemId: { not: null } },
+  })
+  const fxCache = new Map<string, number>()
+
+  for (const r of regras) {
+    const ap = r.aplicacaoFinanceira
+    if (!aplicacaoValida(ap)) { skipped.push({ name: r.name, reason: 'Aplicação financeira inválida' }); continue }
+    const cfg = await prisma.produtoFinanceiro.findUnique({ where: { id: r.configItemId! }, select: { possuiCusto: true, possuiReceita: true } })
+    if (!cfg) { skipped.push({ name: r.name, reason: 'Configuração Financeira não encontrada' }); continue }
+    if (!aplicacaoPermitida(ap, cfg)) { skipped.push({ name: r.name, reason: `Aplicação "${ap}" não permitida pela Configuração Financeira` }); continue }
+
+    for (const natPreco of naturezasDaAplicacao(ap)) {
+      const isRec = natPreco === NaturezaPreco.VENDA
+      const preco = await precoDaConfig(r.configItemId!, natPreco, processoId, tipoProcessoId)
+      if (!preco) { skipped.push({ name: r.name, reason: 'Configuração Financeira sem preço cadastrado' }); continue }
+      if ('erro' in preco) { skipped.push({ name: r.name, reason: `Nenhum preço vigente encontrado para a Configuração Financeira selecionada — ${preco.erro}` }); continue }
+
+      const akey = `${processoId}::${phaseKey}::automation::${r.id}::${isRec ? 'VENDA' : 'CUSTO'}`
+      let art
+      try {
+        art = await prisma.motorArtefato.create({ data: {
+          processoId, tipoProcessoId, phaseKey, event: 'entered', ruleKind: 'financial', ruleSource: 'automation', ruleId: r.id,
+          automaticKey: akey, targetTable: isRec ? 'Receita' : 'Custo', targetId: null, status: 'active', descricao: r.name.slice(0, 300),
+          detalhes: { configItemId: r.configItemId, aplicacao: ap, natureza: isRec ? 'VENDA' : 'CUSTO', valor: preco.valor, moeda: preco.moeda, tabelaValorId: preco.tabelaValorId },
+        } })
+      } catch (e) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') { skipped.push({ name: r.name, reason: 'já lançado (idempotência)' }); continue }
+        erros.push(`${r.name}: ${(e as Error)?.message ?? 'erro'}`); continue
+      }
+      try {
+        const fx = await fxParaBRL(preco.moeda, fxCache)
+        const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId!, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', contexto: { fonte: 'automation_v2', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap } }
+        const id = isRec
+          ? await criarReceita(processoId, r.name, preco.valor, preco.moeda, fx, false, fz)
+          : await criarCusto(processoId, r.name, preco.valor, preco.moeda, fx, fz)
+        await prisma.motorArtefato.update({ where: { id: art.id }, data: { targetId: id } })
+        criadas++
+      } catch (e) {
+        await prisma.motorArtefato.delete({ where: { id: art.id } }).catch(() => {})
+        erros.push(`${r.name}: ${(e as Error)?.message ?? 'erro'}`)
+      }
+    }
+  }
+  return { criadas, skipped, erros }
+}
