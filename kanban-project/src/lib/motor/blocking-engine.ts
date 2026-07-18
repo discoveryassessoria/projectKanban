@@ -12,6 +12,7 @@ import {
   classificarNecessidade, classificarPasso, classificarTarefa, avaliarPolitica, separar,
 } from "@/src/lib/motor/blocking-helpers"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
+import { resolvePassosBloqueantesDaFase } from "@/src/lib/motor/resolve-passos-bloqueantes"
 
 export interface PhaseBlockingResult {
   issues: BlockingIssue[]
@@ -62,9 +63,20 @@ export async function calcularPendencias(
   if (isGenealogia && necessidades.length === 0) {
     issues.push({ code: "NECESSIDADE_NAO_GERADA", category: "NECESSIDADE_DOCUMENTAL", severity: "BLOCKING", entityType: "Processo", entityId: processoId, message: "Nenhuma NecessidadeDocumental de CERTIDÃO foi gerada na Genealogia", resolutionHint: "Materializar as certidões obrigatórias aplicáveis antes de avançar" })
   }
-  for (const n of necessidades) {
-    const issue = classificarNecessidade(n.status, n.obrigatoriedade === "OBRIGATORIA", isGenealogia, n.id)
-    if (issue) issues.push(issue)
+  // ESCOPO OPERACIONAL da fase: se a fase é operada por DOCUMENTO (há passo vinculado a
+  // documentoId na instância ativa), o GATE é o documento — o status da NecessidadeDocumental
+  // (escopo NECESSIDADE, cujo ciclo é a Genealogia) NÃO bloqueia esta fase. Consistente com o
+  // resolver de passos: nenhuma entidade bloqueia uma fase fora do seu escopo operacional.
+  // Sem passo por-documento ainda (fase recém-ativada), a necessidade continua gatando
+  // (evita avançar antes de qualquer documento ser trabalhado). Sem hardcode de fase.
+  const faseDocumentoScoped = (await prisma.phaseWorkflowStepInstance.count({
+    where: { processoId, faseMacroKey, documentoId: { not: null }, status: { notIn: ["SUPERSEDIDO", "CANCELADO"] } },
+  })) > 0
+  if (!faseDocumentoScoped) {
+    for (const n of necessidades) {
+      const issue = classificarNecessidade(n.status, n.obrigatoriedade === "OBRIGATORIA", isGenealogia, n.id)
+      if (issue) issues.push(issue)
+    }
   }
 
   // ---- Genealogia: estrutura mínima ----
@@ -95,21 +107,17 @@ export async function calcularPendencias(
 
   if (instancia) {
     const stepKeys = new Set(instancia.steps.map((s) => s.stepKey))
-    for (const step of instancia.steps) {
+    // RESOLVER CANÔNICO por ESCOPO OPERACIONAL (sem hardcode de fase/stepKey): quando a
+    // fase é operada por ENTIDADE (há passos com documentoId/necessidadeId), os passos
+    // GENÉRICOS (sem entidade) são cópia do template e NÃO bloqueiam. Quando é operada por
+    // PROCESSO (todos genéricos), os genéricos SÃO o gate legítimo e bloqueiam.
+    const passosGate = resolvePassosBloqueantesDaFase(instancia.steps)
+    for (const step of passosGate) {
       const snap = (step.snapshot as SnapshotPasso | null) ?? {}
 
-      // GENEALOGIA — alinhamento com a Central (fonte oficial de progresso): um passo
-      // localizar_registro NÃO é obrigação aberta quando:
-      //   (a) é órfão (necessidadeId=null) — passo genérico do WF Interno da fase que
-      //       fica sem par após a materialização por-necessidade (não representa doc);
-      //   (b) sua necessidade está DISPENSADA — o requisito deixou de ser exigido.
-      // Sem isto, dispensar uma necessidade (ou o passo genérico órfão) deixa um passo
-      // ativo travando o avanço para sempre, embora a Central mostre 100%. As tarefas
-      // do passo saem junto (continue). Não altera o restante do motor.
-      if (isGenealogia && step.stepKey === "localizar_registro") {
-        const ns = step.necessidadeId == null ? null : necStatusById.get(step.necessidadeId)
-        if (step.necessidadeId == null || ns === "DISPENSADA") continue
-      }
+      // Entidade DISPENSADA não bloqueia (o requisito deixou de ser exigido). Cobre a
+      // necessidade DISPENSADA na Genealogia; genérico já foi excluído pelo resolver.
+      if (step.necessidadeId != null && necStatusById.get(step.necessidadeId) === "DISPENSADA") continue
 
       // Passo
       const pIssue = classificarPasso(step.status, step.obrigatorio, step.stepKey, step.id)

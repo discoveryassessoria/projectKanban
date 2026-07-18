@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma"
 import { Prisma, type PhaseWorkflowInstance, type PhaseWorkflowStepInstance } from "@prisma/client"
 import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import { validarDefinicao } from "@/src/services/workflow-definition-validator"
+import { phaseKeyToFaseCode, FASES } from "@/src/lib/process-stage/fases-catalog"
 import {
   type DefWorkflow,
   type DefStep,
@@ -197,7 +198,17 @@ export async function instanciarWorkflowDaFase(
         },
       })
 
-      const ordenados = ordenarStepsDeterministico(steps)
+      // ESCOPO OPERACIONAL: fases operadas por ENTIDADE (kind="documento" = Genealogia por
+      // necessidade, Emissão por documento) NÃO criam a esteira genérica de template — os
+      // passos operacionais nascem por-entidade na materialização (por necessidade/documento),
+      // vinculados à entidade concreta. Isso evita a "segunda esteira paralela" de passos
+      // genéricos (documentoId=null, necessidadeId=null) que nunca conclui. Fases de PROCESSO
+      // (kind="processo") mantêm a criação da esteira (é o gate operacional legítimo).
+      // O template do Workflow Interno continua existindo (workflowDefinitionId); só não é
+      // materializado como passos genéricos aqui.
+      const faseCodeAtual = phaseKeyToFaseCode(input.faseMacroKey)
+      const faseOperadaPorEntidade = faseCodeAtual != null && FASES[faseCodeAtual]?.kind === "documento"
+      const ordenados = faseOperadaPorEntidade ? [] : ordenarStepsDeterministico(steps)
       const stepInstances: PhaseWorkflowStepInstance[] = []
       for (const def of ordenados) {
         const tipoRes = mapearTipoPasso(def)

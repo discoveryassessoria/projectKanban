@@ -24,10 +24,11 @@ const ler = (rel: string) => (existsSync(join(ROOT, rel)) ? readFileSync(join(RO
 const engine = ler("src/lib/motor/blocking-engine.ts")
 const helpers = ler("src/lib/motor/blocking-helpers.ts")
 
-console.log("\n1) BlockingEngine ignora passos localizar_registro órfãos / de necessidade DISPENSADA (Genealogia)")
+console.log("\n1) BlockingEngine ignora passos genéricos (resolver por escopo) e entidade DISPENSADA")
 ok(/necStatusById = new Map\(necessidadesRaw\.map/.test(engine), "constrói mapa necessidadeId → status")
-ok(/isGenealogia && step\.stepKey === "localizar_registro"/.test(engine), "regra escopada à Genealogia + localizar_registro")
-ok(/step\.necessidadeId == null \|\| ns === "DISPENSADA"[\s\S]*?continue/.test(engine), "pula passo órfão (necessidadeId null) ou de necessidade DISPENSADA")
+ok(/const passosGate = resolvePassosBloqueantesDaFase\(instancia\.steps\)/.test(engine), "usa o resolver canônico por escopo (genéricos fora quando há entidade) — sem hardcode")
+ok(/step\.necessidadeId != null && necStatusById\.get\(step\.necessidadeId\) === "DISPENSADA"[\s\S]*?continue/.test(engine), "passo de necessidade DISPENSADA não bloqueia")
+ok(!/isGenealogia && step\.stepKey === "localizar_registro"/.test(engine), "removido o skip hardcoded (Genealogia+localizar_registro)")
 
 console.log("\n2) Não afeta as demais fases (mudança escopada, PASSO_OK inalterado)")
 ok(/const PASSO_OK = new Set\(\["CONCLUIDO", "DISPENSADO", "SUPERSEDIDO"\]\)/.test(helpers), "PASSO_OK sem CANCELADO (fix amplo revertido — sem impacto em outras fases)")
