@@ -103,6 +103,12 @@ export async function POST(request: NextRequest) {
       if (kindDeAvanco(modelo.type) || kindDeAvanco(kind) || kindDeTrabalhoObrigatorio(kind) || !KINDS_EFEITO_PERMITIDOS.has(kind)) {
         return NextResponse.json({ error: msgProibido(kind), code: 'AUTOMACAO_PROIBIDA' }, { status: 422 })
       }
+      // NADA DE LEGADO: modelos financeiros carregam valor/moeda (defaultParams) e não têm
+      // Configuração Financeira. O formato foi descontinuado — regra financeira só via
+      // "Nova regra (financeiro)" selecionando uma Configuração Financeira.
+      if (kind === 'financial') {
+        return NextResponse.json({ error: 'Automações financeiras não podem ser criadas por modelo (formato legado com valor/moeda). Use "Nova regra (financeiro)" e selecione uma Configuração Financeira — o preço vem da Tabela de Preços.', code: 'FINANCEIRO_SEM_MODELO' }, { status: 422 })
+      }
       const dp = (modelo.defaultParams as Record<string, unknown>) || {}
 
       const rule = await prisma.phaseAutomationRule.create({

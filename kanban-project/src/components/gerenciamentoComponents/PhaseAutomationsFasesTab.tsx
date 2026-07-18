@@ -366,8 +366,12 @@ export default function PhaseAutomationsFasesTab() {
 
           {/* toolbar */}
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <button onClick={() => { setApplySel(null); setApplyOpen(true) }} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">+ Aplicar modelo de automação</button>
-            <button onClick={openNew} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10">+ Nova regra ({kindLabel(tab).toLowerCase()})</button>
+            {/* Modelos são formato LEGADO (carregam valor/moeda, sem Configuração Financeira):
+                não se aplicam a automações financeiras. Só "Nova regra (financeiro)". */}
+            {tab !== "financial" && (
+              <button onClick={() => { setApplySel(null); setApplyOpen(true) }} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">+ Aplicar modelo de automação</button>
+            )}
+            <button onClick={openNew} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${tab === "financial" ? "bg-blue-600 text-white hover:bg-blue-500" : "border border-white/10 bg-white/5 text-white/80 hover:bg-white/10"}`}>+ Nova regra ({kindLabel(tab).toLowerCase()})</button>
             {(() => {
               const arq = rulesOf(faseAtual.phaseKey, tab, true).filter(r => r.arquivado).length
               return arq > 0 ? (
