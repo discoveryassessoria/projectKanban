@@ -302,30 +302,24 @@ export async function atualizarPassoV2(
   }
   await prisma.phaseWorkflowStepInstance.update({ where: { id: p.id }, data })
 
-  const LOCK = "Aguardando outros documentos do processo"
+  // PROGRESSÃO POR-DOCUMENTO: ao concluir uma etapa, a PRÓXIMA etapa DO MESMO documento
+  // é liberada imediatamente (EM_ANDAMENTO). Cada certidão flui pelo seu workflow interno
+  // de forma independente (Solicitar → Aguardar → Receber → Conferir → Validar). O gate
+  // "todos os documentos prontos" é responsabilidade do AVANÇO DE FASE (BlockingEngine
+  // exige todos os passos obrigatórios concluídos) — não do lock-step entre irmãos, que
+  // travava a operação por-documento (uma etapa esperava as outras certidões).
   if (liberarProximo) {
     const proximo = await prisma.phaseWorkflowStepInstance.findFirst({
       where: { documentoId, faseMacroKey: p.faseMacroKey, ordem: { gt: p.ordem }, status: { in: ["BLOQUEADO", "PENDENTE"] } },
       orderBy: { ordem: "asc" },
-      select: { id: true, ordem: true },
+      select: { id: true },
     })
     if (proximo) {
-      // irmãos: outros docs do mesmo processo com passo V2 na mesma ordem
-      const irmaos = await prisma.phaseWorkflowStepInstance.findMany({
-        where: { processoId: p.processoId, faseMacroKey: p.faseMacroKey, ordem: p.ordem, documentoId: { not: documentoId, notIn: [] }, status: { notIn: INATIVOS } },
-        select: { documentoId: true, status: true },
+      const due = new Date(now.getTime() + slaDays * 86400000)
+      await prisma.phaseWorkflowStepInstance.update({
+        where: { id: proximo.id },
+        data: { status: "EM_ANDAMENTO", startedAt: now, prazo: due, motivo: null },
       })
-      const todosConcluiram = irmaos.every((s) => s.status === "CONCLUIDO" || s.status === "DISPENSADO")
-      if (todosConcluiram) {
-        const due = new Date(now.getTime() + slaDays * 86400000)
-        await prisma.phaseWorkflowStepInstance.update({ where: { id: proximo.id }, data: { status: "EM_ANDAMENTO", startedAt: now, prazo: due } })
-        await prisma.phaseWorkflowStepInstance.updateMany({
-          where: { processoId: p.processoId, faseMacroKey: p.faseMacroKey, ordem: proximo.ordem, documentoId: { in: irmaos.map((s) => s.documentoId!).filter(Boolean) }, status: { in: ["BLOQUEADO", "PENDENTE"] } },
-          data: { status: "EM_ANDAMENTO", startedAt: now, prazo: due },
-        })
-      } else {
-        await prisma.phaseWorkflowStepInstance.update({ where: { id: proximo.id }, data: { status: "BLOQUEADO", motivo: `${LOCK} concluírem a etapa ${p.ordem}` } })
-      }
     }
   }
   if (vaiReabrir) {
