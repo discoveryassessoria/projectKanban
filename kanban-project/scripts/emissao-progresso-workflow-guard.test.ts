@@ -1,13 +1,14 @@
 /**
- * GUARDA — progresso/conclusão da fase documental vem da CONCLUSÃO REAL do Workflow
- * Interno (última etapa obrigatória concluída), não do status mestre do documento.
+ * GUARDA — FONTE OFICIAL ÚNICA de progresso da fase (resolveProgressoFaseDocumento),
+ * consumida por Central Operacional E cabeçalho (/phase). Sem cálculo duplicado.
  * Rodar: tsx scripts/emissao-progresso-workflow-guard.test.ts
  *
- * BUG: matrix da Central usava STATUS_VALIDADOS = ["RECEBIDO",...] → documento RECEBIDO
- * contava como validado → falso 100% / "4 de 4 validados" / "fase concluída", enquanto
- * cards (faseProgress) e cabeçalho mostravam o correto. Fontes divergentes.
- * FIX: matrix e "próxima ação" derivam dos passos persistidos do Workflow Interno da
- * fase atual (mesma fonte do faseProgress). Teste ESTÁTICO.
+ * BUGS corrigidos (empilhados):
+ *  1) matrix usava STATUS_VALIDADOS (RECEBIDO=validado) → falso 100%.
+ *  2) workflowsRaw era [] hardcoded → faseProgress/matrix/próxima ação zerados.
+ *  3) cabeçalho usava OUTRO endpoint (/phase → computePhaseProgress com workflows:[]) → 0/4.
+ * FIX: uma única função lê PhaseWorkflowStepInstance da fase atual e computa done/total/
+ * percent/counts/próxima ação; Central e cabeçalho consomem a MESMA função. Teste ESTÁTICO.
  */
 import { readFileSync, existsSync } from "fs"
 import { fileURLToPath } from "url"
@@ -19,30 +20,28 @@ const viol: string[] = []
 function ok(c: boolean, n: string) { if (c) { passed++; console.log(`  ✅ ${n}`) } else { failed++; viol.push(n); console.log(`  ❌ ${n}`) } }
 const ler = (rel: string) => (existsSync(join(ROOT, rel)) ? readFileSync(join(ROOT, rel), "utf8") : "")
 
+const fn = ler("src/lib/process-stage/resolve-fase-progresso.ts")
 const route = ler("src/app/api/processos/[processoId]/central-operacional/route.ts")
+const phase = ler("src/app/api/processos/[processoId]/phase/route.ts")
 
-console.log("\n1) Conclusão da fase = última etapa do Workflow Interno concluída (não status)")
-ok(/const docConcluiuFase = \(docId: number\): boolean =>/.test(route), "helper docConcluiuFase (fonte oficial)")
-ok(/const ultima = steps\.reduce\(\(a, b\) => \(b\.ordem > a\.ordem \? b : a\)\)[\s\S]*?stepConcluidoRe\(ultima\.status\)/.test(route), "conclui pela ÚLTIMA etapa (maior ordem) concluída")
-ok(/const concluiuFaseAtual = \(d: DocFull\): boolean => docConcluiuFase\(d\.id\)/.test(route), "concluiuFaseAtual usa o workflow, não STATUS_VALIDADOS")
-ok(/if \(docConcluiuFase\(d\.id\)\) cur\.completed \+= 1/.test(route), "matrix byPerson conta pela conclusão do workflow")
-ok(!/STATUS_VALIDADOS\.includes\(d\.status\)/.test(route), "nenhuma contagem de progresso usa mais STATUS_VALIDADOS(d.status)")
+console.log("\n1) Função oficial única lê as instâncias V2 reais da fase atual")
+ok(/export async function resolveProgressoFaseDocumento/.test(fn), "resolveProgressoFaseDocumento existe")
+ok(/phaseWorkflowStepInstance\.findMany\(\{[\s\S]*?processoId,[\s\S]*?faseMacroKey,[\s\S]*?status: \{ notIn: \["SUPERSEDIDO", "CANCELADO"\] \}/.test(fn), "consulta escopada a processo + fase atual, ignora inativos")
+ok(/const ultima = steps\.reduce\(\(a, b\) => \(b\.ordem > a\.ordem \? b : a\)\)[\s\S]*?stepConcluidoRe\(ultima\.status\)/.test(fn), "conclusão = última etapa concluída (não status mestre)")
+ok(/usuario\.findMany\(\{ where: \{ id: \{ in: respIds \}/.test(fn), "responsáveis em LOTE (sem N+1)")
+ok(/maisRecente|melhor\.set/.test(fn), "dedup por (documento, stepKey) — sem duplicidade")
 
-console.log("\n2) Próxima ação = 1ª etapa não concluída do workflow (não texto fixo)")
-ok(/const proximaAcaoDoc = \(docId: number\): string \| null =>/.test(route), "helper proximaAcaoDoc")
-ok(/const prox = steps\.find\(\(s\) => !stepConcluidoRe\(s\.status\)\)/.test(route), "acha a 1ª etapa ainda não concluída")
-ok(/proximoPasso = proximaAcaoDoc\(d\.id\) \?\? "normal"/.test(route), "queue usa a próxima etapa real (não 'Solicitar' fixo)")
+console.log("\n2) Central Operacional consome a função (sem cálculo paralelo)")
+ok(/resolveProgressoFaseDocumento\(id\)/.test(route), "rota central chama resolveProgressoFaseDocumento")
+ok(/percentage: prog\.percent/.test(route) && /completed: prog\.done/.test(route) && /total: prog\.total/.test(route), "matrix vem de prog (done/total/percent)")
+ok(/counts: prog\.counts/.test(route) && /steps: prog\.faseSteps/.test(route), "faseProgress (counts/steps) vem de prog")
+ok(/prog\.concluidosPorDoc\.has\(docId\)/.test(route), "conclusão por doc vem de prog")
+ok(!/STATUS_VALIDADOS\.includes\(d\.status\)/.test(route), "matrix não usa mais STATUS_VALIDADOS")
 
-console.log("\n3) Passos lidos do cadastro (sem lista fixa como regra)")
-ok(/getStepsForFase\(faseAtualCode\)/.test(route), "títulos/ordem vêm do catálogo da fase (persistido)")
+console.log("\n3) Cabeçalho (/phase) consome a MESMA função — fim da fonte paralela")
+ok(/resolveProgressoFaseDocumento\(processoId\)/.test(phase), "/phase chama resolveProgressoFaseDocumento")
+ok(/done: prog\.done/.test(phase) && /total: prog\.total/.test(phase) && /percent: prog\.percent/.test(phase), "/phase retorna done/total/percent da função")
+ok(!/computePhaseProgress/.test(phase), "/phase não usa mais computePhaseProgress (workflows:[] → 0/4)")
 
-console.log("\n4) workflowsRaw = LEITURA REAL das instâncias V2 (não mais [] hardcoded)")
-ok(!/\[\] as Array<\{ documentoId: number; faseCode: string \| null; steps:/.test(route), "array vazio hardcoded do cutover REMOVIDO")
-ok(/phaseWorkflowStepInstance\.findMany\(\{[\s\S]*?processoId: processo\.id,[\s\S]*?faseMacroKey: processo\.faseAtualKey,/.test(route), "consulta PhaseWorkflowStepInstance escopada a processoId + fase atual")
-ok(/status: \{ notIn: \["SUPERSEDIDO", "CANCELADO"\] \}/.test(route), "ignora instâncias históricas inativas (SUPERSEDIDO/CANCELADO)")
-ok(/const workflowsRaw = Array\.from\(wfPorDoc\.values\(\)\)/.test(route), "workflowsRaw agrupado por documento")
-ok(/melhorPorDocStep|maisRecente/.test(route), "dedup por (documento, stepKey) — instância mais recente (sem duplicidade)")
-ok(/respNomesWf[\s\S]*?usuario\.findMany\(\{ where: \{ id: \{ in: respIdsWf \}/.test(route), "responsáveis resolvidos em LOTE (sem N+1)")
-
-console.log(`\n${failed === 0 ? "✅" : "❌"} GUARDA PROGRESSO-WORKFLOW — ${passed} ok, ${failed} falhas`)
+console.log(`\n${failed === 0 ? "✅" : "❌"} GUARDA PROGRESSO-WORKFLOW (fonte única) — ${passed} ok, ${failed} falhas`)
 if (failed > 0) { console.log("Falhas: " + viol.join("; ")); process.exit(1) }

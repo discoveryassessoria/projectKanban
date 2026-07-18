@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { getOrdemFase, getStepsForFase, getFase, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
+import { resolveProgressoFaseDocumento } from "@/src/lib/process-stage/resolve-fase-progresso"
 import type { FaseCode } from "@prisma/client"
 
 // ============================================================
@@ -234,7 +235,7 @@ export async function GET(
 
     // pessoas e documentos não dependem um do outro (ambos só precisam do
     // arvoreId) → busca os dois EM PARALELO, economizando um round-trip ao banco.
-    const [pessoas, docsRaw, stepInstancesRaw] = await Promise.all([
+    const [pessoas, docsRaw] = await Promise.all([
       processo.arvoreId
         ? prisma.pessoa.findMany({
             where: { arvoreId: processo.arvoreId },
@@ -267,26 +268,6 @@ export async function GET(
             },
           })
         : [],
-      // FONTE REAL do workflow (V2): passos operacionais por-documento da FASE ATUAL do
-      // processo (PhaseWorkflowStepInstance). Escopo por faseMacroKey = fase atual persistida
-      // (NÃO mistura fases anteriores) e status ATIVO (exclui SUPERSEDIDO/CANCELADO
-      // históricos). Agrupado logo abaixo. Substitui o array vazio do cutover — sem o qual
-      // faseProgress/matrix/próxima ação/responsável do passo ficavam zerados.
-      processo.faseAtualKey
-        ? prisma.phaseWorkflowStepInstance.findMany({
-            where: {
-              processoId: processo.id,
-              faseMacroKey: processo.faseAtualKey,
-              documentoId: { not: null },
-              status: { notIn: ["SUPERSEDIDO", "CANCELADO"] },
-            },
-            select: {
-              documentoId: true, faseMacroKey: true, workflowInstanceId: true,
-              stepKey: true, ordem: true, status: true, responsavelId: true, ciclo: true, updatedAt: true,
-            },
-            orderBy: [{ documentoId: "asc" }, { ordem: "asc" }],
-          })
-        : [],
     ])
 
     const nomeCompleto = (p: { nome: string; sobrenome: string | null }) =>
@@ -295,38 +276,10 @@ export async function GET(
     const pessoasMap = new Map(pessoas.map((p) => [p.id, p]))
     const pessoasNaLinha = pessoas.filter((p) => p.linhaReta)
 
-    // ── workflowsRaw = LEITURA REAL das instâncias V2 da FASE ATUAL (agrupada por doc).
-    //    Dedup: uma instância por (documento, stepKey) — a mais recente (maior ciclo, depois
-    //    updatedAt) — para nunca contar passo em duplicidade caso existam instâncias antigas.
-    //    Responsáveis resolvidos em LOTE (responsavelId é ref solta a Usuario, sem relation).
-    const respIdsWf = [...new Set(stepInstancesRaw.map((s) => s.responsavelId).filter((x): x is number => x != null))]
-    const respNomesWf = respIdsWf.length
-      ? new Map((await prisma.usuario.findMany({ where: { id: { in: respIdsWf } }, select: { id: true, nome: true } })).map((u) => [u.id, u.nome]))
-      : new Map<number, string>()
-
-    const melhorPorDocStep = new Map<string, (typeof stepInstancesRaw)[number]>()
-    for (const s of stepInstancesRaw) {
-      if (s.documentoId == null) continue
-      const k = `${s.documentoId}|${s.stepKey}`
-      const prev = melhorPorDocStep.get(k)
-      const maisRecente = !prev
-        || (s.ciclo ?? 0) > (prev.ciclo ?? 0)
-        || ((s.ciclo ?? 0) === (prev.ciclo ?? 0) && (s.updatedAt?.getTime() ?? 0) >= (prev.updatedAt?.getTime() ?? 0))
-      if (maisRecente) melhorPorDocStep.set(k, s)
-    }
-    const wfPorDoc = new Map<number, { documentoId: number; faseCode: string | null; steps: Array<{ ordem: number; stepKey: string; status: string; assigneeId: number | null; assignee: { nome: string } | null }> }>()
-    for (const s of melhorPorDocStep.values()) {
-      const docId = s.documentoId as number
-      let entry = wfPorDoc.get(docId)
-      if (!entry) { entry = { documentoId: docId, faseCode: phaseKeyToFaseCode(s.faseMacroKey), steps: [] }; wfPorDoc.set(docId, entry) }
-      entry.steps.push({
-        ordem: s.ordem, stepKey: s.stepKey, status: s.status,
-        assigneeId: s.responsavelId,
-        assignee: s.responsavelId != null ? { nome: respNomesWf.get(s.responsavelId) ?? "" } : null,
-      })
-    }
-    for (const e of wfPorDoc.values()) e.steps.sort((a, b) => a.ordem - b.ordem)
-    const workflowsRaw = Array.from(wfPorDoc.values())
+    // FONTE OFICIAL ÚNICA de progresso/estado do workflow — a MESMA usada pelo cabeçalho
+    // (/api/processos/[id]/phase) e demais consumidores. Nada de cálculo paralelo aqui.
+    const prog = await resolveProgressoFaseDocumento(id)
+    const workflowsRaw = Array.from(prog.wfPorDoc.values())
 
     const generationOf = (pessoaId: number): number => {
       const p = pessoasMap.get(pessoaId)
@@ -338,17 +291,7 @@ export async function GET(
     //   1º etapa "em execução" (status contém "execu"), com assignee;
     //   senão 1ª etapa não concluída com assignee;
     //   senão 1ª etapa qualquer com assignee.
-    const stepOwnerByDoc = new Map<number, { id: number; nome: string }>()
-    for (const wf of workflowsRaw as any[]) {
-      const comResp = wf.steps.filter((s: any) => s.assigneeId && s.assignee?.nome)
-      if (comResp.length === 0) continue
-      const emExec = comResp.find((s: any) => /execu/i.test(s.status))
-      const naoConcluida = comResp.find((s: any) => !/conclu|finaliz/i.test(s.status))
-      const escolhida = emExec ?? naoConcluida ?? comResp[0]
-      if (escolhida && !stepOwnerByDoc.has(wf.documentoId)) {
-        stepOwnerByDoc.set(wf.documentoId, { id: escolhida.assigneeId, nome: escolhida.assignee.nome })
-      }
-    }
+    const stepOwnerByDoc = prog.stepOwnerPorDoc // fonte oficial (responsável do passo ativo)
 
     // ============================================================
     // 2) Documentos
@@ -516,33 +459,9 @@ export async function GET(
       return generationOf(a.pessoaId) - generationOf(b.pessoaId)
     })
 
-    // ============================================================
-    // FONTE OFICIAL de CONCLUSÃO e PRÓXIMA AÇÃO = passos do Workflow Interno da FASE
-    // ATUAL (persistidos), NÃO o status mestre do documento. Um doc só "concluiu a fase"
-    // quando a ÚLTIMA etapa (maior ordem) do seu workflow está concluída (ex.: Emissão =
-    // validar_certidao); RECEBIDO/status isolado não conclui. A próxima ação é a 1ª etapa
-    // (na ordem) ainda não concluída. Lê os passos cadastrados — sem lista fixa.
-    // ============================================================
-    const stepConcluidoRe = (status: string) => /conclu|finaliz/i.test(String(status))
-    const catStepsFase = faseAtualCode ? getStepsForFase(faseAtualCode) : []
-    const tituloStep = (k: string) => catStepsFase.find((c) => c.stepKey === k)?.title ?? k
-    const wfDoDoc = new Map<number, { steps: Array<{ ordem: number; stepKey: string; status: string }> }>()
-    for (const wf of workflowsRaw as Array<{ documentoId: number; faseCode: string | null; steps: Array<{ ordem: number; stepKey: string; status: string }> }>) {
-      if (wf.faseCode !== faseAtualCode) continue
-      wfDoDoc.set(wf.documentoId, { steps: wf.steps })
-    }
-    const docConcluiuFase = (docId: number): boolean => {
-      const steps = wfDoDoc.get(docId)?.steps ?? []
-      if (steps.length === 0) return false
-      const ultima = steps.reduce((a, b) => (b.ordem > a.ordem ? b : a))
-      return stepConcluidoRe(ultima.status)
-    }
-    const proximaAcaoDoc = (docId: number): string | null => {
-      const steps = [...(wfDoDoc.get(docId)?.steps ?? [])].sort((a, b) => a.ordem - b.ordem)
-      if (steps.length === 0) return null // sem operação materializada ainda
-      const prox = steps.find((s) => !stepConcluidoRe(s.status))
-      return prox ? tituloStep(prox.stepKey) : "Concluído"
-    }
+    // CONCLUSÃO e PRÓXIMA AÇÃO vêm da FONTE OFICIAL (prog) — sem recálculo local.
+    const docConcluiuFase = (docId: number): boolean => prog.concluidosPorDoc.has(docId)
+    const proximaAcaoDoc = (docId: number): string | null => prog.proximaAcaoPorDoc.get(docId) ?? null
 
     // ============================================================
     // 7) Linhas da tabela
@@ -625,7 +544,7 @@ export async function GET(
     // (RECEBIDO não conclui). Alinha matrix/barra/macro/header ao faseProgress.
     const concluiuFaseAtual = (d: DocFull): boolean => docConcluiuFase(d.id)
 
-    const validados = linhaRetaDocs.filter(concluiuFaseAtual).length
+    const validados = prog.done // FONTE OFICIAL (mesma do cabeçalho)
 
     const missing = docs
       .filter((d) => !concluiuFaseAtual(d))
@@ -644,11 +563,11 @@ export async function GET(
       })
 
     const matrixLegado: MatrixResponse = {
-      percentage: totalDocs > 0 ? Math.round((validados / totalDocs) * 100) : 0,
-      completed: validados,
-      total: totalDocs,
+      percentage: prog.percent,          // FONTE OFICIAL (idêntica ao cabeçalho)
+      completed: prog.done,
+      total: prog.total,
       directPeopleCount: pessoasNaLinha.length,
-      missingCount: totalDocs - validados,
+      missingCount: Math.max(0, prog.total - prog.done),
       nameVariationsCount: 0,
       byPerson: matrixByPerson,
       missing,
@@ -682,72 +601,15 @@ export async function GET(
       : matrixLegado
 
     // ============================================================
-    // 9) ✅ NOVO: Estado REAL dos passos da fase atual
-    // ------------------------------------------------------------
-    // Fonte: WorkflowStep.status (a verdade já gravada). Quando um passo é
-    // concluído na tela, a rota de conclusão chama o stepCompletionResolver e,
-    // se passou, grava status = concluída. Então aqui NÃO reavaliamos o portão
-    // (isso seria uma 2ª fonte de verdade + N consultas por polling): apenas
-    // LEMOS o que já está gravado.
-    //
-    // Conta só os documentos da LINHA RETA — mesma régua da matriz e do KPI
-    // "Obrigatórios". (Docs de apoio continuam aparecendo na fila/tabela, mas
-    // não entram nas contagens da fase.)
+    // 9) Estado REAL dos passos da fase atual — direto da FONTE OFICIAL (prog).
+    //    counts/steps/docsNaFase são os MESMOS números do cabeçalho/matrix. Sem 2ª fonte.
     // ============================================================
-    const stepConcluido = (status: string) => /conclu|finaliz/i.test(status)
-
-    const docIdsLinhaReta = new Set(
-      docs.filter((d) => pessoasMap.get(d.pessoaId)?.linhaReta).map((d) => d.id),
-    )
-
-    const wfsDaFase = (workflowsRaw as any[]).filter(
-      (wf) => wf.faseCode === faseAtualCode && docIdsLinhaReta.has(wf.documentoId),
-    )
-    const docsNaFase = wfsDaFase.length
-
-    // concluídos / total por stepKey (agregado entre os docs da fase)
-    const concluidosPorKey = new Map<string, number>()
-    const totalPorKey = new Map<string, number>()
-    for (const wf of wfsDaFase) {
-      for (const s of wf.steps as any[]) {
-        totalPorKey.set(s.stepKey, (totalPorKey.get(s.stepKey) ?? 0) + 1)
-        if (stepConcluido(s.status)) {
-          concluidosPorKey.set(s.stepKey, (concluidosPorKey.get(s.stepKey) ?? 0) + 1)
-        }
-      }
-    }
-
-    // Monta os passos na ORDEM do catálogo, marcando concluída/em_andamento/bloqueada.
-    // "em_andamento" = 1º passo que ainda não foi concluído por TODOS os docs (a frente).
-    const stepsCatalogo = faseAtualCode ? getStepsForFase(faseAtualCode) : []
-    let frontierAchada = false
-    const faseStepsReais: FaseStepReal[] = stepsCatalogo.map((sc) => {
-      const concl = concluidosPorKey.get(sc.stepKey) ?? 0
-      const tot = totalPorKey.get(sc.stepKey) ?? 0
-      const todosConcluiram = tot > 0 && concl >= tot
-      let status: "concluida" | "em_andamento" | "bloqueada"
-      if (todosConcluiram) status = "concluida"
-      else if (!frontierAchada) {
-        frontierAchada = true
-        status = "em_andamento"
-      } else status = "bloqueada"
-      return { ordem: sc.ordem, stepKey: sc.stepKey, title: sc.title, status, concluidos: concl, total: tot }
-    })
-
-    const contarKey = (k: string) => concluidosPorKey.get(k) ?? 0
     const faseProgress: FaseProgress = {
       faseCode: faseAtualCode ?? null,
       kind: faseAtualCode ? getFase(faseAtualCode).kind : "documento",
-      steps: faseStepsReais,
-      docsNaFase,
-      counts: {
-        solicitados: contarKey("solicitar_certidao"),
-        // "aguardando" = solicitou mas ainda não recebeu
-        aguardando: Math.max(0, contarKey("solicitar_certidao") - contarKey("receber_certidao")),
-        recebidos: contarKey("receber_certidao"),
-        conferidos: contarKey("conferir_certidao"),
-        validados: contarKey("validar_certidao"),
-      },
+      steps: prog.faseSteps,
+      docsNaFase: prog.docsNaFase,
+      counts: prog.counts,
     }
 
     // ============================================================

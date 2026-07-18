@@ -15,12 +15,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
-import {
-  computePhaseProgress,
-  stageFromFaseCode,
-} from "@/src/lib/process-stage/compute-phase-progress"
-import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
+import { stageFromFaseCode } from "@/src/lib/process-stage/compute-phase-progress"
+import { STAGE_LABELS } from "@/src/lib/process-stage/derive-stage"
+import { resolveProgressoFaseDocumento } from "@/src/lib/process-stage/resolve-fase-progresso"
 
 export async function GET(
   _req: NextRequest,
@@ -33,49 +30,20 @@ export async function GET(
     return NextResponse.json({ error: "id inválido" }, { status: 400 })
   }
 
-  const processo = await prisma.processo.findUnique({
-    where: { id: processoId },
-    include: {
-      arvore: {
-        include: {
-          pessoas: {
-            include: {
-              documentos: {
-                select: {
-                  id: true,
-                  status: true,
-                  // CUTOVER V2: sem Workflow legado; o gate da fase deriva do status.
-                },
-              },
-            },
-          },
-        },
-      },
-    },
+  // FONTE OFICIAL ÚNICA (mesma da Central Operacional): done/total/percent vêm da
+  // conclusão real do Workflow Interno por documento na fase atual. Elimina a fonte
+  // paralela antiga (calculava com workflows:[] → status mestre → 0/4 falso).
+  const prog = await resolveProgressoFaseDocumento(processoId)
+  const stage = stageFromFaseCode(prog.faseCode ?? undefined) ?? "GENEALOGIA"
+
+  return NextResponse.json({
+    stage,
+    label: STAGE_LABELS[stage],
+    done: prog.done,
+    total: prog.total,
+    percent: prog.percent,
+    reason: prog.total === 0
+      ? "Sem documentos obrigatórios nesta fase"
+      : `${prog.done} de ${prog.total} doc(s) concluídos nesta fase`,
   })
-
-  if (!processo) {
-    return NextResponse.json({ error: "processo não encontrado" }, { status: 404 })
-  }
-
-  // só a linha reta conta pro gate da fase (igual ao resto do sistema)
-  const docs = (processo.arvore?.pessoas ?? [])
-    .filter((p) => p.linhaReta)
-    .flatMap((p) =>
-      p.documentos.map((d) => ({
-        id: d.id,
-        status: d.status,
-        workflows: [],
-      })),
-    )
-
-  // Fonte CANÔNICA da fase = Processo.faseAtualKey (E5 / runtime v2), não a coluna
-  // legada (status.faseCode). Sob v2, statusId costuma ser null → antes caía no
-  // derive por documentos e exibia a fase ERRADA (ex.: "Análise Documental" quando a
-  // fase real é "Emissão Documental"). Ordem: faseAtualKey → status.faseCode → derive.
-  const faseCanonica = phaseKeyToFaseCode(processo.faseAtualKey) ?? null
-  const stageOverride = stageFromFaseCode(faseCanonica ?? undefined)
-  const progress = computePhaseProgress(docs, stageOverride, faseCanonica)
-
-  return NextResponse.json(progress)
 }
