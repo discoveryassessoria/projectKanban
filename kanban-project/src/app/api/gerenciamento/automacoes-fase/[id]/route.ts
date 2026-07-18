@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { aplicacaoValida, aplicacaoPermitida } from '@/lib/financeiro/aplicacao-financeira'
 
 // PUT — edita a regra (campos do editor) / toggle active / arquivar
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -38,6 +39,27 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    // FLUXO NOVO/MIGRAÇÃO — vínculo estrutural à Configuração Financeira + direção.
+    // Regra financeira NUNCA aceita valor/moeda/item/tipo (vêm da Tabela de Preços).
+    const ehFinanceira = novoKind === 'financial'
+    const querVinculo = body.configItemId !== undefined || body.aplicacaoFinanceira !== undefined
+    const pBody = (body.params ?? {}) as Record<string, unknown>
+    const temMoedaValorLegado = pBody.amount != null || !!pBody.currency || !!pBody.financialItemCode || !!body.financialType
+    if (ehFinanceira && temMoedaValorLegado) {
+      return NextResponse.json({ error: 'Regra financeira não aceita valor, moeda, item por código ou tipo financeiro — vêm da Configuração Financeira e da Tabela de Preços.' }, { status: 400 })
+    }
+    let vinculoData: { configItemId?: number; aplicacaoFinanceira?: string; params?: Prisma.InputJsonValue; financialType?: null } | null = null
+    if (ehFinanceira && querVinculo) {
+      const configItemId = body.configItemId ? Number(body.configItemId) : (atual.configItemId ?? null)
+      const aplicacao = body.aplicacaoFinanceira ? String(body.aplicacaoFinanceira).toUpperCase() : atual.aplicacaoFinanceira
+      if (!configItemId) return NextResponse.json({ error: 'Selecione a Configuração Financeira.' }, { status: 400 })
+      if (!aplicacaoValida(aplicacao)) return NextResponse.json({ error: 'Selecione a Aplicação financeira (Receita, Custo ou Ambos).' }, { status: 400 })
+      const cfg = await prisma.produtoFinanceiro.findUnique({ where: { id: configItemId }, select: { possuiCusto: true, possuiReceita: true } })
+      if (!cfg) return NextResponse.json({ error: 'Configuração Financeira não encontrada.' }, { status: 404 })
+      if (!aplicacaoPermitida(aplicacao, cfg)) return NextResponse.json({ error: `A Configuração Financeira não permite "${aplicacao}".` }, { status: 400 })
+      vinculoData = { configItemId, aplicacaoFinanceira: aplicacao, params: {}, financialType: null }
+    }
+
     const data: Prisma.PhaseAutomationRuleUpdateInput = {}
     if (body.name !== undefined) data.name = String(body.name)
     if (body.description !== undefined) data.description = body.description ? String(body.description) : null
@@ -51,6 +73,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.idempotent !== undefined) data.idempotent = !!body.idempotent
     if (body.active !== undefined) data.active = !!body.active
     if (body.arquivado !== undefined) data.arquivado = !!body.arquivado
+    // Vínculo estrutural (fluxo novo) sobrescreve params/financialType legados.
+    if (vinculoData) { data.configItemId = vinculoData.configItemId; data.aplicacaoFinanceira = vinculoData.aplicacaoFinanceira; data.params = vinculoData.params; data.financialType = null }
 
     const rule = await prisma.phaseAutomationRule.update({ where: { id }, data })
     return NextResponse.json({ rule })

@@ -2275,7 +2275,11 @@ model PhaseAutomationRule {
   action             String? @db.VarChar(80)
   conditions         Json? // [{ field, op, value }]
   params             Json? // blob específico do tipo (owner/priority/slaDays/checklist, amount/currency, targetPhaseKey, ...)
-  financialType      String? @db.VarChar(20) // atalho p/ card/consulta (kind=financial)
+  financialType      String? @db.VarChar(20) // LEGADO (kind=financial): atalho de card/consulta do fluxo antigo
+  // FLUXO NOVO (kind=financial): vínculo ESTRUTURAL à Configuração Financeira + direção.
+  // A automação NÃO guarda preço/moeda/valor — o preço vem da Tabela de Preços na execução.
+  configItemId        Int? // → ProdutoFinanceiro.id (solto). Obrigatório em regras financeiras NOVAS.
+  aplicacaoFinanceira String? @db.VarChar(10) // RECEITA | CUSTO | AMBOS (fluxo novo; null = legado)
   idempotencyPattern String  @default("processId+phaseKey") @db.VarChar(120)
   idempotent         Boolean @default(true)
   active             Boolean @default(true)
@@ -2292,6 +2296,7 @@ model PhaseAutomationRule {
   @@index([tipoProcessoId])
   @@index([phaseKey])
   @@index([kind])
+  @@index([configItemId])
 }
 
 model PhaseTriggerRule {

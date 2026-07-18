@@ -19,6 +19,8 @@ interface Rule {
   conditions?: { field: string; op: string; value: string }[] | null
   params?: Record<string, unknown> | null
   financialType?: string | null
+  configItemId?: number | null
+  aplicacaoFinanceira?: string | null
   idempotent: boolean
   active: boolean
   arquivado: boolean
@@ -30,7 +32,13 @@ interface Modelo {
   id: number; name: string; description?: string | null
   type: string; recommendedPhases?: string[] | null
 }
-interface Data { tiposProcesso: TipoProcesso[]; regras: Rule[]; modelosAutomacao: Modelo[] }
+interface ConfigFin { id: number; codigo: string; origem: string; mestre: string; possuiCusto: boolean; possuiReceita: boolean }
+interface Data { tiposProcesso: TipoProcesso[]; regras: Rule[]; modelosAutomacao: Modelo[]; configsFinanceiras: ConfigFin[] }
+
+// Origem estrutural → rótulo de Categoria (nunca por texto do nome).
+const ORIGEM_CAT: Record<string, string> = { documento: "Documentos", servico: "Serviços", honorario: "Honorários", processo: "Processos", item: "Itens" }
+const catLabel = (o?: string | null) => (o ? (ORIGEM_CAT[o] ?? o) : "—")
+const APLIC_LABEL: Record<string, string> = { RECEITA: "Receita", CUSTO: "Custo", AMBOS: "Custo e receita" }
 
 // ============================================================
 // Rótulos (PT)
@@ -84,7 +92,8 @@ type Form = {
   id?: number; kind: string; name: string; description: string; scope: string; trigger: string; action: string
   condField: string; condOp: string; condVal: string; idempotent: boolean; active: boolean
   owner: string; priority: string; slaDays: number; checklist: string
-  financialType: string; amount: number; currency: string; financialItemCode: string
+  // FLUXO NOVO (financeiro): vínculo estrutural + direção. Sem valor/moeda/código.
+  categoria: string; configItemId: string; aplicacaoFinanceira: string
   alertSeverity: string; documentRequired: boolean
   eventType: string; eventOffsetDays: number
 }
@@ -93,7 +102,7 @@ function blankForm(kind: string): Form {
     kind, name: "", description: "", scope: "phase", trigger: "phase_entered", action: "",
     condField: "", condOp: "eq", condVal: "", idempotent: true, active: true,
     owner: "", priority: "medium", slaDays: 0, checklist: "",
-    financialType: "cost", amount: 0, currency: "EUR", financialItemCode: "",
+    categoria: "", configItemId: "", aplicacaoFinanceira: "RECEITA",
     alertSeverity: "info", documentRequired: true,
     eventType: "", eventOffsetDays: 0,
   }
@@ -142,6 +151,14 @@ export default function PhaseAutomationsFasesTab() {
   const rulesOf = (phaseKey: string, kind?: string, includeArchived = false) =>
     (data?.regras || []).filter(r => r.tipoProcessoId === ptNum && r.phaseKey === phaseKey && (!kind || r.kind === kind) && (includeArchived || !r.arquivado))
 
+  // Seletor Categoria|Configuração Financeira (fluxo financeiro novo).
+  const configsFin = data?.configsFinanceiras || []
+  const ordemCat = (o: string) => (o === "documento" ? 0 : o === "servico" ? 1 : 2)
+  const categoriasFin = Array.from(new Set(configsFin.map(c => c.origem))).sort((a, b) => ordemCat(a) - ordemCat(b) || catLabel(a).localeCompare(catLabel(b)))
+  const itensDaCategoria = form?.categoria ? configsFin.filter(c => c.origem === form.categoria).sort((a, b) => a.mestre.localeCompare(b.mestre)) : []
+  const cfgSelForm = configsFin.find(c => String(c.id) === form?.configItemId)
+  const cfgAmbosPermitido = !!cfgSelForm && cfgSelForm.possuiCusto && cfgSelForm.possuiReceita
+
   // ---------- ações ----------
   async function aplicar() {
     if (!applySel || !faseAtual) return
@@ -166,8 +183,9 @@ export default function PhaseAutomationsFasesTab() {
       condField: c0.field || "", condOp: c0.op || "eq", condVal: (c0.value ?? "") + "", idempotent: r.idempotent, active: r.active,
       owner: (p.owner as string) || "", priority: (p.priority as string) || "medium", slaDays: Number(p.slaDays) || 0,
       checklist: Array.isArray(p.checklist) ? (p.checklist as string[]).join("\n") : "",
-      financialType: r.financialType || (p.financialType as string) || "cost", amount: Number(p.amount) || 0,
-      currency: (p.currency as string) || "EUR", financialItemCode: (p.financialItemCode as string) || "",
+      categoria: data?.configsFinanceiras.find(c => c.id === r.configItemId)?.origem || "",
+      configItemId: r.configItemId ? String(r.configItemId) : "",
+      aplicacaoFinanceira: r.aplicacaoFinanceira || "RECEITA",
       alertSeverity: (p.alertSeverity as string) || "info", documentRequired: p.documentRequired !== false,
       eventType: (p.eventType as string) || "", eventOffsetDays: Number(p.eventOffsetDays) || 0,
     })
@@ -175,7 +193,7 @@ export default function PhaseAutomationsFasesTab() {
 
   function buildParams(f: Form): Record<string, unknown> {
     if (f.kind === "task") return { owner: f.owner, priority: f.priority, slaDays: f.slaDays, checklist: f.checklist ? f.checklist.split("\n").map(s => s.trim()).filter(Boolean) : [] }
-    if (f.kind === "financial") return { financialType: f.financialType, amount: f.amount, currency: f.currency, financialItemCode: f.financialItemCode }
+    if (f.kind === "financial") return {} // sem valor/moeda/código — vêm da Config + Tabela de Preços
     if (f.kind === "alert") return { alertSeverity: f.alertSeverity }
     if (f.kind === "document") return { documentRequired: f.documentRequired }
     if (f.kind === "event") return { eventType: f.eventType, eventOffsetDays: f.eventOffsetDays }
@@ -185,12 +203,19 @@ export default function PhaseAutomationsFasesTab() {
   async function saveForm() {
     if (!form || !faseAtual) return
     if (!form.name.trim()) { showFlash("Dê um nome à automação."); return }
+    if (form.kind === "financial") {
+      if (!form.configItemId) { showFlash("Selecione a Configuração Financeira (Categoria + Item)."); return }
+      if (!form.aplicacaoFinanceira) { showFlash("Selecione a Aplicação financeira."); return }
+    }
     const conditions = form.condField && form.condOp ? [{ field: form.condField, op: form.condOp, value: form.condVal }] : []
     const payload = {
       tipoProcessoId: ptNum, phaseKey: faseAtual.phaseKey, kind: form.kind, name: form.name,
       description: form.description, scope: form.scope, trigger: form.trigger, action: form.action,
       conditions, params: buildParams(form),
-      financialType: form.kind === "financial" ? form.financialType : null,
+      // FLUXO NOVO: financeiro envia vínculo estrutural + direção; nunca valor/moeda/tipo.
+      ...(form.kind === "financial"
+        ? { configItemId: Number(form.configItemId), aplicacaoFinanceira: form.aplicacaoFinanceira, financialType: null }
+        : { financialType: null }),
       idempotent: form.idempotent, active: form.active,
     }
     setBusy(true)
@@ -216,7 +241,11 @@ export default function PhaseAutomationsFasesTab() {
       const payload = {
         tipoProcessoId: r.tipoProcessoId, phaseKey: r.phaseKey, kind: r.kind, name: r.name + " (cópia)",
         description: r.description, scope: r.scope, trigger: r.trigger, action: r.action,
-        conditions: r.conditions || [], params: r.params || {}, financialType: r.financialType,
+        conditions: r.conditions || [],
+        // Financeiro novo: duplica o vínculo estrutural, nunca valor/moeda/tipo legado.
+        params: r.kind === "financial" ? {} : (r.params || {}),
+        financialType: null,
+        ...(r.kind === "financial" ? { configItemId: r.configItemId, aplicacaoFinanceira: r.aplicacaoFinanceira } : {}),
         idempotent: r.idempotent, active: r.active,
       }
       const res = await fetch("/api/gerenciamento/automacoes-fase", { method: "POST", headers: authHeaders(), body: JSON.stringify(payload) })
@@ -373,7 +402,13 @@ export default function PhaseAutomationsFasesTab() {
                           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-white/50">
                             <span className="rounded bg-white/10 px-1.5 py-0.5">{kindLabel(r.kind)}</span>
                             <span className="rounded bg-white/10 px-1.5 py-0.5">{trigLabel(r.trigger)}</span>
-                            {r.kind === "financial" && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">{r.financialType === "revenue" || r.financialType === "honorarium" ? "receita" : "custo"} {(Number(p.amount) || 0)} {(p.currency as string) || "EUR"}</span>}
+                            {r.kind === "financial" && (r.configItemId
+                              ? <>
+                                  <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">{catLabel(data?.configsFinanceiras.find(c => c.id === r.configItemId)?.origem)}</span>
+                                  <span className="rounded bg-white/10 px-1.5 py-0.5">{data?.configsFinanceiras.find(c => c.id === r.configItemId)?.mestre || `config #${r.configItemId}`}</span>
+                                  <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-300">{APLIC_LABEL[r.aplicacaoFinanceira || ""] || "Receita"}</span>
+                                </>
+                              : <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">Legada (valor manual)</span>)}
                             {r.kind === "task" && !!p.priority && <span className="rounded bg-white/10 px-1.5 py-0.5">prio: {String(p.priority)}</span>}
                             {cond && <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">se {cond.field} {cond.op === "eq" ? "=" : cond.op} {cond.value}</span>}
                             <span className="rounded bg-white/10 px-1.5 py-0.5">{r.idempotent ? "evita duplicar" : "permite repetir"}</span>
@@ -477,10 +512,32 @@ export default function PhaseAutomationsFasesTab() {
                 <div className="col-span-2"><label className={labelCls}>Checklist (um item por linha)</label><textarea value={form.checklist} onChange={e => setForm(f => f && { ...f, checklist: e.target.value })} className={`${inputCls} min-h-[60px]`} /></div>
               </>)}
               {form.kind === "financial" && (<>
-                <div><label className={labelCls}>Tipo financeiro</label><select value={form.financialType} onChange={e => setForm(f => f && { ...f, financialType: e.target.value })} className={inputCls}><option value="cost" className={opt}>Custo</option><option value="revenue" className={opt}>Receita</option><option value="honorarium" className={opt}>Honorário</option><option value="fee" className={opt}>Taxa</option><option value="tax" className={opt}>Imposto</option></select></div>
-                <div><label className={labelCls}>Item financeiro (código)</label><input value={form.financialItemCode} onChange={e => setForm(f => f && { ...f, financialItemCode: e.target.value })} className={inputCls} placeholder="opcional (senão valor fixo)" /></div>
-                <div><label className={labelCls}>Valor (se sem item)</label><input type="number" value={form.amount} onChange={e => setForm(f => f && { ...f, amount: Number(e.target.value) || 0 })} className={inputCls} /></div>
-                <div><label className={labelCls}>Moeda</label><select value={form.currency} onChange={e => setForm(f => f && { ...f, currency: e.target.value })} className={inputCls}><option value="EUR" className={opt}>EUR</option><option value="BRL" className={opt}>BRL</option><option value="USD" className={opt}>USD</option></select></div>
+                {form.id && !form.configItemId && (
+                  <div className="col-span-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">Regra <b>legada</b> (valor/código manual). Selecione uma Configuração Financeira para migrá-la: o preço passa a vir da Tabela de Preços.</div>
+                )}
+                <div>
+                  <label className={labelCls}>Categoria *</label>
+                  <select value={form.categoria} onChange={e => setForm(f => f && { ...f, categoria: e.target.value, configItemId: "" })} className={inputCls}>
+                    <option value="" className={opt}>Selecione uma categoria</option>
+                    {categoriasFin.map(o => <option key={o} value={o} className={opt}>{catLabel(o)}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Configuração Financeira *</label>
+                  <select value={form.configItemId} disabled={!form.categoria} onChange={e => setForm(f => f && { ...f, configItemId: e.target.value })} className={inputCls + (!form.categoria ? " cursor-not-allowed opacity-60" : "")}>
+                    <option value="" className={opt}>{form.categoria ? "Selecione o item" : "Selecione a categoria primeiro"}</option>
+                    {itensDaCategoria.map(c => <option key={c.id} value={c.id} className={opt}>{c.mestre}{c.possuiCusto ? " · custo" : ""}{c.possuiReceita ? " · venda" : ""}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className={labelCls}>Aplicação financeira *</label>
+                  <select value={form.aplicacaoFinanceira} onChange={e => setForm(f => f && { ...f, aplicacaoFinanceira: e.target.value })} className={inputCls}>
+                    <option value="RECEITA" className={opt}>Receita</option>
+                    <option value="CUSTO" className={opt}>Custo</option>
+                    <option value="AMBOS" className={opt} disabled={!cfgAmbosPermitido}>Custo e receita{cfgAmbosPermitido ? "" : " (config não permite)"}</option>
+                  </select>
+                  <p className="mt-1 text-[11px] text-white/40">A automação não guarda valor nem moeda — o preço vigente vem da Tabela de Preços.</p>
+                </div>
               </>)}
               {form.kind === "alert" && (
                 <div><label className={labelCls}>Severidade</label><select value={form.alertSeverity} onChange={e => setForm(f => f && { ...f, alertSeverity: e.target.value })} className={inputCls}><option value="info" className={opt}>info</option><option value="warning" className={opt}>atenção</option><option value="critical" className={opt}>crítico</option></select></div>

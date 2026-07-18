@@ -2,8 +2,28 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { aplicacaoValida, aplicacaoPermitida } from '@/lib/financeiro/aplicacao-financeira'
 
 function amtTypeToKind(t?: string) { return t === 'phase_transition' ? 'phase_advance' : (t || 'task') }
+
+// Configurações Financeiras (para o seletor Categoria|Item da regra financeira nova).
+// Origem ESTRUTURAL derivada das FKs — nunca por texto. Persistimos só configItemId.
+async function listarConfigsFinanceiras() {
+  const cfgs = await prisma.produtoFinanceiro.findMany({
+    where: { ativo: true },
+    select: {
+      id: true, codigo: true, possuiCusto: true, possuiReceita: true,
+      tipoDocumento: { select: { name: true } }, honorario: { select: { name: true } },
+      tipoProcesso: { select: { name: true } }, itemCatalogo: { select: { name: true, natureza: true } },
+    },
+    orderBy: { id: 'asc' },
+  })
+  return cfgs.map((c) => {
+    const origem = c.tipoDocumento ? 'documento' : c.honorario ? 'honorario' : c.tipoProcesso ? 'processo' : (c.itemCatalogo?.natureza === 'SERVICO' ? 'servico' : 'item')
+    const mestre = c.tipoDocumento?.name ?? c.honorario?.name ?? c.tipoProcesso?.name ?? c.itemCatalogo?.name ?? '—'
+    return { id: c.id, codigo: c.codigo, origem, mestre, possuiCusto: c.possuiCusto, possuiReceita: c.possuiReceita }
+  })
+}
 
 // ARQUITETURA NOVA — automações só descrevem EFEITOS ADICIONAIS. PROIBIDO:
 //  - 'phase_advance'/'phase_transition' → avanço é exclusivo do PhaseAdvanceService;
@@ -26,7 +46,7 @@ export async function GET(request: NextRequest) {
   if (erro) return erro
 
   try {
-    const [tipos, regras, modelos] = await Promise.all([
+    const [tipos, regras, modelos, configs] = await Promise.all([
       prisma.tipoProcessoNacionalidade.findMany({
         where: { arquivado: false },
         include: { macroWorkflow: { include: { fases: { orderBy: { ordem: 'asc' } } } } },
@@ -39,6 +59,7 @@ export async function GET(request: NextRequest) {
         where: { arquivado: false },
         orderBy: { name: 'asc' },
       }),
+      listarConfigsFinanceiras(),
     ])
 
     const tiposProcesso = tipos.map((t) => ({
@@ -49,7 +70,7 @@ export async function GET(request: NextRequest) {
       })),
     }))
 
-    return NextResponse.json({ tiposProcesso, regras, modelosAutomacao: modelos })
+    return NextResponse.json({ tiposProcesso, regras, modelosAutomacao: modelos, configsFinanceiras: configs })
   } catch (e) {
     console.error('GET automacoes-fase', e)
     return NextResponse.json({ error: 'Erro ao carregar automações das fases.' }, { status: 500 })
@@ -111,6 +132,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: msgProibido(kind), code: 'AUTOMACAO_PROIBIDA' }, { status: 422 })
     }
 
+    // FLUXO NOVO OBRIGATÓRIO para regras financeiras: vínculo estrutural + direção.
+    // A automação NÃO guarda preço/moeda/item — vem da Config Financeira + Tabela de Preços.
+    let configItemId: number | null = null
+    let aplicacaoFinanceira: string | null = null
+    if (kind === 'financial') {
+      configItemId = body.configItemId ? Number(body.configItemId) : null
+      aplicacaoFinanceira = body.aplicacaoFinanceira ? String(body.aplicacaoFinanceira).toUpperCase() : null
+      if (!configItemId) return NextResponse.json({ error: 'Selecione a Configuração Financeira (Categoria + Item).' }, { status: 400 })
+      if (!aplicacaoValida(aplicacaoFinanceira)) return NextResponse.json({ error: 'Selecione a Aplicação financeira (Receita, Custo ou Ambos).' }, { status: 400 })
+      const p = (body.params ?? {}) as Record<string, unknown>
+      if (p.amount != null || p.currency || p.financialItemCode || body.financialType) {
+        return NextResponse.json({ error: 'Regra financeira nova não aceita valor, moeda, item por código ou tipo financeiro — esses dados vêm da Configuração Financeira e da Tabela de Preços.' }, { status: 400 })
+      }
+      const cfg = await prisma.produtoFinanceiro.findUnique({ where: { id: configItemId }, select: { possuiCusto: true, possuiReceita: true } })
+      if (!cfg) return NextResponse.json({ error: 'Configuração Financeira não encontrada.' }, { status: 404 })
+      if (!aplicacaoPermitida(aplicacaoFinanceira as 'RECEITA' | 'CUSTO' | 'AMBOS', cfg)) {
+        return NextResponse.json({ error: `A Configuração Financeira selecionada não permite "${aplicacaoFinanceira}".` }, { status: 400 })
+      }
+    }
+
     const rule = await prisma.phaseAutomationRule.create({
       data: {
         tipoProcessoId, phaseKey, kind, name,
@@ -119,8 +160,11 @@ export async function POST(request: NextRequest) {
         trigger: body.trigger || 'phase_entered',
         action: body.action ? String(body.action) : null,
         conditions: (body.conditions ?? undefined) as Prisma.InputJsonValue | undefined,
-        params: (body.params ?? {}) as Prisma.InputJsonValue,
-        financialType: body.financialType ? String(body.financialType) : null,
+        // Regra financeira nova: params/financialType ficam VAZIOS (sem valor/moeda/código).
+        params: (kind === 'financial' ? {} : (body.params ?? {})) as Prisma.InputJsonValue,
+        financialType: null,
+        configItemId,
+        aplicacaoFinanceira,
         idempotent: body.idempotent !== false,
         active: body.active !== false,
       },

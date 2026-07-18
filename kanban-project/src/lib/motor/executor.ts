@@ -24,6 +24,7 @@ import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
 import { gerarEconomicoDaMatriz } from './matriz-economica'
 import { resolverPrecoPorConfigDB } from './resolver-preco-financeiro.prisma'
 import { NaturezaPreco } from '@prisma/client'
+import { aplicacaoValida, naturezasDaAplicacao, aplicacaoPermitida } from '@/lib/financeiro/aplicacao-financeira'
 import { processoEmRuntimeV2 } from './runtime-guard' // CP-4H
 
 // PREÇO-FONTE-ÚNICA (§5): resolve o valor SÓ pela Tabela de Preços de uma
@@ -331,6 +332,33 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
     const cond = await avaliarCondicoes(r.conditions, processoId)
     if (cond.decisao === 'bloqueia') { skipped.push({ name: r.name, reason: cond.motivo || 'condição não satisfeita' }); continue }
     const naoVerificada = cond.decisao === 'nao_verificada'
+
+    // ── FLUXO NOVO — vínculo ESTRUTURAL à Configuração Financeira (sem valor/moeda manual).
+    // Preço SEMPRE da Tabela de Preços por natureza da Aplicação. AMBOS → dois lançamentos.
+    if (r.configItemId != null) {
+      const ap = r.aplicacaoFinanceira
+      if (!aplicacaoValida(ap)) { skipped.push({ name: r.name, reason: 'Aplicação financeira ausente/inválida (RECEITA, CUSTO ou AMBOS)' }); continue }
+      const cfg = await prisma.produtoFinanceiro.findUnique({ where: { id: r.configItemId }, select: { possuiCusto: true, possuiReceita: true } })
+      if (!cfg) { skipped.push({ name: r.name, reason: 'Configuração Financeira vinculada não encontrada' }); continue }
+      if (!aplicacaoPermitida(ap, cfg)) { skipped.push({ name: r.name, reason: `Aplicação "${ap}" não é permitida pela Configuração Financeira (custo=${cfg.possuiCusto}, receita=${cfg.possuiReceita})` }); continue }
+      for (const natPreco of naturezasDaAplicacao(ap)) {
+        const isRec = natPreco === NaturezaPreco.VENDA
+        const preco = await precoDaConfig(r.configItemId, natPreco, processoId, tipoProcessoId)
+        if (!preco) { skipped.push({ name: r.name, reason: 'Configuração Financeira sem preço cadastrado' }); continue }
+        if ('erro' in preco) { skipped.push({ name: r.name, reason: `Nenhum preço vigente encontrado para a Configuração Financeira selecionada — ${preco.erro}` }); continue }
+        const fx = await fxParaBRL(preco.moeda, fxCache)
+        // Idempotência estrutural: processo + fase + automação + natureza (config/aplicação fixos na regra).
+        const akey = `${processoId}::${phaseKey}::automation::${r.id}::${isRec ? 'VENDA' : 'CUSTO'}`
+        const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', contexto: { fonte: 'automation', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap } }
+        await fazer(akey, isRec ? 'Receita' : 'Custo', 'financial', 'automation', r.id, r.name,
+          { configItemId: r.configItemId, aplicacao: ap, natureza: isRec ? 'VENDA' : 'CUSTO', valor: preco.valor, moeda: preco.moeda, tabelaValorId: preco.tabelaValorId, ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
+          async () => (isRec ? criarReceita(processoId, r.name, preco.valor, preco.moeda, fx, false, fz) : criarCusto(processoId, r.name, preco.valor, preco.moeda, fx, fz)),
+          (id) => created.push({ kind: 'financial', targetTable: isRec ? 'Receita' : 'Custo', targetId: id, name: r.name, amount: preco.valor, currency: preco.moeda, condicaoNaoVerificada: naoVerificada || undefined }))
+      }
+      continue
+    }
+
+    // ── FLUXO LEGADO (configItemId null) — mantido só para regras antigas já existentes.
     const code = pstr(r.params, 'financialItemCode')
     const prod = code ? prodByCode.get(code) : undefined
     const honorario = r.financialType === 'honorarium'
