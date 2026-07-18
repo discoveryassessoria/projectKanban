@@ -24,6 +24,8 @@ import { calcularPendencias } from "@/src/lib/motor/blocking-engine"
 import type { BlockingIssue } from "@/src/lib/motor/blocking-helpers"
 import { instanciarWorkflowDaFase, type OrigemInstanciaStr } from "@/src/services/phase-workflow"
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
+import { captureOperationalSnapshot } from "@/src/lib/motor/historical-operational-projection"
+import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import {
   type AdvanceOperacao,
   type AdvanceFailureCode,
@@ -189,7 +191,7 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
       if (p.encerramento !== "NENHUM") {
         const atual = await tx.phaseWorkflowInstance.findFirst({
           where: { processoId: p.processoId, faseMacroKey: p.faseAtual, status: { in: ["ATIVO", "BLOQUEADO", "AGUARDANDO"] } },
-          orderBy: { ciclo: "desc" }, select: { id: true },
+          orderBy: { ciclo: "desc" }, select: { id: true, ciclo: true },
         })
         if (atual) {
           previousInstanceId = atual.id
@@ -210,6 +212,18 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
               dados: { faseMacroKey: p.faseAtual, motivo: p.operacao },
             },
           })
+          // SNAPSHOT DA PROJEÇÃO OPERACIONAL na CONCLUSÃO do ciclo (Central única VIEW):
+          // captura, IMUTÁVEL, o payload que a Central renderizava para esta fase/ciclo.
+          // Só na conclusão real (não em supersessão/retorno). Idempotente (não reescreve).
+          if (concluir) {
+            await captureOperationalSnapshot(tx, {
+              instanceId: atual.id,
+              faseCode: phaseKeyToFaseCode(p.faseAtual),
+              faseMacroKey: p.faseAtual,
+              ciclo: atual.ciclo,
+              capturedAt: new Date().toISOString(),
+            })
+          }
         }
       }
 

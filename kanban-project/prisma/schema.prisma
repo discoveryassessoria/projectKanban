@@ -2746,6 +2746,13 @@ model PhaseWorkflowInstance {
   snapshot              Json?
   snapshotSchemaVersion Int   @default(1) // CP-4B
 
+  // Snapshot IMUTÁVEL da PROJEÇÃO OPERACIONAL consumida pela Central Operacional,
+  // capturado na CONCLUSÃO do ciclo. A consulta histórica (VIEW) DESSERIALIZA isto —
+  // nunca reconstrói a tela lendo tabelas vivas do domínio. Null = ciclo concluído
+  // antes desta infra, ou fase de domínio ainda não migrada (VIEW sinaliza honestamente).
+  operationalSnapshot              Json?
+  operationalSnapshotSchemaVersion Int?
+
   ciclo             Int                    @default(1)
   status            WorkflowInstanceStatus @default(PENDENTE)
   origem            OrigemInstancia        @default(MOTOR)
