@@ -66,6 +66,24 @@ export async function PUT(
     const natFinReq = typeof b.naturezaFin === 'string' && ['SOMENTE_CUSTO', 'SOMENTE_RECEITA', 'CUSTO_E_RECEITA'].includes(b.naturezaFin) ? b.naturezaFin : undefined
     const possuiCustoFinal = natFinReq ? natFinReq !== 'SOMENTE_RECEITA' : (b.possuiCusto !== undefined ? !!b.possuiCusto : atual.possuiCusto)
     const possuiReceitaFinal = natFinReq ? natFinReq !== 'SOMENTE_CUSTO' : (b.possuiReceita !== undefined ? !!b.possuiReceita : atual.possuiReceita)
+
+    // CONTA CONTÁBIL POR NATUREZA — valor EFETIVO (enviado ?? atual ?? conta legada única).
+    const contaLegadoFinal = b.planoContaId !== undefined ? (b.planoContaId ? Number(b.planoContaId) : null) : atual.planoContaId
+    const contaReceitaFinal =
+      (b.planoContaReceitaId !== undefined ? (b.planoContaReceitaId ? Number(b.planoContaReceitaId) : null) : atual.planoContaReceitaId) ?? contaLegadoFinal
+    const contaCustoFinal =
+      (b.planoContaCustoId !== undefined ? (b.planoContaCustoId ? Number(b.planoContaCustoId) : null) : atual.planoContaCustoId) ?? contaLegadoFinal
+    if (possuiReceitaFinal && !contaReceitaFinal) {
+      return NextResponse.json({ error: 'Conta Contábil de Receita é obrigatória para esta Natureza Financeira.' }, { status: 400 })
+    }
+    if (possuiCustoFinal && !contaCustoFinal) {
+      return NextResponse.json({ error: 'Conta Contábil de Custo é obrigatória para esta Natureza Financeira.' }, { status: 400 })
+    }
+    // REEMBOLSÁVEL — valor efetivo; só se aplica a itens que geram custo.
+    const reembolsavelFinal = b.reembolsavel !== undefined ? !!b.reembolsavel : atual.reembolsavel
+    if (reembolsavelFinal && !possuiCustoFinal) {
+      return NextResponse.json({ error: 'Reembolsável só se aplica a itens que geram custo (o reembolso é do custo pelo cliente).' }, { status: 400 })
+    }
     const produto = await prisma.$transaction(async (tx) => {
       // Nome/código do mestre NÃO são editados aqui (pertencem ao cadastro mestre).
       // O ItemCatalogo é rotulado pela tela do próprio mestre (Serviços/Documentos).
@@ -77,7 +95,9 @@ export async function PUT(
           especie: b.especie !== undefined ? s(b.especie) : atual.especie,
           tipoFinanceiro: b.tipoFinanceiro !== undefined ? s(b.tipoFinanceiro) : atual.tipoFinanceiro,
           categoriaId: b.categoriaId !== undefined ? (b.categoriaId ? Number(b.categoriaId) : null) : atual.categoriaId,
-          planoContaId: b.planoContaId !== undefined ? (b.planoContaId ? Number(b.planoContaId) : null) : atual.planoContaId,
+          planoContaId: contaLegadoFinal, // LEGADO preservado
+          planoContaReceitaId: contaReceitaFinal,
+          planoContaCustoId: contaCustoFinal,
           moedaPadrao: b.moedaPadrao !== undefined ? (b.moedaPadrao || 'BRL') : atual.moedaPadrao,
           valorPadrao: b.valorPadrao !== undefined ? parseDecimal(b.valorPadrao) : atual.valorPadrao,
           aplicaA: b.aplicaA !== undefined ? s(b.aplicaA) : atual.aplicaA,
@@ -86,7 +106,7 @@ export async function PUT(
           naturezaFinanceira: b.naturezaFinanceira !== undefined ? (b.naturezaFinanceira || 'revenue') : atual.naturezaFinanceira,
           custoInterno: b.custoInterno !== undefined ? !!b.custoInterno : atual.custoInterno,
           repasse: b.repasse !== undefined ? !!b.repasse : atual.repasse,
-          reembolsavel: b.reembolsavel !== undefined ? !!b.reembolsavel : atual.reembolsavel,
+          reembolsavel: reembolsavelFinal,
           // PREÇO-FONTE-ÚNICA — natureza estrutural; flags derivam dela quando enviada.
           naturezaFin: natFinReq !== undefined ? (natFinReq as never) : atual.naturezaFin,
           possuiCusto: possuiCustoFinal,

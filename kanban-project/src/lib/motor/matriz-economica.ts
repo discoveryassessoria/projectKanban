@@ -180,7 +180,9 @@ export async function gerarEconomicoDaMatriz(
             if (bloqueio) {
               await registrarPendencia({ chave, processoId, tipoProcessoId, phaseKey, phaseCycle, configId: prodCusto.id, regraId: regra.id, natureza: NaturezaPreco.CUSTO, motivo: bloqueio.motivo, detalhe: `${componente}: ${bloqueio.detalhe}`, contexto: bloqueio.contexto }, pulados, erros)
             } else {
-              const cong = congelar(rC, NaturezaPreco.CUSTO, prodCusto.id, regra.id, chave, { tipoProcessoId, phaseKey, phaseCycle })
+              // Conta Contábil de CUSTO ao gerar CUSTO (fallback: conta legada única).
+              const contaCustoId = prodCusto.planoContaCustoId ?? prodCusto.planoContaId ?? null
+              const cong = congelar(rC, NaturezaPreco.CUSTO, prodCusto.id, regra.id, chave, { tipoProcessoId, phaseKey, phaseCycle, contaContabilId: contaCustoId })
               await comIdempotencia(chave, processoId, tipoProcessoId, phaseKey, 'financial', regra.id, 'Custo', desc,
                 () => criarCusto(processoId, desc, cong, { ...vinc, productServiceId: prodCusto.id }),
                 (id) => { item.custoId = id; item.custo = { valor: cong.valor, moeda: cong.moeda } }, pulados, erros)
@@ -199,7 +201,9 @@ export async function gerarEconomicoDaMatriz(
             if (bloqueio) {
               await registrarPendencia({ chave, processoId, tipoProcessoId, phaseKey, phaseCycle, configId: prodReceita.id, regraId: regra.id, natureza: NaturezaPreco.VENDA, motivo: bloqueio.motivo, detalhe: `${componente}: ${bloqueio.detalhe}`, contexto: bloqueio.contexto }, pulados, erros)
             } else {
-              const cong = congelar(rR, NaturezaPreco.VENDA, prodReceita.id, regra.id, chave, { tipoProcessoId, phaseKey, phaseCycle })
+              // Conta Contábil de RECEITA ao gerar RECEITA (fallback: conta legada única).
+              const contaReceitaId = prodReceita.planoContaReceitaId ?? prodReceita.planoContaId ?? null
+              const cong = congelar(rR, NaturezaPreco.VENDA, prodReceita.id, regra.id, chave, { tipoProcessoId, phaseKey, phaseCycle, contaContabilId: contaReceitaId })
               await comIdempotencia(chave, processoId, tipoProcessoId, phaseKey, 'financial', regra.id, 'Receita', desc,
                 () => criarReceita(processoId, desc, cong, { ...vinc, productServiceId: prodReceita.id }),
                 (id) => { item.receitaId = id; item.receita = { valor: cong.valor, moeda: cong.moeda } }, pulados, erros)
@@ -269,13 +273,14 @@ interface Congelado {
 
 function congelar(
   r: ResultadoPreco, natureza: NaturezaPreco, configId: number, regraId: number | null, chave: string,
-  ctx: { tipoProcessoId: number; phaseKey: string; phaseCycle: number },
+  ctx: { tipoProcessoId: number; phaseKey: string; phaseCycle: number; contaContabilId: number | null },
 ): Congelado {
   const ok = r as ResultadoPrecoOK // só chamado quando motivoBloqueio() === null
   return {
     valor: ok.valor, valorUnitario: ok.valorUnitario, quantidade: ok.quantidade, moeda: ok.moeda,
     modoCalculo: ok.modoCalculo, natureza, tabelaValorId: ok.tabelaValorId, configId, regraFinanceiraId: regraId,
-    contexto: { nivel: ok.nivel, prioridade: ok.prioridade, especificidade: ok.especificidade, razao: ok.razao, tipoProcessoId: ctx.tipoProcessoId, phaseKey: ctx.phaseKey, phaseCycle: ctx.phaseCycle },
+    // §6 — conta contábil por natureza congelada no snapshot (rastreabilidade; não altera lançamentos já existentes).
+    contexto: { nivel: ok.nivel, prioridade: ok.prioridade, especificidade: ok.especificidade, razao: ok.razao, tipoProcessoId: ctx.tipoProcessoId, phaseKey: ctx.phaseKey, phaseCycle: ctx.phaseCycle, contaContabilId: ctx.contaContabilId },
     dataReferencia: new Date(), chaveIdempotencia: chave,
   }
 }

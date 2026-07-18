@@ -30,10 +30,13 @@ export interface ProdutoFinanceiroLike {
   naturezaFinanceira: string | null // "cost" | "revenue"
   itemCatalogoId: number | null
   categoriaId: number | null
-  planoContaId: number | null
+  planoContaId: number | null // LEGADO (conta única) — fallback histórico
+  planoContaReceitaId?: number | null
+  planoContaCustoId?: number | null
   moedaPadrao: string
   valorPadrao: number | null
   cobravelDoCliente: boolean
+  /** DEPRECIADO — redundante com a Natureza Financeira; fora da UI. Mantido só p/ leitura. */
   custoInterno: boolean
   repasse: boolean
   reembolsavel: boolean
@@ -42,6 +45,7 @@ export interface ProdutoFinanceiroLike {
 
 export interface FacetasFinanceiras {
   cobravelDoCliente: boolean
+  /** DEPRECIADO — ver ProdutoFinanceiroLike.custoInterno. */
   custoInterno: boolean
   repasse: boolean
   reembolsavel: boolean
@@ -57,7 +61,9 @@ export interface ConfiguracaoFinanceiraView {
   /** true se a config ainda não referencia um mestre (órfã — corrigir no M1). */
   semMestre: boolean
   categoriaId: number | null
-  planoContaId: number | null
+  planoContaId: number | null // LEGADO (conta única)
+  planoContaReceitaId: number | null
+  planoContaCustoId: number | null
   moedaPadrao: string
   valorPadrao: number | null
   facetas: FacetasFinanceiras
@@ -80,6 +86,8 @@ export function paraConfiguracaoView(p: ProdutoFinanceiroLike): ConfiguracaoFina
     semMestre: p.itemCatalogoId == null,
     categoriaId: p.categoriaId,
     planoContaId: p.planoContaId,
+    planoContaReceitaId: p.planoContaReceitaId ?? null,
+    planoContaCustoId: p.planoContaCustoId ?? null,
     moedaPadrao: p.moedaPadrao,
     valorPadrao: p.valorPadrao,
     facetas: {

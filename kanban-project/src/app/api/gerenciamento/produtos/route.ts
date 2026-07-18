@@ -23,6 +23,8 @@ function parseDecimal(v: unknown): number | null {
 const MASTER_INCLUDE = {
   categoria: { select: { id: true, nome: true } },
   planoConta: { select: { id: true, codigo: true, nome: true } },
+  planoContaReceita: { select: { id: true, codigo: true, nome: true } },
+  planoContaCusto: { select: { id: true, codigo: true, nome: true } },
   tipoDocumento: { select: { code: true, name: true } },
   honorario: { select: { code: true, name: true } },
   tipoProcesso: { select: { code: true, name: true } },
@@ -107,6 +109,22 @@ export async function POST(request: NextRequest) {
     const possuiCusto = natFinReq ? natFinReq !== 'SOMENTE_RECEITA' : (!!b.possuiCusto || parseDecimal(b.valorCustoPadrao) != null)
     const possuiReceita = natFinReq ? natFinReq !== 'SOMENTE_CUSTO' : (!!b.possuiReceita || parseDecimal(b.valorReceitaPadrao) != null)
 
+    // CONTA CONTÁBIL POR NATUREZA — fallback: conta legada única satisfaz o requisito (compat).
+    const contaLegado = b.planoContaId ? Number(b.planoContaId) : null
+    const contaReceitaId = (b.planoContaReceitaId ? Number(b.planoContaReceitaId) : null) ?? contaLegado
+    const contaCustoId = (b.planoContaCustoId ? Number(b.planoContaCustoId) : null) ?? contaLegado
+    // Regra: SOMENTE_RECEITA exige só receita; SOMENTE_CUSTO só custo; CUSTO_E_RECEITA ambas.
+    if (possuiReceita && !contaReceitaId) {
+      return NextResponse.json({ error: 'Conta Contábil de Receita é obrigatória para esta Natureza Financeira.' }, { status: 400 })
+    }
+    if (possuiCusto && !contaCustoId) {
+      return NextResponse.json({ error: 'Conta Contábil de Custo é obrigatória para esta Natureza Financeira.' }, { status: 400 })
+    }
+    // REEMBOLSÁVEL — significado exclusivo: os CUSTOS gerados podem ser reembolsados. Só se gera custo.
+    if (!!b.reembolsavel && !possuiCusto) {
+      return NextResponse.json({ error: 'Reembolsável só se aplica a itens que geram custo (o reembolso é do custo pelo cliente).' }, { status: 400 })
+    }
+
     let origem: string
     let masterFkId: number
     let masterNome: string
@@ -153,7 +171,9 @@ export async function POST(request: NextRequest) {
           especie: s(b.especie),
           naturezaFinanceira: b.naturezaFinanceira || 'revenue',
           categoriaId: b.categoriaId ? Number(b.categoriaId) : null,
-          planoContaId: b.planoContaId ? Number(b.planoContaId) : null,
+          planoContaId: contaLegado, // LEGADO preservado
+          planoContaReceitaId: contaReceitaId,
+          planoContaCustoId: contaCustoId,
           moedaPadrao: b.moedaPadrao || 'BRL',
           valorPadrao: parseDecimal(b.valorPadrao),
           cobravelDoCliente: !!b.cobravelDoCliente,

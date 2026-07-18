@@ -18,7 +18,9 @@ type Produto = {
   especie: string | null
   naturezaFinanceira: string | null
   categoriaId: number | null
-  planoContaId: number | null
+  planoContaId: number | null // LEGADO (conta única) — preservado para leitura/fallback
+  planoContaReceitaId: number | null
+  planoContaCustoId: number | null
   moedaPadrao: string
   // M-UNIFICA — custo e receita como valores da MESMA config
   possuiCusto: boolean
@@ -26,12 +28,13 @@ type Produto = {
   valorCustoPadrao: string | number | null
   valorReceitaPadrao: string | number | null
   cobravelDoCliente: boolean
-  custoInterno: boolean
   repasse: boolean
   reembolsavel: boolean
   ativo: boolean
   categoria?: CategoriaRef | null
   planoConta?: ContaRef | null
+  planoContaReceita?: ContaRef | null
+  planoContaCusto?: ContaRef | null
   tipoDocumentoId: number | null
   honorarioId: number | null
   tipoProcessoId: number | null
@@ -76,8 +79,8 @@ const EMPTY = {
   naturezaFin: 'SOMENTE_RECEITA',
   valorCustoPadrao: '', valorReceitaPadrao: '',
   codigo: '', nome: '', naturezaFinanceira: 'revenue',
-  categoriaId: '', planoContaId: '', moedaPadrao: 'BRL', fornecedorPadraoId: '',
-  cobravelDoCliente: false, custoInterno: false, repasse: false, reembolsavel: false, ativo: true,
+  categoriaId: '', planoContaReceitaId: '', planoContaCustoId: '', moedaPadrao: 'BRL', fornecedorPadraoId: '',
+  cobravelDoCliente: false, repasse: false, reembolsavel: false, ativo: true,
 }
 type FormState = typeof EMPTY
 
@@ -201,10 +204,12 @@ export default function ProdutosTab() {
       valorReceitaPadrao: p.valorReceitaPadrao != null ? String(p.valorReceitaPadrao) : '',
       codigo: '', nome: p.mestre?.nome || p.nome,
       naturezaFinanceira: p.naturezaFinanceira || 'revenue',
-      categoriaId: p.categoriaId ? String(p.categoriaId) : '', planoContaId: p.planoContaId ? String(p.planoContaId) : '',
+      categoriaId: p.categoriaId ? String(p.categoriaId) : '',
+      planoContaReceitaId: String(p.planoContaReceitaId ?? p.planoContaId ?? ''),
+      planoContaCustoId: String(p.planoContaCustoId ?? p.planoContaId ?? ''),
       moedaPadrao: p.moedaPadrao || 'BRL',
       fornecedorPadraoId: p.fornecedorPadraoId ? String(p.fornecedorPadraoId) : '',
-      cobravelDoCliente: p.cobravelDoCliente, custoInterno: p.custoInterno,
+      cobravelDoCliente: p.cobravelDoCliente,
       repasse: p.repasse, reembolsavel: p.reembolsavel, ativo: p.ativo,
     })
     setMasterBusca(''); setErroModal(null); setModalAberto(true)
@@ -213,6 +218,11 @@ export default function ProdutosTab() {
   async function salvar() {
     if (!form.masterId) { setErroModal('Selecione a entidade mestre (origem). O nome/código vêm dela.'); return }
     if (!form.naturezaFin) { setErroModal('Selecione a Natureza Financeira.'); return }
+    const geraReceita = form.naturezaFin !== 'SOMENTE_CUSTO'
+    const geraCusto = form.naturezaFin !== 'SOMENTE_RECEITA'
+    if (geraReceita && !form.planoContaReceitaId) { setErroModal('Informe a Conta Contábil de Receita.'); return }
+    if (geraCusto && !form.planoContaCustoId) { setErroModal('Informe a Conta Contábil de Custo.'); return }
+    if (form.reembolsavel && !geraCusto) { setErroModal('Reembolsável só se aplica a itens que geram custo.'); return }
     setSalvando(true); setErroModal(null)
     try {
       const fkField = FK_POR_ORIGEM[form.origem]
@@ -228,7 +238,9 @@ export default function ProdutosTab() {
         possuiCusto: form.naturezaFin !== 'SOMENTE_RECEITA',
         possuiReceita: form.naturezaFin !== 'SOMENTE_CUSTO',
         categoriaId: form.categoriaId || null,
-        planoContaId: form.planoContaId || null,
+        // Conta contábil por natureza (só envia a que a natureza usa).
+        planoContaReceitaId: geraReceita ? (form.planoContaReceitaId || null) : null,
+        planoContaCustoId: geraCusto ? (form.planoContaCustoId || null) : null,
         fornecedorPadraoId: form.fornecedorPadraoId || null,
       })
       if (editando) {
@@ -329,7 +341,6 @@ export default function ProdutosTab() {
                         {p.ativo ? 'Ativo' : 'Inativo'}
                       </span>
                       {p.cobravelDoCliente && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-blue-500/15 text-blue-300">Cobrável</span>}
-                      {p.custoInterno && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-amber-500/15 text-amber-300">Custo interno</span>}
                       {p.repasse && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-purple-500/15 text-purple-300">Repasse</span>}
                       {p.reembolsavel && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-teal-500/15 text-teal-300">Reembolsável</span>}
                     </div>
@@ -409,21 +420,33 @@ export default function ProdutosTab() {
 
               {/* Classificação */}
               <Secao titulo="Classificação">
+                <div>
+                  <label className="mb-1 block text-xs text-white/60">Categoria</label>
+                  <select value={form.categoriaId} onChange={(e) => set('categoriaId', e.target.value)} className={inputCls}>
+                    <option value="" className="bg-zinc-900">— Nenhuma —</option>
+                    {categorias.map((c) => <option key={c.id} value={c.id} className="bg-zinc-900">{c.nome}</option>)}
+                  </select>
+                </div>
+                {/* Conta contábil por natureza: Receita ao gerar RECEITA, Custo ao gerar CUSTO. */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1 block text-xs text-white/60">Categoria</label>
-                    <select value={form.categoriaId} onChange={(e) => set('categoriaId', e.target.value)} className={inputCls}>
-                      <option value="" className="bg-zinc-900">— Nenhuma —</option>
-                      {categorias.map((c) => <option key={c.id} value={c.id} className="bg-zinc-900">{c.nome}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-white/60">Conta contábil</label>
-                    <select value={form.planoContaId} onChange={(e) => set('planoContaId', e.target.value)} className={inputCls}>
-                      <option value="" className="bg-zinc-900">— Nenhuma —</option>
-                      {contas.map((c) => <option key={c.id} value={c.id} className="bg-zinc-900">{c.codigo} — {c.nome}</option>)}
-                    </select>
-                  </div>
+                  {form.naturezaFin !== 'SOMENTE_CUSTO' && (
+                    <div>
+                      <label className="mb-1 block text-xs text-white/60">Conta contábil de Receita</label>
+                      <select value={form.planoContaReceitaId} onChange={(e) => set('planoContaReceitaId', e.target.value)} className={inputCls}>
+                        <option value="" className="bg-zinc-900">— Selecione —</option>
+                        {contas.map((c) => <option key={c.id} value={c.id} className="bg-zinc-900">{c.codigo} — {c.nome}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {form.naturezaFin !== 'SOMENTE_RECEITA' && (
+                    <div>
+                      <label className="mb-1 block text-xs text-white/60">Conta contábil de Custo</label>
+                      <select value={form.planoContaCustoId} onChange={(e) => set('planoContaCustoId', e.target.value)} className={inputCls}>
+                        <option value="" className="bg-zinc-900">— Selecione —</option>
+                        {contas.map((c) => <option key={c.id} value={c.id} className="bg-zinc-900">{c.codigo} — {c.nome}</option>)}
+                      </select>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-white/60">Fornecedor padrão (opcional)</label>
@@ -441,15 +464,11 @@ export default function ProdutosTab() {
                     <input type="checkbox" checked={form.cobravelDoCliente} onChange={(e) => set('cobravelDoCliente', e.target.checked)} className="h-4 w-4 accent-blue-500" />
                     Cobrável do cliente
                   </label>
-                  <label className="flex items-center gap-2 text-sm text-white/80">
-                    <input type="checkbox" checked={form.custoInterno} onChange={(e) => set('custoInterno', e.target.checked)} className="h-4 w-4 accent-blue-500" />
-                    Custo interno
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-white/80">
+                  <label className="flex items-center gap-2 text-sm text-white/80" title="Item é um valor de terceiros repassado ao cliente (pass-through, sem margem).">
                     <input type="checkbox" checked={form.repasse} onChange={(e) => set('repasse', e.target.checked)} className="h-4 w-4 accent-blue-500" />
                     Repasse
                   </label>
-                  <label className="flex items-center gap-2 text-sm text-white/80">
+                  <label className="flex items-center gap-2 text-sm text-white/80" title="Os custos gerados por este item podem ser reembolsados pelo cliente.">
                     <input type="checkbox" checked={form.reembolsavel} onChange={(e) => set('reembolsavel', e.target.checked)} className="h-4 w-4 accent-blue-500" />
                     Reembolsável
                   </label>
@@ -457,6 +476,10 @@ export default function ProdutosTab() {
                     <input type="checkbox" checked={form.ativo} onChange={(e) => set('ativo', e.target.checked)} className="h-4 w-4 accent-blue-500" />
                     Ativo
                   </label>
+                </div>
+                <div className="mt-2 space-y-0.5 text-[11px] text-white/40">
+                  <p><b>Repasse</b>: valor de terceiros repassado ao cliente (pass-through, sem margem/serviço próprio).</p>
+                  <p><b>Reembolsável</b>: os custos gerados por este item podem ser reembolsados pelo cliente.</p>
                 </div>
               </Secao>
 
