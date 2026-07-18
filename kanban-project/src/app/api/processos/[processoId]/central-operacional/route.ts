@@ -6,7 +6,7 @@ import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { getOrdemFase, getStepsForFase, getFase, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 import { resolveProgressoFaseDocumento } from "@/src/lib/process-stage/resolve-fase-progresso"
-import { resolveOperationalProjection, type OperationalProjection } from "@/src/lib/process-stage/operational-projection"
+import { resolveOperationalProjection, resolveOperationalProjectionForInstance, type OperationalProjection } from "@/src/lib/process-stage/operational-projection"
 import type { FaseCode } from "@prisma/client"
 
 // ============================================================
@@ -221,8 +221,12 @@ export async function GET(
       | "lineage"
     const userIdParam = searchParams.get("userId")
     const userId = userIdParam ? parseInt(userIdParam) : null
+    // VIEW/consulta: escopa a Central à instância selecionada (dados reais do ciclo).
+    const pInstParam = searchParams.get("phaseInstanceId")
+    const phaseInstanceId = pInstParam ? parseInt(pInstParam) : null
+    const phaseKey = searchParams.get("phaseKey")
 
-    const built = await buildCentralOperacionalPayload(id, { queueFilter, sortBy, userId })
+    const built = await buildCentralOperacionalPayload(id, { queueFilter, sortBy, userId, phaseInstanceId, phaseKey })
     if (!built.ok) return NextResponse.json({ error: built.error }, { status: built.status })
     return NextResponse.json(built.data)
   } catch (error) {
@@ -242,11 +246,18 @@ export type CentralPayloadResult =
  */
 export async function buildCentralOperacionalPayload(
   id: number,
-  opts: { queueFilter?: QueueId; sortBy?: "priority" | "sla" | "lineage"; userId?: number | null } = {},
+  opts: {
+    queueFilter?: QueueId; sortBy?: "priority" | "sla" | "lineage"; userId?: number | null
+    // VIEW/consulta: escopa a Central a uma fase/instância ESPECÍFICA (dados REAIS do ciclo),
+    // sem usar a fase ATIVA do processo e sem depender de snapshot.
+    phaseInstanceId?: number | null; phaseKey?: string | null
+  } = {},
 ): Promise<CentralPayloadResult> {
   const queueFilter = opts.queueFilter ?? "all"
   const sortBy = opts.sortBy ?? "priority"
   const userId = opts.userId ?? null
+  const phaseInstanceId = opts.phaseInstanceId ?? null
+  const phaseKeySel = opts.phaseKey ?? null
 
     // ============================================================
     // 1) Carrega processo e pessoas da árvore
@@ -260,8 +271,9 @@ export async function buildCentralOperacionalPayload(
       return { ok: false, status: 404, error: "Processo não encontrado" }
     }
 
+    // VIEW: fase CONSULTADA (phaseKeySel); OPERATE: fase ATIVA do processo.
     const faseAtualCode =
-      (phaseKeyToFaseCode(processo.faseAtualKey) ?? null)
+      (phaseKeyToFaseCode(phaseKeySel ?? processo.faseAtualKey) ?? null)
 
     // pessoas e documentos não dependem um do outro (ambos só precisam do
     // arvoreId) → busca os dois EM PARALELO, economizando um round-trip ao banco.
@@ -308,14 +320,19 @@ export async function buildCentralOperacionalPayload(
 
     // FONTE OFICIAL ÚNICA de progresso/estado do workflow — a MESMA usada pelo cabeçalho
     // (/api/processos/[id]/phase) e demais consumidores. Nada de cálculo paralelo aqui.
-    const prog = await resolveProgressoFaseDocumento(id)
+    const prog = await resolveProgressoFaseDocumento(
+      id,
+      phaseInstanceId != null ? { workflowInstanceId: phaseInstanceId, faseMacroKey: phaseKeySel ?? undefined } : undefined,
+    )
     const workflowsRaw = Array.from(prog.wfPorDoc.values())
 
     // PROJEÇÃO OPERACIONAL OFICIAL (scope-aware) — o percentual/estado da fase exibido
     // na Central (barra, trilha macro, KPI headline) vem DAQUI, garantindo o MESMO
     // número do Kanban e do Header. Os KPIs detalhados (byPerson, counts, fila) seguem
     // como dado operacional, mas o headline de progresso é a projeção.
-    const projection = await resolveOperationalProjection(id)
+    const projection = phaseInstanceId != null
+      ? await resolveOperationalProjectionForInstance(id, phaseInstanceId)
+      : await resolveOperationalProjection(id)
 
     const generationOf = (pessoaId: number): number => {
       const p = pessoasMap.get(pessoaId)

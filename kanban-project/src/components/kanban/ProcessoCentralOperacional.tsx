@@ -498,25 +498,22 @@ export function ProcessoCentralOperacional({
 
   useEffect(() => { carregarFases() }, [carregarFases])
 
-  // Busca o SNAPSHOT do ciclo da fase consultada e desserializa o payload da Central
-  // (snapshot.central). Sem fetch vivo, sem materializar. selectedPhaseKey=null ⇒ OPERATE.
+  // VIEW: carrega a Central da fase consultada a partir dos DADOS REAIS escopados à
+  // instância selecionada (central-operacional?phaseInstanceId&phaseKey). NÃO depende de
+  // snapshot; NÃO materializa (a rota é leitura). selectedPhaseKey=null ⇒ OPERATE.
   useEffect(() => {
     if (!selectedPhaseKey) { setViewData(null); setViewState("idle"); return }
     const meta = phases.find((p) => p.phaseKey === selectedPhaseKey)
-    if (!meta?.workflowInstanceId) { setViewData(null); setViewState("unavailable"); setViewCiclo(meta?.ciclo ?? null); return }
     let alive = true
     setViewState("loading")
-    fetch(`/api/processos/${processo.id}/phases/${meta.workflowInstanceId}/projection`, {
+    setViewCiclo(meta?.ciclo ?? null)
+    const params = new URLSearchParams({ queue: "all", sort: "priority", phaseKey: selectedPhaseKey })
+    if (meta?.workflowInstanceId) params.set("phaseInstanceId", String(meta.workflowInstanceId))
+    fetch(`/api/processos/${processo.id}/central-operacional?${params.toString()}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
     })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((j) => {
-        if (!alive) return
-        const central = (j?.operationalSnapshot?.central ?? null) as CentralOpData | null
-        setViewCiclo(j?.operationalSnapshot?.ciclo ?? meta.ciclo ?? null)
-        if (central) { setViewData(central); setViewState("ready") }
-        else { setViewData(null); setViewState("unavailable") }
-      })
+      .then((j) => { if (!alive) return; setViewData(j as CentralOpData); setViewState("ready") })
       .catch(() => { if (alive) { setViewData(null); setViewState("error") } })
     return () => { alive = false }
   }, [selectedPhaseKey, phases, processo.id])
@@ -740,8 +737,8 @@ export function ProcessoCentralOperacional({
               />
             ) : (
               <div className="rounded-xl border border-gray-200 bg-white px-5 py-8 text-center text-[13px] text-gray-500">
-                Projeção histórica não capturada neste ciclo (fase concluída antes desta funcionalidade, ou ainda não materializada).
-                Nada é reconstruído a partir do estado atual.
+                Não foi possível carregar a Central desta fase agora.
+                <button onClick={() => setSelectedPhaseKey(null)} className="ml-2 text-blue-600 font-semibold hover:underline">Voltar à fase ativa</button>
               </div>
             )}
           </div>

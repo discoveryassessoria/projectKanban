@@ -78,6 +78,61 @@ export async function resolveOperationalProjection(processId: number): Promise<O
 }
 
 /**
+ * Projeção operacional de uma INSTÂNCIA de fase ESPECÍFICA (VIEW/consulta) — dados REAIS
+ * daquele ciclo, sem usar a fase ativa do processo e sem depender de snapshot. Reusa o
+ * MESMO núcleo puro `buildOperationalProjection`. Não materializa, não muta.
+ */
+export async function resolveOperationalProjectionForInstance(
+  processId: number,
+  workflowInstanceId: number,
+): Promise<OperationalProjection> {
+  const inst = await prisma.phaseWorkflowInstance.findUnique({
+    where: { id: workflowInstanceId },
+    include: {
+      steps: {
+        include: { tarefas: { where: { chaveIdempotencia: { not: null } }, select: { id: true, statusTarefa: true, responsavelId: true } } },
+        orderBy: { ordem: "asc" },
+      },
+    },
+  })
+  const proc = await prisma.processo.findUnique({ where: { id: processId }, select: { arvoreId: true } })
+  if (!inst || inst.processoId !== processId) {
+    return buildOperationalProjection({
+      processId, faseCode: null, faseMacroKey: null, phaseName: null, scope: null,
+      processoExists: !!proc, hasActiveInstance: false, steps: [], necessidades: [], documentos: [],
+      hasArvore: proc?.arvoreId != null, requerentesCount: 0,
+    })
+  }
+  const faseCode = phaseKeyToFaseCode(inst.faseMacroKey)
+  const faseDef = faseCode ? getFase(faseCode) : null
+  const steps: GateStepData[] = inst.steps.map(mapStepToGate)
+
+  const necsRaw = await prisma.necessidadeDocumental.findMany({
+    where: { processoId: processId },
+    select: { id: true, status: true, obrigatoriedade: true, itemCatalogoId: true },
+  })
+  const certidaoItens = await itemCatalogosDeCertidao(prisma)
+  const necessidades: NecessidadeData[] = necsRaw.map((n) => ({
+    id: n.id, status: n.status, obrigatoria: n.obrigatoriedade === "OBRIGATORIA", ehCertidao: certidaoItens.has(n.itemCatalogoId),
+  }))
+  let documentos: DocumentoData[] = []
+  if (proc?.arvoreId != null) {
+    const pessoas = await prisma.pessoa.findMany({
+      where: { arvoreId: proc.arvoreId, linhaReta: true },
+      select: { documentos: { select: { id: true, status: true } } },
+    })
+    documentos = pessoas.flatMap((p) => p.documentos.map((d) => ({ id: d.id, status: d.status, linhaReta: true })))
+  }
+  const requerentesCount = await prisma.processoRequerente.count({ where: { processoId: processId } })
+
+  return buildOperationalProjection({
+    processId, faseCode, faseMacroKey: inst.faseMacroKey, phaseName: faseDef?.label ?? inst.faseMacroKey,
+    scope: faseDef?.scope ?? null, processoExists: true, hasActiveInstance: true, steps,
+    necessidades, documentos, hasArvore: proc?.arvoreId != null, requerentesCount,
+  })
+}
+
+/**
  * Projeção operacional oficial de N processos em POUCAS queries agregadas.
  * Preserva a ordem de `processIds`. Processos inexistentes recebem projeção "vazia"
  * (activePhase=null) — nunca lançam.

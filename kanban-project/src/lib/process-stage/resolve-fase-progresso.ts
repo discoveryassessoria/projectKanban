@@ -37,17 +37,32 @@ export interface ProgressoFaseDoc {
   stepOwnerPorDoc: Map<number, { id: number; nome: string }>
 }
 
-export async function resolveProgressoFaseDocumento(processoId: number): Promise<ProgressoFaseDoc> {
+export async function resolveProgressoFaseDocumento(
+  processoId: number,
+  // VIEW/consulta: escopa a uma fase/instância ESPECÍFICA (dados REAIS daquele ciclo),
+  // em vez da fase ATIVA. Sem opts = comportamento OPERATE (fase ativa) inalterado.
+  opts?: { workflowInstanceId?: number; faseMacroKey?: string },
+): Promise<ProgressoFaseDoc> {
   const processo = await prisma.processo.findUnique({
     where: { id: processoId },
     select: { id: true, arvoreId: true, faseAtualKey: true },
   })
-  const faseMacroKey = processo?.faseAtualKey ?? null
+  const faseMacroKey = opts?.faseMacroKey ?? processo?.faseAtualKey ?? null
   const faseCode = phaseKeyToFaseCode(faseMacroKey)
 
-  // Instâncias V2 da FASE ATUAL (ativas). Escopo por faseMacroKey → não mistura fases;
-  // exclui SUPERSEDIDO/CANCELADO históricos.
-  const stepInstancesRaw = (processo && faseMacroKey)
+  // OPERATE: instâncias V2 da FASE ATUAL (ativas), escopo por faseMacroKey (exclui histórico).
+  // VIEW: passos REAIS da instância SELECIONADA (por workflowInstanceId) — inclui concluídos/
+  // supersedidos daquele ciclo; não usa a fase ativa.
+  const stepInstancesRaw = opts?.workflowInstanceId != null
+    ? await prisma.phaseWorkflowStepInstance.findMany({
+        where: {
+          workflowInstanceId: opts.workflowInstanceId,
+          OR: [{ documentoId: { not: null } }, { necessidadeId: { not: null } }],
+        },
+        select: { documentoId: true, necessidadeId: true, faseMacroKey: true, stepKey: true, ordem: true, status: true, responsavelId: true, ciclo: true, updatedAt: true },
+        orderBy: [{ documentoId: "asc" }, { ordem: "asc" }],
+      })
+    : (processo && faseMacroKey)
     ? await prisma.phaseWorkflowStepInstance.findMany({
         where: {
           processoId,
