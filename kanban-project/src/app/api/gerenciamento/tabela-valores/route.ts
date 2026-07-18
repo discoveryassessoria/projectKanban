@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { deriveNaturezaFinanceira, validarNaturezaPreco, canonicalNaturezaPreco, admiteCusto, admiteVenda, type NaturezaPrecoRaw } from '@/lib/financeiro/natureza-financeira'
 import { detectarConflitoPreco, type PrecoRegistro } from '@/lib/financeiro/conflito-preco'
+import { modoCalculoValido, unidadeDoModo, modoUsaQuantidade } from '@/lib/financeiro/modo-calculo'
 
 function toAmount(v: any): number {
   if (v === undefined || v === null || v === '') return 0
@@ -126,10 +127,15 @@ export async function POST(request: NextRequest) {
     const prioridade = toIntOrNull(b.prioridade) ?? 0
     const vigenciaInicio = toStrOrNull(b.vigenciaInicio)
     const vigenciaFim = toStrOrNull(b.vigenciaFim)
-    const modoCalculo = toStrOrNull(b.modoCalculo) || 'fixed'
-    const unidade = toStrOrNull(b.unidade)
-    const quantidadeMinima = b.quantidadeMinima === '' || b.quantidadeMinima == null ? null : Number(b.quantidadeMinima)
-    const quantidadeMaxima = b.quantidadeMaxima === '' || b.quantidadeMaxima == null ? null : Number(b.quantidadeMaxima)
+    // Modo de cálculo OBRIGATÓRIO e válido. A UNIDADE é DERIVADA do modo (fonte única
+    // `unidadeDoModo`) — ignoramos qualquer `unidade` enviada pelo cliente (não confiar na UI).
+    const modoCalculo = toStrOrNull(b.modoCalculo) ?? ''
+    if (!modoCalculoValido(modoCalculo)) return NextResponse.json({ error: 'Informe um Modo de cálculo válido.' }, { status: 400 })
+    const unidade = unidadeDoModo(modoCalculo) // fixed → null; demais → unidade canônica
+    // `fixed` não usa faixa de quantidade → normaliza min/max para null.
+    const usaQtd = modoUsaQuantidade(modoCalculo)
+    const quantidadeMinima = usaQtd && !(b.quantidadeMinima === '' || b.quantidadeMinima == null) ? Number(b.quantidadeMinima) : null
+    const quantidadeMaxima = usaQtd && !(b.quantidadeMaxima === '' || b.quantidadeMaxima == null) ? Number(b.quantidadeMaxima) : null
     const mestre = cfg.tipoDocumento?.name ?? cfg.honorario?.name ?? cfg.tipoProcesso?.name ?? cfg.itemCatalogo?.name ?? 'Config'
 
     // LINHAS a criar. Modo CONJUNTO ("Custo e Venda"): b.linhas = [{natureza,moeda,valor,

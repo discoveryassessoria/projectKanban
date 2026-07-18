@@ -6,6 +6,8 @@
 // Backend: /api/gerenciamento/tabela-valores (GET/POST) + /[id] (PUT/DELETE)
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+// FONTE ÚNICA do mapeamento modo → unidade (compartilhada com a API).
+import { MODOS_CALCULO, rotuloModo, rotuloUnidadeCobranca, modoUsaQuantidade } from '@/lib/financeiro/modo-calculo'
 
 type ConfigRef = { id: number; possuiCusto: boolean; possuiReceita: boolean; origem: string; mestre: string; label: string; moedaPadrao: string }
 type FornecedorRef = { id: number; nome: string }
@@ -34,13 +36,7 @@ type Item = {
   fornecedor?: FornecedorRef | null
 }
 
-const MODOS_CALCULO: [string, string][] = [
-  ['fixed', 'Valor fixo'], ['per_person', 'Por pessoa'], ['per_document', 'Por documento'],
-  ['per_applicant', 'Por requerente'], ['per_generation', 'Por geração'], ['per_package', 'Por pacote'],
-  ['per_vendor', 'Por fornecedor'],
-]
 const MOEDAS: [string, string][] = [['EUR', 'EUR'], ['BRL', 'BRL'], ['USD', 'USD']]
-const modoLabel = (v: string) => MODOS_CALCULO.find(([k]) => k === v)?.[1] || v || '—'
 
 // CATEGORIA = origem ESTRUTURAL da Configuração Financeira (config.origem, derivada da FK
 // tipoDocumento/honorario/tipoProcesso/itemCatalogo no backend). NUNCA inferida por texto do nome.
@@ -78,7 +74,7 @@ const EMPTY = {
   // Custo: fornecedor + moeda + valor. Venda: moeda + valor (registros independentes).
   fornecedorId: '', moeda: '', valor: '',
   moedaVenda: '', valorVenda: '',
-  modoCalculo: 'fixed', unidade: '', quantidadeMinima: '', quantidadeMaxima: '',
+  modoCalculo: 'fixed', quantidadeMinima: '', quantidadeMaxima: '',
   vigenciaInicio: '', vigenciaFim: '', prioridade: '0', arquivado: false,
 }
 type FormState = typeof EMPTY
@@ -153,8 +149,9 @@ export default function TabelaValoresTab() {
       moeda: ehVenda ? '' : (i.moeda || ''), valor: ehVenda ? '' : valorStr,
       moedaVenda: ehVenda ? (i.moeda || '') : '', valorVenda: ehVenda ? valorStr : '',
       modoCalculo: i.modoCalculo || 'fixed',
-      unidade: i.unidade || '', quantidadeMinima: i.quantidadeMinima != null ? String(i.quantidadeMinima) : '',
-      quantidadeMaxima: i.quantidadeMaxima != null ? String(i.quantidadeMaxima) : '',
+      // unidade é DERIVADA do modo (não editável); qtd só faz sentido em modos != fixed.
+      quantidadeMinima: i.modoCalculo && i.modoCalculo !== 'fixed' && i.quantidadeMinima != null ? String(i.quantidadeMinima) : '',
+      quantidadeMaxima: i.modoCalculo && i.modoCalculo !== 'fixed' && i.quantidadeMaxima != null ? String(i.quantidadeMaxima) : '',
       vigenciaInicio: i.vigenciaInicio || '', vigenciaFim: i.vigenciaFim || '',
       prioridade: String(i.prioridade ?? 0), arquivado: i.arquivado,
     })
@@ -239,7 +236,7 @@ export default function TabelaValoresTab() {
                     <td className="px-3 py-2.5 text-white/60">{om.origem}</td>
                     <td className="px-3 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${i.natureza === 'CUSTO' ? 'bg-amber-500/15 text-amber-300' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-white/50'}`}>{i.natureza === 'CUSTO' ? 'Custo' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'Venda' : '—'}</span></td>
                     <td className="px-3 py-2.5 text-white/70">{i.fornecedor?.nome || '—'}</td>
-                    <td className="px-3 py-2.5 text-white/60">{modoLabel(i.modoCalculo)}</td>
+                    <td className="px-3 py-2.5 text-white/60">{rotuloModo(i.modoCalculo)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-white/90">{fmtMoeda(i.valor, i.moeda)}</td>
                     <td className="px-3 py-2.5 text-[11px] text-white/50">{i.vigenciaInicio || '—'}{i.vigenciaFim ? ` → ${i.vigenciaFim}` : ''}</td>
                     <td className="px-3 py-2.5 text-white/60">{i.prioridade}</td>
@@ -388,19 +385,31 @@ export default function TabelaValoresTab() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs text-white/60">Modo de cálculo *</label>
-                  <select value={form.modoCalculo} onChange={(e) => set('modoCalculo', e.target.value)} className={inputCls}>
+                  <select value={form.modoCalculo} onChange={(e) => {
+                    const modo = e.target.value
+                    // Modo sem quantidade (Valor fixo) → limpa a faixa de quantidade.
+                    setForm((f) => modoUsaQuantidade(modo) ? { ...f, modoCalculo: modo } : { ...f, modoCalculo: modo, quantidadeMinima: '', quantidadeMaxima: '' })
+                  }} className={inputCls}>
                     {MODOS_CALCULO.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Unidade</label>
-                  <input value={form.unidade} onChange={(e) => set('unidade', e.target.value)} placeholder="un, pág..." className={inputCls} />
+                  <label className="mb-1 block text-xs text-white/60">Unidade de cobrança</label>
+                  {/* SOMENTE LEITURA — derivada do modo (fonte única). Nunca editável. */}
+                  <div className={inputCls + ' flex items-center text-white/60'}>{rotuloUnidadeCobranca(form.modoCalculo)}</div>
+                  <p className="mt-1 text-[11px] text-white/40">Derivada do modo de cálculo — não editável.</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-4 gap-3">
-                <div><label className="mb-1 block text-xs text-white/60">Qtd mín.</label><input type="number" value={form.quantidadeMinima} onChange={(e) => set('quantidadeMinima', e.target.value)} className={inputCls} /></div>
-                <div><label className="mb-1 block text-xs text-white/60">Qtd máx.</label><input type="number" value={form.quantidadeMaxima} onChange={(e) => set('quantidadeMaxima', e.target.value)} className={inputCls} /></div>
+                <div>
+                  <label className="mb-1 block text-xs text-white/60">Qtd mín.</label>
+                  <input type="number" min="0" value={form.quantidadeMinima} disabled={!modoUsaQuantidade(form.modoCalculo)} onChange={(e) => set('quantidadeMinima', e.target.value)} className={inputCls + (!modoUsaQuantidade(form.modoCalculo) ? ' cursor-not-allowed opacity-50' : '')} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-white/60">Qtd máx.</label>
+                  <input type="number" min="0" value={form.quantidadeMaxima} disabled={!modoUsaQuantidade(form.modoCalculo)} onChange={(e) => set('quantidadeMaxima', e.target.value)} className={inputCls + (!modoUsaQuantidade(form.modoCalculo) ? ' cursor-not-allowed opacity-50' : '')} />
+                </div>
                 <div><label className="mb-1 block text-xs text-white/60">Vig. início</label><input type="date" value={form.vigenciaInicio} onChange={(e) => set('vigenciaInicio', e.target.value)} className={inputCls} /></div>
                 <div><label className="mb-1 block text-xs text-white/60">Vig. fim</label><input type="date" value={form.vigenciaFim} onChange={(e) => set('vigenciaFim', e.target.value)} className={inputCls} /></div>
               </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { modoCalculoValido, unidadeDoModo, modoUsaQuantidade } from '@/lib/financeiro/modo-calculo'
 
 function toAmount(v: any): number {
   if (v === undefined || v === null || v === '') return 0
@@ -49,6 +50,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (b.configuracaoFinanceiraItemId !== undefined && Number(b.configuracaoFinanceiraItemId) !== atual.configuracaoFinanceiraItemId) {
       return NextResponse.json({ error: 'Não é permitido trocar a Configuração Financeira de um preço existente. Crie um novo preço e arquive este.' }, { status: 400 })
     }
+    // Modo efetivo → UNIDADE derivada (fonte única). Ignora `unidade` do cliente e normaliza:
+    // fixed → unidade null + sem faixa de quantidade. Assim, re-salvar um registro legado de
+    // VALOR_FIXO com unidade preenchida normaliza para null. Modo desconhecido preserva o legado.
+    const modoFinal = b.modoCalculo !== undefined ? (b.modoCalculo ? String(b.modoCalculo) : '') : atual.modoCalculo
+    if (b.modoCalculo !== undefined && !modoCalculoValido(modoFinal)) {
+      return NextResponse.json({ error: 'Informe um Modo de cálculo válido.' }, { status: 400 })
+    }
+    const modoConhecido = modoCalculoValido(modoFinal)
+    const usaQtd = modoUsaQuantidade(modoFinal)
+    const parseQtd = (v: unknown) => (v === '' || v == null ? null : Number(v))
     try {
       const regra = await prisma.tabelaValor.update({
         where: { id },
@@ -60,10 +71,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           fornecedorId: b.fornecedorId !== undefined ? (b.fornecedorId ? Number(b.fornecedorId) : null) : atual.fornecedorId,
           moeda: b.moeda !== undefined ? b.moeda : atual.moeda,
           valor: b.valor !== undefined ? toAmount(b.valor) : atual.valor,
-          modoCalculo: b.modoCalculo !== undefined ? b.modoCalculo : atual.modoCalculo,
-          unidade: b.unidade !== undefined ? (b.unidade || null) : atual.unidade,
-          quantidadeMinima: b.quantidadeMinima !== undefined ? (b.quantidadeMinima === '' || b.quantidadeMinima == null ? null : Number(b.quantidadeMinima)) : atual.quantidadeMinima,
-          quantidadeMaxima: b.quantidadeMaxima !== undefined ? (b.quantidadeMaxima === '' || b.quantidadeMaxima == null ? null : Number(b.quantidadeMaxima)) : atual.quantidadeMaxima,
+          modoCalculo: modoFinal,
+          // Unidade DERIVADA do modo (normaliza legado fixed→null); modo desconhecido preserva.
+          unidade: modoConhecido ? unidadeDoModo(modoFinal) : atual.unidade,
+          quantidadeMinima: modoConhecido ? (usaQtd ? (b.quantidadeMinima !== undefined ? parseQtd(b.quantidadeMinima) : atual.quantidadeMinima) : null) : atual.quantidadeMinima,
+          quantidadeMaxima: modoConhecido ? (usaQtd ? (b.quantidadeMaxima !== undefined ? parseQtd(b.quantidadeMaxima) : atual.quantidadeMaxima) : null) : atual.quantidadeMaxima,
           vigenciaInicio: b.vigenciaInicio !== undefined ? (b.vigenciaInicio ? String(b.vigenciaInicio) : null) : atual.vigenciaInicio,
           vigenciaFim: b.vigenciaFim !== undefined ? (b.vigenciaFim ? String(b.vigenciaFim) : null) : atual.vigenciaFim,
           prioridade: b.prioridade !== undefined ? (Number(b.prioridade) || 0) : atual.prioridade,
