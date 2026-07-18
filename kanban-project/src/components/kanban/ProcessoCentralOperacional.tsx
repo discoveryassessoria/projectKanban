@@ -642,6 +642,10 @@ export function ProcessoCentralOperacional({
           )}
 
           <DocumentoOperationalDrawer
+            // key inclui a FASE ATUAL + doc: ao trocar de fase (ou documento) o drawer
+            // é DESMONTADO e REMONTADO — zera estado interno (doc/workflow/aba/loading),
+            // sem herdar nada da fase anterior.
+            key={`${faseCodeData ?? "?"}-${drawerDocId ?? "none"}`}
             documentoId={drawerDocId}
             isOpen={drawerDocId !== null}
             onClose={() => setDrawerDocId(null)}

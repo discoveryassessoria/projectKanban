@@ -42,10 +42,28 @@ export interface PassoOperacaoV2 {
   operacao: Record<string, unknown> | null // metadata.operacao (domínio)
 }
 
-/** Passos operacionais V2 de UM documento (ativos), ordenados. */
+/**
+ * Fase ATUAL persistida do processo do documento — ÚNICA fonte de verdade do escopo
+ * operacional. Um mesmo Documento acumula passos de várias fases ao longo da vida
+ * (localizar_registro na Genealogia, depois solicitar/receber/... na Emissão). O
+ * workflow/operação exibido deve ser SEMPRE o da fase atual, nunca uma mistura.
+ * Genérico: vale para qualquer fase do Workflow Macro, sem condicional por fase.
+ */
+async function faseAtualKeyDoDoc(documentoId: number): Promise<string | null> {
+  const doc = await prisma.documento.findUnique({
+    where: { id: documentoId },
+    select: { pessoa: { select: { arvore: { select: { processos: { select: { faseAtualKey: true } } } } } } },
+  })
+  return doc?.pessoa?.arvore?.processos?.[0]?.faseAtualKey ?? null
+}
+
+/** Passos operacionais V2 de UM documento NA FASE ATUAL (ativos), ordenados. */
 export async function passosOperacaoV2(documentoId: number): Promise<PassoOperacaoV2[]> {
+  const faseAtualKey = await faseAtualKeyDoDoc(documentoId)
   const rows = await prisma.phaseWorkflowStepInstance.findMany({
-    where: { documentoId, status: { notIn: INATIVOS } },
+    // Escopo à FASE ATUAL: passos de fases anteriores (mesmo CONCLUIDO) não entram no
+    // workflow operacional. Sem faseAtualKey (doc sem processo) cai no comportamento antigo.
+    where: { documentoId, status: { notIn: INATIVOS }, ...(faseAtualKey ? { faseMacroKey: faseAtualKey } : {}) },
     orderBy: { ordem: "asc" },
     select: {
       id: true, stepKey: true, status: true, faseMacroKey: true, ordem: true,
@@ -62,9 +80,13 @@ export async function passosOperacaoV2(documentoId: number): Promise<PassoOperac
   })
 }
 
-/** Documento já tem operação por-documento no V2? (discrimina V2 × fallback legado.) */
+/** Documento já tem operação por-documento NA FASE ATUAL no V2? (discrimina V2 × fallback
+ *  legado E impede "operação já existe" por causa de passos de fase anterior). */
 export async function temOperacaoV2(documentoId: number): Promise<boolean> {
-  const n = await prisma.phaseWorkflowStepInstance.count({ where: { documentoId } })
+  const faseAtualKey = await faseAtualKeyDoDoc(documentoId)
+  const n = await prisma.phaseWorkflowStepInstance.count({
+    where: { documentoId, ...(faseAtualKey ? { faseMacroKey: faseAtualKey } : {}) },
+  })
   return n > 0
 }
 

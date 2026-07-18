@@ -2,7 +2,7 @@
 
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { createPortal } from "react-dom"
 import { X, Loader2, AlertTriangle } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
@@ -218,6 +218,10 @@ export function DocumentoOperationalDrawer({
   const [initModalOpen, setInitModalOpen] = useState(false)
   const [workflow, setWorkflow] = useState<any | null>(null)
 
+  // Guard de corrida: cada carga tem um seq; respostas antigas (de um documentoId/fase
+  // anterior que chegaram tarde) são DESCARTADAS — nunca sobrescrevem o contexto atual.
+  const reqSeq = useRef(0)
+
   const carregar = useCallback(async () => {
     // NUNCA sair em silêncio: sem documentoId, o backdrop já está na tela e ficaria
     // preso com painel vazio. Sinaliza erro fechável em vez de travar.
@@ -226,6 +230,8 @@ export function DocumentoOperationalDrawer({
       setLoading(false)
       return
     }
+    const seq = ++reqSeq.current
+    const vigente = () => seq === reqSeq.current // resposta ainda é a mais recente?
     setLoading(true)
     setErro(null)
     try {
@@ -234,27 +240,30 @@ export function DocumentoOperationalDrawer({
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: Documento = await res.json()
+      if (!vigente()) return // documentoId mudou no meio — descarta
       setDoc(data)
 
-      // Carrega o workflow em paralelo
+      // Carrega o workflow (fonte já escopada à FASE ATUAL no backend)
       try {
         const wfRes = await fetch(`/api/documentos/${documentoId}/workflow`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
         })
+        if (!vigente()) return
         if (wfRes.ok) {
           const json = await wfRes.json()
+          if (!vigente()) return
           setWorkflow(json.workflow ?? null)
         } else {
           setWorkflow(null)
         }
       } catch {
-        setWorkflow(null)
+        if (vigente()) setWorkflow(null)
       }
     } catch (e) {
       console.warn("[DocumentoOperationalDrawer] falha:", e)
-      setErro("Erro ao carregar documento.")
+      if (vigente()) setErro("Erro ao carregar documento.")
     } finally {
-      setLoading(false)
+      if (vigente()) setLoading(false)
     }
   }, [documentoId])
 
