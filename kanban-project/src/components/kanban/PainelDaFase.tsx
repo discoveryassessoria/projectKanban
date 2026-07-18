@@ -106,6 +106,8 @@ export interface PainelDaFaseProps {
   // existentes", sem rótulo de obrigatório/validado.
   modoReestruturacao?: boolean
   avisoReestruturacao?: string
+  // VIEW / consulta: desabilita delegação e ação de operação (somente leitura).
+  readOnly?: boolean
 }
 
 // ============================================================
@@ -130,6 +132,7 @@ export function PainelDaFase({
   onDelegar,
   modoReestruturacao = false,
   avisoReestruturacao,
+  readOnly = false,
 }: PainelDaFaseProps) {
   const [abaAtiva, setAbaAtiva] = useState("Resumo")
 
@@ -295,7 +298,7 @@ export function PainelDaFase({
             tone="linha"
           />
           {linhaPrincipal.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} ocultarValidacao={modoReestruturacao} />
+            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
           ))}
 
           {/* Grupo Fora da linhagem */}
@@ -306,7 +309,7 @@ export function PainelDaFase({
             tone="fora"
           />
           {foraDaLinha.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} ocultarValidacao={modoReestruturacao} />
+            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
           ))}
         </div>
       </div>
@@ -348,12 +351,14 @@ function PersonRow({
   usuarios,
   onDelegar,
   ocultarValidacao = false,
+  readOnly = false,
 }: {
   p: FasePersonRow
   onAbrirOperacao: (docId: number, necessidadeId?: number | null) => void
   usuarios?: Array<{ id: number; nome: string }>
   onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
   ocultarValidacao?: boolean
+  readOnly?: boolean
 }) {
   const [exp, setExp] = useState(false)
 
@@ -514,7 +519,7 @@ function PersonRow({
             </div>
 
             {/* Responsável — seletor de delegação quando disponível */}
-            {onDelegar && usuarios && usuarios.length > 0 && d.necessidadeId != null ? (
+            {!readOnly && onDelegar && usuarios && usuarios.length > 0 && d.necessidadeId != null ? (
               <select
                 value={d.responsavelId ?? ""}
                 onChange={(e) => onDelegar(d.necessidadeId as number, e.target.value ? Number(e.target.value) : null)}
@@ -544,14 +549,17 @@ function PersonRow({
             {/* Botão */}
             <div className="flex justify-end">
               <button
-                onClick={() => onAbrirOperacao(d.id, d.necessidadeId)}
+                onClick={() => { if (!readOnly) onAbrirOperacao(d.id, d.necessidadeId) }}
+                disabled={readOnly}
                 className={`text-[12px] font-bold px-3 py-2 rounded-lg transition-colors ${
-                  d.emissaoConcluida
+                  readOnly
+                    ? "border border-gray-200 text-gray-300 bg-gray-50 cursor-not-allowed"
+                    : d.emissaoConcluida
                     ? "border border-gray-200 text-gray-700 bg-white hover:bg-gray-50"
                     : "bg-blue-600 text-white hover:bg-blue-500"
                 }`}
               >
-                {d.emissaoConcluida ? "Ver workflow" : "Abrir operação"}
+                {readOnly ? "Somente leitura" : d.emissaoConcluida ? "Ver workflow" : "Abrir operação"}
               </button>
             </div>
           </div>

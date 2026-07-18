@@ -3,7 +3,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { Loader2 } from "lucide-react"
+import { Loader2, Eye } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import type { ProcessoWithStatus, Processo, OperationalProjection } from "@/src/types/kanban"
 import { DocumentoOperationalDrawer } from "./DocumentoOperationalDrawer"
@@ -17,7 +17,10 @@ import { ProcessoApostilamento } from "./ProcessoApostilamento"
 import { ProcessoFaseFinal } from "./ProcessoFaseFinal"
 import { ProcessoRetificacao } from "./ProcessoRetificacao"
 import { ProcessoEmissaoRetificada } from "./ProcessoEmissaoRetificada"
-import { HistoricalPhasePanel, type PhaseMeta } from "./HistoricalPhasePanel"
+// HistoricalPhasePanel foi REMOVIDO como experiência visual: a Central em VIEW usa os
+// MESMOS componentes do OPERATE (PainelDaFase + DocumentoOperationalDrawer) via snapshot.
+// Mantido apenas o tipo PhaseMeta (metadados de fase da rota /phases).
+import { type PhaseMeta } from "./HistoricalPhasePanel"
 import type { FaseCode } from "@prisma/client"
 import { FASES, phaseKeyToFaseCode, faseCodeToPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 
@@ -324,6 +327,11 @@ export function ProcessoCentralOperacional({
   // selectedPhaseKey = fase CONSULTADA (clique na trilha). Independentes: consultar
   // NUNCA altera a fase ativa. selectedPhaseKey=null ⇒ segue a ativa (modo OPERATE).
   const [phases, setPhases] = useState<PhaseMeta[]>([])
+  // VIEW (fase concluída): payload da Central desserializado do SNAPSHOT do ciclo
+  // (mesma forma do OPERATE). Nunca busca estado vivo do domínio.
+  const [viewData, setViewData] = useState<CentralOpData | null>(null)
+  const [viewState, setViewState] = useState<"idle" | "loading" | "ready" | "unavailable" | "error">("idle")
+  const [viewCiclo, setViewCiclo] = useState<number | null>(null)
   const [selectedPhaseKey, setSelectedPhaseKey] = useState<string | null>(null)
 
   // TROCA DE CONTEXTO NO AVANÇO DE FASE: quando a fase da Central muda (avanço/retorno),
@@ -490,6 +498,29 @@ export function ProcessoCentralOperacional({
 
   useEffect(() => { carregarFases() }, [carregarFases])
 
+  // Busca o SNAPSHOT do ciclo da fase consultada e desserializa o payload da Central
+  // (snapshot.central). Sem fetch vivo, sem materializar. selectedPhaseKey=null ⇒ OPERATE.
+  useEffect(() => {
+    if (!selectedPhaseKey) { setViewData(null); setViewState("idle"); return }
+    const meta = phases.find((p) => p.phaseKey === selectedPhaseKey)
+    if (!meta?.workflowInstanceId) { setViewData(null); setViewState("unavailable"); setViewCiclo(meta?.ciclo ?? null); return }
+    let alive = true
+    setViewState("loading")
+    fetch(`/api/processos/${processo.id}/phases/${meta.workflowInstanceId}/projection`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((j) => {
+        if (!alive) return
+        const central = (j?.operationalSnapshot?.central ?? null) as CentralOpData | null
+        setViewCiclo(j?.operationalSnapshot?.ciclo ?? meta.ciclo ?? null)
+        if (central) { setViewData(central); setViewState("ready") }
+        else { setViewData(null); setViewState("unavailable") }
+      })
+      .catch(() => { if (alive) { setViewData(null); setViewState("error") } })
+    return () => { alive = false }
+  }, [selectedPhaseKey, phases, processo.id])
+
   // Otimista: marca o doc recém-mexido como "Atualizando…" na fila enquanto
   // a Central recarrega em 2º plano — evita a sensação de "concluí e nada mudou".
   const marcarAtualizando = useCallback((docId: number | null) => {
@@ -621,6 +652,10 @@ export function ProcessoCentralOperacional({
     setSelectedPhaseKey(pk === activePhaseKey ? null : pk)
   }
 
+  // VIEW: mesma casca do OPERATE, alimentada pelo SNAPSHOT (viewData). Mesmos componentes.
+  const painelView = viewState === "ready" && viewData ? mapearPainel(viewData, selectedLabel ?? faseAtualNome) : null
+  const metaView = (selectedLabel && FASE_META[selectedLabel]) || { sub: "", tabs: ["Resumo"] }
+
   return (
     <div className="h-full overflow-y-auto bg-gray-50/30">
       <div className="px-6 py-5">
@@ -647,20 +682,69 @@ export function ProcessoCentralOperacional({
         </div>
 
         {isView && selectedPhaseMeta ? (
-          <HistoricalPhasePanel
-            processoId={processo.id}
-            phaseMeta={selectedPhaseMeta}
-            podeRetornar={pode("workflow.retornarFase")}
-            onVoltarAtiva={() => setSelectedPhaseKey(null)}
-            onRetornou={() => {
-              // Cascata pós-retorno: volta à ativa + recarrega Central e fases; o
-              // Header/Kanban do modal são invalidados via onProcessoMudou.
-              setSelectedPhaseKey(null)
-              carregar(true)
-              carregarFases()
-              onProcessoMudou?.()
-            }}
-          />
+          <div className="min-w-0">
+            {/* Selo discreto Somente leitura · Ciclo X + ações de consulta */}
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5">
+              <div className="flex items-center gap-2 text-[13px] font-semibold text-amber-800">
+                <Eye className="w-4 h-4" /> Somente leitura — {selectedLabel ?? selectedPhaseMeta.label}
+                {viewCiclo ? <span className="text-amber-600 font-bold"> · Ciclo {viewCiclo}</span> : null}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedPhaseKey(null)}
+                  className="inline-flex items-center gap-1.5 border-[1.5px] border-gray-200 bg-white text-gray-700 text-[12px] font-semibold px-3 py-1.5 rounded-lg hover:border-blue-500 hover:text-blue-600"
+                >Voltar à fase ativa</button>
+                {pode("workflow.retornarFase") && selectedPhaseMeta.state === "COMPLETED" && (
+                  <button
+                    onClick={() => {
+                      const justificativa = window.prompt("Retornar o processo para esta fase (novo ciclo). Justificativa:")
+                      if (!justificativa) return
+                      const motivoCodigo = window.prompt("Código de motivo:") || ""
+                      if (!motivoCodigo) return
+                      fetch(`/api/processos/${processo.id}/phase/return`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+                        body: JSON.stringify({ faseAlvo: selectedPhaseMeta.phaseKey, justificativa, motivoCodigo }),
+                      }).then((r) => r.json()).then((j) => {
+                        if (j?.success) { setSelectedPhaseKey(null); carregar(true); carregarFases(); onProcessoMudou?.() }
+                        else { alert(j?.message || j?.error || "Não foi possível retornar.") }
+                      }).catch(() => alert("Falha de rede ao retornar a fase."))
+                    }}
+                    className="inline-flex items-center gap-1.5 bg-gray-900 text-white text-[12px] font-bold px-3 py-1.5 rounded-lg hover:bg-gray-800"
+                  >Retornar processo para esta fase</button>
+                )}
+              </div>
+            </div>
+
+            {viewState === "loading" ? (
+              <div className="flex items-center justify-center py-10 text-gray-400"><Loader2 className="w-6 h-6 animate-spin" /></div>
+            ) : painelView && viewData ? (
+              <PainelDaFase
+                faseNome={selectedLabel ?? selectedPhaseMeta.label}
+                faseSub={metaView.sub}
+                faseTabs={metaView.tabs}
+                steps={painelView.steps}
+                kpis={painelView.kpis}
+                progressoPct={painelView.pct}
+                progressoConcluidos={painelView.validados}
+                progressoTotal={painelView.total}
+                progressoTexto={painelView.progressoTexto}
+                linhaPrincipal={painelView.linhaPrincipal}
+                foraDaLinha={painelView.foraDaLinha}
+                // VIEW não abre o Drawer live (materializaria). O Drawer histórico por-doc
+                // exige snapshot por-documento — follow-up. Aqui a consulta é do painel.
+                onAbrirOperacao={() => { /* somente leitura: sem operação */ }}
+                modoReestruturacao={!!viewData.genealogiaReestruturacao}
+                avisoReestruturacao={viewData.mensagemReestruturacao ?? undefined}
+                readOnly
+              />
+            ) : (
+              <div className="rounded-xl border border-gray-200 bg-white px-5 py-8 text-center text-[13px] text-gray-500">
+                Projeção histórica não capturada neste ciclo (fase concluída antes desta funcionalidade, ou ainda não materializada).
+                Nada é reconstruído a partir do estado atual.
+              </div>
+            )}
+          </div>
         ) : ehAnalise ? (
           <ProcessoAnalise processoId={processo.id} onConcluido={() => carregar(true)} />
         ) : ehTraducao ? (
