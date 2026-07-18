@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { validarConfigGeraLancamento } from '@/lib/financeiro/regra-financeira-validacao'
 
 const PHASE_LABELS: Record<string, string> = {
   genealogia: 'Genealogia', emissao_documental: 'Emissão Documental', analise_documental: 'Análise Documental',
@@ -44,11 +45,16 @@ export async function POST(request: NextRequest) {
     const produto = await prisma.produtoFinanceiro.findFirst({ where: { codigo: itemCode } })
     const name = `${produto?.nome || itemCode} · ${PHASE_LABELS[phaseKey] || phaseKey}`
 
+    // §3 — entryType (cost/revenue) → lançamento CUSTO/RECEITA deve ser compatível com a config.
+    const entryType = body.entryType || 'revenue'
+    const valNat = await validarConfigGeraLancamento(produto?.id ?? null, entryType === 'cost' ? 'CUSTO' : 'RECEITA')
+    if (!valNat.ok) return NextResponse.json({ error: valNat.motivo }, { status: 400 })
+
     const trigger = await prisma.phaseTriggerRule.create({
       data: {
         itemCode, financialItemId: produto?.id ?? null, configItemId: produto?.id ?? null, name, phaseKey,
         phaseEvent: body.phaseEvent || 'entered',
-        entryType: body.entryType || 'revenue',
+        entryType,
         automatic: body.automatic !== false,
         requiresContractSigned: !!body.requiresContractSigned,
         requiresProposalApproved: !!body.requiresProposalApproved,

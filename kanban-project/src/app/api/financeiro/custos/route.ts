@@ -125,6 +125,10 @@ export async function POST(req: NextRequest) {
         formaPagamento: data.formaPagamento,
         observacoes: data.observacoes ?? null,
         status: data.status,
+        // §4 — congelamento também no lançamento MANUAL (sem regra de preço).
+        origem: "manual", origemLancamento: "PROCESSO", naturezaLancamento: "CUSTO",
+        valorUnitario: data.valor, quantidade: 1, valorTotalCongelado: data.valor,
+        modoCalculoAplicado: "manual", naturezaPreco: "CUSTO", dataReferencia: new Date(),
         ...(parcelas.length > 0 && {
           parcelas: {
             create: parcelas.map((p) => ({

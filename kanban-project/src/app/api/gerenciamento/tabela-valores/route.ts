@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { deriveNaturezaFinanceira, validarNaturezaPreco, canonicalNaturezaPreco, admiteCusto, admiteVenda, type NaturezaPrecoRaw } from '@/lib/financeiro/natureza-financeira'
+import { detectarConflitoPreco, type PrecoRegistro } from '@/lib/financeiro/conflito-preco'
 
 function toAmount(v: any): number {
   if (v === undefined || v === null || v === '') return 0
@@ -102,22 +104,26 @@ export async function POST(request: NextRequest) {
     const cfg = await prisma.produtoFinanceiro.findUnique({
       where: { id: configId },
       select: {
-        id: true, possuiCusto: true, possuiReceita: true, itemCatalogoId: true, moedaPadrao: true,
+        id: true, possuiCusto: true, possuiReceita: true, naturezaFin: true, itemCatalogoId: true, moedaPadrao: true,
         tipoDocumento: { select: { name: true } }, honorario: { select: { name: true } },
         tipoProcesso: { select: { name: true } }, itemCatalogo: { select: { name: true, natureza: true } },
       },
     })
     if (!cfg) return NextResponse.json({ error: 'Configuração Financeira não encontrada.' }, { status: 404 })
 
-    // O PREÇO define a natureza (papel vive na entidade de valores). Deve ser uma das
-    // naturezas habilitadas na config; se a config só tem uma, ela é assumida por padrão.
-    const naturezaReq = toStrOrNull(b.natureza)?.toUpperCase() ?? null
-    const naturezasHabilitadas = [cfg.possuiCusto ? 'CUSTO' : null, cfg.possuiReceita ? 'RECEITA' : null].filter(Boolean) as string[]
-    const natureza = naturezaReq ?? (naturezasHabilitadas.length === 1 ? naturezasHabilitadas[0] : null)
-    if (!natureza || !['CUSTO', 'RECEITA'].includes(natureza))
-      return NextResponse.json({ error: 'Informe a natureza do preço (CUSTO ou RECEITA).' }, { status: 400 })
-    if (!naturezasHabilitadas.includes(natureza))
-      return NextResponse.json({ error: `Esta configuração não habilita ${natureza.toLowerCase()}. Ative "possui ${natureza.toLowerCase()}" na Configuração Financeira.` }, { status: 400 })
+    // §2 — o PREÇO define a natureza; deve ser compatível com a NaturezaFinanceira da
+    // config (SOMENTE_CUSTO/SOMENTE_RECEITA/CUSTO_E_RECEITA). VENDA é a nomenclatura da
+    // Tabela de Preços (RECEITA legado é aceito e normalizado p/ VENDA).
+    const natFin = deriveNaturezaFinanceira(cfg)
+    const naturezaReq = (toStrOrNull(b.natureza)?.toUpperCase() ?? null) as NaturezaPrecoRaw | null
+    const habil = [admiteCusto(natFin) ? 'CUSTO' : null, admiteVenda(natFin) ? 'VENDA' : null].filter(Boolean) as NaturezaPrecoRaw[]
+    const naturezaInput = naturezaReq ?? (habil.length === 1 ? habil[0] : null)
+    if (!naturezaInput || !['CUSTO', 'RECEITA', 'VENDA'].includes(naturezaInput))
+      return NextResponse.json({ error: 'Informe a natureza do preço (CUSTO ou VENDA).' }, { status: 400 })
+    const compat = validarNaturezaPreco(natFin, naturezaInput)
+    if (!compat.ok) return NextResponse.json({ error: compat.motivo }, { status: 400 })
+    // canônico p/ armazenar: CUSTO | VENDA (novos preços de venda gravam VENDA)
+    const natureza = canonicalNaturezaPreco(naturezaInput) as 'CUSTO' | 'VENDA'
 
     const valor = toAmount(b.valor)
     if (valor <= 0) return NextResponse.json({ error: 'Valor deve ser maior que zero (isenção não é modelada aqui).' }, { status: 400 })
@@ -135,6 +141,33 @@ export async function POST(request: NextRequest) {
     const mestre = cfg.tipoDocumento?.name ?? cfg.honorario?.name ?? cfg.tipoProcesso?.name ?? cfg.itemCatalogo?.name ?? 'Config'
     const ctxNome = [processoTipoId, fornecedorId ? `forn.${fornecedorId}` : null].filter(Boolean).join(' · ')
     const name = toStrOrNull(b.name) || `${mestre} · ${natureza}${ctxNome ? ' · ' + ctxNome : ''}`.slice(0, 200)
+
+    // §3 — barreira de DUPLICIDADE no BACKEND (além dos constraints R16/R17 do banco):
+    // devolve erro CLARO apontando as regras conflitantes ANTES de tentar o insert.
+    const existentes = await prisma.tabelaValor.findMany({
+      where: { configuracaoFinanceiraItemId: configId, arquivado: false, legadoPendente: false },
+      select: {
+        id: true, configuracaoFinanceiraItemId: true, natureza: true, processoTipoId: true, faseKey: true,
+        regiao: true, modalidadeId: true, processoId: true, itemCatalogoId: true, fornecedorId: true,
+        quantidadeMinima: true, quantidadeMaxima: true, vigenciaInicio: true, vigenciaFim: true, prioridade: true,
+      },
+    })
+    const candidata: PrecoRegistro = {
+      configuracaoFinanceiraItemId: configId, natureza, processoTipoId, faseKey: toStrOrNull(b.faseKey),
+      regiao: toStrOrNull(b.regiao), modalidadeId, processoId: toIntOrNull(b.processoId), itemCatalogoId: cfg.itemCatalogoId, fornecedorId,
+      quantidadeMinima: b.quantidadeMinima === '' || b.quantidadeMinima == null ? null : Number(b.quantidadeMinima),
+      quantidadeMaxima: b.quantidadeMaxima === '' || b.quantidadeMaxima == null ? null : Number(b.quantidadeMaxima),
+      vigenciaInicio, vigenciaFim, prioridade, arquivado: false, legadoPendente: false,
+    }
+    const conflito = detectarConflitoPreco(candidata, existentes.map((e): PrecoRegistro => ({
+      id: e.id, configuracaoFinanceiraItemId: e.configuracaoFinanceiraItemId, natureza: e.natureza as NaturezaPrecoRaw | null,
+      processoTipoId: e.processoTipoId, faseKey: e.faseKey, regiao: e.regiao, modalidadeId: e.modalidadeId,
+      processoId: e.processoId, itemCatalogoId: e.itemCatalogoId, fornecedorId: e.fornecedorId,
+      quantidadeMinima: e.quantidadeMinima == null ? null : Number(e.quantidadeMinima),
+      quantidadeMaxima: e.quantidadeMaxima == null ? null : Number(e.quantidadeMaxima),
+      vigenciaInicio: e.vigenciaInicio, vigenciaFim: e.vigenciaFim, prioridade: e.prioridade, arquivado: false, legadoPendente: false,
+    })))
+    if (!conflito.ok) return NextResponse.json({ error: conflito.motivo, conflitantes: conflito.conflitantes }, { status: 409 })
 
     try {
       const regra = await prisma.tabelaValor.create({

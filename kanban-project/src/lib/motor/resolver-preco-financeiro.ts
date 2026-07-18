@@ -27,6 +27,7 @@
 // ============================================================================
 
 import { Moeda, NaturezaPreco } from '@prisma/client'
+import { canonicalNaturezaPreco } from '@/lib/financeiro/natureza-financeira'
 
 // ── Tipos de dados (espelham TabelaValor de hoje, mas desacoplados do Prisma) ──
 
@@ -38,11 +39,15 @@ export interface LinhaPreco {
   modoCalculo?: string | null // "fixed" (default) | "per_unit"/"unit"/"por_unidade"
   natureza: NaturezaPreco | null
   arquivado?: boolean
-  // dimensões de precedência (hoje texto/int soltos; viram FK em M2/M3)
+  prioridade?: number | null // desempate EXPLÍCITO (só após especificidade)
+  // dimensões de contexto (§2 — cada uma preenchida+compatível soma especificidade)
   processoId?: number | null
-  processoTipoId?: string | null // tipo de processo / nacionalidade
-  regiao?: string | null // país/região/localidade
+  processoTipoId?: string | null // tipo de processo
+  modalidadeId?: number | null // modalidade
+  regiao?: string | null // nacionalidade / país / região / localidade
   fornecedorId?: number | null
+  quantidadeMinima?: number | null
+  quantidadeMaxima?: number | null
   vigenciaInicio?: string | null // 'YYYY-MM-DD'
   vigenciaFim?: string | null // 'YYYY-MM-DD'
 }
@@ -70,21 +75,13 @@ export interface ContextoPrecoFinanceiro {
   fallbackMoeda?: Moeda | null
 }
 
-export type NivelPreco =
-  | 'processo'
-  | 'tipoProcesso'
-  | 'regiao'
-  | 'fornecedor'
-  | 'global'
-  | 'fallback_padrao'
-
 export type MotivoDescarte =
   | 'valor_zero_ou_negativo'
   | 'fora_de_vigencia'
   | 'natureza_diferente'
   | 'arquivada'
-  | 'perdeu_precedencia'
-  | 'nao_casa_contexto'
+  | 'incompativel_contexto' // linha exige uma dimensão que o contexto não satisfaz
+  | 'menor_especificidade' // compatível, mas perdeu para uma linha mais específica/prioritária
 
 export type MotivoFalha =
   | 'NENHUMA_LINHA'
@@ -93,15 +90,15 @@ export type MotivoFalha =
 
 export interface AlternativaDescartada {
   tabelaValorId: number
-  nivel: NivelPreco | 'indefinido'
+  nivel: string
   motivo: MotivoDescarte
   valor: number
 }
 
-/** Preços VÁLIDOS concorrentes no MESMO nível (mesma especificidade) que divergem
- *  em valor/moeda da linha escolhida — ambiguidade a revisar (Fase 7: transparência). */
+/** Preços VÁLIDOS empatados (mesma especificidade E prioridade) que divergem em
+ *  valor/moeda — AMBIGUIDADE que BLOQUEIA a geração (§2). */
 export interface ConflitoPreco {
-  nivel: NivelPreco
+  nivel: string // "especificidade N · prioridade P"
   competidores: { tabelaValorId: number; valor: number; moeda: Moeda }[]
   nota: string
 }
@@ -110,14 +107,16 @@ export interface ResultadoPrecoOK {
   ok: true
   valor: number // já aplicado modoCalculo/quantidade
   valorUnitario: number
+  quantidade: number // quantidade usada no cálculo (1 quando fixo)
+  modoCalculo: string // modo de cálculo aplicado (congelado no lançamento)
   moeda: Moeda
-  nivel: NivelPreco // "regra utilizada"
-  prioridade: number // 1 = mais específico … 6 = fallback
-  especificidade: number // nº de dimensões de contexto que a linha casou
-  tabelaValorId: number | null // null quando veio do fallback_padrao
+  nivel: string // descrição da regra escolhida (especificidade/prioridade)
+  prioridade: number // prioridade EXPLÍCITA da linha escolhida (desempate final)
+  especificidade: number // nº de dimensões de contexto PREENCHIDAS+compatíveis
+  tabelaValorId: number | null
   razao: string
   moedaDivergente: boolean // true se ctx.moeda != moeda resolvida (sem câmbio aqui)
-  conflito?: ConflitoPreco // presente quando há ambiguidade no nível escolhido
+  conflito?: ConflitoPreco // presente quando há AMBIGUIDADE (empate) → motor bloqueia
   alternativasDescartadas: AlternativaDescartada[]
 }
 
@@ -130,23 +129,10 @@ export interface ResultadoPrecoFalha {
 
 export type ResultadoPreco = ResultadoPrecoOK | ResultadoPrecoFalha
 
-// Prioridade numérica por nível (1 = mais específico).
-const PRIORIDADE: Record<NivelPreco, number> = {
-  processo: 1,
-  tipoProcesso: 2,
-  regiao: 3,
-  fornecedor: 4,
-  global: 5,
-  fallback_padrao: 6,
-}
-
 function ymd(d: Date): string {
   return d.toISOString().slice(0, 10)
 }
 
-// hoje === null → sem restrição de data (não filtra vigência). Evita usar um
-// sentinela enganoso (ex.: 1970) que rejeitaria tudo. O wrapper com banco
-// sempre injeta a data corrente; o core exige data explícita p/ ser puro.
 function dentroDaVigencia(r: LinhaPreco, hoje: string | null): boolean {
   if (hoje == null) return true
   if (r.vigenciaInicio && hoje < r.vigenciaInicio) return false
@@ -159,26 +145,57 @@ function precoValido(v: number): boolean {
   return Number.isFinite(v) && v > 0
 }
 
-// desempate determinístico DENTRO de um nível (nunca "o primeiro da query"):
-// vigência mais recente primeiro (vigenciaInicio desc), depois id desc (mais novo).
-function ordenarPorEspecificidade(rows: LinhaPreco[]): LinhaPreco[] {
-  return [...rows].sort((a, b) => {
-    const va = a.vigenciaInicio ?? ''
-    const vb = b.vigenciaInicio ?? ''
-    if (va !== vb) return va < vb ? 1 : -1
-    return b.id - a.id
-  })
-}
-
 function ehPerUnit(modo?: string | null): boolean {
   if (!modo) return false
   const m = modo.toLowerCase()
   return m === 'per_unit' || m === 'unit' || m === 'por_unidade' || m === 'quantidade'
 }
 
+// ── §2 DIMENSÕES DE CONTEXTO ─────────────────────────────────────────────────
+// Cada dimensão é: "a linha RESTRINGE esta dimensão?" (preenchida) e "a linha é
+// COMPATÍVEL com o contexto nesta dimensão?" (compativel). Uma linha só concorre se
+// é compatível em TODAS. A especificidade = nº de dimensões preenchidas (todas já
+// compatíveis ⇒ casaram um valor real do contexto). Sem escada fixa: quem tem MAIS
+// critérios reais casados vence; prioridade explícita só desempata; empate = conflito.
+interface DimCtx {
+  processoId?: number | null
+  tipoProcesso?: string | null
+  modalidadeId?: number | null
+  regiao?: string | null
+  fornecedorId?: number | null
+  quantidade: number
+}
+interface Dimensao {
+  nome: string
+  preenchida: (r: LinhaPreco) => boolean
+  compativel: (r: LinhaPreco, c: DimCtx) => boolean
+}
+const DIMENSOES: Dimensao[] = [
+  { nome: 'processo', preenchida: (r) => r.processoId != null, compativel: (r, c) => r.processoId == null || (c.processoId != null && r.processoId === c.processoId) },
+  { nome: 'tipoProcesso', preenchida: (r) => r.processoTipoId != null, compativel: (r, c) => r.processoTipoId == null || (c.tipoProcesso != null && r.processoTipoId === c.tipoProcesso) },
+  { nome: 'modalidade', preenchida: (r) => r.modalidadeId != null, compativel: (r, c) => r.modalidadeId == null || (c.modalidadeId != null && r.modalidadeId === c.modalidadeId) },
+  { nome: 'regiao', preenchida: (r) => r.regiao != null, compativel: (r, c) => r.regiao == null || (c.regiao != null && r.regiao === c.regiao) },
+  { nome: 'fornecedor', preenchida: (r) => r.fornecedorId != null, compativel: (r, c) => r.fornecedorId == null || (c.fornecedorId != null && r.fornecedorId === c.fornecedorId) },
+  {
+    nome: 'quantidade',
+    preenchida: (r) => r.quantidadeMinima != null || r.quantidadeMaxima != null,
+    compativel: (r, c) => {
+      const lo = r.quantidadeMinima == null ? -Infinity : r.quantidadeMinima
+      const hi = r.quantidadeMaxima == null ? Infinity : r.quantidadeMaxima
+      return c.quantidade >= lo && c.quantidade <= hi
+    },
+  },
+]
+
+function especificidadeDe(r: LinhaPreco): number {
+  return DIMENSOES.reduce((n, d) => n + (d.preenchida(r) ? 1 : 0), 0)
+}
+
 /**
- * Núcleo PURO da resolução — sem Prisma, sem I/O. Recebe as linhas candidatas
- * já carregadas e devolve o resultado com auditoria completa. Testável offline.
+ * Núcleo PURO da resolução por ESPECIFICIDADE (§2). Sem Prisma, sem I/O.
+ * Ordem: 1) compatibilidade com o contexto real; 2) maior especificidade;
+ * 3) maior prioridade explícita; 4) empate residual ⇒ AMBIGUIDADE (bloqueia).
+ * Nunca zero silencioso; nunca fallback de campo legado.
  */
 export function resolverPrecoCore(
   linhas: LinhaPreco[],
@@ -186,140 +203,83 @@ export function resolverPrecoCore(
 ): ResultadoPreco {
   const descartadas: AlternativaDescartada[] = []
   const quantidade = ctx.quantidade == null || ctx.quantidade <= 0 ? 1 : ctx.quantidade
-  const tipoProcessoStr = ctx.tipoProcessoId == null ? null : String(ctx.tipoProcessoId)
-  const hoje = ctx.dataEvento ? ymd(ctx.dataEvento) : null // null = sem restrição de vigência (core puro)
+  const dimCtx: DimCtx = {
+    processoId: ctx.processoId ?? null,
+    tipoProcesso: ctx.tipoProcessoId == null ? null : String(ctx.tipoProcessoId),
+    modalidadeId: ctx.modalidadeId == null ? null : Number(ctx.modalidadeId),
+    regiao: ctx.regiao ?? null,
+    fornecedorId: ctx.fornecedorId ?? null,
+    quantidade,
+  }
+  const hoje = ctx.dataEvento ? ymd(ctx.dataEvento) : null
 
-  // 1) Filtra por natureza + arquivamento + vigência, registrando descartes.
-  const candidatas: LinhaPreco[] = []
+  // 1) Filtro base: natureza (canônica de PREÇO) + arquivamento + vigência + valor>0
+  //    + compatibilidade de contexto em TODAS as dimensões.
+  const natCtx = ctx.natureza == null ? null : canonicalNaturezaPreco(ctx.natureza)
+  const aplicaveis: { r: LinhaPreco; especificidade: number }[] = []
   for (const r of linhas) {
-    if (ctx.natureza != null && r.natureza !== ctx.natureza) {
-      descartadas.push({ tabelaValorId: r.id, nivel: 'indefinido', motivo: 'natureza_diferente', valor: r.valor })
-      continue
-    }
-    if (r.arquivado) {
-      descartadas.push({ tabelaValorId: r.id, nivel: 'indefinido', motivo: 'arquivada', valor: r.valor })
-      continue
-    }
-    if (!dentroDaVigencia(r, hoje)) {
-      descartadas.push({ tabelaValorId: r.id, nivel: 'indefinido', motivo: 'fora_de_vigencia', valor: r.valor })
-      continue
-    }
-    candidatas.push(r)
+    if (natCtx != null && canonicalNaturezaPreco(r.natureza) !== natCtx) { descartadas.push({ tabelaValorId: r.id, nivel: '—', motivo: 'natureza_diferente', valor: r.valor }); continue }
+    if (r.arquivado) { descartadas.push({ tabelaValorId: r.id, nivel: '—', motivo: 'arquivada', valor: r.valor }); continue }
+    if (!dentroDaVigencia(r, hoje)) { descartadas.push({ tabelaValorId: r.id, nivel: '—', motivo: 'fora_de_vigencia', valor: r.valor }); continue }
+    if (!precoValido(r.valor)) { descartadas.push({ tabelaValorId: r.id, nivel: '—', motivo: 'valor_zero_ou_negativo', valor: r.valor }); continue }
+    const incompat = DIMENSOES.find((d) => !d.compativel(r, dimCtx))
+    if (incompat) { descartadas.push({ tabelaValorId: r.id, nivel: incompat.nome, motivo: 'incompativel_contexto', valor: r.valor }); continue }
+    aplicaveis.push({ r, especificidade: especificidadeDe(r) })
   }
 
-  // 2) Precedência: do mais específico ao global. Cada nível encontra a 1ª linha
-  //    que casa AQUELA dimensão; valor<=0 é descartado (B2) e o nível segue
-  //    procurando a próxima linha válida.
-  const niveis: { nome: NivelPreco; casa: (r: LinhaPreco) => boolean; especificidade: (r: LinhaPreco) => number }[] = [
-    {
-      nome: 'processo',
-      casa: (r) => ctx.processoId != null && r.processoId === ctx.processoId,
-      especificidade: () => 4,
-    },
-    {
-      nome: 'tipoProcesso',
-      casa: (r) => tipoProcessoStr != null && r.processoTipoId === tipoProcessoStr,
-      especificidade: () => 3,
-    },
-    {
-      nome: 'regiao',
-      casa: (r) => ctx.regiao != null && r.regiao === ctx.regiao,
-      especificidade: () => 2,
-    },
-    {
-      nome: 'fornecedor',
-      casa: (r) => ctx.fornecedorId != null && r.fornecedorId === ctx.fornecedorId,
-      especificidade: () => 1,
-    },
-    {
-      nome: 'global',
-      casa: (r) => r.processoId == null && r.processoTipoId == null && r.regiao == null && r.fornecedorId == null,
-      especificidade: () => 0,
-    },
-  ]
+  if (aplicaveis.length === 0) {
+    const houveZeros = descartadas.some((d) => d.motivo === 'valor_zero_ou_negativo')
+    return finalizarFalha(houveZeros ? 'SEM_PRECO_VALIDO' : 'NENHUMA_LINHA', descartadas, ctx)
+  }
 
-  for (const nivel of niveis) {
-    const doNivel = ordenarPorEspecificidade(candidatas.filter(nivel.casa))
-    let escolhida: LinhaPreco | null = null
-    for (const r of doNivel) {
-      if (!precoValido(r.valor)) {
-        descartadas.push({ tabelaValorId: r.id, nivel: nivel.nome, motivo: 'valor_zero_ou_negativo', valor: r.valor })
-        continue
+  // 2) Maior especificidade → 3) maior prioridade explícita.
+  const maxEspec = Math.max(...aplicaveis.map((a) => a.especificidade))
+  const naEspec = aplicaveis.filter((a) => a.especificidade === maxEspec)
+  const maxPrio = Math.max(...naEspec.map((a) => a.r.prioridade ?? 0))
+  const topo = naEspec.filter((a) => (a.r.prioridade ?? 0) === maxPrio)
+
+  // marca todo o resto como descartado por menor especificidade/prioridade
+  for (const a of aplicaveis) if (!topo.includes(a)) descartadas.push({ tabelaValorId: a.r.id, nivel: `espec ${a.especificidade}`, motivo: 'menor_especificidade', valor: a.r.valor })
+
+  // desempate determinístico dentro do topo (vigência recente, depois id)
+  const ordenado = [...topo].sort((x, y) => {
+    const vx = x.r.vigenciaInicio ?? '', vy = y.r.vigenciaInicio ?? ''
+    if (vx !== vy) return vx < vy ? 1 : -1
+    return y.r.id - x.r.id
+  })
+  const escolhida = ordenado[0].r
+
+  // 4) AMBIGUIDADE: ≥2 no topo que DIVERGEM em valor/moeda → conflito (bloqueia).
+  const competidores = topo.filter((a) => a.r.id !== escolhida.id && (a.r.valor !== escolhida.valor || a.r.moeda !== escolhida.moeda))
+  const conflito: ConflitoPreco | undefined = competidores.length
+    ? {
+        nivel: `especificidade ${maxEspec} · prioridade ${maxPrio}`,
+        competidores: competidores.map((a) => ({ tabelaValorId: a.r.id, valor: a.r.valor, moeda: a.r.moeda })),
+        nota: `AMBIGUIDADE: ${competidores.length + 1} preços com mesma especificidade (${maxEspec}) e prioridade (${maxPrio}) divergem em valor/moeda — resolva antes de gerar. Regras: [${[escolhida.id, ...competidores.map((a) => a.r.id)].join(', ')}]`,
       }
-      escolhida = r
-      break
-    }
-    if (escolhida) {
-      // conflito = preços VÁLIDOS no MESMO nível que divergem em valor/moeda.
-      const competidores = doNivel.filter(
-        (r) => r.id !== escolhida!.id && precoValido(r.valor) && (r.valor !== escolhida!.valor || r.moeda !== escolhida!.moeda),
-      )
-      const conflito: ConflitoPreco | undefined = competidores.length
-        ? {
-            nivel: nivel.nome,
-            competidores: competidores.map((r) => ({ tabelaValorId: r.id, valor: r.valor, moeda: r.moeda })),
-            nota: `${competidores.length} preço(s) concorrente(s) no nível "${nivel.nome}"; escolha determinística (vigência recente, depois id) — revisar ambiguidade`,
-          }
-        : undefined
-      // marca as demais candidatas válidas de níveis inferiores como "perdeu precedência"
-      registrarPerdaDePrecedencia(candidatas, escolhida, descartadas)
-      const perUnit = ehPerUnit(escolhida.modoCalculo)
-      const valorFinal = perUnit ? escolhida.valor * quantidade : escolhida.valor
-      const moedaDivergente = ctx.moeda != null && ctx.moeda !== escolhida.moeda
-      return {
-        ok: true,
-        valor: valorFinal,
-        valorUnitario: escolhida.valor,
-        moeda: escolhida.moeda,
-        nivel: nivel.nome,
-        prioridade: PRIORIDADE[nivel.nome],
-        especificidade: nivel.especificidade(escolhida),
-        tabelaValorId: escolhida.id,
-        razao: `Preço de ${ctx.natureza} resolvido no nível "${nivel.nome}" (prioridade ${PRIORIDADE[nivel.nome]})`
-          + (perUnit ? `, modo per_unit × ${quantidade}` : '')
-          + (conflito ? `; ⚠ ${conflito.competidores.length} concorrente(s) no mesmo nível` : '')
-          + (moedaDivergente ? `; ATENÇÃO: moeda desejada ${ctx.moeda} ≠ ${escolhida.moeda} (sem conversão aqui)` : ''),
-        moedaDivergente,
-        conflito,
-        alternativasDescartadas: descartadas,
-      }
-    }
-  }
+    : undefined
 
-  // 3) Fallback EXPLÍCITO (nível 5 da spec) — só se finito e > 0.
-  if (ctx.fallbackValorPadrao != null && precoValido(ctx.fallbackValorPadrao)) {
-    const perUnitN = false // fallback é sempre valor cheio
-    void perUnitN
-    return {
-      ok: true,
-      valor: ctx.fallbackValorPadrao,
-      valorUnitario: ctx.fallbackValorPadrao,
-      moeda: ctx.fallbackMoeda ?? ctx.moeda ?? Moeda.BRL,
-      nivel: 'fallback_padrao',
-      prioridade: PRIORIDADE.fallback_padrao,
-      especificidade: 0,
-      tabelaValorId: null,
-      razao: 'Nenhuma linha de TabelaValor casou; usando fallback explícito (valorPadrao da configuração)',
-      moedaDivergente: false,
-      alternativasDescartadas: descartadas,
-    }
-  }
-
-  // 4) Falha CLARA (Fase 7, item 6) — nunca zero silencioso.
-  const houveZeros = descartadas.some((d) => d.motivo === 'valor_zero_ou_negativo')
-  return finalizarFalha(houveZeros ? 'SEM_PRECO_VALIDO' : 'NENHUMA_LINHA', descartadas, ctx)
-}
-
-function registrarPerdaDePrecedencia(
-  candidatas: LinhaPreco[],
-  escolhida: LinhaPreco,
-  descartadas: AlternativaDescartada[],
-): void {
-  for (const r of candidatas) {
-    if (r.id === escolhida.id) continue
-    if (!precoValido(r.valor)) continue // já vira/virou descarte por zero em outro ponto
-    if (descartadas.some((d) => d.tabelaValorId === r.id)) continue
-    descartadas.push({ tabelaValorId: r.id, nivel: 'indefinido', motivo: 'perdeu_precedencia', valor: r.valor })
+  const perUnit = ehPerUnit(escolhida.modoCalculo)
+  const valorFinal = perUnit ? escolhida.valor * quantidade : escolhida.valor
+  const moedaDivergente = ctx.moeda != null && ctx.moeda !== escolhida.moeda
+  return {
+    ok: true,
+    valor: valorFinal,
+    valorUnitario: escolhida.valor,
+    quantidade: perUnit ? quantidade : 1,
+    modoCalculo: escolhida.modoCalculo ?? 'fixed',
+    moeda: escolhida.moeda,
+    nivel: `especificidade ${maxEspec} · prioridade ${maxPrio}`,
+    prioridade: escolhida.prioridade ?? 0,
+    especificidade: maxEspec,
+    tabelaValorId: escolhida.id,
+    razao: `Preço resolvido por especificidade ${maxEspec} (prioridade ${maxPrio})`
+      + (perUnit ? `, modo per_unit × ${quantidade}` : '')
+      + (conflito ? '; ⚠ AMBIGUIDADE (empate) — bloquear' : '')
+      + (moedaDivergente ? `; ATENÇÃO: moeda desejada ${ctx.moeda} ≠ ${escolhida.moeda} (sem conversão aqui)` : ''),
+    moedaDivergente,
+    conflito,
+    alternativasDescartadas: descartadas,
   }
 }
 

@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { validarRegraEconomica, validarConfigGeraLancamento } from '@/lib/financeiro/regra-financeira-validacao'
 
 function toStrOrNull(v: any): string | null {
   if (v === undefined || v === null) return null
@@ -47,6 +48,11 @@ export async function POST(request: NextRequest) {
       receitaCode ? prisma.produtoFinanceiro.findFirst({ where: { codigo: receitaCode, ativo: true }, select: { id: true } }) : null,
       docCode ? prisma.tipoDocumentoCadastro.findFirst({ where: { code: docCode }, select: { id: true } }) : null,
     ])
+    const custoConfigId = toIntOrNull(b.custoConfigId) ?? custoCfg?.id ?? null
+    const receitaConfigId = toIntOrNull(b.receitaConfigId) ?? receitaCfg?.id ?? null
+    // §3 — natureza da regra deve ser compatível com a Config Financeira (backend).
+    const valNat = await validarRegraEconomica(custoConfigId, receitaConfigId)
+    if (!valNat.ok) return NextResponse.json({ error: valNat.motivo }, { status: 400 })
     const regra = await prisma.phaseEconomicRule.create({
       data: {
         tipoProcessoId: toIntOrNull(b.tipoProcessoId),
@@ -58,8 +64,8 @@ export async function POST(request: NextRequest) {
         custoProdutoCode: custoCode,
         receitaProdutoCode: receitaCode,
         // F3 — grava também os FKs canônicos (dual-write até o cutover final)
-        custoConfigId: toIntOrNull(b.custoConfigId) ?? custoCfg?.id ?? null,
-        receitaConfigId: toIntOrNull(b.receitaConfigId) ?? receitaCfg?.id ?? null,
+        custoConfigId,
+        receitaConfigId,
         tipoDocumentoId: toIntOrNull(b.tipoDocumentoId) ?? tipoDoc?.id ?? null,
         participaPlanilha: b.participaPlanilha !== false,
         ordem: toIntOrNull(b.ordem) ?? 0,

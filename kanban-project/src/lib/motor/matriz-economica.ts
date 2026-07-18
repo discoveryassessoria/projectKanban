@@ -27,6 +27,8 @@ import { gerarParcelas } from '@/lib/financeiro/parcelas'
 import { analyzePessoa } from '@/src/lib/document-generator'
 // LOTE A · B3 — preço hierárquico (arquivo separado, testável isolado)
 import { resolverPrecoPorConfigDB } from './resolver-preco-financeiro.prisma'
+import type { ResultadoPreco, ResultadoPrecoOK } from './resolver-preco-financeiro'
+import { resolverPendenciaPorChave } from '@/lib/financeiro/pendencia'
 import { NaturezaPreco } from '@prisma/client'
 import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
 
@@ -164,31 +166,47 @@ export async function gerarEconomicoDaMatriz(
             })).id,
             (id) => { item.tarefaId = id }, pulados, erros)
         }
+        // PREÇO-FONTE-ÚNICA (§5): a Configuração Financeira NÃO é preço. Resolve SÓ
+        // pela Tabela de Preços; sem fallback de valorPadrao; sem zero silencioso.
+        // Sem preço válido → PENDÊNCIA rastreável (não lança). Conflito de mesma
+        // precedência → BLOQUEIA + pendência. Sucesso → lança com preço CONGELADO.
         if (regra.createsCost) {
-          // F2/Fase 7 — resolvedor endurecido: NUNCA zero silencioso; fallback explícito = valorPadrao (>0).
-          const fbC = prodCusto?.valorPadrao != null ? Number(prodCusto.valorPadrao) : null
-          const rC = prodCusto
-            ? await resolverPrecoPorConfigDB(prodCusto.id, { processoId, tipoProcessoId: String(tipoProcessoId), fallbackValorPadrao: fbC, fallbackMoeda: prodCusto.moedaPadrao })
-            : null
-          const val = rC?.ok ? rC.valor : (fbC != null && fbC > 0 ? fbC : null)
-          const moedaC = (rC?.ok ? rC.moeda : prodCusto?.moedaPadrao) as Moeda
-          if (val == null) pulados.push({ motivo: 'sem preço de CUSTO válido (Fase 7: nunca zero)', detalhe: componente + (rC && !rC.ok ? ` — ${rC.razao}` : '') })
-          else await comIdempotencia(`${base}::custo`, processoId, tipoProcessoId, phaseKey, 'financial', regra.id, 'Custo', desc,
-            () => criarCusto(processoId, desc, val, moedaC, { ...vinc, productServiceId: prodCusto!.id }),
-            (id) => { item.custoId = id; item.custo = { valor: val, moeda: moedaC } }, pulados, erros)
+          if (!prodCusto) {
+            pulados.push({ motivo: 'regra gera CUSTO mas sem Configuração Financeira de custo', detalhe: componente })
+          } else {
+            const chave = `${base}::custo`
+            const rC = await resolverPrecoPorConfigDB(prodCusto.id, { processoId, tipoProcessoId: String(tipoProcessoId), natureza: NaturezaPreco.CUSTO })
+            const bloqueio = motivoBloqueio(rC)
+            if (bloqueio) {
+              await registrarPendencia({ chave, processoId, tipoProcessoId, phaseKey, phaseCycle, configId: prodCusto.id, regraId: regra.id, natureza: NaturezaPreco.CUSTO, motivo: bloqueio.motivo, detalhe: `${componente}: ${bloqueio.detalhe}`, contexto: bloqueio.contexto }, pulados, erros)
+            } else {
+              const cong = congelar(rC, NaturezaPreco.CUSTO, prodCusto.id, regra.id, chave, { tipoProcessoId, phaseKey, phaseCycle })
+              await comIdempotencia(chave, processoId, tipoProcessoId, phaseKey, 'financial', regra.id, 'Custo', desc,
+                () => criarCusto(processoId, desc, cong, { ...vinc, productServiceId: prodCusto.id }),
+                (id) => { item.custoId = id; item.custo = { valor: cong.valor, moeda: cong.moeda } }, pulados, erros)
+              // §13 — se havia pendência para esta chave, o reprocesso bem-sucedido a resolve.
+              await resolverPendenciaPorChave(`pend::${chave}`, 'Preço de custo resolvido e lançamento criado')
+            }
+          }
         }
         if (regra.createsRevenue) {
-          // F2/Fase 7 — resolvedor endurecido: NUNCA zero silencioso. Independente do custo.
-          const fbR = prodReceita?.valorPadrao != null ? Number(prodReceita.valorPadrao) : null
-          const rR = prodReceita
-            ? await resolverPrecoPorConfigDB(prodReceita.id, { processoId, tipoProcessoId: String(tipoProcessoId), fallbackValorPadrao: fbR, fallbackMoeda: prodReceita.moedaPadrao })
-            : null
-          const val = rR?.ok ? rR.valor : (fbR != null && fbR > 0 ? fbR : null)
-          const moedaR = (rR?.ok ? rR.moeda : prodReceita?.moedaPadrao) as Moeda
-          if (val == null) pulados.push({ motivo: 'sem preço de RECEITA válido (Fase 7: nunca zero)', detalhe: componente + (rR && !rR.ok ? ` — ${rR.razao}` : '') })
-          else await comIdempotencia(`${base}::receita`, processoId, tipoProcessoId, phaseKey, 'financial', regra.id, 'Receita', desc,
-            () => criarReceita(processoId, desc, val, moedaR, { ...vinc, productServiceId: prodReceita!.id }),
-            (id) => { item.receitaId = id; item.receita = { valor: val, moeda: moedaR } }, pulados, erros)
+          if (!prodReceita) {
+            pulados.push({ motivo: 'regra gera RECEITA mas sem Configuração Financeira de receita', detalhe: componente })
+          } else {
+            const chave = `${base}::receita`
+            const rR = await resolverPrecoPorConfigDB(prodReceita.id, { processoId, tipoProcessoId: String(tipoProcessoId), natureza: NaturezaPreco.VENDA })
+            const bloqueio = motivoBloqueio(rR)
+            if (bloqueio) {
+              await registrarPendencia({ chave, processoId, tipoProcessoId, phaseKey, phaseCycle, configId: prodReceita.id, regraId: regra.id, natureza: NaturezaPreco.VENDA, motivo: bloqueio.motivo, detalhe: `${componente}: ${bloqueio.detalhe}`, contexto: bloqueio.contexto }, pulados, erros)
+            } else {
+              const cong = congelar(rR, NaturezaPreco.VENDA, prodReceita.id, regra.id, chave, { tipoProcessoId, phaseKey, phaseCycle })
+              await comIdempotencia(chave, processoId, tipoProcessoId, phaseKey, 'financial', regra.id, 'Receita', desc,
+                () => criarReceita(processoId, desc, cong, { ...vinc, productServiceId: prodReceita.id }),
+                (id) => { item.receitaId = id; item.receita = { valor: cong.valor, moeda: cong.moeda } }, pulados, erros)
+              // §13 — reprocesso bem-sucedido resolve a pendência da chave (se houver).
+              await resolverPendenciaPorChave(`pend::${chave}`, 'Preço de venda resolvido e lançamento criado')
+            }
+          }
         }
         if (item.tarefaId || item.custoId || item.receitaId) criados.push(item)
       }
@@ -233,38 +251,109 @@ async function acharOuCriarTipoServico(processoId: number, nome: string) {
 
 type Vinc = { personId: number; documentoId: number; tipoServicoId: number; phaseKey: string; phaseCycle: number; productServiceId: number | null }
 
-async function criarCusto(pid: number, descricao: string, valor: number, moeda: Moeda, v: Vinc): Promise<number> {
+// ── §6 CONGELAMENTO — snapshot imutável do preço/contexto no momento do lançamento ──
+interface Congelado {
+  valor: number // total já calculado (unitário × quantidade)
+  valorUnitario: number
+  quantidade: number
+  moeda: Moeda
+  modoCalculo: string
+  natureza: NaturezaPreco
+  tabelaValorId: number | null // regra de preço utilizada (pricingRuleId)
+  configId: number
+  regraFinanceiraId: number | null
+  contexto: Prisma.InputJsonValue
+  dataReferencia: Date
+  chaveIdempotencia: string
+}
+
+function congelar(
+  r: ResultadoPreco, natureza: NaturezaPreco, configId: number, regraId: number | null, chave: string,
+  ctx: { tipoProcessoId: number; phaseKey: string; phaseCycle: number },
+): Congelado {
+  const ok = r as ResultadoPrecoOK // só chamado quando motivoBloqueio() === null
+  return {
+    valor: ok.valor, valorUnitario: ok.valorUnitario, quantidade: ok.quantidade, moeda: ok.moeda,
+    modoCalculo: ok.modoCalculo, natureza, tabelaValorId: ok.tabelaValorId, configId, regraFinanceiraId: regraId,
+    contexto: { nivel: ok.nivel, prioridade: ok.prioridade, especificidade: ok.especificidade, razao: ok.razao, tipoProcessoId: ctx.tipoProcessoId, phaseKey: ctx.phaseKey, phaseCycle: ctx.phaseCycle },
+    dataReferencia: new Date(), chaveIdempotencia: chave,
+  }
+}
+
+// Sucesso resolvível = ok E sem conflito de mesma precedência (§5: conflito BLOQUEIA).
+function motivoBloqueio(r: ResultadoPreco): { motivo: string; detalhe: string; contexto: Prisma.InputJsonValue } | null {
+  if (!r.ok) {
+    return { motivo: r.motivo, detalhe: r.razao, contexto: { alternativasDescartadas: r.alternativasDescartadas } as unknown as Prisma.InputJsonValue }
+  }
+  if (r.conflito) {
+    return { motivo: 'CONFLITO_PRECO', detalhe: r.conflito.nota, contexto: { conflito: r.conflito } as unknown as Prisma.InputJsonValue }
+  }
+  return null
+}
+
+// §5/§6 — pendência financeira RASTREÁVEL e idempotente (chave única no banco).
+async function registrarPendencia(
+  p: { chave: string; processoId: number; tipoProcessoId: number; phaseKey: string; phaseCycle: number; configId: number | null; regraId: number | null; natureza: NaturezaPreco; motivo: string; detalhe: string; contexto: Prisma.InputJsonValue },
+  pulados: { motivo: string; detalhe?: string }[], erros: string[],
+): Promise<void> {
+  try {
+    await prisma.pendenciaFinanceira.create({
+      data: {
+        processoId: p.processoId, tipoProcessoId: p.tipoProcessoId, phaseKey: p.phaseKey, phaseCycle: p.phaseCycle,
+        configFinanceiraId: p.configId, regraFinanceiraId: p.regraId, natureza: p.natureza,
+        motivo: p.motivo.slice(0, 40), detalhe: p.detalhe.slice(0, 500), contexto: p.contexto,
+        chaveIdempotencia: `pend::${p.chave}`,
+      },
+    })
+    pulados.push({ motivo: `pendência financeira registrada (${p.motivo})`, detalhe: p.detalhe })
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      pulados.push({ motivo: 'pendência já registrada (idempotência)', detalhe: p.detalhe }); return
+    }
+    erros.push(`pendência ${p.detalhe}: ${(e as Error)?.message ?? 'erro'}`)
+  }
+}
+
+async function criarCusto(pid: number, descricao: string, c: Congelado, v: Vinc): Promise<number> {
   const codigo = await gerarCodigoCusto()
   const vencimento = new Date()
-  const parcelas = gerarParcelas(valor, 1, vencimento)
-  const c = await prisma.custo.create({
+  const parcelas = gerarParcelas(c.valor, 1, vencimento)
+  const row = await prisma.custo.create({
     data: {
       codigo, processoId: pid, tipo: TipoCusto.SERVICO, categoria: CategoriaCusto.OUTROS,
-      descricao: descricao.slice(0, 300), moeda, valor,
+      descricao: descricao.slice(0, 300), moeda: c.moeda, valor: c.valor,
       fxEstimado: 1, fxRule: FxRule.VARIAVEL, nParcelas: 1, vencimento, custoOperacional: false, status: CustoStatus.ATIVA,
       personId: v.personId, documentoId: v.documentoId, tipoServicoId: v.tipoServicoId,
       phaseKey: v.phaseKey, phaseCycle: v.phaseCycle, productServiceId: v.productServiceId, origem: 'motor',
+      // §6/§8 — preço CONGELADO + rastreabilidade
+      pricingRuleId: c.tabelaValorId, valorUnitario: c.valorUnitario, quantidade: c.quantidade, valorTotalCongelado: c.valor,
+      modoCalculoAplicado: c.modoCalculo, naturezaPreco: c.natureza, configFinanceiraId: c.configId,
+      regraFinanceiraId: c.regraFinanceiraId, contextoAplicado: c.contexto, dataReferencia: c.dataReferencia, chaveIdempotencia: c.chaveIdempotencia,
       parcelas: { create: parcelas.map((p) => ({ numero: p.numero, vencimento: p.vencimento, valor: p.valor, status: 'PENDENTE' as const })) },
-      eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Custo criado pelo motor (Matriz): ${descricao}`.slice(0, 500), valor } },
+      eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Custo criado pelo motor (Matriz): ${descricao}`.slice(0, 500), valor: c.valor } },
     },
   })
-  return c.id
+  return row.id
 }
 
-async function criarReceita(pid: number, descricao: string, valor: number, moeda: Moeda, v: Vinc): Promise<number> {
+async function criarReceita(pid: number, descricao: string, c: Congelado, v: Vinc): Promise<number> {
   const codigo = await gerarCodigoReceita()
   const data1 = new Date()
-  const parcelas = gerarParcelas(valor, 1, data1)
-  const r = await prisma.receita.create({
+  const parcelas = gerarParcelas(c.valor, 1, data1)
+  const row = await prisma.receita.create({
     data: {
       codigo, processoId: pid, categoria: CategoriaReceita.PASTA_DOCUMENTAL,
-      descricao: descricao.slice(0, 300), moeda, valor,
+      descricao: descricao.slice(0, 300), moeda: c.moeda, valor: c.valor,
       fxEstimado: 1, fxRule: FxRule.VARIAVEL, nParcelas: 1, data1, periodicidade: 'Mensal', status: ReceitaStatus.ATIVA,
       personId: v.personId, documentoId: v.documentoId, tipoServicoId: v.tipoServicoId,
       phaseKey: v.phaseKey, phaseCycle: v.phaseCycle, productServiceId: v.productServiceId, origem: 'motor',
+      // §6/§8 — preço CONGELADO + rastreabilidade
+      pricingRuleId: c.tabelaValorId, valorUnitario: c.valorUnitario, quantidade: c.quantidade, valorTotalCongelado: c.valor,
+      modoCalculoAplicado: c.modoCalculo, naturezaPreco: c.natureza, configFinanceiraId: c.configId,
+      regraFinanceiraId: c.regraFinanceiraId, contextoAplicado: c.contexto, dataReferencia: c.dataReferencia, chaveIdempotencia: c.chaveIdempotencia,
       parcelas: { create: parcelas.map((p) => ({ numero: p.numero, vencimento: p.vencimento, valor: p.valor, status: 'PENDENTE' as const })) },
-      eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Receita criada pelo motor (Matriz): ${descricao}`.slice(0, 500), valor } },
+      eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Receita criada pelo motor (Matriz): ${descricao}`.slice(0, 500), valor: c.valor } },
     },
   })
-  return r.id
+  return row.id
 }

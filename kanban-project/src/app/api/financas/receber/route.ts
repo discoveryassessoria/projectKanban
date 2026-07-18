@@ -36,7 +36,10 @@ export async function GET(_req: NextRequest) {
           id: true, numero: true, valor: true, valorBrl: true, vencimento: true, status: true, dataPagamento: true,
           receita: {
             select: {
-              descricao: true, moeda: true, categoria: true, nParcelas: true,
+              id: true, descricao: true, moeda: true, categoria: true, nParcelas: true,
+              // §1/§3/§4 — campos CANÔNICOS do lançamento de origem
+              origemLancamento: true, naturezaLancamento: true, estornoDeId: true, canceladoEm: true, estornadoEm: true,
+              phaseKey: true, configFinanceiraId: true, valorUnitario: true, dataCompetencia: true,
               processo: { select: { id: true, nome: true, pais: true } },
             },
           },
@@ -69,6 +72,19 @@ export async function GET(_req: NextRequest) {
         cancelada,
         atrasada,
         diasParaVencer: d,
+        // §1/§3/§4/§5 — canônico: origem, vínculo, natureza, bloqueio de edição, estorno
+        lancamentoOrigemTipo: "receita" as const,
+        lancamentoOrigemId: p.receita?.id ?? null,
+        origem: (p.receita?.origemLancamento ?? "PROCESSO") as string,
+        natureza: (p.receita?.naturezaLancamento ?? "RECEITA") as string,
+        editavelEstrutural: (p.receita?.origemLancamento ?? "PROCESSO") !== "PROCESSO",
+        estorno: p.receita?.estornoDeId != null,
+        canceladoEm: p.receita?.canceladoEm ?? null,
+        estornadoEm: p.receita?.estornadoEm ?? null,
+        phaseKey: p.receita?.phaseKey ?? null,
+        configFinanceiraId: p.receita?.configFinanceiraId ?? null,
+        valorUnitario: p.receita?.valorUnitario != null ? Number(p.receita.valorUnitario) : null,
+        dataCompetencia: p.receita?.dataCompetencia ?? null,
       }
     })
 

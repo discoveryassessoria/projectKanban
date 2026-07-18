@@ -60,6 +60,12 @@ export async function PUT(
     if (trocaMestre) {
       return NextResponse.json({ error: 'Não é permitido trocar a entidade mestre de uma configuração existente. Crie uma nova configuração e inative esta.' }, { status: 400 })
     }
+    // PREÇO-FONTE-ÚNICA — Natureza Financeira é a fonte estrutural do "o QUE o item
+    // gera". Quando enviada, deriva possuiCusto/possuiReceita. Valores (preço) NÃO
+    // são mais editados aqui: se o corpo os omitir, os campos legado são preservados.
+    const natFinReq = typeof b.naturezaFin === 'string' && ['SOMENTE_CUSTO', 'SOMENTE_RECEITA', 'CUSTO_E_RECEITA'].includes(b.naturezaFin) ? b.naturezaFin : undefined
+    const possuiCustoFinal = natFinReq ? natFinReq !== 'SOMENTE_RECEITA' : (b.possuiCusto !== undefined ? !!b.possuiCusto : atual.possuiCusto)
+    const possuiReceitaFinal = natFinReq ? natFinReq !== 'SOMENTE_CUSTO' : (b.possuiReceita !== undefined ? !!b.possuiReceita : atual.possuiReceita)
     const produto = await prisma.$transaction(async (tx) => {
       // Nome/código do mestre NÃO são editados aqui (pertencem ao cadastro mestre).
       // O ItemCatalogo é rotulado pela tela do próprio mestre (Serviços/Documentos).
@@ -81,9 +87,11 @@ export async function PUT(
           custoInterno: b.custoInterno !== undefined ? !!b.custoInterno : atual.custoInterno,
           repasse: b.repasse !== undefined ? !!b.repasse : atual.repasse,
           reembolsavel: b.reembolsavel !== undefined ? !!b.reembolsavel : atual.reembolsavel,
-          // M-UNIFICA — custo e receita como valores editáveis da MESMA config.
-          possuiCusto: b.possuiCusto !== undefined ? !!b.possuiCusto : atual.possuiCusto,
-          possuiReceita: b.possuiReceita !== undefined ? !!b.possuiReceita : atual.possuiReceita,
+          // PREÇO-FONTE-ÚNICA — natureza estrutural; flags derivam dela quando enviada.
+          naturezaFin: natFinReq !== undefined ? (natFinReq as never) : atual.naturezaFin,
+          possuiCusto: possuiCustoFinal,
+          possuiReceita: possuiReceitaFinal,
+          // Valores (preço) viraram LEGADO → Tabela de Preços. Preservados se omitidos.
           valorCustoPadrao: b.valorCustoPadrao !== undefined ? parseDecimal(b.valorCustoPadrao) : atual.valorCustoPadrao,
           valorReceitaPadrao: b.valorReceitaPadrao !== undefined ? parseDecimal(b.valorReceitaPadrao) : atual.valorReceitaPadrao,
           // itemCatalogoId (pivô/mestre) NÃO é alterado na edição — R20.

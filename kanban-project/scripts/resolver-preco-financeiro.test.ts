@@ -1,10 +1,10 @@
 /**
- * resolverPrecoFinanceiro — testes do NÚCLEO PURO (sem banco).
- * Rodar: npx tsx scripts/resolver-preco-financeiro.test.ts
+ * resolverPrecoFinanceiro — testes do NÚCLEO PURO (sem banco), modelo por
+ * ESPECIFICIDADE (§2). Rodar: npx tsx scripts/resolver-preco-financeiro.test.ts
  *
- * Cobre os requisitos da Fase 7 e os bugs B1/B2 da auditoria:
- * precedência, zero silencioso, vigência, natureza, per_unit, fallback,
- * alternativas descartadas, moeda divergente.
+ * Cobre: compatibilidade de contexto, especificidade > prioridade > empate,
+ * zero silencioso (sem fallback legado), vigência, natureza, per_unit, faixa de
+ * quantidade, ambiguidade, wrapper, custo/receita independentes.
  */
 import {
   resolverPrecoCore,
@@ -20,14 +20,7 @@ let passed = 0
 let failed = 0
 const falhas: string[] = []
 function ok(cond: boolean, nome: string) {
-  if (cond) {
-    passed++
-    console.log(`  ✅ ${nome}`)
-  } else {
-    failed++
-    falhas.push(nome)
-    console.log(`  ❌ ${nome}`)
-  }
+  if (cond) { passed++; console.log(`  ✅ ${nome}`) } else { failed++; falhas.push(nome); console.log(`  ❌ ${nome}`) }
 }
 
 const DATA = new Date('2026-07-14T00:00:00.000Z')
@@ -35,205 +28,191 @@ const ITEM = 42
 
 function linha(p: Partial<LinhaPreco> & { id: number; valor: number }): LinhaPreco {
   return {
-    moeda: Moeda.EUR,
-    natureza: NaturezaPreco.RECEITA,
-    arquivado: false,
-    processoId: null,
-    processoTipoId: null,
-    regiao: null,
-    fornecedorId: null,
-    vigenciaInicio: null,
-    vigenciaFim: null,
-    modoCalculo: 'fixed',
-    ...p,
+    moeda: Moeda.EUR, natureza: NaturezaPreco.RECEITA, arquivado: false, prioridade: 0,
+    processoId: null, processoTipoId: null, modalidadeId: null, regiao: null, fornecedorId: null,
+    quantidadeMinima: null, quantidadeMaxima: null, vigenciaInicio: null, vigenciaFim: null, modoCalculo: 'fixed', ...p,
   }
 }
-
 function ctx(over: Partial<ContextoPrecoFinanceiro> = {}): ContextoPrecoFinanceiro {
   return { itemCatalogoId: ITEM, natureza: NaturezaPreco.RECEITA, dataEvento: DATA, ...over }
 }
 
-console.log('resolverPrecoFinanceiro — núcleo puro\n')
+console.log('resolverPrecoFinanceiro — especificidade\n')
 
-// 1) Global responde quando só existe global
+// 1) global responde quando só existe global (especificidade 0)
 {
   const r = resolverPrecoCore([linha({ id: 1, valor: 90 })], ctx())
-  ok(r.ok && r.valor === 90 && r.nivel === 'global' && r.prioridade === 5, '1) global responde com valor correto')
+  ok(r.ok && r.valor === 90 && r.especificidade === 0 && r.tabelaValorId === 1, '1) global responde (especificidade 0)')
 }
 
-// 2) B2 — global com valor 0 NÃO vira preço; cai no fallback explícito
+// 2) valor 0 NÃO é preço; SEM fallback legado (mesmo passado) → falha
 {
-  const r = resolverPrecoCore([linha({ id: 1, valor: 0 })], ctx({ fallbackValorPadrao: 150, fallbackMoeda: Moeda.BRL }))
-  ok(r.ok && r.valor === 150 && r.nivel === 'fallback_padrao', '2) valor 0 ignorado, usa fallback explícito')
-  ok(r.ok && r.alternativasDescartadas.some((d) => d.motivo === 'valor_zero_ou_negativo'), '2b) zero registrado em descartadas')
+  const r = resolverPrecoCore([linha({ id: 1, valor: 0 })], ctx({ fallbackValorPadrao: 150 }))
+  ok(!r.ok && r.motivo === 'SEM_PRECO_VALIDO', '2) valor 0 → SEM_PRECO_VALIDO (fallback legado IGNORADO)')
+  ok(!r.ok && r.alternativasDescartadas.some((d) => d.motivo === 'valor_zero_ou_negativo'), '2b) zero registrado em descartadas')
 }
 
-// 3) B2 — global 0 e SEM fallback → falha clara, nunca zero silencioso
-{
-  const r = resolverPrecoCore([linha({ id: 1, valor: 0 })], ctx())
-  ok(!r.ok && r.motivo === 'SEM_PRECO_VALIDO', '3) zero sem fallback → SEM_PRECO_VALIDO (nunca contabiliza 0)')
-}
-
-// 4) Precedência: processo vence global
+// 3) especificidade: processo (espec 1) vence global (espec 0)
 {
   const linhas = [linha({ id: 1, valor: 90 }), linha({ id: 2, valor: 200, processoId: 7 })]
   const r = resolverPrecoCore(linhas, ctx({ processoId: 7 }))
-  ok(r.ok && r.valor === 200 && r.nivel === 'processo' && r.tabelaValorId === 2, '4) processo específico vence global')
-  ok(r.ok && r.alternativasDescartadas.some((d) => d.tabelaValorId === 1 && d.motivo === 'perdeu_precedencia'), '4b) global marcado perdeu_precedencia')
+  ok(r.ok && r.valor === 200 && r.especificidade === 1 && r.tabelaValorId === 2, '3) processo (espec 1) vence global (espec 0)')
+  ok(r.ok && r.alternativasDescartadas.some((d) => d.tabelaValorId === 1 && d.motivo === 'menor_especificidade'), '3b) global marcado menor_especificidade')
 }
 
-// 5) Precedência completa: tipoProcesso > regiao > fornecedor > global
+// 4) especificidade acumulativa: tipo+modalidade (espec 2) vence só-tipo (espec 1)
 {
   const linhas = [
-    linha({ id: 1, valor: 10 }), // global
-    linha({ id: 2, valor: 20, fornecedorId: 5 }),
-    linha({ id: 3, valor: 30, regiao: 'IT' }),
-    linha({ id: 4, valor: 40, processoTipoId: '99' }),
+    linha({ id: 1, valor: 40, processoTipoId: '99' }),
+    linha({ id: 2, valor: 55, processoTipoId: '99', modalidadeId: 3 }),
   ]
-  const r = resolverPrecoCore(linhas, ctx({ tipoProcessoId: 99, regiao: 'IT', fornecedorId: 5 }))
-  ok(r.ok && r.nivel === 'tipoProcesso' && r.valor === 40, '5) tipoProcesso vence regiao/fornecedor/global')
+  const r = resolverPrecoCore(linhas, ctx({ tipoProcessoId: 99, modalidadeId: 3 }))
+  ok(r.ok && r.valor === 55 && r.especificidade === 2 && r.tabelaValorId === 2, '4) tipo+modalidade (espec 2) vence só-tipo (espec 1)')
 }
 
-// 6) Vigência: linha fora da janela é descartada
+// 5) fornecedor específico vence fornecedor vazio quando o contexto tem aquele fornecedor
 {
-  const linhas = [linha({ id: 1, valor: 90, vigenciaInicio: '2027-01-01' })]
-  const r = resolverPrecoCore(linhas, ctx())
-  ok(!r.ok && r.alternativasDescartadas.some((d) => d.motivo === 'fora_de_vigencia'), '6) fora de vigência descartada')
+  const linhas = [linha({ id: 1, valor: 90 }), linha({ id: 2, valor: 70, fornecedorId: 5 })]
+  const r = resolverPrecoCore(linhas, ctx({ fornecedorId: 5 }))
+  ok(r.ok && r.tabelaValorId === 2 && r.especificidade === 1, '5) fornecedor específico vence global (contexto tem o fornecedor)')
 }
 
-// 7) Natureza diferente é ignorada
+// 6) incompatível: linha exige fornecedor que o contexto NÃO tem → eliminada
 {
-  const linhas = [linha({ id: 1, valor: 90, natureza: NaturezaPreco.CUSTO })]
-  const r = resolverPrecoCore(linhas, ctx({ natureza: NaturezaPreco.RECEITA }))
-  ok(!r.ok && r.alternativasDescartadas.some((d) => d.motivo === 'natureza_diferente'), '7) natureza divergente ignorada')
+  const linhas = [linha({ id: 1, valor: 90 }), linha({ id: 2, valor: 70, fornecedorId: 5 })]
+  const r = resolverPrecoCore(linhas, ctx({ fornecedorId: 9 }))
+  ok(r.ok && r.tabelaValorId === 1, '6) linha com fornecedor incompatível é eliminada; sobra a global')
+  ok(r.ok && r.alternativasDescartadas.some((d) => d.tabelaValorId === 2 && d.motivo === 'incompativel_contexto'), '6b) incompatível registrada')
 }
 
-// 8) per_unit multiplica pela quantidade
+// 7) prioridade só desempata MESMA especificidade
 {
-  const linhas = [linha({ id: 1, valor: 25, modoCalculo: 'per_unit' })]
+  const linhas = [
+    linha({ id: 1, valor: 40, processoTipoId: '99', prioridade: 0 }),
+    linha({ id: 2, valor: 60, processoTipoId: '99', prioridade: 5 }),
+  ]
+  const r = resolverPrecoCore(linhas, ctx({ tipoProcessoId: 99 }))
+  ok(r.ok && r.valor === 60 && r.prioridade === 5, '7) prioridade desempata mesma especificidade')
+}
+
+// 7c) prioridade NÃO supera especificidade
+{
+  const linhas = [
+    linha({ id: 1, valor: 40, processoTipoId: '99', modalidadeId: 3, prioridade: 0 }),
+    linha({ id: 2, valor: 60, processoTipoId: '99', prioridade: 9 }),
+  ]
+  const r = resolverPrecoCore(linhas, ctx({ tipoProcessoId: 99, modalidadeId: 3 }))
+  ok(r.ok && r.valor === 40 && r.especificidade === 2, '7c) maior especificidade vence prioridade maior')
+}
+
+// 8) empate de especificidade E prioridade com valores divergentes → AMBIGUIDADE
+{
+  const linhas = [
+    linha({ id: 1, valor: 40, processoTipoId: '99', prioridade: 0 }),
+    linha({ id: 2, valor: 60, regiao: 'IT', prioridade: 0 }),
+  ]
+  const r = resolverPrecoCore(linhas, ctx({ tipoProcessoId: 99, regiao: 'IT' }))
+  ok(r.ok && r.conflito != null && r.conflito.competidores.length === 1, '8) empate espec+prioridade divergente → conflito (bloqueia)')
+}
+
+// 8b) empate de especificidade+prioridade com valores IDÊNTICOS → sem conflito
+{
+  const linhas = [
+    linha({ id: 1, valor: 50, processoTipoId: '99', prioridade: 0 }),
+    linha({ id: 2, valor: 50, regiao: 'IT', prioridade: 0 }),
+  ]
+  const r = resolverPrecoCore(linhas, ctx({ tipoProcessoId: 99, regiao: 'IT' }))
+  ok(r.ok && r.conflito == null && r.valor === 50, '8b) empate com valores idênticos não é conflito')
+}
+
+// 9) fora de vigência → descartada
+{
+  const r = resolverPrecoCore([linha({ id: 1, valor: 90, vigenciaFim: '2020-01-01' })], ctx())
+  ok(!r.ok && r.alternativasDescartadas.some((d) => d.motivo === 'fora_de_vigencia'), '9) fora de vigência descartada')
+}
+
+// 10) natureza divergente ignorada (CUSTO x pedido de VENDA/RECEITA)
+{
+  const r = resolverPrecoCore([linha({ id: 1, valor: 90, natureza: NaturezaPreco.CUSTO })], ctx({ natureza: NaturezaPreco.VENDA }))
+  ok(!r.ok && r.alternativasDescartadas.some((d) => d.motivo === 'natureza_diferente'), '10) natureza divergente ignorada')
+}
+
+// 10b) VENDA (pedido) casa linha RECEITA (legado) no lado do PREÇO
+{
+  const r = resolverPrecoCore([linha({ id: 1, valor: 90, natureza: NaturezaPreco.RECEITA })], ctx({ natureza: NaturezaPreco.VENDA }))
+  ok(r.ok && r.valor === 90, '10b) pedir VENDA resolve linha RECEITA (natureza de PREÇO)')
+}
+
+// 11) per_unit × quantidade
+{
+  const r = resolverPrecoCore([linha({ id: 1, valor: 25, modoCalculo: 'per_unit' })], ctx({ quantidade: 3 }))
+  ok(r.ok && r.valor === 75 && r.valorUnitario === 25 && r.quantidade === 3, '11) per_unit × quantidade congela unitário')
+}
+
+// 12) faixa de quantidade: banda compatível soma especificidade e filtra
+{
+  const linhas = [
+    linha({ id: 1, valor: 90 }),
+    linha({ id: 2, valor: 70, quantidadeMinima: 1, quantidadeMaxima: 5 }),
+    linha({ id: 3, valor: 60, quantidadeMinima: 6, quantidadeMaxima: 10 }),
+  ]
   const r = resolverPrecoCore(linhas, ctx({ quantidade: 3 }))
-  ok(r.ok && r.valor === 75 && r.valorUnitario === 25, '8) per_unit × quantidade')
+  ok(r.ok && r.tabelaValorId === 2 && r.especificidade === 1, '12) banda 1-5 casa qtd 3 (espec 1); banda 6-10 eliminada')
 }
 
-// 9) Sem linhas + fallback → usa fallback
+// 13) sem linhas → NENHUMA_LINHA (sem fallback)
 {
   const r = resolverPrecoCore([], ctx({ fallbackValorPadrao: 120 }))
-  ok(r.ok && r.nivel === 'fallback_padrao' && r.valor === 120, '9) sem linhas usa fallback')
+  ok(!r.ok && r.motivo === 'NENHUMA_LINHA', '13) vazio → NENHUMA_LINHA (fallback ignorado)')
 }
 
-// 10) Sem linhas + sem fallback → NENHUMA_LINHA
+// 14) moeda divergente sinalizada
 {
-  const r = resolverPrecoCore([], ctx())
-  ok(!r.ok && r.motivo === 'NENHUMA_LINHA', '10) vazio sem fallback → NENHUMA_LINHA')
+  const r = resolverPrecoCore([linha({ id: 1, valor: 90, moeda: Moeda.EUR })], ctx({ moeda: Moeda.BRL }))
+  ok(r.ok && r.moedaDivergente === true && r.moeda === Moeda.EUR, '14) moeda divergente sinalizada')
 }
 
-// 11) Moeda divergente sinalizada (sem conversão)
+// 15) NaN/Infinity não são preços válidos
 {
-  const linhas = [linha({ id: 1, valor: 90, moeda: Moeda.EUR })]
-  const r = resolverPrecoCore(linhas, ctx({ moeda: Moeda.BRL }))
-  ok(r.ok && r.moedaDivergente === true && r.moeda === Moeda.EUR, '11) moeda divergente sinalizada, devolve moeda da linha')
+  ok(!resolverPrecoCore([linha({ id: 1, valor: NaN })], ctx()).ok, '15) NaN não é preço válido')
+  ok(!resolverPrecoCore([linha({ id: 1, valor: Infinity })], ctx()).ok, '15b) Infinity não é preço válido')
 }
 
-// 12) fallback com valor 0 NÃO é usado
-{
-  const r = resolverPrecoCore([], ctx({ fallbackValorPadrao: 0 }))
-  ok(!r.ok, '12) fallback 0 não é preço válido')
-}
-
-// 15) Desempate determinístico dentro do nível: vigência mais recente vence
+// 16) desempate determinístico: vigência mais recente, depois id
 {
   const linhas = [
     linha({ id: 1, valor: 80, vigenciaInicio: '2026-01-01' }),
     linha({ id: 2, valor: 95, vigenciaInicio: '2026-06-01' }),
   ]
   const r = resolverPrecoCore(linhas, ctx())
-  ok(r.ok && r.valor === 95 && r.tabelaValorId === 2, '15) desempate: vigência mais recente vence')
-  ok(r.ok && r.alternativasDescartadas.some((d) => d.tabelaValorId === 1 && d.motivo === 'perdeu_precedencia'), '15b) perdedor do desempate registrado')
+  ok(r.ok && r.tabelaValorId === 2, '16) desempate: vigência mais recente vence')
 }
 
-// 15c) Desempate por id quando vigência igual (id maior = mais novo)
+// 17) paraCompat
 {
-  const linhas = [linha({ id: 10, valor: 80 }), linha({ id: 20, valor: 95 })]
-  const r = resolverPrecoCore(linhas, ctx())
-  ok(r.ok && r.tabelaValorId === 20, '15c) desempate por id desc quando vigência igual')
-}
-
-// 16) Guarda de valor não-finito: NaN/Infinity nunca vira preço
-{
-  const rNaN = resolverPrecoCore([linha({ id: 1, valor: Number.NaN })], ctx())
-  ok(!rNaN.ok && rNaN.motivo === 'SEM_PRECO_VALIDO', '16) NaN não é preço válido')
-  const rInf = resolverPrecoCore([linha({ id: 1, valor: Number.POSITIVE_INFINITY })], ctx())
-  ok(!rInf.ok, '16b) Infinity não é preço válido')
-}
-
-// 17) Adaptador de compatibilidade (drop-in legado)
-{
-  const okRes = resolverPrecoCore([linha({ id: 7, valor: 90 })], ctx())
-  const c = paraCompat(okRes)
-  ok(c != null && c.valor === 90 && c.nivel === 'global' && c.tabelaValorId === 7, '17) paraCompat devolve shape legado')
+  const c = paraCompat(resolverPrecoCore([linha({ id: 7, valor: 90 })], ctx()))
+  ok(c != null && c.valor === 90 && c.tabelaValorId === 7, '17) paraCompat devolve shape legado')
   ok(paraCompat(resolverPrecoCore([], ctx())) === null, '17b) paraCompat null quando não resolve')
-  ok(paraCompat(resolverPrecoCore([], ctx({ fallbackValorPadrao: 120 }))) === null, '17c) paraCompat null no fallback (caller legado trata valorPadrao)')
 }
 
-// 18) Sem dataEvento no core → vigência NÃO é filtrada (data futura ainda elegível)
-{
-  const linhas = [linha({ id: 1, valor: 90, vigenciaInicio: '2999-01-01' })]
-  const semData: ContextoPrecoFinanceiro = { itemCatalogoId: ITEM, natureza: NaturezaPreco.RECEITA }
-  const r = resolverPrecoCore(linhas, semData)
-  ok(r.ok && r.valor === 90, '18) core sem dataEvento não aplica vigência')
+async function assíncronos() {
+  // 18) wrapper valida item e resolve via loader injetado
+  const carregar = async () => [linha({ id: 1, valor: 90 })]
+  const bad = await resolverPrecoFinanceiro({ itemCatalogoId: 0, natureza: NaturezaPreco.RECEITA, dataEvento: DATA }, carregar)
+  ok(!bad.ok && bad.motivo === 'ITEM_INVALIDO', '18) wrapper rejeita itemCatalogoId inválido')
+  const good = await resolverPrecoFinanceiro({ itemCatalogoId: ITEM, natureza: NaturezaPreco.RECEITA, dataEvento: DATA }, carregar)
+  ok(good.ok && good.valor === 90, '18b) wrapper resolve via loader injetado')
+
+  // 19) custo e receita resolvidos independentes
+  const carregar2 = async (_item: number, nat: NaturezaPreco | null | undefined) =>
+    nat === NaturezaPreco.CUSTO ? [linha({ id: 1, valor: 150, moeda: Moeda.BRL, natureza: NaturezaPreco.CUSTO })]
+      : [linha({ id: 2, valor: 90, moeda: Moeda.EUR, natureza: NaturezaPreco.RECEITA })]
+  const r = await resolverCustoEReceitaFinanceiro({ itemCatalogoId: ITEM, dataEvento: DATA }, carregar2)
+  ok(r.custo.ok && r.custo.valor === 150 && r.custo.moeda === Moeda.BRL, '19) custo independente')
+  ok(r.receita.ok && r.receita.valor === 90 && r.receita.moeda === Moeda.EUR, '19b) receita independente')
 }
 
-// 19) Conflito: dois preços válidos no MESMO nível com valores diferentes
-{
-  const linhas = [linha({ id: 1, valor: 90 }), linha({ id: 2, valor: 110 })]
-  const r = resolverPrecoCore(linhas, ctx())
-  ok(r.ok && r.conflito != null && r.conflito.competidores.length === 1, '19) conflito sinalizado no mesmo nível')
-  ok(r.ok && r.tabelaValorId === 2, '19b) escolha determinística mantida (id maior)')
-  ok(r.ok && r.conflito?.nivel === 'global', '19c) conflito aponta o nível')
-}
-
-// 20) Sem conflito quando os concorrentes são idênticos (valor+moeda)
-{
-  const linhas = [linha({ id: 1, valor: 90 }), linha({ id: 2, valor: 90 })]
-  const r = resolverPrecoCore(linhas, ctx())
-  ok(r.ok && r.conflito == null, '20) preços idênticos não geram conflito')
-}
-
-// 21) Conflito é POR NÍVEL: vencedor de nível superior não conflita com global
-{
-  const linhas = [linha({ id: 1, valor: 90 }), linha({ id: 2, valor: 200, processoId: 7 })]
-  const r = resolverPrecoCore(linhas, ctx({ processoId: 7 }))
-  ok(r.ok && r.nivel === 'processo' && r.conflito == null, '21) níveis diferentes não são conflito (é precedência)')
-}
-
-async function main() {
-  // 13) Wrapper async valida itemCatalogoId
-  {
-    const loader = async () => [linha({ id: 1, valor: 90 })]
-    const bad = await resolverPrecoFinanceiro(ctx({ itemCatalogoId: 0 }), loader)
-    ok(!bad.ok && bad.motivo === 'ITEM_INVALIDO', '13) wrapper rejeita itemCatalogoId inválido')
-    const good = await resolverPrecoFinanceiro(ctx(), loader)
-    ok(good.ok && good.valor === 90, '13b) wrapper resolve via loader injetado')
-  }
-
-  // 14) custo e receita independentes
-  {
-    const linhas = [
-      linha({ id: 1, valor: 150, natureza: NaturezaPreco.CUSTO, moeda: Moeda.BRL }),
-      linha({ id: 2, valor: 90, natureza: NaturezaPreco.RECEITA, moeda: Moeda.EUR }),
-    ]
-    const loader = async (_item: number, nat: NaturezaPreco | null | undefined) => linhas.filter((l) => l.natureza === nat)
-    const r = await resolverCustoEReceitaFinanceiro({ itemCatalogoId: ITEM, dataEvento: DATA }, loader)
-    ok(r.custo.ok && r.custo.valor === 150 && r.custo.moeda === Moeda.BRL, '14) custo resolvido independente')
-    ok(r.receita.ok && r.receita.valor === 90 && r.receita.moeda === Moeda.EUR, '14b) receita resolvida independente')
-  }
-
-  console.log(`\n${passed} passaram, ${failed} falharam`)
-  if (failed > 0) {
-    console.log('FALHAS: ' + falhas.join('; '))
-    process.exit(1)
-  }
-  console.log('resolverPrecoFinanceiro: núcleo validado ✅')
-}
-
-void main()
+assíncronos().then(() => {
+  console.log(`\n=== ${passed} passaram, ${failed} falharam ===`)
+  if (failed) { console.log('FALHAS:', falhas.join('; ')); process.exit(1) }
+})
