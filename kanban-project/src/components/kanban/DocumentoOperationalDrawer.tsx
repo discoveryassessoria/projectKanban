@@ -163,6 +163,26 @@ type TabId =
   | "attempts"
   | "audit"
 
+// Projeção operacional oficial do documento (espelho do contrato do backend
+// resolveDocumentOperationalProjection). Fonte ÚNICA de estado/próxima ação do Drawer.
+interface DocumentOperationalProjection {
+  processId: string
+  phaseId: string
+  documentId: string
+  state: "OPERATIONAL" | "NOT_MATERIALIZED"
+  workflowInstanceId: string | null
+  stepInstanceId: string | null
+  currentStep: { key: string; label: string; status: string } | null
+  nextAction: { key: string; label: string } | null
+  permissions: {
+    canStart: boolean
+    canOperate: boolean
+    canPause: boolean
+    canCancel: boolean
+    canInvalidate: boolean
+  }
+}
+
 // ============================================================
 // HELPERS
 // ============================================================
@@ -211,59 +231,61 @@ export function DocumentoOperationalDrawer({
   const { pode } = usePermissoes()
   const [doc, setDoc] = useState<Documento | null>(null)
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
-  const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>("operation")
   const [salvando, setSalvando] = useState(false)
   const [initModalOpen, setInitModalOpen] = useState(false)
   const [workflow, setWorkflow] = useState<any | null>(null)
+  const [projection, setProjection] = useState<DocumentOperationalProjection | null>(null)
 
-  // Guard de corrida: cada carga tem um seq; respostas antigas (de um documentoId/fase
-  // anterior que chegaram tarde) são DESCARTADAS — nunca sobrescrevem o contexto atual.
+  // MÁQUINA DE ESTADOS EXPLÍCITA do Drawer — nunca inferir "sem operação" só porque a
+  // projeção ainda não chegou. LOADING = resolvendo; OPERATIONAL = operação materializada;
+  // NOT_MATERIALIZED = backend CONFIRMOU que não há operação; ERROR = falha.
+  const [opState, setOpState] = useState<"LOADING" | "OPERATIONAL" | "NOT_MATERIALIZED" | "ERROR">("LOADING")
+
+  // Guard de corrida por seq + AbortController: ao trocar rápido de documento ou fechar,
+  // a requisição anterior é CANCELADA e respostas antigas são DESCARTADAS (nunca aplicadas
+  // sobre uma seleção mais recente nem sobre outro documento).
   const reqSeq = useRef(0)
+  const abortRef = useRef<AbortController | null>(null)
 
   const carregar = useCallback(async () => {
-    // NUNCA sair em silêncio: sem documentoId, o backdrop já está na tela e ficaria
-    // preso com painel vazio. Sinaliza erro fechável em vez de travar.
     if (!documentoId) {
       setErro("Operação sem documento associado.")
-      setLoading(false)
+      setOpState("ERROR")
       return
     }
+    // Cancela a requisição anterior (troca rápida / reabertura).
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
     const seq = ++reqSeq.current
-    const vigente = () => seq === reqSeq.current // resposta ainda é a mais recente?
-    setLoading(true)
+    const meuDoc = documentoId
+    const vigente = () => seq === reqSeq.current && meuDoc === documentoId && !controller.signal.aborted
+    setOpState("LOADING")
     setErro(null)
     try {
-      const res = await fetch(`/api/documentos/${documentoId}`, {
+      // FONTE ÚNICA: uma única projeção agregada (cabeçalho + estado operacional).
+      const res = await fetch(`/api/documentos/${documentoId}/operational-projection`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+        signal: controller.signal,
       })
+      if (!vigente()) return
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data: Documento = await res.json()
-      if (!vigente()) return // documentoId mudou no meio — descarta
-      setDoc(data)
-
-      // Carrega o workflow (fonte já escopada à FASE ATUAL no backend)
-      try {
-        const wfRes = await fetch(`/api/documentos/${documentoId}/workflow`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-        })
-        if (!vigente()) return
-        if (wfRes.ok) {
-          const json = await wfRes.json()
-          if (!vigente()) return
-          setWorkflow(json.workflow ?? null)
-        } else {
-          setWorkflow(null)
-        }
-      } catch {
-        if (vigente()) setWorkflow(null)
-      }
+      const json = await res.json()
+      if (!vigente()) return
+      const proj: DocumentOperationalProjection | null = json.projection ?? null
+      setDoc(json.document ?? null)
+      setWorkflow(json.workflow ?? null)
+      setProjection(proj)
+      setOpState(proj?.state === "OPERATIONAL" ? "OPERATIONAL" : "NOT_MATERIALIZED")
     } catch (e) {
+      if (controller.signal.aborted) return // resposta cancelada — ignora silenciosamente
       console.warn("[DocumentoOperationalDrawer] falha:", e)
-      if (vigente()) setErro("Erro ao carregar documento.")
-    } finally {
-      if (vigente()) setLoading(false)
+      if (vigente()) {
+        setErro("Erro ao carregar operação.")
+        setOpState("ERROR")
+      }
     }
   }, [documentoId])
 
@@ -281,8 +303,15 @@ export function DocumentoOperationalDrawer({
   useEffect(() => {
     if (isOpen && documentoId) {
       setActiveTab("operation")
+      // Reset explícito ao (re)abrir: entra em LOADING, nunca herda projeção antiga.
+      setProjection(null)
+      setWorkflow(null)
+      setOpState("LOADING")
       carregar()
     }
+    // Cancela a requisição em voo ao fechar/trocar/desmontar — resposta atrasada
+    // NUNCA é aplicada depois de fechar nem sobre outra seleção.
+    return () => { abortRef.current?.abort() }
   }, [isOpen, documentoId, carregar])
 
   // Trava scroll do body
@@ -387,16 +416,22 @@ export function DocumentoOperationalDrawer({
           background: "#0f1419", transform: "translateX(0)",
         }}
       >
-        {loading && !doc && (
-          <div className="flex-1 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-white/50" />
+        {/* LOADING — enquanto a projeção operacional oficial não resolve. Só skeleton:
+            nunca "Sem operação ativa", nunca botão "Iniciar operação", nenhuma ação. */}
+        {opState === "LOADING" && (
+          <div className="flex-1 flex flex-col gap-4 p-6">
+            <div className="flex items-center gap-2 text-white/50">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-[12px]">Carregando operação…</span>
+            </div>
+            <div className="h-16 rounded-lg bg-white/5 animate-pulse" />
+            <div className="h-24 rounded-lg bg-white/5 animate-pulse" />
+            <div className="h-40 rounded-lg bg-white/5 animate-pulse" />
           </div>
         )}
 
-        {/* Estado terminal fechável: cobre erro E o caso "sem doc e sem loading"
-            (ex.: documentoId inválido). Impede backdrop preso com painel vazio.
-            Condicionado a (erro || !documentoId) para não piscar antes do 1º load. */}
-        {!doc && !loading && (erro || !documentoId) && (
+        {/* ERROR — estado terminal fechável (falha ou documentoId inválido). */}
+        {opState === "ERROR" && (
           <div className="flex-1 flex flex-col items-center justify-center text-white/60 gap-3 p-6">
             <AlertTriangle className="w-8 h-8 text-amber-400" />
             <p className="text-sm">{erro || "Não foi possível abrir a operação."}</p>
@@ -409,7 +444,7 @@ export function DocumentoOperationalDrawer({
           </div>
         )}
 
-        {doc && (
+        {(opState === "OPERATIONAL" || opState === "NOT_MATERIALIZED") && doc && (
           <>
             {/* HEADER */}
             <div
@@ -538,6 +573,12 @@ export function DocumentoOperationalDrawer({
                   onAbrirCentralDaEtapa={() => {
                     setActiveTab("workflow")
                   }}
+                  // Estado CONFIRMADO pela projeção (nunca durante LOADING). O empty-state
+                  // só aparece quando o backend confirmou NOT_MATERIALIZED; o botão de início
+                  // só quando canStart e usa a ação inicial do Workflow Interno.
+                  notMaterialized={opState === "NOT_MATERIALIZED"}
+                  canStart={projection?.permissions.canStart ?? false}
+                  nextActionLabel={projection?.nextAction?.label ?? null}
                 />
               )}
               {activeTab === "registry" && <TabRegistry doc={doc} tipoLabel={tipoLabel} />}
