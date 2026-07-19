@@ -192,7 +192,8 @@ export async function resolveProgressoFaseDocumento(processoId: number, contexto
   if (escopoDaFase(stepInstancesRaw) === "NECESSIDADE") {
     const certItens = await itemCatalogosDeCertidao(prisma)
     const necsAll = await prisma.necessidadeDocumental.findMany({
-      where: { processoId },
+      // exclui necessidades SUPERSEDIDAS por reabertura (evita duplo-count no progresso).
+      where: { processoId, supersedePorId: null },
       select: { id: true, status: true, obrigatoriedade: true, itemCatalogoId: true },
     })
     const obrig = necsAll.filter(

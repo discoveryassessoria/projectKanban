@@ -177,12 +177,17 @@ async function avaliarCondicoes(
 // §4 — congelamento também no path de automação/gatilho. tabelaValorId vem do
 // resolvedor central (precoDaConfig); manual (amount) não tem regra de preço.
 type FreezeExec = { tabelaValorId?: number | null; configId?: number | null; regraId?: number | null; naturezaPreco?: 'CUSTO' | 'VENDA' | null; contexto?: Prisma.InputJsonValue; phaseKey?: string | null; phaseCycle?: number | null; chaveIdempotencia?: string | null }
-async function criarReceita(pid: number, descricao: string, valor: number, moeda: Moeda, fx: number, honorario: boolean, fz: FreezeExec = {}): Promise<number> {
+// Client de escrita: prisma global OU um client de transação (para tornar o lançamento
+// atômico com o MotorArtefato de idempotência). gerarCodigo* usa o global de propósito
+// (código nunca reusa — um rollback só deixa um gap, comportamento desejado).
+type DbLancamento = Prisma.TransactionClient | typeof prisma
+
+async function criarReceita(db: DbLancamento, pid: number, descricao: string, valor: number, moeda: Moeda, fx: number, honorario: boolean, fz: FreezeExec = {}): Promise<number> {
   const codigo = await gerarCodigoReceita()
   const data1 = new Date()
   const parcelas = gerarParcelas(valor, 1, data1)
   const valorBrlRef = Number((valor * fx).toFixed(2))
-  const rec = await prisma.receita.create({
+  const rec = await db.receita.create({
     data: {
       codigo, processoId: pid,
       categoria: honorario ? CategoriaReceita.HONORARIOS : CategoriaReceita.OUTROS,
@@ -199,12 +204,12 @@ async function criarReceita(pid: number, descricao: string, valor: number, moeda
   })
   return rec.id
 }
-async function criarCusto(pid: number, descricao: string, valor: number, moeda: Moeda, fx: number, fz: FreezeExec = {}): Promise<number> {
+async function criarCusto(db: DbLancamento, pid: number, descricao: string, valor: number, moeda: Moeda, fx: number, fz: FreezeExec = {}): Promise<number> {
   const codigo = await gerarCodigoCusto()
   const vencimento = new Date()
   const parcelas = gerarParcelas(valor, 1, vencimento)
   const valorBrlRef = Number((valor * fx).toFixed(2))
-  const c = await prisma.custo.create({
+  const c = await db.custo.create({
     data: {
       codigo, processoId: pid, tipo: TipoCusto.SERVICO, categoria: CategoriaCusto.OUTROS,
       descricao: descricao.slice(0, 300), moeda, valor,
@@ -220,12 +225,12 @@ async function criarCusto(pid: number, descricao: string, valor: number, moeda: 
   })
   return c.id
 }
-async function criarEvento(pid: number, titulo: string, descricao: string | null, dataInicio: Date, tipo: TipoEvento): Promise<number> {
-  const ev = await prisma.evento.create({ data: { processoId: pid, titulo: titulo.slice(0, 200), descricao: descricao || null, tipo, dataInicio, observacoes: 'Criado pelo motor' } })
+async function criarEvento(db: DbLancamento, pid: number, titulo: string, descricao: string | null, dataInicio: Date, tipo: TipoEvento): Promise<number> {
+  const ev = await db.evento.create({ data: { processoId: pid, titulo: titulo.slice(0, 200), descricao: descricao || null, tipo, dataInicio, observacoes: 'Criado pelo motor' } })
   return ev.id
 }
-async function criarProtocolo(pid: number, nome: string): Promise<number> {
-  const p = await prisma.protocolo.create({ data: { processoId: pid, consulado: 'OUTROS' as Consulado, observacoes: `Criado pelo motor: ${nome}` } })
+async function criarProtocolo(db: DbLancamento, pid: number, nome: string): Promise<number> {
+  const p = await db.protocolo.create({ data: { processoId: pid, consulado: 'OUTROS' as Consulado, observacoes: `Criado pelo motor: ${nome}` } })
   return p.id
 }
 
@@ -274,27 +279,23 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
   const skipped: { name: string; reason: string }[] = []
   const errors: string[] = []
 
-  async function fazer(akey: string, targetTable: string, ruleKind: string, ruleSource: string, ruleId: number, descricao: string, detalhes: Prisma.InputJsonValue, criar: () => Promise<number>, onCreated: (id: number) => void) {
-    const artefatoData = { processoId, tipoProcessoId, phaseKey, event, ruleKind, ruleSource, ruleId, automaticKey: akey, targetTable, targetId: null as number | null, status: 'active', descricao: descricao.slice(0, 300), detalhes }
-    let art
+  // ATÔMICO + IDEMPOTENTE: o efeito (criar) e o MotorArtefato (marcador único por
+  // automaticKey, já com targetId) são criados na MESMA transação. P2002 no artefato
+  // (retry/concorrência) faz ROLLBACK do efeito junto → nunca duplica nem deixa órfão.
+  async function fazer(akey: string, targetTable: string, ruleKind: string, ruleSource: string, ruleId: number, descricao: string, detalhes: Prisma.InputJsonValue, criar: (tx: Prisma.TransactionClient) => Promise<number>, onCreated: (id: number) => void) {
     try {
-      art = await prisma.motorArtefato.create({ data: artefatoData })
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-        // Órfão de crash (targetId null) → apaga e refaz; efeito já criado (targetId!=null) → pula.
-        const existente = await prisma.motorArtefato.findUnique({ where: { automaticKey: akey }, select: { id: true, targetId: true } })
-        if (!existente || existente.targetId != null) { skipped.push({ name: descricao, reason: 'já criado antes (idempotência)' }); return }
-        await prisma.motorArtefato.delete({ where: { id: existente.id } }).catch(() => {})
-        try { art = await prisma.motorArtefato.create({ data: artefatoData }) }
-        catch (e2) { errors.push(`${descricao}: ${(e2 as Error)?.message || 'erro'}`); return }
-      } else { errors.push(`${descricao}: ${(e as Error)?.message || 'erro'}`); return }
-    }
-    try {
-      const id = await criar()
-      await prisma.motorArtefato.update({ where: { id: art.id }, data: { targetId: id } })
+      const id = await prisma.$transaction(async (tx) => {
+        const novoId = await criar(tx)
+        await tx.motorArtefato.create({
+          data: { processoId, tipoProcessoId, phaseKey, event, ruleKind, ruleSource, ruleId, automaticKey: akey, targetTable, targetId: novoId, status: 'active', descricao: descricao.slice(0, 300), detalhes },
+        })
+        return novoId
+      }, { timeout: 30000, maxWait: 10000 })
       onCreated(id)
     } catch (e) {
-      await prisma.motorArtefato.delete({ where: { id: art.id } }).catch(() => {})
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        skipped.push({ name: descricao, reason: 'já criado antes (idempotência)' }); return
+      }
       errors.push(`${descricao}: ${(e as Error)?.message || 'erro'}`)
     }
   }
@@ -344,7 +345,7 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
         const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', phaseKey, chaveIdempotencia: akey, contexto: { fonte: 'automation', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap, mestre: mestreNome } }
         await fazer(akey, isRec ? 'Receita' : 'Custo', 'financial', 'automation', r.id, titulo,
           { configItemId: r.configItemId, mestre: mestreNome, aplicacao: ap, natureza: isRec ? 'VENDA' : 'CUSTO', valor: preco.valor, moeda: preco.moeda, tabelaValorId: preco.tabelaValorId, ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
-          async () => (isRec ? criarReceita(processoId, descricaoLanc, preco.valor, preco.moeda, fx, false, fz) : criarCusto(processoId, descricaoLanc, preco.valor, preco.moeda, fx, fz)),
+          async (tx) => (isRec ? criarReceita(tx, processoId, descricaoLanc, preco.valor, preco.moeda, fx, false, fz) : criarCusto(tx, processoId, descricaoLanc, preco.valor, preco.moeda, fx, fz)),
           (id) => created.push({ kind: 'financial', targetTable: isRec ? 'Receita' : 'Custo', targetId: id, name: titulo, amount: preco.valor, currency: preco.moeda, condicaoNaoVerificada: naoVerificada || undefined }))
       }
       continue
@@ -369,7 +370,7 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
     const akey = `${processoId}::${phaseKey}::automation::${r.id}`
     await fazer(akey, 'Evento', 'event', 'automation', r.id, nome,
       { tipo, dataInicio: dataInicio.toISOString(), ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
-      async () => criarEvento(processoId, nome, r.description || null, dataInicio, tipo),
+      async (tx) => criarEvento(tx, processoId, nome, r.description || null, dataInicio, tipo),
       (id) => created.push({ kind: 'event', targetTable: 'Evento', targetId: id, name: nome, condicaoNaoVerificada: naoVerificada || undefined }))
   }
 
@@ -383,7 +384,7 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
     const akey = `${processoId}::${phaseKey}::automation::${r.id}`
     await fazer(akey, 'Protocolo', 'protocol', 'automation', r.id, nome,
       { nota: 'consulado OUTROS (ajustar)', ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
-      async () => criarProtocolo(processoId, nome),
+      async (tx) => criarProtocolo(tx, processoId, nome),
       (id) => created.push({ kind: 'protocol', targetTable: 'Protocolo', targetId: id, name: nome, condicaoNaoVerificada: naoVerificada || undefined }))
   }
 
@@ -492,35 +493,30 @@ export async function executarFinanceirasNaFaseV2(
       if (fx == null) { skipped.push({ name: titulo, reason: `Sem cotação de câmbio ${preco.moeda}→BRL. Cadastre a cotação para lançar (não foi lançado com conversão 1:1).` }); continue }
 
       const akey = `${processoId}::${phaseKey}::automation::${r.id}::${isRec ? 'VENDA' : 'CUSTO'}`
-      const artefatoData = {
-        processoId, tipoProcessoId, phaseKey, event: 'entered', ruleKind: 'financial', ruleSource: 'automation', ruleId: r.id,
-        automaticKey: akey, targetTable: isRec ? 'Receita' : 'Custo', targetId: null as number | null, status: 'active', descricao: titulo.slice(0, 300),
-        detalhes: { configItemId: r.configItemId, mestre: mestreNome, aplicacao: ap, natureza: isRec ? 'VENDA' : 'CUSTO', valor: preco.valor, moeda: preco.moeda, tabelaValorId: preco.tabelaValorId },
-      }
-      let art
-      try {
-        art = await prisma.motorArtefato.create({ data: artefatoData })
-      } catch (e) {
-        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-          // Idempotência ancorada no EFEITO, não no marcador: se já há lançamento (targetId
-          // != null) → pula. Se o marcador é ÓRFÃO (targetId null, crash entre marcar e lançar)
-          // → apaga e refaz nesta iteração para não bloquear o lançamento para sempre.
-          const existente = await prisma.motorArtefato.findUnique({ where: { automaticKey: akey }, select: { id: true, targetId: true } })
-          if (!existente || existente.targetId != null) { skipped.push({ name: titulo, reason: 'já lançado (idempotência)' }); continue }
-          await prisma.motorArtefato.delete({ where: { id: existente.id } }).catch(() => {})
-          try { art = await prisma.motorArtefato.create({ data: artefatoData }) }
-          catch (e2) { erros.push(`${titulo}: ${(e2 as Error)?.message ?? 'erro'}`); continue }
-        } else { erros.push(`${titulo}: ${(e as Error)?.message ?? 'erro'}`); continue }
-      }
+      // ATOMICIDADE + IDEMPOTÊNCIA (correção de duplicidade): o LANÇAMENTO e o MotorArtefato
+      // (marcador único por automaticKey, já com targetId) são criados na MESMA transação.
+      // Se o artefato colidir (P2002 — já lançado, por retry/concorrência), a transação faz
+      // ROLLBACK do lançamento junto → nunca sobra Receita/Custo órfão nem duplicata. Sem o
+      // antigo create-null→update→delete (que duplicava quando o update falhava pós-lançamento).
       try {
         const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId!, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', phaseKey, chaveIdempotencia: akey, contexto: { fonte: 'automation_v2', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap, mestre: mestreNome } }
-        const id = isRec
-          ? await criarReceita(processoId, descricaoLanc, preco.valor, preco.moeda, fx, false, fz)
-          : await criarCusto(processoId, descricaoLanc, preco.valor, preco.moeda, fx, fz)
-        await prisma.motorArtefato.update({ where: { id: art.id }, data: { targetId: id } })
+        await prisma.$transaction(async (tx) => {
+          const id = isRec
+            ? await criarReceita(tx, processoId, descricaoLanc, preco.valor, preco.moeda, fx, false, fz)
+            : await criarCusto(tx, processoId, descricaoLanc, preco.valor, preco.moeda, fx, fz)
+          await tx.motorArtefato.create({
+            data: {
+              processoId, tipoProcessoId, phaseKey, event: 'entered', ruleKind: 'financial', ruleSource: 'automation', ruleId: r.id,
+              automaticKey: akey, targetTable: isRec ? 'Receita' : 'Custo', targetId: id, status: 'active', descricao: titulo.slice(0, 300),
+              detalhes: { configItemId: r.configItemId, mestre: mestreNome, aplicacao: ap, natureza: isRec ? 'VENDA' : 'CUSTO', valor: preco.valor, moeda: preco.moeda, tabelaValorId: preco.tabelaValorId },
+            },
+          })
+        }, { timeout: 30000, maxWait: 10000 })
         criadas++
       } catch (e) {
-        await prisma.motorArtefato.delete({ where: { id: art.id } }).catch(() => {})
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+          skipped.push({ name: titulo, reason: 'já lançado (idempotência)' }); continue
+        }
         erros.push(`${titulo}: ${(e as Error)?.message ?? 'erro'}`)
       }
     }

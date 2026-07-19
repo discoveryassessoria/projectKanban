@@ -668,7 +668,7 @@ export async function GET(
     if (faseAtualCode === "GENEALOGIA") {
       const certItens = await itemCatalogosDeCertidao(prisma)
       const necsRaw = await prisma.necessidadeDocumental.findMany({
-        where: { processoId: id },
+        where: { processoId: id, supersedePorId: null }, // ignora superseded (reabertura)
         select: { id: true, pessoaId: true, obrigatoriedade: true, status: true, matrizSnapshot: true, itemCatalogoId: true },
       })
       // só CERTIDÕES (natureza estruturada) e não dispensadas

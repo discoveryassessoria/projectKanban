@@ -517,7 +517,7 @@ export function ProcessoCentralOperacional({
   // Carrega a fase PASSADA consultada (dados VIVOS, escopados por instância/ciclo) na
   // MESMA rota da Central, com ?faseCode&instanceId&ciclo. selectedPhaseKey só é != null
   // quando a fase selecionada NÃO é a ativa (onSelectPhase zera ao clicar na ativa).
-  const carregarView = useCallback(async () => {
+  const carregarView = useCallback(async (signal?: AbortSignal) => {
     if (!selectedPhaseKey) { setViewData(null); setViewErro(null); setViewLoading(false); return }
     const faseCode = phaseKeyToFaseCode(selectedPhaseKey)
     if (!faseCode) { setViewData(null); return }
@@ -531,20 +531,31 @@ export function ProcessoCentralOperacional({
       if (meta?.ciclo != null) params.set("ciclo", String(meta.ciclo))
       const res = await fetch(`/api/processos/${processo.id}/central-operacional?${params.toString()}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+        signal,
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json: CentralOpData = await res.json()
+      if (signal?.aborted) return // troca de fase mais recente venceu — descarta resposta antiga
       setViewData(json)
     } catch (e) {
+      // Requisição SUPERADA (fase trocou antes de resolver): ignora silenciosamente —
+      // NUNCA sobrescreve os dados/erro da consulta atual com uma resposta obsoleta.
+      if (signal?.aborted || (e as Error)?.name === "AbortError") return
       console.warn("[ProcessoCentralOperacional] falha ao consultar fase:", e)
       setViewErro("Não foi possível carregar os dados desta fase.")
       setViewData(null)
     } finally {
-      setViewLoading(false)
+      if (!signal?.aborted) setViewLoading(false)
     }
   }, [processo.id, selectedPhaseKey, phases])
 
-  useEffect(() => { carregarView() }, [carregarView])
+  // Cada troca de fase ABORTA a consulta anterior — só a mais recente sobrevive (sem
+  // vazamento de dados de uma fase na outra por resposta fora de ordem).
+  useEffect(() => {
+    const ctrl = new AbortController()
+    carregarView(ctrl.signal)
+    return () => ctrl.abort()
+  }, [carregarView])
 
   // Otimista: marca o doc recém-mexido como "Atualizando…" na fila enquanto
   // a Central recarrega em 2º plano — evita a sensação de "concluí e nada mudou".
@@ -615,8 +626,11 @@ export function ProcessoCentralOperacional({
 
   // FASE CONSULTADA (corpo) — `viewData` (passada) ou `data` (ativa). MESMO layout;
   // PAST_READ_ONLY só bloqueia mutações. Dados VIVOS da instância/ciclo (nunca snapshot).
-  const bodyData = viewData ?? data
-  const isView = viewData != null && !!selectedPhaseKey
+  // isView = INTENÇÃO (fase selecionada ≠ ativa), NÃO "viewData chegou". Assim, durante o
+  // loading/erro do fetch da fase passada a Central JÁ está em modo consulta (readOnly +
+  // spinner/erro) — nunca expõe o painel EDITÁVEL da fase ativa por engano.
+  const isView = !!selectedPhaseKey && selectedPhaseKey !== activePhaseKey
+  const bodyData = (isView ? viewData : data) ?? data
   const readOnly = isView || bodyData.mode === "PAST_READ_ONLY"
   const faseCodeData = (bodyData?.faseProgress?.faseCode ?? undefined) as FaseCode | undefined
   const faseKey =
@@ -752,10 +766,12 @@ export function ProcessoCentralOperacional({
             ESCOPADOS da instância (bodyData). Os painéis bespoke por-fase buscam a fase
             ATIVA (não escopam) — por isso só aparecem no modo ACTIVE, garantindo que
             NENHUM dado da fase ativa vaze na consulta de fase passada. */}
-        {isView && viewLoading ? (
-          <div className="flex items-center justify-center py-16 text-gray-400"><Loader2 className="w-6 h-6 animate-spin" /></div>
-        ) : isView && viewErro ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">⚠ {viewErro}</div>
+        {isView && !viewData ? (
+          // Consultando fase passada e os dados ainda NÃO chegaram (loading/erro): mostra
+          // spinner/erro — NUNCA o corpo, que cairia nos dados da fase ativa.
+          viewErro
+            ? <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">⚠ {viewErro}</div>
+            : <div className="flex items-center justify-center py-16 text-gray-400"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : !isView && ehAnalise ? (
           <ProcessoAnalise processoId={processo.id} onConcluido={() => carregar(true)} />
         ) : !isView && ehTraducao ? (

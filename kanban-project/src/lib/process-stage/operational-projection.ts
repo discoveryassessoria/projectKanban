@@ -132,7 +132,7 @@ async function resolveOperationalProjectionParaFase(
 
   const [necsRaw, certidaoItens, pessoas, reqCount] = await Promise.all([
     prisma.necessidadeDocumental.findMany({
-      where: { processoId: processId },
+      where: { processoId: processId, supersedePorId: null }, // ignora superseded (reabertura)
       select: { id: true, status: true, obrigatoriedade: true, itemCatalogoId: true },
     }),
     itemCatalogosDeCertidao(prisma),
@@ -208,7 +208,7 @@ export async function resolveOperationalProjectionBatch(
 
   // (3) Necessidades de todos os processos.
   const necsRaw = await prisma.necessidadeDocumental.findMany({
-    where: { processoId: { in: ids } },
+    where: { processoId: { in: ids }, supersedePorId: null }, // ignora superseded (reabertura)
     select: { id: true, processoId: true, status: true, obrigatoriedade: true, itemCatalogoId: true },
   })
   // (4) Conjunto de itens de catálogo de natureza CERTIDÃO (1 query, reutilizável).

@@ -62,7 +62,9 @@ export async function calcularPendencias(
   // Snapshot carregado (mesma origem que o resolver canônico) — em paralelo.
   const [necsRaw, certidaoItens, instancia, reqCount] = await Promise.all([
     prisma.necessidadeDocumental.findMany({
-      where: { processoId },
+      // supersedePorId: null → ignora necessidades SUPERSEDIDAS por reabertura (senão a
+      // antiga ATENDIDA + a nova PENDENTE contariam em dobro no gate/progresso).
+      where: { processoId, supersedePorId: null },
       select: { id: true, status: true, obrigatoriedade: true, itemCatalogoId: true },
     }),
     itemCatalogosDeCertidao(prisma),
