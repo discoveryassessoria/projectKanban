@@ -274,7 +274,7 @@ export default function TabelaValoresTab() {
                   <select
                     value={form.categoria}
                     disabled={!!editando}
-                    onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value, configuracaoFinanceiraItemId: '' }))}
+                    onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value, configuracaoFinanceiraItemId: '', precoCusto: false, precoVenda: false, moeda: '', valor: '', moedaVenda: '', valorVenda: '', fornecedorId: '' }))}
                     className={inputCls + (editando ? ' cursor-not-allowed opacity-60' : '')}
                   >
                     <option value="" className="bg-zinc-900">Selecione uma categoria</option>

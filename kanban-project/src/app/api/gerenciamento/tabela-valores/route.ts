@@ -128,6 +128,9 @@ export async function POST(request: NextRequest) {
     const prioridade = toIntOrNull(b.prioridade) ?? 0
     const vigenciaInicio = toStrOrNull(b.vigenciaInicio)
     const vigenciaFim = toStrOrNull(b.vigenciaFim)
+    if (vigenciaInicio && vigenciaFim && vigenciaInicio > vigenciaFim) {
+      return NextResponse.json({ error: 'Vigência inicial deve ser anterior ou igual à final.' }, { status: 400 })
+    }
     // Modo de cálculo OBRIGATÓRIO e válido. A UNIDADE é DERIVADA do modo (fonte única
     // `unidadeDoModo`) — ignoramos qualquer `unidade` enviada pelo cliente (não confiar na UI).
     const modoCalculo = toStrOrNull(b.modoCalculo) ?? ''
@@ -135,8 +138,16 @@ export async function POST(request: NextRequest) {
     const unidade = unidadeDoModo(modoCalculo) // fixed → null; demais → unidade canônica
     // `fixed` não usa faixa de quantidade → normaliza min/max para null.
     const usaQtd = modoUsaQuantidade(modoCalculo)
-    const quantidadeMinima = usaQtd && !(b.quantidadeMinima === '' || b.quantidadeMinima == null) ? Number(b.quantidadeMinima) : null
-    const quantidadeMaxima = usaQtd && !(b.quantidadeMaxima === '' || b.quantidadeMaxima == null) ? Number(b.quantidadeMaxima) : null
+    const parseQtdPos = (v: unknown): number | null => {
+      if (!usaQtd || v === '' || v == null) return null
+      const n = Number(v)
+      return Number.isFinite(n) && n >= 0 ? n : null
+    }
+    const quantidadeMinima = parseQtdPos(b.quantidadeMinima)
+    const quantidadeMaxima = parseQtdPos(b.quantidadeMaxima)
+    if (quantidadeMinima != null && quantidadeMaxima != null && quantidadeMinima > quantidadeMaxima) {
+      return NextResponse.json({ error: 'Quantidade mínima deve ser menor ou igual à máxima.' }, { status: 400 })
+    }
     const mestre = cfg.tipoDocumento?.name ?? cfg.honorario?.name ?? cfg.tipoProcesso?.name ?? cfg.itemCatalogo?.name ?? 'Config'
 
     // LINHAS a criar. Modo CONJUNTO ("Custo e Venda"): b.linhas = [{natureza,moeda,valor,

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { modoCalculoValido, unidadeDoModo, modoUsaQuantidade } from '@/lib/financeiro/modo-calculo'
+import { detectarConflitoPreco, type PrecoRegistro } from '@/lib/financeiro/conflito-preco'
+import type { NaturezaPrecoRaw } from '@/lib/financeiro/natureza-financeira'
 
 function toAmount(v: any): number {
   if (v === undefined || v === null || v === '') return 0
@@ -60,25 +62,62 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const modoConhecido = modoCalculoValido(modoFinal)
     const usaQtd = modoUsaQuantidade(modoFinal)
     const parseQtd = (v: unknown) => (v === '' || v == null ? null : Number(v))
+
+    // Valores EFETIVOS pós-edição (natureza é imutável). VENDA não leva fornecedor (invariante
+    // do POST). Moeda vazia cai no valor atual (garantidamente não-vazio).
+    const ehVenda = atual.natureza === 'VENDA' || atual.natureza === 'RECEITA'
+    const fornecedorIdEff = ehVenda ? null : (b.fornecedorId !== undefined ? (b.fornecedorId ? Number(b.fornecedorId) : null) : atual.fornecedorId)
+    const moedaEff = b.moeda !== undefined && String(b.moeda).trim() ? String(b.moeda).trim() : atual.moeda
+    const qMinEff = modoConhecido ? (usaQtd ? (b.quantidadeMinima !== undefined ? parseQtd(b.quantidadeMinima) : atual.quantidadeMinima) : null) : atual.quantidadeMinima
+    const qMaxEff = modoConhecido ? (usaQtd ? (b.quantidadeMaxima !== undefined ? parseQtd(b.quantidadeMaxima) : atual.quantidadeMaxima) : null) : atual.quantidadeMaxima
+    const vigIniEff = b.vigenciaInicio !== undefined ? (b.vigenciaInicio ? String(b.vigenciaInicio) : null) : atual.vigenciaInicio
+    const vigFimEff = b.vigenciaFim !== undefined ? (b.vigenciaFim ? String(b.vigenciaFim) : null) : atual.vigenciaFim
+    const prioEff = b.prioridade !== undefined ? (Number(b.prioridade) || 0) : atual.prioridade
+    if (vigIniEff && vigFimEff && vigIniEff > vigFimEff) {
+      return NextResponse.json({ error: 'Vigência inicial deve ser anterior ou igual à final.' }, { status: 400 })
+    }
+
+    // Detecção de CONFLITO na edição (o POST já faz; o PUT não fazia → sobreposição escapava).
+    if (atual.configuracaoFinanceiraItemId != null) {
+      const outras = await prisma.tabelaValor.findMany({
+        where: { configuracaoFinanceiraItemId: atual.configuracaoFinanceiraItemId, arquivado: false, legadoPendente: false, id: { not: id } },
+        select: { id: true, configuracaoFinanceiraItemId: true, natureza: true, processoTipoId: true, faseKey: true, regiao: true, modalidadeId: true, processoId: true, itemCatalogoId: true, fornecedorId: true, quantidadeMinima: true, quantidadeMaxima: true, vigenciaInicio: true, vigenciaFim: true, prioridade: true },
+      })
+      const candidata: PrecoRegistro = {
+        id, configuracaoFinanceiraItemId: atual.configuracaoFinanceiraItemId, natureza: atual.natureza as NaturezaPrecoRaw | null,
+        processoTipoId: atual.processoTipoId, faseKey: atual.faseKey, regiao: atual.regiao, modalidadeId: atual.modalidadeId,
+        processoId: atual.processoId, itemCatalogoId: atual.itemCatalogoId, fornecedorId: fornecedorIdEff,
+        quantidadeMinima: qMinEff == null ? null : Number(qMinEff), quantidadeMaxima: qMaxEff == null ? null : Number(qMaxEff),
+        vigenciaInicio: vigIniEff, vigenciaFim: vigFimEff, prioridade: prioEff, arquivado: false, legadoPendente: false,
+      }
+      const conflito = detectarConflitoPreco(candidata, outras.map((e): PrecoRegistro => ({
+        id: e.id, configuracaoFinanceiraItemId: e.configuracaoFinanceiraItemId, natureza: e.natureza as NaturezaPrecoRaw | null,
+        processoTipoId: e.processoTipoId, faseKey: e.faseKey, regiao: e.regiao, modalidadeId: e.modalidadeId,
+        processoId: e.processoId, itemCatalogoId: e.itemCatalogoId, fornecedorId: e.fornecedorId,
+        quantidadeMinima: e.quantidadeMinima == null ? null : Number(e.quantidadeMinima), quantidadeMaxima: e.quantidadeMaxima == null ? null : Number(e.quantidadeMaxima),
+        vigenciaInicio: e.vigenciaInicio, vigenciaFim: e.vigenciaFim, prioridade: e.prioridade, arquivado: false, legadoPendente: false,
+      })))
+      if (!conflito.ok) return NextResponse.json({ error: conflito.motivo, conflitantes: conflito.conflitantes }, { status: 409 })
+    }
+
     try {
       const regra = await prisma.tabelaValor.update({
         where: { id },
         data: {
-          // config (chave) é imutável na edição; aqui muda-se preço/contexto/vigência/prioridade.
+          // config (chave) e natureza são imutáveis; muda-se preço/contexto/vigência/prioridade.
           name: b.name !== undefined ? String(b.name).trim() : atual.name,
           processoTipoId: b.processoTipoId !== undefined ? (b.processoTipoId ? String(b.processoTipoId).trim() : null) : atual.processoTipoId,
           modalidadeId: b.modalidadeId !== undefined ? (b.modalidadeId ? Number(b.modalidadeId) : null) : atual.modalidadeId,
-          fornecedorId: b.fornecedorId !== undefined ? (b.fornecedorId ? Number(b.fornecedorId) : null) : atual.fornecedorId,
-          moeda: b.moeda !== undefined ? b.moeda : atual.moeda,
+          fornecedorId: fornecedorIdEff,
+          moeda: moedaEff as never,
           valor: b.valor !== undefined ? toAmount(b.valor) : atual.valor,
           modoCalculo: modoFinal,
-          // Unidade DERIVADA do modo (normaliza legado fixed→null); modo desconhecido preserva.
           unidade: modoConhecido ? unidadeDoModo(modoFinal) : atual.unidade,
-          quantidadeMinima: modoConhecido ? (usaQtd ? (b.quantidadeMinima !== undefined ? parseQtd(b.quantidadeMinima) : atual.quantidadeMinima) : null) : atual.quantidadeMinima,
-          quantidadeMaxima: modoConhecido ? (usaQtd ? (b.quantidadeMaxima !== undefined ? parseQtd(b.quantidadeMaxima) : atual.quantidadeMaxima) : null) : atual.quantidadeMaxima,
-          vigenciaInicio: b.vigenciaInicio !== undefined ? (b.vigenciaInicio ? String(b.vigenciaInicio) : null) : atual.vigenciaInicio,
-          vigenciaFim: b.vigenciaFim !== undefined ? (b.vigenciaFim ? String(b.vigenciaFim) : null) : atual.vigenciaFim,
-          prioridade: b.prioridade !== undefined ? (Number(b.prioridade) || 0) : atual.prioridade,
+          quantidadeMinima: qMinEff,
+          quantidadeMaxima: qMaxEff,
+          vigenciaInicio: vigIniEff,
+          vigenciaFim: vigFimEff,
+          prioridade: prioEff,
           arquivado: b.arquivado !== undefined ? !!b.arquivado : atual.arquivado,
         },
         include: { fornecedor: { select: { id: true, nome: true } } },

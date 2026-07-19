@@ -173,7 +173,7 @@ async function avaliarCondicoes(
 // ---- criadores de artefato (idênticos ao route manual) ----
 // §4 — congelamento também no path de automação/gatilho. tabelaValorId vem do
 // resolvedor central (precoDaConfig); manual (amount) não tem regra de preço.
-type FreezeExec = { tabelaValorId?: number | null; configId?: number | null; regraId?: number | null; naturezaPreco?: 'CUSTO' | 'VENDA' | null; contexto?: Prisma.InputJsonValue }
+type FreezeExec = { tabelaValorId?: number | null; configId?: number | null; regraId?: number | null; naturezaPreco?: 'CUSTO' | 'VENDA' | null; contexto?: Prisma.InputJsonValue; phaseKey?: string | null; phaseCycle?: number | null; chaveIdempotencia?: string | null }
 async function criarReceita(pid: number, descricao: string, valor: number, moeda: Moeda, fx: number, honorario: boolean, fz: FreezeExec = {}): Promise<number> {
   const codigo = await gerarCodigoReceita()
   const data1 = new Date()
@@ -189,6 +189,7 @@ async function criarReceita(pid: number, descricao: string, valor: number, moeda
       pricingRuleId: fz.tabelaValorId ?? null, valorUnitario: valor, quantidade: 1, valorTotalCongelado: valor,
       modoCalculoAplicado: fz.tabelaValorId != null ? 'fixed' : 'manual', naturezaPreco: fz.naturezaPreco ?? 'VENDA',
       configFinanceiraId: fz.configId ?? null, regraFinanceiraId: fz.regraId ?? null, contextoAplicado: fz.contexto ?? undefined, dataReferencia: data1,
+      phaseKey: fz.phaseKey ?? null, phaseCycle: fz.phaseCycle ?? null, chaveIdempotencia: fz.chaveIdempotencia ?? null,
       parcelas: { create: parcelas.map((p) => ({ numero: p.numero, vencimento: p.vencimento, valor: p.valor, status: 'PENDENTE' as const })) },
       eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Receita criada pelo motor: ${descricao}`.slice(0, 500), valor, cambio: fx, valorBrl: valorBrlRef } },
     },
@@ -209,6 +210,7 @@ async function criarCusto(pid: number, descricao: string, valor: number, moeda: 
       pricingRuleId: fz.tabelaValorId ?? null, valorUnitario: valor, quantidade: 1, valorTotalCongelado: valor,
       modoCalculoAplicado: fz.tabelaValorId != null ? 'fixed' : 'manual', naturezaPreco: fz.naturezaPreco ?? 'CUSTO',
       configFinanceiraId: fz.configId ?? null, regraFinanceiraId: fz.regraId ?? null, contextoAplicado: fz.contexto ?? undefined, dataReferencia: vencimento,
+      phaseKey: fz.phaseKey ?? null, phaseCycle: fz.phaseCycle ?? null, chaveIdempotencia: fz.chaveIdempotencia ?? null,
       parcelas: { create: parcelas.map((p) => ({ numero: p.numero, vencimento: p.vencimento, valor: p.valor, status: 'PENDENTE' as const })) },
       eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Custo criado pelo motor: ${descricao}`.slice(0, 500), valor, cambio: fx, valorBrl: valorBrlRef } },
     },
@@ -328,7 +330,7 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
         const fx = await fxParaBRL(preco.moeda, fxCache)
         // Idempotência estrutural: processo + fase + automação + natureza (config/aplicação fixos na regra).
         const akey = `${processoId}::${phaseKey}::automation::${r.id}::${isRec ? 'VENDA' : 'CUSTO'}`
-        const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', contexto: { fonte: 'automation', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap, mestre: mestreNome } }
+        const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', phaseKey, chaveIdempotencia: akey, contexto: { fonte: 'automation', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap, mestre: mestreNome } }
         await fazer(akey, isRec ? 'Receita' : 'Custo', 'financial', 'automation', r.id, titulo,
           { configItemId: r.configItemId, mestre: mestreNome, aplicacao: ap, natureza: isRec ? 'VENDA' : 'CUSTO', valor: preco.valor, moeda: preco.moeda, tabelaValorId: preco.tabelaValorId, ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
           async () => (isRec ? criarReceita(processoId, descricaoLanc, preco.valor, preco.moeda, fx, false, fz) : criarCusto(processoId, descricaoLanc, preco.valor, preco.moeda, fx, fz)),
@@ -487,7 +489,7 @@ export async function executarFinanceirasNaFaseV2(
       }
       try {
         const fx = await fxParaBRL(preco.moeda, fxCache)
-        const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId!, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', contexto: { fonte: 'automation_v2', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap, mestre: mestreNome } }
+        const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId!, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', phaseKey, chaveIdempotencia: akey, contexto: { fonte: 'automation_v2', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap, mestre: mestreNome } }
         const id = isRec
           ? await criarReceita(processoId, descricaoLanc, preco.valor, preco.moeda, fx, false, fz)
           : await criarCusto(processoId, descricaoLanc, preco.valor, preco.moeda, fx, fz)

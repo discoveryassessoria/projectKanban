@@ -65,9 +65,28 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     const { id: idStr } = await params
     const id = Number(idStr)
+    const svc = await prisma.servicoProduto.findUnique({ where: { id }, select: { itemCatalogoId: true } })
+    if (!svc) return NextResponse.json({ error: 'Serviço não encontrado' }, { status: 404 })
+
+    // NÃO apaga se houver Config Financeira / preços / automações ligados ao item (órfãos +
+    // perda de histórico financeiro). Preserva: inativa o serviço e sua config.
+    if (svc.itemCatalogoId != null) {
+      const config = await prisma.produtoFinanceiro.findUnique({ where: { itemCatalogoId: svc.itemCatalogoId }, select: { id: true } })
+      const [precos, autos] = await Promise.all([
+        prisma.tabelaValor.count({ where: { itemCatalogoId: svc.itemCatalogoId, arquivado: false } }),
+        config ? prisma.phaseAutomationRule.count({ where: { arquivado: false, configItemId: config.id } }) : Promise.resolve(0),
+      ])
+      if (config || precos > 0 || autos > 0) {
+        await prisma.$transaction([
+          prisma.servicoProduto.update({ where: { id }, data: { ativo: false } }),
+          ...(config ? [prisma.produtoFinanceiro.update({ where: { id: config.id }, data: { ativo: false } })] : []),
+        ])
+        return NextResponse.json({ ok: true, inativado: true, motivo: 'Serviço tem Configuração Financeira/preços/automações — foi inativado (não excluído) para preservar o histórico financeiro.' })
+      }
+    }
     await prisma.servicoProduto.delete({ where: { id } })
 
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: true, excluido: true })
   } catch (error) {
     console.error('Erro ao excluir produto/serviço:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
