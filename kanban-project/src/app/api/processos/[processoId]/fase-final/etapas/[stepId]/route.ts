@@ -14,6 +14,7 @@ import {
   type FinalState,
 } from "@/src/lib/process-stage/final-engine"
 import { dispararMotorNaFaseAtual } from "@/src/lib/motor/executor"
+import { concluirFaseBespokeEAvancar } from "@/src/lib/motor/auto-avanco"
 
 export async function POST(
   request: Request,
@@ -72,9 +73,11 @@ export async function POST(
       { timeout: 30000, maxWait: 10000 }
     )
 
-    // MOTOR — se o card avançou de fase, dispara o motor (best-effort)
+    // MOTOR + AUTO-AVANÇO — fase final concluída: dispara o motor, conclui o Workflow
+    // Interno (libera o gate) e avança (Aguardando protocolo → Protocolado → Finalizado).
     if (avancouFase) {
       await dispararMotorNaFaseAtual(id)
+      await concluirFaseBespokeEAvancar(id, processo.faseAtualKey)
     }
 
     return NextResponse.json({

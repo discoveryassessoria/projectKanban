@@ -33,10 +33,11 @@ import {
   exigeJustificativa,
   montarChaveAdvance,
   montarChaveAdvanceBloqueio,
-  proximaFasePorOrdem,
+  proximaFaseAplicavel,
   faseAlvoEhAnterior,
   montarEventoEntered,
   montarEventoCompleted,
+  type FaseOrdenada,
 } from "@/src/lib/motor/phase-advance-helpers"
 
 // --------------------------------------------------------------------------
@@ -414,6 +415,26 @@ async function snapshotPendencias(processoId: number, faseAtual: string, correla
 // Operações públicas
 // --------------------------------------------------------------------------
 
+// Fases CONDICIONAIS do desvio de retificação (só aplicáveis quando a Análise decide
+// "com retificação"). Se "sem retificação" (ou indefinida), são PULADAS no avanço.
+const CONDICIONAIS_RETIFICACAO = new Set(["retificacao_registros", "emissao_documental_retificada"])
+
+/**
+ * Próxima fase respeitando o DESVIO CONDICIONAL: pula Retificação/Emissão Retificada quando
+ * a Análise decidiu que NÃO requer retificação. Fonte da decisão: AnaliseDocumental.
+ * requerRetificacao (true = entra nas fases de retificação; false/indefinido = pula).
+ */
+async function proximaFaseComCondicional(processoId: number, fases: FaseOrdenada[], faseAtual: string): Promise<string | null> {
+  const analise = await prisma.analiseDocumental.findUnique({
+    where: { processoId },
+    select: { requerRetificacao: true },
+  }).catch(() => null)
+  const requerRetificacao = analise?.requerRetificacao === true
+  const ehAplicavel = (phaseKey: string): boolean =>
+    CONDICIONAIS_RETIFICACAO.has(phaseKey) ? requerRetificacao : true
+  return proximaFaseAplicavel(fases, faseAtual, ehAplicavel)
+}
+
 /** Avanço NORMAL: só avança com zero pendências BLOCKING. Transação atômica. */
 export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise<AdvanceResult> {
   const ctxOuErr = await carregarContexto(processoId)
@@ -421,7 +442,7 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
   const c = ctxOuErr
   const correlationId = ctx.correlationId ?? randomUUID()
 
-  const proxima = proximaFasePorOrdem(c.fases, c.processo.faseAtual)
+  const proxima = await proximaFaseComCondicional(processoId, c.fases, c.processo.faseAtual)
   if (!proxima) {
     return { success: false, resultado: "REJEITADO", code: "SEM_PROXIMA_FASE", message: "Não há próxima fase (última fase do macro)", faseAtual: c.processo.faseAtual, correlationId }
   }
@@ -475,7 +496,7 @@ export async function forceAdvance(processoId: number, input: ForceInput): Promi
     return { success: false, resultado: "REJEITADO", code: "MOTIVO_OBRIGATORIO", message: "Avanço forçado exige código de motivo", correlationId }
   }
 
-  const proxima = proximaFasePorOrdem(c.fases, c.processo.faseAtual)
+  const proxima = await proximaFaseComCondicional(processoId, c.fases, c.processo.faseAtual)
   if (!proxima) {
     return { success: false, resultado: "REJEITADO", code: "SEM_PROXIMA_FASE", message: "Não há próxima fase (última fase do macro)", faseAtual: c.processo.faseAtual, correlationId }
   }

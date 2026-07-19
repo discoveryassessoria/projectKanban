@@ -10,6 +10,7 @@ import {
   type ReWorkflow,
 } from "@/src/lib/process-stage/emissao-retificada-engine"
 import { dispararMotorNaFaseAtual } from "@/src/lib/motor/executor"
+import { concluirFaseBespokeEAvancar } from "@/src/lib/motor/auto-avanco"
 
 export async function POST(
   req: Request,
@@ -53,8 +54,10 @@ export async function POST(
     if (allValidated(todos)) {
       completePhase = true
 
-      // MOTOR — a fase avançou; dispara o motor (best-effort)
+      // MOTOR — dispara efeitos da fase (best-effort)
       await dispararMotorNaFaseAtual(processoId)
+      // AUTO-AVANÇO: conclui o Workflow Interno (libera o gate) e avança p/ Tradução.
+      await concluirFaseBespokeEAvancar(processoId, "emissao_documental_retificada")
     }
   }
 

@@ -102,6 +102,26 @@ export function proximaFasePorOrdem(fases: FaseOrdenada[], faseAtualKey: string)
   return ord[idx + 1].phaseKey
 }
 
+/**
+ * Próxima fase APLICÁVEL: como proximaFasePorOrdem, mas PULA fases condicionais que não
+ * se aplicam a este processo (predicado `ehAplicavel`). Ex.: "sem retificação" pula
+ * Retificação de registros e Emissão documental retificada, indo direto p/ Tradução.
+ * As fases puladas não recebem instância (a trilha as exibe como "pulada").
+ */
+export function proximaFaseAplicavel(
+  fases: FaseOrdenada[],
+  faseAtualKey: string,
+  ehAplicavel: (phaseKey: string) => boolean,
+): string | null {
+  const ord = [...fases].sort((a, b) => a.ordem - b.ordem)
+  const idx = ord.findIndex((f) => f.phaseKey === faseAtualKey)
+  if (idx === -1) return null
+  for (let i = idx + 1; i < ord.length; i++) {
+    if (ehAplicavel(ord[i].phaseKey)) return ord[i].phaseKey
+  }
+  return null
+}
+
 /** Índice de ordenação de uma fase (para validar retorno "para trás"). */
 export function ordemDaFase(fases: FaseOrdenada[], phaseKey: string): number | null {
   const ord = [...fases].sort((a, b) => a.ordem - b.ordem)

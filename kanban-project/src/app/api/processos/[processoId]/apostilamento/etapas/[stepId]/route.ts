@@ -14,6 +14,7 @@ import {
   type ApDoc,
   type ApStepId,
 } from "@/src/lib/process-stage/apostilamento-engine"
+import { concluirFaseBespokeEAvancar } from "@/src/lib/motor/auto-avanco"
 
 function parseBR(s: string | null | undefined): Date | null {
   if (!s) return null
@@ -132,6 +133,9 @@ export async function POST(
       },
       { timeout: 30000, maxWait: 10000 }
     )
+
+    // AUTO-AVANÇO: apostilamento concluído → conclui o Workflow Interno (libera o gate) e avança.
+    if (result.completePhase) await concluirFaseBespokeEAvancar(id, "apostilamento")
 
     return NextResponse.json({
       ok: true,

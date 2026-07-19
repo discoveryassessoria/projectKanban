@@ -14,8 +14,24 @@
 // sequência (limite de segurança evita loop infinito).
 
 import { advance } from "@/src/lib/motor/phase-advance"
+import { concluirWorkflowInternoDaFase } from "@/src/services/alinhar-workflow-fase"
 
 const MAX_SALTOS = 5
+
+/**
+ * Conclusão de uma fase por-processo (fluxo bespoke): alinha o Workflow Interno V2 da fase
+ * (conclui os passos obrigatórios abertos → libera o gate) e então AVANÇA automaticamente.
+ * É o gancho para "todas as fases avançam sozinhas ao concluir" nas fases bespoke, sem
+ * bypassar o gate (o gate é liberado pela conclusão canônica dos passos). Best-effort.
+ */
+export async function concluirFaseBespokeEAvancar(
+  processoId: number | null | undefined,
+  faseMacroKey: string | null | undefined,
+): Promise<void> {
+  if (!processoId || !faseMacroKey) return
+  await concluirWorkflowInternoDaFase(processoId, faseMacroKey)
+  await tentarAvancoAutomatico(processoId)
+}
 
 export async function tentarAvancoAutomatico(processoId: number | null | undefined): Promise<void> {
   if (!processoId) return

@@ -9,6 +9,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { applyStep, allValidated, type RetPkg } from "@/src/lib/process-stage/retificacao-engine"
+import { concluirFaseBespokeEAvancar } from "@/src/lib/motor/auto-avanco"
 
 export async function POST(
   request: Request,
@@ -83,6 +84,9 @@ export async function POST(
       },
       { timeout: 30000, maxWait: 10000 }
     )
+
+    // AUTO-AVANÇO: retificação concluída → conclui o Workflow Interno (libera o gate) e avança.
+    if (phaseComplete) await concluirFaseBespokeEAvancar(id, "retificacao_registros")
 
     return NextResponse.json({
       ok: true,

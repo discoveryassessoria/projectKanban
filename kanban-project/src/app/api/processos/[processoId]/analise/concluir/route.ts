@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import type { FaseCode } from "@prisma/client"
 import { dispararMotorNaFaseAtual } from "@/src/lib/motor/executor"
+import { concluirFaseBespokeEAvancar } from "@/src/lib/motor/auto-avanco"
 
 export async function POST(
   request: Request,
@@ -53,8 +54,13 @@ export async function POST(
       })
     }, { timeout: 30000, maxWait: 10000 })
 
-    // MOTOR — a fase avançou; dispara o motor (best-effort)
+    // MOTOR — dispara efeitos da fase (best-effort)
     await dispararMotorNaFaseAtual(id)
+
+    // AUTO-AVANÇO: análise concluída → conclui o Workflow Interno da fase (libera o gate)
+    // e avança. O roteamento respeita o desvio condicional: SEM retificação pula
+    // Retificação/Emissão Retificada e vai direto p/ Tradução.
+    await concluirFaseBespokeEAvancar(id, "analise_documental")
 
     return NextResponse.json({ ok: true, decisao: decisaoJuridica, proximaFase })
   } catch (error) {

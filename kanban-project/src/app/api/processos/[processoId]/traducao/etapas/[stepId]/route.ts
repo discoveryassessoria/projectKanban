@@ -17,6 +17,7 @@ import {
   type TrDoc,
   type TrStepId,
 } from "@/src/lib/process-stage/traducao-engine"
+import { concluirFaseBespokeEAvancar } from "@/src/lib/motor/auto-avanco"
 
 /** Converte "dd/mm/aaaa" em Date (ou tenta Date nativo; null se inválida). */
 function parseBR(s: string | null | undefined): Date | null {
@@ -134,6 +135,9 @@ export async function POST(
       },
       { timeout: 30000, maxWait: 10000 }
     )
+
+    // AUTO-AVANÇO: fase de tradução concluída → conclui o Workflow Interno (libera o gate) e avança.
+    if (result.completePhase) await concluirFaseBespokeEAvancar(id, "traducao_juramentada")
 
     return NextResponse.json({
       ok: true,

@@ -57,5 +57,25 @@ console.log("\n(D) Invariante progresso↔avanço (blindagem de runtime)")
 const core = read("src/lib/motor/operational-projection-core.ts")
 check("blocked ⇒ percentual < 100 (trava de runtime)", core.includes("blocked") && /prog\.percentage\s*=\s*99/.test(core))
 
+console.log("\n(E) Auto-avanço UNIVERSAL — alinhamento bespoke↔gate + roteamento condicional")
+const alinhar = existsSync(p("src/services/alinhar-workflow-fase.ts")) ? read("src/services/alinhar-workflow-fase.ts") : ""
+check("helper conclui Workflow Interno da fase (via serviço canônico)", alinhar.includes("concluirWorkflowInternoDaFase") && alinhar.includes("concluirPasso"))
+const auto = read("src/lib/motor/auto-avanco.ts")
+check("concluirFaseBespokeEAvancar (conclui gate + avança)", auto.includes("concluirFaseBespokeEAvancar") && auto.includes("concluirWorkflowInternoDaFase"))
+const bespoke: Array<[string, string]> = [
+  ["Análise", "src/app/api/processos/[processoId]/analise/concluir/route.ts"],
+  ["Tradução", "src/app/api/processos/[processoId]/traducao/etapas/[stepId]/route.ts"],
+  ["Apostilamento", "src/app/api/processos/[processoId]/apostilamento/etapas/[stepId]/route.ts"],
+  ["Retificação", "src/app/api/processos/[processoId]/retificacao/pacotes/[pkgId]/etapas/[stepId]/route.ts"],
+  ["Emissão Retificada", "src/app/api/processos/[processoId]/emissao-retificada/documentos/[docId]/etapas/[stepId]/route.ts"],
+  ["Fase Final", "src/app/api/processos/[processoId]/fase-final/etapas/[stepId]/route.ts"],
+]
+for (const [nome, rel] of bespoke) check(`auto-avanço ligado em ${nome}`, read(rel).includes("concluirFaseBespokeEAvancar"))
+const adv = read("src/lib/motor/phase-advance.ts")
+check("advance usa roteamento condicional (proximaFaseComCondicional)", adv.includes("proximaFaseComCondicional") && adv.includes("CONDICIONAIS_RETIFICACAO"))
+check("advance NÃO usa mais proximaFasePorOrdem (por-ordem cego)", !adv.includes("proximaFasePorOrdem("))
+const helpers = read("src/lib/motor/phase-advance-helpers.ts")
+check("proximaFaseAplicavel (pula condicionais não aplicáveis)", helpers.includes("export function proximaFaseAplicavel"))
+
 console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)
 if (falhas.length) { for (const f of falhas) console.log("  - " + f); process.exit(1) }
