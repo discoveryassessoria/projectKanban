@@ -331,11 +331,14 @@ function computeProgress(input: ProjectionInput, blocked: boolean): ProgressResu
     nextAction = proximaAcaoDe(input.faseCode, gateSteps)
   }
 
+  // Progresso = proporção das OBRIGATÓRIAS concluídas (mesma fonte do BlockingEngine/
+  // PhaseAdvance). SEM reserva de 1% / cap em 99: se todas as obrigatórias estão feitas,
+  // é 100% (o BlockingEngine, que usa os MESMOS itens, não bloqueia nesse caso). Se há
+  // pendência real, alguma obrigatória está incompleta → proporção já cai abaixo de 100.
   let percentage: number
   if (totalWeight <= 0) percentage = blocked ? 0 : 100
-  else percentage = Math.round((completedWeight / totalWeight) * 100)
-  // Nunca 100% com bloqueio obrigatório aberto (regra do motor de conclusão).
-  if (blocked) percentage = Math.min(percentage, 99)
+  else if (completedWeight >= totalWeight) percentage = 100 // logicamente completo → nunca 99 por arredondamento
+  else percentage = Math.min(99, Math.round((completedWeight / totalWeight) * 100)) // parcial nunca chega a 100 por arredondamento
 
   return { scope, completedWeight, totalWeight, percentage, required, completed, nextAction }
 }
