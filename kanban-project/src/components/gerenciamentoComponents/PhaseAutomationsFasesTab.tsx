@@ -33,7 +33,7 @@ interface Modelo {
   id: number; name: string; description?: string | null
   type: string; recommendedPhases?: string[] | null
 }
-interface ConfigFin { id: number; codigo: string; origem: string; mestre: string; possuiCusto: boolean; possuiReceita: boolean }
+interface ConfigFin { id: number; codigo: string; origem: string; mestre: string; possuiCusto: boolean; possuiReceita: boolean; temVenda?: boolean; temCusto?: boolean }
 interface Data { tiposProcesso: TipoProcesso[]; regras: Rule[]; modelosAutomacao: Modelo[]; configsFinanceiras: ConfigFin[] }
 
 // Origem estrutural → rótulo de Categoria (nunca por texto do nome).
@@ -158,7 +158,10 @@ export default function PhaseAutomationsFasesTab() {
   const categoriasFin = Array.from(new Set(configsFin.map(c => c.origem))).sort((a, b) => ordemCat(a) - ordemCat(b) || catLabel(a).localeCompare(catLabel(b)))
   const itensDaCategoria = form?.categoria ? configsFin.filter(c => c.origem === form.categoria).sort((a, b) => a.mestre.localeCompare(b.mestre)) : []
   const cfgSelForm = configsFin.find(c => String(c.id) === form?.configItemId)
-  const cfgAmbosPermitido = !!cfgSelForm && cfgSelForm.possuiCusto && cfgSelForm.possuiReceita
+  // Aplicação depende do que EXISTE na Tabela de Preços (não só do que a config habilita).
+  const cfgTemVenda = !!cfgSelForm?.temVenda
+  const cfgTemCusto = !!cfgSelForm?.temCusto
+  const cfgAmbosPermitido = cfgTemVenda && cfgTemCusto
   // IDENTIDADE ESTRUTURADA (financeiro): título/descrição derivados — nunca texto livre.
   const mestreDeConfig = (configItemId: string | number | null) => configsFin.find(c => c.id === Number(configItemId))?.mestre || ""
   const tituloFinanceiroDoForm = (f: Form) => (f.configItemId && f.aplicacaoFinanceira) ? tituloAutomacaoFinanceira(f.aplicacaoFinanceira, mestreDeConfig(f.configItemId)) : ""
@@ -562,11 +565,11 @@ export default function PhaseAutomationsFasesTab() {
                 <div className="col-span-2">
                   <label className={labelCls}>Aplicação financeira *</label>
                   <select value={form.aplicacaoFinanceira} onChange={e => setForm(f => f && { ...f, aplicacaoFinanceira: e.target.value })} className={inputCls}>
-                    <option value="RECEITA" className={opt}>Receita</option>
-                    <option value="CUSTO" className={opt}>Custo</option>
-                    <option value="AMBOS" className={opt} disabled={!cfgAmbosPermitido}>Custo e receita{cfgAmbosPermitido ? "" : " (config não permite)"}</option>
+                    <option value="RECEITA" className={opt} disabled={!cfgTemVenda}>Receita{cfgTemVenda ? "" : " (sem preço de venda)"}</option>
+                    <option value="CUSTO" className={opt} disabled={!cfgTemCusto}>Custo{cfgTemCusto ? "" : " (sem preço de custo)"}</option>
+                    <option value="AMBOS" className={opt} disabled={!cfgAmbosPermitido}>Custo e receita{cfgAmbosPermitido ? "" : " (falta preço)"}</option>
                   </select>
-                  <p className="mt-1 text-[11px] text-white/40">A automação não guarda valor nem moeda — o preço vigente vem da Tabela de Preços.</p>
+                  <p className="mt-1 text-[11px] text-white/40">Só aparecem Configurações com preço na Tabela de Preços. A automação não guarda valor — o preço vigente vem da Tabela.</p>
                 </div>
               </>)}
               {form.kind === "alert" && (

@@ -57,6 +57,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       const cfg = await prisma.produtoFinanceiro.findUnique({ where: { id: configItemId }, select: { possuiCusto: true, possuiReceita: true } })
       if (!cfg) return NextResponse.json({ error: 'Configuração Financeira não encontrada.' }, { status: 404 })
       if (!aplicacaoPermitida(aplicacao, cfg)) return NextResponse.json({ error: `A Configuração Financeira não permite "${aplicacao}".` }, { status: 400 })
+      // VÍNCULO = TABELA DE PREÇOS: sem preço cadastrado, não deixa salvar.
+      const precos = await prisma.tabelaValor.findMany({ where: { configuracaoFinanceiraItemId: configItemId, arquivado: false, legadoPendente: false }, select: { natureza: true } })
+      const temVenda = precos.some((x) => x.natureza === 'VENDA' || x.natureza === 'RECEITA')
+      const temCusto = precos.some((x) => x.natureza === 'CUSTO')
+      if ((aplicacao === 'RECEITA' || aplicacao === 'AMBOS') && !temVenda) return NextResponse.json({ error: 'A Configuração Financeira não tem preço de VENDA na Tabela de Preços. Cadastre o preço antes.', code: 'SEM_PRECO' }, { status: 400 })
+      if ((aplicacao === 'CUSTO' || aplicacao === 'AMBOS') && !temCusto) return NextResponse.json({ error: 'A Configuração Financeira não tem preço de CUSTO na Tabela de Preços. Cadastre o preço antes.', code: 'SEM_PRECO' }, { status: 400 })
       vinculoData = { configItemId, aplicacaoFinanceira: aplicacao, params: {}, financialType: null }
     }
 

@@ -6,23 +6,46 @@ import { aplicacaoValida, aplicacaoPermitida } from '@/lib/financeiro/aplicacao-
 
 function amtTypeToKind(t?: string) { return t === 'phase_transition' ? 'phase_advance' : (t || 'task') }
 
-// Configurações Financeiras (para o seletor Categoria|Item da regra financeira nova).
-// Origem ESTRUTURAL derivada das FKs — nunca por texto. Persistimos só configItemId.
+// VÍNCULO = TABELA DE PREÇOS. Só é selecionável a Configuração Financeira que TEM preço
+// cadastrado (VENDA e/ou CUSTO). Sem preço → não pode virar automação. temVenda/temCusto
+// indicam quais Aplicações são possíveis; configs sem nenhum preço saem da lista.
 async function listarConfigsFinanceiras() {
-  const cfgs = await prisma.produtoFinanceiro.findMany({
-    where: { ativo: true },
-    select: {
-      id: true, codigo: true, possuiCusto: true, possuiReceita: true,
-      tipoDocumento: { select: { name: true } }, honorario: { select: { name: true } },
-      tipoProcesso: { select: { name: true } }, itemCatalogo: { select: { name: true, natureza: true } },
-    },
-    orderBy: { id: 'asc' },
-  })
+  const [cfgs, precos] = await Promise.all([
+    prisma.produtoFinanceiro.findMany({
+      where: { ativo: true },
+      select: {
+        id: true, codigo: true, possuiCusto: true, possuiReceita: true,
+        tipoDocumento: { select: { name: true } }, honorario: { select: { name: true } },
+        tipoProcesso: { select: { name: true } }, itemCatalogo: { select: { name: true, natureza: true } },
+      },
+      orderBy: { id: 'asc' },
+    }),
+    prisma.tabelaValor.findMany({ where: { arquivado: false, legadoPendente: false, configuracaoFinanceiraItemId: { not: null } }, select: { configuracaoFinanceiraItemId: true, natureza: true } }),
+  ])
+  const venda = new Set<number>(), custo = new Set<number>()
+  for (const p of precos) {
+    if (p.configuracaoFinanceiraItemId == null) continue
+    if (p.natureza === 'VENDA' || p.natureza === 'RECEITA') venda.add(p.configuracaoFinanceiraItemId)
+    else if (p.natureza === 'CUSTO') custo.add(p.configuracaoFinanceiraItemId)
+  }
   return cfgs.map((c) => {
     const origem = c.tipoDocumento ? 'documento' : c.honorario ? 'honorario' : c.tipoProcesso ? 'processo' : (c.itemCatalogo?.natureza === 'SERVICO' ? 'servico' : 'item')
     const mestre = c.tipoDocumento?.name ?? c.honorario?.name ?? c.tipoProcesso?.name ?? c.itemCatalogo?.name ?? '—'
-    return { id: c.id, codigo: c.codigo, origem, mestre, possuiCusto: c.possuiCusto, possuiReceita: c.possuiReceita }
-  })
+    return { id: c.id, codigo: c.codigo, origem, mestre, possuiCusto: c.possuiCusto, possuiReceita: c.possuiReceita, temVenda: venda.has(c.id), temCusto: custo.has(c.id) }
+  }).filter((c) => c.temVenda || c.temCusto) // só configs COM preço na Tabela de Preços
+}
+
+// Valida que a Config tem preço para a Aplicação escolhida (RECEITA→VENDA, CUSTO→CUSTO,
+// AMBOS→ambos). Retorna a mensagem de erro, ou null quando ok.
+async function faltaPrecoParaAplicacao(configId: number, aplicacao: string): Promise<string | null> {
+  const precos = await prisma.tabelaValor.findMany({ where: { configuracaoFinanceiraItemId: configId, arquivado: false, legadoPendente: false }, select: { natureza: true } })
+  const temVenda = precos.some((p) => p.natureza === 'VENDA' || p.natureza === 'RECEITA')
+  const temCusto = precos.some((p) => p.natureza === 'CUSTO')
+  const precisaVenda = aplicacao === 'RECEITA' || aplicacao === 'AMBOS'
+  const precisaCusto = aplicacao === 'CUSTO' || aplicacao === 'AMBOS'
+  if (precisaVenda && !temVenda) return 'A Configuração Financeira não tem preço de VENDA na Tabela de Preços. Cadastre o preço antes de criar a automação de Receita.'
+  if (precisaCusto && !temCusto) return 'A Configuração Financeira não tem preço de CUSTO na Tabela de Preços. Cadastre o preço antes de criar a automação de Custo.'
+  return null
 }
 
 // ARQUITETURA NOVA — automações só descrevem EFEITOS ADICIONAIS. PROIBIDO:
@@ -159,6 +182,9 @@ export async function POST(request: NextRequest) {
       if (!aplicacaoPermitida(aplicacaoFinanceira as 'RECEITA' | 'CUSTO' | 'AMBOS', cfg)) {
         return NextResponse.json({ error: `A Configuração Financeira selecionada não permite "${aplicacaoFinanceira}".` }, { status: 400 })
       }
+      // VÍNCULO = TABELA DE PREÇOS: sem preço cadastrado, NÃO deixa criar a automação.
+      const semPreco = await faltaPrecoParaAplicacao(configItemId, aplicacaoFinanceira!)
+      if (semPreco) return NextResponse.json({ error: semPreco, code: 'SEM_PRECO' }, { status: 400 })
     }
 
     const rule = await prisma.phaseAutomationRule.create({
