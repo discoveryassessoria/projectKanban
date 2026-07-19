@@ -62,7 +62,8 @@
     "backfill:cp3:necessidades": "tsx prisma/backfill-cp3-necessidades.ts",
     "backfill:catfin:dry": "tsx prisma/backfill-categoria-financeira-mestre.ts --dry-run",
     "backfill:catfin": "tsx prisma/backfill-categoria-financeira-mestre.ts --execute",
-    "test:operational-projection": "tsx scripts/operational-projection.test.ts"
+    "test:operational-projection": "tsx scripts/operational-projection.test.ts",
+    "test:central-unificada": "tsx scripts/central-unificada-guard.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
