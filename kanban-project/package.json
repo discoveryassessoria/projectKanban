@@ -64,7 +64,8 @@
     "backfill:catfin": "tsx prisma/backfill-categoria-financeira-mestre.ts --execute",
     "test:operational-projection": "tsx scripts/operational-projection.test.ts",
     "test:central-unificada": "tsx scripts/central-unificada-guard.test.ts",
-    "test:roteamento-condicional": "tsx scripts/roteamento-condicional.test.ts"
+    "test:roteamento-condicional": "tsx scripts/roteamento-condicional.test.ts",
+    "test:emissao-gate": "tsx scripts/emissao-gate.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

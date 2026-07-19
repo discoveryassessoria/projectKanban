@@ -19,7 +19,7 @@ import {
   avaliarPolitica, separar,
 } from "@/src/lib/motor/blocking-helpers"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
-import { computeGate, type ProjectionInput, type NecessidadeData } from "@/src/lib/motor/operational-projection-core"
+import { computeGate, type ProjectionInput, type NecessidadeData, type DocumentoData } from "@/src/lib/motor/operational-projection-core"
 import { getFase, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import { mapStepToGate } from "@/src/lib/process-stage/operational-projection"
 
@@ -60,7 +60,7 @@ export async function calcularPendencias(
   const faseDef = faseCode ? getFase(faseCode) : null
 
   // Snapshot carregado (mesma origem que o resolver canônico) — em paralelo.
-  const [necsRaw, certidaoItens, instancia, reqCount] = await Promise.all([
+  const [necsRaw, certidaoItens, instancia, reqCount, pessoasDocs] = await Promise.all([
     prisma.necessidadeDocumental.findMany({
       // supersedePorId: null → ignora necessidades SUPERSEDIDAS por reabertura (senão a
       // antiga ATENDIDA + a nova PENDENTE contariam em dobro no gate/progresso).
@@ -79,6 +79,11 @@ export async function calcularPendencias(
       },
     }),
     prisma.processoRequerente.count({ where: { processoId } }),
+    // Documentos da LINHA RETA (com necessidadeId) — o gate DOCUMENTO precisa deles para
+    // exigir TODAS as certidões obrigatórias resolvidas. Sem isso o advance congelaria a fase.
+    processo.arvoreId != null
+      ? prisma.pessoa.findMany({ where: { arvoreId: processo.arvoreId, linhaReta: true }, select: { documentos: { select: { id: true, status: true, necessidadeId: true } } } })
+      : Promise.resolve([] as Array<{ documentos: Array<{ id: number; status: string; necessidadeId: number | null }> }>),
   ])
 
   const necessidades: NecessidadeData[] = necsRaw.map((n) => ({
@@ -87,6 +92,8 @@ export async function calcularPendencias(
     obrigatoria: n.obrigatoriedade === "OBRIGATORIA",
     ehCertidao: certidaoItens.has(n.itemCatalogoId),
   }))
+
+  const documentos: DocumentoData[] = pessoasDocs.flatMap((p) => p.documentos.map((d) => ({ id: d.id, status: d.status, linhaReta: true, necessidadeId: d.necessidadeId })))
 
   const input: ProjectionInput = {
     processId: processoId,
@@ -98,7 +105,7 @@ export async function calcularPendencias(
     hasActiveInstance: !!instancia,
     steps: (instancia?.steps ?? []).map(mapStepToGate),
     necessidades,
-    documentos: [], // gate não usa documentos (progresso DOCUMENTO usa; aqui é só bloqueio)
+    documentos,
     hasArvore: processo.arvoreId != null,
     requerentesCount: reqCount,
   }

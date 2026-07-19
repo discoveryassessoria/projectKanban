@@ -107,6 +107,9 @@ export interface DocumentoData {
   id: number
   status: string
   linhaReta: boolean
+  /** Necessidade (certidão) que este documento atende — vínculo Documento.necessidadeId.
+   *  Usado para gatear a fase DOCUMENTO pelas CERTIDÕES OBRIGATÓRIAS (não por docs de apoio). */
+  necessidadeId?: number | null
 }
 
 export interface ProjectionInput {
@@ -136,6 +139,41 @@ export interface ProjectionInput {
 // PASSO_OK do gate: um passo dispensado/supersedido não bloqueia e conta como feito).
 const PASSO_OK = new Set(["CONCLUIDO", "DISPENSADO", "SUPERSEDIDO"])
 const passoConcluido = (s: { status: string }) => PASSO_OK.has(s.status)
+
+/**
+ * Escopo DOCUMENTO (Emissão): as CERTIDÕES OBRIGATÓRIAS são o denominador da fase — a
+ * fase só avança quando TODAS estiverem resolvidas. Docs de apoio (RG/CPF etc.) NÃO
+ * gateiam. Uma certidão está resolvida quando SEU documento (Documento.necessidadeId) tem
+ * a operação da fase concluída (último passo por-documento concluído). Fonte ÚNICA usada
+ * por computeGate E computeProgress → gate e progresso nunca divergem (100% ⟺ pode avançar).
+ */
+function certidoesObrigatoriasDocumento(input: ProjectionInput): {
+  certObrig: NecessidadeData[]
+  emitida: (n: NecessidadeData) => boolean
+} {
+  const certObrig = input.necessidades.filter((n) => n.ehCertidao && n.obrigatoria && n.status !== "DISPENSADA")
+  const stepsByDoc = new Map<number, GateStepData[]>()
+  for (const s of input.steps) {
+    if (s.documentoId == null) continue
+    const arr = stepsByDoc.get(s.documentoId) ?? []
+    arr.push(s)
+    stepsByDoc.set(s.documentoId, arr)
+  }
+  const docConcluiu = (docId: number): boolean => {
+    const ss = stepsByDoc.get(docId) ?? []
+    if (ss.length === 0) return false
+    return passoConcluido(ss.reduce((a, b) => (b.ordem > a.ordem ? b : a)))
+  }
+  const docsByNec = new Map<number, number[]>()
+  for (const d of input.documentos) {
+    if (d.necessidadeId == null) continue
+    const arr = docsByNec.get(d.necessidadeId) ?? []
+    arr.push(d.id)
+    docsByNec.set(d.necessidadeId, arr)
+  }
+  const emitida = (n: NecessidadeData): boolean => (docsByNec.get(n.id) ?? []).some(docConcluiu)
+  return { certObrig, emitida }
+}
 
 interface Snapshot { exigeEvidencia?: boolean; exigeResponsavel?: boolean; dependencias?: string[] }
 
@@ -183,7 +221,6 @@ export function computeGate(input: ProjectionInput): BlockingIssue[] {
 
   const scope = escopoEfetivo(input)
   const gateSteps = resolvePassosBloqueantesDaFase(input.steps)
-  const faseEntityScoped = faseOperadaPorEntidade(input.steps)
   const necStatusById = new Map(input.necessidades.map((n) => [n.id, n.status]))
 
   // --- Escopo NECESSIDADE: estrutura mínima (necessidades geradas + árvore + requerente).
@@ -202,15 +239,17 @@ export function computeGate(input: ProjectionInput): BlockingIssue[] {
     }
   }
 
-  // --- Escopo DOCUMENTO ainda NÃO materializado (sem passo por-entidade): gata pela
-  //     EXISTÊNCIA do requisito (certidão obrigatória esperada), NÃO pelo status da
-  //     NecessidadeDocumental. O status ATENDIDA significa "localizada na Genealogia / esperada
-  //     nesta fase", não "documento emitido" — usar o status aqui deixaria a fase avançar
-  //     vazia. Assim que houver passo por-documento, o gate passa a ser o documento.
-  if (scope === "DOCUMENTO" && !faseEntityScoped) {
-    const esperadas = input.necessidades.filter((n) => n.ehCertidao && n.obrigatoria && n.status !== "DISPENSADA")
-    if (esperadas.length > 0) {
-      issues.push({ code: "FASE_DOCUMENTAL_NAO_INICIADA", category: "NECESSIDADE_DOCUMENTAL", severity: "BLOCKING", entityType: "Processo", entityId: input.processId, message: "Fase documental sem documento operacional materializado", resolutionHint: "Abrir a operação dos documentos obrigatórios da fase" })
+  // --- Escopo DOCUMENTO (Emissão): a fase só avança quando TODAS as CERTIDÕES OBRIGATÓRIAS
+  //     estiverem resolvidas (documento emitido/operação concluída). Cada certidão obrigatória
+  //     ainda pendente emite um BLOCKING — inclusive as que NUNCA tiveram operação aberta (o
+  //     bug anterior: com 1 doc aberto, as demais ficavam invisíveis ao gate e a fase avançava
+  //     em 1/N). Docs de apoio (RG/CPF) NÃO gateiam. Mesma régua do computeProgress.
+  if (scope === "DOCUMENTO") {
+    const { certObrig, emitida } = certidoesObrigatoriasDocumento(input)
+    for (const n of certObrig) {
+      if (!emitida(n)) {
+        issues.push({ code: "CERTIDAO_OBRIGATORIA_PENDENTE", category: "NECESSIDADE_DOCUMENTAL", severity: "BLOCKING", entityType: "NecessidadeDocumental", entityId: n.id, message: "Certidão obrigatória ainda não emitida/concluída nesta fase", resolutionHint: "Concluir a operação de TODAS as certidões obrigatórias antes de avançar" })
+      }
     }
   }
 
@@ -281,28 +320,16 @@ function computeProgress(input: ProjectionInput, blocked: boolean): ProgressResu
   let nextAction: { key: string; label: string } | null = null
 
   if (scope === "DOCUMENTO") {
-    const docSteps = gateSteps.filter((s) => s.documentoId != null)
-    const stepsByDoc = new Map<number, GateStepData[]>()
-    for (const s of docSteps) {
-      const arr = stepsByDoc.get(s.documentoId as number) ?? []
-      arr.push(s)
-      stepsByDoc.set(s.documentoId as number, arr)
-    }
-    const docConcluiu = (docId: number): boolean => {
-      const ss = stepsByDoc.get(docId) ?? []
-      if (ss.length === 0) return false
-      const ultima = ss.reduce((a, b) => (b.ordem > a.ordem ? b : a))
-      return passoConcluido(ultima)
-    }
-    // Denominador = documentos obrigatórios da LINHA RETA (mesma régua da fonte oficial),
-    // excluindo CANCELADO. Doc sem passo materializado conta no total como não-concluído.
-    const eligibleDocs = input.documentos.filter((d) => d.linhaReta && d.status !== "CANCELADO")
-    for (const d of eligibleDocs) {
+    // Denominador = CERTIDÕES OBRIGATÓRIAS (mesma régua do gate). Cada certidão conta como
+    // concluída quando SEU documento tem a operação da fase concluída. Certidão sem operação
+    // (nunca aberta) conta no total como NÃO concluída → progresso e gate concordam.
+    const { certObrig, emitida } = certidoesObrigatoriasDocumento(input)
+    for (const n of certObrig) {
       totalWeight += 1
       required += 1
-      if (docConcluiu(d.id)) { completedWeight += 1; completed += 1 }
+      if (emitida(n)) { completedWeight += 1; completed += 1 }
     }
-    nextAction = proximaAcaoDe(input.faseCode, docSteps)
+    nextAction = proximaAcaoDe(input.faseCode, gateSteps.filter((s) => s.documentoId != null))
   } else if (scope === "NECESSIDADE") {
     const stepByNec = new Map<number, GateStepData>()
     for (const s of gateSteps.filter((x) => x.necessidadeId != null)) {

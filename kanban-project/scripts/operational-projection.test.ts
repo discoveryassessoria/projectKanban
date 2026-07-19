@@ -99,23 +99,30 @@ console.log("\n4) NECESSIDADE — sem necessidades geradas → bloqueia NECESSID
   ok(p.metrics.blocked >= 1, "há bloqueio contabilizado")
 }
 
-console.log("\n5) DOCUMENTO — múltiplos documentos; doc concluído = última etapa concluída")
+console.log("\n5) DOCUMENTO — denominador = CERTIDÕES OBRIGATÓRIAS (não docs de apoio); doc concluído = última etapa")
 {
+  // 3 certidões obrigatórias, cada uma com seu documento (necessidadeId); 2 concluídas.
+  const necessidades: NecessidadeData[] = [
+    { id: 10, status: "ATENDIDA", obrigatoria: true, ehCertidao: true },
+    { id: 11, status: "ATENDIDA", obrigatoria: true, ehCertidao: true },
+    { id: 12, status: "ATENDIDA", obrigatoria: true, ehCertidao: true },
+  ]
   const documentos: DocumentoData[] = [
-    { id: 100, status: "PENDENTE", linhaReta: true },
-    { id: 101, status: "PENDENTE", linhaReta: true },
-    { id: 102, status: "PENDENTE", linhaReta: true },
-    { id: 103, status: "CANCELADO", linhaReta: true }, // excluído do denominador
+    { id: 100, status: "PENDENTE", linhaReta: true, necessidadeId: 10 },
+    { id: 101, status: "PENDENTE", linhaReta: true, necessidadeId: 11 },
+    { id: 102, status: "PENDENTE", linhaReta: true, necessidadeId: 12 },
+    { id: 900, status: "PENDENTE", linhaReta: true, necessidadeId: null }, // doc de apoio: NÃO gateia
   ]
   const mk = (doc: number, lastStatus: string) => ([
     step({ ordem: 1, status: "CONCLUIDO", documentoId: doc, stepKey: "solicitar" }),
     step({ ordem: 2, status: lastStatus, documentoId: doc, stepKey: "validar" }),
   ])
   const steps = [...mk(100, "CONCLUIDO"), ...mk(101, "CONCLUIDO"), ...mk(102, "DISPONIVEL")]
-  const p = buildOperationalProjection(base("DOCUMENTO", { documentos, steps }))
+  const p = buildOperationalProjection(base("DOCUMENTO", { necessidades, documentos, steps }))
   ok(p.activePhase?.scope === "DOCUMENTO", "escopo DOCUMENTO")
-  ok(p.progress.totalWeight === 3, "denominador = 3 docs da linha reta (exclui CANCELADO)")
-  ok(p.progress.completedWeight === 2 && p.progress.percentage === 67, "2/3 docs concluídos = 67%")
+  ok(p.progress.totalWeight === 3, "denominador = 3 certidões obrigatórias (doc de apoio fora)")
+  ok(p.progress.completedWeight === 2 && p.progress.percentage === 67, "2/3 certidões emitidas = 67%")
+  ok(p.status.blocked === true && p.status.canAdvance === false, "certidão 12 pendente BLOQUEIA o avanço")
 }
 
 console.log("\n6) Coexistência de passos GENÉRICOS legados + VINCULADOS (genéricos ignorados)")

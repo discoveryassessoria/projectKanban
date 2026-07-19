@@ -137,15 +137,15 @@ async function resolveOperationalProjectionParaFase(
     }),
     itemCatalogosDeCertidao(prisma),
     proc.arvoreId != null
-      ? prisma.pessoa.findMany({ where: { arvoreId: proc.arvoreId, linhaReta: true }, select: { documentos: { select: { id: true, status: true } } } })
-      : Promise.resolve([] as Array<{ documentos: Array<{ id: number; status: string }> }>),
+      ? prisma.pessoa.findMany({ where: { arvoreId: proc.arvoreId, linhaReta: true }, select: { documentos: { select: { id: true, status: true, necessidadeId: true } } } })
+      : Promise.resolve([] as Array<{ documentos: Array<{ id: number; status: string; necessidadeId: number | null }> }>),
     prisma.processoRequerente.count({ where: { processoId: processId } }),
   ])
 
   const necessidades: NecessidadeData[] = necsRaw.map((n) => ({
     id: n.id, status: n.status, obrigatoria: n.obrigatoriedade === "OBRIGATORIA", ehCertidao: certidaoItens.has(n.itemCatalogoId),
   }))
-  const documentos: DocumentoData[] = pessoas.flatMap((p) => p.documentos.map((d) => ({ id: d.id, status: d.status, linhaReta: true })))
+  const documentos: DocumentoData[] = pessoas.flatMap((p) => p.documentos.map((d) => ({ id: d.id, status: d.status, linhaReta: true, necessidadeId: d.necessidadeId })))
 
   const faseCode = phaseKeyToFaseCode(faseMacroKey)
   const faseDef = faseCode ? getFase(faseCode) : null
@@ -230,12 +230,12 @@ export async function resolveOperationalProjectionBatch(
   if (arvoreIds.length > 0) {
     const pessoas = await prisma.pessoa.findMany({
       where: { arvoreId: { in: arvoreIds }, linhaReta: true },
-      select: { arvoreId: true, documentos: { select: { id: true, status: true } } },
+      select: { arvoreId: true, documentos: { select: { id: true, status: true, necessidadeId: true } } },
     })
     for (const p of pessoas) {
       if (p.arvoreId == null) continue
       const arr = docsByArvore.get(p.arvoreId) ?? []
-      for (const d of p.documentos) arr.push({ id: d.id, status: d.status, linhaReta: true })
+      for (const d of p.documentos) arr.push({ id: d.id, status: d.status, linhaReta: true, necessidadeId: d.necessidadeId })
       docsByArvore.set(p.arvoreId, arr)
     }
   }
