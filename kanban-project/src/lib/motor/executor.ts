@@ -80,11 +80,14 @@ function toTipoEvento(s: string | null): TipoEvento {
 }
 const opautoTriggerFor = (ev: string) => (ev === 'entered' ? 'phase_entered' : null)
 
-async function fxParaBRL(moeda: Moeda, cache: Map<string, number>): Promise<number> {
+// Retorna a taxa moeda→BRL, ou NULL quando não há cotação ativa para moeda estrangeira.
+// NUNCA cai para 1 em moeda != BRL — isso gravaria o lançamento sem conversão (valor errado).
+async function fxParaBRL(moeda: Moeda, cache: Map<string, number>): Promise<number | null> {
   if (moeda === 'BRL') return 1
   if (cache.has(moeda)) return cache.get(moeda)!
   const cot = await prisma.cotacaoCambio.findFirst({ where: { moedaDe: moeda, moedaPara: 'BRL', ativo: true }, orderBy: { criadoEm: 'desc' } })
-  const taxa = cot ? Number(cot.taxa) : 1
+  if (!cot) return null
+  const taxa = Number(cot.taxa)
   cache.set(moeda, taxa)
   return taxa
 }
@@ -328,6 +331,7 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
         if (!preco) { skipped.push({ name: titulo, reason: 'Configuração Financeira sem preço cadastrado' }); continue }
         if ('erro' in preco) { skipped.push({ name: titulo, reason: `Nenhum preço vigente encontrado para a Configuração Financeira selecionada — ${preco.erro}` }); continue }
         const fx = await fxParaBRL(preco.moeda, fxCache)
+        if (fx == null) { skipped.push({ name: titulo, reason: `Sem cotação de câmbio ${preco.moeda}→BRL. Cadastre a cotação para lançar.` }); continue }
         // Idempotência estrutural: processo + fase + automação + natureza (config/aplicação fixos na regra).
         const akey = `${processoId}::${phaseKey}::automation::${r.id}::${isRec ? 'VENDA' : 'CUSTO'}`
         const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', phaseKey, chaveIdempotencia: akey, contexto: { fonte: 'automation', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap, mestre: mestreNome } }
@@ -475,6 +479,11 @@ export async function executarFinanceirasNaFaseV2(
       if (!preco) { skipped.push({ name: titulo, reason: 'Configuração Financeira sem preço cadastrado' }); continue }
       if ('erro' in preco) { skipped.push({ name: titulo, reason: `Nenhum preço vigente encontrado para a Configuração Financeira selecionada — ${preco.erro}` }); continue }
 
+      // CÂMBIO obrigatório em moeda estrangeira: sem cotação, NÃO lança (evita valor sem
+      // conversão). Checado ANTES de criar o marcador de idempotência (não deixa órfão).
+      const fx = await fxParaBRL(preco.moeda, fxCache)
+      if (fx == null) { skipped.push({ name: titulo, reason: `Sem cotação de câmbio ${preco.moeda}→BRL. Cadastre a cotação para lançar (não foi lançado com conversão 1:1).` }); continue }
+
       const akey = `${processoId}::${phaseKey}::automation::${r.id}::${isRec ? 'VENDA' : 'CUSTO'}`
       let art
       try {
@@ -488,7 +497,6 @@ export async function executarFinanceirasNaFaseV2(
         erros.push(`${titulo}: ${(e as Error)?.message ?? 'erro'}`); continue
       }
       try {
-        const fx = await fxParaBRL(preco.moeda, fxCache)
         const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId!, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', phaseKey, chaveIdempotencia: akey, contexto: { fonte: 'automation_v2', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap, mestre: mestreNome } }
         const id = isRec
           ? await criarReceita(processoId, descricaoLanc, preco.valor, preco.moeda, fx, false, fz)
