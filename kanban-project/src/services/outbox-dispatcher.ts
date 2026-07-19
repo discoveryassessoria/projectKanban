@@ -49,11 +49,11 @@ async function aplicarPhaseEntered(payload: PhaseEnteredPayload, correlationId: 
   // Tabela de Preços e o lançamento cai no Financeiro do Processo. Idempotente
   // (MotorArtefato). Isolado: uma falha aqui não impede a convergência das tarefas.
   if (payload.processId && payload.newPhaseKey) {
-    try {
-      await executarFinanceirasNaFaseV2(payload.processId, payload.newPhaseKey)
-    } catch (e) {
-      console.error("[outbox] automações financeiras da fase falharam (tarefas seguem):", e)
-    }
+    // NÃO engolir: se algum lançamento falhou (erro transitório), PROPAGAR para o
+    // processarOutbox marcar o evento PENDENTE e reprocessar (idempotente via MotorArtefato).
+    // Engolir marcaria ENVIADO e perderia a Receita/Custo silenciosamente.
+    const r = await executarFinanceirasNaFaseV2(payload.processId, payload.newPhaseKey)
+    if (r.erros.length) throw new Error(`automações financeiras da fase falharam: ${r.erros.join(" ; ")}`)
   }
   return criadas
 }

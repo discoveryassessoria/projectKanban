@@ -160,10 +160,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 })
     }
 
+    // PhaseAutomationRule.configItemId é escalar solto (sem relation) → contar à parte.
+    const autoFin = await prisma.phaseAutomationRule.count({ where: { configItemId: id, arquivado: false } })
     const c = atual._count
     const vinculos: string[] = []
     if (c.precosConfig > 0) vinculos.push(`${c.precosConfig} preço(s)`)
     if (c.econRulesCusto + c.econRulesReceita > 0) vinculos.push(`${c.econRulesCusto + c.econRulesReceita} regra(s) de aplicabilidade econômica`)
+    if (autoFin > 0) vinculos.push(`${autoFin} automação(ões) financeira(s) de fase`)
     if (c.servicos > 0) vinculos.push(`${c.servicos} vínculo(s) de serviço`)
 
     // Sem NENHUM uso/histórico → exclusão física de verdade.

@@ -49,7 +49,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Regra financeira não aceita valor, moeda, item por código ou tipo financeiro — vêm da Configuração Financeira e da Tabela de Preços.' }, { status: 400 })
     }
     let vinculoData: { configItemId?: number; aplicacaoFinanceira?: string; params?: Prisma.InputJsonValue; financialType?: null } | null = null
-    if (ehFinanceira && querVinculo) {
+    // Toda regra financeira (nova, editada OU que VIRE financeira) precisa validar
+    // config + aplicação + PREÇO na Tabela. Sem isto, um PUT trocando kind→financial
+    // sem configItemId passava batido (bypass da trava SEM_PRECO).
+    if (ehFinanceira) {
       const configItemId = body.configItemId ? Number(body.configItemId) : (atual.configItemId ?? null)
       const aplicacao = body.aplicacaoFinanceira ? String(body.aplicacaoFinanceira).toUpperCase() : atual.aplicacaoFinanceira
       if (!configItemId) return NextResponse.json({ error: 'Selecione a Configuração Financeira.' }, { status: 400 })
