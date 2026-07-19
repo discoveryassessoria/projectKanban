@@ -25,7 +25,7 @@ async function main() {
 
   const contagens = {
     produtoFinanceiro: dados.produtos.length, itemCatalogo: dados.itens.length, tabelaValor: dados.precos.length,
-    honorario: dados.honorarios.length, phaseEconomicRule: dados.econRules.length, phaseTriggerRule: dados.triggerRules.length,
+    honorario: dados.honorarios.length, phaseEconomicRule: dados.econRules.length,
     tipoDocumentoCadastro: dados.tiposDoc.length, servicoProduto: dados.servicos.length, tipoServico: dados.tiposServico.length,
   }
 

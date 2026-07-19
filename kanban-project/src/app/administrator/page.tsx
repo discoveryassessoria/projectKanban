@@ -118,7 +118,6 @@ const ModelosAutomacaoTab = dynamic(() => import("@/src/components/gerenciamento
 const ModosInternosFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModosInternosFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PhaseWorkflowsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseWorkflowsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PhaseAutomationsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseAutomationsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const PhaseTriggerRulesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseTriggerRulesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const DepartamentosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DepartamentosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const TiposDocumentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TiposDocumentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CategoriasDocumentaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CategoriasDocumentaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -203,7 +202,6 @@ const TELAS: Record<string, React.ComponentType> = {
   commrules: RegrasComissaoTab,
   discrules: RegrasDescontoTab,
   pricing: AplicabilidadeEconomicaTab,
-  phasemap: PhaseTriggerRulesTab,
   // ARQUITETURA NOVA — telas de Regras/Modelos de Tarefa Transversal REMOVIDAS da
   // interface (criavam tarefas nativas da operação; agora exclusivo do Workflow
   // Interno). Componentes e dados preservados, apenas inacessíveis pela navegação.

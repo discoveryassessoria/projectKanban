@@ -25,7 +25,6 @@ export interface DadosFinanceiros {
   precos: { id: number; name: string; valor: number; moeda: string; natureza: string | null; itemCatalogoId: number | null; arquivado: boolean }[]
   honorarios: { id: number; code: string; name: string; servico: string | null; valorPadrao: number | null; momentoCobranca: string; ativo: boolean }[]
   econRules: { id: number; documentTypeCode: string | null; custoProdutoCode: string | null; receitaProdutoCode: string | null; componentName: string; componentKey: string }[]
-  triggerRules: { id: number; itemCode: string; financialItemId: number | null; name: string; active: boolean }[]
   tiposDoc: { id: number; code: string | null; name: string; legacyEnumKey: string | null; itemCatalogoId: number | null }[]
   servicos: { id: number; code: string; name: string; itemCatalogoId: number | null }[]
   tiposServico: { id: number; nome: string; itemCatalogoId: number | null }[]
@@ -127,10 +126,6 @@ export function analisarFinanceiro(d: DadosFinanceiros): Achado[] {
   out.push(achado('econ_produtoCode_quebrado', 'PhaseEconomicRule custo/receitaProdutoCode sem ProdutoFinanceiro', true,
     d.econRules.filter((r) => (r.custoProdutoCode && !codigosProduto.has(r.custoProdutoCode)) || (r.receitaProdutoCode && !codigosProduto.has(r.receitaProdutoCode)))
       .map((r) => ({ id: r.id, custo: r.custoProdutoCode, receita: r.receitaProdutoCode }))))
-  out.push(achado('trigger_itemCode_quebrado', 'PhaseTriggerRule.itemCode sem ProdutoFinanceiro', true,
-    d.triggerRules.filter((t) => t.itemCode && !codigosProduto.has(t.itemCode)).map((t) => ({ id: t.id, itemCode: t.itemCode, financialItemId: t.financialItemId, name: t.name }))))
-  out.push(achado('trigger_sem_financialItemId', 'PhaseTriggerRule com itemCode mas financialItemId nulo (vínculo só por texto)', true,
-    d.triggerRules.filter((t) => t.itemCode && t.financialItemId == null).map((t) => ({ id: t.id, itemCode: t.itemCode, name: t.name }))))
 
   return out
 }

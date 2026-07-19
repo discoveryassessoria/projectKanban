@@ -1794,7 +1794,6 @@ model ProdutoFinanceiro {
   // F2 — back-relations: aplicabilidade/automação apontam para esta config por FK
   econRulesCusto     PhaseEconomicRule[]        @relation("EconCustoConfig")
   econRulesReceita   PhaseEconomicRule[]        @relation("EconReceitaConfig")
-  triggerRules       PhaseTriggerRule[]         @relation("TriggerConfig")
   precosConfig       TabelaValor[]              @relation("PrecoConfig")
 
   // M-UNIFICA — anti-duplicação: UMA configuração por item mestre (pivô).
@@ -2296,32 +2295,6 @@ model PhaseAutomationRule {
   @@index([tipoProcessoId])
   @@index([phaseKey])
   @@index([kind])
-  @@index([configItemId])
-}
-
-model PhaseTriggerRule {
-  id                       Int      @id @default(autoincrement())
-  itemCode                 String   @db.VarChar(60) // → ProdutoFinanceiro.codigo (solto)
-  financialItemId          Int? // → ProdutoFinanceiro.id (solto)
-  name                     String   @db.VarChar(200) // "<item> · <fase>" (calculado)
-  phaseKey                 String   @db.VarChar(60)
-  phaseEvent               String   @default("entered") @db.VarChar(20) // entered | completed | reopened | blocked
-  entryType                String   @default("revenue") @db.VarChar(20) // revenue | cost
-  automatic                Boolean  @default(true) // Sim | Não (só sugestão)
-  requiresContractSigned   Boolean  @default(false)
-  requiresProposalApproved Boolean  @default(false)
-  allowRepeat              Boolean  @default(false)
-  active                   Boolean  @default(true)
-  arquivado                Boolean  @default(false)
-  criadoEm                 DateTime @default(now())
-  atualizadoEm             DateTime @updatedAt
-
-  // F2 — FK real p/ a Configuração Financeira (dual-read com itemCode/financialItemId)
-  configItemId Int?
-  configItem   ProdutoFinanceiro? @relation("TriggerConfig", fields: [configItemId], references: [id])
-
-  @@index([phaseKey])
-  @@index([itemCode])
   @@index([configItemId])
 }
 

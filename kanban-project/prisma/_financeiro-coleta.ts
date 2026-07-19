@@ -12,7 +12,7 @@ const num = (v: unknown): number | null => (v == null ? null : Number(v))
 
 /** Lê tudo que as checagens precisam. Apenas findMany — nunca escreve. */
 export async function coletarDadosFinanceiros(prisma: PrismaClient): Promise<DadosFinanceiros> {
-  const [produtos, itens, precos, honorarios, econRules, triggerRules, tiposDoc, servicos, tiposServico] =
+  const [produtos, itens, precos, honorarios, econRules, tiposDoc, servicos, tiposServico] =
     await Promise.all([
       prisma.produtoFinanceiro.findMany({ select: { id: true, codigo: true, nome: true, naturezaFinanceira: true, itemCatalogoId: true, valorPadrao: true, ativo: true } }),
       prisma.itemCatalogo.findMany({
@@ -22,7 +22,6 @@ export async function coletarDadosFinanceiros(prisma: PrismaClient): Promise<Dad
       prisma.tabelaValor.findMany({ select: { id: true, name: true, valor: true, moeda: true, natureza: true, itemCatalogoId: true, arquivado: true } }),
       prisma.honorario.findMany({ select: { id: true, code: true, name: true, servico: true, valorPadrao: true, momentoCobranca: true, ativo: true } }),
       prisma.phaseEconomicRule.findMany({ select: { id: true, documentTypeCode: true, custoProdutoCode: true, receitaProdutoCode: true, componentName: true, componentKey: true } }),
-      prisma.phaseTriggerRule.findMany({ select: { id: true, itemCode: true, financialItemId: true, name: true, active: true } }),
       prisma.tipoDocumentoCadastro.findMany({ select: { id: true, code: true, name: true, legacyEnumKey: true, itemCatalogoId: true } }),
       prisma.servicoProduto.findMany({ select: { id: true, code: true, name: true, itemCatalogoId: true } }),
       prisma.tipoServico.findMany({ select: { id: true, nome: true, itemCatalogoId: true } }),
@@ -34,7 +33,6 @@ export async function coletarDadosFinanceiros(prisma: PrismaClient): Promise<Dad
     precos: precos.map((v) => ({ ...v, valor: Number(v.valor) })),
     honorarios: honorarios.map((h) => ({ ...h, valorPadrao: num(h.valorPadrao) })),
     econRules,
-    triggerRules,
     tiposDoc,
     servicos,
     tiposServico,

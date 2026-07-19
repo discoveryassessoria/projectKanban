@@ -151,7 +151,6 @@ export async function DELETE(
             precosConfig: true,      // TabelaValor (preços) — @relation("PrecoConfig")
             econRulesCusto: true,    // PhaseEconomicRule (custo) — @relation("EconCustoConfig")
             econRulesReceita: true,  // PhaseEconomicRule (receita) — @relation("EconReceitaConfig")
-            triggerRules: true,      // PhaseTriggerRule — @relation("TriggerConfig")
             servicos: true,          // ServicoProduto (m2n) — @relation("ServicoProdutoItens")
           },
         },
@@ -165,7 +164,6 @@ export async function DELETE(
     const vinculos: string[] = []
     if (c.precosConfig > 0) vinculos.push(`${c.precosConfig} preço(s)`)
     if (c.econRulesCusto + c.econRulesReceita > 0) vinculos.push(`${c.econRulesCusto + c.econRulesReceita} regra(s) de aplicabilidade econômica`)
-    if (c.triggerRules > 0) vinculos.push(`${c.triggerRules} regra(s) de automação de fase`)
     if (c.servicos > 0) vinculos.push(`${c.servicos} vínculo(s) de serviço`)
 
     // Sem NENHUM uso/histórico → exclusão física de verdade.

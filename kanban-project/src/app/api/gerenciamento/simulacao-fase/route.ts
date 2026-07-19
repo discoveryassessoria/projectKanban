@@ -66,12 +66,7 @@ export async function POST(request: NextRequest) {
     const event = String(b.event || 'entered')
     if (!tipoProcessoId || !phaseKey) return NextResponse.json({ error: 'Escolha o processo e a fase.' }, { status: 400 })
 
-    const [autoRules, triggerRules, produtos] = await Promise.all([
-      prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey } }),
-      prisma.phaseTriggerRule.findMany({ where: { phaseKey, arquivado: false } }),
-      prisma.produtoFinanceiro.findMany({ where: { ativo: true }, select: { codigo: true, nome: true, valorPadrao: true, moedaPadrao: true } }),
-    ])
-    const prodByCode = new Map(produtos.map(p => [p.codigo, p]))
+    const autoRules = await prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey } })
 
     const receitas: any[] = []
     const custos: any[] = []
@@ -80,23 +75,7 @@ export async function POST(request: NextRequest) {
     const ignoradas: any[] = []
     const duplicidades: any[] = [] // sempre vazio na simulação (sem processo real)
 
-    // ---- 1. DISPAROS FINANCEIROS por fase (phasemap) — globais por fase+evento
-    for (const t of triggerRules) {
-      if (t.phaseEvent !== event) { ignoradas.push({ name: t.name, reason: `gatilho não corresponde (dispara em "${t.phaseEvent}")` }); continue }
-      if (!t.active) { ignoradas.push({ name: t.name, reason: 'inativa' }); continue }
-      const prod = prodByCode.get(t.itemCode)
-      const amount = prod?.valorPadrao != null ? Number(prod.valorPadrao) : null
-      const currency = prod?.moedaPadrao || 'EUR'
-      const nome = prod?.nome || t.itemCode
-      if (amount == null) { ignoradas.push({ name: nome, reason: 'sem valor configurado (defina no Catálogo Financeiro / Tabela de Valores)' }); continue }
-      const cond: string[] = []
-      if (t.requiresContractSigned) cond.push('exige contrato assinado')
-      if (t.requiresProposalApproved) cond.push('exige proposta aprovada')
-      const row = { name: nome, amount, currency, source: 'catálogo', condicional: cond.length > 0, condicaoNota: cond.join(' · ') || null, origem: 'disparo' }
-      if (t.entryType === 'cost') custos.push(row); else receitas.push(row)
-    }
-
-    // ---- 2. AUTOMAÇÕES POR FASE (opauto) — por processo+fase
+    // ---- AUTOMAÇÕES POR FASE (opauto) — por processo+fase
     const wantTrigger = opautoTriggerFor(event)
     for (const r of autoRules) {
       if (!r.active || r.arquivado) { ignoradas.push({ name: r.name, reason: r.arquivado ? 'arquivada' : 'inativa' }); continue }
@@ -105,10 +84,14 @@ export async function POST(request: NextRequest) {
       const condicaoNota = condicional ? `${condCount(r.conditions)} condição(ões) — avaliadas na execução` : null
 
       if (r.kind === 'financial') {
-        const amount = pnum(r.params, 'amount') ?? (r.financialType && prodByCode.get(pstr(r.params, 'financialItemCode') || '')?.valorPadrao != null ? Number(prodByCode.get(pstr(r.params, 'financialItemCode') || '')!.valorPadrao) : 0)
-        const currency = pstr(r.params, 'currency') || 'EUR'
-        const row = { name: r.name, amount, currency, source: 'automação', condicional, condicaoNota, origem: 'automacao' }
-        if (r.financialType === 'revenue' || r.financialType === 'honorarium') receitas.push(row); else custos.push(row)
+        // Fluxo novo: sem valor/moeda na automação — o preço vem da Tabela de Preços na
+        // execução (a simulação não resolve preço). Direção = Aplicação financeira.
+        const ap = r.aplicacaoFinanceira
+        if (!r.configItemId || !ap) { ignoradas.push({ name: r.name, reason: 'regra financeira sem Configuração Financeira/Aplicação (legado descontinuado)' }); continue }
+        const row = { name: r.name, amount: null, currency: null, source: 'automação', condicional, condicaoNota, origem: 'automacao', nota: 'preço da Tabela de Preços na execução' }
+        if (ap === 'CUSTO') custos.push(row)
+        else if (ap === 'RECEITA') receitas.push(row)
+        else { receitas.push(row); custos.push({ ...row }) } // AMBOS
       } else if (r.kind === 'alert') {
         alertas.push({ name: r.name, condicional, condicaoNota })
       } else if (r.kind === 'phase_advance') {

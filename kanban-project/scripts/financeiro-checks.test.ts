@@ -18,7 +18,7 @@ const total = (a: Achado[], chave: string) => a.find((x) => x.chave === chave)?.
 const gate = (a: Achado[], chave: string) => a.find((x) => x.chave === chave)?.gate ?? false
 
 function vazio(): DadosFinanceiros {
-  return { produtos: [], itens: [], precos: [], honorarios: [], econRules: [], triggerRules: [], tiposDoc: [], servicos: [], tiposServico: [] }
+  return { produtos: [], itens: [], precos: [], honorarios: [], econRules: [], tiposDoc: [], servicos: [], tiposServico: [] }
 }
 
 console.log('_financeiro-checks — fixtures\n')
@@ -42,10 +42,6 @@ const d: DadosFinanceiros = {
   ],
   honorarios: [{ id: 1, code: 'HON1', name: 'Honorário base', servico: 'Tradução', valorPadrao: 500, momentoCobranca: 'contract_signed', ativo: true }],
   econRules: [{ id: 1, documentTypeCode: 'INEXISTE', custoProdutoCode: 'CIT_CUSTO', receitaProdutoCode: 'NOPE', componentName: 'Certidão IT', componentKey: 'CIT' }],
-  triggerRules: [
-    { id: 1, itemCode: 'GHOST', financialItemId: null, name: 'g', active: true },
-    { id: 2, itemCode: 'CIT_CUSTO', financialItemId: 1, name: 'ok', active: true },
-  ],
   tiposDoc: [{ id: 1, code: 'IT-NAS', name: 'Nascimento', legacyEnumKey: 'CERTIDAO_NASCIMENTO', itemCatalogoId: 1 }],
   servicos: [{ id: 1, code: 'SRV', name: 'Serviço', itemCatalogoId: null }],
   tiposServico: [{ id: 1, nome: 'Trad', itemCatalogoId: null }],
@@ -67,8 +63,6 @@ ok(total(a, 'servico_sem_item') === 1, 'serviço sem item')
 ok(total(a, 'tiposervico_sem_item') === 1, 'tipoServico sem item')
 ok(total(a, 'econ_documentTypeCode_quebrado') === 1 && gate(a, 'econ_documentTypeCode_quebrado'), 'documentTypeCode quebrado (GATE)')
 ok(total(a, 'econ_produtoCode_quebrado') === 1 && gate(a, 'econ_produtoCode_quebrado'), 'produtoCode quebrado NOPE (GATE)')
-ok(total(a, 'trigger_itemCode_quebrado') === 1 && gate(a, 'trigger_itemCode_quebrado'), 'trigger itemCode GHOST quebrado (GATE)')
-ok(total(a, 'trigger_sem_financialItemId') === 1, 'trigger sem financialItemId')
 
 ok(violacoesDeGate(a).length >= 6, 'violacoesDeGate agrega os gates > 0')
 

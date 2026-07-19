@@ -29,9 +29,8 @@ async function main() {
   const desconhecidas = contas.filter((c) => c.processoId != null && c.custoOrigemId == null)
 
   // 2) §3 — regras existentes com natureza incompatível (read-only).
-  const [econ, trig, configs] = await Promise.all([
+  const [econ, configs] = await Promise.all([
     prisma.phaseEconomicRule.findMany({ select: { id: true, componentName: true, custoConfigId: true, receitaConfigId: true } }),
-    prisma.phaseTriggerRule.findMany({ select: { id: true, name: true, entryType: true, configItemId: true } }),
     prisma.produtoFinanceiro.findMany({ select: { id: true, nome: true, naturezaFin: true, possuiCusto: true, possuiReceita: true, valorCustoPadrao: true, valorReceitaPadrao: true } }),
   ])
   const cfgById = new Map(configs.map((c) => [c.id, c]))
@@ -45,11 +44,6 @@ async function main() {
   for (const e of econ) {
     if (e.custoConfigId != null && !admiteCusto(natDe(e.custoConfigId))) regrasIncompat.push(`PhaseEconomicRule#${e.id} "${e.componentName}" gera CUSTO em config ${e.custoConfigId} (${natDe(e.custoConfigId)})`)
     if (e.receitaConfigId != null && !admiteVenda(natDe(e.receitaConfigId))) regrasIncompat.push(`PhaseEconomicRule#${e.id} "${e.componentName}" gera RECEITA em config ${e.receitaConfigId} (${natDe(e.receitaConfigId)})`)
-  }
-  for (const t of trig) {
-    const alvoCusto = t.entryType === 'cost'
-    const nat = natDe(t.configItemId)
-    if (t.configItemId != null && ((alvoCusto && !admiteCusto(nat)) || (!alvoCusto && !admiteVenda(nat)))) regrasIncompat.push(`PhaseTriggerRule#${t.id} "${t.name}" (${t.entryType}) incompatível com config ${t.configItemId} (${nat})`)
   }
 
   console.log(`\n=== BACKFILL ORIGEM FINANCEIRO ${EXECUTE ? '(EXECUTE)' : '(DRY-RUN)'} ===`)

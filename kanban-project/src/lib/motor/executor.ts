@@ -256,12 +256,11 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
   // kind=task existentes só para REPORTá-las como neutralizadas (transparência na
   // simulação/histórico) — mas nenhuma Tarefa é criada aqui. Efeitos adicionais
   // (financeiro/evento/protocolo/trigger) seguem funcionando.
-  const [taskRules, finAutoRules, eventRules, protocolRules, triggerRules] = await Promise.all([
+  const [taskRules, finAutoRules, eventRules, protocolRules] = await Promise.all([
     prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'task', active: true, arquivado: false } }),
     prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'financial', active: true, arquivado: false } }),
     prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'event', active: true, arquivado: false } }),
     prisma.phaseAutomationRule.findMany({ where: { tipoProcessoId, phaseKey, kind: 'protocol', active: true, arquivado: false } }),
-    prisma.phaseTriggerRule.findMany({ where: { phaseKey, arquivado: false } }),
   ])
   const fxCache = new Map<string, number>()
 
@@ -295,13 +294,6 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
   // propósito; mantidos para minimizar churn até a nova arquitetura.)
   for (const rule of taskRules) {
     skipped.push({ name: rule.name, reason: 'automação de tarefa NEUTRALIZADA — tarefas obrigatórias da fase são exclusivas do Workflow Interno' })
-  }
-
-  // FINANCEIRO LEGADO — Regras de Disparo (PhaseTriggerRule, item por CÓDIGO) foram
-  // DESCONTINUADAS: substituídas por automações financeiras (PhaseAutomationRule) com
-  // vínculo estrutural (configItemId) + preço da Tabela de Preços. Não executam mais.
-  for (const t of triggerRules) {
-    skipped.push({ name: t.name, reason: 'Regra de Disparo (formato legado por código) descontinuada — use automação financeira com Configuração Financeira.' })
   }
 
   // FINANCEIRO — Automações kind=financial

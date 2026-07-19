@@ -56,11 +56,7 @@ async function main() {
         tipoDocumentoId: doc.id, custoConfigId: cfg.id, receitaConfigId: cfg.id } })
       ok(econ.custoConfigId === cfg.id && econ.receitaConfigId === cfg.id, '(6) Aplicabilidade seleciona a config unificada por FK (custo e receita)')
 
-      // (7) Automação existente selecionando a configuração por FK
-      const trig = await tx.phaseTriggerRule.create({ data: {
-        itemCode: cfg.codigo, financialItemId: cfg.id, configItemId: cfg.id,
-        name: 'trigger teste', phaseKey: 'emissao_documental', entryType: 'cost' } })
-      ok(trig.configItemId === cfg.id, '(7) Automação (PhaseTriggerRule) referencia config por FK')
+      // (7) [REMOVIDO] PhaseTriggerRule (automação legada por código) foi descontinuada.
 
       // (8) RESOLVER preço — loader ligado à transação
       const carregar: CarregadorLinhasPreco = async (itemId, nat) => {
