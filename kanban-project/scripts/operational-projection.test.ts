@@ -152,5 +152,46 @@ console.log("\n8) SEM_FASE — processo sem fase ativa")
 }
 
 // ============================================================
+// BLINDAGEM — invariante do sistema: 100% ⟺ pode avançar. Uma fase BLOQUEADA jamais
+// pode exibir 100% (senão o card diz "concluído" e não anda). Nenhuma fase/card/processo.
+console.log("\n9) BLINDAGEM — fase bloqueada NUNCA exibe 100% (mesmo com tudo 'feito')")
+{
+  // Necessidade localizada (passo concluído) MAS sem requerente → bloqueio oficial.
+  const necessidades: NecessidadeData[] = [{ id: 10, status: "ATENDIDA", obrigatoria: true, ehCertidao: true }]
+  const steps: GateStepData[] = [step({ ordem: 1, status: "CONCLUIDO", stepKey: "localizar_registro", necessidadeId: 10 })]
+  const p = buildOperationalProjection(base("NECESSIDADE", { necessidades, steps, requerentesCount: 0 }))
+  ok(p.status.blocked === true, "sem requerente → bloqueado (GENEALOGIA_SEM_REQUERENTE)")
+  ok(p.progress.percentage < 100, `bloqueado NUNCA 100% (foi ${p.progress.percentage}%)`)
+  ok(p.status.operationalState === "BLOQUEADA", "estado BLOQUEADA")
+}
+console.log("\n10) BLINDAGEM — fase completa e SEM bloqueio exibe exatamente 100% e pode avançar")
+{
+  const necessidades: NecessidadeData[] = [{ id: 10, status: "ATENDIDA", obrigatoria: true, ehCertidao: true }]
+  const steps: GateStepData[] = [step({ ordem: 1, status: "CONCLUIDO", stepKey: "localizar_registro", necessidadeId: 10 })]
+  const p = buildOperationalProjection(base("NECESSIDADE", { necessidades, steps, requerentesCount: 1, hasArvore: true }))
+  ok(p.status.blocked === false, "com requerente + árvore → não bloqueado")
+  ok(p.progress.percentage === 100, `completo+não bloqueado → 100% (foi ${p.progress.percentage}%)`)
+  ok(p.status.canAdvance === true, "pode avançar")
+}
+console.log("\n11) BLINDAGEM — INVARIANTE em vários cenários: (100% ⟺ canAdvance) e (blocked ⇒ <100)")
+{
+  const cenarios: ProjectionInput[] = [
+    base("NECESSIDADE", { requerentesCount: 0, necessidades: [{ id: 1, status: "ATENDIDA", obrigatoria: true, ehCertidao: true }], steps: [step({ ordem: 1, status: "CONCLUIDO", necessidadeId: 1 })] }),
+    base("NECESSIDADE", { requerentesCount: 1, necessidades: [{ id: 1, status: "ATENDIDA", obrigatoria: true, ehCertidao: true }], steps: [step({ ordem: 1, status: "CONCLUIDO", necessidadeId: 1 })] }),
+    base("PROCESSO", { steps: [step({ ordem: 1, status: "PENDENTE" })] }),
+    base("PROCESSO", { steps: [step({ ordem: 1, status: "CONCLUIDO" })] }),
+    base("NECESSIDADE", { hasArvore: false, necessidades: [{ id: 1, status: "PENDENTE", obrigatoria: true, ehCertidao: true }], steps: [] }),
+  ]
+  let invOk = true
+  for (const c of cenarios) {
+    const p = buildOperationalProjection(c)
+    // 100% ⟺ pode avançar; e bloqueado ⇒ nunca 100.
+    if ((p.progress.percentage >= 100) !== p.status.canAdvance) invOk = false
+    if (p.status.blocked && p.progress.percentage >= 100) invOk = false
+  }
+  ok(invOk, "invariante (100% ⟺ canAdvance) e (blocked ⇒ <100) vale em TODOS os cenários")
+}
+
+// ============================================================
 console.log(`\n${failed === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passed} ok, ${failed} falhas`)
 if (failed > 0) { console.log("Violações:", viol.join("; ")); process.exit(1) }

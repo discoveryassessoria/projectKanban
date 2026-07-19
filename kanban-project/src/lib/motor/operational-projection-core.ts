@@ -331,14 +331,16 @@ function computeProgress(input: ProjectionInput, blocked: boolean): ProgressResu
     nextAction = proximaAcaoDe(input.faseCode, gateSteps)
   }
 
-  // Progresso = proporção das OBRIGATÓRIAS concluídas (mesma fonte do BlockingEngine/
-  // PhaseAdvance). SEM reserva de 1% / cap em 99: se todas as obrigatórias estão feitas,
-  // é 100% (o BlockingEngine, que usa os MESMOS itens, não bloqueia nesse caso). Se há
-  // pendência real, alguma obrigatória está incompleta → proporção já cai abaixo de 100.
+  // Progresso a partir da MESMA fonte oficial (computeGate): `blocked` já inclui as regras
+  // do BlockingEngine (ex.: GENEALOGIA_SEM_REQUERENTE). Regra definitiva:
+  //  • bloqueado (o BlockingEngine NÃO permite concluir) → NUNCA 100% (teto 99);
+  //  • não bloqueado + todas as obrigatórias feitas → EXATAMENTE 100% (sem reserva de 1%);
+  //  • parcial → proporcional, teto 99 (nunca arredonda p/ 100 com item incompleto).
+  const raw = totalWeight > 0 ? Math.round((completedWeight / totalWeight) * 100) : (blocked ? 0 : 100)
   let percentage: number
-  if (totalWeight <= 0) percentage = blocked ? 0 : 100
-  else if (completedWeight >= totalWeight) percentage = 100 // logicamente completo → nunca 99 por arredondamento
-  else percentage = Math.min(99, Math.round((completedWeight / totalWeight) * 100)) // parcial nunca chega a 100 por arredondamento
+  if (blocked) percentage = Math.min(99, raw)
+  else if (totalWeight <= 0 || completedWeight >= totalWeight) percentage = 100
+  else percentage = Math.min(99, raw)
 
   return { scope, completedWeight, totalWeight, percentage, required, completed, nextAction }
 }
@@ -355,6 +357,14 @@ export function buildOperationalProjection(input: ProjectionInput): OperationalP
   const canAdvance = !blocked
 
   const prog = computeProgress(input, blocked)
+
+  // ── BLINDAGEM (invariante do sistema) ──────────────────────────────────────
+  // 100% ⟺ o BlockingEngine PERMITE avançar. Logo, uma fase BLOQUEADA jamais pode
+  // exibir 100% (senão o card mostra "concluído" mas não avança). Trava defensiva
+  // de runtime: mesmo que computeProgress regrida, aqui garantimos ≤ 99% se bloqueado.
+  // (`progress` e `advance` derivam do MESMO computeGate → nunca divergem.)
+  if (blocked && prog.percentage >= 100) prog.percentage = 99
+  if (!blocked && prog.completedWeight >= prog.totalWeight && prog.totalWeight > 0) prog.percentage = 100
 
   const hasPhase = input.processoExists && !!input.faseMacroKey
   const activePhase = hasPhase
