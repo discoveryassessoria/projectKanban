@@ -474,9 +474,14 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
     }
   }
 
+  // CICLO ALVO da fase destino = próximo ciclo REAL (não 1 fixo). Após um returnPhase que
+  // criou um novo ciclo, a fase destino pode já ter uma instância ciclo-1 CONCLUÍDA; usar
+  // ciclo 1 reusaria a instância morta (fase vira no-op que passa sozinha). proximoCiclo
+  // devolve 1 na 1ª passagem e o próximo ciclo após reabertura/retorno — igual a reopen/return.
+  const cicloAlvo = await proximoCiclo(processoId, proxima)
   return executarPlano({
     operacao: "AVANCAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
-    faseDestino: proxima, novaFaseAtualKey: proxima, cicloAlvo: 1, origemInstancia: "MOTOR",
+    faseDestino: proxima, novaFaseAtualKey: proxima, cicloAlvo, origemInstancia: "MOTOR",
     encerramento: "CONCLUIR", eventoFaseTipo: "FASE_AVANCADA", correlationId,
     causationId: ctx.causationId ?? null, solicitadoPorId: ctx.solicitadoPorId, forcado: false,
     origemLog: ctx.origem ?? "advance", regrasAvaliadas: snap.regrasAvaliadas,
@@ -506,9 +511,12 @@ export async function forceAdvance(processoId: number, input: ForceInput): Promi
   // pendências são apenas SNAPSHOT para auditoria (ignoradas no forçado)
   const snap = await snapshotPendencias(processoId, c.processo.faseAtual, correlationId)
 
+  // ciclo alvo = próximo ciclo REAL da fase destino (ver advance) — evita reusar instância
+  // CONCLUÍDA de ciclo anterior após retorno de fase.
+  const cicloAlvo = await proximoCiclo(processoId, proxima)
   return executarPlano({
     operacao: "FORCAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
-    faseDestino: proxima, novaFaseAtualKey: proxima, cicloAlvo: 1, origemInstancia: "MOTOR",
+    faseDestino: proxima, novaFaseAtualKey: proxima, cicloAlvo, origemInstancia: "MOTOR",
     encerramento: "CONCLUIR", eventoFaseTipo: "FASE_AVANCADA_FORCADO", correlationId,
     causationId: input.causationId ?? null, solicitadoPorId: input.solicitadoPorId, forcado: true,
     justificativa: input.justificativa, motivoCodigo: input.motivoCodigo,

@@ -675,7 +675,10 @@ export async function GET(
       const necs = necsRaw.filter((n) => certItens.has(n.itemCatalogoId) && n.status !== "DISPENSADA")
       const stepsLR = await prisma.phaseWorkflowStepInstance.findMany({
         // consulta de fase passada ⇒ escopa à instância indicada (dados vivos daquele ciclo).
-        where: { processoId: id, faseMacroKey: "genealogia", stepKey: "localizar_registro", ...(faseContexto?.workflowInstanceId != null ? { workflowInstanceId: faseContexto.workflowInstanceId } : {}) },
+        // Exclui SUPERSEDIDO/CANCELADO e ordena por ciclo/updatedAt desc → o dedup first-wins
+        // pega o passo MAIS RECENTE de cada necessidade (genealogia reaberta não mostra ciclo velho).
+        where: { processoId: id, faseMacroKey: "genealogia", stepKey: "localizar_registro", status: { notIn: ["SUPERSEDIDO", "CANCELADO"] }, ...(faseContexto?.workflowInstanceId != null ? { workflowInstanceId: faseContexto.workflowInstanceId } : {}) },
+        orderBy: [{ ciclo: "desc" }, { updatedAt: "desc" }],
         select: { id: true, necessidadeId: true, status: true, obrigatorio: true, documentoId: true, prazo: true, responsavelId: true, updatedAt: true, motivo: true },
       })
       // responsavelId é ref solta a Usuario (sem relation) → resolve o nome em lote
