@@ -24,6 +24,7 @@ import { calcularPendencias } from "@/src/lib/motor/blocking-engine"
 import type { BlockingIssue } from "@/src/lib/motor/blocking-helpers"
 import { instanciarWorkflowDaFase, type OrigemInstanciaStr } from "@/src/services/phase-workflow"
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
+import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import {
   type AdvanceOperacao,
   type AdvanceFailureCode,
@@ -347,6 +348,13 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
       timeout: 20000,
       maxWait: 15000,
     })
+    // Drena o phase.entered recém-emitido: os EFEITOS ADICIONAIS da nova fase (automações
+    // FINANCEIRAS → lançamentos) rodam ao AVANÇAR, não só na criação do processo. Best-effort:
+    // uma falha aqui não desfaz o avanço (o evento fica PENDENTE e é reprocessável).
+    if (out.success && out.changed) {
+      try { await processarOutbox({ tipos: ["phase.entered"], limite: 20 }) }
+      catch (e) { console.error("[advance] drenar outbox phase.entered falhou (avanço ok):", e) }
+    }
     return out
   } catch (e) {
     const err = e as { __conflito?: boolean; __instFail?: string; code?: string }
