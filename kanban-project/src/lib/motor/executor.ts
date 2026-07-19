@@ -275,12 +275,19 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
   const errors: string[] = []
 
   async function fazer(akey: string, targetTable: string, ruleKind: string, ruleSource: string, ruleId: number, descricao: string, detalhes: Prisma.InputJsonValue, criar: () => Promise<number>, onCreated: (id: number) => void) {
+    const artefatoData = { processoId, tipoProcessoId, phaseKey, event, ruleKind, ruleSource, ruleId, automaticKey: akey, targetTable, targetId: null as number | null, status: 'active', descricao: descricao.slice(0, 300), detalhes }
     let art
     try {
-      art = await prisma.motorArtefato.create({ data: { processoId, tipoProcessoId, phaseKey, event, ruleKind, ruleSource, ruleId, automaticKey: akey, targetTable, targetId: null, status: 'active', descricao: descricao.slice(0, 300), detalhes } })
+      art = await prisma.motorArtefato.create({ data: artefatoData })
     } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') { skipped.push({ name: descricao, reason: 'já criado antes (idempotência)' }); return }
-      errors.push(`${descricao}: ${(e as Error)?.message || 'erro'}`); return
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        // Órfão de crash (targetId null) → apaga e refaz; efeito já criado (targetId!=null) → pula.
+        const existente = await prisma.motorArtefato.findUnique({ where: { automaticKey: akey }, select: { id: true, targetId: true } })
+        if (!existente || existente.targetId != null) { skipped.push({ name: descricao, reason: 'já criado antes (idempotência)' }); return }
+        await prisma.motorArtefato.delete({ where: { id: existente.id } }).catch(() => {})
+        try { art = await prisma.motorArtefato.create({ data: artefatoData }) }
+        catch (e2) { errors.push(`${descricao}: ${(e2 as Error)?.message || 'erro'}`); return }
+      } else { errors.push(`${descricao}: ${(e as Error)?.message || 'erro'}`); return }
     }
     try {
       const id = await criar()
@@ -485,16 +492,25 @@ export async function executarFinanceirasNaFaseV2(
       if (fx == null) { skipped.push({ name: titulo, reason: `Sem cotação de câmbio ${preco.moeda}→BRL. Cadastre a cotação para lançar (não foi lançado com conversão 1:1).` }); continue }
 
       const akey = `${processoId}::${phaseKey}::automation::${r.id}::${isRec ? 'VENDA' : 'CUSTO'}`
+      const artefatoData = {
+        processoId, tipoProcessoId, phaseKey, event: 'entered', ruleKind: 'financial', ruleSource: 'automation', ruleId: r.id,
+        automaticKey: akey, targetTable: isRec ? 'Receita' : 'Custo', targetId: null as number | null, status: 'active', descricao: titulo.slice(0, 300),
+        detalhes: { configItemId: r.configItemId, mestre: mestreNome, aplicacao: ap, natureza: isRec ? 'VENDA' : 'CUSTO', valor: preco.valor, moeda: preco.moeda, tabelaValorId: preco.tabelaValorId },
+      }
       let art
       try {
-        art = await prisma.motorArtefato.create({ data: {
-          processoId, tipoProcessoId, phaseKey, event: 'entered', ruleKind: 'financial', ruleSource: 'automation', ruleId: r.id,
-          automaticKey: akey, targetTable: isRec ? 'Receita' : 'Custo', targetId: null, status: 'active', descricao: titulo.slice(0, 300),
-          detalhes: { configItemId: r.configItemId, mestre: mestreNome, aplicacao: ap, natureza: isRec ? 'VENDA' : 'CUSTO', valor: preco.valor, moeda: preco.moeda, tabelaValorId: preco.tabelaValorId },
-        } })
+        art = await prisma.motorArtefato.create({ data: artefatoData })
       } catch (e) {
-        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') { skipped.push({ name: titulo, reason: 'já lançado (idempotência)' }); continue }
-        erros.push(`${titulo}: ${(e as Error)?.message ?? 'erro'}`); continue
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+          // Idempotência ancorada no EFEITO, não no marcador: se já há lançamento (targetId
+          // != null) → pula. Se o marcador é ÓRFÃO (targetId null, crash entre marcar e lançar)
+          // → apaga e refaz nesta iteração para não bloquear o lançamento para sempre.
+          const existente = await prisma.motorArtefato.findUnique({ where: { automaticKey: akey }, select: { id: true, targetId: true } })
+          if (!existente || existente.targetId != null) { skipped.push({ name: titulo, reason: 'já lançado (idempotência)' }); continue }
+          await prisma.motorArtefato.delete({ where: { id: existente.id } }).catch(() => {})
+          try { art = await prisma.motorArtefato.create({ data: artefatoData }) }
+          catch (e2) { erros.push(`${titulo}: ${(e2 as Error)?.message ?? 'erro'}`); continue }
+        } else { erros.push(`${titulo}: ${(e as Error)?.message ?? 'erro'}`); continue }
       }
       try {
         const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId!, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', phaseKey, chaveIdempotencia: akey, contexto: { fonte: 'automation_v2', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap, mestre: mestreNome } }
