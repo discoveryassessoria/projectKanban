@@ -42,7 +42,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // documentos por necessidade, um unique global não cabe; o lock garante que só o
     // primeiro cria e os demais reusam. Liberado no fim da transação.
     const doc = await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(741852, ${nec.id})`
+      // ::int4 obrigatório: o Prisma vincula o parâmetro como bigint e a assinatura
+      // pg_advisory_xact_lock(int4,int4) não casa com (int4,bigint).
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(741852, ${nec.id}::int4)`
       let d = await tx.documento.findFirst({ where: { necessidadeId: nec.id }, select: { id: true } })
       if (!d) {
         d = await tx.documento.create({
