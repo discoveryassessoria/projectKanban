@@ -62,19 +62,22 @@ const AuditoriaTab = dynamic(() => import("@/src/components/financeiroComponents
 // ============================================================
 // ABAS
 // ============================================================
+// `avancada` = área sem dado real consolidado ainda → escondida da barra para não poluir.
+// Reative removendo o flag quando a área tiver dado de verdade.
 const TABS = [
   { key: "dashboard", label: "Dashboard" },
   { key: "tesouraria", label: "Tesouraria" },
   { key: "receber", label: "A Receber" },
   { key: "pagar", label: "A Pagar" },
   { key: "fluxo", label: "Fluxo de Caixa" },
-  { key: "dre", label: "DRE" },
-  { key: "cc", label: "Centros de Custo" },
-  { key: "comissoes", label: "Comissões" },
-  { key: "impostos", label: "Impostos" },
-  { key: "auditoria", label: "Auditoria" },
+  { key: "dre", label: "DRE", avancada: true },
+  { key: "cc", label: "Centros de Custo", avancada: true },
+  { key: "comissoes", label: "Comissões", avancada: true },
+  { key: "impostos", label: "Impostos", avancada: true },
+  { key: "auditoria", label: "Auditoria", avancada: true },
 ] as const
 type TabKey = (typeof TABS)[number]["key"]
+const TABS_VISIVEIS = TABS.filter((t) => !("avancada" in t && t.avancada))
 
 // ============================================================
 // FORMATO
@@ -208,7 +211,7 @@ export default function FinanceiroPage() {
           {/* NAV DE ABAS — aba ativa encosta na borda inferior (sem degrau) */}
           <div className="relative mb-4">
             <div className="flex gap-1 overflow-x-auto relative z-10">
-              {TABS.map(t => (
+              {TABS_VISIVEIS.map(t => (
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}

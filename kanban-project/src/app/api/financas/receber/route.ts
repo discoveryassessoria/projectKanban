@@ -157,7 +157,7 @@ export async function GET(_req: NextRequest) {
         proximos30: emAberto.filter((i) => i.diasParaVencer >= 0 && i.diasParaVencer <= 30).length,
         recebidas: itens.filter((i) => i.recebida).length,
       },
-      mock: { dso: 42 },
+      mock: { dso: 0 },
     })
   } catch (e) {
     console.error("[financas/receber] erro:", e)

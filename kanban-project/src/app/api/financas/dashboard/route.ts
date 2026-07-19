@@ -196,50 +196,28 @@ export async function GET(_req: NextRequest) {
       // câmbio de referência (pro front mostrar @ R$)
       fx: FX,
       // placeholders (sem fonte no banco ainda) — front mostra como "prévia".
-      // Replicam fielmente o mockup; trocamos por dado real numa fatia futura.
-      mock: {
-        ticketMedioBRL: 20454,
-        novosProcessos: 4,
-        conversaoPct: 38,
-        burnRateBRL: 1281.87,
-        runwayDias: 421,
-        dso: 42,
-        dpo: 28,
-        colaboradores: 4,
-        // strip do topo
-        fechamentoLabel: "Abr/2026",
-        fechamentoStatus: "Aberto",
-        conciliacaoDiff: 0,
-        conciliacaoPendencias: 0,
-        aVencerFiscalBRL: 10892,
-        qtdImpostos: 3,
-        comissoesPendBRL: 2440,
-        qtdComissoes: 6,
-        // segunda fila
-        forecast30BRL: 94046.74,
-        exposicaoEUR: 12450.5,
-        exposicaoUSD: 3200,
-        exposicaoBRL: 84982.76,
-        // gráfico
-        serie6meses: {
-          labels: ["Dez/25", "Jan/26", "Fev/26", "Mar/26", "Abr/26", "Mai/26"],
-          entradas: [28000, 34500, 41200, 48800, 56300, 42850],
-          saidas: [31500, 36200, 38400, 42100, 45200, 33260],
-          saldo: [-3500, -1700, 2800, 6700, 11100, 9590],
-          totalEntradas: 195400,
-          totalSaidas: 168200,
-          totalSaldo: 27200,
-        },
-        receitaPorPais: { Itália: 88000, Espanha: 63500, Alemanha: 79000, Portugal: 14000 },
-        // alertas e aprovações
-        alertas: [
-          { tipo: "critical", titulo: "Brinker · parcela 2/5", texto: "R$ 4.500 vencida há 6 dias.", meta: "há 6 dias · Sistema" },
-          { tipo: "critical", titulo: "Betina · parcela 2/6", texto: "R$ 3.500 vencida há 16 dias.", meta: "há 16 dias · Sistema" },
-          { tipo: "warning", titulo: "Aprovação pendente", texto: "Demetrio Saccomandi · R$ 3.600 (tradução).", meta: "aguarda Marco · há 1 dia" },
-          { tipo: "info", titulo: "DAS + INSS", texto: "R$ 13.700 vencem em 4 dias.", meta: "20/05 · Financeiro" },
-          { tipo: "success", titulo: "Barzaghi quitado", texto: "Parcela final de R$ 5.500 recebida.", meta: "há 4 dias · 12/05" },
-        ],
-      },
+      // SEM DADOS FICTÍCIOS: métricas ainda não consolidadas voltam ZERADAS/vazias
+      // (nunca números inventados). Serão preenchidas por dado real numa fatia futura.
+      mock: (() => {
+        const now = new Date()
+        const labels = Array.from({ length: 6 }, (_, i) => {
+          const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1)
+          return d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }).replace(".", "")
+        })
+        const zeros = [0, 0, 0, 0, 0, 0]
+        return {
+          ticketMedioBRL: 0, novosProcessos: 0, conversaoPct: 0, burnRateBRL: 0, runwayDias: 0, dso: 0, dpo: 0,
+          colaboradores: 0,
+          fechamentoLabel: now.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(".", ""),
+          fechamentoStatus: "Aberto",
+          conciliacaoDiff: 0, conciliacaoPendencias: 0,
+          aVencerFiscalBRL: 0, qtdImpostos: 0, comissoesPendBRL: 0, qtdComissoes: 0,
+          forecast30BRL: 0, exposicaoEUR: 0, exposicaoUSD: 0, exposicaoBRL: 0,
+          serie6meses: { labels, entradas: zeros, saidas: zeros, saldo: zeros, totalEntradas: 0, totalSaidas: 0, totalSaldo: 0 },
+          receitaPorPais: {},
+          alertas: [] as { tipo: string; titulo: string; texto: string; meta: string }[],
+        }
+      })(),
     })
   } catch (e) {
     console.error("[financas/dashboard] erro:", e)

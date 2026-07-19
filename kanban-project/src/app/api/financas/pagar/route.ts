@@ -189,7 +189,7 @@ export async function GET(_req: NextRequest) {
         agendados: agendados.length,
         pagos: itens.filter((i) => i.pago).length,
       },
-      mock: { dpo: 28 },
+      mock: { dpo: 0 },
     })
   } catch (e) {
     console.error("[financas/pagar] erro:", e)
