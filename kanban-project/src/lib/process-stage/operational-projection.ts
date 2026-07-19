@@ -71,10 +71,100 @@ const INSTANCIA_ATIVA: WorkflowInstanceStatus[] = [
   WorkflowInstanceStatus.BLOQUEADO,
 ]
 
-/** Projeção operacional oficial de UM processo. */
-export async function resolveOperationalProjection(processId: number): Promise<OperationalProjection> {
+/**
+ * Contexto de fase para projetar uma fase ESPECÍFICA (ativa OU passada), com dados
+ * VIVOS escopados por instância/ciclo. Omitido ⇒ fase ATIVA (default, zero regressão).
+ */
+export interface FaseProjecaoContexto {
+  faseMacroKey: string
+  workflowInstanceId?: number | null
+}
+
+/** Projeção operacional oficial de UM processo. Sem contexto ⇒ fase ATIVA. Com contexto
+ *  ⇒ projeta a fase indicada (ativa ou passada) a partir dos dados VIVOS da instância. */
+export async function resolveOperationalProjection(
+  processId: number,
+  contexto?: FaseProjecaoContexto,
+): Promise<OperationalProjection> {
+  if (contexto?.faseMacroKey) return resolveOperationalProjectionParaFase(processId, contexto)
   const [proj] = await resolveOperationalProjectionBatch([processId])
   return proj
+}
+
+/**
+ * Projeção de UMA fase específica (ativa OU passada) de um processo — dados VIVOS da
+ * instância indicada (por id) ou da instância de maior ciclo daquela faseMacroKey.
+ * Mesma função-base pura (buildOperationalProjection/computeGate); nunca recalcula em
+ * outro lugar. Não filtra por status ATIVO (uma fase concluída é CONCLUIDO).
+ */
+async function resolveOperationalProjectionParaFase(
+  processId: number,
+  contexto: FaseProjecaoContexto,
+): Promise<OperationalProjection> {
+  const { faseMacroKey, workflowInstanceId } = contexto
+
+  const proc = await prisma.processo.findUnique({
+    where: { id: processId },
+    select: { id: true, faseAtualKey: true, arvoreId: true },
+  })
+  if (!proc) {
+    return buildOperationalProjection({
+      processId, faseCode: null, faseMacroKey: null, phaseName: null, scope: null,
+      processoExists: false, hasActiveInstance: false, steps: [], necessidades: [], documentos: [],
+      hasArvore: false, requerentesCount: 0,
+    })
+  }
+
+  // Instância da fase consultada: por id (fase passada específica) ou a de maior ciclo
+  // daquela faseMacroKey (qualquer status — CONCLUIDO/ATIVO/…).
+  const inst = await prisma.phaseWorkflowInstance.findFirst({
+    where: workflowInstanceId != null
+      ? { id: workflowInstanceId, processoId: processId }
+      : { processoId: processId, faseMacroKey },
+    orderBy: { ciclo: "desc" },
+    include: {
+      steps: {
+        include: { tarefas: { where: { chaveIdempotencia: { not: null } }, select: { id: true, statusTarefa: true, responsavelId: true } } },
+        orderBy: { ordem: "asc" },
+      },
+    },
+  })
+
+  const [necsRaw, certidaoItens, pessoas, reqCount] = await Promise.all([
+    prisma.necessidadeDocumental.findMany({
+      where: { processoId: processId },
+      select: { id: true, status: true, obrigatoriedade: true, itemCatalogoId: true },
+    }),
+    itemCatalogosDeCertidao(prisma),
+    proc.arvoreId != null
+      ? prisma.pessoa.findMany({ where: { arvoreId: proc.arvoreId, linhaReta: true }, select: { documentos: { select: { id: true, status: true } } } })
+      : Promise.resolve([] as Array<{ documentos: Array<{ id: number; status: string }> }>),
+    prisma.processoRequerente.count({ where: { processoId: processId } }),
+  ])
+
+  const necessidades: NecessidadeData[] = necsRaw.map((n) => ({
+    id: n.id, status: n.status, obrigatoria: n.obrigatoriedade === "OBRIGATORIA", ehCertidao: certidaoItens.has(n.itemCatalogoId),
+  }))
+  const documentos: DocumentoData[] = pessoas.flatMap((p) => p.documentos.map((d) => ({ id: d.id, status: d.status, linhaReta: true })))
+
+  const faseCode = phaseKeyToFaseCode(faseMacroKey)
+  const faseDef = faseCode ? getFase(faseCode) : null
+  const steps: GateStepData[] = (inst?.steps ?? []).map(mapStepToGate)
+
+  return buildOperationalProjection({
+    processId,
+    faseCode,
+    faseMacroKey,
+    phaseName: faseDef?.label ?? faseMacroKey,
+    scope: faseDef?.scope ?? null,
+    processoExists: true,
+    hasActiveInstance: !!inst,
+    steps,
+    necessidades,
+    documentos,
+    hasArvore: proc.arvoreId != null,
+    requerentesCount: reqCount,
+  })
 }
 
 /**

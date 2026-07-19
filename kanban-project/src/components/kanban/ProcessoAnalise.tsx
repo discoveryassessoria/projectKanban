@@ -36,6 +36,7 @@ interface Analise {
 interface Props {
   processoId: number
   onConcluido?: () => void
+  readOnly?: boolean
 }
 
 const DECISOES: Array<[string, string]> = [
@@ -60,7 +61,7 @@ const ini = (nome: string) => {
   return ((p[0]?.[0] || "") + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase()
 }
 
-export function ProcessoAnalise({ processoId, onConcluido }: Props) {
+export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: Props) {
   const [analise, setAnalise] = useState<Analise | null>(null)
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
@@ -114,6 +115,7 @@ export function ProcessoAnalise({ processoId, onConcluido }: Props) {
   }
 
   const concluir = async () => {
+    if (readOnly) return // consulta de fase passada: sem mutação
     setConcluding(true); setErro(null)
     try {
       const res = await fetch(`/api/processos/${processoId}/analise/concluir`, { method: "POST", headers: authHeaders() })

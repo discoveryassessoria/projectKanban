@@ -94,11 +94,15 @@ export interface PainelDaFaseProps {
   progressoTexto: string           // "Solicite, receba... Falta 1 documento..."
   linhaPrincipal: FasePersonRow[]
   foraDaLinha: FasePersonRow[]
-  onAbrirOperacao: (docId: number, necessidadeId?: number | null) => void
+  onAbrirOperacao?: (docId: number, necessidadeId?: number | null) => void
   onAbrirPainelCompleto?: () => void
   // Delegação direto na fila (Genealogia): lista de funcionários + callback.
   usuarios?: Array<{ id: number; nome: string }>
   onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
+  // CONSULTA de fase passada (PAST_READ_ONLY): mesmo layout/dados, mas SEM ações de
+  // mutação (abrir operação/delegar). Só leitura. onAbrirOperacao/onDelegar chegam
+  // undefined; readOnly deixa a intenção explícita para a UI.
+  readOnly?: boolean
   // LEGADO_INATIVO (desativação Genealogia): em modo reestruturação, o painel NÃO
   // exibe as etapas/KPIs/progresso/"validados" antigos (derivados de
   // Documento.status + linhaReta). Mostra apenas um aviso neutro + a lista de
@@ -128,6 +132,7 @@ export function PainelDaFase({
   onAbrirPainelCompleto,
   usuarios,
   onDelegar,
+  readOnly = false,
   modoReestruturacao = false,
   avisoReestruturacao,
 }: PainelDaFaseProps) {
@@ -295,7 +300,7 @@ export function PainelDaFase({
             tone="linha"
           />
           {linhaPrincipal.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} ocultarValidacao={modoReestruturacao} />
+            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
           ))}
 
           {/* Grupo Fora da linhagem */}
@@ -306,7 +311,7 @@ export function PainelDaFase({
             tone="fora"
           />
           {foraDaLinha.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} ocultarValidacao={modoReestruturacao} />
+            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
           ))}
         </div>
       </div>
@@ -348,12 +353,14 @@ function PersonRow({
   usuarios,
   onDelegar,
   ocultarValidacao = false,
+  readOnly = false,
 }: {
   p: FasePersonRow
-  onAbrirOperacao: (docId: number, necessidadeId?: number | null) => void
+  onAbrirOperacao?: (docId: number, necessidadeId?: number | null) => void
   usuarios?: Array<{ id: number; nome: string }>
   onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
   ocultarValidacao?: boolean
+  readOnly?: boolean
 }) {
   const [exp, setExp] = useState(false)
 
@@ -541,18 +548,22 @@ function PersonRow({
             {/* Próxima ação */}
             <span className="text-[12px] text-gray-600">{d.proximaAcao || "—"}</span>
 
-            {/* Botão */}
+            {/* Botão — em consulta (readOnly) não há ação de mutação; só o status acima. */}
             <div className="flex justify-end">
-              <button
-                onClick={() => onAbrirOperacao(d.id, d.necessidadeId)}
-                className={`text-[12px] font-bold px-3 py-2 rounded-lg transition-colors ${
-                  d.emissaoConcluida
-                    ? "border border-gray-200 text-gray-700 bg-white hover:bg-gray-50"
-                    : "bg-blue-600 text-white hover:bg-blue-500"
-                }`}
-              >
-                {d.emissaoConcluida ? "Ver workflow" : "Abrir operação"}
-              </button>
+              {readOnly || !onAbrirOperacao ? (
+                <span className="text-[11px] font-semibold text-gray-400 px-3 py-2">Somente leitura</span>
+              ) : (
+                <button
+                  onClick={() => onAbrirOperacao(d.id, d.necessidadeId)}
+                  className={`text-[12px] font-bold px-3 py-2 rounded-lg transition-colors ${
+                    d.emissaoConcluida
+                      ? "border border-gray-200 text-gray-700 bg-white hover:bg-gray-50"
+                      : "bg-blue-600 text-white hover:bg-blue-500"
+                  }`}
+                >
+                  {d.emissaoConcluida ? "Ver workflow" : "Abrir operação"}
+                </button>
+              )}
             </div>
           </div>
         ))}

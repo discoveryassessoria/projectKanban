@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
-import { getOrdemFase, getStepsForFase, getFase, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
+import { getOrdemFase, getStepsForFase, getFase, phaseKeyToFaseCode, faseCodeToPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 import { resolveProgressoFaseDocumento } from "@/src/lib/process-stage/resolve-fase-progresso"
 import { resolveOperationalProjection, type OperationalProjection } from "@/src/lib/process-stage/operational-projection"
@@ -116,7 +116,17 @@ interface FaseProgress {
   }
 }
 
+// Modo operacional da Central (UMA única tela; muda só o modo, nunca o layout):
+//  • ACTIVE          — fase operada atual, editável.
+//  • PAST_READ_ONLY  — fase passada consultada, dados VIVOS daquela instância/ciclo, só leitura.
+//  • REOPENED        — fase passada retornada como ativa (torna-se ACTIVE após o retorno).
+export type CentralMode = "ACTIVE" | "PAST_READ_ONLY"
+
 interface CentralOperacionalResponse {
+  // Modo + contexto da fase consultada. A UI renderiza SEMPRE o mesmo corpo; PAST_READ_ONLY
+  // apenas bloqueia mutações. Dados são reais/vivos da instância consultada — nunca snapshot.
+  mode: CentralMode
+  phaseContext: { faseCode: string | null; faseMacroKey: string | null; workflowInstanceId: number | null; ciclo: number | null }
   // Projeção operacional OFICIAL da fase (fonte única de progresso/estado). A Central
   // mantém KPIs detalhados, mas o PERCENTUAL da fase vem daqui — idêntico ao Kanban/Header.
   projection: OperationalProjection
@@ -234,8 +244,33 @@ export async function GET(
       return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
     }
 
+    // ============================================================
+    // CONTEXTO DE FASE (Central unificada OPERATE|PAST_READ_ONLY)
+    // ------------------------------------------------------------
+    // Sem ?faseCode ⇒ fase ATIVA (modo ACTIVE). Com ?faseCode de uma fase DIFERENTE da
+    // ativa ⇒ consulta essa fase (modo PAST_READ_ONLY) com DADOS VIVOS escopados pela
+    // instância/ciclo indicados — MESMO corpo de UI, apenas somente-leitura. Nunca snapshot.
+    // ============================================================
+    const faseCodeParam = searchParams.get("faseCode")
+    const instanceIdParam = searchParams.get("instanceId")
+    const cicloParam = searchParams.get("ciclo")
+    const workflowInstanceId = instanceIdParam ? parseInt(instanceIdParam) : null
+    const cicloConsultado = cicloParam ? parseInt(cicloParam) : null
+
+    const faseAtivaKey = processo.faseAtualKey ?? null
+    // fase consultada: a do param (se válida) ou a ativa.
+    const faseConsultadaKey =
+      (faseCodeParam ? faseCodeToPhaseKey(faseCodeParam) : null) ?? faseAtivaKey
+    const isView = faseConsultadaKey != null && faseAtivaKey != null && faseConsultadaKey !== faseAtivaKey
+    const mode: CentralMode = isView ? "PAST_READ_ONLY" : "ACTIVE"
+    // contexto passado aos resolvers: só quando consultando fase != ativa.
+    const faseContexto = isView
+      ? { faseMacroKey: faseConsultadaKey!, workflowInstanceId }
+      : undefined
+
+    // A fase "corrente" desta resposta é a CONSULTADA (ativa ou passada).
     const faseAtualCode =
-      (phaseKeyToFaseCode(processo.faseAtualKey) ?? null)
+      (phaseKeyToFaseCode(faseConsultadaKey) ?? null)
 
     // pessoas e documentos não dependem um do outro (ambos só precisam do
     // arvoreId) → busca os dois EM PARALELO, economizando um round-trip ao banco.
@@ -282,14 +317,14 @@ export async function GET(
 
     // FONTE OFICIAL ÚNICA de progresso/estado do workflow — a MESMA usada pelo cabeçalho
     // (/api/processos/[id]/phase) e demais consumidores. Nada de cálculo paralelo aqui.
-    const prog = await resolveProgressoFaseDocumento(id)
+    const prog = await resolveProgressoFaseDocumento(id, faseContexto)
     const workflowsRaw = Array.from(prog.wfPorDoc.values())
 
     // PROJEÇÃO OPERACIONAL OFICIAL (scope-aware) — o percentual/estado da fase exibido
     // na Central (barra, trilha macro, KPI headline) vem DAQUI, garantindo o MESMO
     // número do Kanban e do Header. Os KPIs detalhados (byPerson, counts, fila) seguem
     // como dado operacional, mas o headline de progresso é a projeção.
-    const projection = await resolveOperationalProjection(id)
+    const projection = await resolveOperationalProjection(id, faseContexto)
 
     const generationOf = (pessoaId: number): number => {
       const p = pessoasMap.get(pessoaId)
@@ -639,7 +674,8 @@ export async function GET(
       // só CERTIDÕES (natureza estruturada) e não dispensadas
       const necs = necsRaw.filter((n) => certItens.has(n.itemCatalogoId) && n.status !== "DISPENSADA")
       const stepsLR = await prisma.phaseWorkflowStepInstance.findMany({
-        where: { processoId: id, faseMacroKey: "genealogia", stepKey: "localizar_registro" },
+        // consulta de fase passada ⇒ escopa à instância indicada (dados vivos daquele ciclo).
+        where: { processoId: id, faseMacroKey: "genealogia", stepKey: "localizar_registro", ...(faseContexto?.workflowInstanceId != null ? { workflowInstanceId: faseContexto.workflowInstanceId } : {}) },
         select: { id: true, necessidadeId: true, status: true, obrigatorio: true, documentoId: true, prazo: true, responsavelId: true, updatedAt: true, motivo: true },
       })
       // responsavelId é ref solta a Usuario (sem relation) → resolve o nome em lote
@@ -729,6 +765,13 @@ export async function GET(
     }
 
     const response: CentralOperacionalResponse = {
+      mode,
+      phaseContext: {
+        faseCode: faseAtualCode,
+        faseMacroKey: faseConsultadaKey,
+        workflowInstanceId,
+        ciclo: cicloConsultado,
+      },
       projection,
       matrix: matrixOficial,
       cards,

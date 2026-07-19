@@ -37,21 +37,36 @@ export interface ProgressoFaseDoc {
   stepOwnerPorDoc: Map<number, { id: number; nome: string }>
 }
 
-export async function resolveProgressoFaseDocumento(processoId: number): Promise<ProgressoFaseDoc> {
+/**
+ * Contexto de fase para consultar uma fase ESPECÍFICA (ativa OU passada), com dados
+ * VIVOS escopados por instância/ciclo. Omitido ⇒ fase ATIVA do processo (default,
+ * zero regressão). Ver Central unificada OPERATE|PAST_READ_ONLY.
+ */
+export interface FaseContexto {
+  faseMacroKey?: string | null
+  workflowInstanceId?: number | null
+}
+
+export async function resolveProgressoFaseDocumento(processoId: number, contexto?: FaseContexto): Promise<ProgressoFaseDoc> {
   const processo = await prisma.processo.findUnique({
     where: { id: processoId },
     select: { id: true, arvoreId: true, faseAtualKey: true },
   })
-  const faseMacroKey = processo?.faseAtualKey ?? null
+  // Fase consultada = contexto (fase passada) ou a ATIVA do processo (default).
+  const faseMacroKey = contexto?.faseMacroKey ?? processo?.faseAtualKey ?? null
   const faseCode = phaseKeyToFaseCode(faseMacroKey)
+  const instanceId = contexto?.workflowInstanceId ?? null
 
-  // Instâncias V2 da FASE ATUAL (ativas). Escopo por faseMacroKey → não mistura fases;
-  // exclui SUPERSEDIDO/CANCELADO históricos.
+  // Passos V2 da fase consultada. Escopo por faseMacroKey (e por instância, quando a
+  // consulta é de uma fase passada específica) → nunca mistura fases nem ciclos. Exclui
+  // SUPERSEDIDO/CANCELADO — para a fase ATIVA remove históricos; para uma fase CONCLUÍDA
+  // os passos são CONCLUIDO/DISPENSADO (preservados).
   const stepInstancesRaw = (processo && faseMacroKey)
     ? await prisma.phaseWorkflowStepInstance.findMany({
         where: {
           processoId,
           faseMacroKey,
+          ...(instanceId != null ? { workflowInstanceId: instanceId } : {}),
           // passos vinculados a ENTIDADE (documento OU necessidade) — genéricos ficam de fora.
           OR: [{ documentoId: { not: null } }, { necessidadeId: { not: null } }],
           status: { notIn: ["SUPERSEDIDO", "CANCELADO"] },
