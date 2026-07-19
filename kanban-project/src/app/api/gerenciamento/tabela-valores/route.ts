@@ -5,6 +5,7 @@ import { deriveNaturezaFinanceira, validarNaturezaPreco, canonicalNaturezaPreco,
 import { detectarConflitoPreco, type PrecoRegistro } from '@/lib/financeiro/conflito-preco'
 import { modoCalculoValido, unidadeDoModo, modoUsaQuantidade } from '@/lib/financeiro/modo-calculo'
 import { naturezasDeSelecao, usaNovoModeloSelecao } from '@/lib/financeiro/selecao-natureza'
+import { reprocessarPendenciasFinanceiras } from '@/src/lib/motor/executor'
 
 function toAmount(v: any): number {
   if (v === undefined || v === null || v === '') return 0
@@ -240,6 +241,8 @@ export async function POST(request: NextRequest) {
       const regras = await prisma.$transaction(
         dados.map((d) => prisma.tabelaValor.create({ data: d as never, include: { fornecedor: { select: { id: true, nome: true } } } })),
       )
+      // P4 — cadastrou preço: reprocessa (best-effort) as pendências financeiras desta config.
+      reprocessarPendenciasFinanceiras({ configItemId: configId }).catch((e) => console.error('[reprocesso pendências pós-preço]', e))
       return NextResponse.json(regras.length === 1 ? { regra: regras[0] } : { regras })
     } catch (e: any) {
       const mapped = mapDbError(e)

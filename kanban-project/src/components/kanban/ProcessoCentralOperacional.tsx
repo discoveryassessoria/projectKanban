@@ -18,6 +18,7 @@ import { ProcessoFaseFinal } from "./ProcessoFaseFinal"
 import { ProcessoRetificacao } from "./ProcessoRetificacao"
 import { ProcessoEmissaoRetificada } from "./ProcessoEmissaoRetificada"
 import { RetornarFaseButton } from "./RetornarFaseButton"
+import { TarefaTransversalModal } from "./TarefaTransversalModal"
 import type { FaseCode } from "@prisma/client"
 
 // Metadados de uma fase materializada (espelho de /api/processos/[id]/phases).
@@ -112,6 +113,7 @@ interface CentralOpData {
   }
   queue: Array<{
     docId: number
+    pessoaId?: number
     pessoaNome: string
     docType: string
     docTypeLabel: string
@@ -241,16 +243,18 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
   // ============================================================
   // tabela por pessoa (inalterada: mostra o status de cada documento)
   // ============================================================
-  const porPessoa = new Map<string, FasePersonRow>()
+  // P6 — chave por pessoaId REAL (não por nome; homônimos não colapsam). Fallback ao nome
+  // só quando o back não enviou pessoaId (compat).
+  const porPessoa = new Map<string | number, FasePersonRow>()
   const ord = (g: number) => (g === 99 ? 100 : g)
 
   for (const q of queue) {
-    const key = q.pessoaNome
+    const key: string | number = q.pessoaId != null && q.pessoaId > 0 ? q.pessoaId : q.pessoaNome
     if (!porPessoa.has(key)) {
       const iniciais = q.pessoaNome.split(/\s+/).map((x) => x[0]).slice(0, 2).join("").toUpperCase()
       const isLinha = q.isLinhaReta
       porPessoa.set(key, {
-        pessoaId: q.docId,
+        pessoaId: q.pessoaId ?? q.docId,
         nome: q.pessoaNome,
         iniciais,
         papel: isLinha ? "Linha reta" : "Apoio",
@@ -349,6 +353,9 @@ export function ProcessoCentralOperacional({
   const [viewData, setViewData] = useState<CentralOpData | null>(null)
   const [viewLoading, setViewLoading] = useState(false)
   const [viewErro, setViewErro] = useState<string | null>(null)
+
+  // Tarefa Transversal: contexto (necessidade) para o modal de criação.
+  const [transversalCtx, setTransversalCtx] = useState<{ necessidadeId: number; pessoaId?: number | null; label?: string } | null>(null)
 
   // TROCA DE CONTEXTO NO AVANÇO DE FASE: quando a fase da Central muda (avanço/retorno),
   // qualquer drawer aberto está exibindo o contexto da fase ANTIGA (ex.: o passo
@@ -814,6 +821,7 @@ export function ProcessoCentralOperacional({
             onAbrirOperacao={readOnly ? undefined : (docId, necessidadeId) => { void abrirOperacao(docId, necessidadeId) }}
             usuarios={usuarios}
             onDelegar={readOnly ? undefined : (necessidadeId, responsavelId) => { void delegar(necessidadeId, responsavelId) }}
+            onCriarTransversal={readOnly ? undefined : (necessidadeId, pessoaIdNec, label) => setTransversalCtx({ necessidadeId, pessoaId: pessoaIdNec, label })}
             modoReestruturacao={!!bodyData.genealogiaReestruturacao}
             avisoReestruturacao={bodyData.mensagemReestruturacao ?? undefined}
           />
@@ -861,6 +869,19 @@ export function ProcessoCentralOperacional({
           />
         </div>
         </>
+        )}
+
+        {transversalCtx && (
+          <TarefaTransversalModal
+            processoId={processo.id}
+            necessidadeId={transversalCtx.necessidadeId}
+            necessidadeLabel={transversalCtx.label}
+            pessoaId={transversalCtx.pessoaId}
+            faseAtivaCode={faseKeyAtiva ? String(faseKeyAtiva) : null}
+            usuarios={usuarios}
+            onClose={() => setTransversalCtx(null)}
+            onCreated={() => { setTransversalCtx(null); carregar(true) }}
+          />
         )}
       </div>
     </div>

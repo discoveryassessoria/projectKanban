@@ -13,8 +13,13 @@
 import { prisma } from "@/lib/prisma"
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
 import { executarFinanceirasNaFaseV2 } from "@/src/lib/motor/executor"
+import { reconciliarTransversaisNaFase } from "@/src/services/tarefa-transversal"
 
 const MAX_TENTATIVAS = 5
+// Reserva "presa" há mais que isto (worker morreu no meio) volta a ser reivindicável.
+const CLAIM_STALE_MS = 5 * 60 * 1000
+// Tipos conhecidos SEM consumidor de efeito: arquivados (marcados ENVIADO) — não acumulam.
+const TIPOS_SEM_EFEITO = new Set(["phase.completed"])
 
 export interface OutboxProcessResumo {
   lidos: number
@@ -54,6 +59,12 @@ async function aplicarPhaseEntered(payload: PhaseEnteredPayload, correlationId: 
     // Engolir marcaria ENVIADO e perderia a Receita/Custo silenciosamente.
     const r = await executarFinanceirasNaFaseV2(payload.processId, payload.newPhaseKey)
     if (r.erros.length) throw new Error(`automações financeiras da fase falharam: ${r.erros.join(" ; ")}`)
+
+    // REAPROVEITAMENTO de trabalho antecipado por Tarefa Transversal: ao entrar numa fase,
+    // reconcilia (idempotente) as transversais cuja fase de referência é esta — associa o
+    // Documento já existente sem duplicar. Isolado/best-effort.
+    try { await reconciliarTransversaisNaFase(payload.processId, payload.newPhaseKey) }
+    catch (e) { console.error("[outbox] reconciliação transversal falhou:", e) }
   }
   return criadas
 }
@@ -69,7 +80,8 @@ export async function processarOutbox(opts?: {
   forcar?: boolean
 }): Promise<OutboxProcessResumo> {
   const limite = opts?.limite ?? 50
-  const tipos = opts?.tipos ?? ["phase.entered"]
+  // phase.completed entra por padrão só para ARQUIVAR (marca ENVIADO) — não acumula.
+  const tipos = opts?.tipos ?? ["phase.entered", "phase.completed"]
 
   const pendentes = await prisma.domainOutbox.findMany({
     where: {
@@ -82,13 +94,22 @@ export async function processarOutbox(opts?: {
   })
 
   const resumo: OutboxProcessResumo = { lidos: pendentes.length, processados: 0, falhos: 0, ignorados: 0, detalhes: [] }
+  const staleAntes = new Date(Date.now() - CLAIM_STALE_MS)
 
   for (const evt of pendentes) {
+    // CLAIM ATÔMICO: reserva a linha antes de processar. Dois workers concorrentes → só um
+    // consegue (count===1); o outro IGNORA. Reivindica também reservas "presas" (worker morto).
+    const claim = await prisma.domainOutbox.updateMany({
+      where: { id: evt.id, status: "PENDENTE", OR: [{ reservadoEm: null }, { reservadoEm: { lt: staleAntes } }] },
+      data: { reservadoEm: new Date() },
+    })
+    if (claim.count !== 1) { resumo.ignorados++; resumo.detalhes.push({ id: evt.id, tipo: evt.tipo, status: "IGNORADO" }); continue }
+
     try {
       if (evt.tipo === "phase.entered") {
         await aplicarPhaseEntered((evt.payload ?? {}) as PhaseEnteredPayload, evt.correlationId)
-      } else {
-        // tipo conhecido mas sem efeito conectado ainda: apenas marca como enviado.
+      } else if (!TIPOS_SEM_EFEITO.has(evt.tipo)) {
+        // tipo conhecido sem efeito conectado ainda: no-op (será marcado ENVIADO/arquivado).
       }
       await prisma.domainOutbox.update({
         where: { id: evt.id },
@@ -98,9 +119,10 @@ export async function processarOutbox(opts?: {
       resumo.detalhes.push({ id: evt.id, tipo: evt.tipo, status: "ENVIADO" })
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
+      // libera a reserva (reservadoEm: null) para reprocessamento.
       await prisma.domainOutbox.update({
         where: { id: evt.id },
-        data: { status: "PENDENTE", tentativas: { increment: 1 }, erro: msg.slice(0, 1000) },
+        data: { status: "PENDENTE", reservadoEm: null, tentativas: { increment: 1 }, erro: msg.slice(0, 1000) },
       }).catch(() => {})
       resumo.falhos++
       resumo.detalhes.push({ id: evt.id, tipo: evt.tipo, status: "ERRO", erro: msg })

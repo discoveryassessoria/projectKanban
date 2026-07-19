@@ -65,7 +65,8 @@
     "test:operational-projection": "tsx scripts/operational-projection.test.ts",
     "test:central-unificada": "tsx scripts/central-unificada-guard.test.ts",
     "test:roteamento-condicional": "tsx scripts/roteamento-condicional.test.ts",
-    "test:emissao-gate": "tsx scripts/emissao-gate.test.ts"
+    "test:emissao-gate": "tsx scripts/emissao-gate.test.ts",
+    "test:entrega-transversal": "tsx scripts/entrega-transversal-guard.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

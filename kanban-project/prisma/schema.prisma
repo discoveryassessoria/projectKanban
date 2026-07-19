@@ -425,6 +425,24 @@ model Tarefa {
   motivoCodigo          String? @db.VarChar(40)
   justificativa         String? @db.Text
 
+  // TAREFA TRANSVERSAL (aditivo) — ação antecipada de OUTRA fase p/ resolver uma necessidade
+  // da fase ATUAL, sem avançar o Macro. Refs "soltas" (padrão executedById): sem relation
+  // p/ não tocar outros models; os serviços resolvem os vínculos. necessidadeId/documentoId/
+  // responsavelId/statusTarefa/dataPrazo/dataConclusao/createdAt/updatedAt já existem acima.
+  tipo                     TipoTarefa @default(NORMAL)
+  faseOrigemCode           String?    @db.VarChar(60) // fase ATIVA onde foi criada
+  faseReferenciaCode       String?    @db.VarChar(60) // fase à qual a AÇÃO pertence
+  workflowInstanceOrigemId Int? // instância da fase de ORIGEM (ativa) no momento da criação
+  pessoaId                 Int? // pessoa correspondente (solto → Pessoa)
+  tipoDocumentoId          Int? // tipo documental correspondente (solto → TipoDocumentoCadastro)
+  acaoStepKey              String?    @db.VarChar(80) // ação de catálogo antecipada (stepKey da fase de referência)
+  motivo                   String?    @db.Text // motivo da antecipação
+  resultadoEsperado        String?    @db.Text
+  resultadoObtido          String?    @db.Text
+  createdBy                Int?
+
+  @@index([tipo])
+  @@index([pessoaId])
   @@index([processoId])
   @@index([responsavelId])
   @@index([concluida])
@@ -1893,6 +1911,10 @@ model PendenciaFinanceira {
   resolvidaEm       DateTime?
   resolucao         String?   @db.VarChar(300) // §13 — o que foi feito p/ resolver
   criadoEm          DateTime  @default(now())
+  // Reprocessamento (P4): a pendência é reprocessável quando o preço/config for cadastrado.
+  tentativas        Int       @default(0)
+  ultimaTentativaEm DateTime?
+  ultimaFalha       String?   @db.VarChar(500)
 
   @@index([processoId])
   @@index([phaseKey])
@@ -2816,6 +2838,13 @@ enum OutboxStatus {
   ERRO
 }
 
+// Tipo da Tarefa: NORMAL (do Workflow Interno da fase) ou TRANSVERSAL (ação antecipada de
+// outra fase para resolver uma necessidade da fase atual, SEM avançar o Macro Workflow).
+enum TipoTarefa {
+  NORMAL
+  TRANSVERSAL
+}
+
 enum WorkflowEventoTipo {
   WORKFLOW_INSTANCIADO
   WORKFLOW_INICIADO
@@ -3048,6 +3077,9 @@ model DomainOutbox {
   erro              String?      @db.Text
   criadoEm          DateTime     @default(now())
   processadoEm      DateTime?
+  // Claim atômico (P7): reserva a linha p/ um worker (UPDATE ... WHERE reservadoEm IS NULL).
+  // Dois workers não processam o mesmo evento; a idempotência continua obrigatória.
+  reservadoEm       DateTime?
 
   @@index([status, criadoEm])
   @@index([correlationId])

@@ -18,7 +18,7 @@ import {
 } from "@/src/lib/process-stage/fases-catalog"
 import { mapLegacyStepStatus, stepInstanceStatusToLegacy } from "@/src/lib/process-stage/legacy-status-map"
 import { montarChavePasso } from "@/src/services/phase-workflow-helpers"
-import { evoluirNecessidadePorPasso } from "@/src/services/necessidade-documental"
+import { evoluirNecessidadePorPasso, reabrirAtendimentoNecessidade } from "@/src/services/necessidade-documental"
 
 // Passos que NÃO contam como operação ativa do documento.
 const INATIVOS: StepInstanceStatus[] = ["SUPERSEDIDO", "CANCELADO"]
@@ -301,43 +301,43 @@ export async function atualizarPassoV2(
     ...(liberarProximo ? { completedAt: now } : {}),
     ...(vaiReabrir ? { completedAt: null } : {}),
   }
-  await prisma.phaseWorkflowStepInstance.update({ where: { id: p.id }, data })
+  // TRANSACIONAL (P3): passo + necessidade + passos-irmãos + documento numa única transação —
+  // a reabertura NÃO deixa estados intermediários inconsistentes (progresso/bloqueio caem juntos).
+  await prisma.$transaction(async (tx) => {
+    await tx.phaseWorkflowStepInstance.update({ where: { id: p.id }, data })
 
-  // CICLO DE VIDA DA NECESSIDADE (fluxo operacional oficial): a evolução do passo vinculado
-  // a uma NecessidadeDocumental evolui o ESTADO CANÔNICO da necessidade — conclusão do passo
-  // → ATENDIDA; início → EM_ATENDIMENTO. Único gatilho, via o serviço de domínio (nenhuma
-  // tela/rota escreve status direto). O resolver canônico consome esse estado.
-  if (p.necessidadeId != null) {
-    await evoluirNecessidadePorPasso(p.necessidadeId, novo)
-  }
+    // CICLO DE VIDA DA NECESSIDADE (fluxo operacional oficial). Conclusão → ATENDIDA; início →
+    // EM_ATENDIMENTO. REABERTURA → regride ATENDIDA/NAO_LOCALIZADA para EM_ATENDIMENTO (a
+    // necessidade deixa de contar como concluída, o gate volta a bloquear). Sem escrita direta.
+    if (p.necessidadeId != null) {
+      if (vaiReabrir) await reabrirAtendimentoNecessidade(p.necessidadeId, tx)
+      else await evoluirNecessidadePorPasso(p.necessidadeId, novo, tx)
+    }
 
-  // PROGRESSÃO POR-DOCUMENTO: ao concluir uma etapa, a PRÓXIMA etapa DO MESMO documento
-  // é liberada imediatamente (EM_ANDAMENTO). Cada certidão flui pelo seu workflow interno
-  // de forma independente (Solicitar → Aguardar → Receber → Conferir → Validar). O gate
-  // "todos os documentos prontos" é responsabilidade do AVANÇO DE FASE (BlockingEngine
-  // exige todos os passos obrigatórios concluídos) — não do lock-step entre irmãos, que
-  // travava a operação por-documento (uma etapa esperava as outras certidões).
-  if (liberarProximo) {
-    const proximo = await prisma.phaseWorkflowStepInstance.findFirst({
-      where: { documentoId, faseMacroKey: p.faseMacroKey, ordem: { gt: p.ordem }, status: { in: ["BLOQUEADO", "PENDENTE"] } },
-      orderBy: { ordem: "asc" },
-      select: { id: true },
-    })
-    if (proximo) {
-      const due = new Date(now.getTime() + slaDays * 86400000)
-      await prisma.phaseWorkflowStepInstance.update({
-        where: { id: proximo.id },
-        data: { status: "EM_ANDAMENTO", startedAt: now, prazo: due, motivo: null },
+    // PROGRESSÃO POR-DOCUMENTO: ao concluir uma etapa, a PRÓXIMA do MESMO documento é liberada.
+    if (liberarProximo) {
+      const proximo = await tx.phaseWorkflowStepInstance.findFirst({
+        where: { documentoId, faseMacroKey: p.faseMacroKey, ordem: { gt: p.ordem }, status: { in: ["BLOQUEADO", "PENDENTE"] } },
+        orderBy: { ordem: "asc" },
+        select: { id: true },
+      })
+      if (proximo) {
+        const due = new Date(now.getTime() + slaDays * 86400000)
+        await tx.phaseWorkflowStepInstance.update({
+          where: { id: proximo.id },
+          data: { status: "EM_ANDAMENTO", startedAt: now, prazo: due, motivo: null },
+        })
+      }
+    }
+    // REABERTURA: bloqueia as etapas posteriores do mesmo documento (voltam a depender desta).
+    if (vaiReabrir) {
+      await tx.phaseWorkflowStepInstance.updateMany({
+        where: { documentoId, faseMacroKey: p.faseMacroKey, ordem: { gt: p.ordem }, status: { in: ["EM_ANDAMENTO", "AGUARDANDO"] } },
+        data: { status: "BLOQUEADO", startedAt: null, prazo: null, motivo: null },
       })
     }
-  }
-  if (vaiReabrir) {
-    await prisma.phaseWorkflowStepInstance.updateMany({
-      where: { documentoId, faseMacroKey: p.faseMacroKey, ordem: { gt: p.ordem }, status: { in: ["EM_ANDAMENTO", "AGUARDANDO"] } },
-      data: { status: "BLOQUEADO", startedAt: null, prazo: null, motivo: null },
-    })
-  }
-  await prisma.documento.update({ where: { id: documentoId }, data: { ultimaMovimentacao: now } })
+    await tx.documento.update({ where: { id: documentoId }, data: { ultimaMovimentacao: now } })
+  })
   return { ok: true, workflow: await montarWorkflowV2(documentoId) }
 }
 

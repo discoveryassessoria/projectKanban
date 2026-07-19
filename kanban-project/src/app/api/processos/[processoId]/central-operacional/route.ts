@@ -64,6 +64,7 @@ interface CardCounts {
 
 interface QueueRow {
   docId: number
+  pessoaId: number // P6 — agrupamento por pessoaId (homônimos NÃO colapsam)
   pessoaNome: string
   docType: string
   docTypeLabel: string
@@ -527,6 +528,7 @@ export async function GET(
 
       return {
         docId: d.id,
+        pessoaId: d.pessoaId,
         pessoaNome: pessoa ? nomeCompleto(pessoa) : "—",
         docType: d.tipo,
         docTypeLabel: TIPO_LABELS[d.tipo] || d.tipo,
@@ -718,6 +720,7 @@ export async function GET(
         const dias = s?.prazo ? diffDays(s.prazo, now) : null
         return {
           docId: s?.documentoId ?? 0,
+          pessoaId: n.pessoaId ?? 0,
           pessoaNome: pessoa ? nomeCompleto(pessoa) : "—",
           docType: requisitoDe(n.matrizSnapshot),
           docTypeLabel: requisitoDe(n.matrizSnapshot),

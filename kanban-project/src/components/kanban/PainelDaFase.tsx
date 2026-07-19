@@ -99,6 +99,8 @@ export interface PainelDaFaseProps {
   // Delegação direto na fila (Genealogia): lista de funcionários + callback.
   usuarios?: Array<{ id: number; nome: string }>
   onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
+  // Tarefa Transversal: cria uma ação antecipada de outra fase para resolver esta necessidade.
+  onCriarTransversal?: (necessidadeId: number, pessoaId: number | null, label: string) => void
   // CONSULTA de fase passada (PAST_READ_ONLY): mesmo layout/dados, mas SEM ações de
   // mutação (abrir operação/delegar). Só leitura. onAbrirOperacao/onDelegar chegam
   // undefined; readOnly deixa a intenção explícita para a UI.
@@ -132,6 +134,7 @@ export function PainelDaFase({
   onAbrirPainelCompleto,
   usuarios,
   onDelegar,
+  onCriarTransversal,
   readOnly = false,
   modoReestruturacao = false,
   avisoReestruturacao,
@@ -300,7 +303,7 @@ export function PainelDaFase({
             tone="linha"
           />
           {linhaPrincipal.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
+            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} onCriarTransversal={onCriarTransversal} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
           ))}
 
           {/* Grupo Fora da linhagem */}
@@ -311,7 +314,7 @@ export function PainelDaFase({
             tone="fora"
           />
           {foraDaLinha.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
+            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} onCriarTransversal={onCriarTransversal} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
           ))}
         </div>
       </div>
@@ -352,6 +355,7 @@ function PersonRow({
   onAbrirOperacao,
   usuarios,
   onDelegar,
+  onCriarTransversal,
   ocultarValidacao = false,
   readOnly = false,
 }: {
@@ -359,6 +363,7 @@ function PersonRow({
   onAbrirOperacao?: (docId: number, necessidadeId?: number | null) => void
   usuarios?: Array<{ id: number; nome: string }>
   onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
+  onCriarTransversal?: (necessidadeId: number, pessoaId: number | null, label: string) => void
   ocultarValidacao?: boolean
   readOnly?: boolean
 }) {
@@ -549,7 +554,17 @@ function PersonRow({
             <span className="text-[12px] text-gray-600">{d.proximaAcao || "—"}</span>
 
             {/* Botão — em consulta (readOnly) não há ação de mutação; só o status acima. */}
-            <div className="flex justify-end">
+            <div className="flex justify-end items-center gap-2">
+              {/* Ação DISCRETA: criar tarefa transversal p/ resolver esta necessidade antecipadamente. */}
+              {!readOnly && onCriarTransversal && d.necessidadeId != null && !d.emissaoConcluida && (
+                <button
+                  onClick={() => onCriarTransversal(d.necessidadeId as number, p.pessoaId ?? null, `${d.tipoLabel}${d.subtitulo ? " · " + d.subtitulo : ""} — ${p.nome}`)}
+                  title="Criar tarefa transversal"
+                  className="text-[11px] font-semibold text-gray-500 hover:text-blue-600 underline decoration-dotted underline-offset-2"
+                >
+                  Transversal
+                </button>
+              )}
               {readOnly || !onAbrirOperacao ? (
                 <span className="text-[11px] font-semibold text-gray-400 px-3 py-2">Somente leitura</span>
               ) : (

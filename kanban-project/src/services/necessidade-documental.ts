@@ -214,6 +214,18 @@ export async function evoluirNecessidadePorPasso(necessidadeId: number, statusPa
 }
 
 /**
+ * REGRESSÃO por REABERTURA de passo (P3): a necessidade cuja condição dependia do passo
+ * reaberto DEIXA de estar concluída → ATENDIDA/NAO_LOCALIZADA volta a EM_ATENDIMENTO. A
+ * conclusão anterior PERMANECE no histórico (eventos append-only). Idempotente.
+ */
+export async function reabrirAtendimentoNecessidade(necessidadeId: number, db: DB = prisma) {
+  const n = await db.necessidadeDocumental.findUnique({ where: { id: necessidadeId }, select: { status: true } })
+  if (!n || (n.status !== "ATENDIDA" && n.status !== "NAO_LOCALIZADA")) return
+  await db.necessidadeDocumental.update({ where: { id: necessidadeId }, data: { status: "EM_ATENDIMENTO" } })
+  await evento(db, necessidadeId, "REABERTA", { origem: "reabertura_passo" })
+}
+
+/**
  * RECONCILIAÇÃO (compatibilidade, idempotente, append-only, NÃO destrutiva): evolui as
  * necessidades cujo passo operacional já está CONCLUIDO mas cujo status ficou defasado em
  * PENDENTE/EM_ATENDIMENTO — trazendo o estado oficial ao mesmo ponto do fluxo de eventos.

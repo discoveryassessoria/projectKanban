@@ -336,10 +336,19 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
       for (const natPreco of naturezasDaAplicacao(ap)) {
         const isRec = natPreco === NaturezaPreco.VENDA
         const preco = await precoDaConfig(r.configItemId, natPreco, processoId, tipoProcessoId)
-        if (!preco) { skipped.push({ name: titulo, reason: 'Configuração Financeira sem preço cadastrado' }); continue }
-        if ('erro' in preco) { skipped.push({ name: titulo, reason: `Nenhum preço vigente encontrado para a Configuração Financeira selecionada — ${preco.erro}` }); continue }
+        if (!preco) {
+          await registrarPendencia({ processoId, tipoProcessoId, phaseKey, configItemId: r.configItemId, regraId: r.id, natureza: natPreco, motivo: 'SEM_PRECO', detalhe: `${titulo}: Configuração Financeira sem preço cadastrado` })
+          skipped.push({ name: titulo, reason: 'Sem preço → pendência financeira registrada (reprocessável)' }); continue
+        }
+        if ('erro' in preco) {
+          await registrarPendencia({ processoId, tipoProcessoId, phaseKey, configItemId: r.configItemId, regraId: r.id, natureza: natPreco, motivo: 'SEM_PRECO_VALIDO', detalhe: `${titulo}: ${preco.erro}` })
+          skipped.push({ name: titulo, reason: 'Preço ausente/conflitante → pendência registrada (reprocessável)' }); continue
+        }
         const fx = await fxParaBRL(preco.moeda, fxCache)
-        if (fx == null) { skipped.push({ name: titulo, reason: `Sem cotação de câmbio ${preco.moeda}→BRL. Cadastre a cotação para lançar.` }); continue }
+        if (fx == null) {
+          await registrarPendencia({ processoId, tipoProcessoId, phaseKey, configItemId: r.configItemId, regraId: r.id, natureza: natPreco, motivo: 'SEM_CAMBIO', detalhe: `${titulo}: Sem cotação de câmbio ${preco.moeda}→BRL` })
+          skipped.push({ name: titulo, reason: `Sem câmbio ${preco.moeda}→BRL → pendência registrada (reprocessável)` }); continue
+        }
         // Idempotência estrutural: processo + fase + automação + natureza (config/aplicação fixos na regra).
         const akey = `${processoId}::${phaseKey}::automation::${r.id}::${isRec ? 'VENDA' : 'CUSTO'}`
         const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', phaseKey, chaveIdempotencia: akey, contexto: { fonte: 'automation', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap, mestre: mestreNome } }
@@ -449,6 +458,29 @@ export async function dispararMotorNaFaseAtual(processoId: number): Promise<void
 // financeiro (tarefas são do Workflow Interno). Preço vem da Tabela de Preços;
 // idempotência via MotorArtefato (automaticKey @unique). Reprocessável (não duplica).
 // ============================================================
+// P4 — PENDÊNCIA FINANCEIRA REPROCESSÁVEL: quando uma regra APLICÁVEL não pode lançar por
+// falta de preço/config/câmbio, NÃO ignora em silêncio — registra (idempotente) uma
+// PendenciaFinanceira reprocessável (nunca lançamento zero, nunca descarta o evento).
+async function registrarPendencia(o: {
+  processoId: number; tipoProcessoId: number | null; phaseKey: string; configItemId: number | null;
+  regraId: number; natureza: NaturezaPreco | null; motivo: string; detalhe: string;
+}): Promise<void> {
+  const chave = `pend::${o.processoId}::${o.phaseKey}::${o.regraId}::${o.natureza ?? 'NA'}`
+  const detalhe = o.detalhe.slice(0, 500)
+  await prisma.pendenciaFinanceira.upsert({
+    where: { chaveIdempotencia: chave },
+    create: { processoId: o.processoId, tipoProcessoId: o.tipoProcessoId, phaseKey: o.phaseKey, phaseCycle: 1, configFinanceiraId: o.configItemId, regraFinanceiraId: o.regraId, natureza: o.natureza, motivo: o.motivo.slice(0, 40), detalhe, chaveIdempotencia: chave, resolvida: false, tentativas: 1, ultimaTentativaEm: new Date(), ultimaFalha: detalhe },
+    update: { resolvida: false, resolvidaEm: null, tentativas: { increment: 1 }, ultimaTentativaEm: new Date(), ultimaFalha: detalhe },
+  }).catch((e) => console.error('[pendencia financeira] falha ao registrar:', e))
+}
+
+/** Marca como resolvida a pendência daquela (processo, fase, regra, natureza) — após um
+ *  lançamento bem-sucedido. Idempotente. */
+async function resolverPendencia(processoId: number, phaseKey: string, regraId: number, natureza: NaturezaPreco): Promise<void> {
+  const chave = `pend::${processoId}::${phaseKey}::${regraId}::${natureza}`
+  await prisma.pendenciaFinanceira.updateMany({ where: { chaveIdempotencia: chave, resolvida: false }, data: { resolvida: true, resolvidaEm: new Date(), resolucao: 'Lançamento criado (preço/config resolvidos)' } }).catch(() => {})
+}
+
 export async function executarFinanceirasNaFaseV2(
   processoId: number, phaseKey: string,
 ): Promise<{ criadas: number; skipped: { name: string; reason: string }[]; erros: string[] }> {
@@ -484,13 +516,22 @@ export async function executarFinanceirasNaFaseV2(
     for (const natPreco of naturezasDaAplicacao(ap)) {
       const isRec = natPreco === NaturezaPreco.VENDA
       const preco = await precoDaConfig(r.configItemId!, natPreco, processoId, tipoProcessoId)
-      if (!preco) { skipped.push({ name: titulo, reason: 'Configuração Financeira sem preço cadastrado' }); continue }
-      if ('erro' in preco) { skipped.push({ name: titulo, reason: `Nenhum preço vigente encontrado para a Configuração Financeira selecionada — ${preco.erro}` }); continue }
+      if (!preco) {
+        await registrarPendencia({ processoId, tipoProcessoId, phaseKey, configItemId: r.configItemId, regraId: r.id, natureza: natPreco, motivo: 'SEM_PRECO', detalhe: `${titulo}: Configuração Financeira sem preço cadastrado na Tabela de Preços` })
+        skipped.push({ name: titulo, reason: 'Sem preço → pendência financeira registrada (reprocessável)' }); continue
+      }
+      if ('erro' in preco) {
+        await registrarPendencia({ processoId, tipoProcessoId, phaseKey, configItemId: r.configItemId, regraId: r.id, natureza: natPreco, motivo: 'SEM_PRECO_VALIDO', detalhe: `${titulo}: ${preco.erro}` })
+        skipped.push({ name: titulo, reason: 'Preço ausente/conflitante → pendência registrada (reprocessável)' }); continue
+      }
 
       // CÂMBIO obrigatório em moeda estrangeira: sem cotação, NÃO lança (evita valor sem
-      // conversão). Checado ANTES de criar o marcador de idempotência (não deixa órfão).
+      // conversão). Registra pendência reprocessável (nunca lança 1:1, nunca descarta).
       const fx = await fxParaBRL(preco.moeda, fxCache)
-      if (fx == null) { skipped.push({ name: titulo, reason: `Sem cotação de câmbio ${preco.moeda}→BRL. Cadastre a cotação para lançar (não foi lançado com conversão 1:1).` }); continue }
+      if (fx == null) {
+        await registrarPendencia({ processoId, tipoProcessoId, phaseKey, configItemId: r.configItemId, regraId: r.id, natureza: natPreco, motivo: 'SEM_CAMBIO', detalhe: `${titulo}: Sem cotação de câmbio ${preco.moeda}→BRL` })
+        skipped.push({ name: titulo, reason: `Sem câmbio ${preco.moeda}→BRL → pendência registrada (reprocessável)` }); continue
+      }
 
       const akey = `${processoId}::${phaseKey}::automation::${r.id}::${isRec ? 'VENDA' : 'CUSTO'}`
       // ATOMICIDADE + IDEMPOTÊNCIA (correção de duplicidade): o LANÇAMENTO e o MotorArtefato
@@ -513,8 +554,10 @@ export async function executarFinanceirasNaFaseV2(
           })
         }, { timeout: 30000, maxWait: 10000 })
         criadas++
+        await resolverPendencia(processoId, phaseKey, r.id, natPreco) // fecha pendência, se havia
       } catch (e) {
         if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+          await resolverPendencia(processoId, phaseKey, r.id, natPreco)
           skipped.push({ name: titulo, reason: 'já lançado (idempotência)' }); continue
         }
         erros.push(`${titulo}: ${(e as Error)?.message ?? 'erro'}`)
@@ -522,4 +565,24 @@ export async function executarFinanceirasNaFaseV2(
     }
   }
   return { criadas, skipped, erros }
+}
+
+// P4 — REPROCESSAMENTO: ao cadastrar o preço/config, reexecuta as automações das (processo,
+// fase) com pendência ABERTA. executarFinanceirasNaFaseV2 é idempotente (automaticKey) e
+// fecha a pendência ao lançar. Executar 2x NÃO duplica lançamento (transação + unique).
+export async function reprocessarPendenciasFinanceiras(opts?: { processoId?: number; configItemId?: number }): Promise<{ reprocessados: number; resolvidos: number }> {
+  const pend = await prisma.pendenciaFinanceira.findMany({
+    where: { resolvida: false, ...(opts?.processoId ? { processoId: opts.processoId } : {}), ...(opts?.configItemId ? { configFinanceiraId: opts.configItemId } : {}) },
+    select: { processoId: true, phaseKey: true },
+  })
+  const alvos = new Map<string, { processoId: number; phaseKey: string }>()
+  for (const p of pend) alvos.set(`${p.processoId}::${p.phaseKey}`, { processoId: p.processoId, phaseKey: p.phaseKey })
+  let resolvidos = 0
+  for (const a of alvos.values()) {
+    const antes = await prisma.pendenciaFinanceira.count({ where: { processoId: a.processoId, phaseKey: a.phaseKey, resolvida: false } })
+    try { await executarFinanceirasNaFaseV2(a.processoId, a.phaseKey) } catch (e) { console.error('[reprocesso pendência]', e) }
+    const depois = await prisma.pendenciaFinanceira.count({ where: { processoId: a.processoId, phaseKey: a.phaseKey, resolvida: false } })
+    resolvidos += Math.max(0, antes - depois)
+  }
+  return { reprocessados: alvos.size, resolvidos }
 }
