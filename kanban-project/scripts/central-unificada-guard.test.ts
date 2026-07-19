@@ -72,7 +72,7 @@ const bespoke: Array<[string, string]> = [
 ]
 for (const [nome, rel] of bespoke) check(`auto-avanço ligado em ${nome}`, read(rel).includes("concluirFaseBespokeEAvancar"))
 const adv = read("src/lib/motor/phase-advance.ts")
-check("advance usa roteamento condicional (proximaFaseComCondicional)", adv.includes("proximaFaseComCondicional") && adv.includes("CONDICIONAIS_RETIFICACAO"))
+check("advance usa roteamento condicional (proximaFaseComCondicional + flag conditional)", adv.includes("proximaFaseComCondicional") && adv.includes("f.conditional") && adv.includes("requerRetificacao"))
 check("advance NÃO usa mais proximaFasePorOrdem (por-ordem cego)", !adv.includes("proximaFasePorOrdem("))
 const helpers = read("src/lib/motor/phase-advance-helpers.ts")
 check("proximaFaseAplicavel (pula condicionais não aplicáveis)", helpers.includes("export function proximaFaseAplicavel"))

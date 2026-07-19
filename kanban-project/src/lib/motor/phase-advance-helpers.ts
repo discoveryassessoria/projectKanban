@@ -85,6 +85,9 @@ export function montarChaveAdvanceBloqueio(i: {
 export interface FaseOrdenada {
   phaseKey: string
   ordem: number
+  /** Fase CONDICIONAL (FaseMacro.conditional): só entra no caminho quando sua condição
+   *  se aplica (ex.: retificação). Quando não se aplica, é PULADA no avanço. */
+  conditional?: boolean
 }
 
 /** Primeira fase pela ORDEM do Workflow Macro (menor ordem), nunca por label/nome.

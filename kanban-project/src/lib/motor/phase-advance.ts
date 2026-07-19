@@ -102,7 +102,7 @@ export type AdvanceResult = AdvanceOk | AdvanceErr
 
 interface Contexto {
   processo: { id: number; faseAtual: string; lockVersion: number; tipoProcessoMotorId: number | null }
-  fases: { phaseKey: string; ordem: number }[]
+  fases: { phaseKey: string; ordem: number; conditional?: boolean }[]
   runtime: "legacy" | "v2"
   v2Global: boolean
 }
@@ -128,7 +128,7 @@ async function carregarContexto(processoId: number): Promise<Contexto | AdvanceE
 
   const wf = await prisma.macroWorkflow.findUnique({
     where: { tipoProcessoId: processo.tipoProcessoMotorId },
-    include: { fases: { orderBy: { ordem: "asc" }, select: { phaseKey: true, ordem: true } } },
+    include: { fases: { orderBy: { ordem: "asc" }, select: { phaseKey: true, ordem: true, conditional: true } } },
   })
   if (!wf) return rejeitar("SEM_TIPO_MOTOR", "Tipo do motor sem Workflow Macro")
 
@@ -415,23 +415,25 @@ async function snapshotPendencias(processoId: number, faseAtual: string, correla
 // Operações públicas
 // --------------------------------------------------------------------------
 
-// Fases CONDICIONAIS do desvio de retificação (só aplicáveis quando a Análise decide
-// "com retificação"). Se "sem retificação" (ou indefinida), são PULADAS no avanço.
-const CONDICIONAIS_RETIFICACAO = new Set(["retificacao_registros", "emissao_documental_retificada"])
-
 /**
- * Próxima fase respeitando o DESVIO CONDICIONAL: pula Retificação/Emissão Retificada quando
- * a Análise decidiu que NÃO requer retificação. Fonte da decisão: AnaliseDocumental.
- * requerRetificacao (true = entra nas fases de retificação; false/indefinido = pula).
+ * Próxima fase respeitando o DESVIO CONDICIONAL. Fases marcadas como CONDICIONAIS no macro
+ * (FaseMacro.conditional — fonte canônica, ex.: "retificacao" e "emissao_documental_
+ * retificada") só entram no caminho quando sua condição se aplica. Hoje a única condição é
+ * a decisão da Análise: requerRetificacao === true entra nas fases condicionais; caso
+ * contrário (false/indefinido) elas são PULADAS, indo direto p/ a próxima aplicável.
  */
 async function proximaFaseComCondicional(processoId: number, fases: FaseOrdenada[], faseAtual: string): Promise<string | null> {
+  const temCondicional = fases.some((f) => f.conditional)
+  if (!temCondicional) return proximaFaseAplicavel(fases, faseAtual, () => true)
+
   const analise = await prisma.analiseDocumental.findUnique({
     where: { processoId },
     select: { requerRetificacao: true },
   }).catch(() => null)
   const requerRetificacao = analise?.requerRetificacao === true
+  const condicionais = new Set(fases.filter((f) => f.conditional).map((f) => f.phaseKey))
   const ehAplicavel = (phaseKey: string): boolean =>
-    CONDICIONAIS_RETIFICACAO.has(phaseKey) ? requerRetificacao : true
+    condicionais.has(phaseKey) ? requerRetificacao : true
   return proximaFaseAplicavel(fases, faseAtual, ehAplicavel)
 }
 
