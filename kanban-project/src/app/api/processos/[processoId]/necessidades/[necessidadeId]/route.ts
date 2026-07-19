@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { marcarNaoLocalizada, reabrir, retornoGenealogia, dispensarNecessidade, atenderNecessidade, iniciarAtendimentoNecessidade } from "@/src/services/necessidade-documental"
+import { tentarAvancoAutomatico } from "@/src/lib/motor/auto-avanco"
 
 // GET - detalhe da necessidade + histórico (eventos) + documentos que a atendem
 export async function GET(
@@ -41,16 +42,25 @@ export async function PATCH(
   const erro = await verificarPermissao(request, "processos.editar")
   if (erro) return erro
   try {
-    const { necessidadeId: nid } = await params
+    const { processoId: pidStr, necessidadeId: nid } = await params
     const id = parseInt(nid)
+    const pid = parseInt(pidStr)
     if (isNaN(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })
 
     const body = await request.json().catch(() => ({}))
     const acao = body.acao as string
 
+    // AUTO-AVANÇO: necessidade é ENTRADA do gate da fase. Quando uma transição
+    // completa/dispensa uma necessidade obrigatória, o card deve ir sozinho — sem
+    // arrastar. Dispara após a transição (gancho idempotente e gated).
+    const avancar = () => tentarAvancoAutomatico(isNaN(pid) ? null : pid)
+
     switch (acao) {
-      case "nao_localizada":
-        return NextResponse.json({ necessidade: await marcarNaoLocalizada(id) })
+      case "nao_localizada": {
+        const necessidade = await marcarNaoLocalizada(id)
+        await avancar()
+        return NextResponse.json({ necessidade })
+      }
       case "reabrir":
         return NextResponse.json({ necessidade: await reabrir(id) }, { status: 201 })
       case "retorno_genealogia":
@@ -58,6 +68,7 @@ export async function PATCH(
       case "dispensar": {
         // Transição CANÔNICA pelo serviço de domínio (nenhuma escrita direta de status).
         await dispensarNecessidade(id, typeof body.motivo === "string" ? body.motivo : undefined)
+        await avancar()
         return NextResponse.json({ necessidade: await prisma.necessidadeDocumental.findUnique({ where: { id } }) })
       }
       case "em_atendimento": {
@@ -66,6 +77,7 @@ export async function PATCH(
       }
       case "atender": {
         await atenderNecessidade(id)
+        await avancar()
         return NextResponse.json({ necessidade: await prisma.necessidadeDocumental.findUnique({ where: { id } }) })
       }
       default:

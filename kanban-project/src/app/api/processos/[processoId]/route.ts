@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { logProcesso } from "@/lib/auditoria"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { tentarAvancoAutomatico } from "@/src/lib/motor/auto-avanco"
 
 // GET - Buscar processo por ID
 export async function GET(
@@ -176,6 +177,13 @@ export async function PUT(
 
     // ✅ REGISTRAR LOG (edição de dados; a fase é registrada pelo PhaseAdvanceService)
     await logProcesso.editar(processoExistente.nome, id)
+
+    // AUTO-AVANÇO: requerente/árvore são ENTRADAS do gate (computeGate). Se a edição
+    // desbloqueou a fase, o card deve ir sozinho — sem arrastar. advance() é idempotente
+    // e gated (só avança com zero pendências blocking). Best-effort: não falha o PUT.
+    if (requerenteIds !== undefined || arvoreId !== undefined) {
+      await tentarAvancoAutomatico(id)
+    }
 
     // Buscar processo atualizado
     const processoAtualizado = await prisma.processo.findUnique({

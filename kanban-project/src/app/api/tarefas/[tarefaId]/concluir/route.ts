@@ -6,6 +6,7 @@ import { hojeBrasil } from "@/src/lib/date-utils"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
 import { concluirTarefa } from "@/src/services/task-step-sync"
+import { tentarAvancoAutomatico } from "@/src/lib/motor/auto-avanco"
 
 export async function POST(
   request: NextRequest,
@@ -44,6 +45,8 @@ export async function POST(
       const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 }, select: { runtimeV2Habilitado: true } })
       if ((cfg?.runtimeV2Habilitado ?? false) && proc?.workflowRuntime === "v2") {
         const r = await concluirTarefa(id, { origem: "USER", usuarioId })
+        // AUTO-AVANÇO: concluída a tarefa v2, se a fase ficou sem pendências o card vai sozinho.
+        if (r.success) await tentarAvancoAutomatico(tarefaAtual.processoId)
         return NextResponse.json(r, { status: r.success ? 200 : 409 })
       }
     }
@@ -90,6 +93,9 @@ export async function POST(
         }
       }
     })
+
+    // AUTO-AVANÇO (legado): tarefa concluída pode ter zerado as pendências da fase.
+    if (tarefaAtual.processoId) await tentarAvancoAutomatico(tarefaAtual.processoId)
 
     return NextResponse.json({ tarefa })
   } catch (error) {
