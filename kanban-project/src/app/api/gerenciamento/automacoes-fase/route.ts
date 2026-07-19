@@ -131,9 +131,12 @@ export async function POST(request: NextRequest) {
     const tipoProcessoId = Number(body.tipoProcessoId)
     const phaseKey = String(body.phaseKey || '')
     const kind = String(body.kind || 'task')
-    const name = String(body.name || '').trim()
+    // FINANCEIRO: identidade 100% ESTRUTURADA — name/description NÃO são aceitos nem
+    // persistidos (título/descrição derivados da regra). Demais tipos ainda usam nome.
+    const ehFinanceira = kind === 'financial'
+    const name = ehFinanceira ? null : String(body.name || '').trim()
     if (!tipoProcessoId || !phaseKey) return NextResponse.json({ error: 'Selecione o processo e a fase.' }, { status: 400 })
-    if (!name) return NextResponse.json({ error: 'Dê um nome à automação.' }, { status: 400 })
+    if (!ehFinanceira && !name) return NextResponse.json({ error: 'Dê um nome à automação.' }, { status: 400 })
     if (kindDeAvanco(kind) || kindDeTrabalhoObrigatorio(kind) || !KINDS_EFEITO_PERMITIDOS.has(kind)) {
       return NextResponse.json({ error: msgProibido(kind), code: 'AUTOMACAO_PROIBIDA' }, { status: 422 })
     }
@@ -161,7 +164,8 @@ export async function POST(request: NextRequest) {
     const rule = await prisma.phaseAutomationRule.create({
       data: {
         tipoProcessoId, phaseKey, kind, name,
-        description: body.description ? String(body.description) : null,
+        // Financeiro: descrição também é derivada — nunca persistida.
+        description: ehFinanceira ? null : (body.description ? String(body.description) : null),
         scope: body.scope || 'phase',
         trigger: body.trigger || 'phase_entered',
         action: body.action ? String(body.action) : null,

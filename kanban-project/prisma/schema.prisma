@@ -2266,7 +2266,10 @@ model PhaseAutomationRule {
   templateId         Int? // → ModeloAutomacao (solto; null = regra ad-hoc)
   tipoProcessoId     Int // → TipoProcessoNacionalidade (solto) — regra pertence a um processo
   phaseKey           String  @db.VarChar(60)
-  name               String  @db.VarChar(200)
+  // LEGADO — texto livre. Regras financeiras NOVAS não preenchem (identidade é derivada
+  // da estrutura: Aplicação + Config Financeira + gatilho + fase). Mantido nullable só p/
+  // leitura de regras antigas. Não usar para gerar título/descrição/lançamento de regras novas.
+  name               String? @db.VarChar(200)
   description        String? @db.Text
   kind               String  @db.VarChar(30) // task | financial | document | event | protocol | phase_advance | alert
   scope              String  @default("phase") @db.VarChar(40)

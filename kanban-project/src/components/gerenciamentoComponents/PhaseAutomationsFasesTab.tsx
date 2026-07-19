@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { tituloAutomacaoFinanceira, descricaoAutomacaoFinanceira } from "@/lib/financeiro/automacao-financeira-identidade"
 
 // ============================================================
 // Tipos
@@ -10,7 +11,7 @@ interface Rule {
   templateId: number | null
   tipoProcessoId: number
   phaseKey: string
-  name: string
+  name: string | null // LEGADO — financeiro não usa (identidade estruturada)
   description?: string | null
   kind: string
   scope: string
@@ -158,6 +159,17 @@ export default function PhaseAutomationsFasesTab() {
   const itensDaCategoria = form?.categoria ? configsFin.filter(c => c.origem === form.categoria).sort((a, b) => a.mestre.localeCompare(b.mestre)) : []
   const cfgSelForm = configsFin.find(c => String(c.id) === form?.configItemId)
   const cfgAmbosPermitido = !!cfgSelForm && cfgSelForm.possuiCusto && cfgSelForm.possuiReceita
+  // IDENTIDADE ESTRUTURADA (financeiro): título/descrição derivados — nunca texto livre.
+  const mestreDeConfig = (configItemId: string | number | null) => configsFin.find(c => c.id === Number(configItemId))?.mestre || ""
+  const tituloFinanceiroDoForm = (f: Form) => (f.configItemId && f.aplicacaoFinanceira) ? tituloAutomacaoFinanceira(f.aplicacaoFinanceira, mestreDeConfig(f.configItemId)) : ""
+  const descricaoFinanceiraDoForm = (f: Form) => (f.configItemId && f.aplicacaoFinanceira) ? descricaoAutomacaoFinanceira({ trigger: f.trigger, phaseKey: faseAtual?.phaseKey, aplicacao: f.aplicacaoFinanceira, mestreNome: mestreDeConfig(f.configItemId) }) : ""
+  // Rótulo do card/confirmações: financeiro = título derivado; demais = nome legado.
+  const rotuloRegra = (r: Rule) => (r.kind === "financial" && r.configItemId)
+    ? tituloAutomacaoFinanceira(r.aplicacaoFinanceira, mestreDeConfig(r.configItemId))
+    : (r.name ?? `automação #${r.id}`)
+  const descricaoRegra = (r: Rule) => (r.kind === "financial" && r.configItemId)
+    ? descricaoAutomacaoFinanceira({ trigger: r.trigger, phaseKey: r.phaseKey, aplicacao: r.aplicacaoFinanceira, mestreNome: mestreDeConfig(r.configItemId) })
+    : (r.description || "")
 
   // ---------- ações ----------
   async function aplicar() {
@@ -179,7 +191,7 @@ export default function PhaseAutomationsFasesTab() {
     const p = (r.params || {}) as Record<string, unknown>
     const c0 = (r.conditions && r.conditions[0]) || { field: "", op: "eq", value: "" }
     setForm({
-      id: r.id, kind: r.kind, name: r.name, description: r.description || "", scope: r.scope, trigger: r.trigger, action: r.action || "",
+      id: r.id, kind: r.kind, name: r.name ?? "", description: r.description || "", scope: r.scope, trigger: r.trigger, action: r.action || "",
       condField: c0.field || "", condOp: c0.op || "eq", condVal: (c0.value ?? "") + "", idempotent: r.idempotent, active: r.active,
       owner: (p.owner as string) || "", priority: (p.priority as string) || "medium", slaDays: Number(p.slaDays) || 0,
       checklist: Array.isArray(p.checklist) ? (p.checklist as string[]).join("\n") : "",
@@ -202,20 +214,23 @@ export default function PhaseAutomationsFasesTab() {
 
   async function saveForm() {
     if (!form || !faseAtual) return
-    if (!form.name.trim()) { showFlash("Dê um nome à automação."); return }
-    if (form.kind === "financial") {
+    const ehFin = form.kind === "financial"
+    // Financeiro NÃO tem Nome — identidade é estruturada.
+    if (!ehFin && !form.name.trim()) { showFlash("Dê um nome à automação."); return }
+    if (ehFin) {
       if (!form.configItemId) { showFlash("Selecione a Configuração Financeira (Categoria + Item)."); return }
       if (!form.aplicacaoFinanceira) { showFlash("Selecione a Aplicação financeira."); return }
     }
     const conditions = form.condField && form.condOp ? [{ field: form.condField, op: form.condOp, value: form.condVal }] : []
     const payload = {
-      tipoProcessoId: ptNum, phaseKey: faseAtual.phaseKey, kind: form.kind, name: form.name,
-      description: form.description, scope: form.scope, trigger: form.trigger, action: form.action,
+      tipoProcessoId: ptNum, phaseKey: faseAtual.phaseKey, kind: form.kind,
+      scope: form.scope, trigger: form.trigger, action: form.action,
       conditions, params: buildParams(form),
-      // FLUXO NOVO: financeiro envia vínculo estrutural + direção; nunca valor/moeda/tipo.
-      ...(form.kind === "financial"
+      // FLUXO NOVO: financeiro envia SÓ vínculo estrutural + direção (sem name/descrição/
+      // valor/moeda/tipo). Demais tipos ainda enviam nome/descrição.
+      ...(ehFin
         ? { configItemId: Number(form.configItemId), aplicacaoFinanceira: form.aplicacaoFinanceira, financialType: null }
-        : { financialType: null }),
+        : { name: form.name, description: form.description, financialType: null }),
       idempotent: form.idempotent, active: form.active,
     }
     setBusy(true)
@@ -239,13 +254,15 @@ export default function PhaseAutomationsFasesTab() {
     setBusy(true)
     try {
       const payload = {
-        tipoProcessoId: r.tipoProcessoId, phaseKey: r.phaseKey, kind: r.kind, name: r.name + " (cópia)",
-        description: r.description, scope: r.scope, trigger: r.trigger, action: r.action,
+        tipoProcessoId: r.tipoProcessoId, phaseKey: r.phaseKey, kind: r.kind,
+        scope: r.scope, trigger: r.trigger, action: r.action,
         conditions: r.conditions || [],
-        // Financeiro novo: duplica o vínculo estrutural, nunca valor/moeda/tipo legado.
+        // Financeiro: duplica SÓ o vínculo estrutural (sem nome/descrição/valor/moeda).
         params: r.kind === "financial" ? {} : (r.params || {}),
         financialType: null,
-        ...(r.kind === "financial" ? { configItemId: r.configItemId, aplicacaoFinanceira: r.aplicacaoFinanceira } : {}),
+        ...(r.kind === "financial"
+          ? { configItemId: r.configItemId, aplicacaoFinanceira: r.aplicacaoFinanceira }
+          : { name: (r.name ?? "") + " (cópia)", description: r.description }),
         idempotent: r.idempotent, active: r.active,
       }
       const res = await fetch("/api/gerenciamento/automacoes-fase", { method: "POST", headers: authHeaders(), body: JSON.stringify(payload) })
@@ -254,7 +271,7 @@ export default function PhaseAutomationsFasesTab() {
     } finally { setBusy(false) }
   }
   async function archiveRule(r: Rule) {
-    if (!confirm(`Arquivar a automação "${r.name}"? Ela sai da lista de ativas, mas pode ser reativada depois.`)) return
+    if (!confirm(`Arquivar a automação "${rotuloRegra(r)}"? Ela sai da lista de ativas, mas pode ser reativada depois.`)) return
     upsertRuleLocal({ ...r, arquivado: true, active: false }) // otimista — some da lista de ativas, mas fica no banco
     const res = await fetch(`/api/gerenciamento/automacoes-fase/${r.id}`, {
       method: "PUT", headers: authHeaders(), body: JSON.stringify({ arquivado: true, active: false }),
@@ -269,7 +286,7 @@ export default function PhaseAutomationsFasesTab() {
     if (res.ok) { const j = await res.json().catch(() => ({})); if (j.rule) upsertRuleLocal(j.rule); showFlash("Automação reativada.") } else { showFlash("Erro."); load() }
   }
   async function deleteRule(r: Rule) {
-    if (!confirm(`Excluir a automação "${r.name}"?`)) return
+    if (!confirm(`Excluir a automação "${rotuloRegra(r)}"?`)) return
     const res = await fetch(`/api/gerenciamento/automacoes-fase/${r.id}`, { method: "DELETE", headers: authHeaders() })
     const j = await res.json().catch(() => ({}))
     if (res.ok) { removeRuleLocal(r.id); showFlash("Automação excluída.") }
@@ -396,13 +413,13 @@ export default function PhaseAutomationsFasesTab() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-white">{r.name}</span>
+                            <span className="text-sm font-medium text-white">{rotuloRegra(r)}</span>
                             {r.arquivado
                               ? <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/50">arquivada</span>
                               : <span className={`rounded-full px-2 py-0.5 text-[10px] ${r.active ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}>{r.active ? "Ativa" : "Inativa"}</span>}
                             {r.templateId != null && <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] text-violet-300">de modelo</span>}
                           </div>
-                          {r.description && <div className="mt-0.5 text-xs text-white/50">{r.description}</div>}
+                          {descricaoRegra(r) && <div className="mt-0.5 text-xs text-white/50">{descricaoRegra(r)}</div>}
                           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-white/50">
                             <span className="rounded bg-white/10 px-1.5 py-0.5">{kindLabel(r.kind)}</span>
                             <span className="rounded bg-white/10 px-1.5 py-0.5">{trigLabel(r.trigger)}</span>
@@ -487,14 +504,23 @@ export default function PhaseAutomationsFasesTab() {
               <p className="mt-0.5 text-xs text-white/50">Fase: {faseAtual.label}</p>
             </div>
             <div className="grid grid-cols-2 gap-3 px-6 py-4">
-              <div className="col-span-2">
-                <label className={labelCls}>Nome *</label>
-                <input value={form.name} onChange={e => setForm(f => f && { ...f, name: e.target.value })} className={inputCls} placeholder="Ex.: Criar tarefa de conferência" />
-              </div>
-              <div className="col-span-2">
-                <label className={labelCls}>Descrição</label>
-                <input value={form.description} onChange={e => setForm(f => f && { ...f, description: e.target.value })} className={inputCls} placeholder="opcional" />
-              </div>
+              {/* FINANCEIRO: sem Nome/Descrição — a identidade é 100% estruturada
+                  (título/descrição derivados da Config + Aplicação + gatilho + fase). */}
+              {form.kind === "financial" ? (
+                <div className="col-span-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60">
+                  <div className="font-medium text-white">{tituloFinanceiroDoForm(form) || "Título gerado automaticamente"}</div>
+                  <div className="mt-0.5 text-white/50">{descricaoFinanceiraDoForm(form) || "A descrição é gerada a partir da regra — sem texto livre."}</div>
+                </div>
+              ) : (<>
+                <div className="col-span-2">
+                  <label className={labelCls}>Nome *</label>
+                  <input value={form.name} onChange={e => setForm(f => f && { ...f, name: e.target.value })} className={inputCls} placeholder="Ex.: Criar tarefa de conferência" />
+                </div>
+                <div className="col-span-2">
+                  <label className={labelCls}>Descrição</label>
+                  <input value={form.description} onChange={e => setForm(f => f && { ...f, description: e.target.value })} className={inputCls} placeholder="opcional" />
+                </div>
+              </>)}
               <div>
                 <label className={labelCls}>Quando (gatilho)</label>
                 <select value={form.trigger} onChange={e => setForm(f => f && { ...f, trigger: e.target.value })} className={inputCls}>

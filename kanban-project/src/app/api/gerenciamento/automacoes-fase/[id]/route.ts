@@ -61,8 +61,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const data: Prisma.PhaseAutomationRuleUpdateInput = {}
-    if (body.name !== undefined) data.name = String(body.name)
-    if (body.description !== undefined) data.description = body.description ? String(body.description) : null
+    // FINANCEIRO: identidade estruturada — name/description NÃO são editáveis nem persistidos
+    // (título/descrição derivados). Regras antigas mantêm o texto legado só p/ auditoria.
+    if (!ehFinanceira) {
+      if (body.name !== undefined) data.name = String(body.name)
+      if (body.description !== undefined) data.description = body.description ? String(body.description) : null
+    }
     if (body.kind !== undefined) data.kind = String(body.kind)
     if (body.scope !== undefined) data.scope = String(body.scope)
     if (body.trigger !== undefined) data.trigger = String(body.trigger)

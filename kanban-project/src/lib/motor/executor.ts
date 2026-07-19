@@ -25,6 +25,7 @@ import { gerarEconomicoDaMatriz } from './matriz-economica'
 import { resolverPrecoPorConfigDB } from './resolver-preco-financeiro.prisma'
 import { NaturezaPreco } from '@prisma/client'
 import { aplicacaoValida, naturezasDaAplicacao, aplicacaoPermitida } from '@/lib/financeiro/aplicacao-financeira'
+import { tituloAutomacaoFinanceira, descricaoLancamentoDaConfig } from '@/lib/financeiro/automacao-financeira-identidade'
 import { processoEmRuntimeV2 } from './runtime-guard' // CP-4H
 
 // PREÇO-FONTE-ÚNICA (§5): resolve o valor SÓ pela Tabela de Preços de uma
@@ -293,37 +294,45 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
   // — criarTarefaDeSpec/mapPrio/resolverResponsavelDaRegra — ficaram sem uso de
   // propósito; mantidos para minimizar churn até a nova arquitetura.)
   for (const rule of taskRules) {
-    skipped.push({ name: rule.name, reason: 'automação de tarefa NEUTRALIZADA — tarefas obrigatórias da fase são exclusivas do Workflow Interno' })
+    skipped.push({ name: rule.name ?? `automação #${rule.id}`, reason: 'automação de tarefa NEUTRALIZADA — tarefas obrigatórias da fase são exclusivas do Workflow Interno' })
   }
 
   // FINANCEIRO — Automações kind=financial
   for (const r of finAutoRules) {
-    if (wantTrigger == null || r.trigger !== wantTrigger) { skipped.push({ name: r.name, reason: `gatilho não corresponde (dispara em "${r.trigger}")` }); continue }
+    if (wantTrigger == null || r.trigger !== wantTrigger) { skipped.push({ name: r.name ?? `automação #${r.id}`, reason: `gatilho não corresponde (dispara em "${r.trigger}")` }); continue }
     const cond = await avaliarCondicoes(r.conditions, processoId)
-    if (cond.decisao === 'bloqueia') { skipped.push({ name: r.name, reason: cond.motivo || 'condição não satisfeita' }); continue }
+    if (cond.decisao === 'bloqueia') { skipped.push({ name: r.name ?? `automação #${r.id}`, reason: cond.motivo || 'condição não satisfeita' }); continue }
     const naoVerificada = cond.decisao === 'nao_verificada'
 
-    // ── FLUXO NOVO — vínculo ESTRUTURAL à Configuração Financeira (sem valor/moeda manual).
-    // Preço SEMPRE da Tabela de Preços por natureza da Aplicação. AMBOS → dois lançamentos.
+    // ── FLUXO NOVO — vínculo ESTRUTURAL à Configuração Financeira. IDENTIDADE DERIVADA
+    // (título/descrição da Config, nunca r.name). Preço da Tabela; AMBOS → dois lançamentos.
     if (r.configItemId != null) {
       const ap = r.aplicacaoFinanceira
-      if (!aplicacaoValida(ap)) { skipped.push({ name: r.name, reason: 'Aplicação financeira ausente/inválida (RECEITA, CUSTO ou AMBOS)' }); continue }
-      const cfg = await prisma.produtoFinanceiro.findUnique({ where: { id: r.configItemId }, select: { possuiCusto: true, possuiReceita: true } })
-      if (!cfg) { skipped.push({ name: r.name, reason: 'Configuração Financeira vinculada não encontrada' }); continue }
-      if (!aplicacaoPermitida(ap, cfg)) { skipped.push({ name: r.name, reason: `Aplicação "${ap}" não é permitida pela Configuração Financeira (custo=${cfg.possuiCusto}, receita=${cfg.possuiReceita})` }); continue }
+      const rotulo = `automação #${r.id}`
+      if (!aplicacaoValida(ap)) { skipped.push({ name: rotulo, reason: 'Aplicação financeira ausente/inválida (RECEITA, CUSTO ou AMBOS)' }); continue }
+      const cfg = await prisma.produtoFinanceiro.findUnique({ where: { id: r.configItemId }, select: {
+        possuiCusto: true, possuiReceita: true,
+        tipoDocumento: { select: { name: true } }, honorario: { select: { name: true } },
+        tipoProcesso: { select: { name: true } }, itemCatalogo: { select: { name: true } },
+      } })
+      if (!cfg) { skipped.push({ name: rotulo, reason: 'Configuração Financeira vinculada não encontrada' }); continue }
+      const mestreNome = cfg.tipoDocumento?.name ?? cfg.honorario?.name ?? cfg.tipoProcesso?.name ?? cfg.itemCatalogo?.name ?? 'Configuração Financeira'
+      const titulo = tituloAutomacaoFinanceira(ap, mestreNome)
+      const descricaoLanc = descricaoLancamentoDaConfig(mestreNome)
+      if (!aplicacaoPermitida(ap, cfg)) { skipped.push({ name: titulo, reason: `Aplicação "${ap}" não é permitida pela Configuração Financeira (custo=${cfg.possuiCusto}, receita=${cfg.possuiReceita})` }); continue }
       for (const natPreco of naturezasDaAplicacao(ap)) {
         const isRec = natPreco === NaturezaPreco.VENDA
         const preco = await precoDaConfig(r.configItemId, natPreco, processoId, tipoProcessoId)
-        if (!preco) { skipped.push({ name: r.name, reason: 'Configuração Financeira sem preço cadastrado' }); continue }
-        if ('erro' in preco) { skipped.push({ name: r.name, reason: `Nenhum preço vigente encontrado para a Configuração Financeira selecionada — ${preco.erro}` }); continue }
+        if (!preco) { skipped.push({ name: titulo, reason: 'Configuração Financeira sem preço cadastrado' }); continue }
+        if ('erro' in preco) { skipped.push({ name: titulo, reason: `Nenhum preço vigente encontrado para a Configuração Financeira selecionada — ${preco.erro}` }); continue }
         const fx = await fxParaBRL(preco.moeda, fxCache)
         // Idempotência estrutural: processo + fase + automação + natureza (config/aplicação fixos na regra).
         const akey = `${processoId}::${phaseKey}::automation::${r.id}::${isRec ? 'VENDA' : 'CUSTO'}`
-        const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', contexto: { fonte: 'automation', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap } }
-        await fazer(akey, isRec ? 'Receita' : 'Custo', 'financial', 'automation', r.id, r.name,
-          { configItemId: r.configItemId, aplicacao: ap, natureza: isRec ? 'VENDA' : 'CUSTO', valor: preco.valor, moeda: preco.moeda, tabelaValorId: preco.tabelaValorId, ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
-          async () => (isRec ? criarReceita(processoId, r.name, preco.valor, preco.moeda, fx, false, fz) : criarCusto(processoId, r.name, preco.valor, preco.moeda, fx, fz)),
-          (id) => created.push({ kind: 'financial', targetTable: isRec ? 'Receita' : 'Custo', targetId: id, name: r.name, amount: preco.valor, currency: preco.moeda, condicaoNaoVerificada: naoVerificada || undefined }))
+        const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', contexto: { fonte: 'automation', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap, mestre: mestreNome } }
+        await fazer(akey, isRec ? 'Receita' : 'Custo', 'financial', 'automation', r.id, titulo,
+          { configItemId: r.configItemId, mestre: mestreNome, aplicacao: ap, natureza: isRec ? 'VENDA' : 'CUSTO', valor: preco.valor, moeda: preco.moeda, tabelaValorId: preco.tabelaValorId, ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
+          async () => (isRec ? criarReceita(processoId, descricaoLanc, preco.valor, preco.moeda, fx, false, fz) : criarCusto(processoId, descricaoLanc, preco.valor, preco.moeda, fx, fz)),
+          (id) => created.push({ kind: 'financial', targetTable: isRec ? 'Receita' : 'Custo', targetId: id, name: titulo, amount: preco.valor, currency: preco.moeda, condicaoNaoVerificada: naoVerificada || undefined }))
       }
       continue
     }
@@ -331,36 +340,38 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
     // SEM configItemId = regra LEGADA (valor/moeda/código manual). O formato legado foi
     // DESCONTINUADO: não executa mais (nada de valor manual). Migre-a para uma
     // Configuração Financeira (o preço passa a vir da Tabela de Preços).
-    skipped.push({ name: r.name, reason: 'Regra financeira LEGADA (valor/moeda manual) — descontinuada. Migre para uma Configuração Financeira; o preço vem da Tabela de Preços.' })
+    skipped.push({ name: r.name ?? `automação #${r.id}`, reason: 'Regra financeira LEGADA (valor/moeda manual) — descontinuada. Migre para uma Configuração Financeira; o preço vem da Tabela de Preços.' })
   }
 
   // EVENTO / AGENDA
   for (const r of eventRules) {
-    if (wantTrigger == null || r.trigger !== wantTrigger) { skipped.push({ name: r.name, reason: `gatilho não corresponde (dispara em "${r.trigger}")` }); continue }
+    const nome = r.name ?? `automação #${r.id}`
+    if (wantTrigger == null || r.trigger !== wantTrigger) { skipped.push({ name: nome, reason: `gatilho não corresponde (dispara em "${r.trigger}")` }); continue }
     const cond = await avaliarCondicoes(r.conditions, processoId)
-    if (cond.decisao === 'bloqueia') { skipped.push({ name: r.name, reason: cond.motivo || 'condição não satisfeita' }); continue }
+    if (cond.decisao === 'bloqueia') { skipped.push({ name: nome, reason: cond.motivo || 'condição não satisfeita' }); continue }
     const naoVerificada = cond.decisao === 'nao_verificada'
     const offset = pnum(r.params, 'eventOffsetDays') ?? 0
     const dataInicio = new Date(Date.now() + offset * 86400000)
     const tipo = toTipoEvento(pstr(r.params, 'eventType'))
     const akey = `${processoId}::${phaseKey}::automation::${r.id}`
-    await fazer(akey, 'Evento', 'event', 'automation', r.id, r.name,
+    await fazer(akey, 'Evento', 'event', 'automation', r.id, nome,
       { tipo, dataInicio: dataInicio.toISOString(), ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
-      async () => criarEvento(processoId, r.name, r.description || null, dataInicio, tipo),
-      (id) => created.push({ kind: 'event', targetTable: 'Evento', targetId: id, name: r.name, condicaoNaoVerificada: naoVerificada || undefined }))
+      async () => criarEvento(processoId, nome, r.description || null, dataInicio, tipo),
+      (id) => created.push({ kind: 'event', targetTable: 'Evento', targetId: id, name: nome, condicaoNaoVerificada: naoVerificada || undefined }))
   }
 
   // PROTOCOLO
   for (const r of protocolRules) {
-    if (wantTrigger == null || r.trigger !== wantTrigger) { skipped.push({ name: r.name, reason: `gatilho não corresponde (dispara em "${r.trigger}")` }); continue }
+    const nome = r.name ?? `automação #${r.id}`
+    if (wantTrigger == null || r.trigger !== wantTrigger) { skipped.push({ name: nome, reason: `gatilho não corresponde (dispara em "${r.trigger}")` }); continue }
     const cond = await avaliarCondicoes(r.conditions, processoId)
-    if (cond.decisao === 'bloqueia') { skipped.push({ name: r.name, reason: cond.motivo || 'condição não satisfeita' }); continue }
+    if (cond.decisao === 'bloqueia') { skipped.push({ name: nome, reason: cond.motivo || 'condição não satisfeita' }); continue }
     const naoVerificada = cond.decisao === 'nao_verificada'
     const akey = `${processoId}::${phaseKey}::automation::${r.id}`
-    await fazer(akey, 'Protocolo', 'protocol', 'automation', r.id, r.name,
+    await fazer(akey, 'Protocolo', 'protocol', 'automation', r.id, nome,
       { nota: 'consulado OUTROS (ajustar)', ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
-      async () => criarProtocolo(processoId, r.name),
-      (id) => created.push({ kind: 'protocol', targetTable: 'Protocolo', targetId: id, name: r.name, condicaoNaoVerificada: naoVerificada || undefined }))
+      async () => criarProtocolo(processoId, nome),
+      (id) => created.push({ kind: 'protocol', targetTable: 'Protocolo', targetId: id, name: nome, condicaoNaoVerificada: naoVerificada || undefined }))
   }
 
   return { created, skipped, errors, totalCriado: created.length }
@@ -442,40 +453,49 @@ export async function executarFinanceirasNaFaseV2(
 
   for (const r of regras) {
     const ap = r.aplicacaoFinanceira
-    if (!aplicacaoValida(ap)) { skipped.push({ name: r.name, reason: 'Aplicação financeira inválida' }); continue }
-    const cfg = await prisma.produtoFinanceiro.findUnique({ where: { id: r.configItemId! }, select: { possuiCusto: true, possuiReceita: true } })
-    if (!cfg) { skipped.push({ name: r.name, reason: 'Configuração Financeira não encontrada' }); continue }
-    if (!aplicacaoPermitida(ap, cfg)) { skipped.push({ name: r.name, reason: `Aplicação "${ap}" não permitida pela Configuração Financeira` }); continue }
+    const rotulo = `automação #${r.id}`
+    if (!aplicacaoValida(ap)) { skipped.push({ name: rotulo, reason: 'Aplicação financeira inválida' }); continue }
+    // IDENTIDADE ESTRUTURADA: nome/descrição derivam da Config (nunca de r.name).
+    const cfg = await prisma.produtoFinanceiro.findUnique({ where: { id: r.configItemId! }, select: {
+      possuiCusto: true, possuiReceita: true,
+      tipoDocumento: { select: { name: true } }, honorario: { select: { name: true } },
+      tipoProcesso: { select: { name: true } }, itemCatalogo: { select: { name: true } },
+    } })
+    if (!cfg) { skipped.push({ name: rotulo, reason: 'Configuração Financeira não encontrada' }); continue }
+    const mestreNome = cfg.tipoDocumento?.name ?? cfg.honorario?.name ?? cfg.tipoProcesso?.name ?? cfg.itemCatalogo?.name ?? 'Configuração Financeira'
+    const titulo = tituloAutomacaoFinanceira(ap, mestreNome) // "Receita • <mestre>"
+    const descricaoLanc = descricaoLancamentoDaConfig(mestreNome) // descrição do lançamento = mestre
+    if (!aplicacaoPermitida(ap, cfg)) { skipped.push({ name: titulo, reason: `Aplicação "${ap}" não permitida pela Configuração Financeira` }); continue }
 
     for (const natPreco of naturezasDaAplicacao(ap)) {
       const isRec = natPreco === NaturezaPreco.VENDA
       const preco = await precoDaConfig(r.configItemId!, natPreco, processoId, tipoProcessoId)
-      if (!preco) { skipped.push({ name: r.name, reason: 'Configuração Financeira sem preço cadastrado' }); continue }
-      if ('erro' in preco) { skipped.push({ name: r.name, reason: `Nenhum preço vigente encontrado para a Configuração Financeira selecionada — ${preco.erro}` }); continue }
+      if (!preco) { skipped.push({ name: titulo, reason: 'Configuração Financeira sem preço cadastrado' }); continue }
+      if ('erro' in preco) { skipped.push({ name: titulo, reason: `Nenhum preço vigente encontrado para a Configuração Financeira selecionada — ${preco.erro}` }); continue }
 
       const akey = `${processoId}::${phaseKey}::automation::${r.id}::${isRec ? 'VENDA' : 'CUSTO'}`
       let art
       try {
         art = await prisma.motorArtefato.create({ data: {
           processoId, tipoProcessoId, phaseKey, event: 'entered', ruleKind: 'financial', ruleSource: 'automation', ruleId: r.id,
-          automaticKey: akey, targetTable: isRec ? 'Receita' : 'Custo', targetId: null, status: 'active', descricao: r.name.slice(0, 300),
-          detalhes: { configItemId: r.configItemId, aplicacao: ap, natureza: isRec ? 'VENDA' : 'CUSTO', valor: preco.valor, moeda: preco.moeda, tabelaValorId: preco.tabelaValorId },
+          automaticKey: akey, targetTable: isRec ? 'Receita' : 'Custo', targetId: null, status: 'active', descricao: titulo.slice(0, 300),
+          detalhes: { configItemId: r.configItemId, mestre: mestreNome, aplicacao: ap, natureza: isRec ? 'VENDA' : 'CUSTO', valor: preco.valor, moeda: preco.moeda, tabelaValorId: preco.tabelaValorId },
         } })
       } catch (e) {
-        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') { skipped.push({ name: r.name, reason: 'já lançado (idempotência)' }); continue }
-        erros.push(`${r.name}: ${(e as Error)?.message ?? 'erro'}`); continue
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') { skipped.push({ name: titulo, reason: 'já lançado (idempotência)' }); continue }
+        erros.push(`${titulo}: ${(e as Error)?.message ?? 'erro'}`); continue
       }
       try {
         const fx = await fxParaBRL(preco.moeda, fxCache)
-        const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId!, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', contexto: { fonte: 'automation_v2', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap } }
+        const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId!, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', contexto: { fonte: 'automation_v2', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap, mestre: mestreNome } }
         const id = isRec
-          ? await criarReceita(processoId, r.name, preco.valor, preco.moeda, fx, false, fz)
-          : await criarCusto(processoId, r.name, preco.valor, preco.moeda, fx, fz)
+          ? await criarReceita(processoId, descricaoLanc, preco.valor, preco.moeda, fx, false, fz)
+          : await criarCusto(processoId, descricaoLanc, preco.valor, preco.moeda, fx, fz)
         await prisma.motorArtefato.update({ where: { id: art.id }, data: { targetId: id } })
         criadas++
       } catch (e) {
         await prisma.motorArtefato.delete({ where: { id: art.id } }).catch(() => {})
-        erros.push(`${r.name}: ${(e as Error)?.message ?? 'erro'}`)
+        erros.push(`${titulo}: ${(e as Error)?.message ?? 'erro'}`)
       }
     }
   }
