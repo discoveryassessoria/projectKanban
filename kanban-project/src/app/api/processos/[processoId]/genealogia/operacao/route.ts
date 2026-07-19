@@ -36,8 +36,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     })
     const tipoEnum = tipoDoc?.legacyEnumKey && TIPOS.has(tipoDoc.legacyEnumKey) ? (tipoDoc.legacyEnumKey as TipoDocumento) : null
 
-    // idempotência: reusa o Documento já vinculado à necessidade
+    // idempotência: reusa o Documento já vinculado à necessidade.
+    // ADVISORY LOCK transacional por necessidade (namespace fixo): serializa criações
+    // concorrentes (duplo-clique/retry) SEM constraint no banco — como o modelo permite N
+    // documentos por necessidade, um unique global não cabe; o lock garante que só o
+    // primeiro cria e os demais reusam. Liberado no fim da transação.
     const doc = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(741852, ${nec.id})`
       let d = await tx.documento.findFirst({ where: { necessidadeId: nec.id }, select: { id: true } })
       if (!d) {
         d = await tx.documento.create({
