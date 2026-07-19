@@ -280,8 +280,22 @@ model Status {
   @@index([pais])
 }
 
+// ── CodeGeneratorService — sequências de código público (contador atômico, sem reuso) ──
+// 1 linha por escopo (prefixo): "IT","ES","DE","CLI","REC","CUS"... `ultimo` = último
+// número emitido. Incremento atômico (UPSERT + RETURNING), transacional, à prova de
+// concorrência. Excluir um registro NÃO decrementa → código nunca é reutilizado.
+model CodeSequence {
+  id           Int      @id @default(autoincrement())
+  scope        String   @unique @db.VarChar(40)
+  ultimo       Int      @default(0)
+  atualizadoEm DateTime @updatedAt
+}
+
 model Processo {
   id                  Int                   @id @default(autoincrement())
+  // CÓDIGO PÚBLICO (humano) gerado pelo CodeGeneratorService: IT-1, ES-1, DE-1...
+  // (sequência por país). UNIQUE, imutável, nunca reusado. O identificador técnico segue id.
+  codigo              String?               @unique @db.VarChar(20)
   nome                String                @db.VarChar(100)
   descricao           String?               @db.VarChar(500)
   observacoes         String?

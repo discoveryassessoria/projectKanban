@@ -23,6 +23,7 @@ import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import { primeiraFasePorOrdem, montarEventoEntered } from "@/src/lib/motor/phase-advance-helpers"
 import { instanciarWorkflowDaFase, resolverWorkflowAplicavel } from "@/src/services/phase-workflow"
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
+import { gerarCodigoPublico } from "@/lib/codigos/code-generator"
 
 export type CriarProcessoFailureCode =
   | "NOME_OBRIGATORIO"
@@ -144,8 +145,11 @@ export async function criarProcessoV2(input: CriarProcessoInput): Promise<CriarP
   // ── 3) transação atômica de nascimento ────────────────────────────────────
   try {
     const out = await prisma.$transaction(async (tx) => {
+      // CÓDIGO PÚBLICO gerado pelo serviço central (IT-1, DE-2...), dentro da MESMA transação.
+      const codigoPublico = await gerarCodigoPublico(tx, "PROCESS", { pais: input.pais })
       const processo = await tx.processo.create({
         data: {
+          codigo: codigoPublico,
           nome: input.nome.trim(),
           descricao: input.descricao?.trim() || null,
           observacoes: input.observacoes?.trim() || null,
@@ -158,7 +162,7 @@ export async function criarProcessoV2(input: CriarProcessoInput): Promise<CriarP
           macroWorkflowVersion: wf.versao,
           chaveIdempotenciaCriacao: chaveCriacao,
         },
-        select: { id: true, nome: true },
+        select: { id: true, nome: true, codigo: true },
       })
 
       if (input.contratanteIds?.length) {

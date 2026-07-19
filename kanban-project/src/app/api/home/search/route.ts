@@ -42,8 +42,9 @@ export async function GET(request: NextRequest) {
 
     const [processos, familias, requerentes, contratantes] = await Promise.all([
       prisma.processo.findMany({
-        where: { nome: contains },
-        select: { id: true, nome: true, pais: true, familia: { select: { nome: true } } },
+        // busca por NOME ou por CÓDIGO PÚBLICO (ex.: "DE-7", "IT-125").
+        where: { OR: [{ nome: contains }, { codigo: contains }] },
+        select: { id: true, nome: true, pais: true, codigo: true, familia: { select: { nome: true } } },
         take: LIMITE,
         orderBy: { updatedAt: "desc" },
       }),
