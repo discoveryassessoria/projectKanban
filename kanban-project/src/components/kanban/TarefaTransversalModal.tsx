@@ -14,9 +14,10 @@ const authHeaders = (): Record<string, string> => ({
 interface Acao { stepKey: string; title: string }
 interface FaseAcoes { faseCode: string; faseLabel: string; acoes: Acao[] }
 
+interface NecOpt { id: number; label: string; pessoaId: number | null }
 interface Props {
   processoId: number
-  necessidadeId: number
+  necessidadeId?: number | null // quando omitido, o modal mostra um SELETOR de necessidade (qualquer fase)
   necessidadeLabel?: string
   pessoaId?: number | null
   faseAtivaCode?: string | null
@@ -27,6 +28,9 @@ interface Props {
 
 export function TarefaTransversalModal({ processoId, necessidadeId, necessidadeLabel, pessoaId, faseAtivaCode, usuarios, onClose, onCreated }: Props) {
   const [fases, setFases] = useState<FaseAcoes[]>([])
+  // Seletor de necessidade (quando não veio pré-selecionada).
+  const [necessidades, setNecessidades] = useState<NecOpt[]>([])
+  const [necSel, setNecSel] = useState<string>(necessidadeId ? String(necessidadeId) : "")
   const [faseRef, setFaseRef] = useState<string>("")
   const [acaoStepKey, setAcaoStepKey] = useState<string>("")
   const [motivo, setMotivo] = useState("")
@@ -47,17 +51,37 @@ export function TarefaTransversalModal({ processoId, necessidadeId, necessidadeL
       .catch(() => setErro("Não foi possível carregar as ações de catálogo."))
   }, [faseAtivaCode])
 
+  // Sem necessidade pré-selecionada → carrega as necessidades do processo p/ o seletor.
+  useEffect(() => {
+    if (necessidadeId) return
+    fetch(`/api/processos/${processoId}/necessidades`, { headers: authHeaders() })
+      .then((r) => r.json())
+      .then((j) => {
+        const lista: NecOpt[] = (j.necessidades ?? [])
+          .filter((n: { status: string }) => n.status !== "DISPENSADA")
+          .map((n: { id: number; pessoaId: number | null; itemCatalogo?: { name?: string; code?: string }; status: string }) => ({
+            id: n.id, pessoaId: n.pessoaId ?? null,
+            label: `${n.itemCatalogo?.name ?? n.itemCatalogo?.code ?? "Necessidade"} #${n.id} · ${n.status}`,
+          }))
+        setNecessidades(lista)
+      })
+      .catch(() => {})
+  }, [processoId, necessidadeId])
+
   const acoesDaFase = fases.find((f) => f.faseCode === faseRef)?.acoes ?? []
+  const necIdFinal = necessidadeId ?? (necSel ? Number(necSel) : null)
+  const pessoaIdFinal = pessoaId ?? necessidades.find((n) => String(n.id) === necSel)?.pessoaId ?? null
 
   const criar = useCallback(async () => {
+    if (!necIdFinal) { setErro("Selecione a necessidade a resolver."); return }
     if (!faseRef || !acaoStepKey) { setErro("Selecione a fase de referência e a ação."); return }
     setEnviando(true); setErro(null)
     try {
       const res = await fetch(`/api/processos/${processoId}/tarefas-transversais`, {
         method: "POST", headers: authHeaders(),
         body: JSON.stringify({
-          necessidadeOrigemId: necessidadeId, faseReferenciaCode: faseRef, acaoStepKey,
-          pessoaId: pessoaId ?? undefined, motivo: motivo.trim() || undefined,
+          necessidadeOrigemId: necIdFinal, faseReferenciaCode: faseRef, acaoStepKey,
+          pessoaId: pessoaIdFinal ?? undefined, motivo: motivo.trim() || undefined,
           resultadoEsperado: resultadoEsperado.trim() || undefined,
           responsavelId: responsavelId ? Number(responsavelId) : undefined,
           prazo: prazo || undefined,
@@ -68,7 +92,7 @@ export function TarefaTransversalModal({ processoId, necessidadeId, necessidadeL
       onCreated()
     } catch { setErro("Falha de rede ao criar a tarefa transversal.") }
     finally { setEnviando(false) }
-  }, [processoId, necessidadeId, faseRef, acaoStepKey, pessoaId, motivo, resultadoEsperado, responsavelId, prazo, onCreated])
+  }, [processoId, necIdFinal, pessoaIdFinal, faseRef, acaoStepKey, motivo, resultadoEsperado, responsavelId, prazo, onCreated])
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={() => !enviando && onClose()}>
@@ -79,9 +103,17 @@ export function TarefaTransversalModal({ processoId, necessidadeId, necessidadeL
         </div>
         <div className="px-5 py-4 space-y-3">
           <p className="text-[12px] text-gray-500 leading-relaxed">Ação antecipada de outra fase para resolver esta necessidade — <b>sem avançar o processo</b>.</p>
-          {necessidadeLabel && (
+          {necessidadeId && necessidadeLabel ? (
             <div className="text-[12.5px]"><span className="text-gray-400">Necessidade:</span> <span className="font-semibold text-gray-800">{necessidadeLabel}</span></div>
-          )}
+          ) : !necessidadeId ? (
+            <label className="block">
+              <span className="block text-[11.5px] font-semibold text-gray-600 mb-1">Necessidade a resolver</span>
+              <select value={necSel} onChange={(e) => setNecSel(e.target.value)} className="w-full text-[13px] rounded-lg border border-gray-200 px-2.5 py-2 bg-white focus:outline-none focus:border-blue-400">
+                <option value="">Selecionar…</option>
+                {necessidades.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
+              </select>
+            </label>
+          ) : null}
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-gray-600 mb-1">Fase de referência</span>
@@ -123,7 +155,7 @@ export function TarefaTransversalModal({ processoId, necessidadeId, necessidadeL
         </div>
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-100">
           <button disabled={enviando} onClick={onClose} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 disabled:opacity-50">Cancelar</button>
-          <button disabled={enviando || !faseRef || !acaoStepKey} onClick={() => void criar()} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50">
+          <button disabled={enviando || !necIdFinal || !faseRef || !acaoStepKey} onClick={() => void criar()} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50">
             {enviando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowLeftRight className="w-3.5 h-3.5" />} Criar tarefa transversal
           </button>
         </div>

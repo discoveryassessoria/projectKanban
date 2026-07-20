@@ -3,7 +3,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { Loader2, Eye, ArrowLeft } from "lucide-react"
+import { Loader2, Eye, ArrowLeft, ArrowLeftRight } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import type { ProcessoWithStatus, Processo, OperationalProjection } from "@/src/types/kanban"
 import { DocumentoOperationalDrawer } from "./DocumentoOperationalDrawer"
@@ -355,7 +355,7 @@ export function ProcessoCentralOperacional({
   const [viewErro, setViewErro] = useState<string | null>(null)
 
   // Tarefa Transversal: contexto (necessidade) para o modal de criação.
-  const [transversalCtx, setTransversalCtx] = useState<{ necessidadeId: number; pessoaId?: number | null; label?: string } | null>(null)
+  const [transversalCtx, setTransversalCtx] = useState<{ necessidadeId?: number | null; pessoaId?: number | null; label?: string } | null>(null)
 
   // TROCA DE CONTEXTO NO AVANÇO DE FASE: quando a fase da Central muda (avanço/retorno),
   // qualquer drawer aberto está exibindo o contexto da fase ANTIGA (ex.: o passo
@@ -732,6 +732,19 @@ export function ProcessoCentralOperacional({
             phaseProgress={progressoPorFase}
           />
         </div>
+
+        {/* AÇÃO DE FASE: criar Tarefa Transversal (disponível em QUALQUER fase ativa) —
+            ação antecipada de outra fase para resolver uma necessidade da fase atual. */}
+        {!isView && pode("processos.editar") && (
+          <div className="flex justify-end mb-3">
+            <button
+              onClick={() => setTransversalCtx({})}
+              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg border-[1.5px] border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-400 transition-colors"
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5" /> Criar tarefa transversal
+            </button>
+          </div>
+        )}
 
         {/* ===== Cabeçalho do MODO CONSULTA (fase passada) — MESMA casca, só leitura ===== */}
         {isView && (

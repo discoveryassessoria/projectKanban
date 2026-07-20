@@ -295,6 +295,7 @@ export async function GET(
             select: {
               id: true,
               pessoaId: true,
+              necessidadeId: true, // p/ Tarefa Transversal na linha do documento (Emissão)
               tipo: true,
               status: true,
               updatedAt: true,
@@ -353,6 +354,7 @@ export async function GET(
     interface DocFull {
       id: number
       pessoaId: number
+      necessidadeId?: number | null
       tipo: string
       status: string
       updatedAt: Date
@@ -369,6 +371,7 @@ export async function GET(
       return {
         id: d.id,
         pessoaId: d.pessoaId,
+        necessidadeId: d.necessidadeId ?? null,
         tipo: d.tipo,
         status: d.status,
         updatedAt: d.updatedAt,
@@ -529,6 +532,7 @@ export async function GET(
       return {
         docId: d.id,
         pessoaId: d.pessoaId,
+        necessidadeId: d.necessidadeId ?? null,
         pessoaNome: pessoa ? nomeCompleto(pessoa) : "—",
         docType: d.tipo,
         docTypeLabel: TIPO_LABELS[d.tipo] || d.tipo,
