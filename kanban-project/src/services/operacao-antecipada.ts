@@ -185,10 +185,14 @@ export async function avaliarOperacaoAntecipada(
       await adapter!.vincularNecessidade!(op.targetOperationId, op.necessidadeId)
       await audit("DOC_VINCULADO", id, `Documento-alvo ${op.targetOperationId} vinculado como oficial da necessidade ${op.necessidadeId} (compatível)`, opts.usuarioId)
     }
-    // Interpretação do resultado: com o objetivo confirmado (e os dados capturados), a necessidade
-    // de origem é atendida — seja pelo documento oficial compatível, seja pelo dado de apoio.
-    await atenderNecessidade(op.necessidadeId)
-    await audit("NECESSIDADE_ATENDIDA", id, `Necessidade ${op.necessidadeId} atendida por operação antecipada${podeVincular ? " (doc oficial)" : " (documento de apoio)"}`, opts.usuarioId)
+    // INTERPRETAÇÃO DO RESULTADO na ORIGEM: propaga o resultado obtido à operação oficial da
+    // necessidade (conclui seus passos obrigatórios abertos com os dados registrais). É isto que
+    // faz o gate/progresso refletirem o trabalho — não basta marcar o status da necessidade.
+    const prop = adapter?.aplicarResultadoNaOrigem
+      ? await adapter.aplicarResultadoNaOrigem({ necessidadeId: op.necessidadeId, processoId: op.processoId, resultadoDados: (opts.resultadoDados ?? op.resultadoDados) as Record<string, unknown> | null })
+      : { concluidos: 0 }
+    await atenderNecessidade(op.necessidadeId)                 // idempotente (garante status ATENDIDA)
+    await audit("NECESSIDADE_ATENDIDA", id, `Necessidade ${op.necessidadeId} atendida por operação antecipada${podeVincular ? " (doc oficial)" : " (documento de apoio)"}; passos oficiais concluídos: ${prop.concluidos}`, opts.usuarioId)
   }
   await tentarAvancoAutomatico(op.processoId)                  // BlockingEngine (computeGate) → PhaseAdvance
   await audit("CONCLUIDA", id, `Objetivo atingido. ${opts.resultadoObtido ?? ""}`.trim(), opts.usuarioId)

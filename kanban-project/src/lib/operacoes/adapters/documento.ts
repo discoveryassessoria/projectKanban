@@ -9,8 +9,10 @@
 
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
-import { montarWorkflowV2 } from "@/src/services/documento-operacao"
+import { montarWorkflowV2, atualizarPassoV2 } from "@/src/services/documento-operacao"
 import type { ExecutionAdapter } from "../tipos"
+
+const PASSO_TERMINAL = ["CONCLUIDO", "DISPENSADO", "SUPERSEDIDO", "CANCELADO"]
 
 const STATUS_LABELS: Record<string, string> = {
   PENDENTE: "Pendente", SOLICITAR: "Solicitar", SOLICITADO: "Solicitado", EM_BUSCA: "Em busca",
@@ -105,6 +107,28 @@ export const documentoAdapter: ExecutionAdapter = {
       concluida,
       uiRef: { kind: "documento", id: targetOperationId, necessidadeId: ctx.necessidadeId },
     }
+  },
+
+  // INTERPRETADOR: propaga o resultado à operação OFICIAL da necessidade de origem. Conclui os
+  // passos obrigatórios ABERTOS dos documentos oficiais da necessidade, na fase vigente do processo,
+  // anexando os dados registrais (o layer oficial só persiste os campos que reconhece). É o que faz
+  // o BlockingEngine/PhaseAdvance refletirem o trabalho antecipado. Genérico (sem hardcode de fase).
+  async aplicarResultadoNaOrigem(ctx) {
+    const proc = await prisma.processo.findUnique({ where: { id: ctx.processoId }, select: { faseAtualKey: true } })
+    if (!proc?.faseAtualKey) return { concluidos: 0 }
+    const docs = await prisma.documento.findMany({ where: { necessidadeId: ctx.necessidadeId }, select: { id: true } })
+    let concluidos = 0
+    for (const d of docs) {
+      const abertos = await prisma.phaseWorkflowStepInstance.findMany({
+        where: { documentoId: d.id, faseMacroKey: proc.faseAtualKey, obrigatorio: true, status: { notIn: PASSO_TERMINAL as never } },
+        orderBy: { ordem: "asc" }, select: { id: true },
+      })
+      for (const s of abertos) {
+        const r = await atualizarPassoV2(d.id, s.id, { status: "CONCLUIDO", ...(ctx.resultadoDados ?? {}) })
+        if (r.ok) concluidos++
+      }
+    }
+    return { concluidos }
   },
 
   async podeVincularNecessidade(targetOperationId, necessidadeId) {

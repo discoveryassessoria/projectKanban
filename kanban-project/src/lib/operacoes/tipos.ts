@@ -91,6 +91,12 @@ export interface ExecutionAdapter {
   /** Vincula a operação-alvo à necessidade (documento oficial). Só chamar após podeVincular=true. */
   vincularNecessidade?(targetOperationId: number | null, necessidadeId: number | null): Promise<void>
 
+  /** INTERPRETADOR DO RESULTADO na ORIGEM: propaga o resultado obtido para a operação oficial da
+   *  necessidade de origem (conclui seus passos obrigatórios abertos na fase vigente, anexando os
+   *  dados registrais capturados). É isto que faz o gate/progresso refletir o trabalho antecipado.
+   *  Genérico (por necessidade → documento → passo); NÃO conhece fase/tipo específico. Opcional. */
+  aplicarResultadoNaOrigem?(ctx: { necessidadeId: number; processoId: number; resultadoDados?: Record<string, unknown> | null }): Promise<{ concluidos: number }>
+
   /** Efeitos na ENTIDADE-ALVO ao avaliar (não na necessidade — isso é do núcleo). Opcional. */
   interpretarResultado?(targetOperationId: number | null, resultado: ResultadoAvaliacao): Promise<void>
 
