@@ -120,15 +120,9 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(70, "execmatrix", "Histórico de Execuções", ["historico", "histórico", "execucao", "execução", "log"], "Automações e regras"),
       // "Tipos de Protocolo" NÃO pertence ao Workflow → mudou para o módulo
       // "Documentos e Protocolos" (é configuração operacional, não estrutura de fase).
-      // Biblioteca de Modelos (sub-seção do Workflow)
-      a(100, "iwtemplates", "Modelos de Workflow Interno", ["modelo", "template", "workflow", "interno"], "Biblioteca de Modelos"),
-      a(110, "imtemplates", "Modelos de Variações da Fase", ["modelo", "variacao", "variação", "fase", "passo", "step"], "Biblioteca de Modelos"),
-      a(120, "amtemplates", "Modelos de Automação", ["modelo", "automacao", "automação", "preset"], "Biblioteca de Modelos"),
-      // "Modelos de Regras Transversais" REMOVIDO da interface (criava tarefas
-      // nativas da operação — agora exclusivo do Workflow Interno).
-      // OCULTO: Hub redundante (as telas já são itens próprios acima).
-      h(200, "workflowsphases", "Hub de Workflows das Fases"),
-      h(210, "mod_wfmacro", "Modelos de Workflow Macro"),
+      // BIBLIOTECA DE MODELOS — REMOVIDA DEFINITIVAMENTE (legado). A fonte de verdade é o
+      // Workflow Macro/Interno + config real por fase (Automações/Variações). Nenhum "Modelo"
+      // participa da execução. Para reaproveitar, use "Duplicar" como ação direta.
       h(220, "wf_conclusao", "Regras de Conclusão"),
       h(230, "wf_dependencias", "Dependências e Paralelismo"),
       h(240, "wf_blockers", "Blockers"),

@@ -2150,88 +2150,6 @@ model FaseMacro {
   @@index([macroWorkflowId])
 }
 
-model ModeloInternoFase {
-  id                Int      @id @default(autoincrement())
-  name              String   @db.VarChar(200)
-  modeKey           String   @db.VarChar(60)
-  category          String?  @db.VarChar(40) // = phaseKey "principal" (retificacao/protocolado/traducao/apostilamento...) — âncora do @@unique
-  recommendedPhases Json? // ← NOVO: lista de phaseKeys recomendadas (CatalogoFase)
-  description       String?  @db.Text
-  conditionOfUse    String?  @db.Text
-  operationalImpact String?  @db.Text
-  documentalImpact  String?  @db.Text
-  financialImpact   String?  @db.Text
-  protocolImpact    String?  @db.Text
-  isSystemTemplate  Boolean  @default(false)
-  usedByCount       Int      @default(0) // ← NOVO: quantas fases usam (bloqueia Excluir quando > 0)
-  arquivado         Boolean  @default(false)
-  criadoEm          DateTime @default(now())
-  atualizadoEm      DateTime @updatedAt
-
-  @@unique([category, modeKey])
-  @@index([category])
-}
-
-model ModeloWorkflowInterno {
-  id                Int      @id @default(autoincrement())
-  templateKey       String   @unique @db.VarChar(80) // âncora do seed, ex: iw_tpl_genealogy_default
-  name              String   @db.VarChar(200)
-  description       String?  @db.Text
-  category          String?  @db.VarChar(40) // = phaseKey "principal"
-  recommendedPhases Json? // lista de phaseKeys (CatalogoFase)
-  isSystemTemplate  Boolean  @default(false)
-  usedByCount       Int      @default(0) // quantas fases usam (bloqueia Excluir quando > 0)
-  arquivado         Boolean  @default(false)
-  criadoEm          DateTime @default(now())
-  atualizadoEm      DateTime @updatedAt
-
-  passos PassoWorkflowInterno[]
-
-  @@index([category])
-}
-
-model PassoWorkflowInterno {
-  id                     Int                   @id @default(autoincrement())
-  modeloId               Int
-  modelo                 ModeloWorkflowInterno @relation(fields: [modeloId], references: [id], onDelete: Cascade)
-  ordem                  Int
-  name                   String                @db.VarChar(200)
-  description            String?               @db.Text
-  generatesTask          Boolean               @default(true) // "Gera tarefa"
-  required               Boolean               @default(true) // "Obrigatório"
-  defaultResponsibleRole String?               @db.VarChar(80) // "Responsável padrão"
-  defaultPriority        String                @default("medium") @db.VarChar(20) // low | medium | high
-  defaultSlaDays         Int                   @default(3)
-  completionCondition    String?               @db.Text
-  checklist              Json? // lista de strings (um item por linha)
-
-  @@index([modeloId])
-}
-
-model ModeloAutomacao {
-  id                 Int      @id @default(autoincrement())
-  templateKey        String   @unique @db.VarChar(80)
-  name               String   @db.VarChar(200)
-  description        String?  @db.Text
-  type               String   @default("task") @db.VarChar(30) // task | financial | document | event | protocol | phase_transition | alert
-  category           String?  @db.VarChar(40) // = phaseKey "principal"
-  recommendedPhases  Json? // lista de phaseKeys
-  scope              String   @default("phase") @db.VarChar(40) // phase | person_document | ...
-  trigger            String?  @db.VarChar(60) // quando acontece
-  action             String?  @db.VarChar(80) // o que o sistema faz
-  conditions         Json? // [{ field, operator, value }] (não editável na UI)
-  defaultParams      Json? // { responsibleRole, priority, slaDays, checklist, financialType? }
-  idempotencyPattern String   @default("processId+phaseKey") @db.VarChar(120)
-  isSystemTemplate   Boolean  @default(false)
-  usedByCount        Int      @default(0) // bloqueia Excluir quando > 0
-  arquivado          Boolean  @default(false)
-  criadoEm           DateTime @default(now())
-  atualizadoEm       DateTime @updatedAt
-
-  @@index([category])
-  @@index([type])
-}
-
 model PhaseInternalMode {
   id                Int      @id @default(autoincrement())
   modeUid           String   @unique @db.VarChar(140) // {tipoProcessoId|'all'}::{phaseKey}::{key}
@@ -2554,32 +2472,6 @@ model MotorConfig {
   // em todos os processos, mesmo os marcados workflowRuntime="v2").
   runtimeV2Habilitado   Boolean  @default(false)
   atualizadoEm          DateTime @updatedAt
-}
-
-model ModeloTarefaTransversal {
-  id                              Int      @id @default(autoincrement())
-  templateKey                     String   @unique @db.VarChar(80) // âncora do seed (cross_tpl_*)
-  name                            String   @db.VarChar(200)
-  type                            String   @db.VarChar(40) // investigative_certificate | support_certificate | document_correction | ... | custom
-  description                     String?  @db.Text
-  defaultOriginPhase              String?  @db.VarChar(60) // null = qualquer fase de origem
-  defaultOperationalPhase         String   @db.VarChar(60) // fase cujo fluxo é reaproveitado
-  defaultMandatory                Boolean  @default(true)
-  defaultResultAction             String   @default("apply_back_to_origin_phase") @db.VarChar(60)
-  operationalWorkflow             Json? // { source, templateId, allowChangeOnCreate, instantiateStepsAutomatically, requireRequiredStepsBeforeApply }
-  originLinkConfig                Json? // { defaultType, requireOriginLink, captureSnapshot, blockWithoutOriginLink }
-  duplicatePolicy                 Json? // { mode, allowDuplicateWithJustification }
-  recommendedForOriginPhases      Json? // lista de phaseKeys
-  operationalWorkflowTemplateId   Int? // → ModeloWorkflowInterno (solto)
-  defaultEffects                  Json? // { createsDocument, createsCost, createsRevenue }
-  defaultOriginLinkType           String   @default("document") @db.VarChar(30)
-  defaultIdempotencyPattern       String   @default("processId+originPhase+operationalPhase+type+originLink.id") @db.VarChar(160)
-  allowDuplicateWithJustification Boolean  @default(true)
-  isSystemTemplate                Boolean  @default(false)
-  usedByCount                     Int      @default(0)
-  arquivado                       Boolean  @default(false)
-  criadoEm                        DateTime @default(now())
-  atualizadoEm                    DateTime @updatedAt
 }
 
 model RegraTarefaTransversal {

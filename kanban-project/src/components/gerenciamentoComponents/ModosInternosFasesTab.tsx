@@ -366,7 +366,6 @@ export default function ModosInternosFasesTab() {
 
           <div className="flex flex-wrap gap-2 pt-1">
             <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500">+ Novo modo</button>
-            <button onClick={abrirAplicar} className="rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10">+ Aplicar modelo interno</button>
           </div>
         </div>
       )}

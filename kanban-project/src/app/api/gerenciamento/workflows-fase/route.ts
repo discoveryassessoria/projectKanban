@@ -3,46 +3,13 @@ import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
-function slug(s: string) {
-  return String(s || '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase().trim()
-    .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
-}
-
-// snapshot dos passos do modelo 2B → passos da instância, com CHAVES ÚNICAS
-function snapshotSteps(passos: any[], workflowId?: number) {
-  const seen = new Set<string>()
-  return (passos || []).map((p: any, i: number) => {
-    let base = slug(String(p?.name || '')); if (!base) base = 'passo_' + (i + 1)
-    let key = base, n = 2
-    while (seen.has(key)) { key = base + '_' + n; n++ }
-    seen.add(key)
-    const row: any = {
-      key,
-      label: String(p?.name || 'Etapa'),
-      description: p?.description ?? null,
-      ordem: p?.ordem ?? i + 1,
-      createsTask: p?.generatesTask !== false,
-      required: p?.required !== false,
-      owner: p?.defaultResponsibleRole ?? null,
-      priority: p?.defaultPriority || 'medium',
-      slaDays: p?.defaultSlaDays ?? 0,
-      completionRule: p?.completionCondition ?? null,
-      checklist: (p?.checklist == null ? undefined : p.checklist) as Prisma.InputJsonValue | undefined,
-    }
-    if (workflowId) row.workflowId = workflowId
-    return row
-  })
-}
-
-// GET — dados da tela: processos+fases, workflows aplicados, biblioteca 2B
+// GET — dados da tela: processos+fases + workflows internos aplicados (sem biblioteca de modelos)
 export async function GET(request: NextRequest) {
   const erro = await verificarPermissao(request, 'usuarios.gerenciar')
   if (erro) return erro
 
   try {
-    const [tipos, workflows, modelos] = await Promise.all([
+    const [tipos, workflows] = await Promise.all([
       prisma.tipoProcessoNacionalidade.findMany({
         where: { arquivado: false },
         include: { macroWorkflow: { include: { fases: { orderBy: { ordem: 'asc' } } } } },
@@ -52,11 +19,6 @@ export async function GET(request: NextRequest) {
         where: { arquivado: false },
         include: { passos: { orderBy: { ordem: 'asc' } } },
         orderBy: { criadoEm: 'asc' },
-      }),
-      prisma.modeloWorkflowInterno.findMany({
-        where: { arquivado: false },
-        include: { passos: { orderBy: { ordem: 'asc' } } },
-        orderBy: { name: 'asc' },
       }),
     ])
 
@@ -68,14 +30,14 @@ export async function GET(request: NextRequest) {
       })),
     }))
 
-    return NextResponse.json({ tiposProcesso, workflows, modelosWorkflow: modelos })
+    return NextResponse.json({ tiposProcesso, workflows })
   } catch (e) {
     console.error('GET workflows-fase', e)
     return NextResponse.json({ error: 'Erro ao carregar workflows das fases.' }, { status: 500 })
   }
 }
 
-// POST — aplicar modelo 2B (com conflito) OU criar workflow vazio ad-hoc
+// POST — criar Workflow Interno vazio (ad-hoc). A aplicação de MODELO (biblioteca) foi removida.
 export async function POST(request: NextRequest) {
   const erro = await verificarPermissao(request, 'usuarios.gerenciar')
   if (erro) return erro
@@ -83,61 +45,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    // ---------- APLICAR MODELO 2B ----------
-    if (body.aplicar) {
-      const templateId = Number(body.templateId)
-      const phaseKey = String(body.phaseKey || '')
-      const tipoProcessoId = body.tipoProcessoId == null ? null : Number(body.tipoProcessoId)
-      const mode = body.mode as string | undefined // undefined | 'replace'
-      if (!templateId || !phaseKey) {
-        return NextResponse.json({ error: 'templateId e phaseKey são obrigatórios.' }, { status: 400 })
-      }
-
-      const modelo = await prisma.modeloWorkflowInterno.findUnique({
-        where: { id: templateId },
-        include: { passos: { orderBy: { ordem: 'asc' } } },
-      })
-      if (!modelo) return NextResponse.json({ error: 'Modelo não encontrado.' }, { status: 404 })
-
-      const wfUid = `${tipoProcessoId ?? 'all'}::${phaseKey}`
-      const existente = await prisma.phaseInternalWorkflow.findUnique({ where: { wfUid } })
-
-      // já existe e não escolheu o que fazer → devolve needsChoice
-      if (existente && mode !== 'replace') {
-        return NextResponse.json({ needsChoice: true, existingId: existente.id })
-      }
-
-      if (existente && mode === 'replace') {
-        const stepData = snapshotSteps(modelo.passos, existente.id)
-        await prisma.$transaction(async (tx) => {
-          await tx.phaseInternalWorkflowStep.deleteMany({ where: { workflowId: existente.id } })
-          await tx.phaseInternalWorkflow.update({
-            where: { id: existente.id }, data: { templateId: modelo.id, name: modelo.name },
-          })
-          if (stepData.length) await tx.phaseInternalWorkflowStep.createMany({ data: stepData })
-        })
-        await prisma.modeloWorkflowInterno.update({
-          where: { id: modelo.id }, data: { usedByCount: { increment: 1 } },
-        })
-        const wf = await prisma.phaseInternalWorkflow.findUnique({
-          where: { id: existente.id }, include: { passos: { orderBy: { ordem: 'asc' } } },
-        })
-        return NextResponse.json({ workflow: wf })
-      }
-
-      // não existe → cria primário (nested create; passos já vêm únicos)
-      const criado = await prisma.phaseInternalWorkflow.create({
-        data: {
-          wfUid, templateId: modelo.id, tipoProcessoId, phaseKey,
-          name: modelo.name, passos: { create: snapshotSteps(modelo.passos) },
-        },
-        include: { passos: { orderBy: { ordem: 'asc' } } },
-      })
-      await prisma.modeloWorkflowInterno.update({
-        where: { id: modelo.id }, data: { usedByCount: { increment: 1 } },
-      })
-      return NextResponse.json({ workflow: criado }, { status: 201 })
-    }
 
     // ---------- CRIAR WORKFLOW VAZIO (ad-hoc) ----------
     if (body.criar) {

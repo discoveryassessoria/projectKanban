@@ -94,14 +94,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     await prisma.phaseInternalWorkflow.delete({ where: { id } })
 
-    if (atual.templateId) {
-      const modelo = await prisma.modeloWorkflowInterno.findUnique({ where: { id: atual.templateId } })
-      if (modelo && modelo.usedByCount > 0) {
-        await prisma.modeloWorkflowInterno.update({
-          where: { id: atual.templateId }, data: { usedByCount: { decrement: 1 } },
-        })
-      }
-    }
 
     return NextResponse.json({ ok: true })
   } catch (e) {

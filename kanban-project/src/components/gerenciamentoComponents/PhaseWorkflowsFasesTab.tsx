@@ -330,7 +330,6 @@ export default function PhaseWorkflowsFasesTab() {
               {wf && (
                 <div className="flex flex-none flex-wrap justify-end gap-1.5">
                   <button onClick={() => openAddStep(wf)} className="rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-500">+ Passo</button>
-                  <button onClick={() => { setApplySel(null); setApplyFor({ phaseKey: p.phaseKey, label: p.label }) }} className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/80 hover:bg-white/10">Aplicar modelo</button>
                   <button onClick={() => excluirWorkflow(wf)} className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-red-300 hover:bg-red-500/10">Excluir</button>
                 </div>
               )}
@@ -340,7 +339,6 @@ export default function PhaseWorkflowsFasesTab() {
             {!wf ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 <button onClick={() => criarVazio(p.phaseKey, p.label)} disabled={busy} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50">+ Criar workflow interno</button>
-                <button onClick={() => { setApplySel(null); setApplyFor({ phaseKey: p.phaseKey, label: p.label }) }} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10">+ Aplicar modelo</button>
               </div>
             ) : wf.passos.length === 0 ? (
               <div className="mt-3 text-xs text-white/40">Nenhum passo ainda. Use “+ Passo” ou aplique um modelo.</div>

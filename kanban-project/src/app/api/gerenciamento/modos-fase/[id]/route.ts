@@ -52,15 +52,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     await prisma.phaseInternalMode.delete({ where: { id: modoId } });
 
     // mantém o usedByCount do modelo honesto
-    if (atual.templateId != null) {
-      const tpl = await prisma.modeloInternoFase.findUnique({ where: { id: atual.templateId } });
-      if (tpl && (tpl.usedByCount || 0) > 0) {
-        await prisma.modeloInternoFase.update({
-          where: { id: atual.templateId },
-          data: { usedByCount: { decrement: 1 } },
-        });
-      }
-    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error('DELETE modos-fase', e);

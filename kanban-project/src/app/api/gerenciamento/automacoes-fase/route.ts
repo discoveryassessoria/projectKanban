@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
   if (erro) return erro
 
   try {
-    const [tipos, regras, modelos, configs] = await Promise.all([
+    const [tipos, regras, configs] = await Promise.all([
       prisma.tipoProcessoNacionalidade.findMany({
         where: { arquivado: false },
         include: { macroWorkflow: { include: { fases: { orderBy: { ordem: 'asc' } } } } },
@@ -77,10 +77,6 @@ export async function GET(request: NextRequest) {
       }),
       prisma.phaseAutomationRule.findMany({
         orderBy: { criadoEm: 'asc' },
-      }),
-      prisma.modeloAutomacao.findMany({
-        where: { arquivado: false },
-        orderBy: { name: 'asc' },
       }),
       listarConfigsFinanceiras(),
     ])
@@ -93,14 +89,14 @@ export async function GET(request: NextRequest) {
       })),
     }))
 
-    return NextResponse.json({ tiposProcesso, regras, modelosAutomacao: modelos, configsFinanceiras: configs })
+    return NextResponse.json({ tiposProcesso, regras, configsFinanceiras: configs })
   } catch (e) {
     console.error('GET automacoes-fase', e)
     return NextResponse.json({ error: 'Erro ao carregar automações das fases.' }, { status: 500 })
   }
 }
 
-// POST — aplicar modelo 2C OU criar regra ad-hoc (payload do editor)
+// POST — criar regra de automação ad-hoc (editor). Aplicação de MODELO (biblioteca) removida.
 export async function POST(request: NextRequest) {
   const erro = await verificarPermissao(request, 'usuarios.gerenciar')
   if (erro) return erro
@@ -108,47 +104,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    // ---------- APLICAR MODELO 2C ----------
-    if (body.aplicar) {
-      const templateId = Number(body.templateId)
-      const phaseKey = String(body.phaseKey || '')
-      const tipoProcessoId = Number(body.tipoProcessoId)
-      if (!templateId || !phaseKey || !tipoProcessoId) {
-        return NextResponse.json({ error: 'templateId, phaseKey e tipoProcessoId são obrigatórios.' }, { status: 400 })
-      }
-
-      const modelo = await prisma.modeloAutomacao.findUnique({ where: { id: templateId } })
-      if (!modelo) return NextResponse.json({ error: 'Modelo não encontrado.' }, { status: 404 })
-
-      const kind = amtTypeToKind(modelo.type)
-      // Modelo de trabalho obrigatório (task/document) ou de avanço não pode ser
-      // aplicado a processos — só efeitos adicionais.
-      if (kindDeAvanco(modelo.type) || kindDeAvanco(kind) || kindDeTrabalhoObrigatorio(kind) || !KINDS_EFEITO_PERMITIDOS.has(kind)) {
-        return NextResponse.json({ error: msgProibido(kind), code: 'AUTOMACAO_PROIBIDA' }, { status: 422 })
-      }
-      // NADA DE LEGADO: modelos financeiros carregam valor/moeda (defaultParams) e não têm
-      // Configuração Financeira. O formato foi descontinuado — regra financeira só via
-      // "Nova regra (financeiro)" selecionando uma Configuração Financeira.
-      if (kind === 'financial') {
-        return NextResponse.json({ error: 'Automações financeiras não podem ser criadas por modelo (formato legado com valor/moeda). Use "Nova regra (financeiro)" e selecione uma Configuração Financeira — o preço vem da Tabela de Preços.', code: 'FINANCEIRO_SEM_MODELO' }, { status: 422 })
-      }
-      const dp = (modelo.defaultParams as Record<string, unknown>) || {}
-
-      const rule = await prisma.phaseAutomationRule.create({
-        data: {
-          templateId: modelo.id, tipoProcessoId, phaseKey,
-          name: modelo.name, description: modelo.description ?? null, kind,
-          scope: modelo.scope || 'phase', trigger: modelo.trigger || 'phase_entered',
-          action: modelo.action ?? null,
-          conditions: (modelo.conditions ?? undefined) as Prisma.InputJsonValue | undefined,
-          params: dp as Prisma.InputJsonValue,
-          financialType: (dp.financialType as string) ?? null,
-          idempotencyPattern: modelo.idempotencyPattern || 'processId+phaseKey',
-        },
-      })
-      await prisma.modeloAutomacao.update({ where: { id: modelo.id }, data: { usedByCount: { increment: 1 } } })
-      return NextResponse.json({ rule }, { status: 201 })
-    }
 
     // ---------- CRIAR REGRA AD-HOC (editor) ----------
     const tipoProcessoId = Number(body.tipoProcessoId)

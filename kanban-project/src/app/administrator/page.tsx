@@ -57,10 +57,7 @@ import {
   FinCatalogTab, HonorariumsTab, PricingRulesTab, PhaseMapTab, DiagnosticsTab,
 } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds4"
 
-// Lote 5 — Bibliotecas de modelos (Centro do Processo)
-import {
-  IMTemplatesTab, AMTemplatesTab,
-} from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds5"
+// Lote 5 — Biblioteca de Modelos: REMOVIDA (legado eliminado).
 
 // Lote 6 — Cadastros do Motor + Saúde do Sistema (telas que faltavam)
 import {
@@ -112,9 +109,8 @@ const FormasPagamentoTab = dynamic(() => import("@/src/components/gerenciamentoC
 const TaxasPagamentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TaxasPagamentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const TipoProcessoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TipoProcessoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const MacroKanbanTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MacroKanbanTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const ModelosInternosFaseTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosInternosFaseTab"), { ssr: false, loading: () => <CarregandoTela /> });
-const ModelosWorkflowInternoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosWorkflowInternoTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const ModelosAutomacaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosAutomacaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
+// LEGADO REMOVIDO — Biblioteca de Modelos (Workflow Interno / Variações da Fase / Automação)
+// eliminada. Fonte de verdade é o Workflow Macro/Interno + config real por fase. Ver migração.
 const ModosInternosFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModosInternosFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PhaseWorkflowsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseWorkflowsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PhaseAutomationsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseAutomationsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -130,7 +126,6 @@ const SimulacaoFaseTab = dynamic(() => import("@/src/components/gerenciamentoCom
 const ExecutorMotorTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ExecutorMotorTab"), { ssr: false, loading: () => <CarregandoTela /> })
 // ARQUITETURA NOVA — imports das telas de Tarefa Transversal removidos (telas
 // retiradas da navegação; criavam tarefas nativas, agora do Workflow Interno).
-const WorkflowsFasesHubTab = dynamic(() => import("@/src/components/gerenciamentoComponents/WorkflowsFasesHubTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PerfisPermissaoMotorTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PerfisPermissaoMotorTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
@@ -174,7 +169,6 @@ const TELAS: Record<string, React.ComponentType> = {
   // bespoke (lote 1)
   teams: TeamsTab,
   opauto: PhaseAutomationsFasesTab,
-  workflowsphases: WorkflowsFasesHubTab,
   protocols: ProtocolsTab,
   sla: SLATab,
   templates: TemplatesTab,
@@ -209,11 +203,6 @@ const TELAS: Record<string, React.ComponentType> = {
   execmotor: ExecutorMotorTab,
   runtimediag: RuntimeWorkflowDiagnostics,
   diagnostics: DiagnosticsTab,
-
-  // bespoke (lote 5) — bibliotecas de modelos
-  iwtemplates: ModelosWorkflowInternoTab,
-  imtemplates: ModelosInternosFaseTab,
-  amtemplates: ModelosAutomacaoTab,
 
   // bespoke (lote 6) — Cadastros do Motor + Saúde
   rolecat: RoleCatalogTab,

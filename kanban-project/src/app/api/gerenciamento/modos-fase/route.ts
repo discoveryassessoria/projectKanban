@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   const erro = await verificarPermissao(request, 'usuarios.gerenciar');
   if (erro) return erro;
   try {
-    const [tiposRaw, modos, modelosInternos] = await Promise.all([
+    const [tiposRaw, modos] = await Promise.all([
       prisma.tipoProcessoNacionalidade.findMany({
         where: { arquivado: false },
         orderBy: { name: 'asc' },
@@ -39,31 +39,13 @@ export async function GET(request: NextRequest) {
         },
       }),
       prisma.phaseInternalMode.findMany({ orderBy: { criadoEm: 'asc' } }),
-      prisma.modeloInternoFase.findMany({
-        where: { arquivado: false },
-        orderBy: { name: 'asc' },
-        select: {
-          id: true,
-          name: true,
-          modeKey: true,
-          category: true,
-          recommendedPhases: true,
-          description: true,
-          conditionOfUse: true,
-          operationalImpact: true,
-          documentalImpact: true,
-          financialImpact: true,
-          protocolImpact: true,
-          isSystemTemplate: true,
-        },
-      }),
     ]);
     const tiposProcesso = tiposRaw.map((t) => ({
       id: t.id,
       name: t.name,
       fases: t.macroWorkflow?.fases || [],
     }));
-    return NextResponse.json({ tiposProcesso, modos, modelosInternos });
+    return NextResponse.json({ tiposProcesso, modos });
   } catch (e) {
     console.error('GET modos-fase', e);
     return NextResponse.json({ error: 'Erro ao carregar modos das fases.' }, { status: 500 });
@@ -82,47 +64,6 @@ export async function POST(request: NextRequest) {
     const phaseKey: string = b?.phaseKey ? String(b.phaseKey) : '';
     if (!phaseKey) return NextResponse.json({ error: 'Selecione uma fase.' }, { status: 400 });
 
-    // ----- APLICAR modelos da biblioteca (2A) -----
-    if (b?.aplicar) {
-      const ids: number[] = Array.isArray(b.templateIds) ? b.templateIds.map(Number) : [];
-      if (!ids.length) return NextResponse.json({ error: 'Selecione ao menos um modelo.' }, { status: 400 });
-      let aplicados = 0;
-      let jaExistiam = 0;
-      for (const tid of ids) {
-        const tpl = await prisma.modeloInternoFase.findUnique({ where: { id: tid } });
-        if (!tpl || tpl.arquivado) continue;
-        const key = tpl.modeKey;
-        const modeUid = uid(tipoProcessoId, phaseKey, key);
-        const existe = await prisma.phaseInternalMode.findUnique({ where: { modeUid } });
-        if (existe) {
-          jaExistiam++;
-          continue;
-        }
-        await prisma.phaseInternalMode.create({
-          data: {
-            modeUid,
-            templateId: tpl.id,
-            tipoProcessoId,
-            phaseKey,
-            key,
-            label: tpl.name,
-            description: tpl.description,
-            condition: tpl.conditionOfUse,
-            impactOperational: tpl.operationalImpact,
-            impactDocument: tpl.documentalImpact,
-            impactFinancial: tpl.financialImpact,
-            impactProtocol: tpl.protocolImpact,
-            active: true,
-          },
-        });
-        await prisma.modeloInternoFase.update({
-          where: { id: tpl.id },
-          data: { usedByCount: { increment: 1 } },
-        });
-        aplicados++;
-      }
-      return NextResponse.json({ aplicados, jaExistiam }, { status: 201 });
-    }
 
     // ----- AD-HOC (criar modo direto) -----
     const label = b?.label ? String(b.label).trim() : '';

@@ -116,12 +116,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     await prisma.phaseAutomationRule.delete({ where: { id } })
 
     // devolve o contador de uso ao modelo 2C (se veio de um)
-    if (atual.templateId) {
-      const modelo = await prisma.modeloAutomacao.findUnique({ where: { id: atual.templateId } })
-      if (modelo && modelo.usedByCount > 0) {
-        await prisma.modeloAutomacao.update({ where: { id: atual.templateId }, data: { usedByCount: { decrement: 1 } } })
-      }
-    }
 
     return NextResponse.json({ ok: true })
   } catch (e) {
