@@ -19,10 +19,23 @@ import { ProcessoRetificacao } from "./ProcessoRetificacao"
 import { ProcessoEmissaoRetificada } from "./ProcessoEmissaoRetificada"
 import { RetornarFaseButton } from "./RetornarFaseButton"
 import { TarefaTransversalModal } from "./TarefaTransversalModal"
-import { TarefasTransversaisLista } from "./TarefasTransversaisLista"
 import type { FaseCode } from "@prisma/client"
 
 // Metadados de uma fase materializada (espelho de /api/processos/[id]/phases).
+// Tarefa Transversal vinculada a uma necessidade (exibida inline no documento).
+export interface TransversalTarefa {
+  id: number
+  titulo: string
+  statusTarefa: string
+  faseReferenciaCode: string | null
+  acaoStepKey: string | null
+  necessidadeId: number | null
+  resultadoEsperado: string | null
+  resultadoObtido: string | null
+  dataPrazo: string | null
+  responsavel?: { id: number; nome: string } | null
+}
+
 export interface PhaseMeta {
   phaseKey: string
   faseCode: FaseCode | null
@@ -355,9 +368,9 @@ export function ProcessoCentralOperacional({
   const [viewLoading, setViewLoading] = useState(false)
   const [viewErro, setViewErro] = useState<string | null>(null)
 
-  // Tarefa Transversal: contexto (necessidade) para o modal de criação + refresh da lista.
+  // Tarefa Transversal: contexto (necessidade) para o modal de criação + lista por necessidade.
   const [transversalCtx, setTransversalCtx] = useState<{ necessidadeId?: number | null; pessoaId?: number | null; label?: string } | null>(null)
-  const [transversalRefresh, setTransversalRefresh] = useState(0)
+  const [transversais, setTransversais] = useState<TransversalTarefa[]>([])
 
   // TROCA DE CONTEXTO NO AVANÇO DE FASE: quando a fase da Central muda (avanço/retorno),
   // qualquer drawer aberto está exibindo o contexto da fase ANTIGA (ex.: o passo
@@ -522,6 +535,33 @@ export function ProcessoCentralOperacional({
   }, [processo.id])
 
   useEffect(() => { carregarFases() }, [carregarFases])
+
+  // Tarefas transversais do processo — exibidas INLINE dentro do documento/necessidade a que
+  // pertencem. Recarregadas junto com a Central.
+  const carregarTransversais = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/processos/${processo.id}/tarefas-transversais`, { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } })
+      if (res.ok) { const j = await res.json(); setTransversais((j.tarefas ?? []) as TransversalTarefa[]) }
+    } catch { /* silencioso */ }
+  }, [processo.id])
+  useEffect(() => { carregarTransversais() }, [carregarTransversais])
+
+  const transversaisPorNec = new Map<number, TransversalTarefa[]>()
+  for (const t of transversais) {
+    if (t.necessidadeId == null) continue
+    const arr = transversaisPorNec.get(t.necessidadeId) ?? []
+    arr.push(t); transversaisPorNec.set(t.necessidadeId, arr)
+  }
+
+  const concluirTransversal = useCallback(async (id: number, resolveu: boolean, resultado: string) => {
+    await fetch(`/api/tarefas-transversais/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` }, body: JSON.stringify({ acao: "concluir", resultadoObtido: resultado || null, resolveuNecessidade: resolveu }) })
+    await carregarTransversais(); carregar(true)
+  }, [carregarTransversais])
+
+  const cancelarTransversal = useCallback(async (id: number) => {
+    await fetch(`/api/tarefas-transversais/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` }, body: JSON.stringify({ acao: "cancelar" }) })
+    await carregarTransversais(); carregar(true)
+  }, [carregarTransversais])
 
   // Carrega a fase PASSADA consultada (dados VIVOS, escopados por instância/ciclo) na
   // MESMA rota da Central, com ?faseCode&instanceId&ciclo. selectedPhaseKey só é != null
@@ -748,8 +788,6 @@ export function ProcessoCentralOperacional({
           </div>
         )}
 
-        {/* Tarefas transversais DENTRO do processo — ver/concluir/cancelar sem sair da Central. */}
-        <TarefasTransversaisLista processoId={processo.id} refreshKey={transversalRefresh} readOnly={isView} onChanged={() => carregar(true)} />
 
         {/* ===== Cabeçalho do MODO CONSULTA (fase passada) — MESMA casca, só leitura ===== */}
         {isView && (
@@ -840,6 +878,9 @@ export function ProcessoCentralOperacional({
             usuarios={usuarios}
             onDelegar={readOnly ? undefined : (necessidadeId, responsavelId) => { void delegar(necessidadeId, responsavelId) }}
             onCriarTransversal={readOnly ? undefined : (necessidadeId, pessoaIdNec, label) => setTransversalCtx({ necessidadeId, pessoaId: pessoaIdNec, label })}
+            transversaisPorNec={transversaisPorNec}
+            onConcluirTransversal={readOnly ? undefined : concluirTransversal}
+            onCancelarTransversal={readOnly ? undefined : cancelarTransversal}
             modoReestruturacao={!!bodyData.genealogiaReestruturacao}
             avisoReestruturacao={bodyData.mensagemReestruturacao ?? undefined}
           />
@@ -898,7 +939,7 @@ export function ProcessoCentralOperacional({
             faseAtivaCode={faseKeyAtiva ? String(faseKeyAtiva) : null}
             usuarios={usuarios}
             onClose={() => setTransversalCtx(null)}
-            onCreated={() => { setTransversalCtx(null); setTransversalRefresh((n) => n + 1); carregar(true) }}
+            onCreated={() => { setTransversalCtx(null); carregarTransversais(); carregar(true) }}
           />
         )}
       </div>

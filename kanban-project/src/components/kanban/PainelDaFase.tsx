@@ -82,6 +82,18 @@ export interface FasePersonRow {
   docs: FaseDocRow[]
 }
 
+export interface TransversalInline {
+  id: number
+  titulo: string
+  statusTarefa: string
+  faseReferenciaCode: string | null
+  acaoStepKey: string | null
+  necessidadeId: number | null
+  resultadoObtido: string | null
+  dataPrazo: string | null
+  responsavel?: { id: number; nome: string } | null
+}
+
 export interface PainelDaFaseProps {
   faseNome: string                 // "Emissão documental"
   faseSub: string                  // subtítulo da fase
@@ -101,6 +113,10 @@ export interface PainelDaFaseProps {
   onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
   // Tarefa Transversal: cria uma ação antecipada de outra fase para resolver esta necessidade.
   onCriarTransversal?: (necessidadeId: number, pessoaId: number | null, label: string) => void
+  // Transversais existentes por necessidade — exibidas INLINE dentro do documento.
+  transversaisPorNec?: Map<number, TransversalInline[]>
+  onConcluirTransversal?: (id: number, resolveu: boolean, resultado: string) => void
+  onCancelarTransversal?: (id: number) => void
   // CONSULTA de fase passada (PAST_READ_ONLY): mesmo layout/dados, mas SEM ações de
   // mutação (abrir operação/delegar). Só leitura. onAbrirOperacao/onDelegar chegam
   // undefined; readOnly deixa a intenção explícita para a UI.
@@ -135,6 +151,9 @@ export function PainelDaFase({
   usuarios,
   onDelegar,
   onCriarTransversal,
+  transversaisPorNec,
+  onConcluirTransversal,
+  onCancelarTransversal,
   readOnly = false,
   modoReestruturacao = false,
   avisoReestruturacao,
@@ -303,7 +322,7 @@ export function PainelDaFase({
             tone="linha"
           />
           {linhaPrincipal.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} onCriarTransversal={onCriarTransversal} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
+            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} onCriarTransversal={onCriarTransversal} transversaisPorNec={transversaisPorNec} onConcluirTransversal={onConcluirTransversal} onCancelarTransversal={onCancelarTransversal} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
           ))}
 
           {/* Grupo Fora da linhagem */}
@@ -314,7 +333,7 @@ export function PainelDaFase({
             tone="fora"
           />
           {foraDaLinha.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} onCriarTransversal={onCriarTransversal} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
+            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} onCriarTransversal={onCriarTransversal} transversaisPorNec={transversaisPorNec} onConcluirTransversal={onConcluirTransversal} onCancelarTransversal={onCancelarTransversal} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
           ))}
         </div>
       </div>
@@ -356,6 +375,9 @@ function PersonRow({
   usuarios,
   onDelegar,
   onCriarTransversal,
+  transversaisPorNec,
+  onConcluirTransversal,
+  onCancelarTransversal,
   ocultarValidacao = false,
   readOnly = false,
 }: {
@@ -364,6 +386,9 @@ function PersonRow({
   usuarios?: Array<{ id: number; nome: string }>
   onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
   onCriarTransversal?: (necessidadeId: number, pessoaId: number | null, label: string) => void
+  transversaisPorNec?: Map<number, TransversalInline[]>
+  onConcluirTransversal?: (id: number, resolveu: boolean, resultado: string) => void
+  onCancelarTransversal?: (id: number) => void
   ocultarValidacao?: boolean
   readOnly?: boolean
 }) {
@@ -500,9 +525,11 @@ function PersonRow({
 
       {/* Linhas expandidas (documentos) */}
       {exp &&
-        p.docs.map((d) => (
+        p.docs.map((d) => {
+        const transv = d.necessidadeId != null ? (transversaisPorNec?.get(d.necessidadeId) ?? []) : []
+        return (
+          <div key={d.id}>
           <div
-            key={d.id}
             className="grid items-center gap-3 border-t border-gray-100 py-3 pr-5"
             style={{ gridTemplateColumns: "minmax(200px,2fr) 0.9fr 1fr 0.8fr 1.2fr 124px", paddingLeft: 76 }}
           >
@@ -581,8 +608,66 @@ function PersonRow({
               )}
             </div>
           </div>
-        ))}
+          {transv.length > 0 && (
+            <TransversalInlineList tarefas={transv} readOnly={readOnly} onConcluir={onConcluirTransversal} onCancelar={onCancelarTransversal} />
+          )}
+          </div>
+        )})}
     </>
+  )
+}
+
+// Transversais vinculadas a UM documento/necessidade — exibidas INLINE sob a linha do doc.
+function TransversalInlineList({ tarefas, readOnly, onConcluir, onCancelar }: {
+  tarefas: TransversalInline[]
+  readOnly?: boolean
+  onConcluir?: (id: number, resolveu: boolean, resultado: string) => void
+  onCancelar?: (id: number) => void
+}) {
+  const [concluindoId, setConcluindoId] = useState<number | null>(null)
+  const [resultado, setResultado] = useState("")
+  const stLabel: Record<string, { t: string; c: string }> = {
+    NAO_INICIADA: { t: "Pendente", c: "bg-gray-100 text-gray-600" },
+    EM_ANDAMENTO: { t: "Em andamento", c: "bg-blue-100 text-blue-700" },
+    AGUARDANDO_TERCEIRO: { t: "Aguardando terceiro", c: "bg-amber-100 text-amber-700" },
+    CONCLUIDO_RECEBIDO: { t: "Concluída", c: "bg-green-100 text-green-700" },
+    CANCELADA: { t: "Cancelada", c: "bg-gray-100 text-gray-400" },
+  }
+  return (
+    <div className="border-t border-gray-50 bg-violet-50/40" style={{ paddingLeft: 76 }}>
+      {tarefas.map((t) => {
+        const st = stLabel[t.statusTarefa] ?? { t: t.statusTarefa, c: "bg-gray-100 text-gray-600" }
+        const encerrada = ["CONCLUIDO_RECEBIDO", "CANCELADA"].includes(t.statusTarefa)
+        return (
+          <div key={t.id} className="py-2 pr-5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-700">⇄ Transversal</span>
+              <span className="text-[12px] font-semibold text-gray-700">{t.acaoStepKey ?? t.titulo}</span>
+              <span className="text-[11px] text-gray-400">→ {t.faseReferenciaCode ?? "—"}{t.responsavel ? ` · ${t.responsavel.nome}` : ""}</span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${st.c}`}>{st.t}</span>
+            </div>
+            {t.resultadoObtido && <div className="text-[11px] text-gray-500 mt-0.5">Obtido: {t.resultadoObtido}</div>}
+            {!readOnly && !encerrada && onConcluir && (
+              concluindoId === t.id ? (
+                <div className="mt-1.5 space-y-1.5">
+                  <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder="Resultado obtido" className="w-full max-w-md text-[12px] rounded-md border border-gray-200 px-2 py-1 focus:outline-none focus:border-blue-400" />
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => { onConcluir(t.id, true, resultado); setConcluindoId(null); setResultado("") }} className="text-[11.5px] font-bold px-2 py-1 rounded bg-green-600 text-white hover:bg-green-500">Resolveu a necessidade</button>
+                    <button onClick={() => { onConcluir(t.id, false, resultado); setConcluindoId(null); setResultado("") }} className="text-[11.5px] font-semibold px-2 py-1 rounded border border-gray-200 text-gray-700 hover:bg-gray-50">Concluir sem resolver</button>
+                    <button onClick={() => { setConcluindoId(null); setResultado("") }} className="text-[11.5px] text-gray-400">cancelar</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-1 flex items-center gap-2">
+                  <button onClick={() => { setConcluindoId(t.id); setResultado("") }} className="text-[11.5px] font-semibold text-blue-600 hover:text-blue-800">Concluir</button>
+                  {onCancelar && <><span className="text-gray-300">·</span><button onClick={() => onCancelar(t.id)} className="text-[11.5px] font-semibold text-gray-500 hover:text-red-600">Cancelar</button></>}
+                </div>
+              )
+            )}
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
