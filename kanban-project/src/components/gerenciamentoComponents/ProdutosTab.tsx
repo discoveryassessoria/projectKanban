@@ -15,7 +15,8 @@ type CategoriaRef = { id: number; nome: string }
 type ContaRef = { id: number; codigo: string; nome: string }
 type Produto = {
   id: number
-  codigo: string
+  publicCode: string | null   // CFG-n — código PÚBLICO da configuração (backend, automático)
+  codigo: string              // id técnico interno (NOT NULL, não exibido)
   nome: string
   especie: string | null
   naturezaFinanceira: string | null
@@ -172,6 +173,7 @@ export default function ProdutosTab() {
     const q = busca.trim().toLowerCase()
     if (!q) return base
     return base.filter((p) =>
+      (p.publicCode ?? '').toLowerCase().includes(q) ||
       (p.mestre?.nome ?? p.nome).toLowerCase().includes(q) ||
       (p.mestre?.codigo ?? '').toLowerCase().includes(q) ||
       (p.mestre?.origem ?? '').toLowerCase().includes(q) ||
@@ -300,7 +302,7 @@ export default function ProdutosTab() {
         <input
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar (cadastro mestre, código ou origem)..."
+          placeholder="Buscar (código CFG-n, cadastro mestre, chave ou origem)..."
           className="min-w-[220px] flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
         />
         <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-white/60 select-none">
@@ -334,6 +336,7 @@ export default function ProdutosTab() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-white/5">
+                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Código</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Cadastro mestre</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Origem</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Natureza financeira</th>
@@ -344,9 +347,10 @@ export default function ProdutosTab() {
             <tbody>
               {filtrados.map((p) => (
                 <tr key={p.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
+                  <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/90">{p.publicCode ?? '—'}</td>
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-white">{p.mestre?.nome || p.nome}</div>
-                    <div className="text-[11px] text-white/40">{p.mestre?.codigo ? `Cód. ${p.mestre.codigo}` : 'sem código de mestre'}</div>
+                    <div className="text-[11px] text-white/40">{p.mestre?.codigo ? `Chave: ${p.mestre.codigo}` : 'sem chave de mestre'}</div>
                   </td>
                   <td className="px-4 py-2.5">
                     <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.mestre?.origem === 'servico' ? 'bg-sky-500/15 text-sky-300' : p.mestre?.origem === 'documento' ? 'bg-indigo-500/15 text-indigo-300' : 'bg-white/10 text-white/60'}`}>{origemLabel(p.mestre?.origem)}</span>
