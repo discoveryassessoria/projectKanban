@@ -98,7 +98,7 @@ export default function TiposDocumentoTab() {
       <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
         <table className="w-full text-sm">
           <thead className="border-b border-white/10 text-left text-xs text-white/50">
-            <tr><th className="px-4 py-3 font-medium">Código</th><th className="px-4 py-3 font-medium">Nome</th><th className="px-4 py-3 font-medium">Categoria</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 text-right font-medium">Ações</th></tr>
+            <tr><th className="px-4 py-3 font-medium">Chave técnica</th><th className="px-4 py-3 font-medium">Nome</th><th className="px-4 py-3 font-medium">Categoria</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 text-right font-medium">Ações</th></tr>
           </thead>
           <tbody>
             {visiveis.length === 0 ? (
@@ -126,7 +126,7 @@ export default function TiposDocumentoTab() {
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="border-b border-white/10 px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Novo"} tipo de documento</h3></div>
             <div className="space-y-3 px-6 py-4">
-              <div><label className={labelCls}>Código</label><input value={form.code} onChange={e => setForm(f => f && { ...f, code: e.target.value })} className={inputCls} /></div>
+              <div><label className={labelCls}>Chave técnica <span className="text-white/30">(integração/regras)</span></label><input value={form.code} onChange={e => setForm(f => f && { ...f, code: e.target.value })} placeholder="CERT_NASCIMENTO_IT" className={inputCls} /><p className="mt-1 text-[10.5px] text-white/35">Identificador funcional do tipo. O código público (DOC-n) é gerado no documento emitido, não aqui.</p></div>
               <div><label className={labelCls}>Nome *</label><input value={form.name} onChange={e => setForm(f => f && { ...f, name: e.target.value })} className={inputCls} /></div>
               <div>
                 <label className={labelCls}>Categoria documental</label>

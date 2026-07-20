@@ -15,7 +15,8 @@ import { ExclusaoDefinitivaModal } from './ExclusaoDefinitivaModal'
 
 type Servico = {
   id: number
-  code: string
+  publicCode: string | null   // SRV-n — código PÚBLICO automático (backend). É o "Código" da tela.
+  code: string                // chave TÉCNICA de catálogo (ex.: TRAD_JURAMENTADA) — sincroniza ItemCatalogo.code
   name: string
   category: string | null
   descricao: string | null
@@ -92,6 +93,7 @@ export default function ProdutosServicosTab() {
     const q = busca.trim().toLowerCase()
     if (!q) return servicos
     return servicos.filter((s) =>
+      (s.publicCode ?? '').toLowerCase().includes(q) ||
       s.code.toLowerCase().includes(q) ||
       s.name.toLowerCase().includes(q) ||
       (s.category || '').toLowerCase().includes(q)
@@ -112,7 +114,7 @@ export default function ProdutosServicosTab() {
   }
 
   async function salvar() {
-    if (!code.trim()) { setErroModal('Informe o código.'); return }
+    if (!code.trim()) { setErroModal("Informe a chave técnica."); return }
     if (!name.trim()) { setErroModal('Informe o nome.'); return }
     setSalvando(true); setErroModal(null)
     try {
@@ -171,7 +173,7 @@ export default function ProdutosServicosTab() {
       <input
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
-        placeholder="Buscar por código, nome ou categoria..."
+        placeholder="Buscar por código (SRV-n), chave técnica, nome ou categoria..."
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
       />
 
@@ -197,6 +199,7 @@ export default function ProdutosServicosTab() {
               <tr className="bg-white/5">
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Código</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Nome</th>
+                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Chave técnica</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Categoria</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Nacionalidade</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
@@ -206,11 +209,12 @@ export default function ProdutosServicosTab() {
             <tbody>
               {filtrados.map((s) => (
                 <tr key={s.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
-                  <td className="px-4 py-2.5 font-mono text-[12px] text-white/80">{s.code}</td>
+                  <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/90">{s.publicCode ?? '—'}</td>
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-white">{s.name}</div>
                     {s.descricao && <div className="text-[11px] text-white/40">{s.descricao}</div>}
                   </td>
+                  <td className="px-4 py-2.5 font-mono text-[11px] text-white/50">{s.code}</td>
                   <td className="px-4 py-2.5 text-white/70">{s.category || '—'}</td>
                   <td className="px-4 py-2.5 text-white/70">{nacLabel(s.nationality)}</td>
                   <td className="px-4 py-2.5">
@@ -240,9 +244,16 @@ export default function ProdutosServicosTab() {
             </div>
 
             <div className="space-y-4 px-6 py-4">
+              {editando && (
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                  <div className="text-[11px] uppercase tracking-wide text-white/40">Código (público, automático)</div>
+                  <div className="font-mono font-bold text-white/90">{editando.publicCode ?? '—'}</div>
+                  <div className="text-[10.5px] text-white/40 mt-0.5">Gerado pelo sistema, permanente e não editável.</div>
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Código</label>
+                  <label className="mb-1 block text-xs text-white/60">Chave técnica <span className="text-white/30">(integração/catálogo)</span></label>
                   <input value={code} onChange={(e) => setCode(e.target.value)} autoFocus placeholder="TRAD_JURAMENTADA" className={inputCls} />
                 </div>
                 <div>

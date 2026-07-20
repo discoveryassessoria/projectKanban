@@ -19,11 +19,24 @@ function buildPrisma() {
         async create({ model, args, query }) {
           const cfg = CODE_REGISTRY[model as string]
           const data = args?.data as Record<string, unknown> | undefined
-          if (cfg && data && !Array.isArray(data) && data[cfg.campo] == null) {
-            try {
-              data[cfg.campo] = await gerarCodigoPublico(base, cfg.entidade)
-            } catch (e) {
-              console.error(`[publicCode] geração falhou para ${model}:`, (e as Error)?.message)
+          if (cfg && data && !Array.isArray(data)) {
+            // publicCode é SEMPRE gerado pelo backend: ignora qualquer valor enviado pelo cliente
+            // (nunca aceita código público informado) e é OBRIGATÓRIO — se a geração falhar, o
+            // create FALHA (sem fail-safe). Lacuna na sequência é aceitável; entidade sem código não.
+            delete data[cfg.campo]
+            data[cfg.campo] = await gerarCodigoPublico(base, cfg.entidade)
+          }
+          return query(args)
+        },
+        // createMany: gera 1 código por linha (também obrigatório; ignora valor do cliente).
+        async createMany({ model, args, query }) {
+          const cfg = CODE_REGISTRY[model as string]
+          const data = args?.data
+          if (cfg && data) {
+            const rows = (Array.isArray(data) ? data : [data]) as Record<string, unknown>[]
+            for (const row of rows) {
+              delete row[cfg.campo]
+              row[cfg.campo] = await gerarCodigoPublico(base, cfg.entidade)
             }
           }
           return query(args)
