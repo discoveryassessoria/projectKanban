@@ -113,7 +113,7 @@ export default function CategoriasTab() {
       const m = (data as any).mestres || {}
       setMestres({
         documento: (m.tiposDocumento || []).map((d: any) => ({ id: d.id, label: d.name, code: d.code ?? null })),
-        servico: (m.servicos || []).map((x: any) => ({ id: x.id, label: x.name, code: x.code ?? null })),
+        servico: (m.servicos || []).map((x: any) => ({ id: x.id, label: x.publicCode ? `${x.publicCode} — ${x.name}` : x.name, code: x.code ?? null })),
         honorario: (m.honorarios || []).map((h: any) => ({ id: h.id, label: h.name, code: h.code ?? null })),
         processo: (m.tiposProcesso || []).map((p: any) => ({ id: p.id, label: p.name, code: null })),
       })

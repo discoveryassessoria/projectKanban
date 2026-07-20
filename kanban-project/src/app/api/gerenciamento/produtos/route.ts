@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
       prisma.tipoDocumentoCadastro.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
       // Serviços mestres: o SELECT expõe o código/nome REAIS do ServicoProduto (nunca SRV_).
       // `id` é o do item-pivô (ItemCatalogo) — a FK que a config grava para Serviço.
-      prisma.servicoProduto.findMany({ where: { ativo: true, itemCatalogoId: { not: null } }, select: { itemCatalogoId: true, code: true, name: true }, orderBy: { name: 'asc' } }),
+      prisma.servicoProduto.findMany({ where: { ativo: true, itemCatalogoId: { not: null } }, select: { itemCatalogoId: true, code: true, name: true, publicCode: true }, orderBy: { name: 'asc' } }),
       prisma.honorario.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
       prisma.tipoProcessoNacionalidade.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
       prisma.fornecedor.findMany({ where: { ativo: true }, select: { id: true, nome: true }, orderBy: { nome: 'asc' } }),
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
 
     // Anexa o mestre RESOLVIDO (nome/código reais por relação) a cada configuração.
     const produtos = produtosRaw.map((p) => ({ ...p, mestre: resolverMestre(p) }))
-    const servicos = servicosRaw.map((x) => ({ id: x.itemCatalogoId, code: x.code, name: x.name }))
+    const servicos = servicosRaw.map((x) => ({ id: x.itemCatalogoId, code: x.code, name: x.name, publicCode: x.publicCode }))
 
     return NextResponse.json({ produtos, mestres: { tiposDocumento, servicos, honorarios, tiposProcesso, fornecedores } })
   } catch (error) {

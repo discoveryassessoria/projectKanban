@@ -14,7 +14,7 @@ async function listarConfigsFinanceiras() {
     prisma.produtoFinanceiro.findMany({
       where: { ativo: true },
       select: {
-        id: true, codigo: true, possuiCusto: true, possuiReceita: true,
+        id: true, codigo: true, publicCode: true, possuiCusto: true, possuiReceita: true,
         tipoDocumento: { select: { name: true } }, honorario: { select: { name: true } },
         tipoProcesso: { select: { name: true } }, itemCatalogo: { select: { name: true, natureza: true } },
       },
@@ -31,7 +31,7 @@ async function listarConfigsFinanceiras() {
   return cfgs.map((c) => {
     const origem = c.tipoDocumento ? 'documento' : c.honorario ? 'honorario' : c.tipoProcesso ? 'processo' : (c.itemCatalogo?.natureza === 'SERVICO' ? 'servico' : 'item')
     const mestre = c.tipoDocumento?.name ?? c.honorario?.name ?? c.tipoProcesso?.name ?? c.itemCatalogo?.name ?? '—'
-    return { id: c.id, codigo: c.codigo, origem, mestre, possuiCusto: c.possuiCusto, possuiReceita: c.possuiReceita, temVenda: venda.has(c.id), temCusto: custo.has(c.id) }
+    return { id: c.id, codigo: c.codigo, publicCode: c.publicCode, origem, mestre, label: `${c.publicCode ? c.publicCode + ' — ' : ''}${mestre}`, possuiCusto: c.possuiCusto, possuiReceita: c.possuiReceita, temVenda: venda.has(c.id), temCusto: custo.has(c.id) }
   }).filter((c) => c.temVenda || c.temCusto) // só configs COM preço na Tabela de Preços
 }
 
