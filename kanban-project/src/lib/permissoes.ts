@@ -93,6 +93,10 @@ export const PERMISSOES = {
   'workflow.concluirPasso': 'Concluir passo do workflow',
   'workflow.aprovarPasso': 'Aprovar passo do workflow',
   'workflow.cancelarPasso': 'Cancelar passo do workflow',
+
+  // SISTEMA — ações destrutivas de infraestrutura. OPT-IN: NÃO é concedida pelo "admin tem tudo"
+  // nem pelos perfis padrão; precisa ser atribuída EXPLICITAMENTE a um perfil/usuário.
+  'sistema.exclusaoDefinitiva': 'Excluir DEFINITIVAMENTE dados de teste (hard delete de Config Financeira / Catálogo Mestre)',
 } as const
 
 export type PermissaoChave = keyof typeof PERMISSOES
@@ -203,9 +207,15 @@ export const MODULOS_PERMISSOES = [
 // PERFIS PADRÃO (seed inicial)
 // ========================================
 
-// Todas as permissões ligadas
+// Permissões OPT-IN: ações destrutivas que NUNCA são concedidas automaticamente — nem por
+// "admin tem tudo", nem pelos perfis padrão (TODAS_PERMISSOES). Só valem se atribuídas
+// EXPLICITAMENTE no perfil ou nas permissões custom do usuário. Autorização por PERMISSÃO,
+// nunca por tipo de usuário.
+export const PERMISSOES_OPT_IN = new Set<string>(['sistema.exclusaoDefinitiva'])
+
+// Todas as permissões ligadas — EXCETO as opt-in (que exigem concessão explícita).
 const TODAS_PERMISSOES = Object.keys(PERMISSOES).reduce((acc, key) => {
-  acc[key] = true
+  acc[key] = !PERMISSOES_OPT_IN.has(key)
   return acc
 }, {} as Record<string, boolean>)
 
@@ -300,17 +310,12 @@ export function calcularPermissoes(
   perfilPermissoes?: MapaPermissoes | null,
   permissoesCustom?: MapaPermissoes | null
 ): MapaPermissoes {
-  // Admin sempre tem tudo
-  if (tipo === 'admin') {
-    return Object.keys(PERMISSOES).reduce((acc, key) => {
-      acc[key] = true
-      return acc
-    }, {} as MapaPermissoes)
-  }
-
-  // Começar com tudo false
+  // BASE: admin recebe tudo por padrão, EXCETO permissões OPT-IN (ações destrutivas), que só
+  // valem se concedidas EXPLICITAMENTE via perfil/custom — inclusive para admin. Usuário comum
+  // começa com tudo false. Perfil e custom são aplicados por cima em AMBOS os casos (podem ligar
+  // uma permissão opt-in).
   const resultado: MapaPermissoes = Object.keys(PERMISSOES).reduce((acc, key) => {
-    acc[key] = false
+    acc[key] = tipo === 'admin' ? !PERMISSOES_OPT_IN.has(key) : false
     return acc
   }, {} as MapaPermissoes)
 

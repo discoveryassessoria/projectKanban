@@ -130,7 +130,8 @@ export default function ProdutosTab() {
 
   const [modalAberto, setModalAberto] = useState(false)
   const [editando, setEditando] = useState<Produto | null>(null)
-  const { isAdmin } = usePermissoes()
+  const { pode } = usePermissoes()
+  const podeExcluirDefinitivo = pode('sistema.exclusaoDefinitiva')
   const [modalExcluir, setModalExcluir] = useState<Produto | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY)
   const [salvando, setSalvando] = useState(false)
@@ -267,8 +268,8 @@ export default function ProdutosTab() {
   }
 
   async function excluir(p: Produto) {
-    // ADMIN: abre o modal com as duas opções (inativar × excluir definitivamente dados de teste).
-    if (isAdmin) { setModalExcluir(p); return }
+    // Com permissão sistema.exclusaoDefinitiva: modal com 2 opções (inativar × excluir definitivo).
+    if (podeExcluirDefinitivo) { setModalExcluir(p); return }
     // Usuário comum: regra geral inalterada — nunca apaga; no máximo inativa (o backend decide).
     const nome = p.mestre?.nome || p.nome
     if (!confirm(`Excluir a Configuração Financeira de "${nome}"?\n\nSe nada estiver usando esta configuração (preço, regra ou vínculo de serviço), ela é apagada de vez. Caso contrário, é inativada para preservar o histórico.`)) return

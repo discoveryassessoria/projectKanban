@@ -1,12 +1,11 @@
 // src/app/api/gerenciamento/catalogo-mestre/[id]/exclusao-definitiva/route.ts
-// EXCLUSÃO DEFINITIVA de item do Catálogo Mestre — SOMENTE ADMIN (limpeza explícita de dados de
-// teste). GET: prévia. DELETE: executa com confirmação forte. Nunca destrói dados reais.
+// EXCLUSÃO DEFINITIVA de item do Catálogo Mestre — requer permissão sistema.exclusaoDefinitiva (limpeza explícita de dados de teste). GET: prévia. DELETE: executa com confirmação forte. Nunca destrói dados reais.
 import { NextRequest, NextResponse } from "next/server"
-import { exigirAdmin } from "@/src/lib/verificar-permissao"
+import { exigirPermissao } from "@/src/lib/verificar-permissao"
 import { analisarExclusaoItemCatalogo, excluirItemCatalogoDefinitivo, FRASE_CONFIRMACAO } from "@/src/services/exclusao-definitiva"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { erro } = await exigirAdmin(request)
+  const { erro } = await exigirPermissao(request, "sistema.exclusaoDefinitiva")
   if (erro) return erro
   const { id } = await params
   const itemId = Number(id)
@@ -17,7 +16,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { usuario, erro } = await exigirAdmin(request)
+  const { usuario, erro } = await exigirPermissao(request, "sistema.exclusaoDefinitiva")
   if (erro) return erro
   const { id } = await params
   const itemId = Number(id)

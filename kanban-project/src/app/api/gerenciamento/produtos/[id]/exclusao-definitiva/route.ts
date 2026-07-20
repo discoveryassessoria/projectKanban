@@ -1,12 +1,12 @@
 // src/app/api/gerenciamento/produtos/[id]/exclusao-definitiva/route.ts
-// EXCLUSÃO DEFINITIVA de Configuração Financeira — SOMENTE ADMIN (validado no backend).
+// EXCLUSÃO DEFINITIVA de Configuração Financeira — requer permissão sistema.exclusaoDefinitiva (validado no backend).
 // GET: prévia (o que será apagado + blockers de uso real). DELETE: executa com confirmação forte.
 import { NextRequest, NextResponse } from "next/server"
-import { exigirAdmin } from "@/src/lib/verificar-permissao"
+import { exigirPermissao } from "@/src/lib/verificar-permissao"
 import { analisarExclusaoConfig, excluirConfigDefinitivo, FRASE_CONFIRMACAO } from "@/src/services/exclusao-definitiva"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { erro } = await exigirAdmin(request)
+  const { erro } = await exigirPermissao(request, "sistema.exclusaoDefinitiva")
   if (erro) return erro
   const { id } = await params
   const configId = Number(id)
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { usuario, erro } = await exigirAdmin(request)
+  const { usuario, erro } = await exigirPermissao(request, "sistema.exclusaoDefinitiva")
   if (erro) return erro
   const { id } = await params
   const configId = Number(id)

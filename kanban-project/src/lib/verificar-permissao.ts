@@ -7,6 +7,7 @@ import { extrairUsuarioKanban } from '@/lib/kanban-auth'
 import {
   calcularPermissoes,
   temPermissao,
+  PERMISSOES_OPT_IN,
   type PermissaoChave,
   type MapaPermissoes,
 } from './permissoes'
@@ -30,15 +31,23 @@ export async function extrairUsuarioComPermissoes(
   const usuario = await extrairUsuarioKanban(request)
   if (!usuario) return null
 
-  // Admin sempre tem tudo — nem precisa buscar perfil
+  // Admin tem tudo — EXCETO as permissões OPT-IN (ações destrutivas), que só valem se concedidas
+  // EXPLICITAMENTE no perfil ou no custom, inclusive para admin. As demais permissões do admin
+  // NUNCA são reduzidas pelo perfil (retrocompatível). Autorização por PERMISSÃO, não por tipo.
   if (usuario.tipo === 'admin') {
-    return {
-      userId: usuario.userId,
-      nome: '',
-      email: usuario.email,
-      tipo: 'admin',
-      permissoes: calcularPermissoes('admin'),
+    const permissoes = calcularPermissoes('admin') // tudo true, menos as opt-in
+    if (PERMISSOES_OPT_IN.size > 0) {
+      const adminDB = await prisma.usuario.findUnique({
+        where: { id: usuario.userId },
+        select: { permissoesCustom: true, perfil: { select: { permissoes: true } } },
+      })
+      const perfilP = adminDB?.perfil?.permissoes as MapaPermissoes | null
+      const customP = adminDB?.permissoesCustom as MapaPermissoes | null
+      for (const key of PERMISSOES_OPT_IN) {
+        if (perfilP?.[key] === true || customP?.[key] === true) permissoes[key] = true
+      }
     }
+    return { userId: usuario.userId, nome: '', email: usuario.email, tipo: 'admin', permissoes }
   }
 
   // Buscar perfil e permissões custom do usuário
@@ -113,16 +122,20 @@ export async function verificarPermissao(
 }
 
 /**
- * Exige perfil ADMIN (usuario.tipo === 'admin'). Usado por ações DESTRUTIVAS (exclusão
- * definitiva de dados de teste). Retorna { usuario } se admin, ou { erro: NextResponse } com
- * 401 (não autenticado) / 403 (não-admin). NUNCA confie só no frontend — chame isto no backend.
+ * Exige uma PERMISSÃO específica e devolve o usuário (para auditoria). Autorização por PERMISSÃO,
+ * nunca por tipo de usuário. Usado por ações DESTRUTIVAS (ex.: 'sistema.exclusaoDefinitiva').
+ * Retorna { usuario } se autorizado, ou { erro } com 401 (não autenticado) / 403 (sem permissão).
+ * NUNCA confie só no frontend — chame isto no backend.
  */
-export async function exigirAdmin(
-  request: Request
+export async function exigirPermissao(
+  request: Request,
+  permissao: PermissaoChave
 ): Promise<{ usuario: UsuarioComPermissoes; erro: null } | { usuario: null; erro: NextResponse }> {
   const usuario = await extrairUsuarioComPermissoes(request)
   if (!usuario) return { usuario: null, erro: NextResponse.json({ error: 'Não autorizado' }, { status: 401 }) }
-  if (usuario.tipo !== 'admin') return { usuario: null, erro: NextResponse.json({ error: 'Ação restrita a administradores' }, { status: 403 }) }
+  if (!temPermissao(usuario.permissoes, permissao)) {
+    return { usuario: null, erro: NextResponse.json({ error: 'Sem permissão para esta ação', permissao }, { status: 403 }) }
+  }
   return { usuario, erro: null }
 }
 

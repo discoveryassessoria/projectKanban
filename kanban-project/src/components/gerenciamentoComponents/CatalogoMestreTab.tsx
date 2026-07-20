@@ -38,7 +38,8 @@ export default function CatalogoMestreTab() {
   const [form, setForm] = useState<Form | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [busca, setBusca] = useState('')
-  const { isAdmin } = usePermissoes()
+  const { pode } = usePermissoes()
+  const podeExcluirDefinitivo = pode('sistema.exclusaoDefinitiva')
   const [modalExcluir, setModalExcluir] = useState<Item | null>(null)
 
   const carregar = useCallback(async () => {
@@ -60,8 +61,8 @@ export default function CatalogoMestreTab() {
     } catch (e: any) { setErro(e.message) } finally { setSalvando(false) }
   }
   async function excluir(it: Item) {
-    // ADMIN: modal de exclusão definitiva (limpeza explícita de dados de teste, com prévia + frase).
-    if (isAdmin) { setModalExcluir(it); return }
+    // Com permissão sistema.exclusaoDefinitiva: modal de exclusão definitiva (limpeza de dados de teste).
+    if (podeExcluirDefinitivo) { setModalExcluir(it); return }
     if (!confirm(`Excluir o item "${it.name}"?`)) return
     try { await jsonFetch(`/api/gerenciamento/catalogo-mestre/${it.id}`, { method: 'DELETE' }); await carregar() }
     catch (e: any) { alert(e.message) }
