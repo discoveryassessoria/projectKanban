@@ -3306,6 +3306,9 @@ enum StatusOperacaoAntecipada {
 
 model OperacaoAntecipada {
   id                         Int                      @id @default(autoincrement())
+  // Código público operacional (OPA-n) gerado pelo CodeGeneratorService central. Aditivo/único;
+  // nullable p/ backfill seguro. Não editável pelo usuário; identidade permanente (id/UUID é a chave técnica).
+  publicCode                 String?                  @unique @db.VarChar(20)
   processoId                 Int
   // Instância do Workflow Interno da fase de ORIGEM (a que solicitou a antecipação).
   workflowInstanceId         Int?

@@ -4,6 +4,7 @@
 // identificador técnico oficial continua sendo o id/UUID do banco.
 
 // Entidades com PREFIXO FIXO + sequência GLOBAL por entidade (independente entre si).
+// Adicionar uma entidade nova = 1 linha aqui (nenhuma lógica duplicada em módulo).
 export const CODE_PREFIX = {
   CLIENT: 'CLI',
   SERVICE: 'SRV',
@@ -17,6 +18,17 @@ export const CODE_PREFIX = {
   COST: 'CUS',
   REVENUE: 'REC',
   FINANCIAL_ENTRY: 'LAN',
+  // Rollout definitivo — demais entidades operacionais do Discovery:
+  OPERATION: 'OPE',
+  ANTICIPATED_OPERATION: 'OPA',
+  FINANCIAL_CONFIG: 'CFG',
+  PRICE: 'PRE',
+  FINANCIAL_RULE: 'RGF',
+  TRANSLATION: 'TRA',
+  RECTIFICATION: 'RET',
+  APOSTILLE: 'APO',
+  ORGANIZATION: 'ORG',
+  USER: 'USR',
 } as const
 
 export type EntidadeCodigo = keyof typeof CODE_PREFIX | 'PROCESS'

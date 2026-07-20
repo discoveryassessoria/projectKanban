@@ -25,6 +25,7 @@ import type { FaseCode } from "@prisma/client"
 // Operação Antecipada vinculada a uma necessidade (exibida inline no documento).
 export interface OpAntecipada {
   id: number
+  publicCode: string | null
   necessidadeId: number | null
   status: string
   operationType: string

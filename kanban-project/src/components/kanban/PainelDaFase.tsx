@@ -95,6 +95,7 @@ export interface FasePersonRow {
 // próprias). O status vem do workflow OFICIAL da operação-alvo.
 export interface OpAntecipadaInline {
   id: number
+  publicCode: string | null
   necessidadeId: number | null
   status: string
   operationType: string
@@ -697,6 +698,7 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
     <div className={`px-3 py-2.5 ${o.encerrada ? "opacity-60" : ""}`}>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex items-baseline gap-1.5 flex-wrap">
+          {o.publicCode && <span className="text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{o.publicCode}</span>}
           <span className="text-[12.5px] font-semibold text-gray-800">{objetivo}</span>
           <span className="text-[11px] text-gray-400">
             {o.operacao.statusLabel}
