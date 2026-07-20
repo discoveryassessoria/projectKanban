@@ -12,9 +12,11 @@ const authHeaders = (): Record<string, string> => ({
   Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("authToken") : ""}`,
 })
 
-interface CatalogoItem { operationType: string; label: string }
+interface CampoAdicional { key: string; label: string; type: "tipoDocumento" | "pais" | "pessoa" | "text"; required: boolean }
+interface CatalogoItem { operationType: string; label: string; camposAdicionais?: CampoAdicional[] }
 interface FaseOpt { faseCode: string; faseLabel: string }
 interface NecOpt { id: number; label: string; pessoaId: number | null }
+interface TipoDoc { id: number; name: string; code: string | null; countryCode: string | null }
 
 interface Props {
   processoId: number
@@ -33,6 +35,8 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
   const [necessidades, setNecessidades] = useState<NecOpt[]>([])
   const [necSel, setNecSel] = useState<string>(necessidadeId ? String(necessidadeId) : "")
   const [operationType, setOperationType] = useState<string>("")
+  const [tipos, setTipos] = useState<TipoDoc[]>([])
+  const [tipoDocumentoId, setTipoDocumentoId] = useState<string>("")
   const [targetPhaseCode, setTargetPhaseCode] = useState<string>("")
   const [objetivo, setObjetivo] = useState("")
   const [resultadoEsperado, setResultadoEsperado] = useState("")
@@ -50,6 +54,14 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
         if (lista.length === 1) setOperationType(lista[0].operationType) // atalho quando só há um tipo
       })
       .catch(() => setErro("Não foi possível carregar o catálogo operacional."))
+  }, [])
+
+  // Cadastro mestre de tipos de documento (para o campo "Documento a emitir").
+  useEffect(() => {
+    fetch("/api/tipos-documento", { headers: authHeaders() })
+      .then((r) => r.json())
+      .then((j) => setTipos((j.tipos ?? []) as TipoDoc[]))
+      .catch(() => {})
   }, [])
 
   // Fases (destino) — catálogo dinâmico; não oferece a própria fase ativa.
@@ -79,12 +91,21 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
 
   const necIdFinal = necessidadeId ?? (necSel ? Number(necSel) : null)
   const pessoaIdFinal = pessoaId ?? necessidades.find((n) => String(n.id) === necSel)?.pessoaId ?? null
+  // Campos gerados pelos METADADOS do adaptador selecionado (sem lista fixa / sem condicionar por fase).
+  const itemSel = catalogo.find((c) => c.operationType === operationType)
+  const campoDoc = itemSel?.camposAdicionais?.find((c) => c.type === "tipoDocumento")
+  const tipoSel = tipos.find((t) => String(t.id) === tipoDocumentoId)
+  const faltaDoc = !!campoDoc?.required && !tipoDocumentoId
 
   const criar = useCallback(async () => {
     if (!necIdFinal) { setErro("Selecione a necessidade a atender."); return }
     if (!operationType) { setErro("Selecione o tipo de operação."); return }
+    if (faltaDoc) { setErro("Selecione o documento a emitir."); return }
     setEnviando(true); setErro(null)
     try {
+      const params: Record<string, unknown> = {}
+      if (campoDoc && tipoDocumentoId) params.tipoDocumentoId = Number(tipoDocumentoId)
+      if (pessoaIdFinal != null) params.pessoaId = pessoaIdFinal
       const res = await fetch(`/api/processos/${processoId}/operacoes-antecipadas`, {
         method: "POST", headers: authHeaders(),
         body: JSON.stringify({
@@ -94,6 +115,7 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
           resultadoEsperado: resultadoEsperado.trim() || undefined,
           responsavelId: responsavelId ? Number(responsavelId) : undefined,
           pessoaId: pessoaIdFinal ?? undefined,
+          params: Object.keys(params).length ? params : undefined,
         }),
       })
       const j = await res.json().catch(() => ({}))
@@ -101,7 +123,7 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
       onCreated()
     } catch { setErro("Falha de rede ao criar a operação antecipada.") }
     finally { setEnviando(false) }
-  }, [processoId, necIdFinal, pessoaIdFinal, operationType, targetPhaseCode, objetivo, resultadoEsperado, responsavelId, onCreated])
+  }, [processoId, necIdFinal, pessoaIdFinal, operationType, campoDoc, tipoDocumentoId, faltaDoc, targetPhaseCode, objetivo, resultadoEsperado, responsavelId, onCreated])
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={() => !enviando && onClose()}>
@@ -139,6 +161,19 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
               </select>
             </label>
           </div>
+          {/* Campo dinâmico gerado pelos metadados do adaptador (ex.: documental → "Documento a emitir"). */}
+          {campoDoc && (
+            <label className="block">
+              <span className="block text-[11.5px] font-semibold text-gray-600 mb-1">{campoDoc.label}{campoDoc.required ? " *" : ""}</span>
+              <select value={tipoDocumentoId} onChange={(e) => setTipoDocumentoId(e.target.value)} className="w-full text-[13px] rounded-lg border border-gray-200 px-2.5 py-2 bg-white focus:outline-none focus:border-blue-400">
+                <option value="">Selecionar…</option>
+                {tipos.map((t) => <option key={t.id} value={t.id}>{t.name}{t.countryCode ? ` (${t.countryCode})` : ""}</option>)}
+              </select>
+              <span className="block text-[10.5px] text-gray-400 mt-1">
+                {tipoSel?.countryCode ? `Jurisdição: ${tipoSel.countryCode}. ` : ""}Se diferir do documento exigido pela necessidade, será tratado como <b>documento de apoio</b> (não substitui a necessidade).
+              </span>
+            </label>
+          )}
           <label className="block">
             <span className="block text-[11.5px] font-semibold text-gray-600 mb-1">Objetivo</span>
             <textarea value={objetivo} onChange={(e) => setObjetivo(e.target.value)} rows={2} placeholder="Ex.: obter os dados do registro de nascimento pela certidão de casamento" className="w-full text-[13px] rounded-lg border border-gray-200 px-2.5 py-2 focus:outline-none focus:border-blue-400" />
@@ -160,7 +195,7 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
         </div>
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-100">
           <button disabled={enviando} onClick={onClose} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 disabled:opacity-50">Cancelar</button>
-          <button disabled={enviando || !necIdFinal || !operationType} onClick={() => void criar()} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50">
+          <button disabled={enviando || !necIdFinal || !operationType || faltaDoc} onClick={() => void criar()} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50">
             {enviando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowLeftRight className="w-3.5 h-3.5" />} Criar operação antecipada
           </button>
         </div>

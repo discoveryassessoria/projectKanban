@@ -3426,11 +3426,18 @@ model OperacaoAntecipada {
   targetWorkflowDefinitionId String?                  @db.VarChar(80)
   // Tipo operacional do CATÁLOGO (ex.: "documento") — resolvido por adaptador.
   targetOperationType        String                   @db.VarChar(40)
+  // Documento-alvo (mestre) escolhido — pode DIFERIR do documento exigido pela necessidade de
+  // origem (nesse caso é documento de APOIO e NÃO substitui a necessidade). Parâmetro tipado.
+  targetTipoDocumentoId      Int?
+  // Params tipados da criação (pessoaId, paisId, jurisdicaoId, documentoExistenteId, …).
+  params                     Json?
   // Id da operação oficial criada/vinculada pelo adaptador (ex.: documentoId).
   targetOperationId          Int?
   objetivo                   String?                  @db.Text
   resultadoEsperado          String?                  @db.Text
   resultadoObtido            String?                  @db.Text
+  // Resultado ESTRUTURADO interpretado (ex.: cartório/livro/folha/termo do registro localizado).
+  resultadoDados             Json?
   status                     StatusOperacaoAntecipada @default(CRIADA)
   responsavelId              Int?
   createdBy                  Int?
@@ -3441,8 +3448,13 @@ model OperacaoAntecipada {
   completedAt                DateTime?
   cancelledAt                DateTime?
 
+  // Idempotência do documento-alvo explícito: 1 operação por (processo, necessidade, tipo op,
+  // tipo documento-alvo). NULLs são distintos no Postgres → o Modo 2 (sem tipo) é deduplicado
+  // pela pré-checagem no serviço, não por este índice.
+  @@unique([processoId, necessidadeId, targetOperationType, targetTipoDocumentoId])
   @@index([processoId])
   @@index([necessidadeId])
   @@index([targetOperationType, targetOperationId])
+  @@index([targetTipoDocumentoId])
   @@index([status])
 }

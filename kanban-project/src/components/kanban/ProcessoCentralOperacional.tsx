@@ -33,9 +33,11 @@ export interface OpAntecipada {
   targetPhaseCode: string | null
   objetivo: string | null
   resultadoObtido: string | null
+  targetTipoDocumentoId?: number | null
   responsavel?: { id: number; nome: string | null } | null
   operacao: { statusRaw: string; statusLabel: string; concluida: boolean; uiRef: { kind: string; id: number | null; necessidadeId?: number | null } }
   aguardandoAvaliacao: boolean
+  vinculavel: boolean
   encerrada: boolean
 }
 
@@ -558,8 +560,8 @@ export function ProcessoCentralOperacional({
     arr.push(o); operacoesPorNec.set(o.necessidadeId, arr)
   }
 
-  const avaliarOperacao = useCallback(async (id: number, resultado: "SIM" | "PARCIAL" | "NAO" | "CANCELAR", resultadoObtido: string) => {
-    await fetch(`/api/operacoes-antecipadas/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` }, body: JSON.stringify({ resultado, resultadoObtido: resultadoObtido || null }) })
+  const avaliarOperacao = useCallback(async (id: number, resultado: "SIM" | "PARCIAL" | "NAO" | "CANCELAR", resultadoObtido: string, resultadoDados?: Record<string, unknown>) => {
+    await fetch(`/api/operacoes-antecipadas/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` }, body: JSON.stringify({ resultado, resultadoObtido: resultadoObtido || null, resultadoDados: resultadoDados ?? null }) })
     await carregarOperacoes(); carregar(true)
   }, [carregarOperacoes])
 

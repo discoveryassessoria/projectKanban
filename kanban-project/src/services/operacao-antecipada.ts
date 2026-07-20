@@ -6,7 +6,7 @@
 // necessidade → BlockingEngine → PhaseAdvanceService (via tentarAvancoAutomatico). Nunca antes.
 
 import { prisma } from "@/lib/prisma"
-import { StatusOperacaoAntecipada } from "@prisma/client"
+import { Prisma, StatusOperacaoAntecipada } from "@prisma/client"
 import { getAdapter } from "@/src/lib/operacoes/catalogo"
 import type { ResultadoAvaliacao } from "@/src/lib/operacoes/tipos"
 import { atenderNecessidade } from "@/src/services/necessidade-documental"
@@ -52,23 +52,48 @@ export async function criarOperacaoAntecipada(input: CriarOperacaoAntecipadaInpu
     : null
 
   const pessoaId = input.pessoaId ?? nec.pessoaId ?? null
-  const { targetOperationId } = await adapter.criarOperacao({
-    processoId: input.processoId, pessoaId, necessidadeId: input.necessidadeId,
-    targetPhaseCode: input.targetPhaseCode ?? null, params: input.params,
-  })
+  const targetTipoDocumentoId = input.params?.tipoDocumentoId != null ? Number(input.params.tipoDocumentoId) : null
 
-  const op = await prisma.operacaoAntecipada.create({
-    data: {
-      processoId: input.processoId, workflowInstanceId: inst?.id ?? null,
-      originPhaseCode, originStepKey: input.originStepKey ?? null, necessidadeId: input.necessidadeId,
-      targetPhaseCode: input.targetPhaseCode ?? null, targetWorkflowDefinitionId: adapter.workflowDefinitionId,
-      targetOperationType: adapter.operationType, targetOperationId,
-      objetivo: input.objetivo ?? null, resultadoEsperado: input.resultadoEsperado ?? null,
-      status: StatusOperacaoAntecipada.EM_EXECUCAO, responsavelId: input.responsavelId ?? null, createdBy: input.usuarioId ?? null,
+  // IDEMPOTÊNCIA: não duplicar operação por duplo-clique/refresh/retry. Modo 1 (com documento-alvo)
+  // é garantido pelo índice único (catch P2002 abaixo); aqui cobrimos também o Modo 2 (sem tipo).
+  const jaExiste = await prisma.operacaoAntecipada.findFirst({
+    where: {
+      processoId: input.processoId, necessidadeId: input.necessidadeId, targetOperationType: adapter.operationType,
+      targetTipoDocumentoId, status: { in: ATIVAS },
     },
   })
-  await audit("CRIADA", op.id, `Operação antecipada "${adapter.label}" p/ necessidade ${input.necessidadeId} (origem ${originPhaseCode}, destino ${input.targetPhaseCode ?? "—"}); alvo ${targetOperationId ?? "sob demanda"}`, input.usuarioId)
-  return op
+  if (jaExiste) return jaExiste
+
+  const params = { ...(input.params ?? {}), ...(pessoaId != null ? { pessoaId } : {}) }
+  const { targetOperationId } = await adapter.criarOperacao({
+    processoId: input.processoId, pessoaId, necessidadeId: input.necessidadeId,
+    targetPhaseCode: input.targetPhaseCode ?? null, params,
+  })
+
+  try {
+    const op = await prisma.operacaoAntecipada.create({
+      data: {
+        processoId: input.processoId, workflowInstanceId: inst?.id ?? null,
+        originPhaseCode, originStepKey: input.originStepKey ?? null, necessidadeId: input.necessidadeId,
+        targetPhaseCode: input.targetPhaseCode ?? null, targetWorkflowDefinitionId: adapter.workflowDefinitionId,
+        targetOperationType: adapter.operationType, targetTipoDocumentoId, params: params as Prisma.InputJsonValue,
+        targetOperationId, objetivo: input.objetivo ?? null, resultadoEsperado: input.resultadoEsperado ?? null,
+        status: StatusOperacaoAntecipada.EM_EXECUCAO, responsavelId: input.responsavelId ?? null, createdBy: input.usuarioId ?? null,
+      },
+    })
+    await audit("CRIADA", op.id, `Operação antecipada "${adapter.label}" p/ necessidade ${input.necessidadeId} (origem ${originPhaseCode}, destino ${input.targetPhaseCode ?? "—"}); alvo doc ${targetOperationId ?? "sob demanda"}${targetTipoDocumentoId ? ` tipo ${targetTipoDocumentoId}` : ""}`, input.usuarioId)
+    return op
+  } catch (e) {
+    // Corrida do índice único (duplo-clique simultâneo): retorna a operação já criada.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      const existente = await prisma.operacaoAntecipada.findFirst({
+        where: { processoId: input.processoId, necessidadeId: input.necessidadeId, targetOperationType: adapter.operationType, targetTipoDocumentoId },
+        orderBy: { id: "desc" },
+      })
+      if (existente) return existente
+    }
+    throw e
+  }
 }
 
 const ATIVAS = [StatusOperacaoAntecipada.CRIADA, StatusOperacaoAntecipada.EM_EXECUCAO, StatusOperacaoAntecipada.AGUARDANDO_RESULTADO]
@@ -92,13 +117,18 @@ export async function listarOperacoesAntecipadas(processoId: number, necessidade
       : { statusRaw: "?", statusLabel: "Tipo desconhecido", concluida: false, uiRef: { kind: r.targetOperationType, id: r.targetOperationId, necessidadeId: r.necessidadeId } }
     // Deriva "aguardando avaliação" quando o workflow oficial concluiu mas a operação ainda não foi avaliada.
     const aguardandoAvaliacao = opStatus.concluida && (ATIVAS as string[]).includes(r.status)
+    // vinculavel = documento-alvo É o documento exigido pela necessidade (compatível). Quando
+    // false, é documento de APOIO → a avaliação captura RESULTADO estruturado, não vincula o doc.
+    const vinculavel = adapter?.podeVincularNecessidade
+      ? await adapter.podeVincularNecessidade(r.targetOperationId, r.necessidadeId)
+      : false
     return {
       id: r.id, necessidadeId: r.necessidadeId, status: r.status,
-      operationType: r.targetOperationType, targetOperationId: r.targetOperationId,
+      operationType: r.targetOperationType, targetOperationId: r.targetOperationId, targetTipoDocumentoId: r.targetTipoDocumentoId,
       originPhaseCode: r.originPhaseCode, targetPhaseCode: r.targetPhaseCode,
-      objetivo: r.objetivo, resultadoEsperado: r.resultadoEsperado, resultadoObtido: r.resultadoObtido,
+      objetivo: r.objetivo, resultadoEsperado: r.resultadoEsperado, resultadoObtido: r.resultadoObtido, resultadoDados: r.resultadoDados,
       responsavel: r.responsavelId != null ? { id: r.responsavelId, nome: nomePorId.get(r.responsavelId) ?? null } : null,
-      operacao: opStatus, aguardandoAvaliacao,
+      operacao: opStatus, aguardandoAvaliacao, vinculavel,
       encerrada: !(ATIVAS as string[]).includes(r.status),
     }
   }))
@@ -111,13 +141,14 @@ export async function listarOperacoesAntecipadas(processoId: number, necessidade
 export async function avaliarOperacaoAntecipada(
   id: number,
   resultado: ResultadoAvaliacao,
-  opts: { resultadoObtido?: string | null; usuarioId?: number | null },
+  opts: { resultadoObtido?: string | null; resultadoDados?: unknown; usuarioId?: number | null },
 ) {
   const op = await prisma.operacaoAntecipada.findUnique({ where: { id } })
   if (!op) throw new Error("Operação antecipada não encontrada")
   const adapter = getAdapter(op.targetOperationType)
   const now = new Date()
-  const base = { resultadoObtido: opts.resultadoObtido ?? op.resultadoObtido ?? null, avaliadoPor: opts.usuarioId ?? null, avaliadoEm: now }
+  const dados = opts.resultadoDados != null ? (opts.resultadoDados as Prisma.InputJsonValue) : (op.resultadoDados ?? Prisma.JsonNull)
+  const base = { resultadoObtido: opts.resultadoObtido ?? op.resultadoObtido ?? null, resultadoDados: dados, avaliadoPor: opts.usuarioId ?? null, avaliadoEm: now }
 
   if (resultado === "CANCELAR") {
     await prisma.operacaoAntecipada.update({ where: { id }, data: { ...base, status: StatusOperacaoAntecipada.CANCELADA, cancelledAt: now } })
@@ -143,11 +174,21 @@ export async function avaliarOperacaoAntecipada(
     return { status: StatusOperacaoAntecipada.CONCLUIDA_PARCIAL }
   }
 
-  // resultado === "SIM": objetivo atingido → motores OFICIAIS na ordem correta.
+  // resultado === "SIM": objetivo atingido. O documento-alvo só é vinculado como documento
+  // OFICIAL da necessidade quando for COMPATÍVEL (mesmo mestre + pessoa); documento de APOIO
+  // apenas produz o RESULTADO (resultadoDados) — nunca corrompe Documento.necessidadeId.
   await prisma.operacaoAntecipada.update({ where: { id }, data: { ...base, status: StatusOperacaoAntecipada.CONCLUIDA, completedAt: now } })
+  await adapter?.interpretarResultado?.(op.targetOperationId, "SIM")
   if (op.necessidadeId != null) {
-    await atenderNecessidade(op.necessidadeId)                 // necessidade → ATENDIDA (motor oficial)
-    await audit("NECESSIDADE_ATENDIDA", id, `Necessidade ${op.necessidadeId} atendida por operação antecipada`, opts.usuarioId)
+    const podeVincular = adapter?.podeVincularNecessidade ? await adapter.podeVincularNecessidade(op.targetOperationId, op.necessidadeId) : false
+    if (podeVincular) {
+      await adapter!.vincularNecessidade!(op.targetOperationId, op.necessidadeId)
+      await audit("DOC_VINCULADO", id, `Documento-alvo ${op.targetOperationId} vinculado como oficial da necessidade ${op.necessidadeId} (compatível)`, opts.usuarioId)
+    }
+    // Interpretação do resultado: com o objetivo confirmado (e os dados capturados), a necessidade
+    // de origem é atendida — seja pelo documento oficial compatível, seja pelo dado de apoio.
+    await atenderNecessidade(op.necessidadeId)
+    await audit("NECESSIDADE_ATENDIDA", id, `Necessidade ${op.necessidadeId} atendida por operação antecipada${podeVincular ? " (doc oficial)" : " (documento de apoio)"}`, opts.usuarioId)
   }
   await tentarAvancoAutomatico(op.processoId)                  // BlockingEngine (computeGate) → PhaseAdvance
   await audit("CONCLUIDA", id, `Objetivo atingido. ${opts.resultadoObtido ?? ""}`.trim(), opts.usuarioId)

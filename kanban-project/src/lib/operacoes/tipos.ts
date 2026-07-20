@@ -31,6 +31,15 @@ export interface OperacaoStatus {
   uiRef: UiRef
 }
 
+/** Descritor de um campo adicional do formulário — o form é GERADO por estes metadados
+ *  (nunca condicionado a nomes de fase). type direciona qual seletor/endpoint a UI usa. */
+export interface CampoAdicional {
+  key: string        // vira params[key]
+  label: string
+  type: "tipoDocumento" | "pais" | "pessoa" | "text"
+  required: boolean
+}
+
 /** Metadados do catálogo (o que a tela de criação consome). Sem lista fixa. */
 export interface CatalogoItem {
   operationType: string
@@ -38,6 +47,13 @@ export interface CatalogoItem {
   canRunOutsidePhase: boolean
   allowAdvanceExecution: boolean
   workflowDefinitionId: string | null
+  exigeTipoDocumento: boolean
+  exigePessoa: boolean
+  permiteReutilizarExistente: boolean
+  permiteCriarNovo: boolean
+  camposAdicionais: CampoAdicional[]
+  resultStrategy: string
+  reconciliationStrategy: string
 }
 
 /**
@@ -54,12 +70,26 @@ export interface ExecutionAdapter {
   resultInterpreter: string
   reconciliationStrategy: string
   active: boolean
+  // Metadados que GERAM o formulário de criação (sem lista fixa / sem condicionar por fase).
+  exigeTipoDocumento: boolean
+  exigePessoa: boolean
+  permiteReutilizarExistente: boolean
+  permiteCriarNovo: boolean
+  camposAdicionais: CampoAdicional[]
 
-  /** Cria/vincula a operação oficial. Retorna o id oficial (ex.: documentoId) ou null (lazy). */
+  /** Cria/vincula a operação oficial (idempotente). Retorna o id oficial (ex.: documentoId).
+   *  DEVE lançar erro funcional se a configuração obrigatória faltar (nunca null silencioso). */
   criarOperacao(ctx: AdapterCriarContexto): Promise<{ targetOperationId: number | null }>
 
   /** Status atual da operação oficial (rótulo + se o workflow oficial concluiu). */
   getStatus(targetOperationId: number | null, ctx: { necessidadeId: number | null }): Promise<OperacaoStatus>
+
+  /** A operação-alvo pode ser vinculada como documento OFICIAL da necessidade de origem?
+   *  (só quando o tipo documental for compatível + mesma pessoa + sem equivalente já vinculado). */
+  podeVincularNecessidade?(targetOperationId: number | null, necessidadeId: number | null): Promise<boolean>
+
+  /** Vincula a operação-alvo à necessidade (documento oficial). Só chamar após podeVincular=true. */
+  vincularNecessidade?(targetOperationId: number | null, necessidadeId: number | null): Promise<void>
 
   /** Efeitos na ENTIDADE-ALVO ao avaliar (não na necessidade — isso é do núcleo). Opcional. */
   interpretarResultado?(targetOperationId: number | null, resultado: ResultadoAvaliacao): Promise<void>

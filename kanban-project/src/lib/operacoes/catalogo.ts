@@ -15,7 +15,8 @@ export function getAdapter(operationType: string): ExecutionAdapter | null {
   return ADAPTERS.find((a) => a.operationType === operationType && a.active) ?? null
 }
 
-/** Itens elegíveis para Operação Antecipada (executáveis fora da fase). Consumido pela UI. */
+/** Itens elegíveis para Operação Antecipada (executáveis fora da fase). Consumido pela UI, que
+ *  GERA o formulário a partir destes metadados (sem lista fixa / sem condicionar por fase). */
 export function listCatalogo(): CatalogoItem[] {
   return ADAPTERS.filter((a) => a.active && a.canRunOutsidePhase).map((a) => ({
     operationType: a.operationType,
@@ -23,5 +24,12 @@ export function listCatalogo(): CatalogoItem[] {
     canRunOutsidePhase: a.canRunOutsidePhase,
     allowAdvanceExecution: a.allowAdvanceExecution,
     workflowDefinitionId: a.workflowDefinitionId,
+    exigeTipoDocumento: a.exigeTipoDocumento,
+    exigePessoa: a.exigePessoa,
+    permiteReutilizarExistente: a.permiteReutilizarExistente,
+    permiteCriarNovo: a.permiteCriarNovo,
+    camposAdicionais: a.camposAdicionais,
+    resultStrategy: a.resultInterpreter,
+    reconciliationStrategy: a.reconciliationStrategy,
   }))
 }

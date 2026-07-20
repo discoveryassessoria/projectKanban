@@ -20,6 +20,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!RESULTADOS.has(resultado)) return NextResponse.json({ error: "resultado deve ser SIM, PARCIAL, NAO ou CANCELAR" }, { status: 400 })
     const r = await avaliarOperacaoAntecipada(opId, resultado as ResultadoAvaliacao, {
       resultadoObtido: body?.resultadoObtido ?? null,
+      resultadoDados: body?.resultadoDados ?? null,
       usuarioId: usuario?.userId ?? null,
     })
     return NextResponse.json(r)

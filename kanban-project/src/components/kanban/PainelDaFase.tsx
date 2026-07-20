@@ -103,13 +103,18 @@ export interface OpAntecipadaInline {
   targetPhaseCode: string | null
   objetivo: string | null
   resultadoObtido: string | null
+  targetTipoDocumentoId?: number | null
   responsavel?: { id: number; nome: string | null } | null
   operacao: { statusRaw: string; statusLabel: string; concluida: boolean; uiRef: { kind: string; id: number | null; necessidadeId?: number | null } }
   aguardandoAvaliacao: boolean
+  // true = documento-alvo É o exigido pela necessidade (será vinculado). false = documento de APOIO
+  // (a avaliação captura RESULTADO estruturado; não vincula o doc à necessidade).
+  vinculavel: boolean
   encerrada: boolean
 }
 
 export type ResultadoAvaliacaoUI = "SIM" | "PARCIAL" | "NAO" | "CANCELAR"
+export type AvaliarFn = (id: number, resultado: ResultadoAvaliacaoUI, resultadoObtido: string, resultadoDados?: Record<string, unknown>) => void
 
 export interface PainelDaFaseProps {
   faseNome: string                 // "Emissão documental"
@@ -132,7 +137,7 @@ export interface PainelDaFaseProps {
   onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
   // Operações antecipadas existentes por necessidade — exibidas INLINE dentro do documento.
   operacoesPorNec?: Map<number, OpAntecipadaInline[]>
-  onAvaliarOperacao?: (id: number, resultado: ResultadoAvaliacaoUI, resultadoObtido: string) => void
+  onAvaliarOperacao?: AvaliarFn
   onAbrirOperacaoAntecipada?: (op: OpAntecipadaInline) => void
   // CONSULTA de fase passada (PAST_READ_ONLY): mesmo layout/dados, mas SEM ações de
   // mutação (abrir operação/delegar). Só leitura. onAbrirOperacao/onDelegar chegam
@@ -404,7 +409,7 @@ function PersonRow({
   onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
   onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
   operacoesPorNec?: Map<number, OpAntecipadaInline[]>
-  onAvaliarOperacao?: (id: number, resultado: ResultadoAvaliacaoUI, resultadoObtido: string) => void
+  onAvaliarOperacao?: AvaliarFn
   onAbrirOperacaoAntecipada?: (op: OpAntecipadaInline) => void
   ocultarValidacao?: boolean
   readOnly?: boolean
@@ -649,7 +654,7 @@ const ST_OP_LABEL: Record<string, { t: string; c: string }> = {
 function OperacoesAntecipadasInline({ ops, readOnly, onAvaliar, onAbrir }: {
   ops: OpAntecipadaInline[]
   readOnly?: boolean
-  onAvaliar?: (id: number, resultado: ResultadoAvaliacaoUI, resultadoObtido: string) => void
+  onAvaliar?: AvaliarFn
   onAbrir?: (op: OpAntecipadaInline) => void
 }) {
   const abertas = ops.filter((o) => !o.encerrada).length
@@ -673,13 +678,20 @@ function OperacoesAntecipadasInline({ ops, readOnly, onAvaliar, onAbrir }: {
 function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
   o: OpAntecipadaInline
   readOnly?: boolean
-  onAvaliar?: (id: number, resultado: ResultadoAvaliacaoUI, resultadoObtido: string) => void
+  onAvaliar?: AvaliarFn
   onAbrir?: (op: OpAntecipadaInline) => void
 }) {
   const [avaliando, setAvaliando] = useState(false)
   const [resultado, setResultado] = useState("")
+  const [dados, setDados] = useState<Record<string, string>>({})
   const st = ST_OP_LABEL[o.status] ?? { t: o.status, c: "bg-gray-100 text-gray-600" }
   const objetivo = o.objetivo || "Operação antecipada"
+  const apoio = !o.vinculavel // documento-alvo diferente do exigido → captura resultado estruturado
+  const setD = (k: string, v: string) => setDados((d) => ({ ...d, [k]: v }))
+  const enviar = (r: ResultadoAvaliacaoUI) => {
+    onAvaliar?.(o.id, r, resultado, r === "SIM" && apoio ? { ...dados } : undefined)
+    setAvaliando(false)
+  }
 
   return (
     <div className={`px-3 py-2.5 ${o.encerrada ? "opacity-60" : ""}`}>
@@ -689,6 +701,7 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
           <span className="text-[11px] text-gray-400">
             {o.operacao.statusLabel}
             {o.originPhaseCode ? ` · origem ${faseLabel(o.originPhaseCode)}` : ""}
+            {apoio && o.targetTipoDocumentoId ? " · documento de apoio" : ""}
             {o.responsavel?.nome ? ` · ${o.responsavel.nome}` : ""}
           </span>
         </div>
@@ -700,16 +713,24 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
         </div>
       </div>
 
-      {/* AVALIAÇÃO FINAL — só após o workflow oficial concluir. */}
+      {/* AVALIAÇÃO FINAL — só após o workflow oficial concluir. Documento de APOIO captura o
+          resultado ESTRUTURADO (é ele que resolve a necessidade de origem, não o doc em si). */}
       {!readOnly && o.aguardandoAvaliacao && onAvaliar && (
         avaliando ? (
           <div className="mt-2 rounded-md border border-gray-200 bg-white p-2 space-y-2">
-            <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder="Resultado obtido (o dado que a operação trouxe)" className="w-full text-[12px] rounded-md border border-gray-200 px-2 py-1.5 focus:outline-none focus:border-blue-400" autoFocus />
+            {apoio && (
+              <div className="grid grid-cols-2 gap-2">
+                {[["cartorio", "Cartório"], ["municipio", "Município"], ["livro", "Livro"], ["folha", "Folha"], ["termo", "Termo"], ["data", "Data"], ["fonte", "Fonte da informação"]].map(([k, label]) => (
+                  <input key={k} value={dados[k] ?? ""} onChange={(e) => setD(k, e.target.value)} placeholder={label} className="text-[12px] rounded-md border border-gray-200 px-2 py-1.5 focus:outline-none focus:border-blue-400" />
+                ))}
+              </div>
+            )}
+            <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder={apoio ? "Observações" : "Resultado obtido"} className="w-full text-[12px] rounded-md border border-gray-200 px-2 py-1.5 focus:outline-none focus:border-blue-400" autoFocus />
             <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={() => { onAvaliar(o.id, "SIM", resultado); setAvaliando(false) }} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-500"><CheckCircle2 className="w-3.5 h-3.5" /> Objetivo atingido</button>
-              <button onClick={() => { onAvaliar(o.id, "PARCIAL", resultado); setAvaliando(false) }} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-teal-200 text-teal-700 hover:bg-teal-50">Parcialmente</button>
-              <button onClick={() => { onAvaliar(o.id, "NAO", resultado); setAvaliando(false) }} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50">Não atingido</button>
-              <button onClick={() => { onAvaliar(o.id, "CANCELAR", resultado); setAvaliando(false) }} className="text-[11.5px] text-gray-400 hover:text-red-600 ml-auto">Cancelar operação</button>
+              <button onClick={() => enviar("SIM")} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-500"><CheckCircle2 className="w-3.5 h-3.5" /> Objetivo atingido</button>
+              <button onClick={() => enviar("PARCIAL")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-teal-200 text-teal-700 hover:bg-teal-50">Parcialmente</button>
+              <button onClick={() => enviar("NAO")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50">Não atingido</button>
+              <button onClick={() => enviar("CANCELAR")} className="text-[11.5px] text-gray-400 hover:text-red-600 ml-auto">Cancelar operação</button>
             </div>
           </div>
         ) : (
