@@ -29,7 +29,22 @@ import {
   FileText,
   Star,
   Users,
+  ArrowLeftRight,
 } from "lucide-react"
+import { FASES } from "@/src/lib/process-stage/fases-catalog"
+import type { FaseCode } from "@prisma/client"
+
+// Rótulos amigáveis a partir dos códigos técnicos (fase de referência + ação de catálogo).
+function faseLabel(code: string | null): string {
+  if (!code) return "—"
+  return FASES[code as FaseCode]?.label ?? code
+}
+function acaoLabel(faseCode: string | null, stepKey: string | null): string {
+  if (!stepKey) return "—"
+  const def = faseCode ? FASES[faseCode as FaseCode] : null
+  const steps = [...(def?.steps ?? []), ...((def?.processSteps as { stepKey: string; title: string }[] | undefined) ?? [])]
+  return steps.find((s) => s.stepKey === stepKey)?.title ?? stepKey
+}
 
 // ============================================================
 // TIPOS
@@ -633,40 +648,52 @@ function TransversalInlineList({ tarefas, readOnly, onConcluir, onCancelar }: {
     CONCLUIDO_RECEBIDO: { t: "Concluída", c: "bg-green-100 text-green-700" },
     CANCELADA: { t: "Cancelada", c: "bg-gray-100 text-gray-400" },
   }
+  const abertas = tarefas.filter((t) => !["CONCLUIDO_RECEBIDO", "CANCELADA"].includes(t.statusTarefa)).length
   return (
-    <div className="border-t border-gray-50 bg-violet-50/40" style={{ paddingLeft: 76 }}>
-      {tarefas.map((t) => {
-        const st = stLabel[t.statusTarefa] ?? { t: t.statusTarefa, c: "bg-gray-100 text-gray-600" }
-        const encerrada = ["CONCLUIDO_RECEBIDO", "CANCELADA"].includes(t.statusTarefa)
-        return (
-          <div key={t.id} className="py-2 pr-5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-700">⇄ Transversal</span>
-              <span className="text-[12px] font-semibold text-gray-700">{t.acaoStepKey ?? t.titulo}</span>
-              <span className="text-[11px] text-gray-400">→ {t.faseReferenciaCode ?? "—"}{t.responsavel ? ` · ${t.responsavel.nome}` : ""}</span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${st.c}`}>{st.t}</span>
-            </div>
-            {t.resultadoObtido && <div className="text-[11px] text-gray-500 mt-0.5">Obtido: {t.resultadoObtido}</div>}
-            {!readOnly && !encerrada && onConcluir && (
-              concluindoId === t.id ? (
-                <div className="mt-1.5 space-y-1.5">
-                  <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder="Resultado obtido" className="w-full max-w-md text-[12px] rounded-md border border-gray-200 px-2 py-1 focus:outline-none focus:border-blue-400" />
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => { onConcluir(t.id, true, resultado); setConcluindoId(null); setResultado("") }} className="text-[11.5px] font-bold px-2 py-1 rounded bg-green-600 text-white hover:bg-green-500">Resolveu a necessidade</button>
-                    <button onClick={() => { onConcluir(t.id, false, resultado); setConcluindoId(null); setResultado("") }} className="text-[11.5px] font-semibold px-2 py-1 rounded border border-gray-200 text-gray-700 hover:bg-gray-50">Concluir sem resolver</button>
-                    <button onClick={() => { setConcluindoId(null); setResultado("") }} className="text-[11.5px] text-gray-400">cancelar</button>
+    <div className="pr-5 pb-2" style={{ paddingLeft: 76 }}>
+      <div className="rounded-lg border border-violet-100 bg-violet-50/50 overflow-hidden">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-violet-100/70 text-[10.5px] font-bold uppercase tracking-wide text-violet-600">
+          <ArrowLeftRight className="w-3 h-3" /> Ações transversais
+          <span className="font-semibold text-violet-400 normal-case tracking-normal">· {tarefas.length}{abertas > 0 ? ` (${abertas} aberta${abertas > 1 ? "s" : ""})` : ""}</span>
+        </div>
+        <div className="divide-y divide-violet-100/70">
+          {tarefas.map((t) => {
+            const st = stLabel[t.statusTarefa] ?? { t: t.statusTarefa, c: "bg-gray-100 text-gray-600" }
+            const encerrada = ["CONCLUIDO_RECEBIDO", "CANCELADA"].includes(t.statusTarefa)
+            const editando = concluindoId === t.id
+            return (
+              <div key={t.id} className={`px-3 py-2 ${encerrada ? "opacity-60" : ""}`}>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="min-w-0 flex items-baseline gap-1.5 flex-wrap">
+                    <span className="text-[12.5px] font-semibold text-gray-800">{acaoLabel(t.faseReferenciaCode, t.acaoStepKey)}</span>
+                    <span className="text-[11px] text-gray-400">via {faseLabel(t.faseReferenciaCode)}{t.responsavel ? ` · ${t.responsavel.nome}` : ""}{t.dataPrazo ? ` · ${new Date(t.dataPrazo).toLocaleDateString("pt-BR")}` : ""}</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-none">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${st.c}`}>{st.t}</span>
+                    {!readOnly && !encerrada && onConcluir && !editando && (
+                      <>
+                        <button onClick={() => { setConcluindoId(t.id); setResultado("") }} className="text-[11.5px] font-semibold text-blue-600 hover:text-blue-800">Concluir</button>
+                        {onCancelar && <button onClick={() => onCancelar(t.id)} className="text-[11.5px] font-semibold text-gray-400 hover:text-red-600">Cancelar</button>}
+                      </>
+                    )}
                   </div>
                 </div>
-              ) : (
-                <div className="mt-1 flex items-center gap-2">
-                  <button onClick={() => { setConcluindoId(t.id); setResultado("") }} className="text-[11.5px] font-semibold text-blue-600 hover:text-blue-800">Concluir</button>
-                  {onCancelar && <><span className="text-gray-300">·</span><button onClick={() => onCancelar(t.id)} className="text-[11.5px] font-semibold text-gray-500 hover:text-red-600">Cancelar</button></>}
-                </div>
-              )
-            )}
-          </div>
-        )
-      })}
+                {t.resultadoObtido && <div className="text-[11px] text-gray-500 mt-0.5">Resultado: {t.resultadoObtido}</div>}
+                {!readOnly && !encerrada && onConcluir && editando && (
+                  <div className="mt-2 rounded-md border border-gray-200 bg-white p-2 space-y-2">
+                    <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder="Resultado obtido (o que a ação trouxe)" className="w-full text-[12px] rounded-md border border-gray-200 px-2 py-1.5 focus:outline-none focus:border-blue-400" autoFocus />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button onClick={() => { onConcluir(t.id, true, resultado); setConcluindoId(null); setResultado("") }} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-500"><CheckCircle2 className="w-3.5 h-3.5" /> Resolveu a necessidade</button>
+                      <button onClick={() => { onConcluir(t.id, false, resultado); setConcluindoId(null); setResultado("") }} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50">Concluir sem resolver</button>
+                      <button onClick={() => { setConcluindoId(null); setResultado("") }} className="text-[11.5px] text-gray-400 hover:text-gray-600 ml-auto">cancelar</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
