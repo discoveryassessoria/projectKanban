@@ -9,12 +9,12 @@
 //   const codigo = await gerarCodigoPublico(tx, 'PROCESS', { pais: proc.pais }) // "DE-7"
 //   const codigo = await gerarCodigoPublico(prisma, 'REVENUE')                   // "REC-42"
 
-import { Prisma } from '@prisma/client'
-import { prisma } from '@/lib/prisma'
+import { Prisma, PrismaClient } from '@prisma/client'
 import { escopoDe, type EntidadeCodigo } from './code-patterns'
 
-// Aceita o client normal OU um tx client (para rodar dentro de transação).
-type DB = Prisma.TransactionClient | typeof prisma
+// Aceita o client normal OU um tx client (para rodar dentro de transação). NÃO importa o singleton
+// (evita ciclo: lib/prisma → code-generator → lib/prisma) — o client é sempre passado pelo chamador.
+type DB = Prisma.TransactionClient | PrismaClient
 
 /**
  * Próximo número da sequência do escopo, de forma ATÔMICA (uma única instrução):

@@ -9,6 +9,7 @@ datasource db {
 }
 
 model Usuario {
+  publicCode         String?            @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
   id                 Int                @id @default(autoincrement())
   nome               String             @db.VarChar(100)
   email              String             @unique @db.VarChar(100)
@@ -30,6 +31,7 @@ model Usuario {
 }
 
 model Pessoa {
+  publicCode         String?       @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
   id                 Int           @id @default(autoincrement())
   nome               String        @db.VarChar(50)
   sobrenome          String?       @db.VarChar(40)
@@ -159,6 +161,7 @@ model Familia {
 }
 
 model Documento {
+  publicCode            String?         @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
   id                    Int             @id @default(autoincrement())
   pessoaId              Int
   tipo                  TipoDocumento?
@@ -369,6 +372,7 @@ model ProcessoContratante {
 }
 
 model Tarefa {
+  publicCode          String?           @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
   id                  Int               @id @default(autoincrement())
   titulo              String            @db.VarChar(200)
   descricao           String?
@@ -559,6 +563,7 @@ model Requerente {
 }
 
 model Protocolo {
+  publicCode      String?          @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
   id              Int              @id @default(autoincrement())
   processoId      Int
   contratanteId   Int?
@@ -872,6 +877,7 @@ model ContaBancaria {
 }
 
 model Fornecedor {
+  publicCode         String?             @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
   id                 Int                 @id @default(autoincrement())
   nome               String              @db.VarChar(150)
   nomeFantasia       String?             @db.VarChar(150)
@@ -1004,6 +1010,7 @@ model CentroCusto {
 }
 
 model Evento {
+  publicCode   String?    @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
   id           Int        @id @default(autoincrement())
   processoId   Int?
   titulo       String     @db.VarChar(200)
@@ -1758,6 +1765,7 @@ model CarteiraRecebimento {
 }
 
 model ProdutoFinanceiro {
+  publicCode          String?              @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
   id                  Int                  @id @default(autoincrement())
   codigo              String               @db.VarChar(30)
   nome                String               @db.VarChar(200)
@@ -1844,6 +1852,7 @@ model ProdutoFinanceiro {
 
 // ── Tabela de Valores (fin_values) ──
 model TabelaValor {
+  publicCode                   String?            @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
   id                           Int                @id @default(autoincrement())
   name                         String             @db.VarChar(200)
   // soltos por ora (viram FK quando o motor/serviços existirem)
@@ -1986,6 +1995,7 @@ model RegraDesconto {
 }
 
 model ServicoProduto {
+  publicCode       String?             @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
   id               Int                 @id @default(autoincrement())
   code             String              @unique @db.VarChar(40)
   name             String              @db.VarChar(200)
@@ -2216,6 +2226,7 @@ model PhaseInternalWorkflowStep {
 }
 
 model PhaseAutomationRule {
+  publicCode          String? @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
   id                  Int     @id @default(autoincrement())
   templateId          Int? // → ModeloAutomacao (solto; null = regra ad-hoc)
   tipoProcessoId      Int // → TipoProcessoNacionalidade (solto) — regra pertence a um processo

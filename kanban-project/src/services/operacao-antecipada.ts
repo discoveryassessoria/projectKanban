@@ -12,7 +12,6 @@ import type { ResultadoAvaliacao } from "@/src/lib/operacoes/tipos"
 import { atenderNecessidade } from "@/src/services/necessidade-documental"
 import { tentarAvancoAutomatico } from "@/src/lib/motor/auto-avanco"
 import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
-import { gerarCodigoPublico } from "@/lib/codigos/code-generator"
 
 const INSTANCIA_ATIVA = ["ATIVO", "AGUARDANDO", "BLOQUEADO"] as const
 
@@ -72,12 +71,10 @@ export async function criarOperacaoAntecipada(input: CriarOperacaoAntecipadaInpu
   })
 
   try {
-    // Código público OPA-n pelo gerador CENTRAL (atômico, sem reuso). Gap na sequência é aceitável
-    // se o create falhar (nunca reutiliza número). NUNCA montado à mão nem no frontend.
-    const publicCode = await gerarCodigoPublico(prisma, "ANTICIPATED_OPERATION")
+    // publicCode (OPA-n) é gerado AUTOMATICAMENTE pela extensão do Prisma Client (CODE_REGISTRY →
+    // CodeGeneratorService central). Não montar aqui: uniforme com todas as demais entidades.
     const op = await prisma.operacaoAntecipada.create({
       data: {
-        publicCode,
         processoId: input.processoId, workflowInstanceId: inst?.id ?? null,
         originPhaseCode, originStepKey: input.originStepKey ?? null, necessidadeId: input.necessidadeId,
         targetPhaseCode: input.targetPhaseCode ?? null, targetWorkflowDefinitionId: adapter.workflowDefinitionId,
