@@ -154,6 +154,7 @@ export default function CatalogoMestreTab() {
       {modalExcluir && (
         <ExclusaoDefinitivaModal
           titulo={`Excluir item do Catálogo Mestre · ${modalExcluir.name}`}
+          entidadeLabel="Item"
           previewUrl={`/api/gerenciamento/catalogo-mestre/${modalExcluir.id}/exclusao-definitiva`}
           deleteUrl={`/api/gerenciamento/catalogo-mestre/${modalExcluir.id}/exclusao-definitiva`}
           onDone={() => { setModalExcluir(null); void carregar() }}

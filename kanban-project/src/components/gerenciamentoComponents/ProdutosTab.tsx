@@ -516,7 +516,8 @@ export default function ProdutosTab() {
       )}
 
       {modalExcluir && (
-        <ExclusaoDefinitivaModal
+          <ExclusaoDefinitivaModal
+          entidadeLabel="Configuração Financeira"
           titulo={`Excluir Configuração Financeira · ${modalExcluir.mestre?.nome || modalExcluir.nome}`}
           previewUrl={`/api/gerenciamento/produtos/${modalExcluir.id}/exclusao-definitiva`}
           deleteUrl={`/api/gerenciamento/produtos/${modalExcluir.id}/exclusao-definitiva`}

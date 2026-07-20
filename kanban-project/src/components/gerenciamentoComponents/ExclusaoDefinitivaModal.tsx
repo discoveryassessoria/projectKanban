@@ -13,24 +13,28 @@ const authHeaders = (): Record<string, string> => ({
 })
 
 interface Preco { id: number; natureza: string; arquivado: boolean; legadoPendente: boolean; valor: string | null }
+interface Lancamento { id: number; tipo: string; descricao: string; valor: string | null; natureza: string; status: string; deletavel: boolean; motivoBloqueio: string | null }
 interface Preview {
   precos: Preco[]
-  blockers: Record<string, number>
+  lancamentos?: Lancamento[]
+  blockers: Record<string, number | null>
   podeExcluir: boolean
   fraseConfirmacao: string
 }
 
 const BLOCKER_LABELS: Record<string, string> = {
-  lancamentosReceita: "lançamentos de receita", lancamentosCusto: "lançamentos de custo",
-  regrasEconomicas: "regras de aplicabilidade econômica", automacoesFase: "automações financeiras de fase",
-  vinculosServico: "vínculos de serviço", tiposDocumento: "tipos de documento",
-  configsFinanceiras: "configurações financeiras", necessidades: "necessidades em processos",
+  lancamentosReais: "lançamento(s) com uso financeiro real", lancamentosReceita: "lançamentos de receita",
+  lancamentosCusto: "lançamentos de custo", regrasEconomicas: "regras de aplicabilidade econômica",
+  automacoesFase: "automações financeiras de fase", vinculosServico: "vínculos de serviço",
+  tiposDocumento: "tipos de documento", configsFinanceiras: "configurações financeiras",
+  necessidades: "necessidades documentais em processos", configId: "",
 }
 
-export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, onInativar, onDone, onClose }: {
+export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidadeLabel = "Registro", onInativar, onDone, onClose }: {
   titulo: string
   previewUrl: string
   deleteUrl: string
+  entidadeLabel?: string
   onInativar?: () => Promise<void>
   onDone: () => void
   onClose: () => void
@@ -41,6 +45,7 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, onInati
   const [motivo, setMotivo] = useState("")
   const [executando, setExecutando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [sucesso, setSucesso] = useState<"inativado" | "excluido" | null>(null)
 
   useEffect(() => {
     fetch(previewUrl, { headers: authHeaders() })
@@ -50,13 +55,16 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, onInati
       .finally(() => setCarregando(false))
   }, [previewUrl])
 
-  const blockersAtivos = preview ? Object.entries(preview.blockers).filter(([k, v]) => k !== "total" && v > 0) : []
+  const blockersAtivos = preview ? Object.entries(preview.blockers).filter(([k, v]) => k !== "total" && k !== "configId" && typeof v === "number" && v > 0) : []
+  const lancamentos = preview?.lancamentos ?? []
+  const lancTeste = lancamentos.filter((l) => l.deletavel)
+  const lancReais = lancamentos.filter((l) => !l.deletavel)
 
   const inativar = useCallback(async () => {
     if (!onInativar) return
     setExecutando(true); setErro(null)
-    try { await onInativar(); onDone() } catch (e) { setErro((e as Error).message || "Falha ao inativar.") } finally { setExecutando(false) }
-  }, [onInativar, onDone])
+    try { await onInativar(); setSucesso("inativado") } catch (e) { setErro((e as Error).message || "Falha ao inativar.") } finally { setExecutando(false) }
+  }, [onInativar])
 
   const excluirDefinitivo = useCallback(async () => {
     setExecutando(true); setErro(null)
@@ -64,12 +72,34 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, onInati
       const r = await fetch(deleteUrl, { method: "DELETE", headers: authHeaders(), body: JSON.stringify({ confirmacao: frase.trim(), motivo: motivo.trim() || null }) })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) { setErro(j?.error || `Falha (HTTP ${r.status}).`); return }
-      onDone()
+      setSucesso("excluido")
     } catch { setErro("Falha de rede ao excluir definitivamente.") }
     finally { setExecutando(false) }
-  }, [deleteUrl, frase, motivo, onDone])
+  }, [deleteUrl, frase, motivo])
 
   const fraseOk = !!preview && frase.trim() === preview.fraseConfirmacao
+
+  // TELA DE RESULTADO — informa exatamente o que aconteceu (nunca "prometer excluir e só inativar").
+  if (sucesso) {
+    const excluido = sucesso === "excluido"
+    return (
+      <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" onClick={() => onDone()}>
+        <div className="max-w-md w-full rounded-2xl bg-[#12151b] border border-white/10 shadow-xl text-white/90 p-5" onClick={(e) => e.stopPropagation()}>
+          <div className={`text-[15px] font-extrabold ${excluido ? "text-red-300" : "text-amber-300"}`}>
+            {excluido ? `${entidadeLabel} excluído definitivamente` : `${entidadeLabel} inativado`}
+          </div>
+          <p className="text-[12.5px] text-white/60 mt-1">
+            {excluido
+              ? "Os dados de teste (configuração, preços e lançamentos sem uso real) foram apagados fisicamente. O registro deixou de existir."
+              : "O histórico foi preservado. O registro continua existindo, apenas inativo."}
+          </p>
+          <div className="flex justify-end mt-4">
+            <button onClick={() => onDone()} className="px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-white/10 hover:bg-white/20">Fechar</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" onClick={() => !executando && onClose()}>
@@ -100,13 +130,29 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, onInati
                     ))}
                   </ul>
                 )}
+                {/* Lançamentos financeiros de TESTE que serão apagados em cascata */}
+                {lancTeste.length > 0 && (
+                  <ul className="text-[12.5px] space-y-0.5 mt-1.5 border-t border-white/5 pt-1.5">
+                    {lancTeste.map((l) => (
+                      <li key={`${l.tipo}-${l.id}`} className="flex items-center gap-2">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/60">{l.tipo}</span>
+                        <span className="text-white/40">#{l.id}</span>
+                        {l.valor != null && <span className="text-white/60">{l.valor}</span>}
+                        <span className="text-white/40 text-[11px]">{l.status} · teste</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               {/* Blockers — uso real impede a exclusão */}
               {!preview.podeExcluir && (
                 <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
-                  <div className="text-[12.5px] font-bold text-red-300 mb-1">Não pode ser excluída definitivamente</div>
-                  <div className="text-[12px] text-red-200/80">Existe uso operacional real: {blockersAtivos.map(([k, v]) => `${v} ${BLOCKER_LABELS[k] ?? k}`).join(", ")}. Remova esses vínculos antes.</div>
+                  <div className="text-[12.5px] font-bold text-red-300 mb-1">Não pode ser excluído definitivamente</div>
+                  <div className="text-[12px] text-red-200/80">
+                    Existe uso operacional/financeiro real:{" "}
+                    {[...lancReais.map((l) => `${l.tipo} #${l.id} (${l.motivoBloqueio})`), ...blockersAtivos.filter(([k]) => k !== "lancamentosReais").map(([k, v]) => `${v} ${BLOCKER_LABELS[k] ?? k}`)].join(", ")}.
+                  </div>
                 </div>
               )}
 

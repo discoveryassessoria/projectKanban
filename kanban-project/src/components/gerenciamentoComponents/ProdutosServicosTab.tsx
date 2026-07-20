@@ -10,6 +10,8 @@
 // Backend: /api/gerenciamento/produtos-servicos (GET/POST) + /[id] (PUT/DELETE)
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { usePermissoes } from '@/src/hooks/use-permissoes'
+import { ExclusaoDefinitivaModal } from './ExclusaoDefinitivaModal'
 
 type Servico = {
   id: number
@@ -59,6 +61,9 @@ export default function ProdutosServicosTab() {
 
   const [modalAberto, setModalAberto] = useState(false)
   const [editando, setEditando] = useState<Servico | null>(null)
+  const { pode } = usePermissoes()
+  const podeExcluirDefinitivo = pode('sistema.exclusaoDefinitiva')
+  const [modalExcluir, setModalExcluir] = useState<Servico | null>(null)
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
@@ -135,10 +140,15 @@ export default function ProdutosServicosTab() {
   }
 
   async function excluir(s: Servico) {
-    if (!confirm(`Excluir o serviço "${s.name}"?`)) return
+    // Com permissão de exclusão definitiva: modal com 2 opções (inativar × excluir dados de teste).
+    if (podeExcluirDefinitivo) { setModalExcluir(s); return }
+    // Sem permissão: regra geral inalterada. O botão não mente — informa o que REALMENTE aconteceu.
+    if (!confirm(`Excluir o serviço "${s.name}"?\n\nSe já teve uso, será apenas inativado para preservar o histórico.`)) return
     try {
-      await jsonFetch(`/api/gerenciamento/produtos-servicos/${s.id}`, { method: 'DELETE' })
+      const r: any = await jsonFetch(`/api/gerenciamento/produtos-servicos/${s.id}`, { method: 'DELETE' })
       await carregar()
+      if (r?.inativado) alert(`Serviço inativado.${r?.motivo ? `\n\n${r.motivo}` : ''}`)
+      else if (r?.excluido) alert('Serviço excluído.')
     } catch (e: any) {
       alert(e.message || 'Não foi possível excluir.')
     }
@@ -285,6 +295,18 @@ export default function ProdutosServicosTab() {
             </div>
           </div>
         </div>
+      )}
+
+      {modalExcluir && (
+        <ExclusaoDefinitivaModal
+          titulo={`Excluir serviço · ${modalExcluir.name}`}
+          entidadeLabel="Serviço"
+          previewUrl={`/api/gerenciamento/produtos-servicos/${modalExcluir.id}/exclusao-definitiva`}
+          deleteUrl={`/api/gerenciamento/produtos-servicos/${modalExcluir.id}/exclusao-definitiva`}
+          onInativar={async () => { await jsonFetch(`/api/gerenciamento/produtos-servicos/${modalExcluir.id}`, { method: 'DELETE' }) }}
+          onDone={() => { setModalExcluir(null); void carregar() }}
+          onClose={() => setModalExcluir(null)}
+        />
       )}
     </div>
   )
