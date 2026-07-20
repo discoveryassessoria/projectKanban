@@ -48,3 +48,4 @@ backup_*.sql
 
 # Scripts utilitários temporários
 reset-password.mjs
+.claude/worktrees/

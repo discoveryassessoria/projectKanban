@@ -17,7 +17,7 @@
 
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   ExternalLink,
   Search,
@@ -632,22 +632,16 @@ function PersonRow({
   )
 }
 
-// Transversais vinculadas a UM documento/necessidade — exibidas INLINE sob a linha do doc.
+const authHeadersT = (): Record<string, string> => ({ "Content-Type": "application/json", Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("authToken") : ""}` })
+
+// Transversais vinculadas a UM documento/necessidade — cada uma com sua OPERAÇÃO documental
+// completa (Solicitar → Aguardar → Receber → Conferir → Validar) exibida INLINE sob o doc.
 function TransversalInlineList({ tarefas, readOnly, onConcluir, onCancelar }: {
   tarefas: TransversalInline[]
   readOnly?: boolean
   onConcluir?: (id: number, resolveu: boolean, resultado: string) => void
   onCancelar?: (id: number) => void
 }) {
-  const [concluindoId, setConcluindoId] = useState<number | null>(null)
-  const [resultado, setResultado] = useState("")
-  const stLabel: Record<string, { t: string; c: string }> = {
-    NAO_INICIADA: { t: "Pendente", c: "bg-gray-100 text-gray-600" },
-    EM_ANDAMENTO: { t: "Em andamento", c: "bg-blue-100 text-blue-700" },
-    AGUARDANDO_TERCEIRO: { t: "Aguardando terceiro", c: "bg-amber-100 text-amber-700" },
-    CONCLUIDO_RECEBIDO: { t: "Concluída", c: "bg-green-100 text-green-700" },
-    CANCELADA: { t: "Cancelada", c: "bg-gray-100 text-gray-400" },
-  }
   const abertas = tarefas.filter((t) => !["CONCLUIDO_RECEBIDO", "CANCELADA"].includes(t.statusTarefa)).length
   return (
     <div className="pr-5 pb-2" style={{ paddingLeft: 76 }}>
@@ -657,43 +651,97 @@ function TransversalInlineList({ tarefas, readOnly, onConcluir, onCancelar }: {
           <span className="font-semibold text-violet-400 normal-case tracking-normal">· {tarefas.length}{abertas > 0 ? ` (${abertas} aberta${abertas > 1 ? "s" : ""})` : ""}</span>
         </div>
         <div className="divide-y divide-violet-100/70">
-          {tarefas.map((t) => {
-            const st = stLabel[t.statusTarefa] ?? { t: t.statusTarefa, c: "bg-gray-100 text-gray-600" }
-            const encerrada = ["CONCLUIDO_RECEBIDO", "CANCELADA"].includes(t.statusTarefa)
-            const editando = concluindoId === t.id
+          {tarefas.map((t) => (
+            <TransversalOperacaoItem key={t.id} t={t} readOnly={readOnly} onConcluir={onConcluir} onCancelar={onCancelar} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface PassoOp { id: number; stepKey: string; title: string; status: string; ordem: number }
+const OP_DONE = new Set(["CONCLUIDO", "DISPENSADO"])
+
+function TransversalOperacaoItem({ t, readOnly, onConcluir, onCancelar }: {
+  t: TransversalInline
+  readOnly?: boolean
+  onConcluir?: (id: number, resolveu: boolean, resultado: string) => void
+  onCancelar?: (id: number) => void
+}) {
+  const [passos, setPassos] = useState<PassoOp[]>([])
+  const [busy, setBusy] = useState(false)
+  const [resolver, setResolver] = useState(false)
+  const [resultado, setResultado] = useState("")
+  const encerrada = ["CONCLUIDO_RECEBIDO", "CANCELADA"].includes(t.statusTarefa)
+
+  const carregar = useCallback(() => {
+    fetch(`/api/tarefas-transversais/${t.id}/operacao`, { headers: authHeadersT() }).then((r) => r.json()).then((j) => setPassos(j.passos ?? [])).catch(() => {})
+  }, [t.id])
+  useEffect(() => { carregar() }, [carregar])
+
+  const avancar = useCallback(async (stepId: number) => {
+    setBusy(true)
+    try { await fetch(`/api/tarefas-transversais/${t.id}/operacao`, { method: "PATCH", headers: authHeadersT(), body: JSON.stringify({ stepInstanceId: stepId }) }); carregar() }
+    finally { setBusy(false) }
+  }, [t.id, carregar])
+
+  const ativo = passos.find((p) => p.status === "EM_ANDAMENTO")
+  const todosDone = passos.length > 0 && passos.every((p) => OP_DONE.has(p.status))
+
+  return (
+    <div className={`px-3 py-2.5 ${encerrada ? "opacity-60" : ""}`}>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="min-w-0 flex items-baseline gap-1.5 flex-wrap">
+          <span className="text-[12.5px] font-semibold text-gray-800">{acaoLabel(t.faseReferenciaCode, t.acaoStepKey)}</span>
+          <span className="text-[11px] text-gray-400">via {faseLabel(t.faseReferenciaCode)}{t.responsavel ? ` · ${t.responsavel.nome}` : ""}</span>
+        </div>
+        {!readOnly && !encerrada && onCancelar && (
+          <button onClick={() => onCancelar(t.id)} className="text-[11px] font-semibold text-gray-400 hover:text-red-600 flex-none">Cancelar</button>
+        )}
+      </div>
+
+      {/* STEPPER da operação documental */}
+      {passos.length > 0 && (
+        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+          {passos.map((p, i) => {
+            const done = OP_DONE.has(p.status)
+            const atual = p.status === "EM_ANDAMENTO"
             return (
-              <div key={t.id} className={`px-3 py-2 ${encerrada ? "opacity-60" : ""}`}>
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="min-w-0 flex items-baseline gap-1.5 flex-wrap">
-                    <span className="text-[12.5px] font-semibold text-gray-800">{acaoLabel(t.faseReferenciaCode, t.acaoStepKey)}</span>
-                    <span className="text-[11px] text-gray-400">via {faseLabel(t.faseReferenciaCode)}{t.responsavel ? ` · ${t.responsavel.nome}` : ""}{t.dataPrazo ? ` · ${new Date(t.dataPrazo).toLocaleDateString("pt-BR")}` : ""}</span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-none">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${st.c}`}>{st.t}</span>
-                    {!readOnly && !encerrada && onConcluir && !editando && (
-                      <>
-                        <button onClick={() => { setConcluindoId(t.id); setResultado("") }} className="text-[11.5px] font-semibold text-blue-600 hover:text-blue-800">Concluir</button>
-                        {onCancelar && <button onClick={() => onCancelar(t.id)} className="text-[11.5px] font-semibold text-gray-400 hover:text-red-600">Cancelar</button>}
-                      </>
-                    )}
-                  </div>
-                </div>
-                {t.resultadoObtido && <div className="text-[11px] text-gray-500 mt-0.5">Resultado: {t.resultadoObtido}</div>}
-                {!readOnly && !encerrada && onConcluir && editando && (
-                  <div className="mt-2 rounded-md border border-gray-200 bg-white p-2 space-y-2">
-                    <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder="Resultado obtido (o que a ação trouxe)" className="w-full text-[12px] rounded-md border border-gray-200 px-2 py-1.5 focus:outline-none focus:border-blue-400" autoFocus />
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <button onClick={() => { onConcluir(t.id, true, resultado); setConcluindoId(null); setResultado("") }} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-500"><CheckCircle2 className="w-3.5 h-3.5" /> Resolveu a necessidade</button>
-                      <button onClick={() => { onConcluir(t.id, false, resultado); setConcluindoId(null); setResultado("") }} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50">Concluir sem resolver</button>
-                      <button onClick={() => { setConcluindoId(null); setResultado("") }} className="text-[11.5px] text-gray-400 hover:text-gray-600 ml-auto">cancelar</button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <span key={p.id} className="flex items-center gap-1.5">
+                <span className={`inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-0.5 rounded-full ${done ? "bg-green-100 text-green-700" : atual ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-400"}`}>
+                  {done && <CheckCircle2 className="w-3 h-3" />}{p.title}
+                </span>
+                {i < passos.length - 1 && <span className="text-gray-300 text-[10px]">›</span>}
+              </span>
             )
           })}
         </div>
-      </div>
+      )}
+
+      {/* Avança o passo ATIVO */}
+      {!readOnly && !encerrada && ativo && (
+        <button disabled={busy} onClick={() => void avancar(ativo.id)} className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50">
+          Concluir "{ativo.title}"
+        </button>
+      )}
+
+      {/* Operação completa → registrar resultado e resolver (ou não) a necessidade de origem */}
+      {!readOnly && !encerrada && todosDone && onConcluir && (
+        resolver ? (
+          <div className="mt-2 rounded-md border border-gray-200 bg-white p-2 space-y-2">
+            <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder="Resultado obtido (o dado que a certidão trouxe)" className="w-full text-[12px] rounded-md border border-gray-200 px-2 py-1.5 focus:outline-none focus:border-blue-400" autoFocus />
+            <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={() => { onConcluir(t.id, true, resultado); setResolver(false) }} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-500"><CheckCircle2 className="w-3.5 h-3.5" /> Resolveu a necessidade</button>
+              <button onClick={() => { onConcluir(t.id, false, resultado); setResolver(false) }} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50">Não trouxe o dado</button>
+              <button onClick={() => setResolver(false)} className="text-[11.5px] text-gray-400 hover:text-gray-600 ml-auto">cancelar</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => { setResolver(true); setResultado("") }} className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-500"><CheckCircle2 className="w-3.5 h-3.5" /> Operação concluída — avaliar resultado</button>
+        )
+      )}
+      {t.resultadoObtido && <div className="text-[11px] text-gray-500 mt-1">Resultado: {t.resultadoObtido}</div>}
     </div>
   )
 }
