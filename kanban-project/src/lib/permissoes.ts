@@ -310,12 +310,12 @@ export function calcularPermissoes(
   perfilPermissoes?: MapaPermissoes | null,
   permissoesCustom?: MapaPermissoes | null
 ): MapaPermissoes {
-  // BASE: admin recebe tudo por padrão, EXCETO permissões OPT-IN (ações destrutivas), que só
-  // valem se concedidas EXPLICITAMENTE via perfil/custom — inclusive para admin. Usuário comum
-  // começa com tudo false. Perfil e custom são aplicados por cima em AMBOS os casos (podem ligar
-  // uma permissão opt-in).
+  // BASE: admin (tipo === 'admin') tem TUDO — inclusive as permissões OPT-IN (ações destrutivas
+  // como exclusão definitiva). Usuário comum começa com tudo false e só recebe o que perfil/custom
+  // conceder; PERMISSOES_OPT_IN mantém essas permissões FORA dos perfis padrão (TODAS_PERMISSOES),
+  // então um não-admin só as obtém por concessão EXPLÍCITA.
   const resultado: MapaPermissoes = Object.keys(PERMISSOES).reduce((acc, key) => {
-    acc[key] = tipo === 'admin' ? !PERMISSOES_OPT_IN.has(key) : false
+    acc[key] = tipo === 'admin' ? true : false
     return acc
   }, {} as MapaPermissoes)
 

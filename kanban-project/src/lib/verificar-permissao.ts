@@ -7,7 +7,6 @@ import { extrairUsuarioKanban } from '@/lib/kanban-auth'
 import {
   calcularPermissoes,
   temPermissao,
-  PERMISSOES_OPT_IN,
   type PermissaoChave,
   type MapaPermissoes,
 } from './permissoes'
@@ -31,23 +30,10 @@ export async function extrairUsuarioComPermissoes(
   const usuario = await extrairUsuarioKanban(request)
   if (!usuario) return null
 
-  // Admin tem tudo — EXCETO as permissões OPT-IN (ações destrutivas), que só valem se concedidas
-  // EXPLICITAMENTE no perfil ou no custom, inclusive para admin. As demais permissões do admin
-  // NUNCA são reduzidas pelo perfil (retrocompatível). Autorização por PERMISSÃO, não por tipo.
+  // Admin tem TUDO — inclusive as permissões OPT-IN (ações destrutivas, ex.: exclusão definitiva).
+  // Não-admin só as obtém por concessão explícita (perfil/custom); elas ficam fora dos perfis padrão.
   if (usuario.tipo === 'admin') {
-    const permissoes = calcularPermissoes('admin') // tudo true, menos as opt-in
-    if (PERMISSOES_OPT_IN.size > 0) {
-      const adminDB = await prisma.usuario.findUnique({
-        where: { id: usuario.userId },
-        select: { permissoesCustom: true, perfil: { select: { permissoes: true } } },
-      })
-      const perfilP = adminDB?.perfil?.permissoes as MapaPermissoes | null
-      const customP = adminDB?.permissoesCustom as MapaPermissoes | null
-      for (const key of PERMISSOES_OPT_IN) {
-        if (perfilP?.[key] === true || customP?.[key] === true) permissoes[key] = true
-      }
-    }
-    return { userId: usuario.userId, nome: '', email: usuario.email, tipo: 'admin', permissoes }
+    return { userId: usuario.userId, nome: '', email: usuario.email, tipo: 'admin', permissoes: calcularPermissoes('admin') }
   }
 
   // Buscar perfil e permissões custom do usuário
