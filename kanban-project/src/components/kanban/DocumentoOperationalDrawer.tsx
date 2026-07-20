@@ -148,6 +148,8 @@ interface DocumentoOperationalDrawerProps {
   /** Se passado, mostra um botão "← {backLabel}" no topo do header e chama onBack ao clicar */
   onBack?: () => void
   backLabel?: string
+  /** Banner de contexto quando a MESMA tela oficial é aberta por uma Operação Antecipada. */
+  bannerAntecipada?: string | null
 }
 
 type TabId =
@@ -227,6 +229,7 @@ export function DocumentoOperationalDrawer({
   onSave,
   onBack,
   backLabel,
+  bannerAntecipada,
 }: DocumentoOperationalDrawerProps) {
   const { pode } = usePermissoes()
   const [doc, setDoc] = useState<Documento | null>(null)
@@ -479,6 +482,13 @@ export function DocumentoOperationalDrawer({
               <div className="text-[13px] text-white/65 mb-3.5">
                 {nomeCompleto(doc.pessoa)}
               </div>
+
+              {bannerAntecipada && (
+                <div className="mb-3.5 rounded-lg border border-violet-400/30 bg-violet-500/15 px-3 py-2 text-[12px] text-violet-100 flex items-start gap-2">
+                  <span className="text-[13px] leading-none mt-0.5">⇄</span>
+                  <span>{bannerAntecipada}</span>
+                </div>
+              )}
 
               <div className="grid grid-cols-4 gap-3.5 mb-3">
                 <div className="flex flex-col gap-0.5">

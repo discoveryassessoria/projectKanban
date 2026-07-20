@@ -13,7 +13,7 @@
 import { prisma } from "@/lib/prisma"
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
 import { executarFinanceirasNaFaseV2 } from "@/src/lib/motor/executor"
-import { reconciliarTransversaisNaFase } from "@/src/services/tarefa-transversal"
+import { reconciliarOperacoesAntecipadas } from "@/src/services/operacao-antecipada"
 
 const MAX_TENTATIVAS = 5
 // Reserva "presa" há mais que isto (worker morreu no meio) volta a ser reivindicável.
@@ -60,11 +60,11 @@ async function aplicarPhaseEntered(payload: PhaseEnteredPayload, correlationId: 
     const r = await executarFinanceirasNaFaseV2(payload.processId, payload.newPhaseKey)
     if (r.erros.length) throw new Error(`automações financeiras da fase falharam: ${r.erros.join(" ; ")}`)
 
-    // REAPROVEITAMENTO de trabalho antecipado por Tarefa Transversal: ao entrar numa fase,
-    // reconcilia (idempotente) as transversais cuja fase de referência é esta — associa o
-    // Documento já existente sem duplicar. Isolado/best-effort.
-    try { await reconciliarTransversaisNaFase(payload.processId, payload.newPhaseKey) }
-    catch (e) { console.error("[outbox] reconciliação transversal falhou:", e) }
+    // REAPROVEITAMENTO de trabalho antecipado: ao entrar numa fase, reconcilia (idempotente) as
+    // Operações Antecipadas cujo destino é esta fase — reusa o trabalho oficial já feito, sem
+    // duplicar (via adaptador do catálogo). Isolado/best-effort.
+    try { await reconciliarOperacoesAntecipadas(payload.processId, payload.newPhaseKey) }
+    catch (e) { console.error("[outbox] reconciliação de operação antecipada falhou:", e) }
   }
   return criadas
 }

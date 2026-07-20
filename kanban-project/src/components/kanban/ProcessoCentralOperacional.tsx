@@ -18,22 +18,25 @@ import { ProcessoFaseFinal } from "./ProcessoFaseFinal"
 import { ProcessoRetificacao } from "./ProcessoRetificacao"
 import { ProcessoEmissaoRetificada } from "./ProcessoEmissaoRetificada"
 import { RetornarFaseButton } from "./RetornarFaseButton"
-import { TarefaTransversalModal } from "./TarefaTransversalModal"
+import { OperacaoAntecipadaModal } from "./OperacaoAntecipadaModal"
 import type { FaseCode } from "@prisma/client"
 
 // Metadados de uma fase materializada (espelho de /api/processos/[id]/phases).
-// Tarefa Transversal vinculada a uma necessidade (exibida inline no documento).
-export interface TransversalTarefa {
+// Operação Antecipada vinculada a uma necessidade (exibida inline no documento).
+export interface OpAntecipada {
   id: number
-  titulo: string
-  statusTarefa: string
-  faseReferenciaCode: string | null
-  acaoStepKey: string | null
   necessidadeId: number | null
-  resultadoEsperado: string | null
+  status: string
+  operationType: string
+  targetOperationId: number | null
+  originPhaseCode: string | null
+  targetPhaseCode: string | null
+  objetivo: string | null
   resultadoObtido: string | null
-  dataPrazo: string | null
-  responsavel?: { id: number; nome: string } | null
+  responsavel?: { id: number; nome: string | null } | null
+  operacao: { statusRaw: string; statusLabel: string; concluida: boolean; uiRef: { kind: string; id: number | null; necessidadeId?: number | null } }
+  aguardandoAvaliacao: boolean
+  encerrada: boolean
 }
 
 export interface PhaseMeta {
@@ -368,9 +371,11 @@ export function ProcessoCentralOperacional({
   const [viewLoading, setViewLoading] = useState(false)
   const [viewErro, setViewErro] = useState<string | null>(null)
 
-  // Tarefa Transversal: contexto (necessidade) para o modal de criação + lista por necessidade.
-  const [transversalCtx, setTransversalCtx] = useState<{ necessidadeId?: number | null; pessoaId?: number | null; label?: string } | null>(null)
-  const [transversais, setTransversais] = useState<TransversalTarefa[]>([])
+  // Operação Antecipada: contexto (necessidade) para o modal de criação + lista por necessidade.
+  const [novaOperacaoCtx, setNovaOperacaoCtx] = useState<{ necessidadeId?: number | null; pessoaId?: number | null; label?: string } | null>(null)
+  const [operacoes, setOperacoes] = useState<OpAntecipada[]>([])
+  // Banner "executada antecipadamente para atender…" exibido na tela oficial (drawer) reusada.
+  const [bannerAntecipada, setBannerAntecipada] = useState<string | null>(null)
 
   // TROCA DE CONTEXTO NO AVANÇO DE FASE: quando a fase da Central muda (avanço/retorno),
   // qualquer drawer aberto está exibindo o contexto da fase ANTIGA (ex.: o passo
@@ -536,32 +541,33 @@ export function ProcessoCentralOperacional({
 
   useEffect(() => { carregarFases() }, [carregarFases])
 
-  // Tarefas transversais do processo — exibidas INLINE dentro do documento/necessidade a que
+  // Operações antecipadas do processo — exibidas INLINE dentro do documento/necessidade a que
   // pertencem. Recarregadas junto com a Central.
-  const carregarTransversais = useCallback(async () => {
+  const carregarOperacoes = useCallback(async () => {
     try {
-      const res = await fetch(`/api/processos/${processo.id}/tarefas-transversais`, { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } })
-      if (res.ok) { const j = await res.json(); setTransversais((j.tarefas ?? []) as TransversalTarefa[]) }
+      const res = await fetch(`/api/processos/${processo.id}/operacoes-antecipadas`, { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } })
+      if (res.ok) { const j = await res.json(); setOperacoes((j.operacoes ?? []) as OpAntecipada[]) }
     } catch { /* silencioso */ }
   }, [processo.id])
-  useEffect(() => { carregarTransversais() }, [carregarTransversais])
+  useEffect(() => { carregarOperacoes() }, [carregarOperacoes])
 
-  const transversaisPorNec = new Map<number, TransversalTarefa[]>()
-  for (const t of transversais) {
-    if (t.necessidadeId == null) continue
-    const arr = transversaisPorNec.get(t.necessidadeId) ?? []
-    arr.push(t); transversaisPorNec.set(t.necessidadeId, arr)
+  const operacoesPorNec = new Map<number, OpAntecipada[]>()
+  for (const o of operacoes) {
+    if (o.necessidadeId == null) continue
+    const arr = operacoesPorNec.get(o.necessidadeId) ?? []
+    arr.push(o); operacoesPorNec.set(o.necessidadeId, arr)
   }
 
-  const concluirTransversal = useCallback(async (id: number, resolveu: boolean, resultado: string) => {
-    await fetch(`/api/tarefas-transversais/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` }, body: JSON.stringify({ acao: "concluir", resultadoObtido: resultado || null, resolveuNecessidade: resolveu }) })
-    await carregarTransversais(); carregar(true)
-  }, [carregarTransversais])
+  const avaliarOperacao = useCallback(async (id: number, resultado: "SIM" | "PARCIAL" | "NAO" | "CANCELAR", resultadoObtido: string) => {
+    await fetch(`/api/operacoes-antecipadas/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` }, body: JSON.stringify({ resultado, resultadoObtido: resultadoObtido || null }) })
+    await carregarOperacoes(); carregar(true)
+  }, [carregarOperacoes])
 
-  const cancelarTransversal = useCallback(async (id: number) => {
-    await fetch(`/api/tarefas-transversais/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` }, body: JSON.stringify({ acao: "cancelar" }) })
-    await carregarTransversais(); carregar(true)
-  }, [carregarTransversais])
+  // "Abrir operação" da antecipada: reusa a MESMA tela oficial (drawer) + banner de contexto.
+  const abrirOperacaoAntecipada = useCallback((op: OpAntecipada) => {
+    setBannerAntecipada(op.objetivo ? `Executada antecipadamente para atender: ${op.objetivo}` : "Operação executada antecipadamente")
+    void abrirOperacao(op.operacao.uiRef.id ?? 0, op.necessidadeId)
+  }, [abrirOperacao])
 
   // Carrega a fase PASSADA consultada (dados VIVOS, escopados por instância/ciclo) na
   // MESMA rota da Central, com ?faseCode&instanceId&ciclo. selectedPhaseKey só é != null
@@ -775,15 +781,15 @@ export function ProcessoCentralOperacional({
           />
         </div>
 
-        {/* AÇÃO DE FASE: criar Tarefa Transversal (disponível em QUALQUER fase ativa) —
-            ação antecipada de outra fase para resolver uma necessidade da fase atual. */}
+        {/* AÇÃO DE FASE: Nova Operação Antecipada (disponível em QUALQUER fase ativa) —
+            usa a operação oficial de outra fase para atender uma necessidade da fase atual. */}
         {!isView && pode("processos.editar") && (
           <div className="flex justify-end mb-3">
             <button
-              onClick={() => setTransversalCtx({})}
+              onClick={() => setNovaOperacaoCtx({})}
               className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg border-[1.5px] border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-400 transition-colors"
             >
-              <ArrowLeftRight className="w-3.5 h-3.5" /> Criar tarefa transversal
+              <ArrowLeftRight className="w-3.5 h-3.5" /> Nova operação antecipada
             </button>
           </div>
         )}
@@ -874,13 +880,13 @@ export function ProcessoCentralOperacional({
             linhaPrincipal={painel.linhaPrincipal}
             foraDaLinha={painel.foraDaLinha}
             readOnly={readOnly}
-            onAbrirOperacao={readOnly ? undefined : (docId, necessidadeId) => { void abrirOperacao(docId, necessidadeId) }}
+            onAbrirOperacao={readOnly ? undefined : (docId, necessidadeId) => { setBannerAntecipada(null); void abrirOperacao(docId, necessidadeId) }}
             usuarios={usuarios}
             onDelegar={readOnly ? undefined : (necessidadeId, responsavelId) => { void delegar(necessidadeId, responsavelId) }}
-            onCriarTransversal={readOnly ? undefined : (necessidadeId, pessoaIdNec, label) => setTransversalCtx({ necessidadeId, pessoaId: pessoaIdNec, label })}
-            transversaisPorNec={transversaisPorNec}
-            onConcluirTransversal={readOnly ? undefined : concluirTransversal}
-            onCancelarTransversal={readOnly ? undefined : cancelarTransversal}
+            onNovaOperacao={readOnly ? undefined : (necessidadeId, pessoaIdNec, label) => setNovaOperacaoCtx({ necessidadeId, pessoaId: pessoaIdNec, label })}
+            operacoesPorNec={operacoesPorNec}
+            onAvaliarOperacao={readOnly ? undefined : avaliarOperacao}
+            onAbrirOperacaoAntecipada={readOnly ? undefined : abrirOperacaoAntecipada}
             modoReestruturacao={!!bodyData.genealogiaReestruturacao}
             avisoReestruturacao={bodyData.mensagemReestruturacao ?? undefined}
           />
@@ -910,9 +916,11 @@ export function ProcessoCentralOperacional({
             key={`${faseCodeData ?? "?"}-${drawerDocId ?? "none"}`}
             documentoId={drawerDocId}
             isOpen={drawerDocId !== null}
-            onClose={() => setDrawerDocId(null)}
+            bannerAntecipada={bannerAntecipada}
+            onClose={() => { setDrawerDocId(null); setBannerAntecipada(null) }}
             onSave={() => {
               marcarAtualizando(drawerDocId)
+              carregarOperacoes()
               carregar(true)
             }}
           />
@@ -930,16 +938,16 @@ export function ProcessoCentralOperacional({
         </>
         )}
 
-        {transversalCtx && (
-          <TarefaTransversalModal
+        {novaOperacaoCtx && (
+          <OperacaoAntecipadaModal
             processoId={processo.id}
-            necessidadeId={transversalCtx.necessidadeId}
-            necessidadeLabel={transversalCtx.label}
-            pessoaId={transversalCtx.pessoaId}
+            necessidadeId={novaOperacaoCtx.necessidadeId}
+            necessidadeLabel={novaOperacaoCtx.label}
+            pessoaId={novaOperacaoCtx.pessoaId}
             faseAtivaCode={faseKeyAtiva ? String(faseKeyAtiva) : null}
             usuarios={usuarios}
-            onClose={() => setTransversalCtx(null)}
-            onCreated={() => { setTransversalCtx(null); carregarTransversais(); carregar(true) }}
+            onClose={() => setNovaOperacaoCtx(null)}
+            onCreated={() => { setNovaOperacaoCtx(null); carregarOperacoes(); carregar(true) }}
           />
         )}
       </div>

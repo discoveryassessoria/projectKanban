@@ -17,7 +17,7 @@
 
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import {
   ExternalLink,
   Search,
@@ -34,16 +34,10 @@ import {
 import { FASES } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
 
-// Rótulos amigáveis a partir dos códigos técnicos (fase de referência + ação de catálogo).
+// Rótulo amigável da fase a partir do código técnico (origem da operação antecipada).
 function faseLabel(code: string | null): string {
   if (!code) return "—"
   return FASES[code as FaseCode]?.label ?? code
-}
-function acaoLabel(faseCode: string | null, stepKey: string | null): string {
-  if (!stepKey) return "—"
-  const def = faseCode ? FASES[faseCode as FaseCode] : null
-  const steps = [...(def?.steps ?? []), ...((def?.processSteps as { stepKey: string; title: string }[] | undefined) ?? [])]
-  return steps.find((s) => s.stepKey === stepKey)?.title ?? stepKey
 }
 
 // ============================================================
@@ -97,17 +91,25 @@ export interface FasePersonRow {
   docs: FaseDocRow[]
 }
 
-export interface TransversalInline {
+// Operação Antecipada vinculada a uma necessidade — VÍNCULO com a operação oficial (sem etapas
+// próprias). O status vem do workflow OFICIAL da operação-alvo.
+export interface OpAntecipadaInline {
   id: number
-  titulo: string
-  statusTarefa: string
-  faseReferenciaCode: string | null
-  acaoStepKey: string | null
   necessidadeId: number | null
+  status: string
+  operationType: string
+  targetOperationId: number | null
+  originPhaseCode: string | null
+  targetPhaseCode: string | null
+  objetivo: string | null
   resultadoObtido: string | null
-  dataPrazo: string | null
-  responsavel?: { id: number; nome: string } | null
+  responsavel?: { id: number; nome: string | null } | null
+  operacao: { statusRaw: string; statusLabel: string; concluida: boolean; uiRef: { kind: string; id: number | null; necessidadeId?: number | null } }
+  aguardandoAvaliacao: boolean
+  encerrada: boolean
 }
+
+export type ResultadoAvaliacaoUI = "SIM" | "PARCIAL" | "NAO" | "CANCELAR"
 
 export interface PainelDaFaseProps {
   faseNome: string                 // "Emissão documental"
@@ -126,12 +128,12 @@ export interface PainelDaFaseProps {
   // Delegação direto na fila (Genealogia): lista de funcionários + callback.
   usuarios?: Array<{ id: number; nome: string }>
   onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
-  // Tarefa Transversal: cria uma ação antecipada de outra fase para resolver esta necessidade.
-  onCriarTransversal?: (necessidadeId: number, pessoaId: number | null, label: string) => void
-  // Transversais existentes por necessidade — exibidas INLINE dentro do documento.
-  transversaisPorNec?: Map<number, TransversalInline[]>
-  onConcluirTransversal?: (id: number, resolveu: boolean, resultado: string) => void
-  onCancelarTransversal?: (id: number) => void
+  // Operação Antecipada: capacidade nativa — usa a operação oficial de outra fase p/ atender esta necessidade.
+  onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
+  // Operações antecipadas existentes por necessidade — exibidas INLINE dentro do documento.
+  operacoesPorNec?: Map<number, OpAntecipadaInline[]>
+  onAvaliarOperacao?: (id: number, resultado: ResultadoAvaliacaoUI, resultadoObtido: string) => void
+  onAbrirOperacaoAntecipada?: (op: OpAntecipadaInline) => void
   // CONSULTA de fase passada (PAST_READ_ONLY): mesmo layout/dados, mas SEM ações de
   // mutação (abrir operação/delegar). Só leitura. onAbrirOperacao/onDelegar chegam
   // undefined; readOnly deixa a intenção explícita para a UI.
@@ -165,10 +167,10 @@ export function PainelDaFase({
   onAbrirPainelCompleto,
   usuarios,
   onDelegar,
-  onCriarTransversal,
-  transversaisPorNec,
-  onConcluirTransversal,
-  onCancelarTransversal,
+  onNovaOperacao,
+  operacoesPorNec,
+  onAvaliarOperacao,
+  onAbrirOperacaoAntecipada,
   readOnly = false,
   modoReestruturacao = false,
   avisoReestruturacao,
@@ -337,7 +339,7 @@ export function PainelDaFase({
             tone="linha"
           />
           {linhaPrincipal.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} onCriarTransversal={onCriarTransversal} transversaisPorNec={transversaisPorNec} onConcluirTransversal={onConcluirTransversal} onCancelarTransversal={onCancelarTransversal} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
+            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} onNovaOperacao={onNovaOperacao} operacoesPorNec={operacoesPorNec} onAvaliarOperacao={onAvaliarOperacao} onAbrirOperacaoAntecipada={onAbrirOperacaoAntecipada} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
           ))}
 
           {/* Grupo Fora da linhagem */}
@@ -348,7 +350,7 @@ export function PainelDaFase({
             tone="fora"
           />
           {foraDaLinha.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} onCriarTransversal={onCriarTransversal} transversaisPorNec={transversaisPorNec} onConcluirTransversal={onConcluirTransversal} onCancelarTransversal={onCancelarTransversal} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
+            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} onNovaOperacao={onNovaOperacao} operacoesPorNec={operacoesPorNec} onAvaliarOperacao={onAvaliarOperacao} onAbrirOperacaoAntecipada={onAbrirOperacaoAntecipada} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
           ))}
         </div>
       </div>
@@ -389,10 +391,10 @@ function PersonRow({
   onAbrirOperacao,
   usuarios,
   onDelegar,
-  onCriarTransversal,
-  transversaisPorNec,
-  onConcluirTransversal,
-  onCancelarTransversal,
+  onNovaOperacao,
+  operacoesPorNec,
+  onAvaliarOperacao,
+  onAbrirOperacaoAntecipada,
   ocultarValidacao = false,
   readOnly = false,
 }: {
@@ -400,10 +402,10 @@ function PersonRow({
   onAbrirOperacao?: (docId: number, necessidadeId?: number | null) => void
   usuarios?: Array<{ id: number; nome: string }>
   onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
-  onCriarTransversal?: (necessidadeId: number, pessoaId: number | null, label: string) => void
-  transversaisPorNec?: Map<number, TransversalInline[]>
-  onConcluirTransversal?: (id: number, resolveu: boolean, resultado: string) => void
-  onCancelarTransversal?: (id: number) => void
+  onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
+  operacoesPorNec?: Map<number, OpAntecipadaInline[]>
+  onAvaliarOperacao?: (id: number, resultado: ResultadoAvaliacaoUI, resultadoObtido: string) => void
+  onAbrirOperacaoAntecipada?: (op: OpAntecipadaInline) => void
   ocultarValidacao?: boolean
   readOnly?: boolean
 }) {
@@ -541,7 +543,7 @@ function PersonRow({
       {/* Linhas expandidas (documentos) */}
       {exp &&
         p.docs.map((d) => {
-        const transv = d.necessidadeId != null ? (transversaisPorNec?.get(d.necessidadeId) ?? []) : []
+        const ops = d.necessidadeId != null ? (operacoesPorNec?.get(d.necessidadeId) ?? []) : []
         return (
           <div key={d.id}>
           <div
@@ -597,14 +599,14 @@ function PersonRow({
 
             {/* Botão — em consulta (readOnly) não há ação de mutação; só o status acima. */}
             <div className="flex justify-end items-center gap-2">
-              {/* Ação DISCRETA: criar tarefa transversal p/ resolver esta necessidade antecipadamente. */}
-              {!readOnly && onCriarTransversal && d.necessidadeId != null && !d.emissaoConcluida && (
+              {/* Ação DISCRETA: nova Operação Antecipada p/ atender esta necessidade via operação oficial de outra fase. */}
+              {!readOnly && onNovaOperacao && d.necessidadeId != null && !d.emissaoConcluida && (
                 <button
-                  onClick={() => onCriarTransversal(d.necessidadeId as number, p.pessoaId ?? null, `${d.tipoLabel}${d.subtitulo ? " · " + d.subtitulo : ""} — ${p.nome}`)}
-                  title="Criar tarefa transversal"
+                  onClick={() => onNovaOperacao(d.necessidadeId as number, p.pessoaId ?? null, `${d.tipoLabel}${d.subtitulo ? " · " + d.subtitulo : ""} — ${p.nome}`)}
+                  title="Nova operação antecipada"
                   className="text-[11px] font-semibold text-gray-500 hover:text-blue-600 underline decoration-dotted underline-offset-2"
                 >
-                  Transversal
+                  + Operação antecipada
                 </button>
               )}
               {readOnly || !onAbrirOperacao ? (
@@ -623,8 +625,8 @@ function PersonRow({
               )}
             </div>
           </div>
-          {transv.length > 0 && (
-            <TransversalInlineList tarefas={transv} readOnly={readOnly} onConcluir={onConcluirTransversal} onCancelar={onCancelarTransversal} />
+          {ops.length > 0 && (
+            <OperacoesAntecipadasInline ops={ops} readOnly={readOnly} onAvaliar={onAvaliarOperacao} onAbrir={onAbrirOperacaoAntecipada} />
           )}
           </div>
         )})}
@@ -632,27 +634,35 @@ function PersonRow({
   )
 }
 
-const authHeadersT = (): Record<string, string> => ({ "Content-Type": "application/json", Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("authToken") : ""}` })
+const ST_OP_LABEL: Record<string, { t: string; c: string }> = {
+  CRIADA: { t: "Criada", c: "bg-gray-100 text-gray-600" },
+  EM_EXECUCAO: { t: "Em execução", c: "bg-blue-100 text-blue-700" },
+  AGUARDANDO_RESULTADO: { t: "Aguardando avaliação", c: "bg-amber-100 text-amber-700" },
+  CONCLUIDA: { t: "Concluída", c: "bg-green-100 text-green-700" },
+  CONCLUIDA_PARCIAL: { t: "Concluída parcial", c: "bg-teal-100 text-teal-700" },
+  NAO_ATINGIDA: { t: "Não atingida", c: "bg-red-100 text-red-700" },
+  CANCELADA: { t: "Cancelada", c: "bg-gray-100 text-gray-400" },
+}
 
-// Transversais vinculadas a UM documento/necessidade — cada uma com sua OPERAÇÃO documental
-// completa (Solicitar → Aguardar → Receber → Conferir → Validar) exibida INLINE sob o doc.
-function TransversalInlineList({ tarefas, readOnly, onConcluir, onCancelar }: {
-  tarefas: TransversalInline[]
+// OPERAÇÕES ANTECIPADAS de UMA necessidade — linha COMPACTA (objetivo · operação vinculada ·
+// status da operação oficial · Abrir operação). NUNCA mostra o workflow inteiro aqui.
+function OperacoesAntecipadasInline({ ops, readOnly, onAvaliar, onAbrir }: {
+  ops: OpAntecipadaInline[]
   readOnly?: boolean
-  onConcluir?: (id: number, resolveu: boolean, resultado: string) => void
-  onCancelar?: (id: number) => void
+  onAvaliar?: (id: number, resultado: ResultadoAvaliacaoUI, resultadoObtido: string) => void
+  onAbrir?: (op: OpAntecipadaInline) => void
 }) {
-  const abertas = tarefas.filter((t) => !["CONCLUIDO_RECEBIDO", "CANCELADA"].includes(t.statusTarefa)).length
+  const abertas = ops.filter((o) => !o.encerrada).length
   return (
     <div className="pr-5 pb-2" style={{ paddingLeft: 76 }}>
       <div className="rounded-lg border border-violet-100 bg-violet-50/50 overflow-hidden">
         <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-violet-100/70 text-[10.5px] font-bold uppercase tracking-wide text-violet-600">
-          <ArrowLeftRight className="w-3 h-3" /> Ações transversais
-          <span className="font-semibold text-violet-400 normal-case tracking-normal">· {tarefas.length}{abertas > 0 ? ` (${abertas} aberta${abertas > 1 ? "s" : ""})` : ""}</span>
+          <ArrowLeftRight className="w-3 h-3" /> Operações antecipadas
+          <span className="font-semibold text-violet-400 normal-case tracking-normal">· {ops.length}{abertas > 0 ? ` (${abertas} aberta${abertas > 1 ? "s" : ""})` : ""}</span>
         </div>
         <div className="divide-y divide-violet-100/70">
-          {tarefas.map((t) => (
-            <TransversalOperacaoItem key={t.id} t={t} readOnly={readOnly} onConcluir={onConcluir} onCancelar={onCancelar} />
+          {ops.map((o) => (
+            <OperacaoAntecipadaItem key={o.id} o={o} readOnly={readOnly} onAvaliar={onAvaliar} onAbrir={onAbrir} />
           ))}
         </div>
       </div>
@@ -660,88 +670,53 @@ function TransversalInlineList({ tarefas, readOnly, onConcluir, onCancelar }: {
   )
 }
 
-interface PassoOp { id: number; stepKey: string; title: string; status: string; ordem: number }
-const OP_DONE = new Set(["CONCLUIDO", "DISPENSADO"])
-
-function TransversalOperacaoItem({ t, readOnly, onConcluir, onCancelar }: {
-  t: TransversalInline
+function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
+  o: OpAntecipadaInline
   readOnly?: boolean
-  onConcluir?: (id: number, resolveu: boolean, resultado: string) => void
-  onCancelar?: (id: number) => void
+  onAvaliar?: (id: number, resultado: ResultadoAvaliacaoUI, resultadoObtido: string) => void
+  onAbrir?: (op: OpAntecipadaInline) => void
 }) {
-  const [passos, setPassos] = useState<PassoOp[]>([])
-  const [busy, setBusy] = useState(false)
-  const [resolver, setResolver] = useState(false)
+  const [avaliando, setAvaliando] = useState(false)
   const [resultado, setResultado] = useState("")
-  const encerrada = ["CONCLUIDO_RECEBIDO", "CANCELADA"].includes(t.statusTarefa)
-
-  const carregar = useCallback(() => {
-    fetch(`/api/tarefas-transversais/${t.id}/operacao`, { headers: authHeadersT() }).then((r) => r.json()).then((j) => setPassos(j.passos ?? [])).catch(() => {})
-  }, [t.id])
-  useEffect(() => { carregar() }, [carregar])
-
-  const avancar = useCallback(async (stepId: number) => {
-    setBusy(true)
-    try { await fetch(`/api/tarefas-transversais/${t.id}/operacao`, { method: "PATCH", headers: authHeadersT(), body: JSON.stringify({ stepInstanceId: stepId }) }); carregar() }
-    finally { setBusy(false) }
-  }, [t.id, carregar])
-
-  const ativo = passos.find((p) => p.status === "EM_ANDAMENTO")
-  const todosDone = passos.length > 0 && passos.every((p) => OP_DONE.has(p.status))
+  const st = ST_OP_LABEL[o.status] ?? { t: o.status, c: "bg-gray-100 text-gray-600" }
+  const objetivo = o.objetivo || "Operação antecipada"
 
   return (
-    <div className={`px-3 py-2.5 ${encerrada ? "opacity-60" : ""}`}>
+    <div className={`px-3 py-2.5 ${o.encerrada ? "opacity-60" : ""}`}>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex items-baseline gap-1.5 flex-wrap">
-          <span className="text-[12.5px] font-semibold text-gray-800">{acaoLabel(t.faseReferenciaCode, t.acaoStepKey)}</span>
-          <span className="text-[11px] text-gray-400">via {faseLabel(t.faseReferenciaCode)}{t.responsavel ? ` · ${t.responsavel.nome}` : ""}</span>
+          <span className="text-[12.5px] font-semibold text-gray-800">{objetivo}</span>
+          <span className="text-[11px] text-gray-400">
+            {o.operacao.statusLabel}
+            {o.originPhaseCode ? ` · origem ${faseLabel(o.originPhaseCode)}` : ""}
+            {o.responsavel?.nome ? ` · ${o.responsavel.nome}` : ""}
+          </span>
         </div>
-        {!readOnly && !encerrada && onCancelar && (
-          <button onClick={() => onCancelar(t.id)} className="text-[11px] font-semibold text-gray-400 hover:text-red-600 flex-none">Cancelar</button>
-        )}
+        <div className="flex items-center gap-2 flex-none">
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${st.c}`}>{st.t}</span>
+          {onAbrir && (
+            <button onClick={() => onAbrir(o)} className="text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-500">Abrir operação</button>
+          )}
+        </div>
       </div>
 
-      {/* STEPPER da operação documental */}
-      {passos.length > 0 && (
-        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-          {passos.map((p, i) => {
-            const done = OP_DONE.has(p.status)
-            const atual = p.status === "EM_ANDAMENTO"
-            return (
-              <span key={p.id} className="flex items-center gap-1.5">
-                <span className={`inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-0.5 rounded-full ${done ? "bg-green-100 text-green-700" : atual ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-400"}`}>
-                  {done && <CheckCircle2 className="w-3 h-3" />}{p.title}
-                </span>
-                {i < passos.length - 1 && <span className="text-gray-300 text-[10px]">›</span>}
-              </span>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Avança o passo ATIVO */}
-      {!readOnly && !encerrada && ativo && (
-        <button disabled={busy} onClick={() => void avancar(ativo.id)} className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50">
-          Concluir "{ativo.title}"
-        </button>
-      )}
-
-      {/* Operação completa → registrar resultado e resolver (ou não) a necessidade de origem */}
-      {!readOnly && !encerrada && todosDone && onConcluir && (
-        resolver ? (
+      {/* AVALIAÇÃO FINAL — só após o workflow oficial concluir. */}
+      {!readOnly && o.aguardandoAvaliacao && onAvaliar && (
+        avaliando ? (
           <div className="mt-2 rounded-md border border-gray-200 bg-white p-2 space-y-2">
-            <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder="Resultado obtido (o dado que a certidão trouxe)" className="w-full text-[12px] rounded-md border border-gray-200 px-2 py-1.5 focus:outline-none focus:border-blue-400" autoFocus />
+            <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder="Resultado obtido (o dado que a operação trouxe)" className="w-full text-[12px] rounded-md border border-gray-200 px-2 py-1.5 focus:outline-none focus:border-blue-400" autoFocus />
             <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={() => { onConcluir(t.id, true, resultado); setResolver(false) }} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-500"><CheckCircle2 className="w-3.5 h-3.5" /> Resolveu a necessidade</button>
-              <button onClick={() => { onConcluir(t.id, false, resultado); setResolver(false) }} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50">Não trouxe o dado</button>
-              <button onClick={() => setResolver(false)} className="text-[11.5px] text-gray-400 hover:text-gray-600 ml-auto">cancelar</button>
+              <button onClick={() => { onAvaliar(o.id, "SIM", resultado); setAvaliando(false) }} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-500"><CheckCircle2 className="w-3.5 h-3.5" /> Objetivo atingido</button>
+              <button onClick={() => { onAvaliar(o.id, "PARCIAL", resultado); setAvaliando(false) }} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-teal-200 text-teal-700 hover:bg-teal-50">Parcialmente</button>
+              <button onClick={() => { onAvaliar(o.id, "NAO", resultado); setAvaliando(false) }} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50">Não atingido</button>
+              <button onClick={() => { onAvaliar(o.id, "CANCELAR", resultado); setAvaliando(false) }} className="text-[11.5px] text-gray-400 hover:text-red-600 ml-auto">Cancelar operação</button>
             </div>
           </div>
         ) : (
-          <button onClick={() => { setResolver(true); setResultado("") }} className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-500"><CheckCircle2 className="w-3.5 h-3.5" /> Operação concluída — avaliar resultado</button>
+          <button onClick={() => { setAvaliando(true); setResultado("") }} className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-500"><CheckCircle2 className="w-3.5 h-3.5" /> Operação concluída — avaliar objetivo</button>
         )
       )}
-      {t.resultadoObtido && <div className="text-[11px] text-gray-500 mt-1">Resultado: {t.resultadoObtido}</div>}
+      {o.resultadoObtido && <div className="text-[11px] text-gray-500 mt-1">Resultado: {o.resultadoObtido}</div>}
     </div>
   )
 }
