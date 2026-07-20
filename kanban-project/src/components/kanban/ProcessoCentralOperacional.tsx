@@ -19,6 +19,7 @@ import { ProcessoRetificacao } from "./ProcessoRetificacao"
 import { ProcessoEmissaoRetificada } from "./ProcessoEmissaoRetificada"
 import { RetornarFaseButton } from "./RetornarFaseButton"
 import { TarefaTransversalModal } from "./TarefaTransversalModal"
+import { TarefasTransversaisLista } from "./TarefasTransversaisLista"
 import type { FaseCode } from "@prisma/client"
 
 // Metadados de uma fase materializada (espelho de /api/processos/[id]/phases).
@@ -354,8 +355,9 @@ export function ProcessoCentralOperacional({
   const [viewLoading, setViewLoading] = useState(false)
   const [viewErro, setViewErro] = useState<string | null>(null)
 
-  // Tarefa Transversal: contexto (necessidade) para o modal de criação.
+  // Tarefa Transversal: contexto (necessidade) para o modal de criação + refresh da lista.
   const [transversalCtx, setTransversalCtx] = useState<{ necessidadeId?: number | null; pessoaId?: number | null; label?: string } | null>(null)
+  const [transversalRefresh, setTransversalRefresh] = useState(0)
 
   // TROCA DE CONTEXTO NO AVANÇO DE FASE: quando a fase da Central muda (avanço/retorno),
   // qualquer drawer aberto está exibindo o contexto da fase ANTIGA (ex.: o passo
@@ -746,6 +748,9 @@ export function ProcessoCentralOperacional({
           </div>
         )}
 
+        {/* Tarefas transversais DENTRO do processo — ver/concluir/cancelar sem sair da Central. */}
+        <TarefasTransversaisLista processoId={processo.id} refreshKey={transversalRefresh} readOnly={isView} onChanged={() => carregar(true)} />
+
         {/* ===== Cabeçalho do MODO CONSULTA (fase passada) — MESMA casca, só leitura ===== */}
         {isView && (
           <div className="mb-4 flex items-start justify-between gap-4 flex-wrap bg-amber-50/60 border border-amber-200 rounded-xl px-4 py-3">
@@ -893,7 +898,7 @@ export function ProcessoCentralOperacional({
             faseAtivaCode={faseKeyAtiva ? String(faseKeyAtiva) : null}
             usuarios={usuarios}
             onClose={() => setTransversalCtx(null)}
-            onCreated={() => { setTransversalCtx(null); carregar(true) }}
+            onCreated={() => { setTransversalCtx(null); setTransversalRefresh((n) => n + 1); carregar(true) }}
           />
         )}
       </div>
