@@ -24,8 +24,15 @@ export async function GET(request: Request) {
     const dataInicio = searchParams.get("dataInicio")
     const dataFim = searchParams.get("dataFim")
     const status = searchParams.get("status")
+    // Tarefa Transversal: filtros por tipo (NORMAL|TRANSVERSAL) e fases de origem/referência.
+    const tipo = searchParams.get("tipo")
+    const faseOrigemCode = searchParams.get("faseOrigemCode")
+    const faseReferenciaCode = searchParams.get("faseReferenciaCode")
 
     const where: any = {}
+    if (tipo === "NORMAL" || tipo === "TRANSVERSAL") where.tipo = tipo
+    if (faseOrigemCode) where.faseOrigemCode = faseOrigemCode
+    if (faseReferenciaCode) where.faseReferenciaCode = faseReferenciaCode
 
     // =====================================================
     // 🔒 FILTRO OBRIGATÓRIO POR USUÁRIO

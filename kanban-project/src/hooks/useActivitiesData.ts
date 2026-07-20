@@ -64,6 +64,11 @@ export interface Atividade {
     titulo: string
   }
   data_inicio?: string | null
+  // Tarefa Transversal (aditivo)
+  tipo?: "NORMAL" | "TRANSVERSAL"
+  faseOrigemCode?: string | null
+  faseReferenciaCode?: string | null
+  necessidadeId?: number | null
 }
 
 // Tipo da resposta da API de tarefas
@@ -166,6 +171,10 @@ function mapTarefaToAtividade(tarefa: TarefaAPI): Atividade {
     tarefaPai: tarefa.tarefaPai || undefined,
     observacoes: tarefa.observacoes,
     data_inicio: tarefa.dataInicio,
+    tipo: (tarefa as { tipo?: "NORMAL" | "TRANSVERSAL" }).tipo ?? "NORMAL",
+    faseOrigemCode: (tarefa as { faseOrigemCode?: string | null }).faseOrigemCode ?? null,
+    faseReferenciaCode: (tarefa as { faseReferenciaCode?: string | null }).faseReferenciaCode ?? null,
+    necessidadeId: (tarefa as { necessidadeId?: number | null }).necessidadeId ?? null,
   }
 }
 

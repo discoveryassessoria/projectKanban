@@ -43,13 +43,16 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [selectedAtividade, setSelectedAtividade] = useState<Atividade | null>(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  // Tarefa Transversal: filtro por tipo (NORMAL | TRANSVERSAL).
+  const [filtroTipo, setFiltroTipo] = useState<"TODAS" | "NORMAL" | "TRANSVERSAL">("TODAS")
 
   const { users = [] } = useUsers()
 
   const { pode } = usePermissoes()
 
   // Garantir que atividades é sempre um array
-  const atividades = Array.isArray(activities) ? activities : []
+  const atividadesTodas = Array.isArray(activities) ? activities : []
+  const atividades = filtroTipo === "TODAS" ? atividadesTodas : atividadesTodas.filter((a: Atividade) => (a.tipo ?? "NORMAL") === filtroTipo)
   
   // Status para tarefas (Pendente/Concluída)
   const statusTarefas = [
@@ -339,6 +342,20 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   return (
     <>
     <div className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+      {/* Filtro por tipo (Normais | Transversais) */}
+      <div className="px-4 pt-3 flex items-center gap-2">
+        <span className="text-[11px] font-semibold text-white/50 uppercase tracking-wide">Tipo:</span>
+        {([["TODAS", "Todas"], ["NORMAL", "Normais"], ["TRANSVERSAL", "Transversais"]] as const).map(([val, label]) => (
+          <button
+            key={val}
+            onClick={() => setFiltroTipo(val)}
+            className={`text-[12px] font-semibold px-3 py-1 rounded-full transition-colors ${filtroTipo === val ? "bg-violet-500/30 text-violet-200 border border-violet-400/40" : "bg-white/5 text-white/60 border border-white/10 hover:text-white"}`}
+          >
+            {label}
+          </button>
+        ))}
+        {filtroTipo === "TRANSVERSAL" && <span className="text-[11px] text-white/40 ml-1">{atividades.length} transversal(is)</span>}
+      </div>
       {/* Table Header */}
       <div className="px-4 py-3 border-b border-white/10">
         <div className="grid gap-4 items-center text-sm font-medium text-white/80" style={{ gridTemplateColumns: '28px 2.5fr 0.8fr 1.2fr 0.7fr 0.7fr 0.6fr 0.4fr 0.6fr' }}>
@@ -397,7 +414,14 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                 
                 <div className="">
                   <div className="space-y-1">
-                    <div className="font-medium text-sm text-white">{atividade.nome || 'Sem título'}</div>
+                    <div className="font-medium text-sm text-white flex items-center gap-2">
+                      {atividade.nome || 'Sem título'}
+                      {atividade.tipo === "TRANSVERSAL" && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 whitespace-nowrap" title={`Ação antecipada de ${atividade.faseReferenciaCode ?? "outra fase"}`}>
+                          ⇄ Transversal{atividade.faseReferenciaCode ? ` · ${atividade.faseReferenciaCode}` : ""}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-white/50 truncate">
                       {atividade.observacoes || atividade.descricao || ''}
                     </div>
