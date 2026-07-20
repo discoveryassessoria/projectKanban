@@ -113,6 +113,20 @@ export async function verificarPermissao(
 }
 
 /**
+ * Exige perfil ADMIN (usuario.tipo === 'admin'). Usado por ações DESTRUTIVAS (exclusão
+ * definitiva de dados de teste). Retorna { usuario } se admin, ou { erro: NextResponse } com
+ * 401 (não autenticado) / 403 (não-admin). NUNCA confie só no frontend — chame isto no backend.
+ */
+export async function exigirAdmin(
+  request: Request
+): Promise<{ usuario: UsuarioComPermissoes; erro: null } | { usuario: null; erro: NextResponse }> {
+  const usuario = await extrairUsuarioComPermissoes(request)
+  if (!usuario) return { usuario: null, erro: NextResponse.json({ error: 'Não autorizado' }, { status: 401 }) }
+  if (usuario.tipo !== 'admin') return { usuario: null, erro: NextResponse.json({ error: 'Ação restrita a administradores' }, { status: 403 }) }
+  return { usuario, erro: null }
+}
+
+/**
  * Verifica múltiplas permissões (precisa ter TODAS).
  */
 export async function verificarPermissoes(

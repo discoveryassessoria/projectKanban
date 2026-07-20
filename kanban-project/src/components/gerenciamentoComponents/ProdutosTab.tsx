@@ -8,6 +8,8 @@
 // Backend: /api/gerenciamento/produtos (GET/POST) + /[id] (PUT/DELETE).
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { usePermissoes } from '@/src/hooks/use-permissoes'
+import { ExclusaoDefinitivaModal } from './ExclusaoDefinitivaModal'
 
 type CategoriaRef = { id: number; nome: string }
 type ContaRef = { id: number; codigo: string; nome: string }
@@ -128,6 +130,8 @@ export default function ProdutosTab() {
 
   const [modalAberto, setModalAberto] = useState(false)
   const [editando, setEditando] = useState<Produto | null>(null)
+  const { isAdmin } = usePermissoes()
+  const [modalExcluir, setModalExcluir] = useState<Produto | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY)
   const [salvando, setSalvando] = useState(false)
   const [erroModal, setErroModal] = useState<string | null>(null)
@@ -263,6 +267,9 @@ export default function ProdutosTab() {
   }
 
   async function excluir(p: Produto) {
+    // ADMIN: abre o modal com as duas opções (inativar × excluir definitivamente dados de teste).
+    if (isAdmin) { setModalExcluir(p); return }
+    // Usuário comum: regra geral inalterada — nunca apaga; no máximo inativa (o backend decide).
     const nome = p.mestre?.nome || p.nome
     if (!confirm(`Excluir a Configuração Financeira de "${nome}"?\n\nSe nada estiver usando esta configuração (preço, regra ou vínculo de serviço), ela é apagada de vez. Caso contrário, é inativada para preservar o histórico.`)) return
     try {
@@ -505,6 +512,17 @@ export default function ProdutosTab() {
             </div>
           </div>
         </div>
+      )}
+
+      {modalExcluir && (
+        <ExclusaoDefinitivaModal
+          titulo={`Excluir Configuração Financeira · ${modalExcluir.mestre?.nome || modalExcluir.nome}`}
+          previewUrl={`/api/gerenciamento/produtos/${modalExcluir.id}/exclusao-definitiva`}
+          deleteUrl={`/api/gerenciamento/produtos/${modalExcluir.id}/exclusao-definitiva`}
+          onInativar={async () => { await jsonFetch(`/api/gerenciamento/produtos/${modalExcluir.id}`, { method: 'DELETE' }) }}
+          onDone={() => { setModalExcluir(null); void carregar() }}
+          onClose={() => setModalExcluir(null)}
+        />
       )}
     </div>
   )

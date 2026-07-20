@@ -4,6 +4,8 @@
 // Cada item existe UMA vez aqui; Matriz/Produtos/Preços/Regras só REFERENCIAM.
 // Backend: /api/gerenciamento/catalogo-mestre (GET/POST) + /[id] (PUT/DELETE)
 import { useState, useEffect, useCallback } from 'react'
+import { usePermissoes } from '@/src/hooks/use-permissoes'
+import { ExclusaoDefinitivaModal } from './ExclusaoDefinitivaModal'
 
 type Item = {
   id: number; code: string; name: string; descricao: string | null
@@ -36,6 +38,8 @@ export default function CatalogoMestreTab() {
   const [form, setForm] = useState<Form | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [busca, setBusca] = useState('')
+  const { isAdmin } = usePermissoes()
+  const [modalExcluir, setModalExcluir] = useState<Item | null>(null)
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro(null)
@@ -56,6 +60,8 @@ export default function CatalogoMestreTab() {
     } catch (e: any) { setErro(e.message) } finally { setSalvando(false) }
   }
   async function excluir(it: Item) {
+    // ADMIN: modal de exclusão definitiva (limpeza explícita de dados de teste, com prévia + frase).
+    if (isAdmin) { setModalExcluir(it); return }
     if (!confirm(`Excluir o item "${it.name}"?`)) return
     try { await jsonFetch(`/api/gerenciamento/catalogo-mestre/${it.id}`, { method: 'DELETE' }); await carregar() }
     catch (e: any) { alert(e.message) }
@@ -142,6 +148,16 @@ export default function CatalogoMestreTab() {
             </div>
           </div>
         </div>
+      )}
+
+      {modalExcluir && (
+        <ExclusaoDefinitivaModal
+          titulo={`Excluir item do Catálogo Mestre · ${modalExcluir.name}`}
+          previewUrl={`/api/gerenciamento/catalogo-mestre/${modalExcluir.id}/exclusao-definitiva`}
+          deleteUrl={`/api/gerenciamento/catalogo-mestre/${modalExcluir.id}/exclusao-definitiva`}
+          onDone={() => { setModalExcluir(null); void carregar() }}
+          onClose={() => setModalExcluir(null)}
+        />
       )}
     </div>
   )
