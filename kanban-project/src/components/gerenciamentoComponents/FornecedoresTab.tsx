@@ -10,6 +10,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 
 type Fornecedor = {
   id: number
+  publicCode: string | null   // FOR-n — código público
   nome: string
   tipo: string
   nomeFantasia: string | null
@@ -123,6 +124,7 @@ export default function FornecedoresTab() {
     const q = busca.trim().toLowerCase()
     if (!q) return fornecedores
     return fornecedores.filter((f) =>
+      (f.publicCode ?? '').toLowerCase().includes(q) ||
       f.nome.toLowerCase().includes(q) ||
       (f.nomeFantasia || '').toLowerCase().includes(q) ||
       (f.cpfCnpj || '').toLowerCase().includes(q) ||
@@ -199,7 +201,7 @@ export default function FornecedoresTab() {
       <input
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
-        placeholder="Buscar fornecedor..."
+        placeholder="Buscar por código (FOR-n), nome ou documento..."
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
       />
 
@@ -225,6 +227,7 @@ export default function FornecedoresTab() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-white/5">
+                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Código</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Fornecedor</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Categoria</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Contato</th>
@@ -235,6 +238,7 @@ export default function FornecedoresTab() {
             <tbody>
               {filtrados.map((f) => (
                 <tr key={f.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
+                  <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/90">{f.publicCode ?? '—'}</td>
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-white">{f.nome}</div>
                     {f.nomeFantasia && <div className="text-[11px] text-white/40">{f.nomeFantasia}</div>}

@@ -56,7 +56,7 @@ const ORIGENS: [string, string][] = [
 ]
 type MestreRef = { id: number; label: string; code: string | null }
 type Mestres = { documento: MestreRef[]; servico: MestreRef[]; honorario: MestreRef[]; processo: MestreRef[] }
-type FornecedorRef = { id: number; nome: string }
+type FornecedorRef = { id: number; nome: string; publicCode: string | null }
 const MESTRES_VAZIO: Mestres = { documento: [], servico: [], honorario: [], processo: [] }
 // Rótulo da ORIGEM estrutural do mestre (Documento/Serviço/...). Usado na coluna e busca.
 const ORIGEM_LABEL: Record<string, string> = { documento: 'Documento', servico: 'Serviço', honorario: 'Honorário', processo: 'Processo', item: 'Item' }
@@ -157,7 +157,7 @@ export default function ProdutosTab() {
         honorario: (m.honorarios || []).map((h: any) => ({ id: h.id, label: h.name, code: h.code ?? null })),
         processo: (m.tiposProcesso || []).map((p: any) => ({ id: p.id, label: p.name, code: null })),
       })
-      setFornecedores((m.fornecedores || []).map((f: any) => ({ id: f.id, nome: f.nome })))
+      setFornecedores((m.fornecedores || []).map((f: any) => ({ id: f.id, nome: f.nome, publicCode: f.publicCode ?? null })))
       setCategorias((dCat as any).categorias || [])
       setContas((dContas as any).contas || [])
     } catch (e: any) {
@@ -474,7 +474,7 @@ export default function ProdutosTab() {
                   <label className="mb-1 block text-xs text-white/60">Fornecedor padrão (opcional)</label>
                   <select value={form.fornecedorPadraoId} onChange={(e) => set('fornecedorPadraoId', e.target.value)} className={inputCls}>
                     <option value="" className="bg-zinc-900">— Nenhum —</option>
-                    {fornecedores.map((f) => <option key={f.id} value={f.id} className="bg-zinc-900">{f.nome}</option>)}
+                    {fornecedores.map((f) => <option key={f.id} value={f.id} className="bg-zinc-900">{f.publicCode ? f.publicCode + ' — ' : ''}{f.nome}</option>)}
                   </select>
                 </div>
               </Secao>

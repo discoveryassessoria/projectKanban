@@ -10,7 +10,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { MODOS_CALCULO, rotuloModo, rotuloUnidadeCobranca, modoUsaQuantidade } from '@/lib/financeiro/modo-calculo'
 
 type ConfigRef = { id: number; publicCode: string | null; possuiCusto: boolean; possuiReceita: boolean; origem: string; mestre: string; label: string; moedaPadrao: string }
-type FornecedorRef = { id: number; nome: string }
+type FornecedorRef = { id: number; nome: string; publicCode?: string | null }
 type CfgEmbed = {
   id: number; publicCode?: string | null; possuiCusto: boolean; possuiReceita: boolean
   tipoDocumento?: { name: string } | null; honorario?: { name: string } | null
@@ -240,7 +240,7 @@ export default function TabelaValoresTab() {
                     <td className="px-3 py-2.5 font-medium text-white">{om.publicCode ? <span className="font-mono text-[11px] text-white/50 mr-1">{om.publicCode} —</span> : null}{om.mestre}</td>
                     <td className="px-3 py-2.5 text-white/60">{om.origem}</td>
                     <td className="px-3 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${i.natureza === 'CUSTO' ? 'bg-amber-500/15 text-amber-300' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-white/50'}`}>{i.natureza === 'CUSTO' ? 'Custo' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'Venda' : '—'}</span></td>
-                    <td className="px-3 py-2.5 text-white/70">{i.fornecedor?.nome || '—'}</td>
+                    <td className="px-3 py-2.5 text-white/70">{i.fornecedor ? `${i.fornecedor.publicCode ? i.fornecedor.publicCode + ' — ' : ''}${i.fornecedor.nome}` : '—'}</td>
                     <td className="px-3 py-2.5 text-white/60">{rotuloModo(i.modoCalculo)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-white/90">{fmtMoeda(i.valor, i.moeda)}</td>
                     <td className="px-3 py-2.5 text-[11px] text-white/50">{i.vigenciaInicio || '—'}{i.vigenciaFim ? ` → ${i.vigenciaFim}` : ''}</td>
@@ -348,7 +348,7 @@ export default function TabelaValoresTab() {
                       <label className="mb-1 block text-xs text-white/60">Fornecedor</label>
                       <select value={form.fornecedorId} onChange={(e) => set('fornecedorId', e.target.value)} className={inputCls}>
                         <option value="" className="bg-zinc-900">— Nenhum —</option>
-                        {fornecedores.map((f) => <option key={f.id} value={f.id} className="bg-zinc-900">{f.nome}</option>)}
+                        {fornecedores.map((f) => <option key={f.id} value={f.id} className="bg-zinc-900">{f.publicCode ? f.publicCode + ' — ' : ''}{f.nome}</option>)}
                       </select>
                     </div>
                     <div>

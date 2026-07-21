@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
         where: { arquivado: false, legadoPendente: false, configuracaoFinanceiraItemId: { not: null } },
         orderBy: [{ prioridade: 'desc' }, { criadoEm: 'desc' }],
         include: {
-          fornecedor: { select: { id: true, nome: true } },
+          fornecedor: { select: { id: true, nome: true, publicCode: true } },
           modalidade: { select: { id: true, modalityLabel: true } },
           configuracaoFinanceiraItem: {
             select: {
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
         },
       }),
       listarConfigs(),
-      prisma.fornecedor.findMany({ where: { ativo: true }, orderBy: { nome: 'asc' }, select: { id: true, nome: true } }),
+      prisma.fornecedor.findMany({ where: { ativo: true }, orderBy: { nome: "asc" }, select: { id: true, nome: true, publicCode: true } }),
       prisma.tipoProcessoNacionalidade.findMany({ where: { ativo: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
       prisma.modalidadePais.findMany({ where: { ativo: true }, orderBy: { modalityLabel: 'asc' }, select: { id: true, modalityLabel: true } }),
     ])
@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
     // desfeita — nunca fica só metade do cadastro persistido.
     try {
       const regras = await prisma.$transaction(
-        dados.map((d) => prisma.tabelaValor.create({ data: d as never, include: { fornecedor: { select: { id: true, nome: true } } } })),
+        dados.map((d) => prisma.tabelaValor.create({ data: d as never, include: { fornecedor: { select: { id: true, nome: true, publicCode: true } } } })),
       )
       // P4 — cadastrou preço: reprocessa (best-effort) as pendências financeiras desta config.
       reprocessarPendenciasFinanceiras({ configItemId: configId }).catch((e) => console.error('[reprocesso pendências pós-preço]', e))

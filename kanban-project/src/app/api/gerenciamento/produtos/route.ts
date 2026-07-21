@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
       prisma.servicoProduto.findMany({ where: { ativo: true, itemCatalogoId: { not: null } }, select: { itemCatalogoId: true, code: true, name: true, publicCode: true }, orderBy: { name: 'asc' } }),
       prisma.honorario.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
       prisma.tipoProcessoNacionalidade.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
-      prisma.fornecedor.findMany({ where: { ativo: true }, select: { id: true, nome: true }, orderBy: { nome: 'asc' } }),
+      prisma.fornecedor.findMany({ where: { ativo: true }, select: { id: true, nome: true, publicCode: true }, orderBy: { nome: "asc" } }),
     ])
 
     // Anexa o mestre RESOLVIDO (nome/código reais por relação) a cada configuração.
