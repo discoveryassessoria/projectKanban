@@ -48,7 +48,23 @@ export async function GET(req: NextRequest) {
       })
     );
 
-    return NextResponse.json(receitas);
+    // AGRUPAMENTO: o grupo pai da listagem é a FASE de origem. Enriquecemos com o
+    // rótulo do CatalogoFase para a UI não precisar de um segundo round-trip.
+    const phaseKeys = [...new Set(receitas.map((r) => r.phaseKey).filter((k): k is string => !!k))];
+    const fases = phaseKeys.length
+      ? await prisma.catalogoFase.findMany({
+          where: { phaseKey: { in: phaseKeys } },
+          select: { phaseKey: true, label: true },
+        })
+      : [];
+    const labelPorFase = new Map(fases.map((f) => [f.phaseKey, f.label]));
+
+    return NextResponse.json(
+      receitas.map((r) => ({
+        ...r,
+        faseLabel: r.phaseKey ? (labelPorFase.get(r.phaseKey) ?? null) : null,
+      }))
+    );
   } catch (err) {
     console.error("[GET /api/financeiro/receitas] erro:", err);
     return NextResponse.json(

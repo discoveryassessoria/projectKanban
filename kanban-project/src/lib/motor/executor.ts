@@ -28,6 +28,7 @@ import { aplicacaoValida, naturezasDaAplicacao, aplicacaoPermitida } from '@/lib
 import { isoDoPais } from '@/lib/codigos/code-patterns'
 import { tituloAutomacaoFinanceira, descricaoLancamentoDaConfig } from '@/lib/financeiro/automacao-financeira-identidade'
 import { processoEmRuntimeV2 } from './runtime-guard' // CP-4H
+import { artefatoEstaSuprimido } from '@/lib/financeiro/supressao-motor'
 
 // PREÇO-FONTE-ÚNICA (§5): resolve o valor SÓ pela Tabela de Preços de uma
 // Configuração Financeira. NÃO usa valorPadrao da config como preço; sem preço
@@ -720,6 +721,13 @@ export async function aplicarHonorariosCidadaniaItaliana(processoId: number): Pr
 
   const akey = `${processoId}::honorario_cidadania_italiana::VENDA`
   const artefato = await prisma.motorArtefato.findFirst({ where: { automaticKey: akey } })
+
+  // SUPRESSÃO RASTREÁVEL — o operador cancelou o lançamento e registrou uma
+  // supressão autorizada. A reconciliação NÃO recria enquanto ela estiver ativa
+  // (quebra o ciclo cancela→recria). Revogar a supressão reabre a aplicação.
+  if (artefatoEstaSuprimido(artefato)) {
+    return { aplicavel: true, n, acao: 'nenhum', motivo: 'lançamento suprimido por decisão registrada — reconciliação não recria', receitaId: artefato?.targetId ?? undefined }
+  }
 
   // helper: a receita tem pagamento/dependência que impede alteração destrutiva?
   const receitaBloqueada = async (receitaId: number): Promise<boolean> => {

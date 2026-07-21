@@ -54,6 +54,7 @@
     "test:resolver-preco": "tsx scripts/resolver-preco-financeiro.test.ts",
     "test:financeiro-geral": "tsx scripts/financeiro-geral.test.ts",
     "test:financeiro": "tsx scripts/preco-fonte-unica.test.ts && tsx scripts/resolver-preco-financeiro.test.ts && tsx scripts/financeiro-geral.test.ts",
+    "test:receitas-processo": "tsx scripts/receitas-processo.test.ts",
     "guard:db": "tsx scripts/guard-nonprod-db.ts",
     "migrate:test": "npm run guard:db && prisma migrate deploy",
     "build:safe": "npm run guard:db && prisma generate && next build --turbopack",
