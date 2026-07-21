@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
         select: { id: true, name: true, macroWorkflow: { select: { fases: { select: { phaseKey: true, label: true, ordem: true }, orderBy: { ordem: 'asc' } } } } },
         orderBy: { name: 'asc' },
       }),
-      prisma.tipoDocumentoCadastro.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
+      prisma.tipoDocumentoCadastro.findMany({ where: { ativo: true }, select: { id: true, publicCode: true, code: true, name: true }, orderBy: { name: 'asc' } }),
       prisma.matrizDocumental.findMany({ orderBy: { criadoEm: 'asc' } }),
     ])
     const tiposProcesso = tipos.map(t => ({ id: t.id, name: t.name, fases: t.macroWorkflow?.fases ?? [] }))

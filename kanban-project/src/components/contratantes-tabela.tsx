@@ -387,6 +387,7 @@ export function ContratanteModal({
   setIsViewMode,
   editingId,
   editingTipo,
+  codigoPublico,
   formData,
   setFormData,
   onSave,
@@ -402,6 +403,7 @@ export function ContratanteModal({
   setIsViewMode: (v: boolean) => void
   editingId: number | null
   editingTipo: string
+  codigoPublico?: string | null
   formData: typeof initialFormData
   setFormData: (data: typeof initialFormData) => void
   onSave: () => void
@@ -1159,6 +1161,15 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
             {/* Tab Dados Pessoais */}
             {activeTab === "dados" && (
               <div className="space-y-6">
+                {/* Código público (somente leitura, automático) */}
+                <div className="bg-white rounded-xl px-6 py-4 shadow-sm border border-gray-200">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Código</label>
+                  {codigoPublico ? (
+                    <div className="font-mono text-sm font-bold text-gray-900">{codigoPublico}</div>
+                  ) : (
+                    <div className="text-sm italic text-gray-400">Será gerado automaticamente ao salvar.</div>
+                  )}
+                </div>
                 {/* Seção: Identificação */}
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -1955,6 +1966,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isViewMode, setIsViewMode] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingCodigo, setEditingCodigo] = useState<string | null>(null)
   const [editingTipo, setEditingTipo] = useState<string>("contratante")
   const [formData, setFormData] = useState(initialFormData)
   const [isLoading, setIsLoading] = useState(false)
@@ -1981,6 +1993,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
   const handleNew = () => {
     setFormData(initialFormData)
     setEditingId(null)
+    setEditingCodigo(null)
     setEditingTipo("contratante")
     setIsViewMode(false)
     setErrors({}) // ✅ Limpar erros
@@ -1988,6 +2001,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
   }
 
   const handleEdit = (contratante: Contratante) => {
+    setEditingCodigo(contratante.publicCode ?? null)
     const tipo = contratante.tipo || "contratante"
     const paisSalvo = contratante.pais || "Brasil"
     const paisNaLista = PAISES_OPTIONS.some(p => p.nome === paisSalvo)
@@ -2026,6 +2040,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
   }
 
   const handleView = (contratante: Contratante) => {
+    setEditingCodigo(contratante.publicCode ?? null)
     const tipo = contratante.tipo || "contratante"
     const paisSalvo = contratante.pais || "Brasil"
     const paisNaLista = PAISES_OPTIONS.some(p => p.nome === paisSalvo)
@@ -2440,6 +2455,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
         setIsViewMode={setIsViewMode}
         editingId={editingId}
         editingTipo={editingTipo}
+        codigoPublico={editingCodigo}
         formData={formData}
         setFormData={setFormData}
         onSave={handleSave}

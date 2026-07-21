@@ -16,7 +16,7 @@ interface CampoAdicional { key: string; label: string; type: "tipoDocumento" | "
 interface CatalogoItem { operationType: string; label: string; camposAdicionais?: CampoAdicional[] }
 interface FaseOpt { faseCode: string; faseLabel: string }
 interface NecOpt { id: number; label: string; pessoaId: number | null }
-interface TipoDoc { id: number; name: string; code: string | null; countryCode: string | null }
+interface TipoDoc { id: number; publicCode?: string | null; name: string; code: string | null; countryCode: string | null }
 
 interface Props {
   processoId: number
@@ -167,7 +167,7 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
               <span className="block text-[11.5px] font-semibold text-gray-600 mb-1">{campoDoc.label}{campoDoc.required ? " *" : ""}</span>
               <select value={tipoDocumentoId} onChange={(e) => setTipoDocumentoId(e.target.value)} className="w-full text-[13px] rounded-lg border border-gray-200 px-2.5 py-2 bg-white focus:outline-none focus:border-blue-400">
                 <option value="">Selecionar…</option>
-                {tipos.map((t) => <option key={t.id} value={t.id}>{t.name}{t.countryCode ? ` (${t.countryCode})` : ""}</option>)}
+                {tipos.map((t) => <option key={t.id} value={t.id}>{t.publicCode ? t.publicCode + " — " : ""}{t.name}{t.countryCode ? ` (${t.countryCode})` : ""}</option>)}
               </select>
               <span className="block text-[10.5px] text-gray-400 mt-1">
                 {tipoSel?.countryCode ? `Jurisdição: ${tipoSel.countryCode}. ` : ""}Se diferir do documento exigido pela necessidade, será tratado como <b>documento de apoio</b> (não substitui a necessidade).

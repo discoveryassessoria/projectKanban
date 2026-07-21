@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   try {
     const tipos = await prisma.tipoDocumentoCadastro.findMany({
       where: { ativo: true },
-      select: { id: true, name: true, code: true, category: true, countryCode: true, itemCatalogoId: true },
+      select: { id: true, publicCode: true, name: true, code: true, category: true, countryCode: true, itemCatalogoId: true },
       orderBy: { name: "asc" },
     })
     return NextResponse.json({ tipos })

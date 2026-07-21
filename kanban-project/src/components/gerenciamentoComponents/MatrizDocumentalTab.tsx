@@ -7,7 +7,7 @@ import { useEffect, useState, useCallback } from "react"
 // ============================================================
 interface Fase { phaseKey: string; label: string; ordem: number }
 interface TipoProcesso { id: number; name: string; fases: Fase[] }
-interface DocType { id: number; code: string | null; name: string }
+interface DocType { id: number; publicCode?: string | null; code: string | null; name: string }
 interface Regra {
   id: number; tipoProcessoId: number; phaseKey: string | null; documentTypeCode: string
   target: string; generationRule: string; required: boolean; conditional: boolean; condition: string | null
@@ -85,7 +85,11 @@ export default function MatrizDocumentalTab() {
   const remove = (id: number) => setData(d => d ? { ...d, matriz: d.matriz.filter(x => x.id !== id) } : d)
 
   const proc = data?.tiposProcesso.find(t => t.id === ptId) || null
-  const docName = (code: string) => data?.docTypes.find(d => (d.code || String(d.id)) === code)?.name || code
+  const docName = (code: string) => {
+    const d = data?.docTypes.find(d => (d.code || String(d.id)) === code)
+    if (!d) return code
+    return d.publicCode ? `${d.publicCode} — ${d.name}` : d.name
+  }
   const phaseName = (pk: string | null) => (pk ? proc?.fases.find(f => f.phaseKey === pk)?.label || pk : "qualquer fase")
   const regrasDoProc = (data?.matriz || []).filter(m => m.tipoProcessoId === ptId && (showArchived || !m.arquivado))
   const arquivadasCount = (data?.matriz || []).filter(m => m.tipoProcessoId === ptId && m.arquivado).length
@@ -217,7 +221,7 @@ export default function MatrizDocumentalTab() {
                 <label className={labelCls}>Tipo de documento *</label>
                 <select value={form.documentTypeCode} onChange={e => setForm(f => f && { ...f, documentTypeCode: e.target.value })} className={inputCls}>
                   <option value="" className={opt}>— selecione —</option>
-                  {data?.docTypes.map(d => <option key={d.id} value={d.code || String(d.id)} className={opt}>{d.name}</option>)}
+                  {data?.docTypes.map(d => <option key={d.id} value={d.code || String(d.id)} className={opt}>{d.publicCode ? d.publicCode + " — " : ""}{d.name}</option>)}
                 </select>
               </div>
               <div>
