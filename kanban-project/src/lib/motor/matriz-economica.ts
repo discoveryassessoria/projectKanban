@@ -88,6 +88,9 @@ export interface ResultadoMatriz {
   criados: ItemEconomico[]
   pulados: { motivo: string; detalhe?: string }[]
   erros: string[]
+  /** Conjunto de automaticKeys que DEVEM existir nesta (fase, ciclo) — usado pelo
+   *  reconcile por-documento para remover órfãos (documento/serviço que sumiu). */
+  esperados: string[]
 }
 
 /**
@@ -100,11 +103,13 @@ export async function gerarEconomicoDaMatriz(
   const criados: ItemEconomico[] = []
   const pulados: { motivo: string; detalhe?: string }[] = []
   const erros: string[] = []
+  // Chaves que DEVEM existir (documento/serviço elegível AGORA) — base do reconcile.
+  const esperados: string[] = []
 
   const regras = await prisma.matrizDocumental.findMany({ where: { tipoProcessoId, phaseKey, arquivado: false } })
   if (regras.length === 0) {
     pulados.push({ motivo: `sem regra na Matriz para tipoProcesso ${tipoProcessoId} + fase "${phaseKey}"` })
-    return { criados, pulados, erros }
+    return { criados, pulados, erros, esperados }
   }
 
   // Regras econômicas CONFIGURADAS p/ esta fase (tipo específico OU qualquer tipo).
@@ -121,7 +126,7 @@ export async function gerarEconomicoDaMatriz(
     } } } } },
   })
   const pessoas = (proc?.arvore?.pessoas ?? []) as PessoaMin[]
-  if (pessoas.length === 0) { pulados.push({ motivo: 'processo sem pessoas na árvore' }); return { criados, pulados, erros } }
+  if (pessoas.length === 0) { pulados.push({ motivo: 'processo sem pessoas na árvore' }); return { criados, pulados, erros, esperados } }
 
   for (const regra of regras) {
     const econ = resolverRegraEconomica(economicRules, regra.documentTypeCode)
@@ -175,6 +180,7 @@ export async function gerarEconomicoDaMatriz(
             pulados.push({ motivo: 'regra gera CUSTO mas sem Configuração Financeira de custo', detalhe: componente })
           } else {
             const chave = `${base}::custo`
+            esperados.push(chave)
             const rC = await resolverPrecoPorConfigDB(prodCusto.id, { processoId, tipoProcessoId: String(tipoProcessoId), natureza: NaturezaPreco.CUSTO })
             const bloqueio = motivoBloqueio(rC)
             if (bloqueio) {
@@ -196,6 +202,7 @@ export async function gerarEconomicoDaMatriz(
             pulados.push({ motivo: 'regra gera RECEITA mas sem Configuração Financeira de receita', detalhe: componente })
           } else {
             const chave = `${base}::receita`
+            esperados.push(chave)
             const rR = await resolverPrecoPorConfigDB(prodReceita.id, { processoId, tipoProcessoId: String(tipoProcessoId), natureza: NaturezaPreco.VENDA })
             const bloqueio = motivoBloqueio(rR)
             if (bloqueio) {
@@ -216,7 +223,63 @@ export async function gerarEconomicoDaMatriz(
       }
     }
   }
-  return { criados, pulados, erros }
+  return { criados, pulados, erros, esperados }
+}
+
+// ============================================================================
+// RECONCILE POR DOCUMENTO/SERVIÇO — convergência do motor econômico da Matriz.
+//   1) CRIA os itens elegíveis AGORA (gerarEconomicoDaMatriz — idempotente).
+//   2) REMOVE os órfãos: lançamentos matriz cujo documento/serviço deixou de
+//      existir/ser elegível (automaticKey do ciclo fora do conjunto esperado).
+// Remoção SEGURA (dependência bloqueia). Filtra pelo CICLO reconciliado para não
+// tocar em lançamentos de outros ciclos (reemissão).
+// ============================================================================
+export async function reconciliarEconomicoDaFase(
+  processoId: number, tipoProcessoId: number, phaseKey: string, phaseCycle = 1,
+): Promise<ResultadoMatriz & { removidas: number; bloqueadas: number }> {
+  const r = await gerarEconomicoDaMatriz(processoId, tipoProcessoId, phaseKey, phaseCycle)
+  const esperados = new Set(r.esperados)
+  const marcaCiclo = `::c${phaseCycle}::`
+  const ativos = await prisma.motorArtefato.findMany({
+    where: { processoId, phaseKey, ruleSource: 'matriz', ruleKind: 'financial', status: 'active' },
+    select: { id: true, automaticKey: true, targetTable: true, targetId: true },
+  })
+  let removidas = 0, bloqueadas = 0
+  for (const a of ativos) {
+    if (!a.automaticKey.includes(marcaCiclo)) continue // outro ciclo → não mexe
+    if (esperados.has(a.automaticKey)) continue
+    try {
+      await prisma.$transaction(async (tx) => {
+        if (a.targetId) {
+          if (a.targetTable === 'Custo') await tx.custo.delete({ where: { id: a.targetId } })
+          else if (a.targetTable === 'Receita') await tx.receita.delete({ where: { id: a.targetId } })
+        }
+        await tx.motorArtefato.update({ where: { id: a.id }, data: { status: 'removed' } })
+      }, { timeout: 30000, maxWait: 10000 })
+      removidas++
+    } catch { bloqueadas++ }
+  }
+  return { ...r, removidas, bloqueadas }
+}
+
+/** Reconcilia o motor econômico (por documento) em todas as fases com lançamentos matriz
+ *  + a fase atual. Disparado por eventos operacionais (documento criado/removido, etc.). */
+export async function reconciliarEconomicoDoProcesso(
+  processoId: number,
+): Promise<{ fases: number; criadas: number; removidas: number; bloqueadas: number }> {
+  const proc = await prisma.processo.findUnique({ where: { id: processoId }, select: { tipoProcessoMotorId: true, faseAtualKey: true } })
+  if (!proc?.tipoProcessoMotorId) return { fases: 0, criadas: 0, removidas: 0, bloqueadas: 0 }
+  const arts = await prisma.motorArtefato.findMany({
+    where: { processoId, ruleSource: 'matriz', ruleKind: 'financial' }, select: { phaseKey: true }, distinct: ['phaseKey'],
+  })
+  const fases = new Set<string>(arts.map((a) => a.phaseKey))
+  if (proc.faseAtualKey) fases.add(proc.faseAtualKey)
+  let criadas = 0, removidas = 0, bloqueadas = 0
+  for (const f of fases) {
+    const r = await reconciliarEconomicoDaFase(processoId, proc.tipoProcessoMotorId, f, 1)
+    criadas += r.criados.length; removidas += r.removidas; bloqueadas += r.bloqueadas
+  }
+  return { fases: fases.size, criadas, removidas, bloqueadas }
 }
 
 async function comIdempotencia(

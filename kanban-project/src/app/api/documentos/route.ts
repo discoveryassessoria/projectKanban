@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma"
 import { TipoDocumento, StatusDocumento } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { resolverNecessidadeDeDocumento } from '@/src/services/necessidade-documental'
+import { reconciliarEconomicoDoProcesso } from '@/src/lib/motor/matriz-economica'
 
 // Helper para obter label do tipo de documento
 function getTipoDocumentoLabel(tipo: string): string {
@@ -341,6 +342,10 @@ export async function POST(request: NextRequest) {
         }
       }
     }
+
+    // GRANULARIDADE POR DOCUMENTO: documento criado → o motor recalcula o econômico
+    // do processo (cria os lançamentos do novo documento). Best-effort, não bloqueia.
+    if (processoId) reconciliarEconomicoDoProcesso(processoId).catch((e) => console.error('[doc criado → reconcile econômico]', e))
 
     return NextResponse.json(documento, { status: 201 })
   } catch (error) {

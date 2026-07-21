@@ -7,6 +7,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma, TipoDocumento, StatusDocumento } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { reconciliarEconomicoDoProcesso } from '@/src/lib/motor/matriz-economica'
 
 // Helper para obter label do tipo de documento
 function getTipoDocumentoLabel(tipo: string): string {
@@ -436,6 +437,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       where: { id }
     })
 
+    // GRANULARIDADE POR DOCUMENTO: documento removido → o motor remove os lançamentos
+    // que dependiam dele (reconcile). Best-effort, não bloqueia a resposta.
+    if (processoId) reconciliarEconomicoDoProcesso(processoId).catch((e) => console.error('[doc removido → reconcile econômico]', e))
+
     return NextResponse.json({ message: "Documento e tarefas excluídos com sucesso", id })
   } catch (error) {
     console.error("Erro ao excluir documento:", error)
@@ -519,6 +524,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const nomePessoa = `${documentoAtual.pessoa.nome} ${documentoAtual.pessoa.sobrenome || ""}`.trim()
       await criarTarefasDocumento(body.status, documentoAtual.tipo ?? "", nomePessoa, processoId)
     }
+
+    // GRANULARIDADE POR DOCUMENTO: mudança de status (ex.: cancelado/invalidado) muda a
+    // elegibilidade → reconcilia (cria/remove os lançamentos). Best-effort.
+    if (processoId) reconciliarEconomicoDoProcesso(processoId).catch((e) => console.error('[doc alterado → reconcile econômico]', e))
 
     return NextResponse.json(documentoAtualizado)
   } catch (error) {

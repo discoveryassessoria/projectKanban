@@ -13,6 +13,7 @@
 import { prisma } from "@/lib/prisma"
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
 import { reconciliarFinanceiroDaFase } from "@/src/lib/motor/executor"
+import { reconciliarEconomicoDoProcesso } from "@/src/lib/motor/matriz-economica"
 import { reconciliarOperacoesAntecipadas } from "@/src/services/operacao-antecipada"
 
 const MAX_TENTATIVAS = 5
@@ -62,6 +63,11 @@ async function aplicarPhaseEntered(payload: PhaseEnteredPayload, correlationId: 
     // FinanceRuleEngine determina. Idempotente.
     const r = await reconciliarFinanceiroDaFase(payload.processId, payload.newPhaseKey)
     if (r.erros.length) throw new Error(`automações financeiras da fase falharam: ${r.erros.join(" ; ")}`)
+
+    // GRANULARIDADE POR DOCUMENTO/SERVIÇO: reconcilia o motor econômico da Matriz
+    // (cria por documento elegível + remove órfãos). Isolado/best-effort.
+    try { await reconciliarEconomicoDoProcesso(payload.processId) }
+    catch (e) { console.error("[outbox] reconcile econômico (matriz) falhou:", e) }
 
     // REAPROVEITAMENTO de trabalho antecipado: ao entrar numa fase, reconcilia (idempotente) as
     // Operações Antecipadas cujo destino é esta fase — reusa o trabalho oficial já feito, sem
