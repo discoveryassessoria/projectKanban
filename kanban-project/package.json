@@ -4,8 +4,6 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "ambiente:manifesto": "node scripts/gerar-manifesto-ambiente.mjs",
-    "prebuild": "node scripts/gerar-manifesto-ambiente.mjs",
     "build": "prisma generate && next build --turbopack",
     "start": "next start",
     "seed": "tsx prisma/seed.ts",

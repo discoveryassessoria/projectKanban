@@ -4,7 +4,6 @@ import { BitrixSidebar } from "@/src/components/bitrix-sidebar"
 import { SidebarProvider, useSidebarContext } from "@/src/contexts/sidebar-context"
 import { useSidebarVisibility } from "@/src/hooks/use-sidebar-visibility"
 import { usePathname } from "next/navigation"
-import { AmbienteRaiz } from "@/src/components/ambiente/AmbienteEscopo"
 
 function SidebarContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebarContext()
@@ -38,9 +37,7 @@ export function SidebarWrapper({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <AmbienteRaiz>
-        <SidebarContent>{children}</SidebarContent>
-      </AmbienteRaiz>
+      <SidebarContent>{children}</SidebarContent>
     </SidebarProvider>
   )
 }

@@ -26,7 +26,6 @@ import {
   type Requerente
 } from "@/src/types/kanban"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
-import { useAmbiente } from "@/src/contexts/ambiente-context"
 import { Shield } from "lucide-react"
 
 interface User {
@@ -42,7 +41,6 @@ type SubTab = "kanban" | "lista"
 export function KanbanContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { focarPais } = useAmbiente()
 
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -144,12 +142,6 @@ export function KanbanContent() {
   useEffect(() => {
     setTipoSelecionadoId(null)
   }, [paisSelecionado])
-
-  // AMBIENTE: a lista já assume o país da aba. Quando um processo é aberto, o
-  // modal assume a câmera (entrarNoProcesso) e devolve para cá ao fechar.
-  useEffect(() => {
-    focarPais(paisSelecionado)
-  }, [paisSelecionado, focarPais])
 
   const handleLogout = () => {
     localStorage.removeItem("authToken")
@@ -286,9 +278,10 @@ export function KanbanContent() {
   if (loading) {
     return (
       <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
+        <div className="min-h-screen bg-black/40 backdrop-blur-sm flex items-center justify-center">
           <div className="text-center">
-            <div className="amb-spinner h-12 w-12 mx-auto mb-4" />
+            <div className="animate-spin h-12 w-12 border-4 border-white border-t-transparent rounded-full mx-auto mb-4" />
             <p className="text-white/70">Carregando...</p>
           </div>
         </div>
@@ -298,6 +291,8 @@ export function KanbanContent() {
 
   return (
     <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
+
       <HeaderBar
         title={tabPrincipal === "processos" ? "Processos" : "Clientes"}
         subtitle={tabPrincipal === "processos" ? "Gerencie seus processos de cidadania" : "Gerencie seus clientes"}
@@ -311,9 +306,11 @@ export function KanbanContent() {
       />
 
       <div className="min-h-screen relative">
+        <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+
         <main className="relative px-6 py-6 overflow-hidden">
           {/* TABS PRINCIPAIS */}
-          <div className="amb-vidro rounded-2xl p-4 shadow-lg mb-4">
+          <div className="bg-white/5 border border-white/15 rounded-2xl p-4 backdrop-blur-xl shadow-lg mb-4">
             <div className="flex items-center justify-between flex-wrap gap-4">
               {/* Tabs Processos / Clientes */}
               <div className="flex items-center gap-2">

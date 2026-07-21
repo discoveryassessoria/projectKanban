@@ -105,9 +105,9 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <div
         className={`
-          mb-3 amb-vidro amb-hover rounded-lg shadow-sm
+          mb-3 bg-white rounded-lg shadow-sm border border-gray-200
           hover:shadow-md transition-all cursor-grab active:cursor-grabbing
-          ${isDragging ? "shadow-xl ring-2 ring-[color:var(--amb-indicador)]/60" : ""}
+          ${isDragging ? "shadow-xl ring-2 ring-blue-400/50" : ""}
         `}
         onClick={handleCardClick}
       >
@@ -115,14 +115,14 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
         <div className="p-3">
           {/* Header: Nome */}
           <div className="flex items-start justify-between gap-2 mb-2">
-            <h3 className="font-medium text-sm text-white leading-tight flex-1">
+            <h3 className="font-medium text-sm text-gray-900 leading-tight flex-1">
               {nome}
             </h3>
           </div>
 
           {/* Contratante */}
           {contratante && (
-            <p className="text-xs text-white/55 mb-2 truncate">
+            <p className="text-xs text-gray-500 mb-2 truncate">
               {contratante.publicCode ? contratante.publicCode + ' — ' : ''}{contratante.nome}
             </p>
           )}
@@ -130,7 +130,7 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
           {/* Badge: Requerentes (identidade — não é contador operacional) */}
           {requerentesCount > 0 && (
             <div className="flex items-center gap-2 mb-2">
-              <span className="amb-badge flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded">
+              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-600 text-xs font-medium rounded">
                 <Users className="h-3 w-3" />
                 {requerentesCount}
               </span>
@@ -141,14 +141,14 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
           {activePhase && (
             <div className="mb-2">
               <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="text-[11px] text-white/55 truncate" title={activePhase.name}>
+                <span className="text-[11px] text-gray-500 truncate" title={activePhase.name}>
                   {activePhase.name}
                 </span>
-                <span className="text-[11px] font-semibold text-white/85 tabular-nums flex-shrink-0">
+                <span className="text-[11px] font-semibold text-gray-700 tabular-nums flex-shrink-0">
                   {pct}%
                 </span>
               </div>
-              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${pct}%`, background: barColor }}
@@ -161,7 +161,7 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
           <div className="flex items-center justify-end gap-1">
             <button
               onClick={handlePhoneClick}
-              className={`p-1.5 rounded hover:bg-white/10 transition-colors ${telefone ? 'text-white/60 hover:text-white' : 'text-white/20 cursor-not-allowed'}`}
+              className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${telefone ? 'text-gray-500 hover:text-blue-600' : 'text-gray-300 cursor-not-allowed'}`}
               disabled={!telefone}
               title={telefone || 'Sem telefone'}
             >
@@ -169,7 +169,7 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
             </button>
             <button
               onClick={handleEmailClick}
-              className={`p-1.5 rounded hover:bg-white/10 transition-colors ${email ? 'text-white/60 hover:text-white' : 'text-white/20 cursor-not-allowed'}`}
+              className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${email ? 'text-gray-500 hover:text-blue-600' : 'text-gray-300 cursor-not-allowed'}`}
               disabled={!email}
               title={email || 'Sem email'}
             >
@@ -177,7 +177,7 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
             </button>
             <button
               onClick={handleChatClick}
-              className={`p-1.5 rounded hover:bg-white/10 transition-colors ${telefone ? 'text-white/60 hover:text-[color:var(--amb-indicador)]' : 'text-white/20 cursor-not-allowed'}`}
+              className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${telefone ? 'text-gray-500 hover:text-green-600' : 'text-gray-300 cursor-not-allowed'}`}
               disabled={!telefone}
               title={telefone ? 'WhatsApp' : 'Sem telefone'}
             >

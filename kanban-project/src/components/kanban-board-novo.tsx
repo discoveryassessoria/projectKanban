@@ -332,7 +332,7 @@ export function KanbanBoard({
         >
           <div className="relative w-full max-w-full">
             <div
-              className="amb-vidro rounded-lg pb-3 scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-white/10"
+              className="rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm pb-3 scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-white/10"
               style={{
                 overflowX: 'auto',
                 overflowY: 'hidden',
@@ -378,7 +378,7 @@ export function KanbanBoard({
       {/* MODAL: Novo processo — em portal pro body (senão fica preso no painel com blur) */}
       {criarModal && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-auto rounded-2xl amb-vidro-forte bg-zinc-900/90 shadow-2xl">
+          <div className="w-full max-w-md overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
               <h3 className="text-lg font-semibold text-white">Novo processo</h3>
               <button onClick={() => setCriarModal(false)} className="text-white/40 transition hover:text-white">✕</button>

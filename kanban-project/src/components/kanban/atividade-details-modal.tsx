@@ -24,8 +24,6 @@ import { ProcessoFinanceiro } from "./ProcessoFinanceiro"
 import { ContratanteModal, initialFormData } from "../contratantes-tabela"
 import { ProcessoEventos } from "./ProcessoEventos"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
-import { useAmbiente } from "@/src/contexts/ambiente-context"
-import { familiaDoProcesso } from "@/src/lib/ambiente/rotulos"
 // ✅ NOVO: header de progresso da fase do processo
 import { PhaseProgressHeader } from "@/src/components/processo/PhaseProgressHeader"
 import { 
@@ -100,7 +98,6 @@ export function ProcessoDetailsModal({
 }: ProcessoDetailsModalProps) {
   // ✅ ATUALIZADO: Adicionado "informacoes" como possível aba
   const { pode } = usePermissoes()
-  const { entrarNoProcesso, focarPais } = useAmbiente()
   const [activeTab, setActiveTab] = useState<"geral" | "central" | "documentos" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos">("geral")
 
   // ✅ NOVO: força refetch do PhaseProgressHeader quando algo muda
@@ -288,29 +285,13 @@ export function ProcessoDetailsModal({
     }
   }, [isOpen, initialTab, initialPessoaId, initialSidebarTab, initialParamsProcessed, isEspanha, isItalia])
 
-  // AMBIENTE: abrir o processo assume a câmera. Enquanto ele estiver aberto,
-  // trocar de aba (Geral → Central → Financeiro → Árvore) NÃO mexe no fundo —
-  // a assinatura da cena só depende de país + imagem. Ao fechar, a câmera volta
-  // para o país da lista, sem cortar para outra cidade.
-  useEffect(() => {
-    if (!isOpen || !processo) return
-    entrarNoProcesso({
-      processoId: Number(processo.id),
-      pais: processo.pais,
-      codigo: (processo as any).codigo ?? null,
-      familia: familiaDoProcesso(processo.nome),
-      fase: (processo as any).faseAtualKey ?? null,
-    })
-  }, [isOpen, processo, entrarNoProcesso])
-
   useEffect(() => {
     if (!isOpen) {
-      if (processo?.pais) focarPais(processo.pais)
       setInitialParamsProcessed(false)
       setPessoaIdParaFocar(undefined)
       setSidebarTabParaFocar(undefined)
     }
-  }, [isOpen, processo?.pais, focarPais])
+  }, [isOpen])
 
   useEffect(() => {
     setNomeEditado(processo?.nome || "")
