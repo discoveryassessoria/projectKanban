@@ -139,7 +139,11 @@ async function resolveOperationalProjectionParaFase(
     proc.arvoreId != null
       ? prisma.pessoa.findMany({ where: { arvoreId: proc.arvoreId, linhaReta: true }, select: { documentos: { select: { id: true, status: true, necessidadeId: true } } } })
       : Promise.resolve([] as Array<{ documentos: Array<{ id: number; status: string; necessidadeId: number | null }> }>),
-    prisma.processoRequerente.count({ where: { processoId: processId } }),
+    // REQUERENTE da GENEALOGIA = Pessoa marcada como requerente na ÁRVORE ('maior'|'menor'),
+    // NÃO o vínculo comercial ProcessoRequerente (que pode ser 0 e travava a fase em 99%).
+    proc.arvoreId != null
+      ? prisma.pessoa.count({ where: { arvoreId: proc.arvoreId, requerente: { in: ['maior', 'menor'] } } })
+      : Promise.resolve(0),
   ])
 
   const necessidades: NecessidadeData[] = necsRaw.map((n) => ({
@@ -240,13 +244,12 @@ export async function resolveOperationalProjectionBatch(
     }
   }
 
-  // (6) Contagem de requerentes por processo.
-  const reqAgg = await prisma.processoRequerente.groupBy({
-    by: ["processoId"],
-    where: { processoId: { in: ids } },
-    _count: { _all: true },
-  })
-  const reqByProc = new Map(reqAgg.map((r) => [r.processoId, r._count._all]))
+  // (6) Requerentes por processo = Pessoa marcada requerente ('maior'|'menor') na ÁRVORE
+  //     (NÃO ProcessoRequerente — vínculo comercial que travava a genealogia em 99%).
+  const reqAgg = arvoreIds.length > 0
+    ? await prisma.pessoa.groupBy({ by: ["arvoreId"], where: { arvoreId: { in: arvoreIds }, requerente: { in: ["maior", "menor"] } }, _count: { _all: true } })
+    : []
+  const reqByArvore = new Map(reqAgg.map((r) => [r.arvoreId, r._count._all]))
 
   // Monta o snapshot e delega ao núcleo puro — na ordem original dos ids.
   return processIds.map((pid) => {
@@ -275,7 +278,7 @@ export async function resolveOperationalProjectionBatch(
       necessidades: necsByProc.get(pid) ?? [],
       documentos: proc.arvoreId != null ? docsByArvore.get(proc.arvoreId) ?? [] : [],
       hasArvore: proc.arvoreId != null,
-      requerentesCount: reqByProc.get(pid) ?? 0,
+      requerentesCount: proc.arvoreId != null ? reqByArvore.get(proc.arvoreId) ?? 0 : 0,
     }
     return buildOperationalProjection(input)
   })

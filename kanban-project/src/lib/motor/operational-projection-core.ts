@@ -263,6 +263,11 @@ export function computeGate(input: ProjectionInput): BlockingIssue[] {
       // Entidade DISPENSADA não bloqueia (requisito deixou de ser exigido).
       if (step.necessidadeId != null && necStatusById.get(step.necessidadeId) === "DISPENSADA") continue
 
+      // INVARIANTE gate↔progresso: um passo já CONCLUÍDO/DISPENSADO/SUPERSEDIDO conta como
+      // feito no computeProgress — logo NÃO pode bloquear aqui por tarefas/evidência/deps
+      // residuais (senão a fase fica em 99% "travada" com 1/1 concluído, sem motivo real).
+      if (passoConcluido(step)) continue
+
       const pIssue = classificarPasso(step.status, step.obrigatorio, step.stepKey, step.id)
       if (pIssue) issues.push(pIssue)
 

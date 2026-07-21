@@ -78,7 +78,12 @@ export async function calcularPendencias(
         },
       },
     }),
-    prisma.processoRequerente.count({ where: { processoId } }),
+    // FONTE ÚNICA (igual ao resolver da projeção): requerente da GENEALOGIA = Pessoa marcada
+    // requerente ('maior'|'menor') na ÁRVORE, NÃO o vínculo comercial ProcessoRequerente
+    // (que travava a fase em 99% e impedia o avanço). Gate do avanço = gate da projeção.
+    processo.arvoreId != null
+      ? prisma.pessoa.count({ where: { arvoreId: processo.arvoreId, requerente: { in: ['maior', 'menor'] } } })
+      : Promise.resolve(0),
     // Documentos da LINHA RETA (com necessidadeId) — o gate DOCUMENTO precisa deles para
     // exigir TODAS as certidões obrigatórias resolvidas. Sem isso o advance congelaria a fase.
     processo.arvoreId != null
