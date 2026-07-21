@@ -70,7 +70,11 @@
     "test:emissao-gate": "tsx scripts/emissao-gate.test.ts",
     "test:entrega-transversal": "tsx scripts/entrega-transversal-guard.test.ts",
     "test:acoes-financeiras": "tsx scripts/acoes-lancamento.test.ts",
-    "test:condicao-pagamento": "tsx scripts/condicao-pagamento.test.ts"
+    "test:condicao-pagamento": "tsx scripts/condicao-pagamento.test.ts",
+    "db:guard": "node scripts/db-guard.mjs",
+    "db:preflight": "node scripts/preflight-db.mjs",
+    "db:shadow-check": "node scripts/db-guard.mjs --shadow",
+    "build:prod-migrate": "prisma generate && node scripts/prod-migrate-guard.mjs && next build --turbopack"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
