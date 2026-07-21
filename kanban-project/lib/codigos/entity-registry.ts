@@ -20,11 +20,13 @@ export interface RegistroCodigo {
 // PhaseAutomationRule (regra/automação) e OperacaoAntecipada (orquestração interna — identificada
 // pelo documento/serviço/operação oficial vinculada). Essas mantêm apenas o ID técnico interno.
 //
-// Cliente = Contratante + Requerente compartilham o MESMO escopo CLI (sequência única entre as duas
-// tabelas). Não existe tabela "Cliente" nem "Produto" separado (Serviço = ServicoProduto).
+// CLIENTE = RELAÇÃO COMERCIAL, não papel. Contratante (quem contrata) é o portador da relação
+// comercial → recebe CLI. Requerente é PAPEL dentro do processo: NÃO recebe CLI-n só por ser
+// requerente (uma mesma pessoa pode acumular papéis, mas os papéis não são equivalentes). Gerar CLI
+// para Requerente foi SUSPENSO até a entidade Cliente estar corretamente modelada. Não existe tabela
+// "Cliente" nem "Produto" separado (Serviço = ServicoProduto).
 export const CODE_REGISTRY: Record<string, RegistroCodigo> = {
-  Contratante:    { entidade: 'CLIENT',   campo: 'publicCode' }, // CLI (cliente)
-  Requerente:     { entidade: 'CLIENT',   campo: 'publicCode' }, // CLI (cliente — mesma sequência)
+  Contratante:    { entidade: 'CLIENT',   campo: 'publicCode' }, // CLI (relação comercial)
   ServicoProduto: { entidade: 'SERVICE',  campo: 'publicCode' }, // SRV
   Documento:      { entidade: 'DOCUMENT', campo: 'publicCode' }, // DOC (documento concreto)
   Fornecedor:     { entidade: 'SUPPLIER', campo: 'publicCode' }, // FOR
