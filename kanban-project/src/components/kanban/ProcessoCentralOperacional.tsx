@@ -20,6 +20,7 @@ import { ProcessoRetificacao } from "./ProcessoRetificacao"
 import { ProcessoEmissaoRetificada } from "./ProcessoEmissaoRetificada"
 import { RetornarFaseButton } from "./RetornarFaseButton"
 import { OperacaoAntecipadaModal } from "./OperacaoAntecipadaModal"
+import { TarefaTransversalModal } from "./TarefaTransversalModal"
 import type { FaseCode } from "@prisma/client"
 
 // Metadados de uma fase materializada (espelho de /api/processos/[id]/phases).
@@ -386,6 +387,8 @@ export function ProcessoCentralOperacional({
 
   // Operação Antecipada: contexto (necessidade) para o modal de criação + lista por necessidade.
   const [novaOperacaoCtx, setNovaOperacaoCtx] = useState<{ necessidadeId?: number | null; pessoaId?: number | null; label?: string } | null>(null)
+  // Tarefa Transversal (funcionalidade oficial e SEPARADA da Operação Antecipada).
+  const [novaTransversalCtx, setNovaTransversalCtx] = useState<{ necessidadeId?: number | null; pessoaId?: number | null; label?: string } | null>(null)
   const [operacoes, setOperacoes] = useState<OpAntecipada[]>([])
   // Banner "executada antecipadamente para atender…" exibido na tela oficial (drawer) reusada.
   const [bannerAntecipada, setBannerAntecipada] = useState<string | null>(null)
@@ -797,7 +800,16 @@ export function ProcessoCentralOperacional({
         {/* AÇÃO DE FASE: Nova Operação Antecipada (disponível em QUALQUER fase ativa) —
             usa a operação oficial de outra fase para atender uma necessidade da fase atual. */}
         {!isView && pode("processos.editar") && (
-          <div className="flex justify-end mb-3">
+          <div className="flex justify-end gap-2 mb-3">
+            {/* TAREFA TRANSVERSAL: orquestra um objetivo transversal referenciando uma operação
+                oficial de outra fase (SEM workflow próprio). Funcionalidade OFICIAL e SEPARADA
+                da Operação Antecipada — as duas coexistem. */}
+            <button
+              onClick={() => setNovaTransversalCtx({})}
+              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg border-[1.5px] border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-400 transition-colors"
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5" /> Nova tarefa transversal
+            </button>
             <button
               onClick={() => setNovaOperacaoCtx({})}
               className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg border-[1.5px] border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-400 transition-colors"
@@ -961,6 +973,18 @@ export function ProcessoCentralOperacional({
             usuarios={usuarios}
             onClose={() => setNovaOperacaoCtx(null)}
             onCreated={() => { setNovaOperacaoCtx(null); carregarOperacoes(); carregar(true) }}
+          />
+        )}
+
+        {novaTransversalCtx && (
+          <TarefaTransversalModal
+            processoId={processo.id}
+            necessidadeId={novaTransversalCtx.necessidadeId}
+            necessidadeLabel={novaTransversalCtx.label}
+            pessoaId={novaTransversalCtx.pessoaId}
+            usuarios={usuarios}
+            onClose={() => setNovaTransversalCtx(null)}
+            onCreated={() => { setNovaTransversalCtx(null); carregar(true) }}
           />
         )}
       </div>
