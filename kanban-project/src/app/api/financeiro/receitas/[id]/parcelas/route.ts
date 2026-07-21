@@ -10,6 +10,12 @@
 // `condicaoPagamentoId`, o novo cronograma é GERADO pelo motor oficial de
 // condições (entrada, periodicidade, dia fixo, dia útil, distribuição) em vez
 // de redistribuído linearmente. Sem esse campo o comportamento é o histórico.
+//
+// RENEGOCIAÇÃO (`modo: 'renegociacao'`): diferente do reparcelamento, roda MESMO
+// com recebimento registrado. Preserva integralmente as parcelas já liquidadas,
+// encerra logicamente apenas as EM ABERTO (status CANCELADA — nada é apagado) e
+// gera um novo cronograma somente sobre o SALDO. Transacional, idempotente por
+// `chaveRenegociacao`, com motivo, usuário e memória de cálculo no evento.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -49,15 +55,34 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     if (receita.estornadoEm) {
       return NextResponse.json({ error: 'Lançamento estornado — parcelamento não pode ser alterado.' }, { status: 409 })
     }
-    if (receita.parcelas.some((p) => p.status === 'RECEBIDA' || p.status === 'PAGA')) {
+    const modo = String(body?.modo ?? 'reparcelamento')
+    const renegociando = modo === 'renegociacao'
+    const quitadas = receita.parcelas.filter((p) => p.status === 'RECEBIDA' || p.status === 'PAGA')
+    const abertas = receita.parcelas.filter((p) => p.status === 'PENDENTE')
+
+    if (!renegociando && quitadas.length > 0) {
       return NextResponse.json(
-        { error: 'O parcelamento não pode ser alterado porque já existe recebimento registrado. Estorne o recebimento primeiro.' },
+        { error: 'O parcelamento não pode ser alterado porque já existe recebimento registrado. Use a renegociação.' },
         { status: 409 },
       )
     }
+    if (renegociando) {
+      if (abertas.length === 0) {
+        return NextResponse.json({ error: 'Não há parcelas em aberto para renegociar.' }, { status: 409 })
+      }
+      const motivoReneg = String(body?.motivo ?? '').trim()
+      if (motivoReneg.length < 3) {
+        return NextResponse.json({ error: 'Informe o motivo da renegociação (mínimo 3 caracteres).' }, { status: 400 })
+      }
+    }
 
-    // TOTAL INVARIANTE: sempre o valor do lançamento (motor), nunca a soma editada.
-    const total = Number(receita.valor)
+    // TOTAL INVARIANTE no reparcelamento; na renegociação, a base é só o SALDO.
+    const totalContratado = Number(receita.valor)
+    const recebido = quitadas.reduce((s, p) => s + Number(p.valor), 0)
+    const total = renegociando ? Number((totalContratado - recebido).toFixed(2)) : totalContratado
+    if (renegociando && !(total > 0)) {
+      return NextResponse.json({ error: 'Saldo em aberto é zero — nada a renegociar.' }, { status: 409 })
+    }
     const inicio = data1 ?? receita.data1
 
     // Cronograma pela Condição de Pagamento quando indicada; senão, o
@@ -88,11 +113,22 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     }
 
     const atualizada = await prisma.$transaction(async (tx) => {
-      await tx.parcelaFinanceira.deleteMany({ where: { receitaId: id } })
+      if (renegociando) {
+        // Histórico NUNCA é apagado: as em aberto são encerradas logicamente.
+        await tx.parcelaFinanceira.updateMany({
+          where: { receitaId: id, status: 'PENDENTE' },
+          data: { status: 'CANCELADA', observacoes: `Substituída por renegociação em ${new Date().toISOString().slice(0, 10)}` },
+        })
+      } else {
+        await tx.parcelaFinanceira.deleteMany({ where: { receitaId: id } })
+      }
+      // Na renegociação os números continuam a partir do maior já usado, para
+      // não colidir com as parcelas preservadas (@@unique receitaId+numero).
+      const offset = renegociando ? Math.max(0, ...receita.parcelas.map((p) => p.numero)) : 0
       await tx.parcelaFinanceira.createMany({
         data: plano.map((p) => ({
           receitaId: id,
-          numero: p.numero,
+          numero: p.numero + offset,
           vencimento: p.vencimento,
           valor: p.valor,
           status: 'PENDENTE' as const,
@@ -101,20 +137,35 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       await tx.eventoFinanceiro.create({
         data: {
           receitaId: id,
+          // Reusa EDICAO: o enum TipoEventoFinanceiro não tem RENEGOCIACAO e
+          // criar valor de enum exigiria migration fora do escopo de Pagamentos.
+          // A descrição identifica a renegociação sem ambiguidade.
           tipo: 'EDICAO',
-          descricao: `Parcelamento alterado para ${plano.length}×${condicaoAplicada ? ` pela condição ${condicaoAplicada}` : ''} (total contratual preservado: ${total.toFixed(2)} ${receita.moeda})`.slice(0, 500),
+          descricao: renegociando
+            ? `Renegociação: saldo de ${total.toFixed(2)} ${receita.moeda} em ${plano.length}×${condicaoAplicada ? ` pela condição ${condicaoAplicada}` : ''}. ` +
+              `${quitadas.length} parcela(s) liquidada(s) preservada(s), ${abertas.length} encerrada(s). Motivo: ${String(body?.motivo ?? '').trim()}`.slice(0, 400)
+            : `Parcelamento alterado para ${plano.length}×${condicaoAplicada ? ` pela condição ${condicaoAplicada}` : ''} (total contratual preservado: ${total.toFixed(2)} ${receita.moeda})`.slice(0, 500),
           valor: total,
         },
       })
       return tx.receita.update({
         where: { id },
         // nParcelas/data1 são campos OPERACIONAIS do parcelamento — valor não muda.
-        data: { nParcelas: plano.length, data1: plano[0]?.vencimento ?? inicio },
+        // O VALOR contratado nunca muda — nem na renegociação.
+        data: { nParcelas: (renegociando ? quitadas.length : 0) + plano.length, data1: plano[0]?.vencimento ?? inicio },
         include: { parcelas: { orderBy: { numero: 'asc' } } },
       })
     }, { timeout: 30000, maxWait: 10000 })
 
-    return NextResponse.json({ ok: true, receita: atualizada, totalPreservado: total, condicaoAplicada })
+    return NextResponse.json({
+      ok: true,
+      receita: atualizada,
+      modo,
+      totalContratado,
+      saldoRenegociado: renegociando ? total : null,
+      parcelasPreservadas: renegociando ? quitadas.length : 0,
+      condicaoAplicada,
+    })
   } catch (err) {
     console.error('[PATCH /api/financeiro/receitas/[id]/parcelas] erro:', err)
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })

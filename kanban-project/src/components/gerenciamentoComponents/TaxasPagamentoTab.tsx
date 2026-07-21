@@ -23,7 +23,16 @@ type Taxa = {
   anticipationPercent: string | number | null
   installmentsFrom: number | null
   installmentsTo: number | null
+  baseIncidencia: string
+  quemAbsorve: string
+  adquirente: string | null
+  ativo: boolean
+  vigenciaInicio: string | null
+  vigenciaFim: string | null
 }
+
+const BASES: [string, string][] = [['TOTAL', 'Sobre o total'], ['PARCELA', 'Por parcela']]
+const ABSORVE: [string, string][] = [['EMPRESA', 'Nós (reduz o líquido)'], ['CLIENTE', 'Cliente (repasse)']]
 
 // Tipos de taxa do mockup (fin_fees.feeType) com rótulos PT
 const TIPOS: [string, string][] = [
@@ -66,6 +75,12 @@ export default function TaxasPagamentoTab() {
   const [fixedFee, setFixedFee] = useState('')
   const [anticipationEnabled, setAnticipationEnabled] = useState(false)
   const [anticipationPercent, setAnticipationPercent] = useState('')
+  const [baseIncidencia, setBaseIncidencia] = useState('TOTAL')
+  const [quemAbsorve, setQuemAbsorve] = useState('EMPRESA')
+  const [adquirente, setAdquirente] = useState('')
+  const [ativo, setAtivo] = useState(true)
+  const [vigenciaInicio, setVigenciaInicio] = useState('')
+  const [vigenciaFim, setVigenciaFim] = useState('')
   const [installmentsFrom, setInstallmentsFrom] = useState('')
   const [installmentsTo, setInstallmentsTo] = useState('')
   const [salvando, setSalvando] = useState(false)
@@ -105,6 +120,8 @@ export default function TaxasPagamentoTab() {
     setCode(''); setName(''); setFormaPagamentoId(''); setMoeda(''); setFeeType('')
     setFeePercent(''); setFixedFee(''); setAnticipationEnabled(false); setAnticipationPercent('')
     setInstallmentsFrom(''); setInstallmentsTo('')
+    setBaseIncidencia('TOTAL'); setQuemAbsorve('EMPRESA'); setAdquirente('')
+    setAtivo(true); setVigenciaInicio(''); setVigenciaFim('')
     setErroModal(null); setModalAberto(true)
   }
   function abrirEditar(t: Taxa) {
@@ -118,6 +135,10 @@ export default function TaxasPagamentoTab() {
     setAnticipationPercent(t.anticipationPercent != null ? String(t.anticipationPercent) : '')
     setInstallmentsFrom(t.installmentsFrom != null ? String(t.installmentsFrom) : '')
     setInstallmentsTo(t.installmentsTo != null ? String(t.installmentsTo) : '')
+    setBaseIncidencia(t.baseIncidencia || 'TOTAL'); setQuemAbsorve(t.quemAbsorve || 'EMPRESA')
+    setAdquirente(t.adquirente || ''); setAtivo(t.ativo ?? true)
+    setVigenciaInicio(t.vigenciaInicio ? String(t.vigenciaInicio).slice(0, 10) : '')
+    setVigenciaFim(t.vigenciaFim ? String(t.vigenciaFim).slice(0, 10) : '')
     setErroModal(null); setModalAberto(true)
   }
 
@@ -138,6 +159,12 @@ export default function TaxasPagamentoTab() {
         anticipationPercent: anticipationEnabled ? num(anticipationPercent) : null,
         installmentsFrom: num(installmentsFrom),
         installmentsTo: num(installmentsTo),
+        baseIncidencia,
+        quemAbsorve,
+        adquirente: adquirente.trim() || null,
+        ativo,
+        vigenciaInicio: vigenciaInicio || null,
+        vigenciaFim: vigenciaFim || null,
       })
       if (editando) {
         await jsonFetch(`/api/gerenciamento/taxas-pagamento/${editando.id}`, { method: 'PUT', body })
@@ -320,6 +347,45 @@ export default function TaxasPagamentoTab() {
                     <input type="number" step="0.01" value={anticipationPercent} onChange={(e) => setAnticipationPercent(e.target.value)} placeholder="1,99" className="w-28 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20" />
                   </div>
                 )}
+              </div>
+
+              <div className="border-t border-white/10 pt-4">
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-white/40">Incidência e absorção</div>
+                <div className="mb-3 text-[11px] text-white/30">
+                  Define como a taxa entra no lançamento. Absorvida por nós reduz o valor líquido; repassada ao cliente é registrada sem reduzir o líquido.
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div>
+                    <label className="mb-1 block text-xs text-white/60">Base de incidência</label>
+                    <select value={baseIncidencia} onChange={(e) => setBaseIncidencia(e.target.value)} className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/20">
+                      {BASES.map(([v, l]) => <option key={v} value={v} className="bg-zinc-900">{l}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-white/60">Quem absorve</label>
+                    <select value={quemAbsorve} onChange={(e) => setQuemAbsorve(e.target.value)} className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/20">
+                      {ABSORVE.map(([v, l]) => <option key={v} value={v} className="bg-zinc-900">{l}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-white/60">Adquirente</label>
+                    <input value={adquirente} onChange={(e) => setAdquirente(e.target.value)} placeholder="Stone, Cielo, Wise..." className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20" />
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs text-white/60">Vigência — início</label>
+                    <input type="date" value={vigenciaInicio} onChange={(e) => setVigenciaInicio(e.target.value)} className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/20" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-white/60">Vigência — fim</label>
+                    <input type="date" value={vigenciaFim} onChange={(e) => setVigenciaFim(e.target.value)} className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/20" />
+                  </div>
+                </div>
+                <label className="mt-3 flex items-center gap-2 text-sm text-white/80">
+                  <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+                  Taxa ativa
+                </label>
               </div>
 
               {erroModal && (

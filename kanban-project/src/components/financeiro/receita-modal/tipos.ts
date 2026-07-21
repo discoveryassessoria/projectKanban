@@ -28,6 +28,27 @@ export interface EventoReceita {
   usuario?: { id: number; nome: string } | null
 }
 
+/** Memória de cálculo congelada no lançamento (aplicar-condicao.ts). */
+export interface MemoriaCalculo {
+  condicao?: { id: number | null; codigo: string | null; nome: string | null; versao: number } | null
+  cronograma?: {
+    nParcelas: number
+    periodicidade: string
+    valorEntrada: number
+    primeiroVencimento: string
+    observacoes: string[]
+  } | null
+  taxas?: {
+    linhas: Array<{ nome: string; tipo: string; adquirente: string | null; quemAbsorve: string; valor: number; formula: string }>
+    memoria: string[]
+  } | null
+  encargos?: {
+    linhas: Array<{ tipo: string; rotulo: string; valor: number; formula: string }>
+    memoria: string[]
+  } | null
+  geradoEm?: string
+}
+
 export interface Detalhe {
   receita: LancamentoView & {
     observacoes?: string | null
@@ -37,6 +58,15 @@ export interface Detalhe {
     quantidade?: number | string | null
     composicao: Composicao | null
     eventos?: EventoReceita[]
+    // Condição de pagamento aplicada e resultado das taxas — congelados na
+    // criação pelo FinanceRuleEngine. Chegam pelo spread de `receita`.
+    condicaoPagamentoId?: number | null
+    condicaoVersao?: number | null
+    condicaoCodigo?: string | null
+    valorBruto?: number | string | null
+    valorTaxas?: number | string | null
+    valorLiquido?: number | string | null
+    memoriaCalculo?: MemoriaCalculo | null
   }
   requerentesConsiderados: Array<{ id: number; nome: string; statusFamiliar?: string | null; percentual: number }>
   origem: {

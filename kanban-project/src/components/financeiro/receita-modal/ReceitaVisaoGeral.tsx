@@ -59,6 +59,7 @@ export function ReceitaVisaoGeral({
   const composicao = r.composicao
   const eventos = (r.eventos ?? []).slice(0, 5)
   const acaoParcela = proximaParcela ? acoes.parcela(proximaParcela) : null
+  const mem = r.memoriaCalculo ?? null
 
   return (
     <div className="rfm-grid">
@@ -89,6 +90,61 @@ export function ReceitaVisaoGeral({
             <p className="rfm-vazio">O motor não registrou composição detalhada para este lançamento.</p>
           )}
         </section>
+
+        {(r.condicaoPagamentoId || r.valorTaxas != null) && (
+          <section className="rfm-bloco">
+            <h3 className="rfm-bloco-titulo">Condição de pagamento aplicada</h3>
+            <div className="rfm-pares">
+              <div>
+                <div className="rfm-par-rotulo">Condição</div>
+                <div className="rfm-par-valor">
+                  {mem?.condicao?.nome ?? r.condicaoCodigo ?? '—'}
+                  {r.condicaoVersao ? ` · v${r.condicaoVersao}` : ''}
+                </div>
+              </div>
+              <div>
+                <div className="rfm-par-rotulo">Parcelamento</div>
+                <div className="rfm-par-valor">
+                  {mem?.cronograma ? `${mem.cronograma.nParcelas}× ${mem.cronograma.periodicidade.toLowerCase()}` : `${parcelas.length}×`}
+                </div>
+              </div>
+              {!!mem?.cronograma?.valorEntrada && (
+                <div>
+                  <div className="rfm-par-rotulo">Entrada</div>
+                  <div className="rfm-par-valor">{fmtMoeda(mem.cronograma.valorEntrada, moeda)}</div>
+                </div>
+              )}
+            </div>
+
+            {num(r.valorTaxas) > 0 && (
+              <>
+                <div className="rfm-linhas" style={{ marginTop: 16 }}>
+                  {(mem?.taxas?.linhas ?? []).map((l, i) => (
+                    <div className="rfm-linha" key={`${l.nome}-${i}`}>
+                      <span className="rfm-linha-rotulo">
+                        {l.nome}
+                        <span className="rfm-linha-detalhe">
+                          {l.formula}
+                          {l.adquirente ? ` · ${l.adquirente}` : ''}
+                          {l.quemAbsorve === 'CLIENTE' ? ' · repassada ao cliente' : ''}
+                        </span>
+                      </span>
+                      <span className="rfm-linha-valor">−{fmtMoeda(l.valor, moeda)}</span>
+                    </div>
+                  ))}
+                  <div className="rfm-linha total">
+                    <span className="rfm-linha-rotulo">Valor líquido esperado</span>
+                    <span className="rfm-linha-valor">{fmtMoeda(num(r.valorLiquido), moeda)}</span>
+                  </div>
+                </div>
+                <p className="rfm-nota">
+                  Bruto {fmtMoeda(num(r.valorBruto) || totais.contratado, moeda)} · taxas {fmtMoeda(num(r.valorTaxas), moeda)}.
+                  Congelado na criação: alterar a condição ou a taxa não recalcula este lançamento.
+                </p>
+              </>
+            )}
+          </section>
+        )}
 
         <section className="rfm-bloco">
           <h3 className="rfm-bloco-titulo">Próxima parcela</h3>

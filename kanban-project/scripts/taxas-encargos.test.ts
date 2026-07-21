@@ -238,6 +238,57 @@ secao('Integração com o FinanceRuleEngine')
   ok('migration adiciona condição no Custo', mig.includes('"Custo" ADD COLUMN "condicaoPagamentoId"'))
 }
 
+secao('Renegociação')
+{
+  const rota = readFileSync(join(RAIZ, 'src/app/api/financeiro/receitas/[id]/parcelas/route.ts'), 'utf8')
+  ok('aceita modo renegociacao', rota.includes("modo === 'renegociacao'"))
+  ok('exige motivo', rota.includes('Informe o motivo da renegociação'))
+  ok('opera somente sobre o saldo', rota.includes('totalContratado - recebido'))
+  ok('preserva parcelas liquidadas', rota.includes("status: 'RECEBIDA' || p.status === 'PAGA'") || rota.includes('quitadas'))
+  ok('encerra logicamente as abertas (sem apagar)', rota.includes("data: { status: 'CANCELADA'"))
+  ok('não apaga histórico na renegociação', rota.includes('if (renegociando)') && rota.includes('deleteMany') )
+  ok('numeração não colide com as preservadas', rota.includes('offset'))
+  ok('valor contratado nunca muda', rota.includes('O VALOR contratado nunca muda'))
+  ok('é transacional', rota.includes('prisma.$transaction'))
+  ok('registra evento com motivo', rota.includes('Motivo: ${String(body?.motivo'))
+  ok('bloqueia sem parcelas em aberto', rota.includes('Não há parcelas em aberto para renegociar'))
+  ok('bloqueia saldo zero', rota.includes('Saldo em aberto é zero'))
+  ok('reparcelamento comum segue bloqueado com recebimento', rota.includes('Use a renegociação.'))
+}
+
+secao('Reflexo nas telas')
+{
+  const tipos = readFileSync(join(RAIZ, 'src/components/financeiro/receita-modal/tipos.ts'), 'utf8')
+  ok('modal conhece a condição aplicada', tipos.includes('condicaoPagamentoId') && tipos.includes('MemoriaCalculo'))
+  ok('modal conhece bruto/taxas/líquido', tipos.includes('valorBruto') && tipos.includes('valorTaxas') && tipos.includes('valorLiquido'))
+
+  const visao = readFileSync(join(RAIZ, 'src/components/financeiro/receita-modal/ReceitaVisaoGeral.tsx'), 'utf8')
+  ok('Visão geral mostra a condição aplicada', visao.includes('Condição de pagamento aplicada'))
+  ok('Visão geral mostra o valor líquido', visao.includes('Valor líquido esperado'))
+  ok('Visão geral explica o congelamento', visao.includes('não recalcula este lançamento'))
+
+  const tec = readFileSync(join(RAIZ, 'src/components/financeiro/receita-modal/ReceitaInformacoesTecnicasTab.tsx'), 'utf8')
+  ok('aba técnica traz a memória de cálculo', tec.includes('Memória de cálculo'))
+
+  const cond = readFileSync(join(RAIZ, 'src/components/gerenciamentoComponents/CondicoesPagamentoTab.tsx'), 'utf8')
+  for (const secaoNome of ['Entrada', 'Parcelamento', 'Cronograma', 'Distribuição dos valores', 'Encargos e descontos', 'Câmbio', 'Restrições de utilização']) {
+    ok(`tela de Condições tem a seção "${secaoNome}"`, cond.includes(secaoNome))
+  }
+  ok('tela de Condições versiona', cond.includes('EXIGE_NOVA_VERSAO') && cond.includes('Nova versão'))
+  ok('feriados marcados como sem efeito', cond.includes('Sem efeito por enquanto'))
+
+  const formas = readFileSync(join(RAIZ, 'src/components/gerenciamentoComponents/FormasPagamentoTab.tsx'), 'utf8')
+  for (const c of ['aceitaEntrada', 'aceitaRecorrencia', 'aceitaMoedaEstrangeira', 'ordem', 'icone', 'observacoes']) {
+    ok(`tela de Formas edita ${c}`, formas.includes(c))
+  }
+  ok('Formas não duplica regra de parcelamento', formas.includes('pertencem à Condição de Pagamento'))
+
+  const taxasTela = readFileSync(join(RAIZ, 'src/components/gerenciamentoComponents/TaxasPagamentoTab.tsx'), 'utf8')
+  for (const c of ['baseIncidencia', 'quemAbsorve', 'adquirente', 'vigenciaInicio', 'ativo']) {
+    ok(`tela de Taxas edita ${c}`, taxasTela.includes(c))
+  }
+}
+
 console.log(`\n${'='.repeat(60)}`)
 console.log(`Taxas e Encargos: ${passou} passaram, ${falhou} falharam`)
 console.log('='.repeat(60))

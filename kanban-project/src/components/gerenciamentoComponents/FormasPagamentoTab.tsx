@@ -19,6 +19,13 @@ type Forma = {
   moeda: string | null
   permiteParcelas: boolean
   maxParcelas: number | null
+  ativo: boolean
+  ordem: number
+  icone: string | null
+  aceitaEntrada: boolean
+  aceitaRecorrencia: boolean
+  aceitaMoedaEstrangeira: boolean
+  observacoes: string | null
 }
 
 // Tipos do mockup (fin_methods.type) com rótulos amigáveis
@@ -60,6 +67,14 @@ export default function FormasPagamentoTab() {
   const [moeda, setMoeda] = useState('')
   const [permiteParcelas, setPermiteParcelas] = useState(false)
   const [maxParcelas, setMaxParcelas] = useState('')
+  // capacidades do MEIO — sem regra de parcelamento (isso é da Condição)
+  const [ativo, setAtivo] = useState(true)
+  const [ordem, setOrdem] = useState('0')
+  const [icone, setIcone] = useState('')
+  const [aceitaEntrada, setAceitaEntrada] = useState(false)
+  const [aceitaRecorrencia, setAceitaRecorrencia] = useState(false)
+  const [aceitaMoedaEstrangeira, setAceitaMoedaEstrangeira] = useState(false)
+  const [observacoes, setObservacoes] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [erroModal, setErroModal] = useState<string | null>(null)
 
@@ -89,12 +104,17 @@ export default function FormasPagamentoTab() {
   function abrirNovo() {
     setEditando(null)
     setCode(''); setName(''); setType(''); setMoeda(''); setPermiteParcelas(false); setMaxParcelas('')
+    setAtivo(true); setOrdem('0'); setIcone(''); setAceitaEntrada(false)
+    setAceitaRecorrencia(false); setAceitaMoedaEstrangeira(false); setObservacoes('')
     setErroModal(null); setModalAberto(true)
   }
   function abrirEditar(f: Forma) {
     setEditando(f)
     setCode(f.code || ''); setName(f.name); setType(f.type || ''); setMoeda(f.moeda || '')
     setPermiteParcelas(f.permiteParcelas); setMaxParcelas(f.maxParcelas != null ? String(f.maxParcelas) : '')
+    setAtivo(f.ativo ?? true); setOrdem(String(f.ordem ?? 0)); setIcone(f.icone || '')
+    setAceitaEntrada(!!f.aceitaEntrada); setAceitaRecorrencia(!!f.aceitaRecorrencia)
+    setAceitaMoedaEstrangeira(!!f.aceitaMoedaEstrangeira); setObservacoes(f.observacoes || '')
     setErroModal(null); setModalAberto(true)
   }
 
@@ -109,6 +129,13 @@ export default function FormasPagamentoTab() {
         moeda: moeda || null,
         permiteParcelas,
         maxParcelas: permiteParcelas ? (maxParcelas === '' ? null : Number(maxParcelas)) : null,
+        ativo,
+        ordem: ordem === '' ? 0 : Number(ordem),
+        icone: icone.trim() || null,
+        aceitaEntrada,
+        aceitaRecorrencia,
+        aceitaMoedaEstrangeira,
+        observacoes: observacoes.trim() || null,
       })
       if (editando) {
         await jsonFetch(`/api/gerenciamento/formas-pagamento/${editando.id}`, { method: 'PUT', body })
@@ -190,7 +217,12 @@ export default function FormasPagamentoTab() {
                   <td className="px-4 py-2.5 font-medium text-white">{f.name}</td>
                   <td className="px-4 py-2.5 text-white/70">{tipoLabel(f.type)}</td>
                   <td className="px-4 py-2.5 text-white/70">{f.moeda || '—'}</td>
-                  <td className="px-4 py-2.5 text-white/70">{f.permiteParcelas ? (f.maxParcelas ? `até ${f.maxParcelas}×` : 'Sim') : '—'}</td>
+                  <td className="px-4 py-2.5 text-white/70">
+                    {f.permiteParcelas ? (f.maxParcelas ? `até ${f.maxParcelas}×` : 'Sim') : '—'}
+                    <div className="text-[11px] text-white/40">
+                      {[f.aceitaEntrada ? 'entrada' : null, f.aceitaRecorrencia ? 'recorrência' : null, f.aceitaMoedaEstrangeira ? 'moeda estrangeira' : null].filter(Boolean).join(' · ') || '—'}
+                    </div>
+                  </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => abrirEditar(f)} className="rounded-md border border-white/10 px-2.5 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white">Editar</button>
@@ -253,6 +285,45 @@ export default function FormasPagamentoTab() {
                     <input type="number" min="1" value={maxParcelas} onChange={(e) => setMaxParcelas(e.target.value)} placeholder="12" className="w-24 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20" />
                   </div>
                 )}
+              </div>
+
+              <div className="border-t border-white/10 pt-4">
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-white/40">Capacidades do meio</div>
+                <div className="mb-3 text-[11px] text-white/30">
+                  Só o que o MEIO suporta. Entrada, quantidade de parcelas e cronograma pertencem à Condição de Pagamento.
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div>
+                    <label className="mb-1 block text-xs text-white/60">Ícone</label>
+                    <input value={icone} onChange={(e) => setIcone(e.target.value)} placeholder="💳" maxLength={8} className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-white/60">Ordem de exibição</label>
+                    <input type="number" value={ordem} onChange={(e) => setOrdem(e.target.value)} className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/20" />
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+                  <label className="flex items-center gap-2 text-sm text-white/80">
+                    <input type="checkbox" checked={aceitaEntrada} onChange={(e) => setAceitaEntrada(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+                    Aceita entrada
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-white/80">
+                    <input type="checkbox" checked={aceitaRecorrencia} onChange={(e) => setAceitaRecorrencia(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+                    Aceita recorrência
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-white/80">
+                    <input type="checkbox" checked={aceitaMoedaEstrangeira} onChange={(e) => setAceitaMoedaEstrangeira(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+                    Aceita moeda estrangeira
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-white/80">
+                    <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+                    Ativo
+                  </label>
+                </div>
+                <div className="mt-3">
+                  <label className="mb-1 block text-xs text-white/60">Observações</label>
+                  <textarea rows={2} value={observacoes} onChange={(e) => setObservacoes(e.target.value)} className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20" />
+                </div>
               </div>
 
               {erroModal && (

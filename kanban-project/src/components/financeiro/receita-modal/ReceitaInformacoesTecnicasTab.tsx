@@ -11,7 +11,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { fmtData } from '@/lib/financeiro/apresentacao-lancamento'
 import { fmtDataHora, type Detalhe } from './tipos'
 
-export type SecaoTecnica = 'regra' | 'tabela' | 'servico' | 'rastreio' | 'excecoes'
+export type SecaoTecnica = 'regra' | 'tabela' | 'servico' | 'rastreio' | 'memoria' | 'excecoes'
 
 function Secao({
   id,
@@ -145,6 +145,35 @@ export function ReceitaInformacoesTecnicasTab({
           <pre className="rfm-json" style={{ marginTop: 8 }}>{JSON.stringify(o.tecnico, null, 2)}</pre>
         </div>
       </Secao>
+
+      {detalhe.receita.memoriaCalculo && (
+        <Secao id="memoria" titulo="Memória de cálculo (condição, cronograma e taxas)" aberta={aberta('memoria')} onToggle={alternar}>
+          <div className="rfm-pares">
+            <Par rotulo="Condição" valor={detalhe.receita.condicaoCodigo ?? detalhe.receita.memoriaCalculo.condicao?.nome ?? '—'} />
+            <Par rotulo="Versão" valor={detalhe.receita.condicaoVersao != null ? `v${detalhe.receita.condicaoVersao}` : '—'} />
+            <Par rotulo="Valor bruto" valor={detalhe.receita.valorBruto != null ? String(detalhe.receita.valorBruto) : '—'} />
+            <Par rotulo="Taxas" valor={detalhe.receita.valorTaxas != null ? String(detalhe.receita.valorTaxas) : '—'} />
+            <Par rotulo="Valor líquido" valor={detalhe.receita.valorLiquido != null ? String(detalhe.receita.valorLiquido) : '—'} />
+          </div>
+          {(detalhe.receita.memoriaCalculo.taxas?.memoria?.length ?? 0) > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div className="rfm-par-rotulo">Taxas — passo a passo</div>
+              <ul className="rfm-mono" style={{ marginTop: 6, paddingLeft: 18 }}>
+                {detalhe.receita.memoriaCalculo.taxas!.memoria.map((m, i) => <li key={i}>{m}</li>)}
+              </ul>
+            </div>
+          )}
+          {(detalhe.receita.memoriaCalculo.encargos?.memoria?.length ?? 0) > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div className="rfm-par-rotulo">Encargos e descontos — passo a passo</div>
+              <ul className="rfm-mono" style={{ marginTop: 6, paddingLeft: 18 }}>
+                {detalhe.receita.memoriaCalculo.encargos!.memoria.map((m, i) => <li key={i}>{m}</li>)}
+              </ul>
+            </div>
+          )}
+          <pre className="rfm-json" style={{ marginTop: 14 }}>{JSON.stringify(detalhe.receita.memoriaCalculo, null, 2)}</pre>
+        </Secao>
+      )}
 
       {(detalhe.supressao || detalhe.cancelamento || detalhe.estorno) && (
         <Secao id="excecoes" titulo="Supressão, cancelamento e estorno" aberta={aberta('excecoes')} onToggle={alternar}>
