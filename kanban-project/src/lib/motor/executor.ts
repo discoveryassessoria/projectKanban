@@ -18,8 +18,7 @@ import { getFase, faseCodeToPhaseKey, phaseKeyToFaseCode } from '@/src/lib/proce
 import { gerarCodigoReceita, gerarCodigoCusto } from '@/lib/financeiro/codigos'
 // Cronograma OFICIAL: a Condição de Pagamento decide entrada, quantidade,
 // periodicidade e vencimentos. O motor consome o plano pronto.
-import { gerarCronograma } from '@/lib/financeiro/condicao-pagamento'
-import { condicaoDaConfig, rotuloPeriodicidade } from '@/lib/financeiro/resolver-condicao'
+import { aplicarCondicaoPagamento } from '@/lib/financeiro/aplicar-condicao'
 import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
 // ✅ E8 (fatia Emissão) — motor econômico por ELEGIBILIDADE. Roda AO LADO do
 // executor clássico, atrás da MESMA trava (autoExecutarAoAvancar). Import
@@ -190,28 +189,30 @@ type DbLancamento = Prisma.TransactionClient | typeof prisma
 async function criarReceita(db: DbLancamento, pid: number, descricao: string, valor: number, moeda: Moeda, fx: number, honorario: boolean, fz: FreezeExec = {}): Promise<number> {
   const codigo = await gerarCodigoReceita()
   const dataBase = new Date()
-  // Condição de Pagamento da Configuração Financeira; sem condição vinculada o
-  // cronograma cai no comportamento histórico (1 parcela na data base).
-  const { condicao } = await condicaoDaConfig(fz.configId ?? null, {
-    natureza: 'RECEITA', moeda: String(moeda), total: valor, emDatas: dataBase,
+  // Condição de Pagamento da Configuração Financeira → cronograma, taxas e
+  // encargos. Sem condição vinculada, cai no comportamento histórico.
+  const ap = await aplicarCondicaoPagamento({
+    configId: fz.configId ?? null, natureza: 'RECEITA', moeda: String(moeda), valor, dataBase,
   })
-  const crono = gerarCronograma(condicao, { total: valor, dataBase })
-  const parcelas = crono.parcelas
-  const data1 = crono.data1
+  const parcelas = ap.parcelas
+  const data1 = ap.data1
   const valorBrlRef = Number((valor * fx).toFixed(2))
   const rec = await db.receita.create({
     data: {
       codigo, processoId: pid,
       categoria: honorario ? CategoriaReceita.HONORARIOS : CategoriaReceita.OUTROS,
       descricao: descricao.slice(0, 300), moeda, valor,
-      fxEstimado: fx, fxRule: FxRule.VARIAVEL, nParcelas: crono.nParcelas, data1, periodicidade: rotuloPeriodicidade(crono.periodicidade), status: ReceitaStatus.ATIVA,
+      fxEstimado: fx, fxRule: FxRule.VARIAVEL, nParcelas: ap.campos.nParcelas, data1, periodicidade: ap.campos.periodicidade, status: ReceitaStatus.ATIVA,
+      condicaoPagamentoId: ap.campos.condicaoPagamentoId, condicaoVersao: ap.campos.condicaoVersao, condicaoCodigo: ap.campos.condicaoCodigo,
+      valorBruto: ap.campos.valorBruto, valorTaxas: ap.campos.valorTaxas, valorLiquido: ap.campos.valorLiquido,
+      memoriaCalculo: (ap.campos.memoriaCalculo ?? undefined) as Prisma.InputJsonValue | undefined,
       origem: 'motor', origemLancamento: 'PROCESSO', naturezaLancamento: 'RECEITA',
       pricingRuleId: fz.tabelaValorId ?? null, valorUnitario: valor, quantidade: 1, valorTotalCongelado: valor,
       modoCalculoAplicado: fz.tabelaValorId != null ? 'fixed' : 'manual', naturezaPreco: fz.naturezaPreco ?? 'VENDA',
       configFinanceiraId: fz.configId ?? null, regraFinanceiraId: fz.regraId ?? null, contextoAplicado: fz.contexto ?? undefined, dataReferencia: dataBase,
       phaseKey: fz.phaseKey ?? null, phaseCycle: fz.phaseCycle ?? null, chaveIdempotencia: fz.chaveIdempotencia ?? null,
-      parcelas: { create: parcelas.map((p) => ({ numero: p.numero, vencimento: p.vencimento, valor: p.valor, status: 'PENDENTE' as const })) },
-      eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Receita criada pelo motor: ${descricao}${condicao ? ` (condição ${condicao.codigo ?? condicao.nome ?? condicao.id}, ${crono.nParcelas}x)` : ''}`.slice(0, 500), valor, cambio: fx, valorBrl: valorBrlRef } },
+      parcelas: { create: parcelas },
+      eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Receita criada pelo motor: ${descricao}${ap.resumo}`.slice(0, 500), valor, cambio: fx, valorBrl: valorBrlRef } },
     },
   })
   return rec.id
@@ -219,25 +220,27 @@ async function criarReceita(db: DbLancamento, pid: number, descricao: string, va
 async function criarCusto(db: DbLancamento, pid: number, descricao: string, valor: number, moeda: Moeda, fx: number, fz: FreezeExec = {}): Promise<number> {
   const codigo = await gerarCodigoCusto()
   const dataBase = new Date()
-  const { condicao } = await condicaoDaConfig(fz.configId ?? null, {
-    natureza: 'CUSTO', moeda: String(moeda), total: valor, emDatas: dataBase,
+  const ap = await aplicarCondicaoPagamento({
+    configId: fz.configId ?? null, natureza: 'CUSTO', moeda: String(moeda), valor, dataBase,
   })
-  const crono = gerarCronograma(condicao, { total: valor, dataBase })
-  const parcelas = crono.parcelas
-  const vencimento = crono.data1
+  const parcelas = ap.parcelas
+  const vencimento = ap.data1
   const valorBrlRef = Number((valor * fx).toFixed(2))
   const c = await db.custo.create({
     data: {
       codigo, processoId: pid, tipo: TipoCusto.SERVICO, categoria: CategoriaCusto.OUTROS,
       descricao: descricao.slice(0, 300), moeda, valor,
-      fxEstimado: fx, fxRule: FxRule.VARIAVEL, nParcelas: crono.nParcelas, vencimento, custoOperacional: false, status: CustoStatus.ATIVA,
+      fxEstimado: fx, fxRule: FxRule.VARIAVEL, nParcelas: ap.campos.nParcelas, vencimento, custoOperacional: false, status: CustoStatus.ATIVA,
+      condicaoPagamentoId: ap.campos.condicaoPagamentoId, condicaoVersao: ap.campos.condicaoVersao, condicaoCodigo: ap.campos.condicaoCodigo,
+      valorBruto: ap.campos.valorBruto, valorTaxas: ap.campos.valorTaxas, valorLiquido: ap.campos.valorLiquido,
+      memoriaCalculo: (ap.campos.memoriaCalculo ?? undefined) as Prisma.InputJsonValue | undefined,
       origem: 'motor', origemLancamento: 'PROCESSO', naturezaLancamento: 'CUSTO',
       pricingRuleId: fz.tabelaValorId ?? null, valorUnitario: valor, quantidade: 1, valorTotalCongelado: valor,
       modoCalculoAplicado: fz.tabelaValorId != null ? 'fixed' : 'manual', naturezaPreco: fz.naturezaPreco ?? 'CUSTO',
       configFinanceiraId: fz.configId ?? null, regraFinanceiraId: fz.regraId ?? null, contextoAplicado: fz.contexto ?? undefined, dataReferencia: dataBase,
       phaseKey: fz.phaseKey ?? null, phaseCycle: fz.phaseCycle ?? null, chaveIdempotencia: fz.chaveIdempotencia ?? null,
-      parcelas: { create: parcelas.map((p) => ({ numero: p.numero, vencimento: p.vencimento, valor: p.valor, status: 'PENDENTE' as const })) },
-      eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Custo criado pelo motor: ${descricao}${condicao ? ` (condição ${condicao.codigo ?? condicao.nome ?? condicao.id}, ${crono.nParcelas}x)` : ''}`.slice(0, 500), valor, cambio: fx, valorBrl: valorBrlRef } },
+      parcelas: { create: parcelas },
+      eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Custo criado pelo motor: ${descricao}${ap.resumo}`.slice(0, 500), valor, cambio: fx, valorBrl: valorBrlRef } },
     },
   })
   return c.id

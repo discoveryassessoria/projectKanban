@@ -19,6 +19,7 @@ import {
   type ContextoAplicabilidade,
   type Periodicidade,
 } from './condicao-pagamento'
+import type { TaxaView } from './taxas-pagamento'
 
 /** Converte o registro Prisma (Decimal/Date) para a view pura do motor. */
 export function paraView(c: Record<string, unknown> | null): CondicaoPagamentoView | null {
@@ -59,6 +60,12 @@ export function paraView(c: Record<string, unknown> | null): CondicaoPagamentoVi
     distribuicao: (c.distribuicao as CondicaoPagamentoView['distribuicao']) ?? 'ULTIMA_AJUSTA',
     primeiraParcelaPercent: n(c.primeiraParcelaPercent),
 
+    multaPercent: n(c.multaPercent),
+    jurosMesPercent: n(c.jurosMesPercent),
+    descontoPercent: n(c.descontoPercent),
+    descontoAntecipacaoPercent: n(c.descontoAntecipacaoPercent),
+    descontoAVistaPercent: n(c.descontoAVistaPercent),
+
     politicaCambio: (c.politicaCambio as CondicaoPagamentoView['politicaCambio']) ?? 'VARIAVEL',
     travaCambial: (c.travaCambial as boolean) ?? false,
 
@@ -74,8 +81,41 @@ export function paraView(c: Record<string, unknown> | null): CondicaoPagamentoVi
 
 export interface ResultadoCondicao {
   condicao: CondicaoPagamentoView | null
+  /** Taxas vinculadas à condição (CondicaoPagamentoTaxa). Vazio quando não há. */
+  taxas: TaxaView[]
   /** Por que a condição vinculada não foi usada (quando houver uma). */
   motivoDescarte: string | null
+}
+
+/** Converte TaxaPagamento (Prisma) para a view do motor de taxas. */
+export function taxaParaView(t: Record<string, unknown>): TaxaView {
+  const n = (v: unknown) => (v == null ? null : Number(v))
+  const feeType = String(t.feeType ?? 'PERCENTUAL').toUpperCase()
+  const tipo = (
+    feeType.includes('FIX') && feeType.includes('PERCENT') ? 'PERCENTUAL_MAIS_FIXA'
+      : feeType.includes('TARIFA') || feeType.includes('BANC') ? 'TARIFA_BANCARIA'
+      : feeType.includes('ANTECIP') ? 'ANTECIPACAO'
+      : feeType.includes('FIX') ? 'FIXA'
+      : 'PERCENTUAL'
+  ) as TaxaView['tipo']
+  return {
+    id: t.id as number,
+    nome: (t.name as string) ?? null,
+    codigo: (t.code as string) ?? null,
+    tipo,
+    percentual: n(t.feePercent),
+    valorFixo: n(t.fixedFee),
+    baseIncidencia: ((t.baseIncidencia as string) ?? 'TOTAL') as TaxaView['baseIncidencia'],
+    quemAbsorve: ((t.quemAbsorve as string) ?? 'EMPRESA') as TaxaView['quemAbsorve'],
+    adquirente: (t.adquirente as string) ?? null,
+    parcelasDe: (t.installmentsFrom as number) ?? null,
+    parcelasAte: (t.installmentsTo as number) ?? null,
+    antecipacaoAtiva: (t.anticipationEnabled as boolean) ?? false,
+    antecipacaoPercent: n(t.anticipationPercent),
+    ativo: (t.ativo as boolean) ?? true,
+    vigenciaInicio: (t.vigenciaInicio as Date) ?? null,
+    vigenciaFim: (t.vigenciaFim as Date) ?? null,
+  }
 }
 
 /**
@@ -87,21 +127,24 @@ export async function condicaoDaConfig(
   configId: number | null | undefined,
   ctx: ContextoAplicabilidade,
 ): Promise<ResultadoCondicao> {
-  if (!configId) return { condicao: null, motivoDescarte: null }
+  if (!configId) return { condicao: null, taxas: [], motivoDescarte: null }
   try {
     const config = await prisma.produtoFinanceiro.findUnique({
       where: { id: configId },
-      select: { condicaoPagamento: true },
+      select: { condicaoPagamento: { include: { taxasVinculadas: { include: { taxa: true } } } } },
     })
-    const view = paraView(config?.condicaoPagamento as unknown as Record<string, unknown> | null)
-    if (!view) return { condicao: null, motivoDescarte: null }
+    const bruto = config?.condicaoPagamento as unknown as Record<string, unknown> | null
+    const view = paraView(bruto)
+    if (!view) return { condicao: null, taxas: [], motivoDescarte: null }
 
     const veredito = condicaoAplicavel(view, ctx)
-    if (!veredito.aplicavel) return { condicao: null, motivoDescarte: veredito.motivo }
-    return { condicao: view, motivoDescarte: null }
+    if (!veredito.aplicavel) return { condicao: null, taxas: [], motivoDescarte: veredito.motivo }
+
+    const taxas = extrairTaxas(bruto)
+    return { condicao: view, taxas, motivoDescarte: null }
   } catch (err) {
     console.error('[condicaoDaConfig] erro ao resolver condição de pagamento:', err)
-    return { condicao: null, motivoDescarte: 'Falha ao resolver a condição de pagamento.' }
+    return { condicao: null, taxas: [], motivoDescarte: 'Falha ao resolver a condição de pagamento.' }
   }
 }
 
@@ -111,16 +154,27 @@ export async function condicaoPorId(
   ctx: ContextoAplicabilidade,
 ): Promise<ResultadoCondicao> {
   try {
-    const c = await prisma.condicaoPagamento.findUnique({ where: { id: condicaoId } })
-    const view = paraView(c as unknown as Record<string, unknown> | null)
-    if (!view) return { condicao: null, motivoDescarte: 'Condição de pagamento não encontrada.' }
+    const c = await prisma.condicaoPagamento.findUnique({
+      where: { id: condicaoId },
+      include: { taxasVinculadas: { include: { taxa: true } } },
+    })
+    const bruto = c as unknown as Record<string, unknown> | null
+    const view = paraView(bruto)
+    if (!view) return { condicao: null, taxas: [], motivoDescarte: 'Condição de pagamento não encontrada.' }
     const veredito = condicaoAplicavel(view, ctx)
-    if (!veredito.aplicavel) return { condicao: null, motivoDescarte: veredito.motivo }
-    return { condicao: view, motivoDescarte: null }
+    if (!veredito.aplicavel) return { condicao: null, taxas: [], motivoDescarte: veredito.motivo }
+    return { condicao: view, taxas: extrairTaxas(bruto), motivoDescarte: null }
   } catch (err) {
     console.error('[condicaoPorId] erro:', err)
-    return { condicao: null, motivoDescarte: 'Falha ao carregar a condição de pagamento.' }
+    return { condicao: null, taxas: [], motivoDescarte: 'Falha ao carregar a condição de pagamento.' }
   }
+}
+
+/** Extrai as taxas vinculadas de uma condição carregada com include. */
+function extrairTaxas(bruto: Record<string, unknown> | null): TaxaView[] {
+  if (!bruto) return []
+  const vinculos = (bruto.taxasVinculadas as Array<{ taxa?: Record<string, unknown> }> | undefined) ?? []
+  return vinculos.map((v) => v.taxa).filter(Boolean).map((t) => taxaParaView(t as Record<string, unknown>))
 }
 
 const ROTULO_PERIODICIDADE: Record<Periodicidade, string> = {

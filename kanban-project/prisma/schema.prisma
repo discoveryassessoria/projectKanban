@@ -1294,9 +1294,23 @@ model Receita {
   estornos            Receita[] @relation("ReceitaEstorno")
   chaveEstorno        String?   @unique @db.VarChar(220) // §12 idempotência do estorno
 
+  // ── CONDIÇÃO DE PAGAMENTO APLICADA (congelada no lançamento) ──
+  // Guarda QUAL condição e QUAL versão geraram este cronograma, o resultado do
+  // cálculo de taxas e a memória. Alterar a condição ou a taxa depois NUNCA
+  // recalcula este lançamento — ele carrega o que foi aplicado.
+  condicaoPagamentoId Int?
+  condicaoPagamento   CondicaoPagamento? @relation("ReceitaCondicaoPagamento", fields: [condicaoPagamentoId], references: [id])
+  condicaoVersao      Int?
+  condicaoCodigo      String?            @db.VarChar(40)
+  valorBruto          Decimal?           @db.Decimal(12, 2)
+  valorTaxas          Decimal?           @db.Decimal(12, 2)
+  valorLiquido        Decimal?           @db.Decimal(12, 2)
+  memoriaCalculo      Json?
+
   @@index([processoId])
   @@index([categoria])
   @@index([cancelada])
+  @@index([condicaoPagamentoId])
   @@index([origemLancamento])
   @@index([codigo])
   @@index([personId])
@@ -1378,10 +1392,24 @@ model Custo {
   estornos            Custo[]   @relation("CustoEstorno")
   chaveEstorno        String?   @unique @db.VarChar(220)
 
+  // ── CONDIÇÃO DE PAGAMENTO APLICADA (congelada no lançamento) ──
+  // Guarda QUAL condição e QUAL versão geraram este cronograma, o resultado do
+  // cálculo de taxas e a memória. Alterar a condição ou a taxa depois NUNCA
+  // recalcula este lançamento — ele carrega o que foi aplicado.
+  condicaoPagamentoId Int?
+  condicaoPagamento   CondicaoPagamento? @relation("CustoCondicaoPagamento", fields: [condicaoPagamentoId], references: [id])
+  condicaoVersao      Int?
+  condicaoCodigo      String?            @db.VarChar(40)
+  valorBruto          Decimal?           @db.Decimal(12, 2)
+  valorTaxas          Decimal?           @db.Decimal(12, 2)
+  valorLiquido        Decimal?           @db.Decimal(12, 2)
+  memoriaCalculo      Json?
+
   @@index([processoId])
   @@index([tipo])
   @@index([categoria])
   @@index([cancelado])
+  @@index([condicaoPagamentoId])
   @@index([origemLancamento])
   @@index([codigo])
   @@index([personId])
@@ -1405,6 +1433,10 @@ model ParcelaFinanceira {
   comprovanteUrl  String?
   comprovanteNome String?         @db.VarChar(200)
   observacoes     String?
+  // Parcela de ENTRADA definida pela Condição de Pagamento.
+  entrada         Boolean         @default(false)
+  valorTaxa       Decimal?        @db.Decimal(12, 2)
+  valorLiquido    Decimal?        @db.Decimal(12, 2)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   custo           Custo?          @relation(fields: [custoId], references: [id], onDelete: Cascade)
@@ -2038,6 +2070,8 @@ model CondicaoPagamento {
   formasPermitidas CondicaoPagamentoForma[]
   taxasVinculadas  CondicaoPagamentoTaxa[]
   configuracoes    ProdutoFinanceiro[]      @relation("ConfigFinCondicaoPagamento")
+  receitas         Receita[]                @relation("ReceitaCondicaoPagamento")
+  custos           Custo[]                  @relation("CustoCondicaoPagamento")
 
   @@unique([codigo, versao])
   @@index([carteiraId])
@@ -2174,20 +2208,27 @@ model FormaPagamentoCadastro {
 }
 
 model TaxaPagamento {
-  id                  Int      @id @default(autoincrement())
-  code                String?  @db.VarChar(40)
-  name                String   @db.VarChar(200)
+  id                  Int       @id @default(autoincrement())
+  code                String?   @db.VarChar(40)
+  name                String    @db.VarChar(200)
   formaPagamentoId    Int? // ref. solta -> FormaPagamentoCadastro
-  moeda               String?  @db.VarChar(10) // code -> MoedaCadastro
-  feeType             String?  @db.VarChar(30)
-  feePercent          Decimal? @db.Decimal(7, 4)
-  fixedFee            Decimal? @db.Decimal(12, 2)
-  anticipationEnabled Boolean  @default(false)
-  anticipationPercent Decimal? @db.Decimal(7, 4)
+  moeda               String?   @db.VarChar(10) // code -> MoedaCadastro
+  feeType             String?   @db.VarChar(30)
+  feePercent          Decimal?  @db.Decimal(7, 4)
+  fixedFee            Decimal?  @db.Decimal(12, 2)
+  anticipationEnabled Boolean   @default(false)
+  anticipationPercent Decimal?  @db.Decimal(7, 4)
   installmentsFrom    Int?
   installmentsTo      Int?
-  criadoEm            DateTime @default(now())
-  atualizadoEm        DateTime @updatedAt
+  // Incidência e absorção (motor lib/financeiro/taxas-pagamento.ts)
+  baseIncidencia      String    @default("TOTAL") @db.VarChar(20) // TOTAL | PARCELA
+  quemAbsorve         String    @default("EMPRESA") @db.VarChar(20) // EMPRESA | CLIENTE
+  adquirente          String?   @db.VarChar(120)
+  ativo               Boolean   @default(true)
+  vigenciaInicio      DateTime?
+  vigenciaFim         DateTime?
+  criadoEm            DateTime  @default(now())
+  atualizadoEm        DateTime  @updatedAt
 
   condicoes CondicaoPagamentoTaxa[]
 }

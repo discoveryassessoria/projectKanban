@@ -247,14 +247,20 @@ secao('Caso real — honorários € 6.290,00')
 secao('FinanceRuleEngine consome a Condição de Pagamento')
 {
   const executor = readFileSync(join(RAIZ, 'src/lib/motor/executor.ts'), 'utf8')
-  ok('executor usa o motor de cronograma', executor.includes('gerarCronograma'))
-  ok('executor resolve a condição da config', executor.includes('condicaoDaConfig'))
+  // O motor consome o PONTO ÚNICO (lib/financeiro/aplicar-condicao.ts), que
+  // internamente resolve a condição, gera o cronograma e calcula taxas/encargos.
+  ok('executor usa o ponto único de aplicação', executor.includes('aplicarCondicaoPagamento'))
   ok('executor não chama mais gerarParcelas', !executor.includes('gerarParcelas'))
-  ok('nParcelas vem do cronograma', executor.includes('nParcelas: crono.nParcelas'))
-  ok('periodicidade vem do cronograma', executor.includes('rotuloPeriodicidade(crono.periodicidade)'))
+  ok('nParcelas vem do cronograma', executor.includes('nParcelas: ap.campos.nParcelas'))
+  ok('periodicidade vem do cronograma', executor.includes('periodicidade: ap.campos.periodicidade'))
+  ok('condição aplicada é congelada no lançamento', executor.includes('condicaoPagamentoId: ap.campos.condicaoPagamentoId'))
+
+  const aplicar = readFileSync(join(RAIZ, 'lib/financeiro/aplicar-condicao.ts'), 'utf8')
+  ok('ponto único usa o motor de cronograma', aplicar.includes('gerarCronograma'))
+  ok('ponto único resolve a condição da config', aplicar.includes('condicaoDaConfig'))
 
   const matriz = readFileSync(join(RAIZ, 'src/lib/motor/matriz-economica.ts'), 'utf8')
-  ok('matriz econômica usa o cronograma', matriz.includes('gerarCronograma'))
+  ok('matriz econômica usa o ponto único', matriz.includes('aplicarCondicaoPagamento'))
   ok('matriz não chama mais gerarParcelas', !matriz.includes('gerarParcelas'))
 
   const reparcelar = readFileSync(join(RAIZ, 'src/app/api/financeiro/receitas/[id]/parcelas/route.ts'), 'utf8')

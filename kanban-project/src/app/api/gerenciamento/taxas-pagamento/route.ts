@@ -58,6 +58,13 @@ export async function POST(request: NextRequest) {
         feePercent: toNumOrNull(b.feePercent),
         fixedFee: toNumOrNull(b.fixedFee),
         anticipationEnabled: !!b.anticipationEnabled,
+        // incidência e absorção — consumidas por lib/financeiro/taxas-pagamento.ts
+        baseIncidencia: ['TOTAL', 'PARCELA'].includes(String(b.baseIncidencia)) ? String(b.baseIncidencia) : 'TOTAL',
+        quemAbsorve: ['EMPRESA', 'CLIENTE'].includes(String(b.quemAbsorve)) ? String(b.quemAbsorve) : 'EMPRESA',
+        adquirente: b.adquirente ? String(b.adquirente).slice(0, 120) : null,
+        ativo: b.ativo === undefined ? true : !!b.ativo,
+        vigenciaInicio: b.vigenciaInicio ? new Date(String(b.vigenciaInicio)) : null,
+        vigenciaFim: b.vigenciaFim ? new Date(String(b.vigenciaFim)) : null,
         anticipationPercent: b.anticipationEnabled ? toNumOrNull(b.anticipationPercent) : null,
         installmentsFrom: toIntOrNull(b.installmentsFrom),
         installmentsTo: toIntOrNull(b.installmentsTo),

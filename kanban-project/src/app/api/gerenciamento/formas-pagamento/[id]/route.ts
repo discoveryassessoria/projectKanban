@@ -33,6 +33,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         type: b.type !== undefined ? toStrOrNull(b.type) : atual.type,
         moeda: b.moeda !== undefined ? toStrOrNull(b.moeda) : atual.moeda,
         permiteParcelas: b.permiteParcelas !== undefined ? !!b.permiteParcelas : atual.permiteParcelas,
+        ativo: b.ativo !== undefined ? !!b.ativo : atual.ativo,
+        ordem: b.ordem !== undefined ? (Number.isFinite(Number(b.ordem)) ? Math.trunc(Number(b.ordem)) : atual.ordem) : atual.ordem,
+        icone: b.icone !== undefined ? (b.icone ? String(b.icone).slice(0, 60) : null) : atual.icone,
+        aceitaEntrada: b.aceitaEntrada !== undefined ? !!b.aceitaEntrada : atual.aceitaEntrada,
+        aceitaRecorrencia: b.aceitaRecorrencia !== undefined ? !!b.aceitaRecorrencia : atual.aceitaRecorrencia,
+        aceitaMoedaEstrangeira: b.aceitaMoedaEstrangeira !== undefined ? !!b.aceitaMoedaEstrangeira : atual.aceitaMoedaEstrangeira,
+        observacoes: b.observacoes !== undefined ? (b.observacoes ? String(b.observacoes) : null) : atual.observacoes,
         maxParcelas: b.maxParcelas !== undefined ? toIntOrNull(b.maxParcelas) : atual.maxParcelas,
       },
     })

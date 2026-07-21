@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     if (erro) return erro
 
     const [formasPagamento, moedas] = await Promise.all([
-      prisma.formaPagamentoCadastro.findMany({ orderBy: { name: 'asc' } }),
+      prisma.formaPagamentoCadastro.findMany({ orderBy: [{ ordem: 'asc' }, { name: 'asc' }] }),
       prisma.moedaCadastro.findMany({ orderBy: { code: 'asc' }, select: { id: true, code: true, name: true } }),
     ])
 
@@ -49,6 +49,14 @@ export async function POST(request: NextRequest) {
         type: toStrOrNull(b.type),
         moeda: toStrOrNull(b.moeda),
         permiteParcelas: !!b.permiteParcelas,
+        // capacidades do MEIO (sem regra de parcelamento — isso é da Condição)
+        ativo: b.ativo === undefined ? true : !!b.ativo,
+        ordem: Number.isFinite(Number(b.ordem)) ? Math.trunc(Number(b.ordem)) : 0,
+        icone: b.icone ? String(b.icone).slice(0, 60) : null,
+        aceitaEntrada: !!b.aceitaEntrada,
+        aceitaRecorrencia: !!b.aceitaRecorrencia,
+        aceitaMoedaEstrangeira: !!b.aceitaMoedaEstrangeira,
+        observacoes: b.observacoes ? String(b.observacoes) : null,
         maxParcelas: b.permiteParcelas ? toIntOrNull(b.maxParcelas) : null,
       },
     })

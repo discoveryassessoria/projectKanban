@@ -83,6 +83,13 @@ export interface CondicaoPagamentoView {
   distribuicao?: Distribuicao | null
   primeiraParcelaPercent?: number | string | null
 
+  // encargos e descontos (consumidos por lib/financeiro/encargos-financeiros.ts)
+  multaPercent?: number | string | null
+  jurosMesPercent?: number | string | null
+  descontoPercent?: number | string | null
+  descontoAntecipacaoPercent?: number | string | null
+  descontoAVistaPercent?: number | string | null
+
   // câmbio
   politicaCambio?: PoliticaCambio | null
   travaCambial?: boolean | null

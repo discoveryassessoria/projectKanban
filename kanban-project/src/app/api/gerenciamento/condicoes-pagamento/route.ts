@@ -1,31 +1,17 @@
 // src/app/api/gerenciamento/condicoes-pagamento/route.ts
-// GET  - Listar condicoes de pagamento (+ carteiras para o select)
-// POST - Criar condicao de pagamento
+// GET  - Listar condições (+ carteiras, formas e taxas para os selects)
+// POST - Criar condição de pagamento
 //
-// Tabela CondicaoPagamento (nova). Mockup fin_paycond:
-//   name(req), currency, paymentMethodId, receivingWalletId(->Carteira),
-//   entryEnabled, entryPercent, installments, dueDay, applyPaymentFees.
-// OBS: o mockup usa o catalogo paymentMethods; aqui usamos o enum
-//   FormaPagamento existente como stand-in (formaPagamento).
-// GET ja devolve { condicoes, carteiras } -> a tela faz UM fetch so.
+// A Condição de Pagamento é o cadastro OFICIAL das regras de cobrança: entrada,
+// parcelamento, cronograma, distribuição, encargos, câmbio e restrições. O
+// FinanceRuleEngine consome daqui (lib/financeiro/condicao-pagamento.ts).
+//
+// O mapeamento body→colunas vive em ./campos.ts, compartilhado com o PUT.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
-
-const MOEDAS = ['BRL', 'EUR', 'USD']
-const FORMAS = ['PIX', 'CARTAO_CREDITO', 'CARTAO_DEBITO', 'BOLETO', 'TRANSFERENCIA', 'DINHEIRO', 'CHEQUE', 'OUTRO']
-
-function parseNum(v: unknown): number | null {
-  if (v === null || v === undefined || v === '') return null
-  const n = Number(v)
-  return Number.isFinite(n) ? n : null
-}
-function parseIntOrNull(v: unknown): number | null {
-  if (v === null || v === undefined || v === '') return null
-  const n = Number(v)
-  return Number.isFinite(n) ? Math.trunc(n) : null
-}
+import { paraColunas, validar, inteiro } from './campos'
 
 // GET - Listar
 export async function GET(request: NextRequest) {
@@ -33,58 +19,96 @@ export async function GET(request: NextRequest) {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
 
-    const [condicoes, carteiras] = await Promise.all([
+    const [condicoes, carteiras, formasPagamento, taxas] = await Promise.all([
       prisma.condicaoPagamento.findMany({
-        orderBy: { name: 'asc' },
-        include: { carteira: { select: { id: true, nome: true } } },
+        orderBy: [{ name: 'asc' }, { versao: 'desc' }],
+        include: {
+          carteira: { select: { id: true, nome: true } },
+          formasPermitidas: { select: { formaId: true } },
+          taxasVinculadas: { select: { taxaId: true } },
+          _count: { select: { configuracoes: true, receitas: true, custos: true } },
+        },
       }),
       prisma.carteiraRecebimento.findMany({
         where: { ativo: true },
         select: { id: true, nome: true },
         orderBy: { nome: 'asc' },
       }),
+      prisma.formaPagamentoCadastro.findMany({
+        where: { ativo: true },
+        select: { id: true, name: true, code: true, icone: true },
+        orderBy: [{ ordem: 'asc' }, { name: 'asc' }],
+      }),
+      prisma.taxaPagamento.findMany({
+        where: { ativo: true },
+        select: { id: true, name: true, code: true, feeType: true, feePercent: true, fixedFee: true },
+        orderBy: { name: 'asc' },
+      }),
     ])
 
-    return NextResponse.json({ condicoes, carteiras })
+    return NextResponse.json({ condicoes, carteiras, formasPagamento, taxas })
   } catch (error) {
     console.error('Erro ao listar condições de pagamento:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 }
 
-// POST - Criar
+// POST - Criar (ou criar NOVA VERSÃO quando `substituiId` vier no body)
 export async function POST(request: NextRequest) {
   try {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
 
     const b = await request.json()
-
-    if (!b.name || !String(b.name).trim()) {
-      return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 })
-    }
-    if (b.moeda && !MOEDAS.includes(b.moeda)) {
-      return NextResponse.json({ error: 'Moeda inválida' }, { status: 400 })
-    }
-    if (b.formaPagamento && !FORMAS.includes(b.formaPagamento)) {
-      return NextResponse.json({ error: 'Forma de pagamento inválida' }, { status: 400 })
+    const erros = validar(b)
+    if (erros.length) {
+      return NextResponse.json({ error: erros[0].mensagem, erros }, { status: 400 })
     }
 
-    const parcelas = parseIntOrNull(b.parcelas)
+    const colunas = paraColunas(b)
+    const substituiId = inteiro(b.substituiId)
 
-    const condicao = await prisma.condicaoPagamento.create({
-      data: {
-        name: String(b.name).trim(),
-        moeda: b.moeda || 'BRL',
-        formaPagamento: b.formaPagamento || null,
-        carteiraId: b.carteiraId ? Number(b.carteiraId) : null,
-        temEntrada: !!b.temEntrada,
-        percentEntrada: parseNum(b.percentEntrada),
-        parcelas: parcelas && parcelas > 0 ? parcelas : 1,
-        diaVencimento: parseIntOrNull(b.diaVencimento),
-        aplicarTaxas: !!b.aplicarTaxas,
-        ativo: b.ativo === undefined ? true : !!b.ativo,
-      },
+    // Nova versão: herda o código da anterior e incrementa a versão; a anterior
+    // é encerrada (vigenciaFim = agora) mas NUNCA é apagada nem alterada nos
+    // campos estruturais — lançamentos históricos continuam apontando para ela.
+    let versao = 1
+    let codigo = colunas.codigo
+    if (substituiId) {
+      const anterior = await prisma.condicaoPagamento.findUnique({ where: { id: substituiId } })
+      if (!anterior) return NextResponse.json({ error: 'Condição anterior não encontrada' }, { status: 404 })
+      codigo = anterior.codigo ?? colunas.codigo
+      const maxVersao = await prisma.condicaoPagamento.aggregate({
+        where: codigo ? { codigo } : { id: substituiId },
+        _max: { versao: true },
+      })
+      versao = (maxVersao._max.versao ?? anterior.versao ?? 1) + 1
+    }
+
+    const ids = {
+      formas: (Array.isArray(b.formasPermitidas) ? b.formasPermitidas : []).map((x: unknown) => inteiro(x)).filter((x: number | null): x is number => x != null),
+      taxas: (Array.isArray(b.taxasVinculadas) ? b.taxasVinculadas : []).map((x: unknown) => inteiro(x)).filter((x: number | null): x is number => x != null),
+    }
+
+    const condicao = await prisma.$transaction(async (tx) => {
+      const criada = await tx.condicaoPagamento.create({
+        data: {
+          ...colunas,
+          codigo,
+          versao,
+          substituiId: substituiId ?? null,
+          vigenciaInicio: colunas.vigenciaInicio ?? new Date(),
+          formasPermitidas: ids.formas.length ? { create: ids.formas.map((formaId: number) => ({ formaId })) } : undefined,
+          taxasVinculadas: ids.taxas.length ? { create: ids.taxas.map((taxaId: number) => ({ taxaId })) } : undefined,
+        },
+        include: { formasPermitidas: true, taxasVinculadas: true },
+      })
+      if (substituiId) {
+        await tx.condicaoPagamento.update({
+          where: { id: substituiId },
+          data: { vigenciaFim: new Date(), ativo: false },
+        })
+      }
+      return criada
     })
 
     return NextResponse.json({ condicao }, { status: 201 })
