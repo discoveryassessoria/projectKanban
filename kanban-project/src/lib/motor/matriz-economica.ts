@@ -22,7 +22,8 @@ import {
   TipoCusto, CategoriaReceita, CategoriaCusto,
 } from '@prisma/client'
 import { gerarCodigoReceita, gerarCodigoCusto } from '@/lib/financeiro/codigos'
-import { gerarParcelas } from '@/lib/financeiro/parcelas'
+import { gerarCronograma } from '@/lib/financeiro/condicao-pagamento'
+import { condicaoDaConfig, rotuloPeriodicidade } from '@/lib/financeiro/resolver-condicao'
 // LOTE A · B4 — trava de estado civil (reusa a MESMA engine da árvore, não recria)
 import { analyzePessoa } from '@/src/lib/document-generator'
 // LOTE A · B3 — preço hierárquico (arquivo separado, testável isolado)
@@ -384,13 +385,18 @@ async function registrarPendencia(
 
 async function criarCusto(pid: number, descricao: string, c: Congelado, v: Vinc): Promise<number> {
   const codigo = await gerarCodigoCusto()
-  const vencimento = new Date()
-  const parcelas = gerarParcelas(c.valor, 1, vencimento)
+  const dataBase = new Date()
+  const { condicao } = await condicaoDaConfig(c.configId, {
+    natureza: 'CUSTO', moeda: String(c.moeda), total: Number(c.valor), emDatas: dataBase,
+  })
+  const crono = gerarCronograma(condicao, { total: Number(c.valor), dataBase })
+  const parcelas = crono.parcelas
+  const vencimento = crono.data1
   const row = await prisma.custo.create({
     data: {
       codigo, processoId: pid, tipo: TipoCusto.SERVICO, categoria: CategoriaCusto.OUTROS,
       descricao: descricao.slice(0, 300), moeda: c.moeda, valor: c.valor,
-      fxEstimado: 1, fxRule: FxRule.VARIAVEL, nParcelas: 1, vencimento, custoOperacional: false, status: CustoStatus.ATIVA,
+      fxEstimado: 1, fxRule: FxRule.VARIAVEL, nParcelas: crono.nParcelas, vencimento, custoOperacional: false, status: CustoStatus.ATIVA,
       personId: v.personId, documentoId: v.documentoId, tipoServicoId: v.tipoServicoId,
       phaseKey: v.phaseKey, phaseCycle: v.phaseCycle, productServiceId: v.productServiceId, origem: 'motor',
       // §6/§8 — preço CONGELADO + rastreabilidade
@@ -406,13 +412,18 @@ async function criarCusto(pid: number, descricao: string, c: Congelado, v: Vinc)
 
 async function criarReceita(pid: number, descricao: string, c: Congelado, v: Vinc): Promise<number> {
   const codigo = await gerarCodigoReceita()
-  const data1 = new Date()
-  const parcelas = gerarParcelas(c.valor, 1, data1)
+  const dataBase = new Date()
+  const { condicao } = await condicaoDaConfig(c.configId, {
+    natureza: 'RECEITA', moeda: String(c.moeda), total: Number(c.valor), emDatas: dataBase,
+  })
+  const crono = gerarCronograma(condicao, { total: Number(c.valor), dataBase })
+  const parcelas = crono.parcelas
+  const data1 = crono.data1
   const row = await prisma.receita.create({
     data: {
       codigo, processoId: pid, categoria: CategoriaReceita.PASTA_DOCUMENTAL,
       descricao: descricao.slice(0, 300), moeda: c.moeda, valor: c.valor,
-      fxEstimado: 1, fxRule: FxRule.VARIAVEL, nParcelas: 1, data1, periodicidade: 'Mensal', status: ReceitaStatus.ATIVA,
+      fxEstimado: 1, fxRule: FxRule.VARIAVEL, nParcelas: crono.nParcelas, data1, periodicidade: rotuloPeriodicidade(crono.periodicidade), status: ReceitaStatus.ATIVA,
       personId: v.personId, documentoId: v.documentoId, tipoServicoId: v.tipoServicoId,
       phaseKey: v.phaseKey, phaseCycle: v.phaseCycle, productServiceId: v.productServiceId, origem: 'motor',
       // §6/§8 — preço CONGELADO + rastreabilidade

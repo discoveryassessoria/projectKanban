@@ -5,11 +5,18 @@
 // Nunca altera valor/moeda/quantidade de requerentes — o total é invariante e
 // continua sendo o valor calculado pelo FinanceRuleEngine. Bloqueado quando já
 // existe recebimento (aí o caminho é estorno, não reparcelamento).
+//
+// CONDIÇÃO DE PAGAMENTO (aditivo, retrocompatível): quando o corpo traz
+// `condicaoPagamentoId`, o novo cronograma é GERADO pelo motor oficial de
+// condições (entrada, periodicidade, dia fixo, dia útil, distribuição) em vez
+// de redistribuído linearmente. Sem esse campo o comportamento é o histórico.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withRetry } from '@/lib/db-retry'
 import { redistribuirParcelas } from '@/lib/financeiro/apresentacao-lancamento'
+import { gerarCronograma } from '@/lib/financeiro/condicao-pagamento'
+import { condicaoPorId } from '@/lib/financeiro/resolver-condicao'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -52,7 +59,27 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     // TOTAL INVARIANTE: sempre o valor do lançamento (motor), nunca a soma editada.
     const total = Number(receita.valor)
     const inicio = data1 ?? receita.data1
-    const plano = redistribuirParcelas(total, nParcelas, inicio)
+
+    // Cronograma pela Condição de Pagamento quando indicada; senão, o
+    // reparcelamento linear histórico.
+    const condicaoId = Number(body?.condicaoPagamentoId) || null
+    let plano = redistribuirParcelas(total, nParcelas, inicio)
+    let condicaoAplicada: string | null = null
+
+    if (condicaoId) {
+      const { condicao, motivoDescarte } = await condicaoPorId(condicaoId, {
+        natureza: 'RECEITA', moeda: String(receita.moeda), total, emDatas: new Date(),
+      })
+      if (!condicao) {
+        return NextResponse.json(
+          { error: motivoDescarte ?? 'Condição de pagamento inválida para este lançamento.' },
+          { status: 422 },
+        )
+      }
+      const crono = gerarCronograma(condicao, { total, dataBase: inicio, nParcelas })
+      plano = crono.parcelas.map((p) => ({ numero: p.numero, vencimento: p.vencimento, valor: p.valor }))
+      condicaoAplicada = condicao.codigo ?? condicao.nome ?? String(condicao.id)
+    }
 
     // Guarda dura: a soma redistribuída fecha exatamente o total contratual.
     const soma = Number(plano.reduce((s, p) => s + p.valor, 0).toFixed(2))
@@ -75,19 +102,19 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
         data: {
           receitaId: id,
           tipo: 'EDICAO',
-          descricao: `Parcelamento alterado para ${nParcelas}× (total contratual preservado: ${total.toFixed(2)} ${receita.moeda})`.slice(0, 500),
+          descricao: `Parcelamento alterado para ${plano.length}×${condicaoAplicada ? ` pela condição ${condicaoAplicada}` : ''} (total contratual preservado: ${total.toFixed(2)} ${receita.moeda})`.slice(0, 500),
           valor: total,
         },
       })
       return tx.receita.update({
         where: { id },
         // nParcelas/data1 são campos OPERACIONAIS do parcelamento — valor não muda.
-        data: { nParcelas, data1: inicio },
+        data: { nParcelas: plano.length, data1: plano[0]?.vencimento ?? inicio },
         include: { parcelas: { orderBy: { numero: 'asc' } } },
       })
     }, { timeout: 30000, maxWait: 10000 })
 
-    return NextResponse.json({ ok: true, receita: atualizada, totalPreservado: total })
+    return NextResponse.json({ ok: true, receita: atualizada, totalPreservado: total, condicaoAplicada })
   } catch (err) {
     console.error('[PATCH /api/financeiro/receitas/[id]/parcelas] erro:', err)
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })

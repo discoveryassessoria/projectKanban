@@ -53,7 +53,7 @@
     "test:preco-fonte-unica": "tsx scripts/preco-fonte-unica.test.ts",
     "test:resolver-preco": "tsx scripts/resolver-preco-financeiro.test.ts",
     "test:financeiro-geral": "tsx scripts/financeiro-geral.test.ts",
-    "test:financeiro": "tsx scripts/preco-fonte-unica.test.ts && tsx scripts/resolver-preco-financeiro.test.ts && tsx scripts/financeiro-geral.test.ts && tsx scripts/acoes-lancamento.test.ts && tsx scripts/receitas-processo.test.ts",
+    "test:financeiro": "tsx scripts/preco-fonte-unica.test.ts && tsx scripts/resolver-preco-financeiro.test.ts && tsx scripts/financeiro-geral.test.ts && tsx scripts/acoes-lancamento.test.ts && tsx scripts/condicao-pagamento.test.ts && tsx scripts/receitas-processo.test.ts",
     "test:receitas-processo": "tsx scripts/receitas-processo.test.ts",
     "guard:db": "tsx scripts/guard-nonprod-db.ts",
     "migrate:test": "npm run guard:db && prisma migrate deploy",
@@ -69,7 +69,8 @@
     "test:roteamento-condicional": "tsx scripts/roteamento-condicional.test.ts",
     "test:emissao-gate": "tsx scripts/emissao-gate.test.ts",
     "test:entrega-transversal": "tsx scripts/entrega-transversal-guard.test.ts",
-    "test:acoes-financeiras": "tsx scripts/acoes-lancamento.test.ts"
+    "test:acoes-financeiras": "tsx scripts/acoes-lancamento.test.ts",
+    "test:condicao-pagamento": "tsx scripts/condicao-pagamento.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

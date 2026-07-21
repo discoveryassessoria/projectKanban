@@ -1825,18 +1825,23 @@ model ProdutoFinanceiro {
   // itemCatalogoId é o pivô (spine) e alvo de preço (TabelaValor/resolverPreco).
   // Exatamente UM mestre é apontado. O papel financeiro NÃO vive mais aqui —
   // custo/receita são valores desta config (M-UNIFICA); papel só em TabelaValor.natureza.
-  tipoDocumentoId    Int?
-  tipoDocumento      TipoDocumentoCadastro?     @relation("ConfigFinTipoDocumento", fields: [tipoDocumentoId], references: [id])
-  honorarioId        Int?
-  honorario          Honorario?                 @relation("ConfigFinHonorario", fields: [honorarioId], references: [id])
-  tipoProcessoId     Int?
-  tipoProcesso       TipoProcessoNacionalidade? @relation("ConfigFinTipoProcesso", fields: [tipoProcessoId], references: [id])
-  fornecedorPadraoId Int?
-  fornecedorPadrao   Fornecedor?                @relation("ConfigFinFornecedor", fields: [fornecedorPadraoId], references: [id])
+  tipoDocumentoId     Int?
+  tipoDocumento       TipoDocumentoCadastro?     @relation("ConfigFinTipoDocumento", fields: [tipoDocumentoId], references: [id])
+  honorarioId         Int?
+  honorario           Honorario?                 @relation("ConfigFinHonorario", fields: [honorarioId], references: [id])
+  tipoProcessoId      Int?
+  tipoProcesso        TipoProcessoNacionalidade? @relation("ConfigFinTipoProcesso", fields: [tipoProcessoId], references: [id])
+  fornecedorPadraoId  Int?
+  fornecedorPadrao    Fornecedor?                @relation("ConfigFinFornecedor", fields: [fornecedorPadraoId], references: [id])
+  // CONDIÇÃO DE PAGAMENTO PADRÃO — cada serviço/documento carrega a sua regra de
+  // cobrança. Nullable na adoção incremental: sem condição o motor mantém o
+  // comportamento histórico (1 parcela). Torna-se obrigatório após o backfill.
+  condicaoPagamentoId Int?
+  condicaoPagamento   CondicaoPagamento?         @relation("ConfigFinCondicaoPagamento", fields: [condicaoPagamentoId], references: [id])
   // F2 — back-relations: aplicabilidade/automação apontam para esta config por FK
-  econRulesCusto     PhaseEconomicRule[]        @relation("EconCustoConfig")
-  econRulesReceita   PhaseEconomicRule[]        @relation("EconReceitaConfig")
-  precosConfig       TabelaValor[]              @relation("PrecoConfig")
+  econRulesCusto      PhaseEconomicRule[]        @relation("EconCustoConfig")
+  econRulesReceita    PhaseEconomicRule[]        @relation("EconReceitaConfig")
+  precosConfig        TabelaValor[]              @relation("PrecoConfig")
 
   // M-UNIFICA — anti-duplicação: UMA configuração por item mestre (pivô).
   // itemCatalogoId nulo é distinto no Postgres (não restringe configs sem pivô).
@@ -1850,6 +1855,7 @@ model ProdutoFinanceiro {
   @@index([honorarioId])
   @@index([tipoProcessoId])
   @@index([fornecedorPadraoId])
+  @@index([condicaoPagamentoId])
 }
 
 // ── Tabela de Valores (fin_values) ──
@@ -1939,6 +1945,17 @@ model PendenciaFinanceira {
 }
 
 // ── Condições de Pagamento (fin_paycond) ──
+// ── CONDIÇÃO DE PAGAMENTO ────────────────────────────────────────────────────
+// Cadastro OFICIAL das regras de cobrança do sistema. É aqui — e só aqui — que
+// vivem entrada, quantidade de parcelas, periodicidade, cronograma,
+// distribuição, encargos, política cambial e restrições de uso.
+//
+// A Tabela de Preços responde por VALOR; a Condição de Pagamento responde por
+// COMO esse valor é cobrado. O FinanceRuleEngine consome o cronograma pronto
+// (lib/financeiro/condicao-pagamento.ts) em vez de montar parcelas na mão.
+//
+// Campos históricos (name/moeda/formaPagamento/parcelas/diaVencimento/...) são
+// PRESERVADOS: a expansão é aditiva e os registros existentes seguem válidos.
 model CondicaoPagamento {
   id             Int                  @id @default(autoincrement())
   name           String               @db.VarChar(200)
@@ -1955,7 +1972,105 @@ model CondicaoPagamento {
   criadoEm       DateTime             @default(now())
   atualizadoEm   DateTime             @updatedAt
 
+  // ── identificação e versionamento ──
+  // Condição já utilizada NUNCA é alterada: cria-se a versão seguinte
+  // (proximaVersao) e encerra-se a vigência da anterior.
+  codigo      String?             @db.VarChar(40)
+  descricao   String?             @db.Text
+  versao      Int                 @default(1)
+  substituiId Int?
+  substitui   CondicaoPagamento?  @relation("VersaoCondicao", fields: [substituiId], references: [id])
+  versoes     CondicaoPagamento[] @relation("VersaoCondicao")
+
+  vigenciaInicio DateTime?
+  vigenciaFim    DateTime?
+
+  // ── parcelamento ──
+  tipoPagamento                 String   @default("PARCELADO") @db.VarChar(20) // AVISTA | PARCELADO
+  entradaObrigatoria            Boolean  @default(false)
+  valorEntradaFixo              Decimal? @db.Decimal(12, 2)
+  parcelasMin                   Int?
+  parcelasMax                   Int?
+  parcelasPadrao                Int?
+  permiteParcelasPersonalizadas Boolean  @default(false)
+  permiteEdicaoManual           Boolean  @default(false)
+
+  // ── cronograma ──
+  inicioCronograma    String    @default("IMEDIATA") @db.VarChar(20) // IMEDIATA | DIAS | DATA_ESPECIFICA
+  primeiraParcelaDias Int?
+  primeiraParcelaData DateTime?
+  periodicidade       String    @default("MENSAL") @db.VarChar(20) // SEMANAL..ANUAL | PERSONALIZADA
+  periodicidadeDias   Int?
+  diaFixo             Int?
+  ajusteDiaUtil       String    @default("NENHUM") @db.VarChar(20) // NENHUM | ULTIMO_DIA_UTIL | PROXIMO_DIA_UTIL
+  ajustarFimDeSemana  Boolean   @default(false)
+  // Declarado; o ajuste efetivo depende de um calendário de feriados que o
+  // sistema ainda não possui (ver ajustarVencimento).
+  ajustarFeriados     Boolean   @default(false)
+
+  // ── distribuição ──
+  distribuicao           String   @default("ULTIMA_AJUSTA") @db.VarChar(30)
+  primeiraParcelaPercent Decimal? @db.Decimal(5, 2)
+
+  // ── encargos (armazenados; aplicação em runtime é o próximo incremento) ──
+  multaPercent               Decimal? @db.Decimal(7, 4)
+  jurosMesPercent            Decimal? @db.Decimal(7, 4)
+  descontoPercent            Decimal? @db.Decimal(7, 4)
+  descontoAntecipacaoPercent Decimal? @db.Decimal(7, 4)
+  descontoAVistaPercent      Decimal? @db.Decimal(7, 4)
+
+  // ── câmbio ──
+  politicaCambio String  @default("VARIAVEL") @db.VarChar(20) // FIXO | VARIAVEL | CONTRATACAO | RECEBIMENTO
+  travaCambial   Boolean @default(false)
+
+  // ── restrições de uso ──
+  aplicaA          String   @default("AMBOS") @db.VarChar(20) // RECEITA | CUSTO | AMBOS
+  moedasPermitidas String[] @default([])
+  valorMinimo      Decimal? @db.Decimal(12, 2)
+  valorMaximo      Decimal? @db.Decimal(12, 2)
+  paises           String[] @default([])
+  modalidades      String[] @default([])
+  tiposProcesso    String[] @default([])
+
+  observacoes String? @db.Text
+
+  // ── vínculos ──
+  formasPermitidas CondicaoPagamentoForma[]
+  taxasVinculadas  CondicaoPagamentoTaxa[]
+  configuracoes    ProdutoFinanceiro[]      @relation("ConfigFinCondicaoPagamento")
+
+  @@unique([codigo, versao])
   @@index([carteiraId])
+  @@index([codigo])
+  @@index([substituiId])
+}
+
+// Formas de pagamento aceitas por uma condição (N:N).
+model CondicaoPagamentoForma {
+  id         Int                    @id @default(autoincrement())
+  condicaoId Int
+  condicao   CondicaoPagamento      @relation(fields: [condicaoId], references: [id], onDelete: Cascade)
+  formaId    Int
+  forma      FormaPagamentoCadastro @relation(fields: [formaId], references: [id], onDelete: Cascade)
+  criadoEm   DateTime               @default(now())
+
+  @@unique([condicaoId, formaId])
+  @@index([condicaoId])
+  @@index([formaId])
+}
+
+// Taxas de pagamento vinculadas automaticamente por uma condição (N:N).
+model CondicaoPagamentoTaxa {
+  id         Int               @id @default(autoincrement())
+  condicaoId Int
+  condicao   CondicaoPagamento @relation(fields: [condicaoId], references: [id], onDelete: Cascade)
+  taxaId     Int
+  taxa       TaxaPagamento     @relation(fields: [taxaId], references: [id], onDelete: Cascade)
+  criadoEm   DateTime          @default(now())
+
+  @@unique([condicaoId, taxaId])
+  @@index([condicaoId])
+  @@index([taxaId])
 }
 
 // ── Honorários (fin_honorariums) ──
@@ -2030,6 +2145,9 @@ model MoedaCadastro {
   atualizadoEm DateTime @updatedAt
 }
 
+// FORMA DE PAGAMENTO — cadastro do MEIO utilizado (PIX, boleto, cartão, Stripe…).
+// Sem regra financeira: parcelamento, cronograma e encargos pertencem à
+// Condição de Pagamento. Aqui só ficam as capacidades do meio.
 model FormaPagamentoCadastro {
   id              Int      @id @default(autoincrement())
   code            String?  @db.VarChar(40)
@@ -2040,6 +2158,19 @@ model FormaPagamentoCadastro {
   maxParcelas     Int?
   criadoEm        DateTime @default(now())
   atualizadoEm    DateTime @updatedAt
+
+  // ── capacidades do meio (aditivo) ──
+  ativo                  Boolean @default(true)
+  ordem                  Int     @default(0)
+  icone                  String? @db.VarChar(60)
+  aceitaEntrada          Boolean @default(false)
+  aceitaRecorrencia      Boolean @default(false)
+  aceitaMoedaEstrangeira Boolean @default(false)
+  observacoes            String? @db.Text
+
+  condicoes CondicaoPagamentoForma[]
+
+  @@index([ativo, ordem])
 }
 
 model TaxaPagamento {
@@ -2057,6 +2188,8 @@ model TaxaPagamento {
   installmentsTo      Int?
   criadoEm            DateTime @default(now())
   atualizadoEm        DateTime @updatedAt
+
+  condicoes CondicaoPagamentoTaxa[]
 }
 
 // ============================================================
