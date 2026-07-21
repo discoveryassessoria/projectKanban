@@ -586,3 +586,99 @@ export async function reprocessarPendenciasFinanceiras(opts?: { processoId?: num
   }
   return { reprocessados: alvos.size, resolvidos }
 }
+
+// ============================================================================
+// RECONCILE — convergência definitiva do FinanceRuleEngine.
+//
+// A única origem de lançamento é o motor. Reconciliar uma (processo, fase):
+//   1) CRIA os que faltam (executarFinanceirasNaFaseV2 — idempotente).
+//   2) REMOVE os órfãos: lançamentos que o motor criou (MotorArtefato ativo) mas
+//      cuja regra/config deixou de existir/aplicar (automaticKey fora do conjunto
+//      esperado atual). Remoção SEGURA: se o lançamento tiver dependência (ex.:
+//      pagamento realizado com FK RESTRICT), a transação falha e ele é PRESERVADO.
+// É idempotente: rodar N vezes converge para o conjunto correto e não duplica.
+// ============================================================================
+export async function reconciliarFinanceiroDaFase(
+  processoId: number, phaseKey: string,
+): Promise<{ criadas: number; removidas: number; bloqueadas: number; skipped: { name: string; reason: string }[]; erros: string[] }> {
+  // 1) cria os que faltam
+  const run = await executarFinanceirasNaFaseV2(processoId, phaseKey)
+
+  const proc = await prisma.processo.findUnique({ where: { id: processoId }, select: { tipoProcessoMotorId: true } })
+  const tipoProcessoId = proc?.tipoProcessoMotorId
+  if (!tipoProcessoId) return { ...run, removidas: 0, bloqueadas: 0 }
+
+  // 2) conjunto ESPERADO de chaves (regras financeiras ativas atuais da fase)
+  const regras = await prisma.phaseAutomationRule.findMany({
+    where: { kind: 'financial', tipoProcessoId, phaseKey, trigger: 'phase_entered', active: true, arquivado: false, configItemId: { not: null } },
+  })
+  const esperados = new Set<string>()
+  for (const r of regras) {
+    const ap = r.aplicacaoFinanceira
+    if (!aplicacaoValida(ap)) continue
+    const cfg = await prisma.produtoFinanceiro.findUnique({ where: { id: r.configItemId! }, select: { possuiCusto: true, possuiReceita: true } })
+    if (!cfg || !aplicacaoPermitida(ap, cfg)) continue
+    for (const natPreco of naturezasDaAplicacao(ap)) {
+      const isRec = natPreco === NaturezaPreco.VENDA
+      esperados.add(`${processoId}::${phaseKey}::automation::${r.id}::${isRec ? 'VENDA' : 'CUSTO'}`)
+    }
+  }
+
+  // 3) remove artefatos ativos que não estão mais no conjunto esperado
+  const ativos = await prisma.motorArtefato.findMany({
+    where: { processoId, phaseKey, ruleKind: 'financial', ruleSource: 'automation', status: 'active' },
+    select: { id: true, automaticKey: true, targetTable: true, targetId: true },
+  })
+  let removidas = 0, bloqueadas = 0
+  for (const a of ativos) {
+    if (esperados.has(a.automaticKey)) continue
+    try {
+      await prisma.$transaction(async (tx) => {
+        if (a.targetId) {
+          if (a.targetTable === 'Receita') await tx.receita.delete({ where: { id: a.targetId } })
+          else if (a.targetTable === 'Custo') await tx.custo.delete({ where: { id: a.targetId } })
+        }
+        await tx.motorArtefato.update({ where: { id: a.id }, data: { status: 'removed' } })
+      }, { timeout: 30000, maxWait: 10000 })
+      removidas++
+    } catch {
+      // dependência impede a remoção (ex.: pagamento realizado) → preserva o lançamento
+      bloqueadas++
+    }
+  }
+  return { ...run, removidas, bloqueadas }
+}
+
+/** Reconcilia os processos afetados por uma REGRA financeira (ex.: regra desativada/arquivada
+ *  → remove os lançamentos órfãos que ela havia gerado). Idempotente, best-effort. */
+export async function reconciliarPorRegra(ruleId: number): Promise<{ processos: number; criadas: number; removidas: number; bloqueadas: number }> {
+  const arts = await prisma.motorArtefato.findMany({
+    where: { ruleId, ruleKind: 'financial', status: 'active' },
+    select: { processoId: true, phaseKey: true }, distinct: ['processoId', 'phaseKey'],
+  })
+  const procs = new Set<number>()
+  let criadas = 0, removidas = 0, bloqueadas = 0
+  for (const a of arts) {
+    if (!a.phaseKey) continue
+    procs.add(a.processoId)
+    const r = await reconciliarFinanceiroDaFase(a.processoId, a.phaseKey)
+    criadas += r.criadas; removidas += r.removidas; bloqueadas += r.bloqueadas
+  }
+  return { processos: procs.size, criadas, removidas, bloqueadas }
+}
+
+/** Reconcilia TODAS as fases em que o processo já teve lançamentos do motor. */
+export async function reconciliarFinanceiroDoProcesso(processoId: number): Promise<{ fases: number; criadas: number; removidas: number; bloqueadas: number }> {
+  const arts = await prisma.motorArtefato.findMany({
+    where: { processoId, ruleKind: 'financial' }, select: { phaseKey: true }, distinct: ['phaseKey'],
+  })
+  const proc = await prisma.processo.findUnique({ where: { id: processoId }, select: { faseAtualKey: true } })
+  const fases = new Set<string>(arts.map((a) => a.phaseKey).filter((p): p is string => !!p))
+  if (proc?.faseAtualKey) fases.add(proc.faseAtualKey)
+  let criadas = 0, removidas = 0, bloqueadas = 0
+  for (const f of fases) {
+    const r = await reconciliarFinanceiroDaFase(processoId, f)
+    criadas += r.criadas; removidas += r.removidas; bloqueadas += r.bloqueadas
+  }
+  return { fases: fases.size, criadas, removidas, bloqueadas }
+}

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { aplicacaoValida, aplicacaoPermitida } from '@/lib/financeiro/aplicacao-financeira'
+import { reconciliarPorRegra } from '@/src/lib/motor/executor'
 
 // PUT — edita a regra (campos do editor) / toggle active / arquivar
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -90,6 +91,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (vinculoData) { data.configItemId = vinculoData.configItemId; data.aplicacaoFinanceira = vinculoData.aplicacaoFinanceira; data.params = vinculoData.params; data.financialType = null }
 
     const rule = await prisma.phaseAutomationRule.update({ where: { id }, data })
+    // MODELO DEFINITIVO: mudança de regra financeira → o motor reconcilia os processos
+    // afetados (remove lançamentos órfãos quando a regra deixa de aplicar). Best-effort.
+    reconciliarPorRegra(id).catch((e) => console.error('[reconcile regra PUT]', e))
     return NextResponse.json({ rule })
   } catch (e) {
     console.error('PUT automacoes-fase/[id]', e)

@@ -12,7 +12,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
-import { executarFinanceirasNaFaseV2 } from "@/src/lib/motor/executor"
+import { reconciliarFinanceiroDaFase } from "@/src/lib/motor/executor"
 import { reconciliarOperacoesAntecipadas } from "@/src/services/operacao-antecipada"
 
 const MAX_TENTATIVAS = 5
@@ -57,7 +57,10 @@ async function aplicarPhaseEntered(payload: PhaseEnteredPayload, correlationId: 
     // NÃO engolir: se algum lançamento falhou (erro transitório), PROPAGAR para o
     // processarOutbox marcar o evento PENDENTE e reprocessar (idempotente via MotorArtefato).
     // Engolir marcaria ENVIADO e perderia a Receita/Custo silenciosamente.
-    const r = await executarFinanceirasNaFaseV2(payload.processId, payload.newPhaseKey)
+    // RECONCILE (modelo definitivo): cria os lançamentos que faltam E remove os órfãos
+    // (regra/config que deixou de aplicar). Converge o Financeiro do Processo ao que o
+    // FinanceRuleEngine determina. Idempotente.
+    const r = await reconciliarFinanceiroDaFase(payload.processId, payload.newPhaseKey)
     if (r.erros.length) throw new Error(`automações financeiras da fase falharam: ${r.erros.join(" ; ")}`)
 
     // REAPROVEITAMENTO de trabalho antecipado: ao entrar numa fase, reconcilia (idempotente) as
