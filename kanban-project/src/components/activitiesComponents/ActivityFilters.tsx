@@ -25,6 +25,7 @@ interface Processo {
 interface Usuario {
   id: number
   nome: string
+  publicCode?: string | null
 }
 
 interface FilterOptions {
@@ -337,7 +338,7 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
                   <SelectItem value="all" className="text-white hover:bg-white/10">Todos os Responsáveis</SelectItem>
                   {usuarios.map((usuario) => (
                     <SelectItem key={usuario.id} value={usuario.id.toString()} className="text-white hover:bg-white/10">
-                      {usuario.nome}
+                      {usuario.publicCode ? usuario.publicCode + ' — ' : ''}{usuario.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>

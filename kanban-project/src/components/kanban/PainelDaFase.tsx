@@ -132,7 +132,7 @@ export interface PainelDaFaseProps {
   onAbrirOperacao?: (docId: number, necessidadeId?: number | null) => void
   onAbrirPainelCompleto?: () => void
   // Delegação direto na fila (Genealogia): lista de funcionários + callback.
-  usuarios?: Array<{ id: number; nome: string }>
+  usuarios?: Array<{ id: number; nome: string; publicCode?: string | null }>
   onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
   // Operação Antecipada: capacidade nativa — usa a operação oficial de outra fase p/ atender esta necessidade.
   onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
@@ -406,7 +406,7 @@ function PersonRow({
 }: {
   p: FasePersonRow
   onAbrirOperacao?: (docId: number, necessidadeId?: number | null) => void
-  usuarios?: Array<{ id: number; nome: string }>
+  usuarios?: Array<{ id: number; nome: string; publicCode?: string | null }>
   onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
   onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
   operacoesPorNec?: Map<number, OpAntecipadaInline[]>
@@ -586,7 +586,7 @@ function PersonRow({
               >
                 <option value="">Delegar…</option>
                 {usuarios.map((u) => (
-                  <option key={u.id} value={u.id}>{u.nome}</option>
+                  <option key={u.id} value={u.id}>{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>
                 ))}
               </select>
             ) : (

@@ -66,7 +66,7 @@ const MODULOS_PERMISSOES = [
 ]
 const TODAS_CHAVES = MODULOS_PERMISSOES.flatMap(m => m.permissoes.map(p => p.chave))
 
-interface Usuario { id: number; nome: string; email: string; tipo: string; perfilId?: number | null; perfilNome?: string | null }
+interface Usuario { id: number; publicCode?: string | null; nome: string; email: string; tipo: string; perfilId?: number | null; perfilNome?: string | null }
 interface Perfil { id: number; nome: string; descricao: string | null; cor: string | null; sistema: boolean; permissoes: Record<string, boolean> }
 
 export default function UsersTab() {
@@ -253,6 +253,7 @@ export default function UsersTab() {
           <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="text-white/40 text-xs border-b border-white/10">
+                <th className="text-left font-medium py-2">Código</th>
                 <th className="text-left font-medium py-2">Nome</th>
                 <th className="text-left font-medium py-2">E-mail</th>
                 <th className="text-left font-medium py-2">Tipo</th>
@@ -262,6 +263,7 @@ export default function UsersTab() {
             <tbody>
               {usuarios.map(u => (
                 <tr key={u.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
+                  <td className="py-2.5 font-mono text-[12px] font-bold text-white/80">{u.publicCode ?? '—'}</td>
                   <td className="py-2.5 text-white">{u.nome}{getPerfilBadge(u)}</td>
                   <td className="py-2.5 text-white/70">{u.email}</td>
                   <td className="py-2.5">

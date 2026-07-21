@@ -137,6 +137,7 @@ interface Documento {
 interface Usuario {
   id: number
   nome: string
+  publicCode?: string | null
   email?: string | null
 }
 
@@ -740,7 +741,7 @@ function TabOperation({
             >
               <option value="">— Não atribuído —</option>
               {usuarios.map((u) => (
-                <option key={u.id} value={u.id} className="bg-slate-800">{u.nome}</option>
+                <option key={u.id} value={u.id} className="bg-slate-800">{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>
               ))}
             </select>
           </div>

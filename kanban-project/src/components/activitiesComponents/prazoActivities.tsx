@@ -478,7 +478,7 @@ export default function PrazoActivities({ filters }: PrazoActivitiesProps) {
             }}
             onClose={() => setIsDetailsModalOpen(false)}
             onUpdate={() => { mutate(); invalidateActivities() }}
-            usuarios={users.map((u: any) => ({ id: u.id, nome: u.nome, email: u.email }))}
+            usuarios={users.map((u: any) => ({ id: u.id, nome: u.nome, email: u.email, publicCode: u.publicCode }))}
           />
         )}
     </div>

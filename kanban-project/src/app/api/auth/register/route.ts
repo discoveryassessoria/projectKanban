@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       },
       select: {
         id: true,
+        publicCode: true, // USR-n — código público
         nome: true,
         email: true,
         tipo: true,

@@ -19,6 +19,7 @@ import { PrazoClassification } from "@/src/utils/prazoUtils"
 interface Usuario {
   id: number
   nome: string
+  publicCode?: string | null
   email?: string
 }
 
@@ -307,7 +308,7 @@ export default function QuickAddModal({
                 <SelectItem value="none">Sem responsável</SelectItem>
                 {usuarios.map((usuario) => (
                   <SelectItem key={usuario.id} value={usuario.id.toString()}>
-                    {usuario.nome}
+                    {usuario.publicCode ? usuario.publicCode + ' — ' : ''}{usuario.nome}
                   </SelectItem>
                 ))}
               </SelectContent>

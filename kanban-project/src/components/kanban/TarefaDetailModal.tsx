@@ -51,6 +51,7 @@ const selectStyle = {
 interface Responsavel {
   id: number
   nome: string
+  publicCode?: string | null
   email?: string
 }
 
@@ -501,7 +502,7 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
                 </select>
                 <select value={editForm.responsavelId} onChange={(e) => setEditForm({...editForm, responsavelId: e.target.value})} className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-xs bg-white appearance-none cursor-pointer" style={selectStyle}>
                   <option value="">Sem responsável</option>
-                  {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+                  {usuarios.map(u => <option key={u.id} value={u.id}>{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>)}
                 </select>
               </div>
               <div className="flex justify-end gap-2">
@@ -909,7 +910,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                         <label className="text-xs text-gray-500 mb-1 block">Responsável</label>
                         <select value={editForm.responsavelId} onChange={(e) => setEditForm({...editForm, responsavelId: e.target.value})} className={selectClass} style={selectStyle}>
                           <option value="">Sem responsável</option>
-                          {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+                          {usuarios.map(u => <option key={u.id} value={u.id}>{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>)}
                         </select>
                       </div>
                     </div>

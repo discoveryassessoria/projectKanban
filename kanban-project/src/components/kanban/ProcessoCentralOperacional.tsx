@@ -444,11 +444,11 @@ export function ProcessoCentralOperacional({
   )
 
   // Lista de funcionários para os seletores "Delegar" (carrega uma vez).
-  const [usuarios, setUsuarios] = useState<Array<{ id: number; nome: string }>>([])
+  const [usuarios, setUsuarios] = useState<Array<{ id: number; nome: string; publicCode?: string | null }>>([])
   useEffect(() => {
     fetch("/api/usuarios", { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } })
       .then((r) => r.json())
-      .then((d) => setUsuarios((d.usuarios || d || []).map((u: { id: number; nome: string }) => ({ id: u.id, nome: u.nome }))))
+      .then((d) => setUsuarios((d.usuarios || d || []).map((u: { id: number; nome: string; publicCode?: string | null }) => ({ id: u.id, nome: u.nome, publicCode: u.publicCode ?? null }))))
       .catch(() => {})
   }, [])
 

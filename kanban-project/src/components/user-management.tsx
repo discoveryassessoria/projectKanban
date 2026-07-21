@@ -31,6 +31,7 @@ import { getUsers, createUser, updateUser, deleteUser } from "@/src/services/use
 
 interface Usuario {
   id: number
+  publicCode?: string | null   // USR-n — código público
   nome: string
   email: string
   tipo: string
@@ -281,6 +282,7 @@ export function UserManagement() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-medium">Código</th>
                     <th className="text-left py-3 px-4 font-medium">Nome</th>
                     <th className="text-left py-3 px-4 font-medium">Email</th>
                     <th className="text-left py-3 px-4 font-medium">Tipo</th>
@@ -290,6 +292,7 @@ export function UserManagement() {
                 <tbody>
                   {usuarios.map((usuario) => (
                     <tr key={usuario.id} className="border-b last:border-0 hover:bg-muted/50">
+                      <td className="py-3 px-4 font-mono text-xs font-bold">{usuario.publicCode ?? '—'}</td>
                       <td className="py-3 px-4">{usuario.nome}</td>
                       <td className="py-3 px-4 text-muted-foreground">{usuario.email}</td>
                       <td className="py-3 px-4">

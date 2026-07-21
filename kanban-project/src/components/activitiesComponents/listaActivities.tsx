@@ -550,7 +550,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
           }}
           onClose={() => setIsDetailsModalOpen(false)}
           onUpdate={() => { mutate() }}
-          usuarios={users.map((u: any) => ({ id: u.id, nome: u.nome, email: u.email }))}
+          usuarios={users.map((u: any) => ({ id: u.id, nome: u.nome, email: u.email, publicCode: u.publicCode }))}
         />
       )}
     </>

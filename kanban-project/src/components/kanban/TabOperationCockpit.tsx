@@ -67,7 +67,7 @@ interface Props {
   onAbrirIniciar: () => void                          // abre o InitOperationModal
   onTrocarAba: (tab: "registry" | "history" | "workflow") => void  // troca pra aba interna
   onAbrirCentralDaEtapa: (stepId: number) => void     // abre o editor inline da etapa (na aba Workflow)
-  usuarios?: Array<{ id: number; nome: string }>       // p/ delegar o responsável do passo ativo
+  usuarios?: Array<{ id: number; nome: string; publicCode?: string | null }>       // p/ delegar o responsável do passo ativo
   onAtribuir?: (stepId: number, responsavelId: number | null) => void | Promise<void>
   // Estado CONFIRMADO pela projeção operacional (fonte única). O empty-state "sem operação"
   // só é renderizado quando o Drawer já resolveu NOT_MATERIALIZED — nunca durante o LOADING.
@@ -314,7 +314,7 @@ export function TabOperationCockpit({
               >
                 <option value="" className="bg-slate-800">Delegar…</option>
                 {usuarios.map((u) => (
-                  <option key={u.id} value={u.id} className="bg-slate-800">{u.nome}</option>
+                  <option key={u.id} value={u.id} className="bg-slate-800">{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>
                 ))}
               </select>
             ) : (

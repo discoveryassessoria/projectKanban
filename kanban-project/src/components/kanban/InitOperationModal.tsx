@@ -22,6 +22,7 @@ type Prioridade = "normal" | "urgente" | "critica"
 interface Usuario {
   id: number
   nome: string
+  publicCode?: string | null
   email?: string | null
 }
 

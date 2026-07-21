@@ -66,6 +66,7 @@ interface Processo {
 interface Responsavel {
   id: number
   nome: string
+  publicCode?: string | null
   email?: string
 }
 

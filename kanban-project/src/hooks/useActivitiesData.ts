@@ -12,6 +12,7 @@ import useSWR, { mutate } from 'swr'
 // Tipos compartilhados
 export interface Usuario {
   id?: number
+  publicCode?: string | null   // USR-n — código público
   nome: string
   email?: string
 }

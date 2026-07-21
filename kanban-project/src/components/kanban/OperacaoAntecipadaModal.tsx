@@ -24,7 +24,7 @@ interface Props {
   necessidadeLabel?: string
   pessoaId?: number | null
   faseAtivaCode?: string | null
-  usuarios?: Array<{ id: number; nome: string }>
+  usuarios?: Array<{ id: number; nome: string; publicCode?: string | null }>
   onClose: () => void
   onCreated: () => void
 }
@@ -187,7 +187,7 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
               <span className="block text-[11.5px] font-semibold text-gray-600 mb-1">Responsável</span>
               <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="w-full text-[13px] rounded-lg border border-gray-200 px-2.5 py-2 bg-white focus:outline-none focus:border-blue-400">
                 <option value="">—</option>
-                {(usuarios ?? []).map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+                {(usuarios ?? []).map((u) => <option key={u.id} value={u.id}>{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>)}
               </select>
             </label>
           </div>

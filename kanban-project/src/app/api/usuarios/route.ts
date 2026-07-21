@@ -21,12 +21,14 @@ export async function GET(request: NextRequest) {
     const usuarios = await prisma.usuario.findMany({
       select: {
         id: true,
+        publicCode: true, // USR-n — código público
         nome: true,
         email: true,
         tipo: true, // Incluir tipo de usuário
       },
       where: search ? {
         OR: [
+          { publicCode: { contains: search, mode: 'insensitive' } },
           { nome: { contains: search, mode: 'insensitive' } },
           { email: { contains: search, mode: 'insensitive' } }
         ]
