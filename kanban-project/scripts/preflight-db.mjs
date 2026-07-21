@@ -48,24 +48,50 @@ if (!url) {
   }
 }
 
-// 3 · shadow separado
+// 3 · shadow separado — só se aplica a fluxos que USAM shadow (migrate dev/diff).
+// `migrate deploy` nunca cria shadow database; exigir um aqui seria teatro.
 console.log('\n3. Shadow database')
-const v = validarShadow({ shadowUrl: process.env.SHADOW_DATABASE_URL, mainUrl: url })
-item('shadow separado e descartável', v.ok, v.motivo || identificador(process.env.SHADOW_DATABASE_URL))
+const modo = process.env.PREFLIGHT_MODO ?? 'deploy'
+if (modo === 'deploy') {
+  item('não se aplica a migrate deploy (não usa shadow)', true, 'modo=deploy')
+} else {
+  const v = validarShadow({ shadowUrl: process.env.SHADOW_DATABASE_URL, mainUrl: url })
+  item('shadow separado e descartável', v.ok, v.motivo || identificador(process.env.SHADOW_DATABASE_URL))
+}
 
-// 4 · migrations revisadas
+// 4 · migrations — só as PENDENTES importam. Migration já aplicada no passado
+// não é risco deste deploy; avaliá-la aqui produzia falso positivo.
 console.log('\n4. Migrations')
 const dir = join(RAIZ, 'prisma/migrations')
-const migs = existsSync(dir) ? readdirSync(dir).filter((d) => /^\d/.test(d)) : []
+const migs = existsSync(dir) ? readdirSync(dir).filter((d) => /^\d/.test(d)).sort() : []
 item('migrations versionadas no repositório', migs.length > 0, `${migs.length}`)
+
+let pendentes = migs
+if (url) {
+  const { PrismaClient } = await import('@prisma/client')
+  const px = new PrismaClient({ datasources: { db: { url } } })
+  try {
+    const aplicadas = await px.$queryRawUnsafe(
+      `SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL`,
+    )
+    const nomes = new Set(aplicadas.map((r) => r.migration_name))
+    pendentes = migs.filter((m) => !nomes.has(m))
+  } catch {
+    item('leitura de _prisma_migrations', false, 'não foi possível determinar as pendentes')
+  } finally {
+    await px.$disconnect()
+  }
+}
+item('migrations pendentes identificadas', true, pendentes.length ? pendentes.join(', ') : 'nenhuma')
+
 const destrutivas = []
-for (const m of migs) {
+for (const m of pendentes) {
   const p = join(dir, m, 'migration.sql')
   if (!existsSync(p)) continue
   const sql = readFileSync(p, 'utf8')
-  if (/DROP\s+(TABLE|COLUMN|SCHEMA|DATABASE)|TRUNCATE/i.test(sql)) destrutivas.push(m)
+  if (/DROP\s+(TABLE|COLUMN|SCHEMA|DATABASE)|TRUNCATE|DELETE\s+FROM/i.test(sql)) destrutivas.push(m)
 }
-item('nenhuma migration pendente é destrutiva', destrutivas.length === 0, destrutivas.slice(-3).join(', ') || 'nenhuma')
+item('nenhuma migration PENDENTE é destrutiva', destrutivas.length === 0, destrutivas.join(', ') || 'nenhuma')
 
 // 5 · plano de rollback
 console.log('\n5. Rollback')
