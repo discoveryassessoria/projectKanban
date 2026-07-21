@@ -12,6 +12,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { getStoredUser, isAuthenticated } from "@/lib/auth"
+import { useAmbiente } from "@/src/contexts/ambiente-context"
 import { KanbanBoard } from "@/src/components/kanban-board-novo"
 import { ProcessosLista } from "@/src/components/processos-lista"
 import { ContratantesTabela } from "@/src/components/contratantes-tabela"
@@ -142,6 +143,13 @@ export function KanbanContent() {
   useEffect(() => {
     setTipoSelecionadoId(null)
   }, [paisSelecionado])
+
+  // Ambiente visual: o país selecionado no Kanban é uma FONTE CONFIÁVEL do fundo
+  // (sem processo aberto = lista filtrada por país). Só decora — não altera layout.
+  const { focarPais } = useAmbiente()
+  useEffect(() => {
+    focarPais(paisSelecionado)
+  }, [paisSelecionado, focarPais])
 
   const handleLogout = () => {
     localStorage.removeItem("authToken")

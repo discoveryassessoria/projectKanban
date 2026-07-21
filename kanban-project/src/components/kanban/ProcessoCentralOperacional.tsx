@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Loader2, Eye, ArrowLeft, ArrowLeftRight } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { useAmbiente } from "@/src/contexts/ambiente-context"
 import type { ProcessoWithStatus, Processo, OperationalProjection } from "@/src/types/kanban"
 import { DocumentoOperationalDrawer } from "./DocumentoOperationalDrawer"
 import { InitOperationModal } from "./InitOperationModal"
@@ -350,6 +351,15 @@ export function ProcessoCentralOperacional({
   onProcessoMudou,
 }: ProcessoCentralOperacionalProps) {
   const { pode } = usePermissoes()
+
+  // Ambiente visual: abrir/estar num processo é a FONTE mais confiável do país.
+  // Mantém o país ao navegar entre as abas do processo (Central/Documentos/Árvore/
+  // Financeiro do Processo). Só decora o fundo — não altera layout/dados.
+  const { entrarNoProcesso } = useAmbiente()
+  useEffect(() => {
+    const p = processo as { id: number; pais?: string | null; codigo?: string | null; nome?: string | null; faseAtualKey?: string | null }
+    entrarNoProcesso({ processoId: p.id, pais: p.pais ?? null, codigo: p.codigo ?? null, familia: p.nome ?? null, fase: p.faseAtualKey ?? null })
+  }, [processo, entrarNoProcesso])
   const [data, setData] = useState<CentralOpData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
