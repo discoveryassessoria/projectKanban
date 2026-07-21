@@ -5,8 +5,9 @@
 // MODELO DEFINITIVO:
 //   • Os lançamentos nascem EXCLUSIVAMENTE do FinanceRuleEngine. Não há botão
 //     de criação, cadastro livre, valor digitado nem moeda manual nesta tela.
-//   • Mas eles NÃO são uma tabela morta: cada linha abre um drawer onde o
-//     lançamento é consultável, parcelável, recebível, cancelável e estornável.
+//   • Mas eles NÃO são uma tabela morta: cada linha abre o MODAL FINANCEIRO
+//     CENTRAL, onde o lançamento é consultável, parcelável, recebível,
+//     cancelável e estornável.
 //   • A MOEDA ORIGINAL é a apresentação principal. O BRL é sempre conversão
 //     auxiliar — nunca substitui o valor contratual nem soma moedas diferentes.
 //   • Agrupamento: FASE → subgrupo. "Pasta Documental" agrupa só lançamento
@@ -35,7 +36,7 @@ import {
   fmtCambio,
   fmtData,
 } from '@/lib/financeiro/apresentacao-lancamento'
-import { ReceitaDrawer } from '../ReceitaDrawer'
+import { ReceitaFinanceiraModal } from '../receita-modal/ReceitaFinanceiraModal'
 
 type ReceitaAPI = LancamentoView & { faseLabel?: string | null }
 
@@ -108,7 +109,7 @@ export function Receitas({ processoId, onUpdate }: ReceitasProps) {
   const [filtro, setFiltro] = useState<Filtro>('todas')
   const [busca, setBusca] = useState('')
   const [abertos, setAbertos] = useState<Record<string, boolean>>({})
-  const [drawerId, setDrawerId] = useState<number | null>(null)
+  const [lancamentoAberto, setLancamentoAberto] = useState<number | null>(null)
 
   const carregar = useCallback(async () => {
     setErro(null)
@@ -189,7 +190,7 @@ export function Receitas({ processoId, onUpdate }: ReceitasProps) {
   function LinhaLancamento({ r }: { r: ReceitaAPI }) {
     const t = totaisDoLancamento(r)
     const s = statusDoLancamento(r)
-    const abrir = () => setDrawerId(r.id)
+    const abrir = () => setLancamentoAberto(r.id)
     return (
       <tr
         className="rct-linha"
@@ -442,11 +443,11 @@ export function Receitas({ processoId, onUpdate }: ReceitasProps) {
         )}
       </div>
 
-      {/* ── 5 · DRAWER DE DETALHES ── */}
-      {drawerId != null && (
-        <ReceitaDrawer
-          receitaId={drawerId}
-          onClose={() => setDrawerId(null)}
+      {/* ── 5 · MODAL FINANCEIRO CENTRAL ── */}
+      {lancamentoAberto != null && (
+        <ReceitaFinanceiraModal
+          receitaId={lancamentoAberto}
+          onClose={() => setLancamentoAberto(null)}
           onChanged={() => { void carregar(); onUpdate?.() }}
         />
       )}

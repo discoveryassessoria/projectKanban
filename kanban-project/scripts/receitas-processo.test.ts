@@ -173,7 +173,9 @@ secao('Cenário 8 — caracteres especiais na interface')
     'src/components/financeiro/subabas/Receitas.tsx',
     'src/components/financeiro/subabas/Custos.tsx',
     'src/components/financeiro/subabas/Extrato.tsx',
-    'src/components/financeiro/ReceitaDrawer.tsx',
+    'src/components/financeiro/receita-modal/ReceitaFinanceiraModal.tsx',
+    'src/components/financeiro/receita-modal/ReceitaResumoExecutivo.tsx',
+    'src/components/financeiro/receita-modal/ReceitaVisaoGeral.tsx',
   ]
   // Escape unicode literal em POSIÇÃO DE TEXTO JSX (fora de string) renderiza cru.
   const escapeEmTextoJsx = />[^<>{}\n]*\\u[0-9a-fA-F]{4}/
@@ -215,7 +217,9 @@ secao('Cenário 10 — nenhuma criação manual reintroduzida')
   const proibidos = ['Nova Receita', 'Novo Custo', 'Adicionar Receita', 'Criar Receita', 'Lançamento Manual', 'NovaReceitaPagina', 'LancarParcelaPagina']
   for (const p of proibidos) ok(`sem "${p}"`, !src.includes(p))
   ok('sem POST de criação de receita na tela', !/method:\s*['"]POST['"][\s\S]{0,200}\/api\/financeiro\/receitas['"]/.test(src))
-  ok('drawer é o caminho de operação', src.includes('ReceitaDrawer'))
+  ok('modal central é o caminho de operação', src.includes('ReceitaFinanceiraModal'))
+  ok('drawer lateral removido da tela', !src.includes('ReceitaDrawer'))
+  ok('drawer lateral removido do repositório', !existsSync(join(RAIZ, 'src/components/financeiro/ReceitaDrawer.tsx')))
 }
 
 // ── CENÁRIO 11 — supressão impede recriação ─────────────────────────────────
@@ -308,6 +312,95 @@ secao('Campos calculados bloqueados')
   ok('reparcelamento usa o valor do lançamento como total', rep.includes('Number(receita.valor)'))
   ok('reparcelamento tem guarda de arredondamento', rep.includes('Falha de arredondamento'))
   ok('reparcelamento bloqueia com recebimento', rep.includes('já existe recebimento'))
+}
+
+// ── Guarda: MODAL FINANCEIRO CENTRAL (experiência definitiva) ───────────────
+secao('Modal financeiro central')
+{
+  const base = 'src/components/financeiro/receita-modal'
+  const componentes = [
+    'ReceitaFinanceiraModal',
+    'ReceitaModalHeader',
+    'ReceitaResumoExecutivo',
+    'ReceitaVisaoGeral',
+    'ReceitaParcelasTab',
+    'ReceitaRecebimentosTab',
+    'ReceitaHistoricoTab',
+    'ReceitaInformacoesTecnicasTab',
+    'ReceitaAcoesMenu',
+  ]
+  for (const c of componentes) {
+    ok(`componente ${c} existe`, existsSync(join(RAIZ, `${base}/${c}.tsx`)))
+  }
+  ok('folha de estilo própria do modal', existsSync(join(RAIZ, 'src/styles/receita-modal.css')))
+
+  const modal = readFileSync(join(RAIZ, `${base}/ReceitaFinanceiraModal.tsx`), 'utf8')
+
+  // Modal central — nunca drawer, nunca navegação para outra página.
+  ok('sem drawer lateral', !/ReceitaDrawer|rdw-|rfm-painel-lateral/.test(modal))
+  ok('sem navegação para outra página', !modal.includes('useRouter') && !modal.includes('router.push'))
+
+  // Acessibilidade
+  ok('role dialog + aria-modal', modal.includes('role="dialog"') && modal.includes('aria-modal="true"'))
+  ok('rotulado pelo título', modal.includes('aria-labelledby="rfm-titulo"'))
+  ok('Escape fecha', modal.includes("e.key === 'Escape'"))
+  ok('foco preso no modal (Tab)', modal.includes("e.key !== 'Tab'"))
+  ok('devolve o foco ao elemento de origem', modal.includes('focoAnterior.current?.focus'))
+  ok('trava a rolagem do fundo', modal.includes("document.body.style.overflow = 'hidden'"))
+  ok('abas com role tablist/tab/tabpanel',
+    modal.includes('role="tablist"') && modal.includes('role="tab"') && modal.includes('role="tabpanel"'))
+
+  // Somente a aba ativa renderiza.
+  for (const aba of ['geral', 'parcelas', 'recebimentos', 'historico', 'tecnico']) {
+    ok(`aba ${aba} renderiza sob condição`, modal.includes(`aba === '${aba}'`))
+  }
+
+  // Reutilização integral dos endpoints já existentes — nenhuma API nova.
+  const endpoints = [
+    '/detalhe',
+    '/api/financeiro/parcelas/${p.id}',
+    '/api/financeiro/parcelas/${p.id}/lancamento',
+    '/parcelas`',
+    '/cancelar`',
+    '/estornar`',
+    '/supressao`',
+  ]
+  for (const e of endpoints) ok(`usa endpoint existente ${e}`, modal.includes(e))
+  ok('não recalcula composição no cliente', !modal.includes('requerentesAdicionais') && !modal.includes('* valorBase'))
+  ok('status e totais vêm da fonte única',
+    modal.includes('statusDoLancamento') && modal.includes('totaisDoLancamento'))
+
+  // Ações excepcionais fora do destaque permanente.
+  ok('modal não tem botão de perigo fixo no rodapé', !/rfm-rodape[\s\S]{0,400}rfm-btn-perigo/.test(modal))
+  const menu = readFileSync(join(RAIZ, `${base}/ReceitaAcoesMenu.tsx`), 'utf8')
+  ok('cancelar vive em Mais ações', menu.includes('Cancelar lançamento'))
+  ok('estornar só com recebimento (podeEstornar)', menu.includes('a.podeEstornar'))
+  ok('bloqueio mostra o motivo', menu.includes('motivoBloqueioCancelamento'))
+
+  // Informação técnica fora da leitura principal.
+  const visao = readFileSync(join(RAIZ, `${base}/ReceitaVisaoGeral.tsx`), 'utf8')
+  for (const termo of ['chaveIdempotencia', 'tecnico', 'ruleSource', 'tabelaPrecos', 'vigencia']) {
+    ok(`Visão geral sem "${termo}"`, !visao.includes(termo))
+  }
+  ok('Visão geral sem cadeado', !visao.includes('🔒'))
+  const tecnica = readFileSync(join(RAIZ, `${base}/ReceitaInformacoesTecnicasTab.tsx`), 'utf8')
+  for (const termo of ['tecnico', 'tabelaPrecos', 'Vigência', 'eventoOperacional', 'phaseKey']) {
+    ok(`aba técnica contém "${termo}"`, tecnica.includes(termo))
+  }
+
+  // Moeda original permanece principal.
+  const resumo = readFileSync(join(RAIZ, `${base}/ReceitaResumoExecutivo.tsx`), 'utf8')
+  ok('valor principal usa a moeda original', resumo.includes('fmtMoeda(totais.contratado, moeda)'))
+  ok('BRL aparece como conversão auxiliar', resumo.includes('≈ ') && resumo.includes('fmtBRL'))
+  ok('progresso é percentual recebido', resumo.includes('percentualRecebido'))
+  ok('sem gráfico decorativo', !/donut|pizza|chart|Chart/.test(resumo))
+
+  // Escapes literais em texto JSX.
+  const escapeEmTextoJsx = />[^<>{}\n]*\\u[0-9a-fA-F]{4}/
+  for (const c of componentes) {
+    const src = readFileSync(join(RAIZ, `${base}/${c}.tsx`), 'utf8')
+    ok(`${c} sem escape \\uXXXX renderizável`, !escapeEmTextoJsx.test(src))
+  }
 }
 
 // ── resultado ───────────────────────────────────────────────────────────────
