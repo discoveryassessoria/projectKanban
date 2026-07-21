@@ -243,7 +243,9 @@ export async function criarProcessoV2(input: CriarProcessoInput): Promise<CriarP
       })
 
       const ok: CriarProcessoOk = {
-        success: true, created: true, processId: processo.id, processCode: `#${processo.id}`,
+        // Código OFICIAL do processo (Processo.codigo, ex.: ES-1). O #<id> é apenas fallback
+        // excepcional para o caso — que não deve ocorrer após a criação — de código ainda não persistido.
+        success: true, created: true, processId: processo.id, processCode: processo.codigo ?? `#${processo.id}`,
         workflowRuntime: "v2", currentPhaseKey: primeiraFase,
         currentPhaseInstanceId: inst.workflowInstance.id, workflowMacroVersionId: wf.versao,
         phaseEnteredEventId: evt.eventId, tarefasIniciais, initializationStatus: "INITIALIZED",
@@ -272,7 +274,7 @@ async function montarRespostaExistente(
 ): Promise<CriarProcessoResult> {
   const proc = await prisma.processo.findUnique({
     where: { id: processoId },
-    select: { id: true, faseAtualKey: true, macroWorkflowVersion: true },
+    select: { id: true, codigo: true, faseAtualKey: true, macroWorkflowVersion: true },
   })
   if (!proc) return { success: false, code: "CONFIG_INVALIDA", message: MSG.CONFIG_INVALIDA, correlationId }
   const inst = await prisma.phaseWorkflowInstance.findFirst({
@@ -281,7 +283,7 @@ async function montarRespostaExistente(
   })
   const tarefas = await prisma.tarefa.count({ where: { processoId } })
   return {
-    success: true, created: false, processId: proc.id, processCode: `#${proc.id}`,
+    success: true, created: false, processId: proc.id, processCode: proc.codigo ?? `#${proc.id}`,
     workflowRuntime: "v2", currentPhaseKey: proc.faseAtualKey ?? "",
     currentPhaseInstanceId: inst?.id ?? 0, workflowMacroVersionId: proc.macroWorkflowVersion ?? 0,
     phaseEnteredEventId: `evt|entered|${chaveCriacao}`, tarefasIniciais: tarefas,

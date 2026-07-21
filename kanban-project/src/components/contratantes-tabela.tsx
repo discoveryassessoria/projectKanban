@@ -151,7 +151,7 @@ function ProcessosTooltip({
         const data = await response.json()
         setProcessos(data.processos?.map((p: any) => ({
           id: p.id,
-          numero: p.numero || p.nome || `#${p.id}`,
+          numero: p.codigo || p.nome || `#${p.id}`,
           pais: p.pais || 'N/A',
           fase: p.faseAtualKey || 'Em andamento',
           etapaAtual: p.etapaAtual

@@ -9,6 +9,7 @@ import type { ProcessoWithStatus } from "@/src/types/kanban"
 import { parseLocalDate, formatDateBR, getToday, isToday, isPast, isWithinDays } from "@/src/lib/date-utils"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import useSWR from 'swr'
+import { useAmbiente } from "@/src/contexts/ambiente-context"
 
 // Mapeamento de bandeiras por país
 const BANDEIRAS_PAIS: Record<string, string> = {
@@ -69,6 +70,7 @@ export function HeaderBar({
   }>({ processos: [] })
 
   const { pode } = usePermissoes()
+  const { ambiente } = useAmbiente()
 
   const router = useRouter()
   const notificacoesRef = useRef<HTMLDivElement>(null)
@@ -191,16 +193,28 @@ export function HeaderBar({
 
   const totalResults = searchResults.processos.length
 
+  // O topo acompanha o ambiente. Com um processo aberto ele deixa de anunciar o
+  // módulo e passa a anunciar ONDE você está: "🇮🇹 Itália · Processo IT-154".
+  // Sem processo, volta ao institucional — sem exagero, só elegante.
+  const emProcesso = ambiente.processoId != null && ambiente.pais != null
+  const tituloAmbiente = emProcesso
+    ? `${ambiente.bandeira} ${ambiente.label} · ${ambiente.codigoProcesso ? `Processo ${ambiente.codigoProcesso}` : "Processo"}`
+    : `Grupo Discovery · ${title}`
+  const subtituloAmbiente = emProcesso ? (ambiente.familia ?? subtitle) : subtitle
+
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-black/40 backdrop-blur-md shadow-lg">
+    <header className="sticky top-0 z-40 amb-vidro-forte border-x-0 border-t-0 shadow-lg">
       <div className="px-6 py-4 flex items-center justify-between">
         {/* Lado esquerdo - Título e Subtítulo */}
         <div>
-          <h1 className="text-lg font-semibold leading-tight text-white">
-            Grupo Discovery · {title}
+          <h1 className="text-lg font-semibold leading-tight text-white amb-transicao">
+            {tituloAmbiente}
           </h1>
-          <p className="text-xs text-white/70">
-            {subtitle}
+          <p className="text-xs text-white/70 amb-transicao">
+            {subtituloAmbiente}
+            {ambiente.cidade && (
+              <span className="ml-2 text-white/40">· {ambiente.cidade}</span>
+            )}
           </p>
         </div>
 

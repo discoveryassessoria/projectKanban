@@ -45,8 +45,8 @@ export function KanbanColumn({
       ref={setNodeRef}
       className={`
         flex flex-col h-full w-full
-        ${!isLast ? 'border-r-2 border-dashed border-white/20' : ''}
-        ${isOver ? 'bg-blue-500/10' : 'bg-transparent'}
+        ${!isLast ? 'border-r-2 border-dashed amb-borda' : ''}
+        ${isOver ? 'bg-[color:var(--amb-indicador)]/15' : 'bg-transparent'}
         transition-colors duration-200
       `}
     >
