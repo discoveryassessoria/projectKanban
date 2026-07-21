@@ -431,7 +431,7 @@ export function Custos({
         <td>
           <strong>{dentroPasta ? componenteLabel(c) : c.descricao}</strong>
           <span className="muted-xs">
-            {dentroPasta ? `${pessoaLabel(c)} · ${c.codigo}` : c.codigo}
+            {dentroPasta ? pessoaLabel(c) : ''}
           </span>
         </td>
         <td>

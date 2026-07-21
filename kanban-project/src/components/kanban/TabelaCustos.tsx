@@ -793,57 +793,10 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
             <FileDown className="w-4 h-4" />
             Exportar Todos
           </button>
-          {temAlteracoes && pode('financeiro.custos_editar') && (
-            <button
-              onClick={salvarAlteracoes}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Salvar
-            </button>
-          )}
-          {pode('financeiro.coluna_criar') && (
-            <button
-              onClick={() => setShowAddServico(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition"
-            >
-              <Plus className="w-4 h-4" />
-              Adicionar Coluna
-            </button>
-          )}
+          {/* MODELO DEFINITIVO: Pasta Documental é SÓ LEITURA — os valores vêm do
+              FinanceRuleEngine. Sem Salvar, sem adicionar coluna/linha, sem editar. */}
         </div>
       </div>
-
-      {/* Modal adicionar serviço */}
-      {showAddServico && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-          <div className="flex items-center gap-3">
-            <input
-              type="text"
-              value={novoServico}
-              onChange={(e) => setNovoServico(e.target.value)}
-              placeholder="Nome do serviço (ex: Procuração)"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
-              onKeyPress={(e) => e.key === 'Enter' && adicionarServico()}
-              autoFocus
-            />
-            <button
-              onClick={adicionarServico}
-              disabled={addingServico || !novoServico.trim()}
-              className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition disabled:opacity-50"
-            >
-              {addingServico ? <Loader2 className="w-4 h-4 animate-spin" /> : "Adicionar"}
-            </button>
-            <button
-              onClick={() => { setShowAddServico(false); setNovoServico("") }}
-              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Tabela de custos estilo Excel */}
       <div ref={tabelaRef} className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
@@ -878,40 +831,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
               )}
               {servicos.map(servico => (
                 <th key={servico.id} className="px-2 py-2 text-center font-semibold border-r border-[#2d4a6f] min-w-[100px]">
-                  {editandoServico === servico.id ? (
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="text"
-                        value={novoNomeServico}
-                        onChange={(e) => setNovoNomeServico(e.target.value)}
-                        className="w-full px-1 py-0.5 text-xs border border-blue-300 rounded bg-[#2d4a6f] text-white placeholder-gray-300"
-                        onKeyPress={(e) => e.key === 'Enter' && salvarNomeServico(servico.id)}
-                        autoFocus
-                      />
-                      <button onClick={() => salvarNomeServico(servico.id)} className="text-green-300 hover:text-green-100">
-                        {salvandoNome ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                      </button>
-                      <button onClick={cancelarEdicaoNome} className="text-gray-300 hover:text-white">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center gap-1 group">
-                      <span className="truncate" title={servico.nome}>{servico.nome}</span>
-                      <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-                        {pode('financeiro.coluna_editar') && (
-                          <button onClick={() => iniciarEdicaoNome(servico)} className="text-blue-200 hover:text-white p-0.5">
-                            <Pencil className="w-3 h-3" />
-                          </button>
-                        )}
-                        {pode('financeiro.coluna_excluir') && (
-                          <button onClick={() => removerServico(servico.id, servico.nome)} className="text-red-300 hover:text-red-100 p-0.5">
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  <span className="truncate" title={servico.nome}>{servico.nome}</span>
                 </th>
               ))}
               <th className="px-3 py-2 text-right font-semibold bg-amber-600 min-w-[100px]">Total</th>
@@ -1057,19 +977,16 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                     </>
                   )}
                   
-                  {/* Valores por Serviço - ✅ ATUALIZADO: Em TODAS as linhas */}
-                  {servicos.map(servico => (
-                    <td key={servico.id} className="px-1 py-1 text-center border-r border-gray-200">
-                      <input
-                        type="text"
-                        value={valoresEditados[`${linha.pessoaId}-${linha.tipoRegistro}-${servico.id}`] || ''}
-                        onChange={(e) => handleValorChange(linha.pessoaId, linha.tipoRegistro, servico.id, e.target.value)}
-                        placeholder="0"
-                        readOnly={!pode('financeiro.custos_editar')}
-                        className={`w-full px-1 py-0.5 text-right text-xs border border-gray-200 rounded focus:ring-1 focus:ring-amber-500 focus:border-amber-500 ${pode('financeiro.custos_editar') ? 'bg-white' : 'bg-gray-100 cursor-default'}`}
-                      />
-                    </td>
-                  ))}
+                  {/* Valores por Serviço — SOMENTE LEITURA (vêm do FinanceRuleEngine) */}
+                  {servicos.map(servico => {
+                    const bruto = valoresEditados[`${linha.pessoaId}-${linha.tipoRegistro}-${servico.id}`]
+                    const num = Number(String(bruto ?? '').replace(',', '.'))
+                    return (
+                      <td key={servico.id} className="px-2 py-1.5 text-right text-xs text-gray-700 border-r border-gray-200">
+                        {bruto && num > 0 ? formatarMoeda(num) : <span className="text-gray-300">—</span>}
+                      </td>
+                    )
+                  })}
                   
                   {/* Total da Linha */}
                   <td className="px-3 py-1.5 text-right font-semibold text-amber-700 bg-amber-50">

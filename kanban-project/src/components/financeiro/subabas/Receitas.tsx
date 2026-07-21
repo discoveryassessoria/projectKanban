@@ -388,7 +388,7 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
         <td style={dentroPasta ? { paddingLeft: 28 } : undefined}>{isRascunho ? '📝' : dentroPasta ? '↳' : '📑'}</td>
         <td>
           <strong>{dentroPasta ? componenteLabelR(r) : r.descricao}</strong>
-          <span className="muted-xs">{dentroPasta ? `${pessoaLabelR(r)} · ${r.codigo}` : r.codigo}</span>
+          <span className="muted-xs">{dentroPasta ? pessoaLabelR(r) : ''}</span>
         </td>
         <td>{CATEGORIA_LABEL[r.categoria]}</td>
         <td>{fmtMoeda(totOrig, r.moeda)}</td>
