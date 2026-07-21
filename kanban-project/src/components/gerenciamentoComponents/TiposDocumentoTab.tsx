@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import DocumentCategorySelector from "./DocumentCategorySelector"
+import { CodigoPublicoField } from "./CodigoPublicoField"
 
 interface CatRel { id: number; code: string; name: string; ativo: boolean }
 interface Tipo { id: number; publicCode?: string | null; code: string | null; name: string; category: string | null; nature?: string | null; categoriaDocumentalId?: number | null; categoriaDocumental?: CatRel | null; ativo: boolean }
@@ -128,13 +129,7 @@ export default function TiposDocumentoTab() {
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="border-b border-white/10 px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Novo"} tipo de documento</h3></div>
             <div className="space-y-3 px-6 py-4">
-              {form.publicCode && (
-                <div>
-                  <label className={labelCls}>Código</label>
-                  <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-sm font-bold text-white/80">{form.publicCode}</div>
-                  <p className="mt-1 text-[10.5px] text-white/35">Gerado pelo sistema, permanente e não editável.</p>
-                </div>
-              )}
+              <CodigoPublicoField codigo={form.publicCode} />
               <div><label className={labelCls}>Nome *</label><input value={form.name} onChange={e => setForm(f => f && { ...f, name: e.target.value })} autoFocus className={inputCls} /></div>
               <div>
                 <label className={labelCls}>Categoria documental</label>

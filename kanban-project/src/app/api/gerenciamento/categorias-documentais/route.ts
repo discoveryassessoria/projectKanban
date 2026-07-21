@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { codeFromLegacy } from '@/src/lib/document-category-map'
+import { gerarChaveUnica } from '@/src/lib/catalogo/chave-tecnica-interna'
 
 // LOTE A — API canônica de Categorias Documentais (FONTE CANÔNICA da classificação).
 const normCode = (s: string) => s.trim().toUpperCase().replace(/\s+/g, '_')
@@ -79,10 +80,11 @@ export async function POST(request: NextRequest) {
     const b = await request.json()
     const name = String(b.name ?? '').trim()
     if (!name) return NextResponse.json({ error: 'Informe o nome.' }, { status: 400 })
-    const code = normCode(String(b.code ?? name))
-    if (!code) return NextResponse.json({ error: 'Informe o código.' }, { status: 400 })
-    const dup = await prisma.categoriaDocumental.findUnique({ where: { code } })
-    if (dup) return NextResponse.json({ error: `Já existe categoria com o código "${code}".`, code: 'DUPLICATE' }, { status: 409 })
+    // CHAVE TÉCNICA INTERNA: derivada do nome no backend (o operador nunca informa `code`).
+    const base = normCode(name) || 'CATEGORIA'
+    const code = await gerarChaveUnica(base, async (c) =>
+      !!(await prisma.categoriaDocumental.findUnique({ where: { code: c }, select: { id: true } })),
+    )
     const categoria = await prisma.categoriaDocumental.create({
       data: {
         code, name,

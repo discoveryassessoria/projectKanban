@@ -43,7 +43,9 @@ export default function CategoriasDocumentaisTab() {
     setBusy(true)
     try {
       const url = form.id ? `/api/gerenciamento/categorias-documentais/${form.id}` : "/api/gerenciamento/categorias-documentais"
-      const res = await fetch(url, { method: form.id ? "PUT" : "POST", headers: authHeaders(), body: JSON.stringify(form) })
+      // Chave técnica interna gerada/mantida no backend — o frontend nunca envia `code`.
+      const { code: _code, ...payload } = form
+      const res = await fetch(url, { method: form.id ? "PUT" : "POST", headers: authHeaders(), body: JSON.stringify(payload) })
       const j = await res.json().catch(() => ({}))
       if (res.ok) { setForm(null); showFlash("Salvo."); load() }
       else showFlash(j.error || "Erro ao salvar.")
@@ -88,20 +90,19 @@ export default function CategoriasDocumentaisTab() {
         <table className="w-full text-sm">
           <thead className="border-b border-white/10 text-left text-xs text-white/50">
             <tr>
-              <th className="px-4 py-3 font-medium">Código</th><th className="px-4 py-3 font-medium">Nome</th>
+              <th className="px-4 py-3 font-medium">Nome</th>
               <th className="px-4 py-3 font-medium">Ordem</th><th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Docs vinculados</th><th className="px-4 py-3 text-right font-medium">Ações</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-xs text-white/40">Carregando…</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-white/40">Carregando…</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-xs text-white/40">Nenhuma categoria.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-white/40">Nenhuma categoria.</td></tr>
             ) : rows.map((c) => (
               <tr key={c.id} className="border-b border-white/5 last:border-0">
-                <td className="px-4 py-2.5 text-white/70">{c.code}{c.sistema && <span className="ml-1.5 rounded bg-white/10 px-1.5 py-0.5 text-[9px] uppercase text-white/50">sistema</span>}</td>
-                <td className="px-4 py-2.5 text-white">{c.name}</td>
+                <td className="px-4 py-2.5 text-white">{c.name}{c.sistema && <span className="ml-1.5 rounded bg-white/10 px-1.5 py-0.5 text-[9px] uppercase text-white/50">sistema</span>}</td>
                 <td className="px-4 py-2.5 text-white/70">{c.ordem}</td>
                 <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${c.ativo ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}>{c.ativo ? "Ativa" : "Inativa"}</span></td>
                 <td className="px-4 py-2.5 text-white/70">{c.tiposCount}</td>
@@ -127,12 +128,7 @@ export default function CategoriasDocumentaisTab() {
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-white/10 px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Nova"} categoria documental</h3></div>
             <div className="space-y-3 px-6 py-4">
-              <div>
-                <label className={labelCls}>Código{form.id ? " (imutável)" : ""}</label>
-                <input value={form.code} onChange={(e) => setForm((f) => f && { ...f, code: e.target.value })} placeholder="ex.: REGISTRO_CIVIL" readOnly={!!form.id} className={`${inputCls} ${form.id ? "opacity-60" : ""}`} />
-                {form.id && <p className="mt-1 text-[11px] text-white/40">O código não pode ser alterado após a criação.</p>}
-              </div>
-              <div><label className={labelCls}>Nome *</label><input value={form.name} onChange={(e) => setForm((f) => f && { ...f, name: e.target.value })} className={inputCls} /></div>
+              <div><label className={labelCls}>Nome *</label><input value={form.name} onChange={(e) => setForm((f) => f && { ...f, name: e.target.value })} autoFocus className={inputCls} /></div>
               <div><label className={labelCls}>Descrição</label><input value={form.description} onChange={(e) => setForm((f) => f && { ...f, description: e.target.value })} className={inputCls} /></div>
               <div><label className={labelCls}>Ordem</label><input type="number" value={form.ordem} onChange={(e) => setForm((f) => f && { ...f, ordem: Number(e.target.value) || 0 })} className={inputCls} /></div>
               <label className="flex items-center gap-2 text-sm text-white/70"><input type="checkbox" checked={form.ativo} onChange={(e) => setForm((f) => f && { ...f, ativo: e.target.checked })} />Ativa</label>

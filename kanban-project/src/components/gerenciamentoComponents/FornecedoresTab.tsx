@@ -7,6 +7,7 @@
 // Campos ricos do schema + pais + moedaPadrao (novos). Form em 5 seções.
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { CodigoPublicoField } from './CodigoPublicoField'
 
 type Fornecedor = {
   id: number
@@ -277,6 +278,7 @@ export default function FornecedoresTab() {
             </div>
 
             <div className="max-h-[72vh] space-y-5 overflow-y-auto px-6 py-5">
+              <CodigoPublicoField codigo={editando?.publicCode} />
               {/* Identificação */}
               <Secao titulo="Identificação" primeira>
                 <div className="grid grid-cols-2 gap-3">

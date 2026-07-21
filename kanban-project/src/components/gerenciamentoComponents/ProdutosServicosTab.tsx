@@ -12,6 +12,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { usePermissoes } from '@/src/hooks/use-permissoes'
 import { ExclusaoDefinitivaModal } from './ExclusaoDefinitivaModal'
+import { CodigoPublicoField } from './CodigoPublicoField'
 
 type Servico = {
   id: number
@@ -240,13 +241,7 @@ export default function ProdutosServicosTab() {
             </div>
 
             <div className="space-y-4 px-6 py-4">
-              {editando && (
-                <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
-                  <div className="text-[11px] uppercase tracking-wide text-white/40">Código (público, automático)</div>
-                  <div className="font-mono font-bold text-white/90">{editando.publicCode ?? '—'}</div>
-                  <div className="text-[10.5px] text-white/40 mt-0.5">Gerado pelo sistema, permanente e não editável.</div>
-                </div>
-              )}
+              <CodigoPublicoField codigo={editando?.publicCode} />
               <div>
                 <label className="mb-1 block text-xs text-white/60">Nome</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Tradução Juramentada" className={inputCls} />

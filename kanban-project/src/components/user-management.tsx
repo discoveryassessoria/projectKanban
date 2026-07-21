@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge"
 import { UserPlus, Pencil, Trash2, Search, Shield, User, Users } from "lucide-react"
 import { UserType, userTypeLabels } from "@/src/utils/userTypes"
 import { getUsers, createUser, updateUser, deleteUser } from "@/src/services/userService"
+import { CodigoPublicoField } from "@/src/components/gerenciamentoComponents/CodigoPublicoField"
 
 interface Usuario {
   id: number
@@ -346,6 +347,7 @@ export function UserManagement() {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <CodigoPublicoField codigo={currentUser?.publicCode} />
             <div className="space-y-2">
               <Label htmlFor="nome">Nome *</Label>
               <Input

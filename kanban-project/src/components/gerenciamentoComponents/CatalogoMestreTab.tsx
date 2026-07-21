@@ -56,7 +56,9 @@ export default function CatalogoMestreTab() {
     setSalvando(true); setErro(null)
     try {
       const url = form.id ? `/api/gerenciamento/catalogo-mestre/${form.id}` : '/api/gerenciamento/catalogo-mestre'
-      await jsonFetch(url, { method: form.id ? 'PUT' : 'POST', body: JSON.stringify(form) })
+      // Chave técnica interna gerada/mantida no backend — o frontend nunca envia `code`.
+      const { code: _code, ...payload } = form
+      await jsonFetch(url, { method: form.id ? 'PUT' : 'POST', body: JSON.stringify(payload) })
       setForm(null); await carregar()
     } catch (e: any) { setErro(e.message) } finally { setSalvando(false) }
   }
@@ -100,12 +102,11 @@ export default function CatalogoMestreTab() {
         <div className="overflow-hidden rounded-xl ring-1 ring-white/10">
           <table className="w-full text-sm">
             <thead className="bg-white/5 text-left text-white/60">
-              <tr><th className="px-3 py-2">Código</th><th className="px-3 py-2">Nome</th><th className="px-3 py-2">Natureza</th><th className="px-3 py-2">Unidade</th><th className="px-3 py-2">Vínculos</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Ações</th></tr>
+              <tr><th className="px-3 py-2">Nome</th><th className="px-3 py-2">Natureza</th><th className="px-3 py-2">Unidade</th><th className="px-3 py-2">Vínculos</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Ações</th></tr>
             </thead>
             <tbody>
               {filtrados.map(it => (
                 <tr key={it.id} className="border-t border-white/5">
-                  <td className="px-3 py-2 font-mono text-xs text-white/70">{it.code}</td>
                   <td className="px-3 py-2 font-medium">{it.name}{it.categoria && <span className="ml-1.5 text-[10px] text-white/40">· {it.categoria}</span>}</td>
                   <td className="px-3 py-2">{NAT_LABEL[it.natureza] || it.natureza}</td>
                   <td className="px-3 py-2 text-white/60">{it.unidade}</td>
@@ -127,9 +128,7 @@ export default function CatalogoMestreTab() {
           <div className="w-full max-w-lg rounded-2xl bg-neutral-900 p-5 ring-1 ring-white/10" onClick={e => e.stopPropagation()}>
             <h3 className="mb-4 text-base font-semibold text-white">{form.id ? 'Editar item' : 'Novo item'}</h3>
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <label className="col-span-1"><span className="text-white/50">Código *</span>
-                <input value={form.code} onChange={e => setForm(f => f && { ...f, code: e.target.value })} className="mt-1 w-full rounded-lg bg-white/5 px-3 py-2 outline-none ring-1 ring-white/10 focus:ring-blue-500" placeholder="CERT_NASCIMENTO_IT" /></label>
-              <label className="col-span-1"><span className="text-white/50">Categoria</span>
+              <label className="col-span-2"><span className="text-white/50">Categoria</span>
                 <input value={form.categoria} onChange={e => setForm(f => f && { ...f, categoria: e.target.value })} className="mt-1 w-full rounded-lg bg-white/5 px-3 py-2 outline-none ring-1 ring-white/10 focus:ring-blue-500" placeholder="Registro civil" /></label>
               <label className="col-span-2"><span className="text-white/50">Nome *</span>
                 <input value={form.name} onChange={e => setForm(f => f && { ...f, name: e.target.value })} className="mt-1 w-full rounded-lg bg-white/5 px-3 py-2 outline-none ring-1 ring-white/10 focus:ring-blue-500" placeholder="Certidão de Nascimento - Inteiro Teor" /></label>
