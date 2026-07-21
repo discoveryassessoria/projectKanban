@@ -12,8 +12,8 @@ export async function GET(request: NextRequest) {
     const recibos = await prisma.recibo.findMany({
       where: { processoId },
       include: {
-        pagadorRequerente: { select: { id: true, nome: true } },
-        pagadorContratante: { select: { id: true, nome: true } },
+        pagadorRequerente: { select: { id: true, publicCode: true, nome: true } },
+        pagadorContratante: { select: { id: true, publicCode: true, nome: true } },
         emitidoPor: { select: { id: true, nome: true } }
       },
       orderBy: { createdAt: "desc" }

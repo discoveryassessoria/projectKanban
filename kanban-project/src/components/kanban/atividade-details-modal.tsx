@@ -420,16 +420,18 @@ export function ProcessoDetailsModal({
     }
   }
 
-  const contratantesFiltrados = contratantes.filter(c => 
+  const contratantesFiltrados = contratantes.filter(c =>
     !contratantesSelecionados.find(sel => sel.id === c.id) &&
-    (c.nome.toLowerCase().includes(buscaContratante.toLowerCase()) ||
+    (c.publicCode?.toLowerCase().includes(buscaContratante.toLowerCase()) ||
+    c.nome.toLowerCase().includes(buscaContratante.toLowerCase()) ||
     c.email?.toLowerCase().includes(buscaContratante.toLowerCase()) ||
     c.telefone?.includes(buscaContratante))
   )
 
-  const requerentesFiltrados = requerentes.filter(r => 
+  const requerentesFiltrados = requerentes.filter(r =>
     !requerentesSelecionados.find(sel => sel.id === r.id) &&
-    (r.nome.toLowerCase().includes(buscaRequerente.toLowerCase()) ||
+    (r.publicCode?.toLowerCase().includes(buscaRequerente.toLowerCase()) ||
+    r.nome.toLowerCase().includes(buscaRequerente.toLowerCase()) ||
     r.email?.toLowerCase().includes(buscaRequerente.toLowerCase()) ||
     r.telefone?.includes(buscaRequerente))
   )
@@ -602,7 +604,7 @@ export function ProcessoDetailsModal({
                               onClick={() => pode('clientes.ver') && abrirDetalhesCliente(cont, "contratante")}
                               className={`p-4 bg-gray-50 rounded-lg transition-colors ${pode('clientes.ver') ? 'hover:bg-gray-100 cursor-pointer' : 'cursor-default'}`}
                             >
-                              <p className="text-gray-900 font-semibold">{cont.nome}</p>
+                              <p className="text-gray-900 font-semibold">{cont.publicCode ? cont.publicCode + ' — ' : ''}{cont.nome}</p>
                               
                               {cont.telefone && (
                                 <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
@@ -674,7 +676,7 @@ export function ProcessoDetailsModal({
                               onClick={() => pode('clientes.ver') && abrirDetalhesCliente(req, "requerente")}
                               className={`p-3 bg-blue-50 rounded-lg transition-colors ${pode('clientes.ver') ? 'hover:bg-blue-100 cursor-pointer' : 'cursor-default'}`}
                             >
-                              <p className="text-gray-900 font-medium">{req.nome}</p>
+                              <p className="text-gray-900 font-medium">{req.publicCode ? req.publicCode + ' — ' : ''}{req.nome}</p>
                               {req.telefone && (
                                 <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
                                   <Phone className="h-3 w-3" />
@@ -743,7 +745,7 @@ export function ProcessoDetailsModal({
                             <div key={cont.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
                               <div className="flex items-center gap-2">
                                 <User className="h-4 w-4 text-gray-600" />
-                                <span className="text-gray-900 text-sm">{cont.nome}</span>
+                                <span className="text-gray-900 text-sm">{cont.publicCode ? cont.publicCode + ' — ' : ''}{cont.nome}</span>
                               </div>
                               <button 
                                 onClick={() => removeContratante(cont.id)}
@@ -788,7 +790,7 @@ export function ProcessoDetailsModal({
                                       <User className="h-4 w-4 text-blue-600" />
                                     </div>
                                     <div>
-                                      <p className="font-medium text-gray-900 text-sm">{c.nome}</p>
+                                      <p className="font-medium text-gray-900 text-sm">{c.publicCode ? c.publicCode + ' — ' : ''}{c.nome}</p>
                                       <p className="text-xs text-gray-500">{c.email || c.telefone}</p>
                                     </div>
                                   </button>
@@ -814,7 +816,7 @@ export function ProcessoDetailsModal({
                             <div key={req.id} className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
                               <div className="flex items-center gap-2">
                                 <User className="h-4 w-4 text-blue-600" />
-                                <span className="text-gray-900 text-sm">{req.nome}</span>
+                                <span className="text-gray-900 text-sm">{req.publicCode ? req.publicCode + ' — ' : ''}{req.nome}</span>
                               </div>
                               <button 
                                 onClick={() => removeRequerente(req.id)}
@@ -859,7 +861,7 @@ export function ProcessoDetailsModal({
                                       <User className="h-4 w-4 text-green-600" />
                                     </div>
                                     <div>
-                                      <p className="font-medium text-gray-900 text-sm">{r.nome}</p>
+                                      <p className="font-medium text-gray-900 text-sm">{r.publicCode ? r.publicCode + ' — ' : ''}{r.nome}</p>
                                       <p className="text-xs text-gray-500">{r.email || r.telefone}</p>
                                     </div>
                                   </button>

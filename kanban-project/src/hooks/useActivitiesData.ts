@@ -29,6 +29,7 @@ export interface UserAtv {
 
 export interface Contratante {
   id: number
+  publicCode?: string | null   // CLI-n — código público do cliente
   nome: string
   email: string | null
 }

@@ -13,6 +13,7 @@ export async function GET(request: Request) {
     const where = search
       ? {
           OR: [
+            { publicCode: { contains: search, mode: "insensitive" as const } },
             { nome: { contains: search, mode: "insensitive" as const } },
             { email: { contains: search, mode: "insensitive" as const } },
             { cpf: { contains: search, mode: "insensitive" as const } },

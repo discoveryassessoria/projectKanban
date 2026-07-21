@@ -237,7 +237,7 @@ export default function TabelaValoresTab() {
                 const om = origemMestre(i.configuracaoFinanceiraItem)
                 return (
                   <tr key={i.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
-                    <td className="px-3 py-2.5 font-medium text-white">{om.publicCode ? <span className="font-mono text-[11px] text-white/50 mr-1">{om.publicCode} —</span> : null}{om.mestre}</td>
+                    <td className="px-3 py-2.5 font-medium text-white">{om.mestre}</td>
                     <td className="px-3 py-2.5 text-white/60">{om.origem}</td>
                     <td className="px-3 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${i.natureza === 'CUSTO' ? 'bg-amber-500/15 text-amber-300' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-white/50'}`}>{i.natureza === 'CUSTO' ? 'Custo' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'Venda' : '—'}</span></td>
                     <td className="px-3 py-2.5 text-white/70">{i.fornecedor ? `${i.fornecedor.publicCode ? i.fornecedor.publicCode + ' — ' : ''}${i.fornecedor.nome}` : '—'}</td>
@@ -305,7 +305,7 @@ export default function TabelaValoresTab() {
                     <option value="" className="bg-zinc-900">{form.categoria ? 'Selecione um item' : 'Selecione uma categoria primeiro'}</option>
                     {itensDaCategoria.map((c) => (
                       <option key={c.id} value={c.id} className="bg-zinc-900">
-                        {c.publicCode ? c.publicCode + ' — ' : ''}{c.mestre}{c.possuiCusto ? ' · custo' : ''}{c.possuiReceita ? ' · venda' : ''}
+                        {c.mestre}{c.possuiCusto ? ' · custo' : ''}{c.possuiReceita ? ' · venda' : ''}
                       </option>
                     ))}
                   </select>

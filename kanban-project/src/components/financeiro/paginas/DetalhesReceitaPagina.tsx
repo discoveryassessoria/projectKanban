@@ -70,7 +70,7 @@ interface ReceitaRequerenteAPI {
   percentual: number | string
   nome?: string
   statusFamiliar?: string | null
-  requerente?: { id: number; nome: string }
+  requerente?: { id: number; nome: string; publicCode?: string | null }
 }
 
 interface ReceitaAPI {
@@ -646,7 +646,7 @@ export function DetalhesReceitaPagina({
                     return (
                       <tr key={r.id}>
                         <td>
-                          {r.requerente?.nome || r.nome || 'Requerente'}
+                          {r.requerente ? (r.requerente.publicCode ? r.requerente.publicCode + ' — ' : '') + r.requerente.nome : (r.nome || 'Requerente')}
                         </td>
                         <td>
                           {r.statusFamiliar === 'Menor' ? (

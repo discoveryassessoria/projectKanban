@@ -130,6 +130,7 @@ export async function GET(
                 contratante: {
                   select: {
                     id: true,
+                    publicCode: true,
                     nome: true
                   }
                 }

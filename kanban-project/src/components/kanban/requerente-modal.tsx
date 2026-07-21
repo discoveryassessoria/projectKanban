@@ -20,6 +20,7 @@ import { Separator } from "@/components/ui/separator"
 
 interface Requerente {
   id: number
+  publicCode?: string | null   // CLI-n — código público do cliente
   nome: string
   cpf?: string | null
   rg?: string | null

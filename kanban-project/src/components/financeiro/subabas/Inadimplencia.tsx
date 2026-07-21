@@ -49,7 +49,7 @@ interface ReceitaRequerenteAPI {
   requerenteId?: number | null
   nome?: string | null
   percentual: number | string
-  requerente?: { id: number; nome: string } | null
+  requerente?: { id: number; nome: string; publicCode?: string | null } | null
 }
 
 interface ParcelaAPI {

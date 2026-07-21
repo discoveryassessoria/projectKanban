@@ -28,6 +28,7 @@ type Divisao = 'igual' | 'personalizada'
 
 interface RequerenteAPI {
   id: number
+  publicCode?: string | null   // CLI-n — código público do cliente
   nome: string
   idade?: number | null
   dataNascimento?: string | null

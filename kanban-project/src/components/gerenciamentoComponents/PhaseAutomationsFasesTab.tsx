@@ -555,7 +555,7 @@ export default function PhaseAutomationsFasesTab() {
                   <label className={labelCls}>Configuração Financeira *</label>
                   <select value={form.configItemId} disabled={!form.categoria} onChange={e => setForm(f => f && { ...f, configItemId: e.target.value })} className={inputCls + (!form.categoria ? " cursor-not-allowed opacity-60" : "")}>
                     <option value="" className={opt}>{form.categoria ? "Selecione o item" : "Selecione a categoria primeiro"}</option>
-                    {itensDaCategoria.map(c => <option key={c.id} value={c.id} className={opt}>{c.publicCode ? c.publicCode + " — " : ""}{c.mestre}{c.possuiCusto ? " · custo" : ""}{c.possuiReceita ? " · venda" : ""}</option>)}
+                    {itensDaCategoria.map(c => <option key={c.id} value={c.id} className={opt}>{c.mestre}{c.possuiCusto ? " · custo" : ""}{c.possuiReceita ? " · venda" : ""}</option>)}
                   </select>
                 </div>
                 <div className="col-span-2">

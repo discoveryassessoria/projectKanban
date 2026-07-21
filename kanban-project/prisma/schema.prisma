@@ -486,6 +486,7 @@ model ProcessoRequerente {
 }
 
 model Contratante {
+  publicCode     String?               @unique @db.VarChar(20) // CLI — CodeGeneratorService central (cliente), aditivo/único/não editável
   id             Int                   @id @default(autoincrement())
   nome           String                @db.VarChar(100)
   cpf            String?               @db.VarChar(14)
@@ -523,6 +524,7 @@ model Contratante {
 }
 
 model Requerente {
+  publicCode           String?                 @unique @db.VarChar(20) // CLI — CodeGeneratorService central (cliente, mesma sequência do Contratante)
   id                   Int                     @id @default(autoincrement())
   nome                 String                  @db.VarChar(100)
   cpf                  String?                 @db.VarChar(14)

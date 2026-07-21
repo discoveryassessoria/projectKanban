@@ -46,7 +46,7 @@ export async function GET(
             destinatarios: {
               include: {
                 requerente: {
-                  select: { id: true, nome: true }
+                  select: { id: true, publicCode: true, nome: true }
                 }
               }
             }
@@ -57,6 +57,7 @@ export async function GET(
             requerente: {
               select: {
                 id: true,
+                publicCode: true,
                 nome: true,
                 cpf: true,
                 endereco: true,
@@ -328,7 +329,7 @@ export async function POST(
         destinatarios: {
           include: {
             requerente: {
-              select: { id: true, nome: true }
+              select: { id: true, publicCode: true, nome: true }
             }
           }
         },

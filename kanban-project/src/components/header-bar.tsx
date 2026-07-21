@@ -162,7 +162,7 @@ export function HeaderBar({
     const processosFiltrados = processos.filter(p => 
       p.nome.toLowerCase().includes(queryLower) ||
       p.descricao?.toLowerCase().includes(queryLower) ||
-      p.contratantes?.some(c => c.nome?.toLowerCase().includes(queryLower))
+      p.contratantes?.some(c => c.publicCode?.toLowerCase().includes(queryLower) || c.nome?.toLowerCase().includes(queryLower))
     )
 
     setSearchResults({
@@ -255,7 +255,7 @@ export function HeaderBar({
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-gray-800 truncate font-medium">{processo.nome}</p>
                           <p className="text-[10px] text-gray-400 truncate">
-                            {processo.contratantes?.[0]?.nome || "Sem contratante"}
+                            {processo.contratantes?.[0] ? (processo.contratantes[0].publicCode ? processo.contratantes[0].publicCode + ' — ' : '') + processo.contratantes[0].nome : "Sem contratante"}
                           </p>
                         </div>
                         <span className="text-[10px] text-blue-500 flex-shrink-0">

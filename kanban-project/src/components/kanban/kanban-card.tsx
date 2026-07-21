@@ -123,7 +123,7 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
           {/* Contratante */}
           {contratante && (
             <p className="text-xs text-gray-500 mb-2 truncate">
-              {contratante.nome}
+              {contratante.publicCode ? contratante.publicCode + ' — ' : ''}{contratante.nome}
             </p>
           )}
 

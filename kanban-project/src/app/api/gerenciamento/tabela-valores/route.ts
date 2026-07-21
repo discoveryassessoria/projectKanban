@@ -44,7 +44,7 @@ async function listarConfigs() {
   const cfgs = await prisma.produtoFinanceiro.findMany({
     where: { ativo: true },
     select: {
-      id: true, publicCode: true, possuiCusto: true, possuiReceita: true, moedaPadrao: true,
+      id: true, possuiCusto: true, possuiReceita: true, moedaPadrao: true,
       tipoDocumento: { select: { name: true } },
       honorario: { select: { name: true } },
       tipoProcesso: { select: { name: true } },
@@ -55,8 +55,8 @@ async function listarConfigs() {
   return cfgs.map((c) => {
     const origem = c.tipoDocumento ? 'Documento' : c.honorario ? 'Honorário' : c.tipoProcesso ? 'Processo' : (c.itemCatalogo?.natureza === 'SERVICO' ? 'Serviço' : 'Item')
     const mestre = c.tipoDocumento?.name ?? c.honorario?.name ?? c.tipoProcesso?.name ?? c.itemCatalogo?.name ?? '—'
-    // PADRÃO DEFINITIVO: label = "CFG-n — Nome" (código público acompanha o nome em todo seletor).
-    return { id: c.id, publicCode: c.publicCode, possuiCusto: c.possuiCusto, possuiReceita: c.possuiReceita, moedaPadrao: c.moedaPadrao, origem, mestre, label: `${c.publicCode ? c.publicCode + ' — ' : ''}${mestre}` }
+    // Config Financeira NÃO tem código público (é config interna): identificada pelo mestre + natureza.
+    return { id: c.id, possuiCusto: c.possuiCusto, possuiReceita: c.possuiReceita, moedaPadrao: c.moedaPadrao, origem, mestre, label: mestre }
   })
 }
 
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
           modalidade: { select: { id: true, modalityLabel: true } },
           configuracaoFinanceiraItem: {
             select: {
-              id: true, publicCode: true, possuiCusto: true, possuiReceita: true,
+              id: true, possuiCusto: true, possuiReceita: true,
               tipoDocumento: { select: { name: true } }, honorario: { select: { name: true } },
               tipoProcesso: { select: { name: true } }, itemCatalogo: { select: { name: true, natureza: true } },
             },

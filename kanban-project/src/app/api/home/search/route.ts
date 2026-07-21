@@ -54,18 +54,20 @@ export async function GET(request: NextRequest) {
         take: LIMITE,
       }),
       prisma.requerente.findMany({
-        where: { nome: contains },
+        where: { OR: [{ nome: contains }, { publicCode: contains }] },
         select: {
           id: true,
+          publicCode: true,
           nome: true,
           processos: { select: { processo: { select: { id: true, nome: true, pais: true } } }, take: 3 },
         },
         take: LIMITE,
       }),
       prisma.contratante.findMany({
-        where: { nome: contains },
+        where: { OR: [{ nome: contains }, { publicCode: contains }] },
         select: {
           id: true,
+          publicCode: true,
           nome: true,
           processos: { select: { processo: { select: { id: true, nome: true, pais: true } } }, take: 3 },
         },
@@ -93,13 +95,13 @@ export async function GET(request: NextRequest) {
     for (const r of requerentes) {
       for (const v of r.processos) {
         if (!v.processo) continue
-        add({ tipo: "requerente", id: r.id, label: r.nome, sub: `Requerente · ${v.processo.nome}`, processoId: v.processo.id, pais: v.processo.pais, href: href(v.processo.id, v.processo.pais) })
+        add({ tipo: "requerente", id: r.id, label: r.publicCode ? `${r.publicCode} — ${r.nome}` : r.nome, sub: `Requerente · ${v.processo.nome}`, processoId: v.processo.id, pais: v.processo.pais, href: href(v.processo.id, v.processo.pais) })
       }
     }
     for (const c of contratantes) {
       for (const v of c.processos) {
         if (!v.processo) continue
-        add({ tipo: "cliente", id: c.id, label: c.nome, sub: `Cliente · ${v.processo.nome}`, processoId: v.processo.id, pais: v.processo.pais, href: href(v.processo.id, v.processo.pais) })
+        add({ tipo: "cliente", id: c.id, label: c.publicCode ? `${c.publicCode} — ${c.nome}` : c.nome, sub: `Cliente · ${v.processo.nome}`, processoId: v.processo.id, pais: v.processo.pais, href: href(v.processo.id, v.processo.pais) })
       }
     }
 

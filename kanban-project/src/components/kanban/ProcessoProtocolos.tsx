@@ -26,6 +26,7 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 // Tipos compatíveis com os do modal
 interface PessoaBase {
   id: number
+  publicCode?: string | null   // CLI-n — código público do cliente (contratante/requerente)
   nome: string
   email?: string | null
   telefone?: string | null
@@ -352,8 +353,8 @@ export function ProcessoProtocolos({
 
   // Obter nome da pessoa do protocolo
   const getNomePessoa = (protocolo: Protocolo) => {
-    if (protocolo.contratante) return protocolo.contratante.nome
-    if (protocolo.requerente) return protocolo.requerente.nome
+    const c = protocolo.contratante ?? protocolo.requerente
+    if (c) return c.publicCode ? `${c.publicCode} — ${c.nome}` : c.nome
     return "Pessoa não encontrada"
   }
 
@@ -435,7 +436,7 @@ export function ProcessoProtocolos({
                     <optgroup label="Contratantes">
                       {contratantes.map(c => (
                         <option key={`c-${c.id}`} value={`contratante-${c.id}`}>
-                          {c.nome}
+                          {c.publicCode ? c.publicCode + ' — ' : ''}{c.nome}
                         </option>
                       ))}
                     </optgroup>
@@ -444,7 +445,7 @@ export function ProcessoProtocolos({
                     <optgroup label="Requerentes">
                       {requerentes.map(r => (
                         <option key={`r-${r.id}`} value={`requerente-${r.id}`}>
-                          {r.nome}
+                          {r.publicCode ? r.publicCode + ' — ' : ''}{r.nome}
                         </option>
                       ))}
                     </optgroup>

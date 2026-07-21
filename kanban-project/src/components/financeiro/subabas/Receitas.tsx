@@ -61,7 +61,7 @@ interface ReceitaRequerenteAPI {
   requerenteId?: number | null
   percentual: number | string
   nome?: string
-  requerente?: { id: number; nome: string }
+  requerente?: { id: number; nome: string; publicCode?: string | null }
 }
 
 interface ReceitaAPI {

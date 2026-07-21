@@ -27,6 +27,7 @@ export async function GET(
         contratante: {
           select: {
             id: true,
+            publicCode: true,
             nome: true,
             email: true,
             telefone: true
@@ -35,6 +36,7 @@ export async function GET(
         requerente: {
           select: {
             id: true,
+            publicCode: true,
             nome: true,
             email: true,
             telefone: true
@@ -156,12 +158,14 @@ export async function PUT(
         contratante: {
           select: {
             id: true,
+            publicCode: true,
             nome: true
           }
         },
         requerente: {
           select: {
             id: true,
+            publicCode: true,
             nome: true
           }
         }

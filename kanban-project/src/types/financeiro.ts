@@ -45,6 +45,7 @@ export type TipoPessoa = 'CONTRATANTE' | 'REQUERENTE';
 
 export interface DestinatarioPagamento {
   id: number;
+  publicCode?: string | null;   // CLI-n — código público do cliente
   nome: string;
   tipo?: TipoPessoa;
 }
@@ -165,6 +166,7 @@ export interface PastaDocumentalDetalhePDF {
 
 export interface PessoaContexto {
   id: number;
+  publicCode?: string | null;   // CLI-n — código público do cliente (quando contratante/requerente)
   nome: string;
   tipo: TipoPessoa;
   endereco?: string | null;
@@ -251,8 +253,8 @@ export interface Recibo {
   pagadorContratanteId?: number | null;
   pagadorNome?: string | null;
 
-  pagadorRequerente?: { id: number; nome: string } | null;
-  pagadorContratante?: { id: number; nome: string } | null;
+  pagadorRequerente?: { id: number; nome: string; publicCode?: string | null } | null;
+  pagadorContratante?: { id: number; nome: string; publicCode?: string | null } | null;
 
   pdfUrl?: string | null;
   pdfNome?: string | null;

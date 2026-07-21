@@ -111,7 +111,7 @@ export async function PATCH(
       include: {
         destinatarios: {
           include: {
-            requerente: { select: { id: true, nome: true } }
+            requerente: { select: { id: true, publicCode: true, nome: true } }
           }
         }
       }

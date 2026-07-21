@@ -98,6 +98,7 @@ export interface Usuario {
 // =====================================================
 export interface Contratante {
   id: number
+  publicCode?: string | null   // CLI-n — código público do cliente
   nome: string
   cpf?: string | null
   rg?: string | null
@@ -127,6 +128,7 @@ export interface Contratante {
 // =====================================================
 export interface Requerente {
   id: number
+  publicCode?: string | null   // CLI-n — código público do cliente
   nome: string
   cpf?: string | null
   rg?: string | null

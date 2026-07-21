@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
           where: { dataNascimento: null },
           select: {
             id: true,
+            publicCode: true,
             nome: true,
             dataNascimento: true,
             telefone: true,
@@ -37,6 +38,7 @@ export async function GET(request: NextRequest) {
           where: { dataNascimento: null },
           select: {
             id: true,
+            publicCode: true,
             nome: true,
             dataNascimento: true,
             telefone: true,
@@ -83,6 +85,7 @@ export async function GET(request: NextRequest) {
         where: { dataNascimento: { not: null } },
         select: {
           id: true,
+          publicCode: true,
           nome: true,
           dataNascimento: true,
           telefone: true,
@@ -103,6 +106,7 @@ export async function GET(request: NextRequest) {
         where: { dataNascimento: { not: null } },
         select: {
           id: true,
+          publicCode: true,
           nome: true,
           dataNascimento: true,
           telefone: true,

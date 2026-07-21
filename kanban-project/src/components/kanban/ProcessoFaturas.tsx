@@ -40,6 +40,7 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 // ========================================
 interface Requerente {
   id: number
+  publicCode?: string | null   // CLI-n — código público do cliente
   nome: string
   cpf?: string | null
   endereco?: string | null
@@ -925,7 +926,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                     key={dest.id}
                                     className="px-2 py-1 bg-white border rounded-lg text-sm"
                                   >
-                                    {dest.nome}
+                                    {dest.publicCode ? dest.publicCode + ' — ' : ''}{dest.nome}
                                   </span>
                                 ))}
                               </div>
@@ -1124,7 +1125,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                       {pag.destinatarios && pag.destinatarios.length > 0 && (
                                         <span className="flex items-center gap-1 text-gray-500">
                                           <Users className="h-3 w-3" />
-                                          {pag.destinatarios.map(d => d.nome).join(', ')}
+                                          {pag.destinatarios.map(d => d.publicCode ? `${d.publicCode} — ${d.nome}` : d.nome).join(', ')}
                                         </span>
                                       )}
                                       {pag.observacao && (
@@ -1455,7 +1456,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                   {isSelected && <Check className="h-3 w-3 text-white" />}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-gray-900">{req.nome}</p>
+                                  <p className="font-medium text-gray-900">{req.publicCode ? req.publicCode + ' — ' : ''}{req.nome}</p>
                                   {endereco && (
                                     <p className="text-xs text-gray-500 truncate">{endereco}</p>
                                   )}

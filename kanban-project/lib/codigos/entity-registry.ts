@@ -11,19 +11,22 @@ export interface RegistroCodigo {
 
 // Chave = nome do MODELO Prisma (como a extensão $extends reporta: PascalCase).
 // Entidades já concluídas (Processo.codigo, Receita.codigo, Custo.codigo) NÃO entram aqui — usam
-// o mesmo gerador por chamada explícita e não devem ser alteradas. OperacaoAntecipada gera OPA
-// explicitamente no serviço; a extensão só age quando publicCode ainda não veio no data.
+// o mesmo gerador por chamada explícita e não devem ser alteradas.
+//
+// ESCOPO DEFINITIVO (correção conceitual): publicCode SÓ para cadastros operacionais REAIS que o
+// usuário cria, pesquisa e referencia. NÃO para entidades internas/config/infra. Por isso saíram
+// daqui: Pessoa (interna — o cliente é Contratante/Requerente), ProdutoFinanceiro (config),
+// TabelaValor (preço/config), Tarefa, Evento, Protocolo (identificado por numeroProtocolo/consulado),
+// PhaseAutomationRule (regra/automação) e OperacaoAntecipada (orquestração interna — identificada
+// pelo documento/serviço/operação oficial vinculada). Essas mantêm apenas o ID técnico interno.
+//
+// Cliente = Contratante + Requerente compartilham o MESMO escopo CLI (sequência única entre as duas
+// tabelas). Não existe tabela "Cliente" nem "Produto" separado (Serviço = ServicoProduto).
 export const CODE_REGISTRY: Record<string, RegistroCodigo> = {
-  ServicoProduto:      { entidade: 'SERVICE',               campo: 'publicCode' }, // SRV
-  Documento:           { entidade: 'DOCUMENT',              campo: 'publicCode' }, // DOC
-  Pessoa:              { entidade: 'PERSON',                campo: 'publicCode' }, // PES
-  Fornecedor:          { entidade: 'SUPPLIER',              campo: 'publicCode' }, // FOR
-  ProdutoFinanceiro:   { entidade: 'FINANCIAL_CONFIG',      campo: 'publicCode' }, // CFG
-  TabelaValor:         { entidade: 'PRICE',                 campo: 'publicCode' }, // PRE
-  Tarefa:              { entidade: 'TASK',                  campo: 'publicCode' }, // TAR
-  Usuario:             { entidade: 'USER',                  campo: 'publicCode' }, // USR
-  Evento:              { entidade: 'EVENT',                 campo: 'publicCode' }, // EVT
-  Protocolo:           { entidade: 'PROTOCOL',              campo: 'publicCode' }, // PRO
-  PhaseAutomationRule: { entidade: 'FINANCIAL_RULE',        campo: 'publicCode' }, // RGF
-  OperacaoAntecipada:  { entidade: 'ANTICIPATED_OPERATION', campo: 'publicCode' }, // OPA (create já gera; extensão é no-op se já veio)
+  Contratante:    { entidade: 'CLIENT',   campo: 'publicCode' }, // CLI (cliente)
+  Requerente:     { entidade: 'CLIENT',   campo: 'publicCode' }, // CLI (cliente — mesma sequência)
+  ServicoProduto: { entidade: 'SERVICE',  campo: 'publicCode' }, // SRV
+  Documento:      { entidade: 'DOCUMENT', campo: 'publicCode' }, // DOC (documento concreto)
+  Fornecedor:     { entidade: 'SUPPLIER', campo: 'publicCode' }, // FOR
+  Usuario:        { entidade: 'USER',     campo: 'publicCode' }, // USR (equipe interna)
 }

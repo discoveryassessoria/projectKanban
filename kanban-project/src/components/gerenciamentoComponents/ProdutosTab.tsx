@@ -174,7 +174,6 @@ export default function ProdutosTab() {
     const q = busca.trim().toLowerCase()
     if (!q) return base
     return base.filter((p) =>
-      (p.publicCode ?? '').toLowerCase().includes(q) ||
       (p.mestre?.nome ?? p.nome).toLowerCase().includes(q) ||
       (p.mestre?.codigo ?? '').toLowerCase().includes(q) ||
       (p.mestre?.origem ?? '').toLowerCase().includes(q) ||
@@ -337,7 +336,6 @@ export default function ProdutosTab() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-white/5">
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Código</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Cadastro mestre</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Origem</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Natureza financeira</th>
@@ -348,7 +346,6 @@ export default function ProdutosTab() {
             <tbody>
               {filtrados.map((p) => (
                 <tr key={p.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
-                  <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/90">{p.publicCode ?? '—'}</td>
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-white">{p.mestre?.publicCode ? <span className="font-mono text-[12px] text-white/60 mr-1">{p.mestre.publicCode} —</span> : null}{p.mestre?.nome || p.nome}</div>
                     <div className="text-[11px] text-white/40">{p.mestre?.codigo ? `Chave: ${p.mestre.codigo}` : 'sem chave de mestre'}</div>

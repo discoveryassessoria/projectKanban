@@ -17,6 +17,7 @@ import { applyCPFMask, applyRGMask, applyTelefoneMask, removeMask, removeTelefon
 
 interface Contratante {
   id: number
+  publicCode?: string | null   // CLI-n — código público do cliente
   nome: string
   cpf?: string | null
   rg?: string | null

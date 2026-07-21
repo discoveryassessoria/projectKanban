@@ -31,7 +31,9 @@ export function GerarReciboModal({ ctx, onClose }: Props) {
   useEffect(() => { carregar() }, [])
 
   function nomeDoPagador(r: Recibo): string {
-    return r.pagadorRequerente?.nome || r.pagadorContratante?.nome || r.pagadorNome || "—"
+    const p = r.pagadorRequerente ?? r.pagadorContratante
+    if (p) return p.publicCode ? `${p.publicCode} — ${p.nome}` : p.nome
+    return r.pagadorNome || "—"
   }
 
   return (

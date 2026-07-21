@@ -65,14 +65,14 @@ export async function GET(request: NextRequest) {
           include: {
             destinatarios: {
               include: {
-                requerente: { select: { id: true, nome: true } }
+                requerente: { select: { id: true, publicCode: true, nome: true } }
               }
             }
           }
         },
         destinatarios: {
           include: {
-            requerente: { select: { id: true, nome: true } }
+            requerente: { select: { id: true, publicCode: true, nome: true } }
           }
         },
         parcelasBoleto: {

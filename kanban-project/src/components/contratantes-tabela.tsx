@@ -43,6 +43,7 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 interface Contratante {
   id: number
+  publicCode?: string | null   // CLI-n — código público do cliente
   tipo?: string | null
   nome: string
   cpf?: string | null
@@ -1965,6 +1966,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
   const filteredContratantes = contratantes.filter(c => {
     const searchLower = searchTerm.toLowerCase()
     return (
+      c.publicCode?.toLowerCase().includes(searchLower) ||
       c.nome.toLowerCase().includes(searchLower) ||
       c.email?.toLowerCase().includes(searchLower) ||
       c.cpf?.includes(searchTerm) ||
@@ -2277,6 +2279,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
           <thead className="bg-white/10">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Tipo</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Código</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Nome</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">CPF</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Telefone</th>
@@ -2311,6 +2314,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
                       {contratante.tipo === 'requerente' ? 'Requerente' : 'Contratante'}
                     </span>
                   </td>
+                  <td className="px-4 py-3 font-mono text-xs font-bold text-white/80">{contratante.publicCode ?? '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${

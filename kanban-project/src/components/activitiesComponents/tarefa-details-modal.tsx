@@ -58,6 +58,7 @@ interface Processo {
   contratantes?: {
     contratante: {
       id: number
+      publicCode?: string | null   // CLI-n — código público do cliente
       nome: string
     }
   }[]
