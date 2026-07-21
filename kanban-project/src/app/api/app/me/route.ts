@@ -15,13 +15,13 @@ export async function GET(request: NextRequest) {
       include: {
         contratante: {
           select: {
-            id: true, nome: true, email: true, telefone: true, cpf: true,
+            id: true, publicCode: true, nome: true, email: true, telefone: true, cpf: true,
             cidade: true, estado: true, pais: true,
           },
         },
         requerente: {
           select: {
-            id: true, nome: true, email: true, telefone: true, cpf: true,
+            id: true, publicCode: true, nome: true, email: true, telefone: true, cpf: true,
             cidade: true, estado: true, pais: true,
           },
         },

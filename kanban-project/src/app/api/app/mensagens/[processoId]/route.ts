@@ -59,8 +59,8 @@ export async function GET(
         clienteAuth: {
           select: {
             id: true,
-            contratante: { select: { nome: true } },
-            requerente: { select: { nome: true } },
+            contratante: { select: { publicCode: true, nome: true } },
+            requerente: { select: { publicCode: true, nome: true } },
           },
         },
       },

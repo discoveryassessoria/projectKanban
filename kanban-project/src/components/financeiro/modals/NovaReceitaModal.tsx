@@ -43,6 +43,7 @@ interface ReqState {
   /** FK pra Requerente real (quando vem da API) */
   requerenteId: number | null
   idx: number
+  publicCode: string | null
   nome: string
   idade: number | null
   isAdulto: boolean
@@ -214,6 +215,7 @@ export function NovaReceitaModal({
           return {
             requerenteId: r.id,
             idx: i,
+            publicCode: r.publicCode ?? null,
             nome: r.nome || `Requerente ${i + 1}`,
             idade,
             isAdulto,
@@ -331,6 +333,7 @@ export function NovaReceitaModal({
         requerenteId: null,
         idx: proxIdx,
         nome: `Requerente ${proxIdx + 1}`,
+        publicCode: null, // requerente manual (fallback) não tem código
         idade: null,
         isAdulto: true,
         participa: true,
@@ -770,7 +773,7 @@ export function NovaReceitaModal({
                                       }
                                     />
                                   ) : (
-                                    <span>{r.nome}</span>
+                                    <span>{r.publicCode ? r.publicCode + ' — ' : ''}{r.nome}</span>
                                   )}
                                 </label>
                               </td>

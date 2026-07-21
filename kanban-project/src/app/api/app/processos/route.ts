@@ -61,12 +61,12 @@ export async function GET(request: NextRequest) {
         },
         contratantes: {
           include: {
-            contratante: { select: { nome: true } },
+            contratante: { select: { publicCode: true, nome: true } },
           },
         },
         requerentes: {
           include: {
-            requerente: { select: { nome: true } },
+            requerente: { select: { publicCode: true, nome: true } },
           },
         },
       },

@@ -56,8 +56,8 @@ export async function GET(request: NextRequest) {
     // Sem params: listar todos os acessos
     const acessos = await prisma.clienteAuth.findMany({
       include: {
-        contratante: { select: { id: true, nome: true } },
-        requerente: { select: { id: true, nome: true } },
+        contratante: { select: { id: true, publicCode: true, nome: true } },
+        requerente: { select: { id: true, publicCode: true, nome: true } },
       },
       orderBy: { createdAt: 'desc' },
     });

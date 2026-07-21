@@ -21,10 +21,10 @@ export async function GET(
       where: { id: processoId },
       include: {
         contratantes: {
-          include: { contratante: { select: { id: true, nome: true } } },
+          include: { contratante: { select: { id: true, publicCode: true, nome: true } } },
         },
         requerentes: {
-          include: { requerente: { select: { id: true, nome: true } } },
+          include: { requerente: { select: { id: true, publicCode: true, nome: true } } },
         },
         // Todas as tarefas com hierarquia completa
         tarefas: {

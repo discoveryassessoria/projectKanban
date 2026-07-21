@@ -37,6 +37,7 @@ interface RequerenteAPI {
 interface ReqState {
   requerenteId: number | null
   idx: number
+  publicCode: string | null
   nome: string
   idade: number | null
   isAdulto: boolean
@@ -237,6 +238,7 @@ export function NovaReceitaPagina({
           return {
             requerenteId: r.id,
             idx: i,
+            publicCode: r.publicCode ?? null,
             nome: r.nome || `Requerente ${i + 1}`,
             idade,
             isAdulto,
@@ -839,7 +841,7 @@ export function NovaReceitaPagina({
                                   verticalAlign: 'middle',
                                 }}
                               />{' '}
-                              {r.nome}
+                              {r.publicCode ? r.publicCode + ' — ' : ''}{r.nome}
                             </td>
                             <td>{r.idade ?? '—'}</td>
                             <td>{badge}</td>

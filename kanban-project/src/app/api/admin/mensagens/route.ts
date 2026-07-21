@@ -25,8 +25,8 @@ export async function GET(request: NextRequest) {
             usuario: { select: { nome: true } },
             clienteAuth: {
               select: {
-                contratante: { select: { nome: true } },
-                requerente: { select: { nome: true } },
+                contratante: { select: { publicCode: true, nome: true } },
+                requerente: { select: { publicCode: true, nome: true } },
               },
             },
           },
