@@ -29,6 +29,7 @@ export const CODE_REGISTRY: Record<string, RegistroCodigo> = {
   Contratante:    { entidade: 'CLIENT',   campo: 'publicCode' }, // CLI (relação comercial)
   ServicoProduto: { entidade: 'SERVICE',  campo: 'publicCode' }, // SRV
   Documento:      { entidade: 'DOCUMENT', campo: 'publicCode' }, // DOC (documento concreto)
+  TipoDocumentoCadastro: { entidade: 'DOCUMENT_TYPE', campo: 'publicCode' }, // TDOC (tipo/mestre; NÃO é DOC-n)
   Fornecedor:     { entidade: 'SUPPLIER', campo: 'publicCode' }, // FOR
   Usuario:        { entidade: 'USER',     campo: 'publicCode' }, // USR (equipe interna)
 }

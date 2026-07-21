@@ -9,6 +9,8 @@ export const CODE_PREFIX = {
   CLIENT: 'CLI',
   SERVICE: 'SRV',
   DOCUMENT: 'DOC',
+  DOCUMENT_TYPE: 'TDOC', // Tipo de Documento (cadastro mestre) — distinto do DOC-n do documento concreto
+
   PERSON: 'PES',
   SUPPLIER: 'FOR',
   TASK: 'TAR',

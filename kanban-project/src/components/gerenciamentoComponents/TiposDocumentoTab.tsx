@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react"
 import DocumentCategorySelector from "./DocumentCategorySelector"
 
 interface CatRel { id: number; code: string; name: string; ativo: boolean }
-interface Tipo { id: number; code: string | null; name: string; category: string | null; nature?: string | null; categoriaDocumentalId?: number | null; categoriaDocumental?: CatRel | null; ativo: boolean }
+interface Tipo { id: number; publicCode?: string | null; code: string | null; name: string; category: string | null; nature?: string | null; categoriaDocumentalId?: number | null; categoriaDocumental?: CatRel | null; ativo: boolean }
 // Sem lista fixa de categorias na UI: o nome exibido vem da relação canônica
 // (categoriaDocumental). Fallback textual só para linhas ainda não migradas.
 
@@ -17,7 +17,7 @@ const labelCls = "mb-1 block text-xs text-white/60"
 const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
 const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>)
 
-type Form = { id?: number; code: string; name: string; category: string; categoriaDocumentalId: number | null; currentCat?: CatRel | null; ativo: boolean }
+type Form = { id?: number; publicCode?: string | null; code: string; name: string; category: string; categoriaDocumentalId: number | null; currentCat?: CatRel | null; ativo: boolean }
 
 export default function TiposDocumentoTab() {
   const [rows, setRows] = useState<Tipo[]>([])
@@ -100,19 +100,20 @@ export default function TiposDocumentoTab() {
       <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
         <table className="w-full text-sm">
           <thead className="border-b border-white/10 text-left text-xs text-white/50">
-            <tr><th className="px-4 py-3 font-medium">Nome</th><th className="px-4 py-3 font-medium">Categoria</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 text-right font-medium">Ações</th></tr>
+            <tr><th className="px-4 py-3 font-medium">Código</th><th className="px-4 py-3 font-medium">Nome</th><th className="px-4 py-3 font-medium">Categoria</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 text-right font-medium">Ações</th></tr>
           </thead>
           <tbody>
             {visiveis.length === 0 ? (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-xs text-white/40">{filtro === "certidoes" ? "Nenhuma certidão encontrada." : "Nenhum tipo de documento cadastrado."}</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-white/40">{filtro === "certidoes" ? "Nenhuma certidão encontrada." : "Nenhum tipo de documento cadastrado."}</td></tr>
             ) : visiveis.map(d => (
               <tr key={d.id} className="border-b border-white/5 last:border-0">
+                <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/80">{d.publicCode ?? "—"}</td>
                 <td className="px-4 py-2.5 text-white">{d.name}</td>
                 <td className="px-4 py-2.5 text-white/70">{d.categoriaDocumental?.name ?? (d.category || "—")}</td>
                 <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-0.5 text-white/50">
-                    <button title="Editar" aria-label="Editar" onClick={() => setForm({ id: d.id, code: d.code || "", name: d.name, category: d.category || "", categoriaDocumentalId: d.categoriaDocumentalId ?? null, currentCat: d.categoriaDocumental ?? null, ativo: d.ativo })} className="rounded p-1 hover:bg-white/10 hover:text-white"><IEdit /></button>
+                    <button title="Editar" aria-label="Editar" onClick={() => setForm({ id: d.id, publicCode: d.publicCode ?? null, code: d.code || "", name: d.name, category: d.category || "", categoriaDocumentalId: d.categoriaDocumentalId ?? null, currentCat: d.categoriaDocumental ?? null, ativo: d.ativo })} className="rounded p-1 hover:bg-white/10 hover:text-white"><IEdit /></button>
                     <button title="Excluir" aria-label="Excluir" onClick={() => del(d)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>
                   </div>
                 </td>
@@ -127,6 +128,13 @@ export default function TiposDocumentoTab() {
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="border-b border-white/10 px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Novo"} tipo de documento</h3></div>
             <div className="space-y-3 px-6 py-4">
+              {form.publicCode && (
+                <div>
+                  <label className={labelCls}>Código</label>
+                  <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-sm font-bold text-white/80">{form.publicCode}</div>
+                  <p className="mt-1 text-[10.5px] text-white/35">Gerado pelo sistema, permanente e não editável.</p>
+                </div>
+              )}
               <div><label className={labelCls}>Nome *</label><input value={form.name} onChange={e => setForm(f => f && { ...f, name: e.target.value })} autoFocus className={inputCls} /></div>
               <div>
                 <label className={labelCls}>Categoria documental</label>
