@@ -27,7 +27,6 @@ import { gerarEconomicoDaMatriz } from './matriz-economica'
 import { resolverPrecoPorConfigDB } from './resolver-preco-financeiro.prisma'
 import { NaturezaPreco } from '@prisma/client'
 import { aplicacaoValida, naturezasDaAplicacao, aplicacaoPermitida } from '@/lib/financeiro/aplicacao-financeira'
-import { isoDoPais } from '@/lib/codigos/code-patterns'
 import { tituloAutomacaoFinanceira, descricaoLancamentoDaConfig } from '@/lib/financeiro/automacao-financeira-identidade'
 import { processoEmRuntimeV2 } from './runtime-guard' // CP-4H
 import { artefatoEstaSuprimido } from '@/lib/financeiro/supressao-motor'
@@ -703,15 +702,18 @@ export async function reconciliarFinanceiroDoProcesso(processoId: number): Promi
   return { fases: fases.size, criadas, removidas, bloqueadas }
 }
 // ============================================================================
-// HONORÁRIOS CONTRATUAIS — CIDADANIA ITALIANA (RECEITA por requerente).
+// HONORÁRIOS CONTRATUAIS POR REQUERENTE (RECEITA) — GENÉRICO, dirigido por dados.
 //
-// Regra comercial: total = valorBase + (nRequerentes - 1) × valorAdicional, EUR.
-// Conta SÓ Pessoa marcada como requerente ('maior' | 'menor'; ambos = 1) na árvore
-// do processo. UM ÚNICO lançamento consolidado por processo (idempotente por chave).
-// Valores NÃO hardcoded: vêm da Tabela de Preços (valorBase/valorAdicional) do
-// registro 'honorario_por_requerente' (natureza VENDA). Recálculo in-place enquanto
-// não houver parcela paga; se houver pagamento, PRESERVA e registra pendência.
-// Disparado pelo evento REQUERENTES_DO_PROCESSO_DEFINIDOS/ATUALIZADOS.
+// SEM tratamento por nacionalidade no código. A geração segue a arquitetura:
+//   Evento Operacional → Automação → FinanceRuleEngine → ItemCatalogo →
+//   ProdutoFinanceiro (do tipo de processo) → TabelaValor (modo POR_REQUERENTE)
+//   → Financeiro do Processo.
+//
+// Regra comercial: total = valorBase + (nRequerentes - 1) × valorAdicional.
+// Conta SÓ Pessoa marcada como requerente ('maior' | 'menor'; ambos = 1) na árvore.
+// UM ÚNICO lançamento consolidado por processo (idempotente por chave). Valores
+// vêm da Tabela de Preços do TIPO DE PROCESSO — nunca hardcoded, nunca por país.
+// Recálculo in-place enquanto não houver parcela paga; se houver, PRESERVA.
 // ============================================================================
 export type ResultadoHonorario = {
   aplicavel: boolean
@@ -723,22 +725,23 @@ export type ResultadoHonorario = {
   receitaId?: number
 }
 
-export async function aplicarHonorariosCidadaniaItaliana(processoId: number): Promise<ResultadoHonorario> {
+export async function aplicarHonorariosPorRequerente(processoId: number): Promise<ResultadoHonorario> {
   const proc = await prisma.processo.findUnique({
     where: { id: processoId },
-    select: { pais: true, arvoreId: true, tipoProcessoMotorId: true },
+    select: { pais: true, arvoreId: true, tipoProcessoMotorId: true,
+      tipoProcessoMotor: { select: { nationalityLabel: true, name: true } } },
   })
   if (!proc) return { aplicavel: false, motivo: 'processo não encontrado' }
-  // Só cidadania ITALIANA (por país do processo). Outro país → regra não se aplica.
-  if (isoDoPais(proc.pais) !== 'IT') return { aplicavel: false, motivo: 'processo não é de cidadania italiana' }
 
   // Conta EXCLUSIVAMENTE requerentes marcados na árvore (maior|menor = 1; nunca idade/parentesco).
   const n = proc.arvoreId
     ? await prisma.pessoa.count({ where: { arvoreId: proc.arvoreId, requerente: { in: ['maior', 'menor'] } } })
     : 0
 
-  const akey = `${processoId}::honorario_cidadania_italiana::VENDA`
-  const artefato = await prisma.motorArtefato.findFirst({ where: { automaticKey: akey } })
+  const akey = `${processoId}::honorario_por_requerente::VENDA`
+  // Compat: artefato pode ter sido criado com a chave legada (cidadania_italiana).
+  const akeyLegado = `${processoId}::honorario_cidadania_italiana::VENDA`
+  const artefato = await prisma.motorArtefato.findFirst({ where: { automaticKey: { in: [akey, akeyLegado] } } })
 
   // SUPRESSÃO RASTREÁVEL — o operador cancelou o lançamento e registrou uma
   // supressão autorizada. A reconciliação NÃO recria enquanto ela estiver ativa
@@ -768,13 +771,31 @@ export async function aplicarHonorariosCidadaniaItaliana(processoId: number): Pr
     return { aplicavel: true, n: 0, acao: 'nenhum' }
   }
 
-  // Preço OFICIAL (Tabela de Preços) — base + adicional. Nunca hardcoded.
-  const preco = await prisma.tabelaValor.findFirst({
-    where: { modoCalculo: 'honorario_por_requerente', natureza: NaturezaPreco.VENDA, arquivado: false },
-    orderBy: { prioridade: 'desc' },
-  })
-  if (!preco || preco.valorBase == null || preco.valorAdicional == null) {
-    await registrarPendencia({ processoId, tipoProcessoId: proc.tipoProcessoMotorId ?? null, phaseKey: 'genealogia', configItemId: preco?.configuracaoFinanceiraItemId ?? null, regraId: 0, natureza: NaturezaPreco.VENDA, motivo: 'SEM_PRECO', detalhe: 'Honorários Cidadania Italiana: Tabela de Preços sem valorBase/valorAdicional cadastrado' })
+  // Preço OFICIAL — Tabela de Preços do TIPO DE PROCESSO (base + adicional).
+  // Cadeia: ProdutoFinanceiro(tipoProcessoId) → TabelaValor(modo POR_REQUERENTE).
+  // Modos aceitos: o oficial (per_applicant) e o alias legado, via normalizarModo.
+  const MODOS_REQUERENTE = ['per_applicant', 'honorario_por_requerente']
+  let preco = proc.tipoProcessoMotorId
+    ? await prisma.tabelaValor.findFirst({
+        where: {
+          modoCalculo: { in: MODOS_REQUERENTE }, natureza: NaturezaPreco.VENDA, arquivado: false,
+          configuracaoFinanceiraItem: { tipoProcessoId: proc.tipoProcessoMotorId },
+        },
+        orderBy: { prioridade: 'desc' },
+      })
+    : null
+  // Fallback de compatibilidade: preço global sem vínculo de tipo (dados legados).
+  if (!preco) {
+    preco = await prisma.tabelaValor.findFirst({
+      where: { modoCalculo: { in: MODOS_REQUERENTE }, natureza: NaturezaPreco.VENDA, arquivado: false },
+      orderBy: { prioridade: 'desc' },
+    })
+  }
+  // Sem preço de honorário por requerente configurado p/ este tipo de processo:
+  // a regra simplesmente não se aplica (não é erro — nem todo processo tem).
+  if (!preco) return { aplicavel: false, n, motivo: 'sem honorário por requerente configurado para este tipo de processo' }
+  if (preco.valorBase == null || preco.valorAdicional == null) {
+    await registrarPendencia({ processoId, tipoProcessoId: proc.tipoProcessoMotorId ?? null, phaseKey: 'genealogia', configItemId: preco?.configuracaoFinanceiraItemId ?? null, regraId: 0, natureza: NaturezaPreco.VENDA, motivo: 'SEM_PRECO', detalhe: 'Honorários por requerente: Tabela de Preços sem valorBase/valorAdicional cadastrado' })
     return { aplicavel: true, n, acao: 'pendencia', motivo: 'sem preço base/adicional cadastrado (pendência registrada)' }
   }
   const base = Number(preco.valorBase)
@@ -787,12 +808,13 @@ export async function aplicarHonorariosCidadaniaItaliana(processoId: number): Pr
   const moeda = ((config?.moedaPadrao as Moeda) ?? Moeda.EUR)
   const fx = await fxParaBRL(moeda, new Map())
   if (fx == null) {
-    await registrarPendencia({ processoId, tipoProcessoId: proc.tipoProcessoMotorId ?? null, phaseKey: 'genealogia', configItemId: config?.id ?? null, regraId: 0, natureza: NaturezaPreco.VENDA, motivo: 'SEM_CAMBIO', detalhe: `Honorários Cidadania Italiana: sem cotação ${moeda}→BRL` })
+    await registrarPendencia({ processoId, tipoProcessoId: proc.tipoProcessoMotorId ?? null, phaseKey: 'genealogia', configItemId: config?.id ?? null, regraId: 0, natureza: NaturezaPreco.VENDA, motivo: 'SEM_CAMBIO', detalhe: `Honorários por requerente: sem cotação ${moeda}→BRL` })
     return { aplicavel: true, n, total, moeda, acao: 'pendencia', motivo: `sem câmbio ${moeda}→BRL (pendência registrada)` }
   }
 
-  const desc = 'Honorários Contratuais — Cidadania Italiana'
-  const contexto = { fonte: 'honorario_cidadania_italiana', requerentes: n, incluidoNaBase: 1, adicionais: n - 1, valorBase: base, valorAdicional: adic, tabelaValorId: preco.id, evento: 'REQUERENTES_DO_PROCESSO_DEFINIDOS' } as Prisma.InputJsonValue
+  const nacionalidade = proc.tipoProcessoMotor?.nationalityLabel || proc.tipoProcessoMotor?.name || null
+  const desc = nacionalidade ? `Honorários Contratuais — ${nacionalidade}` : 'Honorários Contratuais por Requerente'
+  const contexto = { fonte: 'honorario_por_requerente', requerentes: n, incluidoNaBase: 1, adicionais: n - 1, valorBase: base, valorAdicional: adic, tabelaValorId: preco.id, evento: 'REQUERENTES_DO_PROCESSO_DEFINIDOS' } as Prisma.InputJsonValue
   const fz: FreezeExec = { tabelaValorId: preco.id, configId: config?.id ?? null, regraId: null, naturezaPreco: 'VENDA', phaseKey: 'genealogia', chaveIdempotencia: akey, contexto }
 
   // Já existe lançamento ativo → recálculo IN-PLACE (mesmo lançamento) ou BLOQUEIO se pago.
@@ -841,3 +863,7 @@ export async function aplicarHonorariosCidadaniaItaliana(processoId: number): Pr
     throw e
   }
 }
+
+// COMPATIBILIDADE: nome legado mantido como alias do genérico. Callers antigos
+// (materializar-genealogia, supressao-motor) seguem funcionando sem alteração.
+export const aplicarHonorariosCidadaniaItaliana = aplicarHonorariosPorRequerente

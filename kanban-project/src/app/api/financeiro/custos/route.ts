@@ -4,12 +4,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import {
-  CriarCustoSchema,
-  formatZodError,
-} from "@/lib/financeiro/validacao";
-import { gerarCodigoCusto } from "@/lib/financeiro/codigos";
-import { gerarParcelas } from "@/lib/financeiro/parcelas";
 import { withRetry } from "@/lib/db-retry"; // 🆕
 
 export async function GET(req: NextRequest) {
@@ -58,111 +52,15 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const parse = CriarCustoSchema.safeParse(body);
-    if (!parse.success) {
-      return NextResponse.json(
-        { error: "Dados inválidos", details: formatZodError(parse.error) },
-        { status: 400 }
-      );
-    }
-    const data = parse.data;
-
-    // 🆕 withRetry na primeira chamada
-    const processo = await withRetry(() =>
-      prisma.processo.findUnique({
-        where: { id: data.processoId },
-        select: { id: true },
-      })
-    );
-    if (!processo) {
-      return NextResponse.json(
-        { error: `Processo ${data.processoId} não encontrado` },
-        { status: 404 }
-      );
-    }
-
-    const codigo = await gerarCodigoCusto();
-
-    const valorBrlFixo =
-      data.fxRule === "FIXO" && data.fxFixo
-        ? Number((data.valor * data.fxFixo).toFixed(2))
-        : null;
-
-    // Rascunho não gera parcelas
-    const isRascunho = data.status === "RASCUNHO";
-    const parcelas = isRascunho
-      ? []
-      : gerarParcelas(data.valor, data.nParcelas, data.vencimento);
-
-    const cambioReferencia = data.fxFixo ?? data.fxEstimado;
-    const valorBrlReferencia = Number(
-      (data.valor * cambioReferencia).toFixed(2)
-    );
-
-    const custo = await prisma.custo.create({
-      data: {
-        codigo,
-        processoId: data.processoId,
-        tipo: data.tipo,
-        categoria: data.categoria,
-        descricao: data.descricao,
-        fornecedor: data.fornecedor ?? null,
-        moeda: data.moeda,
-        valor: data.valor,
-        fxEstimado: data.fxEstimado,
-        fxRule: data.fxRule,
-        fxFixo: data.fxFixo ?? null,
-        fxData: data.fxData ?? null,
-        valorBrlFixo,
-        nParcelas: data.nParcelas,
-        vencimento: data.vencimento,
-        custoOperacional: data.custoOperacional,
-        categoriaVinculada: data.categoriaVinculada ?? null,
-        percentualVinculado: data.percentualVinculado ?? null,
-        formaPagamento: data.formaPagamento,
-        observacoes: data.observacoes ?? null,
-        status: data.status,
-        // §4 — congelamento também no lançamento MANUAL (sem regra de preço).
-        origem: "manual", origemLancamento: "PROCESSO", naturezaLancamento: "CUSTO",
-        valorUnitario: data.valor, quantidade: 1, valorTotalCongelado: data.valor,
-        modoCalculoAplicado: "manual", naturezaPreco: "CUSTO", dataReferencia: new Date(),
-        ...(parcelas.length > 0 && {
-          parcelas: {
-            create: parcelas.map((p) => ({
-              numero: p.numero,
-              vencimento: p.vencimento,
-              valor: p.valor,
-              status: "PENDENTE" as const,
-            })),
-          },
-        }),
-        eventos: {
-          create: {
-            tipo: "CRIACAO" as const,
-            descricao: isRascunho
-              ? `Rascunho criado: ${data.descricao}`
-              : `Custo criado: ${data.descricao}`,
-            valor: data.valor,
-            cambio: cambioReferencia,
-            valorBrl: valorBrlReferencia,
-          },
-        },
-      },
-      include: {
-        parcelas: { orderBy: { numero: "asc" } },
-        eventos: { orderBy: { createdAt: "desc" } },
-      },
-    });
-
-    return NextResponse.json(custo, { status: 201 });
-  } catch (err) {
-    console.error("[POST /api/financeiro/custos] erro:", err);
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
-  }
+// ── FinanceRuleEngine é o ÚNICO autorizado a criar lançamentos ──────────────
+// A criação manual foi DESATIVADA: nenhum endpoint/tela cria custo diretamente.
+// O corpo original é preservado abaixo (renomeado) só para referência/compat.
+export async function POST(): Promise<NextResponse> {
+  return NextResponse.json(
+    {
+      error: "Criação manual desativada. Lançamentos financeiros são gerados exclusivamente pelo FinanceRuleEngine (a partir de eventos/automações e do cadastro mestre).",
+      codigo: "CRIACAO_MANUAL_DESATIVADA",
+    },
+    { status: 405 },
+  )
 }

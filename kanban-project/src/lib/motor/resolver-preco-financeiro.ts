@@ -27,6 +27,7 @@
 // ============================================================================
 
 import { Moeda, NaturezaPreco } from '@prisma/client'
+import { modoMultiplicaQuantidade } from '@/lib/financeiro/modo-calculo'
 import { canonicalNaturezaPreco } from '@/lib/financeiro/natureza-financeira'
 
 // ── Tipos de dados (espelham TabelaValor de hoje, mas desacoplados do Prisma) ──
@@ -146,9 +147,10 @@ function precoValido(v: number): boolean {
 }
 
 function ehPerUnit(modo?: string | null): boolean {
-  if (!modo) return false
-  const m = modo.toLowerCase()
-  return m === 'per_unit' || m === 'unit' || m === 'por_unidade' || m === 'quantidade'
+  // Delegado à FONTE ÚNICA (lib/financeiro/modo-calculo). Reconhece os modos
+  // oficiais (per_person/per_document/per_applicant/...) e os aliases legados
+  // (honorario_por_requerente, per_unit, unit, por_unidade, quantidade).
+  return modoMultiplicaQuantidade(modo)
 }
 
 // ── §2 DIMENSÕES DE CONTEXTO ─────────────────────────────────────────────────

@@ -8,6 +8,48 @@
 // canônicos são os abaixo. `unidade` (TabelaValor.unidade) é só rótulo/dedup — não entra
 // em cálculo. VALOR_FIXO ("fixed") não tem unidade (null) e não multiplica no motor.
 
+/**
+ * ENUM OFICIAL ÚNICO de modo de cálculo. Fonte única para UI, API, resolver e
+ * motor. Qualquer ponto que decida "modo de cálculo" importa daqui.
+ */
+export const MODO = {
+  FIXO: 'fixed',
+  POR_PESSOA: 'per_person',
+  POR_DOCUMENTO: 'per_document',
+  POR_REQUERENTE: 'per_applicant',
+  POR_GERACAO: 'per_generation',
+  POR_PACOTE: 'per_package',
+  POR_FORNECEDOR: 'per_vendor',
+} as const
+export type ModoCalculo = (typeof MODO)[keyof typeof MODO]
+
+/** Modo canônico dos honorários base+adicional por requerente. */
+export const MODO_HONORARIO_REQUERENTE = MODO.POR_REQUERENTE
+
+/**
+ * ALIASES legados → modo oficial. Registros/rotas antigas continuam válidos:
+ * o sistema normaliza para o canônico ao ler. NÃO removidos (compatibilidade).
+ */
+export const MODO_ALIASES: Record<string, ModoCalculo> = {
+  honorario_por_requerente: MODO.POR_REQUERENTE,
+  per_unit: MODO.POR_REQUERENTE,
+  unit: MODO.POR_REQUERENTE,
+  por_unidade: MODO.POR_REQUERENTE,
+  quantidade: MODO.POR_REQUERENTE,
+}
+
+/** Normaliza qualquer modo (canônico ou alias legado) para o valor OFICIAL. */
+export function normalizarModo(modo: string | null | undefined): ModoCalculo {
+  if (!modo) return MODO.FIXO
+  if (Object.prototype.hasOwnProperty.call(UNIDADE_POR_MODO, modo)) return modo as ModoCalculo
+  return MODO_ALIASES[modo] ?? MODO.FIXO
+}
+
+/** Modo multiplica valor × quantidade? (todos os "por X", exceto fixed). */
+export function modoMultiplicaQuantidade(modo: string | null | undefined): boolean {
+  return normalizarModo(modo) !== MODO.FIXO
+}
+
 /** Modos válidos, na ordem de exibição. [valor canônico, rótulo do modo]. */
 export const MODOS_CALCULO: [string, string][] = [
   ['fixed', 'Valor fixo'],
