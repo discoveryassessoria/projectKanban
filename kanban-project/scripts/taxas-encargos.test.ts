@@ -3,7 +3,7 @@
 // Motores de TAXAS (lib/financeiro/taxas-pagamento) e ENCARGOS
 // (lib/financeiro/encargos-financeiros). Puros: não precisam de banco.
 // ============================================================================
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { calcularTaxas, taxaAplicavel, type TaxaView } from '../lib/financeiro/taxas-pagamento'
 import { calcularEncargos, diferencaEmDias } from '../lib/financeiro/encargos-financeiros'
@@ -287,6 +287,48 @@ secao('Reflexo nas telas')
   for (const c of ['baseIncidencia', 'quemAbsorve', 'adquirente', 'vigenciaInicio', 'ativo']) {
     ok(`tela de Taxas edita ${c}`, taxasTela.includes(c))
   }
+}
+
+secao('Paridade Receita x Custo')
+{
+  for (const rota of ['detalhe', 'parcelas']) {
+    ok(`custos/[id]/${rota} existe`, existsSync(join(RAIZ, `src/app/api/financeiro/custos/[id]/${rota}/route.ts`)))
+  }
+  const det = readFileSync(join(RAIZ, 'src/app/api/financeiro/custos/[id]/detalhe/route.ts'), 'utf8')
+  ok('detalhe de custo devolve o mesmo envelope', det.includes('receita: {') && det.includes('acoes'))
+  ok('detalhe de custo expõe natureza', det.includes("natureza: 'CUSTO'"))
+  ok('detalhe de custo não recalcula', det.includes('CONGELADAS pelo FinanceRuleEngine'))
+  ok('detalhe de custo mapeia vencimento→data1', det.includes('data1: custo.vencimento'))
+
+  const parc = readFileSync(join(RAIZ, 'src/app/api/financeiro/custos/[id]/parcelas/route.ts'), 'utf8')
+  ok('custo tem renegociação', parc.includes("modo === 'renegociacao'"))
+  ok('custo preserva parcelas liquidadas', parc.includes("data: { status: 'CANCELADA'"))
+  ok('custo opera sobre o saldo', parc.includes('totalContratado - recebido'))
+  ok('custo grava vencimento (não data1)', parc.includes('vencimento: plano[0]?.vencimento'))
+  ok('custo usa a tabela certa', parc.includes('prisma.custo.findUnique') && parc.includes('custoId: id'))
+
+  const modal = readFileSync(join(RAIZ, 'src/components/financeiro/receita-modal/ReceitaFinanceiraModal.tsx'), 'utf8')
+  ok('modal é parametrizado por natureza', modal.includes("natureza?: 'RECEITA' | 'CUSTO'"))
+  ok('modal deriva a base da API', modal.includes('const base = `/api/financeiro/${vocab.recurso}/${receitaId}`'))
+  ok('vocabulário por natureza', modal.includes('Registrar pagamento') && modal.includes('Registrar recebimento'))
+  ok('exporta CustoFinanceiroModal', modal.includes('export function CustoFinanceiroModal'))
+
+  const tela = readFileSync(join(RAIZ, 'src/components/financeiro/subabas/Custos.tsx'), 'utf8')
+  ok('tela de Custos abre o modal', tela.includes('CustoFinanceiroModal'))
+  ok('linha de custo é clicável', tela.includes('role="button"') && tela.includes('setLancamentoAberto'))
+}
+
+secao('Financeiro Geral')
+{
+  const proj = readFileSync(join(RAIZ, 'lib/financeiro/financeiro-geral-projecao.ts'), 'utf8')
+  ok('projeção expõe valorTaxas', proj.includes('valorTaxas: number'))
+  ok('projeção expõe valorLiquido', proj.includes('valorLiquido: number'))
+  ok('projeção expõe a condição aplicada', proj.includes('condicao: string | null'))
+  ok('receitas trazem os campos do banco', proj.includes('valorTaxas: true, valorLiquido: true, condicaoCodigo: true'))
+  ok('totais somam líquido', proj.includes('aReceberLiquido'))
+  ok('saldo líquido projetado', proj.includes('saldoProjetadoLiquido'))
+  ok('conta corporativa não tem taxa', proj.includes('Conta corporativa não passa por Condição'))
+  ok('valor bruto segue sendo o principal', proj.includes('Valor CONTRATADO (bruto)'))
 }
 
 console.log(`\n${'='.repeat(60)}`)

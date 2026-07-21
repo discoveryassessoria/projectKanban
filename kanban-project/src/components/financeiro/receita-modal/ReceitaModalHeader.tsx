@@ -15,9 +15,10 @@ export interface ReceitaModalHeaderProps {
   tituloFallback: string
   menu: ReactNode
   onClose: () => void
+  natureza?: 'RECEITA' | 'CUSTO'
 }
 
-export function ReceitaModalHeader({ detalhe, status, tituloFallback, menu, onClose }: ReceitaModalHeaderProps) {
+export function ReceitaModalHeader({ detalhe, status, tituloFallback, menu, onClose, natureza = 'RECEITA' }: ReceitaModalHeaderProps) {
   const r = detalhe?.receita
   const origem = detalhe?.origem
   const contexto = [
@@ -39,7 +40,7 @@ export function ReceitaModalHeader({ detalhe, status, tituloFallback, menu, onCl
         <h2 className="rfm-head-titulo" id="rfm-titulo">{r?.descricao ?? tituloFallback}</h2>
         {contexto && <div className="rfm-head-sub">{contexto}</div>}
         <div className="rfm-head-badges">
-          <span className="rfm-badge rfm-badge-tipo">Receita</span>
+          <span className="rfm-badge rfm-badge-tipo">{natureza === 'CUSTO' ? 'Custo' : 'Receita'}</span>
           {r && <span className="rfm-badge rfm-badge-moeda">{r.moeda}</span>}
           {status && (
             <span className="rfm-badge rfm-badge-status" style={{ background: STATUS_TOM[status] }}>

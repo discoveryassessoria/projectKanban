@@ -50,7 +50,15 @@ export interface ReceitaFinanceiraModalProps {
   receitaId: number
   onClose: () => void
   onChanged?: () => void
+  /** PARIDADE: o mesmo modal serve receita e custo. Muda a base da API e os rótulos. */
+  natureza?: 'RECEITA' | 'CUSTO'
 }
+
+/** Rótulos por natureza — o fluxo é idêntico, o vocabulário não. */
+const VOCAB = {
+  RECEITA: { tipo: 'Receita', evento: 'Recebimento', verbo: 'Registrar recebimento', quitado: 'Lançamento quitado', recurso: 'receitas' },
+  CUSTO: { tipo: 'Custo', evento: 'Pagamento', verbo: 'Registrar pagamento', quitado: 'Lançamento pago', recurso: 'custos' },
+} as const
 
 type Painel =
   | { tipo: 'recebimento'; modo: 'registrar' | 'editar'; parcela: ParcelaView }
@@ -65,7 +73,9 @@ type Painel =
 const FOCAVEIS =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-export function ReceitaFinanceiraModal({ receitaId, onClose, onChanged }: ReceitaFinanceiraModalProps) {
+export function ReceitaFinanceiraModal({ receitaId, onClose, onChanged, natureza = 'RECEITA' }: ReceitaFinanceiraModalProps) {
+  const vocab = VOCAB[natureza]
+  const base = `/api/financeiro/${vocab.recurso}/${receitaId}`
   const [d, setD] = useState<Detalhe | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
@@ -88,7 +98,7 @@ export function ReceitaFinanceiraModal({ receitaId, onClose, onChanged }: Receit
   const carregar = useCallback(async () => {
     setErro(null)
     try {
-      const res = await fetch(`/api/financeiro/receitas/${receitaId}/detalhe`, { headers: cabecalhosAuth() })
+      const res = await fetch(`${base}/detalhe`, { headers: cabecalhosAuth() })
       if (!res.ok) {
         setErro(`Não foi possível carregar o lançamento (HTTP ${res.status}).`)
         return
@@ -99,7 +109,7 @@ export function ReceitaFinanceiraModal({ receitaId, onClose, onChanged }: Receit
     } catch {
       setErro('Erro de conexão ao carregar o lançamento.')
     }
-  }, [receitaId])
+  }, [base])
 
   useEffect(() => {
     let vivo = true
@@ -226,7 +236,7 @@ export function ReceitaFinanceiraModal({ receitaId, onClose, onChanged }: Receit
 
   async function reparcelar(nParcelas: number) {
     const res = await chamar(
-      `/api/financeiro/receitas/${receitaId}/parcelas`,
+      `${base}/parcelas`,
       { method: 'PATCH', body: JSON.stringify({ nParcelas }) },
       `Parcelamento alterado para ${nParcelas}×. Total contratual preservado.`,
     )
@@ -290,7 +300,7 @@ export function ReceitaFinanceiraModal({ receitaId, onClose, onChanged }: Receit
 
   async function salvarObservacoes() {
     const res = await chamar(
-      `/api/financeiro/receitas/${receitaId}`,
+      base,
       { method: 'PATCH', body: JSON.stringify({ observacoes }) },
       'Observações salvas.',
     )
@@ -300,7 +310,7 @@ export function ReceitaFinanceiraModal({ receitaId, onClose, onChanged }: Receit
   async function confirmarCancelamento(suprimirOrigem: boolean) {
     if (motivo.trim().length < 3) { setAviso('Informe um motivo com ao menos 3 caracteres.'); return }
     const res = await chamar(
-      `/api/financeiro/receitas/${receitaId}/cancelar`,
+      `${base}/cancelar`,
       { method: 'POST', body: JSON.stringify(suprimirOrigem ? { motivo, suprimirOrigem: true } : { motivo }) },
       suprimirOrigem ? 'Lançamento cancelado e supressão registrada.' : 'Lançamento cancelado.',
     )
@@ -313,7 +323,7 @@ export function ReceitaFinanceiraModal({ receitaId, onClose, onChanged }: Receit
   async function confirmarEstorno() {
     if (motivo.trim().length < 3) { setAviso('Informe um motivo com ao menos 3 caracteres.'); return }
     const res = await chamar(
-      `/api/financeiro/receitas/${receitaId}/estornar`,
+      `${base}/estornar`,
       { method: 'POST', body: JSON.stringify({ motivo }) },
       'Estorno registrado — o lançamento e o recebimento originais foram preservados.',
     )
@@ -322,7 +332,7 @@ export function ReceitaFinanceiraModal({ receitaId, onClose, onChanged }: Receit
 
   async function confirmarRevogacao() {
     const res = await chamar(
-      `/api/financeiro/receitas/${receitaId}/supressao`,
+      `${base}/supressao`,
       { method: 'DELETE', body: JSON.stringify({ motivo }) },
       'Supressão revogada — a regra ativa volta a valer na próxima reconciliação.',
     )
@@ -425,7 +435,8 @@ export function ReceitaFinanceiraModal({ receitaId, onClose, onChanged }: Receit
         <ReceitaModalHeader
           detalhe={d}
           status={status}
-          tituloFallback="Lançamento financeiro"
+          tituloFallback={`${vocab.tipo} financeira`}
+          natureza={natureza}
           menu={menu('abaixo')}
           onClose={onClose}
         />
@@ -548,10 +559,10 @@ export function ReceitaFinanceiraModal({ receitaId, onClose, onChanged }: Receit
                 disabled={salvando}
                 onClick={() => abrirRecebimento(parcelaAlvo)}
               >
-                Registrar recebimento
+                {vocab.verbo}
               </button>
             )}
-            {acoes?.quitado && aba !== 'geral' && <span className="rfm-selo ok">Lançamento quitado</span>}
+            {acoes?.quitado && aba !== 'geral' && <span className="rfm-selo ok">{vocab.quitado}</span>}
           </div>
         </footer>
 
@@ -768,6 +779,11 @@ export function ReceitaFinanceiraModal({ receitaId, onClose, onChanged }: Receit
       </div>
     </div>
   )
+}
+
+/** Central de Operação do CUSTO — mesmo componente, vocabulário e API de custo. */
+export function CustoFinanceiroModal(props: Omit<ReceitaFinanceiraModalProps, 'natureza'>) {
+  return <ReceitaFinanceiraModal {...props} natureza="CUSTO" />
 }
 
 export default ReceitaFinanceiraModal

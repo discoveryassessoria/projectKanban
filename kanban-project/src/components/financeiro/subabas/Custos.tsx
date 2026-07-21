@@ -23,6 +23,8 @@ import '@/src/styles/financeiro-paginas.css'
 import { useEffect, useState, useMemo } from 'react'
 import { TabelaCustos } from '@/src/components/kanban/TabelaCustos'
 import { parseLista } from '@/src/lib/financeiro/parseLista'
+// PARIDADE COM RECEITA: mesma Central de Operação, vocabulário de custo.
+import { CustoFinanceiroModal } from '@/src/components/financeiro/receita-modal/ReceitaFinanceiraModal'
 // ARQUITETURA NOVA — aplicação MANUAL de template financeiro REMOVIDA. Lançamentos
 // financeiros nascem apenas via Automações por Fase (evento do Workflow Interno).
 // O modal SeletorTemplate e o botão "Template" foram retirados desta tela.
@@ -183,6 +185,7 @@ export function Custos({
   onUpdate,
   fxHoje = 5.5,
 }: CustosProps) {
+  const [lancamentoAberto, setLancamentoAberto] = useState<number | null>(null)
   const [view, setView] = useState<View>({ kind: 'lista' })
   const [custos, setCustos] = useState<CustoAPI[]>([])
   const [loading, setLoading] = useState(true)
@@ -412,17 +415,24 @@ export function Custos({
         <span className="badge-fx-var-sm">VAR</span>
       )
 
+    const abrir = () => setLancamentoAberto(c.id)
     return (
       <tr
         key={c.id}
+        onClick={abrir}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir() } }}
+        tabIndex={0}
+        role="button"
+        aria-label={`Abrir detalhes de ${c.descricao}`}
+        className="rct-linha"
         style={
           sendoExcluido
-            ? { opacity: 0.4 }
+            ? { opacity: 0.4, cursor: 'pointer' }
             : isRascunho
-              ? { opacity: 0.7 }
+              ? { opacity: 0.7, cursor: 'pointer' }
               : dentroPasta
-                ? { background: '#fcfdff' }
-                : undefined
+                ? { background: '#fcfdff', cursor: 'pointer' }
+                : { cursor: 'pointer' }
         }
       >
         <td style={dentroPasta ? { paddingLeft: 28 } : undefined}>
@@ -673,6 +683,15 @@ export function Custos({
           )}
         </div>
       </section>
+
+      {/* ── CENTRAL DE OPERAÇÃO DO CUSTO (mesma da receita) ── */}
+      {lancamentoAberto != null && (
+        <CustoFinanceiroModal
+          receitaId={lancamentoAberto}
+          onClose={() => setLancamentoAberto(null)}
+          onChanged={() => { void recarregar(); onUpdate?.() }}
+        />
+      )}
     </div>
   )
 }

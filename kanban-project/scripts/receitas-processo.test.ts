@@ -433,19 +433,17 @@ secao('Central de operação do lançamento')
 
   // Nenhum endpoint novo: só rotas já existentes.
   const rotasUsadas = modal.match(/\/api\/[a-z0-9/[\]${}.-]+/gi) ?? []
+  // A base é derivada da natureza (receitas|custos) — PARIDADE receita/custo.
+  // Continuam sendo apenas rotas do módulo financeiro, nenhuma inventada.
   const permitidas = [
-    '/api/financeiro/receitas/${receitaId}/detalhe',
-    '/api/financeiro/receitas/${receitaId}/parcelas',
-    '/api/financeiro/receitas/${receitaId}/cancelar',
-    '/api/financeiro/receitas/${receitaId}/estornar',
-    '/api/financeiro/receitas/${receitaId}/supressao',
-    '/api/financeiro/receitas/${receitaId}',
+    '/api/financeiro/${vocab.recurso}/${receitaId}',
     '/api/financeiro/parcelas/${p.id}',
     '/api/financeiro/parcelas/${p.id}/lancamento',
   ]
   for (const rota of rotasUsadas) {
     ok(`rota existente: ${rota}`, permitidas.includes(rota))
   }
+  ok('base derivada cobre receitas e custos', modal.includes("recurso: 'receitas'") && modal.includes("recurso: 'custos'"))
   const form = readFileSync(join(RAIZ, `${base}/ReceitaRecebimentoForm.tsx`), 'utf8')
   ok('comprovante usa o presign existente', form.includes('/api/storage/presign'))
   ok('formulário completo de recebimento',
