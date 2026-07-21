@@ -374,8 +374,9 @@ secao('Modal financeiro central')
   ok('modal não tem botão de perigo fixo no rodapé', !/rfm-rodape[\s\S]{0,400}rfm-btn-perigo/.test(modal))
   const menu = readFileSync(join(RAIZ, `${base}/ReceitaAcoesMenu.tsx`), 'utf8')
   ok('cancelar vive em Mais ações', menu.includes('Cancelar lançamento'))
-  ok('estornar só com recebimento (podeEstornar)', menu.includes('a.podeEstornar'))
-  ok('bloqueio mostra o motivo', menu.includes('motivoBloqueioCancelamento'))
+  ok('estorno vem resolvido do estado', menu.includes('acoes.lancamento.estornar'))
+  ok('bloqueio mostra o motivo', menu.includes('item.acao.motivo'))
+  ok('menu não decide nada por conta própria', !/podeEstornar|podeCancelar|temRecebimento/.test(menu))
 
   // Informação técnica fora da leitura principal.
   const visao = readFileSync(join(RAIZ, `${base}/ReceitaVisaoGeral.tsx`), 'utf8')
@@ -401,6 +402,82 @@ secao('Modal financeiro central')
     const src = readFileSync(join(RAIZ, `${base}/${c}.tsx`), 'utf8')
     ok(`${c} sem escape \\uXXXX renderizável`, !escapeEmTextoJsx.test(src))
   }
+}
+
+// ── Guarda: CENTRAL DE OPERAÇÃO (Financeiro V2) ─────────────────────────────
+secao('Central de operação do lançamento')
+{
+  const base = 'src/components/financeiro/receita-modal'
+  for (const c of ['ReceitaAcoesRapidas', 'ReceitaRecebimentoForm', 'ReceitaMenuLinha']) {
+    ok(`componente ${c} existe`, existsSync(join(RAIZ, `${base}/${c}.tsx`)))
+  }
+  ok('fonte única de ações existe', existsSync(join(RAIZ, 'lib/financeiro/acoes-lancamento.ts')))
+
+  const modal = readFileSync(join(RAIZ, `${base}/ReceitaFinanceiraModal.tsx`), 'utf8')
+  ok('modal consome a fonte única de ações', modal.includes('resolveAvailableFinancialActions'))
+  ok('modal lê permissões do usuário', modal.includes('usePermissoes'))
+  ok('permissões usam as chaves do backend',
+    modal.includes('financeiro.pagamento_criar') &&
+    modal.includes('financeiro.pagamento_editar') &&
+    modal.includes('financeiro.pagamento_excluir'))
+  ok('sem permissão carregada, nada operacional é oferecido', modal.includes('carregandoPerm ? false'))
+
+  // Operações completas dentro do modal, sem sair da tela.
+  for (const painel of ['recebimento', 'vencimento', 'vencimento-lote', 'recebimento-lote', 'observacoes', 'cancelamento', 'estorno', 'revogacao']) {
+    ok(`painel interno "${painel}"`, modal.includes(`'${painel}'`))
+  }
+  ok('sem window.prompt', !modal.includes('window.prompt'))
+  ok('sem window.confirm', !modal.includes('window.confirm'))
+  ok('sem reload de página', !modal.includes('location.reload'))
+  ok('recarrega o detalhe após cada ação', modal.includes('await carregar()'))
+
+  // Nenhum endpoint novo: só rotas já existentes.
+  const rotasUsadas = modal.match(/\/api\/[a-z0-9/[\]${}.-]+/gi) ?? []
+  const permitidas = [
+    '/api/financeiro/receitas/${receitaId}/detalhe',
+    '/api/financeiro/receitas/${receitaId}/parcelas',
+    '/api/financeiro/receitas/${receitaId}/cancelar',
+    '/api/financeiro/receitas/${receitaId}/estornar',
+    '/api/financeiro/receitas/${receitaId}/supressao',
+    '/api/financeiro/receitas/${receitaId}',
+    '/api/financeiro/parcelas/${p.id}',
+    '/api/financeiro/parcelas/${p.id}/lancamento',
+  ]
+  for (const rota of rotasUsadas) {
+    ok(`rota existente: ${rota}`, permitidas.includes(rota))
+  }
+  const form = readFileSync(join(RAIZ, `${base}/ReceitaRecebimentoForm.tsx`), 'utf8')
+  ok('comprovante usa o presign existente', form.includes('/api/storage/presign'))
+  ok('formulário completo de recebimento',
+    ['Data do recebimento', 'Câmbio aplicado', 'Forma de pagamento', 'Conta financeira', 'Observações', 'Comprovante']
+      .every((c) => form.includes(c)))
+  ok('valor e moeda permanecem do motor', form.includes('rfm-campo-fixo'))
+
+  // Ações contextuais: os componentes não decidem, só renderizam.
+  const rapidas = readFileSync(join(RAIZ, `${base}/ReceitaAcoesRapidas.tsx`), 'utf8')
+  ok('ações rápidas renderizam do resolvedor', rapidas.includes('acoes.lancamento') && rapidas.includes('.disponivel'))
+  ok('ações rápidas sem regra própria', !/podeCancelar|podeEstornar|status ===/.test(rapidas))
+
+  const parcelasTab = readFileSync(join(RAIZ, `${base}/ReceitaParcelasTab.tsx`), 'utf8')
+  ok('parcelas usam menu contextual', parcelasTab.includes('ReceitaMenuLinha'))
+  ok('parcelas resolvem ação por linha', parcelasTab.includes('acoes.parcela(p)'))
+  ok('seleção em lote presente', parcelasTab.includes('rfm-lote') && parcelasTab.includes('selecao'))
+  ok('lote só opera parcelas válidas', parcelasTab.includes('acoes.parcela(p).registrarRecebimento.disponivel'))
+  ok('parcelas sem condicional de permissão própria', !parcelasTab.includes('detalhe.acoes.'))
+
+  const recebTab = readFileSync(join(RAIZ, `${base}/ReceitaRecebimentosTab.tsx`), 'utf8')
+  ok('recebimentos têm menu por linha', recebTab.includes('ReceitaMenuLinha'))
+  ok('recebimentos mostram conciliação', recebTab.includes('recebimentoConciliado'))
+  ok('recebimentos sem condicional própria', !recebTab.includes('detalhe.acoes.'))
+
+  const hist = readFileSync(join(RAIZ, `${base}/ReceitaHistoricoTab.tsx`), 'utf8')
+  ok('histórico expande sob demanda', hist.includes('aria-expanded'))
+  ok('histórico mostra responsável', hist.includes('Responsável'))
+  ok('histórico não abre tudo por padrão', hist.includes('useState(false)'))
+
+  const tec = readFileSync(join(RAIZ, `${base}/ReceitaInformacoesTecnicasTab.tsx`), 'utf8')
+  ok('aba técnica é endereçável', tec.includes('secaoInicial'))
+  ok('aba técnica é somente leitura', !/method:\s*['"](POST|PATCH|DELETE)['"]/.test(tec))
 }
 
 // ── resultado ───────────────────────────────────────────────────────────────

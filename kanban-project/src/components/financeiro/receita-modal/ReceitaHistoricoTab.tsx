@@ -1,13 +1,13 @@
 // src/components/financeiro/receita-modal/ReceitaHistoricoTab.tsx
 // ============================================================================
-// Timeline completa do lançamento: geração, regra, cálculo, câmbio, parcelas,
-// vencimento, recebimento, conciliação, cancelamento, supressão, revogação,
-// estorno e reconciliação. Detalhe técnico expande por evento.
+// Histórico NAVEGÁVEL do lançamento. Nenhum evento nasce expandido: a linha
+// mostra quem, quando e o que aconteceu; o detalhe técnico (valor, câmbio,
+// valor em BRL e o payload `dados` gravado pelo motor) abre sob demanda.
 // ============================================================================
 'use client'
 
 import { useState } from 'react'
-import { fmtMoeda, num, type Moeda } from '@/lib/financeiro/apresentacao-lancamento'
+import { fmtBRL, fmtCambio, fmtMoeda, num, type Moeda } from '@/lib/financeiro/apresentacao-lancamento'
 import { fmtDataHora, type Detalhe, type EventoReceita } from './tipos'
 
 export interface ReceitaHistoricoTabProps {
@@ -28,7 +28,9 @@ function rotuloAcao(tipo: string): string {
     PARCELAMENTO: 'Parcelamento definido',
     PARCELAS_ALTERADAS: 'Parcelamento alterado',
     VENCIMENTO_ALTERADO: 'Vencimento alterado',
+    EDICAO: 'Edição operacional',
     RECEBIMENTO: 'Recebimento registrado',
+    PAGAMENTO: 'Pagamento registrado',
     CONCILIACAO: 'Conciliação',
     CANCELAMENTO: 'Cancelamento',
     SUPRESSAO: 'Supressão registrada',
@@ -42,6 +44,8 @@ function rotuloAcao(tipo: string): string {
 
 function Evento({ e, moeda }: { e: EventoReceita; moeda: Moeda }) {
   const [aberto, setAberto] = useState(false)
+  const temTecnico = e.valor != null || e.cambio != null || e.valorBrl != null || e.dados != null
+
   return (
     <li className="rfm-evento">
       <div className="rfm-evento-data">{fmtDataHora(e.createdAt)}</div>
@@ -50,16 +54,58 @@ function Evento({ e, moeda }: { e: EventoReceita; moeda: Moeda }) {
         {e.descricao ? ` — ${e.descricao}` : ''}
       </div>
       <div className="rfm-evento-meta">
-        {e.usuario?.nome ?? 'Sistema'}
+        Por {e.usuario?.nome ?? 'Sistema'}
         {e.valor != null ? ` · ${fmtMoeda(num(e.valor), moeda)}` : ''}
       </div>
-      <button type="button" className="rfm-btn-txt" onClick={() => setAberto((v) => !v)}>
-        {aberto ? 'Ocultar detalhe técnico' : 'Detalhe técnico'}
-      </button>
+
+      {temTecnico && (
+        <button
+          type="button"
+          className="rfm-btn-txt"
+          aria-expanded={aberto}
+          onClick={() => setAberto((v) => !v)}
+        >
+          {aberto ? 'Ocultar detalhes' : 'Ver detalhes'}
+        </button>
+      )}
+
       {aberto && (
-        <div className="rfm-evento-detalhe rfm-mono">
-          tipo: {e.tipo} · evento #{e.id}
-          {e.valor != null ? ` · valor: ${String(e.valor)}` : ''}
+        <div className="rfm-evento-detalhe">
+          <div className="rfm-pares">
+            <div>
+              <div className="rfm-par-rotulo">Evento</div>
+              <div className="rfm-par-valor rfm-mono">{e.tipo} · #{e.id}</div>
+            </div>
+            <div>
+              <div className="rfm-par-rotulo">Responsável</div>
+              <div className="rfm-par-valor">{e.usuario?.nome ?? 'Sistema'}</div>
+            </div>
+            <div>
+              <div className="rfm-par-rotulo">Registrado em</div>
+              <div className="rfm-par-valor">{fmtDataHora(e.createdAt)}</div>
+            </div>
+            {e.valor != null && (
+              <div>
+                <div className="rfm-par-rotulo">Valor</div>
+                <div className="rfm-par-valor">{fmtMoeda(num(e.valor), moeda)}</div>
+              </div>
+            )}
+            {e.cambio != null && (
+              <div>
+                <div className="rfm-par-rotulo">Câmbio</div>
+                <div className="rfm-par-valor">{fmtCambio(num(e.cambio))}</div>
+              </div>
+            )}
+            {e.valorBrl != null && (
+              <div>
+                <div className="rfm-par-rotulo">Valor em BRL</div>
+                <div className="rfm-par-valor">{fmtBRL(num(e.valorBrl))}</div>
+              </div>
+            )}
+          </div>
+          {e.dados != null && (
+            <pre className="rfm-json" style={{ marginTop: 14 }}>{JSON.stringify(e.dados, null, 2)}</pre>
+          )}
         </div>
       )}
     </li>

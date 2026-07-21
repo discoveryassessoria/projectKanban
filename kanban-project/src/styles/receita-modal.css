@@ -201,6 +201,23 @@
 }
 .rfm-progresso-texto { margin-top: 7px; font-size: 12px; color: var(--rfm-muted) }
 
+/* ── Ações rápidas ───────────────────────────────────────────────────────── */
+
+.rfm-rapidas {
+  flex: 0 0 auto;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 0 34px 22px;
+}
+.rfm-selo {
+  display: inline-flex; align-items: center; height: 30px;
+  padding: 0 14px; border-radius: 999px;
+  font-size: 13px; font-weight: 600;
+  background: var(--rfm-line-soft); color: var(--rfm-ink-2);
+}
+.rfm-selo.ok { background: var(--rfm-ok-soft); color: var(--rfm-ok) }
+.rfm-selo.warn { background: var(--rfm-warn-soft); color: var(--rfm-warn) }
+.rfm-selo-bloco { width: 100%; justify-content: center; height: 38px }
+
 /* ── Navegação interna ───────────────────────────────────────────────────── */
 
 .rfm-abas {
@@ -525,6 +542,70 @@
   box-shadow: 0 0 0 3px var(--rfm-accent-soft);
 }
 .rfm-confirm-acoes { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px }
+
+/* ── Formulário de recebimento ───────────────────────────────────────────── */
+
+.rfm-form { display: block }
+.rfm-form-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0 16px;
+}
+.rfm-campo select {
+  font: inherit; font-size: 14px;
+  padding: 9px 11px;
+  border: 1px solid var(--rfm-line); border-radius: 10px;
+  background: var(--rfm-surface); color: var(--rfm-ink);
+}
+.rfm-campo select:focus {
+  outline: none; border-color: var(--rfm-accent);
+  box-shadow: 0 0 0 3px var(--rfm-accent-soft);
+}
+.rfm-campo-fixo {
+  display: block;
+  padding: 9px 11px;
+  border: 1px dashed var(--rfm-line);
+  border-radius: 10px;
+  background: var(--rfm-surface-2);
+  font-size: 14px; color: var(--rfm-ink-2);
+}
+.rfm-erro-campo { font-size: 12px; color: var(--rfm-danger) }
+.rfm-anexo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px }
+.rfm-anexo-nome { font-size: 13.5px; color: var(--rfm-accent); overflow-wrap: anywhere }
+.rfm-check {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 13.5px; color: var(--rfm-ink-2);
+  margin-bottom: 6px; cursor: pointer;
+}
+.rfm-clipe { font-size: 12px }
+
+/* ── Seleção e lote ──────────────────────────────────────────────────────── */
+
+.rfm-col-check { width: 34px; padding-right: 8px !important; text-align: left !important }
+.rfm-linha-marcada td { background: var(--rfm-accent-soft) }
+.rfm-lote {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin-bottom: 20px; padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--rfm-accent-soft);
+}
+.rfm-lote-contagem { font-size: 13.5px; font-weight: 600; color: var(--rfm-accent); margin-right: 4px }
+.rfm-icone-btn-sm { width: 28px; height: 28px; border-radius: 8px }
+
+/* ── Impressão / PDF ─────────────────────────────────────────────────────── */
+
+@media print {
+  body > *:not(.rfm-root) { display: none !important }
+  .rfm-root { position: static; padding: 0; display: block }
+  .rfm-backdrop, .rfm-abas, .rfm-rodape, .rfm-rapidas,
+  .rfm-menu-wrap, .rfm-confirm-fundo, .rfm-icone-btn { display: none !important }
+  .rfm-shell {
+    width: 100%; height: auto; max-height: none;
+    border-radius: 0; box-shadow: none; animation: none;
+  }
+  .rfm-corpo { overflow: visible; padding: 0 }
+  .rfm-grid { grid-template-columns: minmax(0, 1fr) }
+}
 
 /* foco visível consistente */
 .rfm-root :focus-visible {

@@ -1,9 +1,11 @@
 // src/components/financeiro/receita-modal/ReceitaVisaoGeral.tsx
 // ============================================================================
 // Aba inicial. Coluna principal (~65%): composição do contrato, próxima parcela,
-// origem resumida e requerentes. Coluna lateral (~35%): situação, últimas
+// origem navegável e requerentes. Coluna lateral (~35%): situação, últimas
 // movimentações e a ação principal.
+//
 // Nada técnico aqui — identificadores, chaves e vigências vivem na aba técnica.
+// Nenhuma condicional de ação: tudo vem de resolveAvailableFinancialActions.
 // ============================================================================
 'use client'
 
@@ -19,16 +21,19 @@ import {
   type StatusLancamento,
   type TotaisLancamento,
 } from '@/lib/financeiro/apresentacao-lancamento'
+import type { ResultadoAcoes } from '@/lib/financeiro/acoes-lancamento'
 import { fmtDataHora, iniciais, type AbaId, type Detalhe } from './tipos'
 
 export interface ReceitaVisaoGeralProps {
   detalhe: Detalhe
+  acoes: ResultadoAcoes
   totais: TotaisLancamento
   status: StatusLancamento
   proximaParcela: ParcelaView | null
   onIrParaAba: (aba: AbaId) => void
   onRegistrarRecebimento: (parcela: ParcelaView) => void
   onAlterarVencimento: (parcela: ParcelaView) => void
+  onVerTecnico: (secao: string) => void
 }
 
 function statusDaParcela(p: ParcelaView): string {
@@ -39,19 +44,21 @@ function statusDaParcela(p: ParcelaView): string {
 
 export function ReceitaVisaoGeral({
   detalhe,
+  acoes,
   totais,
   status,
   proximaParcela,
   onIrParaAba,
   onRegistrarRecebimento,
   onAlterarVencimento,
+  onVerTecnico,
 }: ReceitaVisaoGeralProps) {
   const r = detalhe.receita
   const moeda = r.moeda
-  const parcelas = r.parcelas ?? []
+  const parcelas = (r.parcelas ?? []).filter((p) => p.status !== 'CANCELADA')
   const composicao = r.composicao
   const eventos = (r.eventos ?? []).slice(0, 5)
-  const podeReceber = detalhe.acoes.podeRegistrarRecebimento && totais.saldo > 0.004
+  const acaoParcela = proximaParcela ? acoes.parcela(proximaParcela) : null
 
   return (
     <div className="rfm-grid">
@@ -113,12 +120,12 @@ export function ReceitaVisaoGeral({
                 <button type="button" className="rfm-btn-sec" onClick={() => onIrParaAba('parcelas')}>
                   Ver parcelas
                 </button>
-                {detalhe.acoes.podeEditarParcelas && (
+                {acaoParcela?.alterarVencimento.disponivel && (
                   <button type="button" className="rfm-btn-sec" onClick={() => onAlterarVencimento(proximaParcela)}>
                     Alterar vencimento
                   </button>
                 )}
-                {podeReceber && (
+                {acaoParcela?.registrarRecebimento.disponivel && (
                   <button type="button" className="rfm-btn-sec" onClick={() => onRegistrarRecebimento(proximaParcela)}>
                     Registrar recebimento
                   </button>
@@ -158,6 +165,20 @@ export function ReceitaVisaoGeral({
               <div className="rfm-par-valor">{detalhe.origem.regraFinanceira?.descricao ?? '—'}</div>
             </div>
           </div>
+          {/* Navegação interna somente leitura — abre a seção correspondente
+              na aba técnica; o app não expõe rota própria dessas entidades. */}
+          <div className="rfm-proxima-acoes">
+            {detalhe.origem.regraFinanceira && (
+              <button type="button" className="rfm-btn-sec" onClick={() => onVerTecnico('regra')}>
+                Ver regra financeira
+              </button>
+            )}
+            {(detalhe.origem.servico || detalhe.origem.configuracaoFinanceira) && (
+              <button type="button" className="rfm-btn-sec" onClick={() => onVerTecnico('servico')}>
+                Ver serviço e evento
+              </button>
+            )}
+          </div>
         </section>
 
         {detalhe.requerentesConsiderados.length > 0 && (
@@ -172,6 +193,13 @@ export function ReceitaVisaoGeral({
                 </div>
               ))}
             </div>
+          </section>
+        )}
+
+        {r.observacoes && (
+          <section className="rfm-bloco">
+            <h3 className="rfm-bloco-titulo">Observações</h3>
+            <p className="rfm-par-valor" style={{ whiteSpace: 'pre-wrap' }}>{r.observacoes}</p>
           </section>
         )}
       </div>
@@ -192,9 +220,7 @@ export function ReceitaVisaoGeral({
             {moeda !== 'BRL' && (
               <div className="rfm-situacao-linha">
                 <span className="rfm-situacao-rotulo">Câmbio aplicado</span>
-                <span className="rfm-situacao-valor">
-                  1 {moeda} = R$ {fmtCambio(totais.cambio)}
-                </span>
+                <span className="rfm-situacao-valor">1 {moeda} = R$ {fmtCambio(totais.cambio)}</span>
               </div>
             )}
             <div className="rfm-situacao-linha">
@@ -229,7 +255,7 @@ export function ReceitaVisaoGeral({
           )}
         </section>
 
-        {podeReceber && proximaParcela && (
+        {acoes.lancamento.registrarRecebimento.disponivel && proximaParcela ? (
           <button
             type="button"
             className="rfm-btn rfm-btn-bloco"
@@ -237,7 +263,9 @@ export function ReceitaVisaoGeral({
           >
             Registrar recebimento
           </button>
-        )}
+        ) : acoes.quitado ? (
+          <div className="rfm-selo ok rfm-selo-bloco">Lançamento quitado</div>
+        ) : null}
       </aside>
     </div>
   )

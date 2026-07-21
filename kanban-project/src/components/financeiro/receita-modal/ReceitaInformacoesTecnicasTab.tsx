@@ -1,24 +1,38 @@
 // src/components/financeiro/receita-modal/ReceitaInformacoesTecnicasTab.tsx
 // ============================================================================
 // Tudo que é de suporte/auditoria e NÃO pertence à leitura principal: regra,
-// tabela de preços, vigência, serviço, evento operacional, chave idempotente,
-// documento, datas, identificadores e supressão. Seções expansíveis.
+// tabela de preços, vigência, serviço, evento operacional, chaves e
+// rastreabilidade. Seções expansíveis e endereçáveis — a Origem e o menu
+// abrem aqui a seção correspondente. Somente leitura.
 // ============================================================================
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { fmtData } from '@/lib/financeiro/apresentacao-lancamento'
 import { fmtDataHora, type Detalhe } from './tipos'
 
-function Secao({ titulo, aberta, children }: { titulo: string; aberta?: boolean; children: ReactNode }) {
-  const [open, setOpen] = useState(!!aberta)
+export type SecaoTecnica = 'regra' | 'tabela' | 'servico' | 'rastreio' | 'excecoes'
+
+function Secao({
+  id,
+  titulo,
+  aberta,
+  onToggle,
+  children,
+}: {
+  id: SecaoTecnica
+  titulo: string
+  aberta: boolean
+  onToggle: (id: SecaoTecnica) => void
+  children: ReactNode
+}) {
   return (
-    <div className="rfm-expansivel">
-      <button type="button" className="rfm-expansivel-botao" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+    <div className="rfm-expansivel" id={`rfm-tec-${id}`}>
+      <button type="button" className="rfm-expansivel-botao" aria-expanded={aberta} onClick={() => onToggle(id)}>
         <span>{titulo}</span>
-        <span className={`rfm-expansivel-seta${open ? ' aberta' : ''}`} aria-hidden="true">▸</span>
+        <span className={`rfm-expansivel-seta${aberta ? ' aberta' : ''}`} aria-hidden="true">▸</span>
       </button>
-      {open && <div className="rfm-expansivel-corpo">{children}</div>}
+      {aberta && <div className="rfm-expansivel-corpo">{children}</div>}
     </div>
   )
 }
@@ -34,15 +48,35 @@ function Par({ rotulo, valor }: { rotulo: string; valor: ReactNode }) {
 
 export interface ReceitaInformacoesTecnicasTabProps {
   detalhe: Detalhe
+  secaoInicial?: SecaoTecnica | null
+  onCopiar: (texto: string, rotulo: string) => void
 }
 
-export function ReceitaInformacoesTecnicasTab({ detalhe }: ReceitaInformacoesTecnicasTabProps) {
+export function ReceitaInformacoesTecnicasTab({
+  detalhe,
+  secaoInicial,
+  onCopiar,
+}: ReceitaInformacoesTecnicasTabProps) {
+  const [abertas, setAbertas] = useState<SecaoTecnica[]>(['regra'])
+
+  useEffect(() => {
+    if (!secaoInicial) return
+    setAbertas((s) => (s.includes(secaoInicial) ? s : [...s, secaoInicial]))
+    // rola até a seção pedida sem mover o fundo
+    const el = document.getElementById(`rfm-tec-${secaoInicial}`)
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [secaoInicial])
+
+  const alternar = (id: SecaoTecnica) =>
+    setAbertas((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
+  const aberta = (id: SecaoTecnica) => abertas.includes(id)
+
   const o = detalhe.origem
   const tabela = o.tabelaPrecos
 
   return (
     <div>
-      <Secao titulo="Regra financeira" aberta>
+      <Secao id="regra" titulo="Regra financeira" aberta={aberta('regra')} onToggle={alternar}>
         <div className="rfm-pares">
           <Par rotulo="Descrição" valor={o.regraFinanceira?.descricao ?? '—'} />
           <Par rotulo="Tipo da regra" valor={o.regraFinanceira?.ruleKind ?? '—'} />
@@ -50,9 +84,18 @@ export function ReceitaInformacoesTecnicasTab({ detalhe }: ReceitaInformacoesTec
           <Par rotulo="Identificador da regra" valor={o.regraFinanceira?.ruleId != null ? `#${o.regraFinanceira.ruleId}` : '—'} />
           <Par rotulo="Origem ativa" valor={detalhe.origemAtiva ? 'Sim' : 'Não'} />
         </div>
+        {o.regraFinanceira?.ruleId != null && (
+          <button
+            type="button"
+            className="rfm-btn-txt"
+            onClick={() => onCopiar(String(o.regraFinanceira?.ruleId), 'Identificador da regra')}
+          >
+            Copiar identificador da regra
+          </button>
+        )}
       </Secao>
 
-      <Secao titulo="Tabela de preços e vigência">
+      <Secao id="tabela" titulo="Tabela de preços e vigência" aberta={aberta('tabela')} onToggle={alternar}>
         <div className="rfm-pares">
           <Par rotulo="Tabela" valor={tabela ? `#${tabela.id}` : '—'} />
           <Par rotulo="Modo de cálculo" valor={tabela?.modoCalculo ?? '—'} />
@@ -63,22 +106,39 @@ export function ReceitaInformacoesTecnicasTab({ detalhe }: ReceitaInformacoesTec
         </div>
       </Secao>
 
-      <Secao titulo="Serviço e evento operacional">
+      <Secao id="servico" titulo="Serviço e evento operacional" aberta={aberta('servico')} onToggle={alternar}>
         <div className="rfm-pares">
           <Par rotulo="Serviço" valor={o.servico ?? '—'} />
-          <Par rotulo="Configuração financeira" valor={o.configuracaoFinanceira ? `${o.configuracaoFinanceira.nome} (${o.configuracaoFinanceira.moedaPadrao})` : '—'} />
+          <Par
+            rotulo="Configuração financeira"
+            valor={o.configuracaoFinanceira ? `${o.configuracaoFinanceira.nome} (${o.configuracaoFinanceira.moedaPadrao})` : '—'}
+          />
           <Par rotulo="Evento operacional" valor={o.eventoOperacional ?? '—'} />
           <Par rotulo="Fase técnica" valor={o.phaseKey ?? '—'} />
           <Par rotulo="Documento relacionado" valor={o.documento ? `#${o.documento.id} ${o.documento.tipo ?? ''}`.trim() : '—'} />
+          <Par rotulo="Processo" valor={o.processo ? `${o.processo.codigo ?? o.processo.nome} · ${o.processo.pais}` : '—'} />
         </div>
+        {o.eventoOperacional && (
+          <button type="button" className="rfm-btn-txt" onClick={() => onCopiar(o.eventoOperacional!, 'Evento operacional')}>
+            Copiar evento operacional
+          </button>
+        )}
       </Secao>
 
-      <Secao titulo="Rastreabilidade">
+      <Secao id="rastreio" titulo="Rastreabilidade" aberta={aberta('rastreio')} onToggle={alternar}>
         <div className="rfm-pares">
           <Par rotulo="Código do lançamento" valor={<span className="rfm-mono">{detalhe.receita.codigo}</span>} />
           <Par rotulo="Identificador interno" valor={<span className="rfm-mono">#{detalhe.receita.id}</span>} />
           <Par rotulo="Criado em" valor={fmtDataHora(o.criadoEm)} />
           <Par rotulo="Última reconciliação" valor={fmtDataHora(o.atualizadoEm)} />
+        </div>
+        <div className="rfm-proxima-acoes">
+          <button type="button" className="rfm-btn-txt" onClick={() => onCopiar(detalhe.receita.codigo, 'Referência')}>
+            Copiar referência
+          </button>
+          <button type="button" className="rfm-btn-txt" onClick={() => onCopiar(String(detalhe.receita.id), 'ID interno')}>
+            Copiar ID interno
+          </button>
         </div>
         <div style={{ marginTop: 18 }}>
           <div className="rfm-par-rotulo">Chaves e metadados do motor</div>
@@ -87,7 +147,7 @@ export function ReceitaInformacoesTecnicasTab({ detalhe }: ReceitaInformacoesTec
       </Secao>
 
       {(detalhe.supressao || detalhe.cancelamento || detalhe.estorno) && (
-        <Secao titulo="Supressão, cancelamento e estorno">
+        <Secao id="excecoes" titulo="Supressão, cancelamento e estorno" aberta={aberta('excecoes')} onToggle={alternar}>
           <div className="rfm-pares">
             {detalhe.supressao && (
               <>

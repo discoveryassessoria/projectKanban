@@ -20,6 +20,10 @@ export interface EventoReceita {
   tipo: string
   descricao: string
   valor?: number | string | null
+  /** Campos já gravados pelo EventoFinanceiro — lidos, nunca alterados. */
+  cambio?: number | string | null
+  valorBrl?: number | string | null
+  dados?: unknown
   createdAt: string
   usuario?: { id: number; nome: string } | null
 }
