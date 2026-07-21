@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { sincronizarItemDeServico } from '@/src/services/catalogo-sync'
 import { garantirConfigFinanceiraDeServico } from '@/src/services/config-financeira-auto'
+import { slugTecnico, gerarChaveUnica } from '@/src/lib/catalogo/chave-tecnica-interna'
 
 function toStrOrNull(v: any): string | null {
   if (v === undefined || v === null) return null
@@ -33,18 +34,20 @@ export async function POST(request: NextRequest) {
     if (erro) return erro
 
     const b = await request.json()
-    if (!b.code || !String(b.code).trim()) {
-      return NextResponse.json({ error: 'Informe o código.' }, { status: 400 })
-    }
     if (!b.name || !String(b.name).trim()) {
       return NextResponse.json({ error: 'Informe o nome.' }, { status: 400 })
     }
 
-    const code = String(b.code).trim()
     const name = String(b.name).trim()
     const category = toStrOrNull(b.category)
     // dual-write: ItemCatalogo (mestre, natureza SERVICO) — é o que o Financeiro referencia.
     const servico = await prisma.$transaction(async (tx) => {
+      // CHAVE TÉCNICA INTERNA: gerada no backend a partir do nome (o operador NUNCA
+      // informa nem vê `code`). Igual ao publicCode — automática, única, invisível.
+      const code = await gerarChaveUnica(slugTecnico(name, 'SERVICO'), async (c) =>
+        !!(await tx.servicoProduto.findUnique({ where: { code: c }, select: { id: true } })) ||
+        !!(await tx.itemCatalogo.findUnique({ where: { code: c }, select: { id: true } })),
+      )
       const itemCatalogoId = await sincronizarItemDeServico(tx, { code, name, category })
       const s = await tx.servicoProduto.create({
         data: {

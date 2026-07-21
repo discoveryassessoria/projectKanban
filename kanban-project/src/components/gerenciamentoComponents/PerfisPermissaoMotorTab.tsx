@@ -206,14 +206,11 @@ export default function PerfisPermissaoMotorTab() {
             </div>
 
             <div className="grid grid-cols-2 gap-3 p-5">
-              <div>
+              <div className="col-span-2">
                 <label className={labelCls}>Nome *</label>
                 <input value={form.nome} onChange={e => setF({ nome: e.target.value })} className={inputCls} />
               </div>
-              <div>
-                <label className={labelCls}>Chave técnica</label>
-                <input value={form.chave} onChange={e => setF({ chave: e.target.value })} placeholder="(gerada automaticamente)" className={inputCls} />
-              </div>
+              {/* Chave técnica interna gerada no backend — nunca informada nem exibida ao operador. */}
               <div className="col-span-2">
                 <label className={labelCls}>Status</label>
                 <select value={form.arquivado ? "archived" : "active"} onChange={e => setF({ arquivado: e.target.value === "archived" })} className={inputCls}>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { legacyFromCode } from '@/src/lib/document-category-map'
+import { slugTecnico, gerarChaveUnica } from '@/src/lib/catalogo/chave-tecnica-interna'
 
 // Classificação CANÔNICA = categoriaDocumental (por ID). A relação é sempre
 // carregada para a UI exibir o nome do mestre (sem mapa local). A coluna legada
@@ -48,10 +49,17 @@ export async function POST(request: NextRequest) {
       categoryLegado = String(b.category)
     }
 
+    // CHAVE TÉCNICA INTERNA: gerada no backend a partir do nome (o operador NUNCA
+    // informa nem vê `code`). Necessária porque a Matriz Documental referencia o
+    // tipo por `documentTypeCode`. DOC-n é do documento concreto, não do tipo.
+    const nome = String(b.name).trim()
+    const code = await gerarChaveUnica(slugTecnico(nome, 'DOC'), async (c) =>
+      !!(await prisma.tipoDocumentoCadastro.findFirst({ where: { code: c }, select: { id: true } })),
+    )
     const tipo = await prisma.tipoDocumentoCadastro.create({
       data: {
-        code: b.code ? String(b.code) : null,
-        name: String(b.name).trim(),
+        code,
+        name: nome,
         category: categoryLegado,
         categoriaDocumentalId,
         ativo: b.ativo !== false,

@@ -45,7 +45,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const tipo = await prisma.tipoDocumentoCadastro.update({
       where: { id },
       data: {
-        code: b.code !== undefined ? (b.code ? String(b.code) : null) : atual.code,
+        code: atual.code, // chave técnica interna imutável — nunca vem do cliente
         name: b.name !== undefined ? String(b.name).trim() : atual.name,
         category: categoryLegado,
         categoriaDocumentalId,

@@ -65,7 +65,6 @@ export default function ProdutosServicosTab() {
   const { pode } = usePermissoes()
   const podeExcluirDefinitivo = pode('sistema.exclusaoDefinitiva')
   const [modalExcluir, setModalExcluir] = useState<Servico | null>(null)
-  const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
   const [descricao, setDescricao] = useState('')
@@ -94,7 +93,6 @@ export default function ProdutosServicosTab() {
     if (!q) return servicos
     return servicos.filter((s) =>
       (s.publicCode ?? '').toLowerCase().includes(q) ||
-      s.code.toLowerCase().includes(q) ||
       s.name.toLowerCase().includes(q) ||
       (s.category || '').toLowerCase().includes(q)
     )
@@ -102,24 +100,24 @@ export default function ProdutosServicosTab() {
 
   function abrirNovo() {
     setEditando(null)
-    setCode(''); setName(''); setCategory(''); setDescricao(''); setUnidadePadrao(''); setNationality('all'); setAtivo(true)
+    setName(''); setCategory(''); setDescricao(''); setUnidadePadrao(''); setNationality('all'); setAtivo(true)
     setErroModal(null); setModalAberto(true)
   }
   function abrirEditar(s: Servico) {
     setEditando(s)
-    setCode(s.code); setName(s.name); setCategory(s.category || '')
+    setName(s.name); setCategory(s.category || '')
     setDescricao(s.descricao || ''); setUnidadePadrao(s.unidadePadrao || '')
     setNationality(s.nationality || 'all'); setAtivo(s.ativo)
     setErroModal(null); setModalAberto(true)
   }
 
   async function salvar() {
-    if (!code.trim()) { setErroModal("Informe a chave técnica."); return }
     if (!name.trim()) { setErroModal('Informe o nome.'); return }
     setSalvando(true); setErroModal(null)
     try {
+      // publicCode (SRV-n) e a chave técnica interna são gerados no BACKEND. O
+      // frontend nunca envia identificadores técnicos.
       const body = JSON.stringify({
-        code: code.trim(),
         name: name.trim(),
         category: category.trim() || null,
         descricao: descricao.trim() || null,
@@ -173,7 +171,7 @@ export default function ProdutosServicosTab() {
       <input
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
-        placeholder="Buscar por código (SRV-n), chave técnica, nome ou categoria..."
+        placeholder="Buscar por código (SRV-n), nome ou categoria..."
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
       />
 
@@ -199,7 +197,6 @@ export default function ProdutosServicosTab() {
               <tr className="bg-white/5">
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Código</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Nome</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Chave técnica</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Categoria</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Nacionalidade</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
@@ -214,7 +211,6 @@ export default function ProdutosServicosTab() {
                     <div className="font-medium text-white">{s.name}</div>
                     {s.descricao && <div className="text-[11px] text-white/40">{s.descricao}</div>}
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-[11px] text-white/50">{s.code}</td>
                   <td className="px-4 py-2.5 text-white/70">{s.category || '—'}</td>
                   <td className="px-4 py-2.5 text-white/70">{nacLabel(s.nationality)}</td>
                   <td className="px-4 py-2.5">
@@ -251,15 +247,9 @@ export default function ProdutosServicosTab() {
                   <div className="text-[10.5px] text-white/40 mt-0.5">Gerado pelo sistema, permanente e não editável.</div>
                 </div>
               )}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs text-white/60">Chave técnica <span className="text-white/30">(integração/catálogo)</span></label>
-                  <input value={code} onChange={(e) => setCode(e.target.value)} autoFocus placeholder="TRAD_JURAMENTADA" className={inputCls} />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-white/60">Nome</label>
-                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tradução Juramentada" className={inputCls} />
-                </div>
+              <div>
+                <label className="mb-1 block text-xs text-white/60">Nome</label>
+                <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Tradução Juramentada" className={inputCls} />
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

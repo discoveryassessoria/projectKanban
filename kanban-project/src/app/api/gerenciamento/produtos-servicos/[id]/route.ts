@@ -22,7 +22,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const b = await request.json()
     const data: any = {
-      code: b.code !== undefined ? String(b.code).trim() : atual.code,
+      // Chave técnica interna é IMUTÁVEL e nunca vem do cliente: sempre preserva a atual.
+      code: atual.code,
       name: b.name !== undefined ? String(b.name).trim() : atual.name,
       category: b.category !== undefined ? toStrOrNull(b.category) : atual.category,
       descricao: b.descricao !== undefined ? toStrOrNull(b.descricao) : atual.descricao,
