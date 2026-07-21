@@ -33,19 +33,20 @@ const MASTER_INCLUDE = {
     select: {
       natureza: true,
       name: true,
-      servicos: { select: { code: true, name: true }, orderBy: { id: 'asc' as const }, take: 1 },
+      servicos: { select: { code: true, name: true, publicCode: true }, orderBy: { id: 'asc' as const }, take: 1 },
     },
   },
 } as const
 
-/** Resolve o mestre REAL (nome + código de negócio) por relação — nunca campo derivado. */
-function resolverMestre(p: any): { origem: string; codigo: string | null; nome: string } | null {
-  if (p.tipoDocumento) return { origem: 'documento', codigo: p.tipoDocumento.code ?? null, nome: p.tipoDocumento.name }
-  if (p.honorario) return { origem: 'honorario', codigo: p.honorario.code ?? null, nome: p.honorario.name }
-  if (p.tipoProcesso) return { origem: 'processo', codigo: p.tipoProcesso.code ?? null, nome: p.tipoProcesso.name }
+/** Resolve o mestre REAL (nome + chave técnica + publicCode quando o mestre for uma entidade com
+ *  código público, ex.: Serviço → SRV-n). `codigo` = chave técnica; `publicCode` = código público. */
+function resolverMestre(p: any): { origem: string; codigo: string | null; nome: string; publicCode: string | null } | null {
+  if (p.tipoDocumento) return { origem: 'documento', codigo: p.tipoDocumento.code ?? null, nome: p.tipoDocumento.name, publicCode: null }
+  if (p.honorario) return { origem: 'honorario', codigo: p.honorario.code ?? null, nome: p.honorario.name, publicCode: null }
+  if (p.tipoProcesso) return { origem: 'processo', codigo: p.tipoProcesso.code ?? null, nome: p.tipoProcesso.name, publicCode: null }
   const svc = p.itemCatalogo?.servicos?.[0]
-  if (svc) return { origem: 'servico', codigo: svc.code ?? null, nome: svc.name }
-  if (p.itemCatalogo) return { origem: 'item', codigo: null, nome: p.itemCatalogo.name }
+  if (svc) return { origem: 'servico', codigo: svc.code ?? null, nome: svc.name, publicCode: svc.publicCode ?? null }
+  if (p.itemCatalogo) return { origem: 'item', codigo: null, nome: p.itemCatalogo.name, publicCode: null }
   return null
 }
 

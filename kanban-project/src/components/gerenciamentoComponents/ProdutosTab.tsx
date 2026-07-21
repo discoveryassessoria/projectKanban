@@ -43,8 +43,9 @@ type Produto = {
   tipoProcessoId: number | null
   itemCatalogoId: number | null
   fornecedorPadraoId: number | null
-  // Mestre REAL resolvido pelo backend (nome/código de negócio por relação — nunca derivado).
-  mestre?: { origem: string; codigo: string | null; nome: string } | null
+  // Mestre REAL resolvido pelo backend. codigo = chave técnica; publicCode = código público do
+  // mestre quando ele tem um (ex.: Serviço → SRV-n).
+  mestre?: { origem: string; codigo: string | null; nome: string; publicCode: string | null } | null
 }
 
 const MOEDAS: [string, string][] = [['BRL', 'Real (BRL)'], ['EUR', 'Euro (EUR)'], ['USD', 'Dólar (USD)']]
@@ -349,7 +350,7 @@ export default function ProdutosTab() {
                 <tr key={p.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
                   <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/90">{p.publicCode ?? '—'}</td>
                   <td className="px-4 py-2.5">
-                    <div className="font-medium text-white">{p.mestre?.nome || p.nome}</div>
+                    <div className="font-medium text-white">{p.mestre?.publicCode ? <span className="font-mono text-[12px] text-white/60 mr-1">{p.mestre.publicCode} —</span> : null}{p.mestre?.nome || p.nome}</div>
                     <div className="text-[11px] text-white/40">{p.mestre?.codigo ? `Chave: ${p.mestre.codigo}` : 'sem chave de mestre'}</div>
                   </td>
                   <td className="px-4 py-2.5">
