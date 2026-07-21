@@ -17,6 +17,7 @@ import { matrizParaRegra } from "@/src/lib/documentos/regras-documentais/mapear"
 import { avaliarRegrasDocumentais } from "@/src/lib/documentos/regras-documentais/avaliador"
 import type { RegraDocumental, SujeitoContexto } from "@/src/lib/documentos/regras-documentais/tipos"
 import { ehNaturezaCertidao } from "@/src/lib/documentos/natureza-certidao"
+import { aplicarHonorariosCidadaniaItaliana } from "@/src/lib/motor/executor"
 
 type DB = typeof prisma | Prisma.TransactionClient
 
@@ -209,6 +210,10 @@ export async function dispararMaterializacaoPorArvore(arvoreId: number | null | 
     const procs = await prisma.processo.findMany({ where: { arvoreId }, select: { id: true } })
     for (const p of procs) {
       try { await materializarGenealogia(p.id) } catch (e) { console.error(`[genealogia] materializar processo ${p.id} falhou (fluxo seguiu):`, e) }
+      // EVENTO OPERACIONAL "REQUERENTES_DO_PROCESSO_DEFINIDOS/ATUALIZADOS": mudou a árvore
+      // (inclui a marcação de requerente) → o FinanceRuleEngine recalcula os honorários da
+      // cidadania italiana (1 lançamento consolidado por processo). Best-effort, idempotente.
+      try { await aplicarHonorariosCidadaniaItaliana(p.id) } catch (e) { console.error(`[honorarios] processo ${p.id} falhou (fluxo seguiu):`, e) }
     }
   } catch (e) {
     console.error("[genealogia] disparo por árvore falhou (fluxo seguiu):", e)

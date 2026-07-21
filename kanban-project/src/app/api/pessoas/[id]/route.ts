@@ -241,6 +241,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       })
     })
 
+    // Requerente removido da árvore → recalcula os honorários (evento REQUERENTES_ATUALIZADOS).
+    await dispararMaterializacaoPorArvore(pessoa.arvoreId)
+
     return NextResponse.json({
       message: "Pessoa excluída com sucesso",
       id: id,

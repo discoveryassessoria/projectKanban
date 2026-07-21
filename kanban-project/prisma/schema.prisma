@@ -1866,7 +1866,12 @@ model TabelaValor {
   fornecedor                   Fornecedor?        @relation(fields: [fornecedorId], references: [id])
   moeda                        Moeda              @default(EUR)
   valor                        Decimal            @default(0) @db.Decimal(12, 2)
-  modoCalculo                  String             @default("fixed") @db.VarChar(20)
+  // Preço "base + adicional por unidade" (ex.: honorários por requerente). Aditivo:
+  // quando modoCalculo indica cálculo por unidade, valorBase = 1ª unidade e
+  // valorAdicional = cada unidade extra. modoCalculo 'fixed' ignora estes campos.
+  valorBase                    Decimal?           @db.Decimal(12, 2)
+  valorAdicional               Decimal?           @db.Decimal(12, 2)
+  modoCalculo                  String             @default("fixed") @db.VarChar(40)
   condicao                     String?            @db.VarChar(200)
   vigenciaInicio               String?            @db.VarChar(10)
   vigenciaFim                  String?            @db.VarChar(10)

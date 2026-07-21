@@ -25,6 +25,7 @@ import { gerarEconomicoDaMatriz } from './matriz-economica'
 import { resolverPrecoPorConfigDB } from './resolver-preco-financeiro.prisma'
 import { NaturezaPreco } from '@prisma/client'
 import { aplicacaoValida, naturezasDaAplicacao, aplicacaoPermitida } from '@/lib/financeiro/aplicacao-financeira'
+import { isoDoPais } from '@/lib/codigos/code-patterns'
 import { tituloAutomacaoFinanceira, descricaoLancamentoDaConfig } from '@/lib/financeiro/automacao-financeira-identidade'
 import { processoEmRuntimeV2 } from './runtime-guard' // CP-4H
 
@@ -681,4 +682,136 @@ export async function reconciliarFinanceiroDoProcesso(processoId: number): Promi
     criadas += r.criadas; removidas += r.removidas; bloqueadas += r.bloqueadas
   }
   return { fases: fases.size, criadas, removidas, bloqueadas }
+}
+// ============================================================================
+// HONORÁRIOS CONTRATUAIS — CIDADANIA ITALIANA (RECEITA por requerente).
+//
+// Regra comercial: total = valorBase + (nRequerentes - 1) × valorAdicional, EUR.
+// Conta SÓ Pessoa marcada como requerente ('maior' | 'menor'; ambos = 1) na árvore
+// do processo. UM ÚNICO lançamento consolidado por processo (idempotente por chave).
+// Valores NÃO hardcoded: vêm da Tabela de Preços (valorBase/valorAdicional) do
+// registro 'honorario_por_requerente' (natureza VENDA). Recálculo in-place enquanto
+// não houver parcela paga; se houver pagamento, PRESERVA e registra pendência.
+// Disparado pelo evento REQUERENTES_DO_PROCESSO_DEFINIDOS/ATUALIZADOS.
+// ============================================================================
+export type ResultadoHonorario = {
+  aplicavel: boolean
+  motivo?: string
+  n?: number
+  total?: number
+  moeda?: string
+  acao?: 'criado' | 'atualizado' | 'inalterado' | 'removido' | 'bloqueado' | 'pendencia' | 'nenhum'
+  receitaId?: number
+}
+
+export async function aplicarHonorariosCidadaniaItaliana(processoId: number): Promise<ResultadoHonorario> {
+  const proc = await prisma.processo.findUnique({
+    where: { id: processoId },
+    select: { pais: true, arvoreId: true, tipoProcessoMotorId: true },
+  })
+  if (!proc) return { aplicavel: false, motivo: 'processo não encontrado' }
+  // Só cidadania ITALIANA (por país do processo). Outro país → regra não se aplica.
+  if (isoDoPais(proc.pais) !== 'IT') return { aplicavel: false, motivo: 'processo não é de cidadania italiana' }
+
+  // Conta EXCLUSIVAMENTE requerentes marcados na árvore (maior|menor = 1; nunca idade/parentesco).
+  const n = proc.arvoreId
+    ? await prisma.pessoa.count({ where: { arvoreId: proc.arvoreId, requerente: { in: ['maior', 'menor'] } } })
+    : 0
+
+  const akey = `${processoId}::honorario_cidadania_italiana::VENDA`
+  const artefato = await prisma.motorArtefato.findFirst({ where: { automaticKey: akey } })
+
+  // helper: a receita tem pagamento/dependência que impede alteração destrutiva?
+  const receitaBloqueada = async (receitaId: number): Promise<boolean> => {
+    const pagas = await prisma.parcelaFinanceira.count({ where: { receitaId, status: { in: ['PAGA', 'RECEBIDA'] } } }).catch(() => 0)
+    return pagas > 0
+  }
+
+  // Sem requerentes → não deve existir lançamento. Remove se ativo e sem pagamento.
+  if (n < 1) {
+    if (artefato?.status === 'active' && artefato.targetId) {
+      if (await receitaBloqueada(artefato.targetId)) return { aplicavel: true, n: 0, acao: 'bloqueado', receitaId: artefato.targetId }
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.receita.delete({ where: { id: artefato.targetId! } })
+          await tx.motorArtefato.update({ where: { id: artefato.id }, data: { status: 'removed' } })
+        })
+        return { aplicavel: true, n: 0, acao: 'removido' }
+      } catch { return { aplicavel: true, n: 0, acao: 'bloqueado', receitaId: artefato.targetId } }
+    }
+    return { aplicavel: true, n: 0, acao: 'nenhum' }
+  }
+
+  // Preço OFICIAL (Tabela de Preços) — base + adicional. Nunca hardcoded.
+  const preco = await prisma.tabelaValor.findFirst({
+    where: { modoCalculo: 'honorario_por_requerente', natureza: NaturezaPreco.VENDA, arquivado: false },
+    orderBy: { prioridade: 'desc' },
+  })
+  if (!preco || preco.valorBase == null || preco.valorAdicional == null) {
+    await registrarPendencia({ processoId, tipoProcessoId: proc.tipoProcessoMotorId ?? null, phaseKey: 'genealogia', configItemId: preco?.configuracaoFinanceiraItemId ?? null, regraId: 0, natureza: NaturezaPreco.VENDA, motivo: 'SEM_PRECO', detalhe: 'Honorários Cidadania Italiana: Tabela de Preços sem valorBase/valorAdicional cadastrado' })
+    return { aplicavel: true, n, acao: 'pendencia', motivo: 'sem preço base/adicional cadastrado (pendência registrada)' }
+  }
+  const base = Number(preco.valorBase)
+  const adic = Number(preco.valorAdicional)
+  const total = Number((base + (n - 1) * adic).toFixed(2))
+
+  const config = preco.configuracaoFinanceiraItemId
+    ? await prisma.produtoFinanceiro.findUnique({ where: { id: preco.configuracaoFinanceiraItemId }, select: { id: true, moedaPadrao: true } })
+    : null
+  const moeda = ((config?.moedaPadrao as Moeda) ?? Moeda.EUR)
+  const fx = await fxParaBRL(moeda, new Map())
+  if (fx == null) {
+    await registrarPendencia({ processoId, tipoProcessoId: proc.tipoProcessoMotorId ?? null, phaseKey: 'genealogia', configItemId: config?.id ?? null, regraId: 0, natureza: NaturezaPreco.VENDA, motivo: 'SEM_CAMBIO', detalhe: `Honorários Cidadania Italiana: sem cotação ${moeda}→BRL` })
+    return { aplicavel: true, n, total, moeda, acao: 'pendencia', motivo: `sem câmbio ${moeda}→BRL (pendência registrada)` }
+  }
+
+  const desc = 'Honorários Contratuais — Cidadania Italiana'
+  const contexto = { fonte: 'honorario_cidadania_italiana', requerentes: n, incluidoNaBase: 1, adicionais: n - 1, valorBase: base, valorAdicional: adic, tabelaValorId: preco.id, evento: 'REQUERENTES_DO_PROCESSO_DEFINIDOS' } as Prisma.InputJsonValue
+  const fz: FreezeExec = { tabelaValorId: preco.id, configId: config?.id ?? null, regraId: null, naturezaPreco: 'VENDA', phaseKey: 'genealogia', chaveIdempotencia: akey, contexto }
+
+  // Já existe lançamento ativo → recálculo IN-PLACE (mesmo lançamento) ou BLOQUEIO se pago.
+  if (artefato?.status === 'active' && artefato.targetId) {
+    const rec = await prisma.receita.findUnique({ where: { id: artefato.targetId }, select: { id: true, valor: true, parcelas: { select: { id: true } } } })
+    if (rec) {
+      if (await receitaBloqueada(rec.id)) {
+        await registrarPendencia({ processoId, tipoProcessoId: proc.tipoProcessoMotorId ?? null, phaseKey: 'genealogia', configItemId: config?.id ?? null, regraId: 0, natureza: NaturezaPreco.VENDA, motivo: 'LANCAMENTO_PAGO', detalhe: `Honorários com pagamento — recálculo para ${n} requerentes (€${total}) bloqueado; tratar por aditivo` })
+        return { aplicavel: true, n, total, moeda, acao: 'bloqueado', receitaId: rec.id }
+      }
+      if (Number(rec.valor) === total) return { aplicavel: true, n, total, moeda, acao: 'inalterado', receitaId: rec.id }
+      // ATUALIZA o MESMO lançamento (valor + parcela única + contexto) — sem duplicar.
+      await prisma.$transaction(async (tx) => {
+        await tx.receita.update({ where: { id: rec.id }, data: {
+          valor: total, valorUnitario: base, quantidade: n, valorTotalCongelado: total,
+          contextoAplicado: contexto, descricao: desc,
+          eventos: { create: { tipo: 'EDICAO', descricao: `Recalculado: ${n} requerente(s) → €${total}`.slice(0, 500), valor: total, cambio: fx, valorBrl: Number((total * fx).toFixed(2)) } },
+        } })
+        // reemite a parcela única com o novo valor (nParcelas=1)
+        await tx.parcelaFinanceira.deleteMany({ where: { receitaId: rec.id } })
+        await tx.parcelaFinanceira.create({ data: { receitaId: rec.id, numero: 1, vencimento: new Date(), valor: total, status: 'PENDENTE' } })
+      }, { timeout: 30000, maxWait: 10000 })
+      return { aplicavel: true, n, total, moeda, acao: 'atualizado', receitaId: rec.id }
+    }
+    // artefato aponta p/ receita inexistente → recria abaixo
+  }
+
+  // CRIA um único lançamento consolidado + artefato (idempotente por akey).
+  try {
+    let receitaId = 0
+    await prisma.$transaction(async (tx) => {
+      receitaId = await criarReceita(tx, processoId, desc, total, moeda, fx, true, fz)
+      await tx.motorArtefato.create({ data: {
+        processoId, tipoProcessoId: proc.tipoProcessoMotorId ?? 0, phaseKey: 'genealogia', event: 'req_definidos',
+        ruleKind: 'financial', ruleSource: 'honorario', ruleId: null, automaticKey: akey,
+        targetTable: 'Receita', targetId: receitaId, status: 'active', descricao: desc.slice(0, 300),
+        detalhes: { requerentes: n, valorBase: base, valorAdicional: adic, total, moeda, tabelaValorId: preco.id },
+      } })
+    }, { timeout: 30000, maxWait: 10000 })
+    return { aplicavel: true, n, total, moeda, acao: 'criado', receitaId }
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      // corrida: outro processo criou o mesmo akey → idempotente, não duplica
+      return { aplicavel: true, n, total, moeda, acao: 'inalterado' }
+    }
+    throw e
+  }
 }
