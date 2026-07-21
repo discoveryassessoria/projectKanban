@@ -22,25 +22,15 @@ import { Custos } from '@/src/components/financeiro/subabas/Custos'
 // ⚠️ Ajuste estes imports se os caminhos forem outros no seu projeto:
 import { VisaoGeral } from '@/src/components/financeiro/subabas/VisaoGeral'
 import { Extrato } from '@/src/components/financeiro/subabas/Extrato'
-import { Inadimplencia } from '@/src/components/financeiro/subabas/Inadimplencia'
-import { Documentos } from '@/src/components/financeiro/subabas/Documentos'
-import { Timeline } from '@/src/components/financeiro/subabas/Timeline'
-import { Carteira } from '@/src/components/financeiro/subabas/Carteira'
 import { CotacaoCard } from '@/src/components/financeiro/CotacaoCard'
 
 // ============================================================================
 // Tipos
 // ============================================================================
 
-type Aba =
-  | 'visao-geral'
-  | 'receitas'
-  | 'custos'
-  | 'extrato'
-  | 'inadimplencia'
-  | 'documentos'
-  | 'timeline'
-  | 'carteira'
+// MODELO DEFINITIVO: a aba Financeiro do Processo possui APENAS estas 4 abas.
+// Inadimplência/Documentos/Timeline/Carteira eram do modelo antigo e saíram.
+type Aba = 'visao-geral' | 'receitas' | 'custos' | 'extrato'
 
 export interface ProcessoFinanceiroProps {
   processoId: number
@@ -177,27 +167,6 @@ export function ProcessoFinanceiro({
             atualizadoEm={cambio.atualizadoEm}
           />
         </div>
-
-        <FinTab
-          active={aba === 'inadimplencia'}
-          onClick={() => setAba('inadimplencia')}
-          label="⚠ Inadimplência"
-        />
-        <FinTab
-          active={aba === 'documentos'}
-          onClick={() => setAba('documentos')}
-          label="📁 Documentos"
-        />
-        <FinTab
-          active={aba === 'timeline'}
-          onClick={() => setAba('timeline')}
-          label="📄 Timeline"
-        />
-        <FinTab
-          active={aba === 'carteira'}
-          onClick={() => setAba('carteira')}
-          label="💼 Carteira"
-        />
       </div>
 
       {/* ============ Conteúdo (com scroll interno) ============ */}
@@ -229,27 +198,6 @@ export function ProcessoFinanceiro({
           />
         )}
         {aba === 'extrato' && <Extrato processoId={processoId} fxHoje={cambio.eur} />}
-
-        {aba === 'inadimplencia' && (
-          <Inadimplencia
-            processoId={processoId}
-            nomeFamilia={nomeFamilia}
-            fxHoje={cambio.eur}
-          />
-        )}
-        {aba === 'documentos' && (
-          <Documentos
-            processoId={processoId}
-            codigoProcesso={codigoProcesso}
-            fxHoje={cambio.eur}
-          />
-        )}
-        {aba === 'timeline' && (
-          <Timeline processoId={processoId} fxHoje={cambio.eur} />
-        )}
-        {aba === 'carteira' && (
-          <Carteira processoId={processoId} fxHoje={cambio.eur} fxUsdHoje={cambio.usd} />
-        )}
       </div>
     </div>
   )

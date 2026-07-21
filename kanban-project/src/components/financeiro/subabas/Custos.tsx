@@ -21,19 +21,11 @@
 
 import '@/src/styles/financeiro-paginas.css'
 import { useEffect, useState, useMemo } from 'react'
-import { NovoCustoPagina } from '@/src/components/financeiro/paginas/NovoCustoPagina'
-import {
-  LancarParcelaPagina,
-  type ParcelaLancavel,
-  type EntidadeLancavel,
-} from '@/src/components/financeiro/paginas/LancarParcelaPagina'
-
 import { TabelaCustos } from '@/src/components/kanban/TabelaCustos'
 import { parseLista } from '@/src/lib/financeiro/parseLista'
 // ARQUITETURA NOVA — aplicação MANUAL de template financeiro REMOVIDA. Lançamentos
 // financeiros nascem apenas via Automações por Fase (evento do Workflow Interno).
 // O modal SeletorTemplate e o botão "Template" foram retirados desta tela.
-import { DetalhesCustoPagina } from '@/src/components/financeiro/paginas/DetalhesCustoPagina'
 
 // ============================================================================
 // Tipos
@@ -183,16 +175,7 @@ function isVencida(p: ParcelaAPI): boolean {
 // Componente
 // ============================================================================
 
-type View =
-  | { kind: 'lista' }
-  | { kind: 'nova' }
-  | { kind: 'editar'; custo: CustoAPI }
-  | { kind: 'lancar'; parcela: ParcelaLancavel; entidade: EntidadeLancavel }
-  | { kind: 'detalhes'; custo: CustoAPI }
-
-// Cast pra TS não reclamar de prop opcional `custoInicial` adicionada na v4.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const NovoCustoPaginaAny = NovoCustoPagina as any
+type View = { kind: 'lista' }
 
 export function Custos({
   processoId,
@@ -482,120 +465,14 @@ export function Custos({
           {pgCount}/{totParc}
         </td>
         <td>{statusBadge}</td>
-        <td>
-          {isRascunho ? (
-            <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
-              <button
-                type="button"
-                className="btn-link-sm"
-                onClick={() => setView({ kind: 'editar', custo: c })}
-                disabled={sendoExcluido}
-              >
-                Editar
-              </button>
-              <button
-                type="button"
-                className="btn-link-sm"
-                style={{ color: '#dc2626' }}
-                onClick={() => excluirRascunho(c)}
-                disabled={sendoExcluido}
-              >
-                {sendoExcluido ? 'Excluindo...' : 'Excluir'}
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
-              <button
-                type="button"
-                className="btn-link-sm"
-                disabled
-                title="Em desenvolvimento"
-                style={{ opacity: 0.5, cursor: 'not-allowed' }}
-              >
-                Comprovante
-              </button>
-              <button
-                type="button"
-                className="btn-link-sm"
-                onClick={() => setView({ kind: 'detalhes', custo: c })}
-              >
-                Ver
-              </button>
-            </div>
-          )}
-        </td>
       </tr>
     )
   }
 
-  // ---- Render por view ----
-  if (view.kind === 'nova') {
-    return (
-      <NovoCustoPagina
-        processoId={processoId}
-        fxHoje={fxHoje}
-        onVoltar={() => setView({ kind: 'lista' })}
-        onCriado={() => {
-          setView({ kind: 'lista' })
-          recarregar()
-          onUpdate?.()
-        }}
-      />
-    )
-  }
-
-  if (view.kind === 'editar') {
-    return (
-      <NovoCustoPaginaAny
-        processoId={processoId}
-        fxHoje={fxHoje}
-        custoInicial={view.custo}
-        onVoltar={() => setView({ kind: 'lista' })}
-        onCriado={() => {
-          setView({ kind: 'lista' })
-          recarregar()
-          onUpdate?.()
-        }}
-      />
-    )
-  }
-
-  if (view.kind === 'detalhes') {
-    return (
-      <DetalhesCustoPagina
-        custo={view.custo}
-        fxHoje={fxHoje}
-        onVoltar={() => setView({ kind: 'lista' })}
-        onEditar={(c) => setView({ kind: 'editar', custo: c })}
-        onLancarParcela={(parcela, entidade) =>
-          setView({ kind: 'lancar', parcela, entidade })
-        }
-        onExcluido={() => {
-          setView({ kind: 'lista' })
-          recarregar()
-          onUpdate?.()
-        }}
-      />
-    )
-  }
-
-  if (view.kind === 'lancar') {
-    return (
-      <LancarParcelaPagina
-        parcela={view.parcela}
-        entidade={view.entidade}
-        fxHoje={fxHoje}
-        onVoltar={() => setView({ kind: 'lista' })}
-        onLancado={() => {
-          setView({ kind: 'lista' })
-          recarregar()
-          onUpdate?.()
-        }}
-      />
-    )
-  }
-
-  // ---- View 'lista' ----
+  // MODELO DEFINITIVO: o Financeiro do Processo é READ ONLY para criação de
+  // lançamentos. Não há mais criação/edição/lançamento manual de custos — quem
+  // cria é exclusivamente o motor financeiro (Config Financeira → Regra → Engine).
+  // ---- View única: leitura ----
   return (
     <div className="fpag-page">
       {/* === Section 1: Pasta Documental === */}
@@ -611,23 +488,14 @@ export function Custos({
         <TabelaCustos processoId={processoId} nomeFamilia={nomeFamilia} />
       </section>
 
-      {/* === Section 2: Custos Novos (Fase 3) === */}
+      {/* === Section 2: Lançamentos de custo (gerados pelo motor) === */}
       <section>
         <div className="page-header">
           <div>
-            <h1 className="page-title">🧾 Registrar Custos</h1>
+            <h1 className="page-title">🧾 Lançamentos de Custo</h1>
             <div className="page-subtitle">
-              Serviços, impostos, despesas e demais saídas operacionais do processo
+              Gerados automaticamente pelo motor financeiro (Config Financeira → Regra). Somente leitura.
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => setView({ kind: 'nova' })}
-            >
-              + Novo Custo
-            </button>
           </div>
         </div>
 
@@ -713,7 +581,7 @@ export function Custos({
             custosAtivos.length === 0 &&
             custosRascunho.length === 0 ? (
             <div className="empty-state">
-              Nenhum custo cadastrado. Clique em <strong>+ Novo Custo</strong> para começar.
+              Nenhum lançamento de custo. Os custos são gerados automaticamente pelo motor financeiro conforme o processo avança.
             </div>
           ) : custosExibidos.length === 0 ? (
             <div className="empty-state">
@@ -734,7 +602,6 @@ export function Custos({
                   <th>Câmbio</th>
                   <th>Parcelas</th>
                   <th>Status</th>
-                  <th></th>
                 </tr>
               </thead>
               <tbody>

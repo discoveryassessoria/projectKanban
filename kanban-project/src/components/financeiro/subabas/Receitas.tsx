@@ -23,16 +23,8 @@
 
 import '@/src/styles/financeiro-paginas.css'
 import { useEffect, useState, useMemo } from 'react'
-import { NovaReceitaPagina } from '@/src/components/financeiro/paginas/NovaReceitaPagina'
-import {
-  LancarParcelaPagina,
-  type ParcelaLancavel,
-  type EntidadeLancavel,
-} from '@/src/components/financeiro/paginas/LancarParcelaPagina'
-// ARQUITETURA NOVA — aplicação MANUAL de template financeiro REMOVIDA. Lançamentos
-// financeiros nascem apenas via Automações por Fase (evento do Workflow Interno).
-// O modal SeletorTemplate e o botão "Template" foram retirados desta tela.
-import { DetalhesReceitaPagina } from '@/src/components/financeiro/paginas/DetalhesReceitaPagina'
+// ARQUITETURA NOVA — Receitas do Processo são READ ONLY: nascem apenas das Regras
+// Financeiras (motor). Criação/edição/lançamento manual REMOVIDOS desta tela.
 
 // ============================================================================
 // Tipos
@@ -169,12 +161,7 @@ function parseLista(data: unknown): ReceitaAPI[] {
 // Componente
 // ============================================================================
 
-type View =
-  | { kind: 'lista' }
-  | { kind: 'nova' }
-  | { kind: 'editar'; receita: ReceitaAPI }
-  | { kind: 'lancar'; parcela: ParcelaLancavel; entidade: EntidadeLancavel }
-  | { kind: 'detalhes'; receita: ReceitaAPI }
+type View = { kind: 'lista' }
 
 export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) {
   const [view, setView] = useState<View>({ kind: 'lista' })
@@ -421,106 +408,19 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
           <div className="muted-xs">{pct.toFixed(0)}%</div>
         </td>
         <td>{statusBadge}</td>
-        <td>
-          {isRascunho ? (
-            <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
-              <button type="button" className="btn-link-sm" onClick={() => setView({ kind: 'editar', receita: r })} disabled={sendoExcluido}>Editar</button>
-              <button type="button" className="btn-link-sm" style={{ color: '#dc2626' }} onClick={() => excluirRascunho(r)} disabled={sendoExcluido}>{sendoExcluido ? 'Excluindo...' : 'Excluir'}</button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: 12, whiteSpace: 'nowrap' }}>
-              <button type="button" className="btn-link-sm" disabled title="Em desenvolvimento" style={{ opacity: 0.5, cursor: 'not-allowed' }}>Fatura</button>
-              <button type="button" className="btn-link-sm" onClick={() => setView({ kind: 'detalhes', receita: r })}>Ver</button>
-            </div>
-          )}
-        </td>
       </tr>
     )
   }
 
-  // ---- Render por view ----
-  if (view.kind === 'nova') {
-    return (
-      <NovaReceitaPagina
-        processoId={processoId}
-        fxHoje={fxHoje}
-        onVoltar={() => setView({ kind: 'lista' })}
-        onCriado={() => {
-          setView({ kind: 'lista' })
-          recarregar()
-          onUpdate?.()
-        }}
-      />
-    )
-  }
-
-  if (view.kind === 'editar') {
-    return (
-      <NovaReceitaPagina
-        processoId={processoId}
-        fxHoje={fxHoje}
-        receitaInicial={view.receita}
-        onVoltar={() => setView({ kind: 'lista' })}
-        onCriado={() => {
-          setView({ kind: 'lista' })
-          recarregar()
-          onUpdate?.()
-        }}
-      />
-    )
-  }
-
-  if (view.kind === 'detalhes') {
-    return (
-      <DetalhesReceitaPagina
-        receita={view.receita}
-        fxHoje={fxHoje}
-        onVoltar={() => setView({ kind: 'lista' })}
-        onEditar={(r) => setView({ kind: 'editar', receita: r })}
-        onLancarParcela={(parcela, entidade) =>
-          setView({ kind: 'lancar', parcela, entidade })
-        }
-        onExcluido={() => {
-          setView({ kind: 'lista' })
-          recarregar()
-          onUpdate?.()
-        }}
-      />
-    )
-  }
-
-  if (view.kind === 'lancar') {
-    return (
-      <LancarParcelaPagina
-        parcela={view.parcela}
-        entidade={view.entidade}
-        fxHoje={fxHoje}
-        onVoltar={() => setView({ kind: 'lista' })}
-        onLancado={() => {
-          setView({ kind: 'lista' })
-          recarregar()
-          onUpdate?.()
-        }}
-      />
-    )
-  }
-
-  // ---- View 'lista' ----
+  // MODELO DEFINITIVO: Receitas do Processo são READ ONLY. Nunca cadastradas
+  // manualmente — nascem exclusivamente das Regras Financeiras (motor financeiro).
+  // ---- View única: leitura ----
   return (
     <div className="fpag-page">
       <div className="page-header">
         <div>
           <h1 className="page-title">Receitas</h1>
-          <div className="page-subtitle">Honorários e demais entradas do processo</div>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => setView({ kind: 'nova' })}
-          >
-            + Nova Receita
-          </button>
+          <div className="page-subtitle">Geradas automaticamente pelas Regras Financeiras. Somente leitura.</div>
         </div>
       </div>
 
@@ -607,7 +507,7 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
           receitasAtivas.length === 0 &&
           receitasRascunho.length === 0 ? (
           <div className="empty-state">
-            Nenhuma receita cadastrada. Clique em <strong>+ Nova Receita</strong> para começar.
+            Nenhuma receita. As receitas do processo são geradas automaticamente pelas Regras Financeiras.
           </div>
         ) : receitasExibidas.length === 0 ? (
           <div className="empty-state">
@@ -628,7 +528,6 @@ export function Receitas({ processoId, onUpdate, fxHoje = 5.5 }: ReceitasProps) 
                 <th>Parcelas</th>
                 <th>Progresso</th>
                 <th>Status</th>
-                <th></th>
               </tr>
             </thead>
             <tbody>
