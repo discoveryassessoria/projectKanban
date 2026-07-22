@@ -94,9 +94,12 @@ export function paraColunasTaxa(b: Record<string, unknown>) {
     adquirente: enumOu(b.adquirente, ADQUIRENTES),
 
     // regras de aplicação
-    paises: listaStr(b.paises),
-    moedasAplicaveis: listaStr(b.moedasAplicaveis),
-    servicos: listaInt(b.servicos),
+    //
+    // paises / moedasAplicaveis / servicos NÃO são mais escritos aqui: viraram
+    // seleção por RELACIONAMENTO REAL (TaxaPagamentoMoeda / TaxaPagamentoPais) e
+    // por array de IDs de ServicoProduto. As rotas gravam esses arrays como
+    // PROJEÇÃO derivada — ver lib/financeiro/taxa-aplicabilidade.ts. Assim o
+    // motor (candidataElegivel) segue intacto e o histórico é preservado.
     modalidades: listaStr(b.modalidades),
     tiposProcesso: listaStr(b.tiposProcesso),
     valorMinimo: num(b.valorMinimo),

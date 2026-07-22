@@ -181,8 +181,10 @@ export function paraColunas(b: Record<string, unknown>) {
     politicaTaxas: enumOu(b.politicaTaxas, POLITICAS_TAXAS, 'IGNORAR'),
     aplicarTaxas: enumOu(b.politicaTaxas, POLITICAS_TAXAS, 'IGNORAR') !== 'IGNORAR',
 
-    // forma/entrada sugeridas
-    formaSugeridaId: inteiro(b.formaSugeridaId),
+    // FORMA PADRÃO (coluna legada `formaSugeridaId` preservada — ver
+    // lib/financeiro/condicao-formas.ts). Só sugestão inicial da cobrança;
+    // quem valida existência/atividade/pertencimento às permitidas é a rota.
+    formaSugeridaId: inteiro(b.formaPadraoId ?? b.formaPagamentoPadraoId ?? b.formaSugeridaId),
     entradaTipo: enumN(b.entradaTipo, ENTRADA_TIPOS),
     entradaMin: num(b.entradaMin),
     entradaMax: num(b.entradaMax),

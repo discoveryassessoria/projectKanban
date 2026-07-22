@@ -19,7 +19,9 @@ export interface ConfiguracaoFinanceira {
     id: number; name: string; codigo: string | null; versao: number; moeda: string; ativo: boolean
     tipoPagamento: string; parcelas: number; parcelasMin: number | null; parcelasMax: number | null; parcelasPadrao: number | null
     temEntrada: boolean; periodicidade: string; aplicaA: string
-    formasPermitidas: number[]; taxasVinculadas: number[]; carteiraId: number | null
+    // formasPermitidas: vazio = SEM RESTRIÇÃO (qualquer forma ativa compatível).
+    // formaPadraoId: sugestão inicial da cobrança (pode ser trocada).
+    formasPermitidas: number[]; formaPadraoId: number | null; taxasVinculadas: number[]; carteiraId: number | null
   }[]
   taxasPagamento: { id: number; code: string | null; name: string; feeType: string | null; feePercent: number | null; fixedFee: number | null; ativo: boolean }[]
   contasBancarias: { id: number; nome: string; moeda: string; banco: string | null; isDefaultReceiving: boolean }[]
@@ -60,7 +62,8 @@ export async function obterConfiguracaoFinanceira(opts?: { incluirInativos?: boo
       id: c.id, name: c.name, codigo: c.codigo, versao: c.versao, moeda: String(c.moeda), ativo: c.ativo,
       tipoPagamento: c.tipoPagamento, parcelas: c.parcelas, parcelasMin: c.parcelasMin, parcelasMax: c.parcelasMax, parcelasPadrao: c.parcelasPadrao,
       temEntrada: c.temEntrada, periodicidade: c.periodicidade, aplicaA: c.aplicaA,
-      formasPermitidas: c.formasPermitidas.map((x) => x.formaId), taxasVinculadas: c.taxasVinculadas.map((x) => x.taxaId), carteiraId: c.carteiraId,
+      formasPermitidas: c.formasPermitidas.map((x) => x.formaId), formaPadraoId: c.formaSugeridaId ?? null,
+      taxasVinculadas: c.taxasVinculadas.map((x) => x.taxaId), carteiraId: c.carteiraId,
     })),
     taxasPagamento: taxas.map((t) => ({ id: t.id, code: t.code, name: t.name, feeType: t.feeType, feePercent: num(t.feePercent), fixedFee: num(t.fixedFee), ativo: t.ativo })),
     contasBancarias: contas.map((c) => ({ id: c.id, nome: c.nome, moeda: String(c.moeda), banco: c.bank?.nome ?? c.banco ?? null, isDefaultReceiving: c.isDefaultReceiving })),

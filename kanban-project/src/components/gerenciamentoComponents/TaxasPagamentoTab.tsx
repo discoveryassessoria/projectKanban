@@ -13,7 +13,7 @@ import {
   Percent, Search, Plus, X, Check, ArrowRight, ArrowLeft, Loader2, Pencil, Trash2,
   Tag, Calculator, Layers, Scale, Filter, CalendarClock, Cpu, Sparkles,
 } from 'lucide-react'
-import { OURO, GLASS, INPUT, jf, toggleArr, Secao, Campo, Select, Toggle, ChipsMulti, Stepper } from './pagamentoUI'
+import { OURO, GLASS, INPUT, jf, toggleArr, Secao, Campo, Select, Toggle, ChipsMulti, MultiSelect, ModalWizard, Stepper, fecharTodosMultiSelects } from './pagamentoUI'
 import {
   FEE_TYPES, FEE_TYPES_LABEL, FEE_TYPES_COM_MOEDA, CATEGORIAS_TAXA, CATEGORIAS_TAXA_LABEL,
   APLICA_PARCELA, APLICA_PARCELA_LABEL, ANTICIPATION_TYPES, ANTICIPATION_TYPES_LABEL,
@@ -23,6 +23,7 @@ import {
 
 type Ref = { id: number; name: string; code?: string | null }
 type MoedaRef = { id: number; code: string; name: string | null }
+type PaisRef = { id: number; countryKey: string; countryLabel: string; flag?: string | null }
 type Taxa = {
   id: number; code: string | null; name: string; descricao: string | null; categoria: string | null; ativo: boolean; prioridade: number
   formaPagamentoId: number | null; formasAplicaveis: number[]
@@ -30,11 +31,19 @@ type Taxa = {
   aplicaParcela: string | null; installmentsFrom: number | null; installmentsTo: number | null
   anticipationType: string | null; anticipationPercent: number | null; anticipationFixed: number | null; anticipationMinDays: number | null
   baseIncidencia: string; quemAbsorve: string; absorcaoPercentEmpresa: number | null; adquirente: string | null
+  // Projeções legadas (leitura): o motor de cálculo continua consumindo estes arrays.
   paises: string[]; moedasAplicaveis: string[]; servicos: number[]; modalidades: string[]; tiposProcesso: string[]
+  // Aplicabilidade por RELACIONAMENTO REAL (fonte da verdade da tela e da API).
+  moedasVinculadas?: { moedaId: number }[]; paisesPermitidos?: { paisId: number }[]
   valorMinimo: number | null; valorMaximo: number | null; canal: string | null; gateway: string | null; perfil: string | null
   momentoCambio: string | null; vigenciaInicio: string | null; vigenciaFim: string | null
 }
-type Form = Omit<Taxa, 'id'>
+
+// O formulário guarda IDs de cadastro real — nunca texto. Os arrays legados
+// (paises/moedasAplicaveis/servicos) saem do estado: viram PROJEÇÃO no backend.
+type Form = Omit<Taxa, 'id' | 'paises' | 'moedasAplicaveis' | 'servicos' | 'moedasVinculadas' | 'paisesPermitidos'> & {
+  moedasIds: number[]; paisesIds: number[]; servicosIds: number[]
+}
 
 const VAZIO = (): Form => ({
   code: '', name: '', descricao: '', categoria: null, ativo: true, prioridade: 0,
@@ -43,7 +52,7 @@ const VAZIO = (): Form => ({
   aplicaParcela: 'TODAS', installmentsFrom: null, installmentsTo: null,
   anticipationType: 'NAO_POSSUI', anticipationPercent: null, anticipationFixed: null, anticipationMinDays: null,
   baseIncidencia: 'TOTAL', quemAbsorve: 'EMPRESA', absorcaoPercentEmpresa: null, adquirente: null,
-  paises: [], moedasAplicaveis: [], servicos: [], modalidades: [], tiposProcesso: [],
+  moedasIds: [], paisesIds: [], servicosIds: [], modalidades: [], tiposProcesso: [],
   valorMinimo: null, valorMaximo: null, canal: '', gateway: '', perfil: '',
   momentoCambio: null, vigenciaInicio: null, vigenciaFim: null,
 })
@@ -54,6 +63,7 @@ export default function TaxasPagamentoTab() {
   const [itens, setItens] = useState<Taxa[]>([])
   const [formas, setFormas] = useState<Ref[]>([])
   const [moedas, setMoedas] = useState<MoedaRef[]>([])
+  const [paises, setPaises] = useState<PaisRef[]>([])
   const [servicos, setServicos] = useState<Ref[]>([])
   const [loading, setLoading] = useState(true)
   const [erroLista, setErroLista] = useState<string | null>(null)
@@ -66,7 +76,10 @@ export default function TaxasPagamentoTab() {
     setLoading(true); setErroLista(null)
     try {
       const d = await jf('/api/gerenciamento/taxas-pagamento', { cache: 'no-store' })
-      setItens(d.taxas || []); setFormas(d.formasPagamento || []); setMoedas(d.moedas || []); setServicos(d.servicos || [])
+      // Cadastros dos seletores vêm JUNTO com a listagem: uma busca só, sem
+      // refetch a cada abertura do menu (a lista fica em memória na aba).
+      setItens(d.taxas || []); setFormas(d.formasPagamento || []); setMoedas(d.moedas || [])
+      setPaises(d.paises || []); setServicos(d.servicos || [])
     } catch (e: any) { setErroLista(e.message || 'Não foi possível carregar.') }
     finally { setLoading(false) }
   }, [])
@@ -145,7 +158,7 @@ export default function TaxasPagamentoTab() {
 
       {aberto && (
         <TaxaWizard
-          editando={editando} formas={formas} moedas={moedas} servicos={servicos}
+          editando={editando} formas={formas} moedas={moedas} paises={paises} servicos={servicos}
           onClose={() => setAberto(false)} onSalvo={() => { setAberto(false); carregar() }}
         />
       )}
@@ -154,8 +167,8 @@ export default function TaxasPagamentoTab() {
 }
 
 // ── wizard premium ─────────────────────────────────────────────────────────
-function TaxaWizard({ editando, formas, moedas, servicos, onClose, onSalvo }: {
-  editando: Taxa | null; formas: Ref[]; moedas: MoedaRef[]; servicos: Ref[]; onClose: () => void; onSalvo: () => void
+function TaxaWizard({ editando, formas, moedas, paises, servicos, onClose, onSalvo }: {
+  editando: Taxa | null; formas: Ref[]; moedas: MoedaRef[]; paises: PaisRef[]; servicos: Ref[]; onClose: () => void; onSalvo: () => void
 }) {
   const [step, setStep] = useState(1)
   const [f, setF] = useState<Form>(() => editando ? { ...VAZIO(), ...normalizar(editando) } : VAZIO())
@@ -180,18 +193,32 @@ function TaxaWizard({ editando, formas, moedas, servicos, onClose, onSalvo }: {
     finally { setSalvando(false) }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 border-b border-white/10 bg-zinc-900/95 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" style={{ color: OURO }} /><h3 className="text-base font-semibold">{editando ? 'Editar taxa' : 'Nova taxa de pagamento'}</h3></div>
-            <button onClick={onClose} className="text-white/40 transition hover:text-white"><X className="h-4 w-4" /></button>
-          </div>
-          <div className="mt-3"><Stepper passos={PASSOS} atual={step} /></div>
-        </div>
+  // Toda troca de etapa fecha os seletores abertos: nenhum menu sobrevive à
+  // navegação e nenhum resto de camada fica capturando clique.
+  const irPara = (n: number) => { fecharTodosMultiSelects(); setStep(n) }
 
-        <div className="space-y-4 px-6 py-5">
+  return (
+    <ModalWizard
+      onClose={onClose}
+      header={<>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" style={{ color: OURO }} /><h3 className="text-base font-semibold">{editando ? 'Editar taxa' : 'Nova taxa de pagamento'}</h3></div>
+          <button onClick={() => { fecharTodosMultiSelects(); onClose() }} className="text-white/40 transition hover:text-white"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="mt-3"><Stepper passos={PASSOS} atual={step} /></div>
+      </>}
+      footer={
+        <div className="flex items-center justify-between">
+          <button onClick={() => (step > 1 ? irPara(step - 1) : (fecharTodosMultiSelects(), onClose()))} className="inline-flex items-center gap-1 text-sm text-white/60 transition hover:text-white"><ArrowLeft className="h-4 w-4" /> {step > 1 ? 'Voltar' : 'Cancelar'}</button>
+          {step < PASSOS.length ? (
+            <button onClick={() => { fecharTodosMultiSelects(); if (step === 1 && !f.name.trim()) { setErro('Informe o nome.'); return } setErro(null); setStep(step + 1) }} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
+          ) : (
+            <button onClick={salvar} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{salvando ? 'Salvando…' : 'Salvar'}</button>
+          )}
+        </div>
+      }
+    >
+      <>
           {erro && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erro}</div>}
 
           {step === 1 && (
@@ -259,25 +286,54 @@ function TaxaWizard({ editando, formas, moedas, servicos, onClose, onSalvo }: {
             </Secao>
           )}
 
+          {/*
+            Etapa 5 — nada aqui é digitado. Moeda, país e serviço só podem ser
+            SELECIONADOS entre registros do cadastro oficial; a seleção é
+            persistida por ID (vínculo real), nunca como texto separado por vírgula.
+            Vazio = sem restrição.
+          */}
           {step === 5 && (
-            <Secao icon={Filter} titulo="Aplicabilidade" dica="Restrinja onde a taxa vale (tudo opcional). Vazio = sem restrição.">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Campo label="Países (ISO, vírgula)"><input className={INPUT} value={f.paises.join(', ')} onChange={(e) => set('paises', e.target.value.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean))} placeholder="BR, PT" /></Campo>
-                <Campo label="Moedas (vírgula)"><input className={INPUT} value={f.moedasAplicaveis.join(', ')} onChange={(e) => set('moedasAplicaveis', e.target.value.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean))} placeholder="BRL, EUR" /></Campo>
-                <Campo label="Valor mínimo"><input type="number" step="0.01" className={INPUT} value={f.valorMinimo ?? ''} onChange={(e) => set('valorMinimo', e.target.value === '' ? null : Number(e.target.value))} /></Campo>
-                <Campo label="Valor máximo"><input type="number" step="0.01" className={INPUT} value={f.valorMaximo ?? ''} onChange={(e) => set('valorMaximo', e.target.value === '' ? null : Number(e.target.value))} /></Campo>
-                <Campo label="Canal"><input className={INPUT} value={f.canal ?? ''} onChange={(e) => set('canal', e.target.value)} /></Campo>
-                <Campo label="Gateway"><input className={INPUT} value={f.gateway ?? ''} onChange={(e) => set('gateway', e.target.value)} /></Campo>
-                <Campo label="Perfil"><input className={INPUT} value={f.perfil ?? ''} onChange={(e) => set('perfil', e.target.value)} /></Campo>
-                <Campo label="Câmbio (taxa internacional)"><Select value={f.momentoCambio ?? ''} onChange={(v) => set('momentoCambio', v || null)} options={[['', '— não se aplica —'], ...MOMENTO_CAMBIO.map((m) => [m, MOMENTO_CAMBIO_LABEL[m]] as [string, string])]} /></Campo>
-              </div>
-              {servicos.length > 0 && (
-                <div className="mt-3">
-                  <p className="mb-1.5 text-[11px] uppercase tracking-wide text-white/40">Serviços (opcional)</p>
-                  <ChipsMulti items={servicos.map((x) => ({ id: x.id, label: x.name }))} selecionados={f.servicos} onToggle={(id) => set('servicos', toggleArr(f.servicos, Number(id)))} />
+            <div className="space-y-4">
+              <Secao icon={Filter} titulo="Onde a taxa se aplica" dica="Tudo opcional. Sem nenhuma seleção, a taxa vale para qualquer moeda, país e serviço.">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <Campo label="Moedas">
+                    <MultiSelect
+                      opcoes={moedas.map((m) => ({ id: m.id, label: m.code, hint: m.name || undefined }))}
+                      selecionados={f.moedasIds} onChange={(ids) => set('moedasIds', ids)}
+                      placeholder="Todas as moedas" dicaVazio="Todas as moedas."
+                      vazioMsg="Nenhuma moeda ativa cadastrada." busca acoes buscaPlaceholder="Filtrar moeda…"
+                    />
+                  </Campo>
+                  <Campo label="Países">
+                    <MultiSelect
+                      opcoes={paises.map((p) => ({ id: p.id, label: `${p.flag ? `${p.flag} ` : ''}${p.countryLabel}`, hint: p.countryKey }))}
+                      selecionados={f.paisesIds} onChange={(ids) => set('paisesIds', ids)}
+                      placeholder="Todos os países" dicaVazio="Todos os países."
+                      vazioMsg="Nenhum país ativo cadastrado." busca acoes buscaPlaceholder="Filtrar país…"
+                    />
+                  </Campo>
+                  <Campo label="Serviços">
+                    <MultiSelect
+                      opcoes={servicos.map((s) => ({ id: s.id, label: s.name, hint: s.code || undefined }))}
+                      selecionados={f.servicosIds} onChange={(ids) => set('servicosIds', ids)}
+                      placeholder="Todos os serviços" dicaVazio="Todos os serviços."
+                      vazioMsg="Nenhum serviço ativo cadastrado." busca acoes buscaPlaceholder="Filtrar serviço…"
+                    />
+                  </Campo>
                 </div>
-              )}
-            </Secao>
+              </Secao>
+
+              <Secao icon={Scale} titulo="Faixa de valor e canal" dica="Limites e metadados operacionais da regra.">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <Campo label="Valor mínimo"><input type="number" step="0.01" className={INPUT} value={f.valorMinimo ?? ''} onChange={(e) => set('valorMinimo', e.target.value === '' ? null : Number(e.target.value))} /></Campo>
+                  <Campo label="Valor máximo"><input type="number" step="0.01" className={INPUT} value={f.valorMaximo ?? ''} onChange={(e) => set('valorMaximo', e.target.value === '' ? null : Number(e.target.value))} /></Campo>
+                  <Campo label="Canal"><input className={INPUT} value={f.canal ?? ''} onChange={(e) => set('canal', e.target.value)} /></Campo>
+                  <Campo label="Gateway"><input className={INPUT} value={f.gateway ?? ''} onChange={(e) => set('gateway', e.target.value)} /></Campo>
+                  <Campo label="Perfil"><input className={INPUT} value={f.perfil ?? ''} onChange={(e) => set('perfil', e.target.value)} /></Campo>
+                  <Campo label="Câmbio (taxa internacional)" wide><Select value={f.momentoCambio ?? ''} onChange={(v) => set('momentoCambio', v || null)} options={[['', '— não se aplica —'], ...MOMENTO_CAMBIO.map((m) => [m, MOMENTO_CAMBIO_LABEL[m]] as [string, string])]} /></Campo>
+                </div>
+              </Secao>
+            </div>
           )}
 
           {step === 6 && (
@@ -300,6 +356,9 @@ function TaxaWizard({ editando, formas, moedas, servicos, onClose, onSalvo }: {
                     ['Incidência', BASE_INCIDENCIA_LABEL[f.baseIncidencia]], ['Aplica-se a', APLICA_PARCELA_LABEL[f.aplicaParcela || 'TODAS']],
                     ['Absorção', QUEM_ABSORVE_LABEL[f.quemAbsorve]], ['Antecipação', ANTICIPATION_TYPES_LABEL[f.anticipationType || 'NAO_POSSUI']],
                     ['Formas', f.formasAplicaveis.length ? `${f.formasAplicaveis.length} selecionada(s)` : 'qualquer'],
+                    ['Moedas', f.moedasIds.length ? `${f.moedasIds.length} selecionada(s)` : 'todas'],
+                    ['Países', f.paisesIds.length ? `${f.paisesIds.length} selecionado(s)` : 'todos'],
+                    ['Serviços', f.servicosIds.length ? `${f.servicosIds.length} selecionado(s)` : 'todos'],
                   ].map(([l, v], i) => (
                     <div key={i} className="flex justify-between gap-3"><span className="text-white/45">{l}</span><span className="truncate text-right text-white/85">{String(v ?? '—')}</span></div>
                   ))}
@@ -314,28 +373,25 @@ function TaxaWizard({ editando, formas, moedas, servicos, onClose, onSalvo }: {
               </div>
             </div>
           )}
-        </div>
-
-        <div className="sticky bottom-0 flex items-center justify-between border-t border-white/10 bg-zinc-900/95 px-6 py-4">
-          <button onClick={() => (step > 1 ? setStep(step - 1) : onClose())} className="inline-flex items-center gap-1 text-sm text-white/60 transition hover:text-white"><ArrowLeft className="h-4 w-4" /> {step > 1 ? 'Voltar' : 'Cancelar'}</button>
-          {step < PASSOS.length ? (
-            <button onClick={() => { if (step === 1 && !f.name.trim()) { setErro('Informe o nome.'); return } setErro(null); setStep(step + 1) }} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
-          ) : (
-            <button onClick={salvar} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{salvando ? 'Salvando…' : 'Salvar'}</button>
-          )}
-        </div>
-      </div>
-    </div>
+      </>
+    </ModalWizard>
   )
 }
 
 /** Normaliza a taxa vinda da API (nulls → arrays/strings; datas mantidas ISO). */
 function normalizar(t: Taxa): Partial<Form> {
+  const { paises: _p, moedasAplicaveis: _m, servicos: _s, moedasVinculadas, paisesPermitidos, ...resto } = t
   return {
-    ...t,
+    ...resto,
     code: t.code ?? '', descricao: t.descricao ?? '', canal: t.canal ?? '', gateway: t.gateway ?? '', perfil: t.perfil ?? '',
-    formasAplicaveis: t.formasAplicaveis ?? [], paises: t.paises ?? [], moedasAplicaveis: t.moedasAplicaveis ?? [],
-    servicos: t.servicos ?? [], modalidades: t.modalidades ?? [], tiposProcesso: t.tiposProcesso ?? [],
+    formasAplicaveis: t.formasAplicaveis ?? [],
+    // Aplicabilidade vem SEMPRE dos vínculos reais; serviços seguem em array de
+    // IDs de ServicoProduto (id real, nunca texto). Os arrays de texto legados
+    // (paises/moedasAplicaveis) são só projeção de leitura — nunca hidratam a tela.
+    moedasIds: (moedasVinculadas ?? []).map((x) => x.moedaId),
+    paisesIds: (paisesPermitidos ?? []).map((x) => x.paisId),
+    servicosIds: t.servicos ?? [],
+    modalidades: t.modalidades ?? [], tiposProcesso: t.tiposProcesso ?? [],
     aplicaParcela: t.aplicaParcela ?? 'TODAS', anticipationType: t.anticipationType ?? 'NAO_POSSUI',
     feeType: t.feeType ?? 'percentage', baseIncidencia: t.baseIncidencia ?? 'TOTAL', quemAbsorve: t.quemAbsorve ?? 'EMPRESA',
     vigenciaInicio: t.vigenciaInicio ?? null, vigenciaFim: t.vigenciaFim ?? null,

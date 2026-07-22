@@ -15,6 +15,7 @@ import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { paraColunas, validar, inteiro } from './campos'
 import { gerarCodigoPublico } from '@/lib/codigos/code-generator'
 import { INCLUDE_APLICABILIDADE, resolverAplicabilidade, vinculosParaCriar } from '@/lib/financeiro/condicao-aplicabilidade'
+import { INCLUDE_FORMAS, resolverFormas } from '@/lib/financeiro/condicao-formas'
 
 // GET - Listar
 export async function GET(request: NextRequest) {
@@ -29,7 +30,9 @@ export async function GET(request: NextRequest) {
         orderBy: [{ name: 'asc' }, { versao: 'desc' }],
         include: {
           carteira: { select: { id: true, nome: true } },
-          formasPermitidas: { select: { formaId: true } },
+          // Formas permitidas COM nome/código/ativo: a tela precisa dos nomes,
+          // não só dos ids (a Forma padrão é `formaSugeridaId`, já no registro).
+          ...INCLUDE_FORMAS,
           taxasVinculadas: { select: { taxaId: true } },
           ...INCLUDE_APLICABILIDADE,
           _count: { select: { configuracoes: true, receitas: true, custos: true } },
@@ -99,6 +102,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: aplic.erros[0].mensagem, erros: aplic.erros }, { status: 400 })
     }
 
+    // Formas permitidas + Forma padrão: existência, atividade e a regra "a
+    // padrão precisa estar entre as permitidas" são conferidas AQUI.
+    const formas = await resolverFormas(b)
+    if (formas.erros.length) {
+      return NextResponse.json({ error: formas.erros[0].mensagem, erros: formas.erros }, { status: 400 })
+    }
+
     const colunas = paraColunas(b)
     const substituiId = inteiro(b.substituiId)
 
@@ -121,7 +131,7 @@ export async function POST(request: NextRequest) {
     }
 
     const ids = {
-      formas: (Array.isArray(b.formasPermitidas) ? b.formasPermitidas : []).map((x: unknown) => inteiro(x)).filter((x: number | null): x is number => x != null),
+      formas: formas.selecao.permitidas,
       taxas: (Array.isArray(b.taxasVinculadas) ? b.taxasVinculadas : []).map((x: unknown) => inteiro(x)).filter((x: number | null): x is number => x != null),
     }
 
@@ -144,7 +154,7 @@ export async function POST(request: NextRequest) {
           taxasVinculadas: ids.taxas.length ? { create: ids.taxas.map((taxaId: number) => ({ taxaId })) } : undefined,
           ...vinculosParaCriar(aplic.selecao),
         },
-        include: { formasPermitidas: true, taxasVinculadas: true, ...INCLUDE_APLICABILIDADE },
+        include: { ...INCLUDE_FORMAS, taxasVinculadas: true, ...INCLUDE_APLICABILIDADE },
       })
       if (substituiId) {
         await tx.condicaoPagamento.update({

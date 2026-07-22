@@ -13,6 +13,7 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { inteiro, mudouEstrutura, paraColunas, validar } from '../campos'
 import { INCLUDE_APLICABILIDADE, eixosPresentes, regravarVinculos, resolverAplicabilidade } from '@/lib/financeiro/condicao-aplicabilidade'
+import { INCLUDE_FORMAS, eixosFormasPresentes, padraoValido, resolverFormas } from '@/lib/financeiro/condicao-formas'
 
 /** Uma condição está "em uso" quando já produziu lançamento ou está vinculada. */
 async function usoReal(id: number) {
@@ -48,6 +49,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: aplic.erros[0].mensagem, erros: aplic.erros }, { status: 400 })
     }
 
+    // Formas permitidas + Forma padrão.
+    // Eixo ausente do body não é regravado. Se a edição remover das permitidas
+    // a forma que era PADRÃO, a padrão é LIMPA (nunca fica referência inválida)
+    // — é a mesma regra que a tela aplica ao remover o chip.
+    const presentesFormas = eixosFormasPresentes(b)
+    const formas = await resolverFormas(presentesFormas.padrao ? b : { ...b, formaPadraoId: null })
+    if (formas.erros.length) {
+      return NextResponse.json({ error: formas.erros[0].mensagem, erros: formas.erros }, { status: 400 })
+    }
+    let padraoFinal: number | null = presentesFormas.padrao ? formas.selecao.padrao : atual.formaSugeridaId
+    if (presentesFormas.permitidas && !padraoValido(formas.selecao.permitidas, padraoFinal)) padraoFinal = null
+
     const colunas = paraColunas({ ...atual, ...b } as Record<string, unknown>)
     const estruturais = mudouEstrutura(atual as unknown as Record<string, unknown>, colunas as unknown as Record<string, unknown>)
 
@@ -69,9 +82,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const ids = {
-      formas: Array.isArray(b.formasPermitidas)
-        ? b.formasPermitidas.map((x: unknown) => inteiro(x)).filter((x: number | null): x is number => x != null)
-        : null,
+      formas: presentesFormas.permitidas ? formas.selecao.permitidas : null,
       taxas: Array.isArray(b.taxasVinculadas)
         ? b.taxasVinculadas.map((x: unknown) => inteiro(x)).filter((x: number | null): x is number => x != null)
         : null,
@@ -104,8 +115,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         where: { id },
         // codigo/versao/substituiId não se editam: pertencem ao versionamento.
         // O código é IMUTÁVEL — nunca regenerado nem sobrescrito pelo body.
-        data: { ...colunas, ...projecao, codigo: atual.codigo },
-        include: { formasPermitidas: true, taxasVinculadas: true, ...INCLUDE_APLICABILIDADE },
+        data: { ...colunas, ...projecao, formaSugeridaId: padraoFinal, codigo: atual.codigo },
+        include: { ...INCLUDE_FORMAS, taxasVinculadas: true, ...INCLUDE_APLICABILIDADE },
       })
     })
 

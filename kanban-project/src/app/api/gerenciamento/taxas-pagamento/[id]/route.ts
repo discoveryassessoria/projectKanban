@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { validarTaxa, paraColunasTaxa } from '../campos'
+import {
+  INCLUDE_APLICABILIDADE_TAXA, eixosPresentes, regravarVinculosTaxa, resolverAplicabilidadeTaxa,
+} from '@/lib/financeiro/taxa-aplicabilidade'
 
 // PUT — Atualizar taxa (merge campo-a-campo → mapeamento único).
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -20,7 +23,30 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const erros = validarTaxa(merged)
     if (erros.length) return NextResponse.json({ error: erros[0].mensagem, erros }, { status: 400 })
 
-    const taxa = await prisma.taxaPagamento.update({ where: { id }, data: paraColunasTaxa(merged) })
+    // Aplicabilidade: ids conferidos contra o cadastro (existe? ativo?).
+    // Eixo ausente do body não é regravado — PUT parcial não apaga vínculo algum.
+    const presentes = eixosPresentes(b)
+    const aplic = await resolverAplicabilidadeTaxa(b)
+    if (aplic.erros.length) {
+      return NextResponse.json({ error: aplic.erros[0].mensagem, erros: aplic.erros }, { status: 400 })
+    }
+
+    const taxa = await prisma.$transaction(async (tx) => {
+      await regravarVinculosTaxa(tx, id, aplic.selecao, presentes)
+
+      // Projeção legada: só dos eixos que o body declarou (o motor de cálculo
+      // continua lendo destes arrays — nada nele foi alterado).
+      const projecao: Record<string, unknown> = {}
+      if (presentes.moedas) projecao.moedasAplicaveis = aplic.projecao.moedasAplicaveis
+      if (presentes.paises) projecao.paises = aplic.projecao.paises
+      if (presentes.servicos) projecao.servicos = aplic.projecao.servicos
+
+      return tx.taxaPagamento.update({
+        where: { id },
+        data: { ...paraColunasTaxa(merged), ...projecao },
+        include: INCLUDE_APLICABILIDADE_TAXA,
+      })
+    })
     return NextResponse.json({ taxa })
   } catch (error) {
     console.error('Erro ao atualizar taxa de pagamento:', error)

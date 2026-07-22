@@ -14,6 +14,7 @@
 import { gerarCronograma, type CondicaoPagamentoView } from './condicao-pagamento'
 import { calcularTaxas, type TaxaView } from './taxas-pagamento'
 import { validarCompatibilidadeCobranca, type FormaView } from './payment-method-rules'
+import { formaPermitidaNaCondicao } from './condicao-formas'
 
 export type Direcao = 'RECEBER' | 'PAGAR'
 export type PoliticaTaxas = 'IGNORAR' | 'REPASSAR' | 'ABSORVER' | 'ESCOLHER_NA_COBRANCA'
@@ -32,7 +33,13 @@ export interface CobrancaInput {
   moeda: string
   dataBase: Date
   forma?: FormaView | null
-  condicao?: (CondicaoPagamentoView & { politicaTaxas?: string | null; aplicaA?: string | null; carteiraId?: number | null }) | null
+  condicao?: (CondicaoPagamentoView & {
+    politicaTaxas?: string | null; aplicaA?: string | null; carteiraId?: number | null
+    /** Ids das Formas permitidas pela condição. Vazio/ausente = sem restrição. */
+    formasPermitidasIds?: number[] | null
+    /** Forma PADRÃO (sugestão inicial). Nunca restringe: só pré-seleciona. */
+    formaPadraoId?: number | null
+  }) | null
   /** Escolha explícita quando a política da condição é ESCOLHER_NA_COBRANCA. */
   politicaTaxasEscolhida?: PoliticaTaxas | null
   nParcelas?: number | null
@@ -152,7 +159,14 @@ export function calcularCobranca(input: CobrancaInput): ResultadoCobranca {
   }
 
   // ── 2. Forma de Pagamento ──
+  //
+  // A Condição RESTRINGE (formas permitidas) mas nunca torna válida uma forma
+  // incompatível: as regras técnicas da Forma (moeda, direção, parcelamento,
+  // adquirente, entrada) continuam valendo integralmente logo abaixo.
   if (forma) {
+    if (!formaPermitidaNaCondicao(cond?.formasPermitidasIds, forma.id)) {
+      erros.push({ codigo: 'FORMA_NAO_PERMITIDA', mensagem: `Forma "${forma.name}" não está entre as formas permitidas por esta condição.` })
+    }
     if (!forma.ativo) erros.push({ codigo: 'FORMA_INATIVA', mensagem: `Forma "${forma.name}" está inativa.` })
     if (input.aplicaComo === 'RECEBER' && forma.usoRecebimento === false) erros.push({ codigo: 'FORMA_SEM_RECEBIMENTO', mensagem: `Forma "${forma.name}" não pode ser usada em recebimento.` })
     if (input.aplicaComo === 'PAGAR' && forma.usoPagamento === false) erros.push({ codigo: 'FORMA_SEM_PAGAMENTO', mensagem: `Forma "${forma.name}" não pode ser usada em pagamento.` })

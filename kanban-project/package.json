@@ -57,7 +57,7 @@
     "test:automacao-requerente": "tsx scripts/automacao-requerente-guard.test.ts",
     "test:cambio": "tsx scripts/cambio-confidence-guard.test.ts",
     "test:financeiro-geral": "tsx scripts/financeiro-geral.test.ts",
-    "test:financeiro": "tsx scripts/calculo-preco.test.ts && tsx scripts/unidade-cobranca-guard.test.ts && tsx scripts/automacao-requerente-guard.test.ts && tsx scripts/preco-fonte-unica.test.ts && tsx scripts/resolver-preco-financeiro.test.ts && tsx scripts/financeiro-geral.test.ts && tsx scripts/acoes-lancamento.test.ts && tsx scripts/condicao-pagamento.test.ts && tsx scripts/taxas-encargos.test.ts && tsx scripts/receitas-processo.test.ts && tsx scripts/receitas-processo-view.test.ts && tsx scripts/dossie-receita-guard.test.ts && tsx scripts/arquitetura-financeira-guard.test.ts && tsx scripts/forma-pagamento-guard.test.ts && tsx scripts/taxa-pagamento-guard.test.ts && tsx scripts/condicao-regra-guard.test.ts && tsx scripts/condicao-aplicabilidade.test.ts && tsx scripts/charge-calculation.test.ts && tsx scripts/cadastro-mestre-guard.test.ts",
+    "test:financeiro": "tsx scripts/calculo-preco.test.ts && tsx scripts/unidade-cobranca-guard.test.ts && tsx scripts/automacao-requerente-guard.test.ts && tsx scripts/preco-fonte-unica.test.ts && tsx scripts/resolver-preco-financeiro.test.ts && tsx scripts/financeiro-geral.test.ts && tsx scripts/acoes-lancamento.test.ts && tsx scripts/condicao-pagamento.test.ts && tsx scripts/taxas-encargos.test.ts && tsx scripts/receitas-processo.test.ts && tsx scripts/receitas-processo-view.test.ts && tsx scripts/dossie-receita-guard.test.ts && tsx scripts/arquitetura-financeira-guard.test.ts && tsx scripts/forma-pagamento-guard.test.ts && tsx scripts/taxa-pagamento-guard.test.ts && tsx scripts/condicao-regra-guard.test.ts && tsx scripts/condicao-aplicabilidade.test.ts && tsx scripts/charge-calculation.test.ts && tsx scripts/cadastro-mestre-guard.test.ts && tsx scripts/taxa-aplicabilidade.test.ts && tsx scripts/condicao-formas.test.ts && tsx scripts/wizard-multiselect-guard.test.ts",
     "test:receitas-processo": "tsx scripts/receitas-processo.test.ts",
     "guard:db": "tsx scripts/guard-nonprod-db.ts",
     "migrate:test": "npm run guard:db && prisma migrate deploy",
@@ -82,7 +82,10 @@
     "build:prod-migrate": "prisma generate && node scripts/prod-migrate-guard.mjs && next build --turbopack",
     "test:taxas-encargos": "tsx scripts/taxas-encargos.test.ts",
     "test:arquitetura-financeira": "tsx scripts/arquitetura-financeira-guard.test.ts",
-    "test:cadastro-mestre": "tsx scripts/cadastro-mestre-guard.test.ts"
+    "test:cadastro-mestre": "tsx scripts/cadastro-mestre-guard.test.ts",
+    "test:taxa-aplicabilidade": "tsx scripts/taxa-aplicabilidade.test.ts",
+    "test:condicao-formas": "tsx scripts/condicao-formas.test.ts",
+    "test:wizard-multiselect": "tsx scripts/wizard-multiselect-guard.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

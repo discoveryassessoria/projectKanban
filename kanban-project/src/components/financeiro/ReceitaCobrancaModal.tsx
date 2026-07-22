@@ -169,6 +169,31 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
 
   const condicao = cfg?.condicoesPagamento?.find((c: any) => c.id === f.condicaoPagamentoId)
 
+  // Formas que a condição permite (vazio = sem restrição → qualquer forma ativa
+  // compatível). A compatibilidade real (moeda/direção/parcelas/adquirente) é do
+  // backend: aqui só se restringe a lista e se sugere a padrão.
+  const permitidas: number[] = condicao?.formasPermitidas ?? []
+  const formasDisponiveis = React.useMemo(
+    () => (cfg?.formasPagamento ?? []).filter((x: any) => !permitidas.length || permitidas.includes(x.id)),
+    [cfg, condicao], // eslint-disable-line
+  )
+  const [avisoForma, setAvisoForma] = React.useState<string | null>(null)
+
+  // Ao escolher a condição: pré-seleciona a FORMA PADRÃO e descarta uma forma
+  // que a condição não permita (o operador pode trocar por qualquer permitida).
+  React.useEffect(() => {
+    if (!condicao) return
+    const atual = f.formaPagamentoId
+    if (atual && permitidas.length && !permitidas.includes(atual)) {
+      const padrao = condicao.formaPadraoId && permitidas.includes(condicao.formaPadraoId) ? condicao.formaPadraoId : undefined
+      setF((p) => ({ ...p, formaPagamentoId: padrao }))
+      setAvisoForma('A forma escolhida não é permitida por esta condição — selecione uma das formas permitidas.')
+      return
+    }
+    setAvisoForma(null)
+    if (!atual && condicao.formaPadraoId) setF((p) => ({ ...p, formaPagamentoId: condicao.formaPadraoId }))
+  }, [f.condicaoPagamentoId]) // eslint-disable-line
+
   // SIMULAÇÃO oficial no backend (não persiste). Recalcula ao mudar seleção/parcelas/política.
   const simular = React.useCallback(async () => {
     if (!f.formaPagamentoId) return
@@ -264,8 +289,11 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
           {cfg && step === 1 && (<div><label className="mb-1 block text-xs text-white/60">Forma de pagamento</label>
             <select className={sel} value={f.formaPagamentoId ?? ''} onChange={(e) => setF({ ...f, formaPagamentoId: Number(e.target.value) || undefined })}>
               <option value="" className="bg-zinc-900">Selecione</option>
-              {cfg.formasPagamento.map((x: any) => <option key={x.id} value={x.id} className="bg-zinc-900">{x.name}</option>)}
-            </select></div>)}
+              {formasDisponiveis.map((x: any) => <option key={x.id} value={x.id} className="bg-zinc-900">{x.name}{condicao?.formaPadraoId === x.id ? ' · padrão' : ''}</option>)}
+            </select>
+            {avisoForma && <p className="mt-1 text-[11px] text-amber-300/80">{avisoForma}</p>}
+            {!!permitidas.length && <p className="mt-1 text-[11px] text-white/40">Somente as formas permitidas pela condição selecionada.</p>}
+            </div>)}
 
           {cfg && step === 2 && (<div className="space-y-3">
             <div><label className="mb-1 block text-xs text-white/60">Condição de pagamento</label>

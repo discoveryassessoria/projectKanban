@@ -15,7 +15,7 @@ import {
   CalendarClock, Search, Plus, X, Check, ArrowRight, ArrowLeft, Loader2, Pencil, Trash2,
   Tag, Filter, Layers, CalendarRange, CreditCard, Percent, Coins, Scale, Sparkles, GitBranch,
 } from 'lucide-react'
-import { OURO, GLASS, INPUT, jf, toggleArr, Secao, Campo, Select, Toggle, ChipsMulti, MultiSelect, Stepper } from './pagamentoUI'
+import { OURO, GLASS, INPUT, jf, toggleArr, Secao, Campo, Select, Toggle, ChipsMulti, MultiSelect, ModalWizard, Stepper, fecharTodosMultiSelects } from './pagamentoUI'
 import {
   POLITICAS_TAXAS, POLITICAS_TAXAS_LABEL, POLITICAS_CAMBIO, POLITICAS_CAMBIO_LABEL,
   APLICA_A, APLICA_A_LABEL, TIPOS_PAGAMENTO, TIPOS_PAGAMENTO_LABEL, PERIODICIDADES, PERIODICIDADES_LABEL,
@@ -36,7 +36,9 @@ const PASSOS = ['Identificação', 'Aplicabilidade', 'Parcelamento', 'Cronograma
 
 const VAZIO = () => ({
   // `codigo` é somente leitura: o backend gera pelo serviço central e nunca muda.
-  name: '', codigo: '', descricao: '', ativo: true, carteiraId: null as number | null, formaSugeridaId: null as number | null,
+  // `formaPadraoId` é a FORMA PADRÃO (persistida na coluna legada
+  // formaSugeridaId). Só sugestão inicial da cobrança — nunca uma restrição.
+  name: '', codigo: '', descricao: '', ativo: true, carteiraId: null as number | null, formaPadraoId: null as number | null,
   aplicaA: 'AMBOS', vigenciaInicio: '', vigenciaFim: '',
   // Aplicabilidade por ID de cadastro real (nada de texto livre). Vazio = sem restrição.
   moedasIds: [] as number[], paisesIds: [] as number[], modalidadesIds: [] as number[], servicosIds: [] as number[],
@@ -204,18 +206,32 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
     } finally { setSalvando(false) }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 border-b border-white/10 bg-zinc-900/95 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" style={{ color: OURO }} /><h3 className="text-base font-semibold">{editando ? 'Editar condição' : 'Nova condição de pagamento'}</h3></div>
-            <button onClick={onClose} className="text-white/40 transition hover:text-white"><X className="h-4 w-4" /></button>
-          </div>
-          <div className="mt-3"><Stepper passos={PASSOS} atual={step} /></div>
-        </div>
+  // Toda troca de etapa fecha os seletores abertos: nenhum menu sobrevive à
+  // navegação e nenhum resto de camada fica capturando clique.
+  const irPara = (n: number) => { fecharTodosMultiSelects(); setStep(n) }
 
-        <div className="space-y-4 px-6 py-5">
+  return (
+    <ModalWizard
+      onClose={onClose}
+      header={<>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" style={{ color: OURO }} /><h3 className="text-base font-semibold">{editando ? 'Editar condição' : 'Nova condição de pagamento'}</h3></div>
+          <button onClick={() => { fecharTodosMultiSelects(); onClose() }} className="text-white/40 transition hover:text-white"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="mt-3"><Stepper passos={PASSOS} atual={step} /></div>
+      </>}
+      footer={
+        <div className="flex items-center justify-between">
+          <button onClick={() => (step > 1 ? irPara(step - 1) : (fecharTodosMultiSelects(), onClose()))} className="inline-flex items-center gap-1 text-sm text-white/60 transition hover:text-white"><ArrowLeft className="h-4 w-4" /> {step > 1 ? 'Voltar' : 'Cancelar'}</button>
+          {step < PASSOS.length ? (
+            <button onClick={() => { fecharTodosMultiSelects(); if (step === 1 && !f.name.trim()) { setErro('Informe o nome.'); return } setErro(null); setStep(step + 1) }} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
+          ) : (
+            <button onClick={() => salvar(false)} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{salvando ? 'Salvando…' : (editando ? 'Salvar' : 'Criar condição')}</button>
+          )}
+        </div>
+      }
+    >
+      <>
           {erro && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
               {erro}
@@ -235,10 +251,11 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
                   />
                 </Campo>
                 <Campo label="Descrição" wide><input className={INPUT} value={f.descricao} onChange={(e) => set('descricao', e.target.value)} /></Campo>
-                <Campo label="Forma sugerida"><Select value={f.formaSugeridaId ? String(f.formaSugeridaId) : ''} onChange={(v) => set('formaSugeridaId', v ? Number(v) : null)} options={[['', '— nenhuma —'], ...formas.map((x) => [String(x.id), x.name] as [string, string])]} /></Campo>
                 <Campo label="Carteira sugerida"><Select value={f.carteiraId ? String(f.carteiraId) : ''} onChange={(v) => set('carteiraId', v ? Number(v) : null)} options={[['', '— nenhuma —'], ...carteiras.map((x) => [String(x.id), x.nome] as [string, string])]} /></Campo>
               </div>
-              <p className="mt-2 text-[11px] text-white/40">Forma e carteira aqui são apenas <b>sugestões</b>. Na Cobrança o usuário escolhe entre as formas permitidas.</p>
+              {/* O antigo campo único de forma saiu daqui: virou FORMA PADRÃO na
+                  etapa Formas, ao lado das Formas permitidas (conceitos separados). */}
+              <p className="mt-2 text-[11px] text-white/40">A carteira aqui é apenas uma <b>sugestão</b>. As formas de pagamento ficam na etapa <b>Formas</b>.</p>
               <div className="mt-3"><Toggle label="Condição ativa" on={f.ativo} onChange={(v) => set('ativo', v)} /></div>
             </Secao>
           )}
@@ -361,11 +378,51 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
             </Secao>
           )}
 
+          {/*
+            Etapa 5 — DOIS conceitos separados, nunca no mesmo campo:
+              • Formas permitidas: multisseleção. Vazio = sem restrição de forma.
+              • Forma padrão: seleção única, opcional, restrita às permitidas.
+            Uma condição "À vista" permite PIX, Transferência, Dinheiro, Débito e
+            Boleto ao mesmo tempo — sem duplicar a condição por forma.
+          */}
           {step === 5 && (
-            <Secao icon={CreditCard} titulo="Formas de pagamento aceitas" dica="A Condição só informa quais Formas são aceitas. Quem escolhe é a Cobrança.">
-              {formas.length === 0 ? <p className="text-[11px] text-white/35">Nenhuma forma ativa cadastrada.</p> : (
-                <ChipsMulti items={formas.map((x) => ({ id: x.id, label: `${x.icone || ''} ${x.name}`.trim() }))} selecionados={f.formasPermitidas} onToggle={(id) => set('formasPermitidas', toggleArr(f.formasPermitidas, Number(id)))} />
-              )}
+            <Secao icon={CreditCard} titulo="Compatibilidade com formas de pagamento" dica="A Condição só informa quais Formas são aceitas. Quem escolhe é a Cobrança.">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Campo label="Formas permitidas">
+                  <MultiSelect
+                    opcoes={formas.map((x) => ({ id: x.id, label: `${x.icone || ''} ${x.name}`.trim() }))}
+                    selecionados={f.formasPermitidas}
+                    onChange={(ids) => {
+                      // Remover das permitidas a forma que era padrão limpa o
+                      // campo — nunca fica referência inválida gravada.
+                      set('formasPermitidas', ids)
+                      if (f.formaPadraoId && ids.length && !ids.includes(f.formaPadraoId)) set('formaPadraoId', null)
+                    }}
+                    placeholder="Qualquer forma compatível"
+                    dicaVazio="Sem restrição: a cobrança poderá usar qualquer forma ativa compatível."
+                    vazioMsg="Nenhuma forma ativa cadastrada."
+                  />
+                  <p className="mt-1 text-[11px] text-white/35">Selecione todas as formas que poderão ser usadas com esta condição.</p>
+                </Campo>
+                <Campo label="Forma padrão (opcional)">
+                  <Select
+                    value={f.formaPadraoId ? String(f.formaPadraoId) : ''}
+                    onChange={(v) => set('formaPadraoId', v ? Number(v) : null)}
+                    options={[
+                      ['', '— nenhuma —'],
+                      // Restrita às permitidas; sem restrição, qualquer forma ativa.
+                      ...(f.formasPermitidas.length ? formas.filter((x) => f.formasPermitidas.includes(x.id)) : formas)
+                        .map((x) => [String(x.id), `${x.icone || ''} ${x.name}`.trim()] as [string, string]),
+                    ]}
+                  />
+                  <p className="mt-1 text-[11px] text-white/35">Será pré-selecionada na cobrança, mas poderá ser alterada por outra forma permitida.</p>
+                </Campo>
+              </div>
+              <p className="mt-3 text-[11px] text-white/40">
+                A forma padrão será sugerida inicialmente. Na cobrança, o operador poderá escolher qualquer outra forma
+                permitida <b>e compatível</b> — a condição nunca torna válida uma forma incompatível (moeda, direção,
+                parcelamento, adquirente continuam valendo).
+              </p>
             </Secao>
           )}
 
@@ -421,7 +478,8 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
                   ['Pagamento', TIPOS_PAGAMENTO_LABEL[f.tipoPagamento] + (parcela ? ` (${f.parcelasMin}–${f.parcelasMax}, padrão ${f.parcelasPadrao})` : '')],
                   ['Entrada', f.temEntrada ? (f.entradaTipo === 'PERCENTUAL' ? `${f.percentEntrada ?? '—'}%` : `fixo ${f.valorEntradaFixo ?? '—'}`) : 'não'],
                   ['Periodicidade', PERIODICIDADES_LABEL[f.periodicidade]], ['Distribuição', DISTRIBUICOES_LABEL[f.distribuicao]],
-                  ['Formas aceitas', f.formasPermitidas.length ? `${f.formasPermitidas.length}` : 'nenhuma'],
+                  ['Formas permitidas', f.formasPermitidas.length ? `${f.formasPermitidas.length} selecionada(s)` : 'sem restrição'],
+                  ['Forma padrão', formas.find((x) => x.id === f.formaPadraoId)?.name ?? 'nenhuma'],
                   ['Política de taxas', POLITICAS_TAXAS_LABEL[f.politicaTaxas]], ['Câmbio', POLITICAS_CAMBIO_LABEL[f.politicaCambio]],
                 ].map(([l, v], i) => (
                   <div key={i} className="flex justify-between gap-3"><span className="text-white/45">{l}</span><span className="truncate text-right text-white/85">{String(v ?? '—')}</span></div>
@@ -430,18 +488,8 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
               <p className="mt-3 text-[11px] text-white/40">Ao salvar, o motor usará esta regra para gerar Cobranças. Ela nunca congela dados da Cobrança.</p>
             </Secao>
           )}
-        </div>
-
-        <div className="sticky bottom-0 flex items-center justify-between border-t border-white/10 bg-zinc-900/95 px-6 py-4">
-          <button onClick={() => (step > 1 ? setStep(step - 1) : onClose())} className="inline-flex items-center gap-1 text-sm text-white/60 transition hover:text-white"><ArrowLeft className="h-4 w-4" /> {step > 1 ? 'Voltar' : 'Cancelar'}</button>
-          {step < PASSOS.length ? (
-            <button onClick={() => { if (step === 1 && !f.name.trim()) { setErro('Informe o nome.'); return } setErro(null); setStep(step + 1) }} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
-          ) : (
-            <button onClick={() => salvar(false)} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{salvando ? 'Salvando…' : (editando ? 'Salvar' : 'Criar condição')}</button>
-          )}
-        </div>
-      </div>
-    </div>
+      </>
+    </ModalWizard>
   )
 }
 
@@ -451,7 +499,8 @@ function mapear(c: any): Form {
   return {
     ...v,
     name: c.name || '', codigo: c.codigo || '', descricao: c.descricao || '', ativo: c.ativo ?? true,
-    carteiraId: c.carteiraId ?? null, formaSugeridaId: c.formaSugeridaId ?? null,
+    // Forma padrão: persistida na coluna legada `formaSugeridaId`.
+    carteiraId: c.carteiraId ?? null, formaPadraoId: c.formaPadraoId ?? c.formaSugeridaId ?? null,
     aplicaA: c.aplicaA || 'AMBOS', vigenciaInicio: c.vigenciaInicio || '', vigenciaFim: c.vigenciaFim || '',
     // Aplicabilidade vem SEMPRE dos vínculos reais (nunca dos arrays legados).
     moedasIds: (c.moedasVinculadas || []).map((x: any) => x.moedaId),

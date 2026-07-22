@@ -47,10 +47,14 @@ export async function montarECalcular(e: EntradaRuntime): Promise<SaidaRuntime |
   if (e.condicaoPagamentoId) {
     const cond = await prisma.condicaoPagamento.findUnique({
       where: { id: Number(e.condicaoPagamentoId) },
-      include: { taxasVinculadas: { include: { taxa: true } } },
+      include: { taxasVinculadas: { include: { taxa: true } }, formasPermitidas: { select: { formaId: true } } },
     })
     if (!cond) return { erro: 'Condição de pagamento inválida', status: 400 }
     condicaoView = JSON.parse(JSON.stringify(cond)) // Decimals→string, Dates→ISO
+    // Formas permitidas (vazio = sem restrição) e Forma PADRÃO (só sugestão —
+    // a coluna legada formaSugeridaId é a FK da forma padrão).
+    condicaoView.formasPermitidasIds = cond.formasPermitidas.map((x) => x.formaId)
+    condicaoView.formaPadraoId = cond.formaSugeridaId ?? null
     condMeta = { id: cond.id, versao: cond.versao, codigo: cond.codigo }
     taxaCandidatas = cond.taxasVinculadas.map((v) => taxaParaCandidata(JSON.parse(JSON.stringify(v.taxa))))
   }

@@ -2370,6 +2370,7 @@ model MoedaCadastro {
   atualizadoEm DateTime @updatedAt
 
   condicoesPagamento CondicaoPagamentoMoeda[]
+  taxasPagamento     TaxaPagamentoMoeda[]
 }
 
 // FORMA DE PAGAMENTO — cadastro do MEIO utilizado (PIX, boleto, cartão, Stripe…).
@@ -2514,7 +2515,44 @@ model TaxaPagamento {
 
   condicoes CondicaoPagamentoTaxa[]
 
+  // Aplicabilidade por RELACIONAMENTO REAL (fonte da verdade da tela e da API).
+  // `paises` e `moedasAplicaveis` (arrays de texto acima) continuam gravados como
+  // PROJEÇÃO derivada destes vínculos — o motor (candidataElegivel) segue intacto.
+  moedasVinculadas TaxaPagamentoMoeda[]
+  paisesPermitidos TaxaPagamentoPais[]
+
   @@index([ativo, prioridade])
+}
+
+// ── Aplicabilidade da Taxa por RELACIONAMENTO REAL (N:N) ────────────────────
+// Substituem os campos de texto livre ("BRL, EUR" / "BR, PT") da etapa
+// "Aplicabilidade". Nada é digitado: só se seleciona o que existe no cadastro.
+// Vazio = SEM RESTRIÇÃO. Serviço permanece em `servicos Int[]` (já são IDs reais
+// de ServicoProduto — array de IDs, nunca CSV).
+model TaxaPagamentoMoeda {
+  id       Int           @id @default(autoincrement())
+  taxaId   Int
+  taxa     TaxaPagamento @relation(fields: [taxaId], references: [id], onDelete: Cascade)
+  moedaId  Int
+  moeda    MoedaCadastro @relation(fields: [moedaId], references: [id], onDelete: Cascade)
+  criadoEm DateTime      @default(now())
+
+  @@unique([taxaId, moedaId])
+  @@index([taxaId])
+  @@index([moedaId])
+}
+
+model TaxaPagamentoPais {
+  id       Int           @id @default(autoincrement())
+  taxaId   Int
+  taxa     TaxaPagamento @relation(fields: [taxaId], references: [id], onDelete: Cascade)
+  paisId   Int
+  pais     CatalogoPais  @relation(fields: [paisId], references: [id], onDelete: Cascade)
+  criadoEm DateTime      @default(now())
+
+  @@unique([taxaId, paisId])
+  @@index([taxaId])
+  @@index([paisId])
 }
 
 // ============================================================
@@ -2560,6 +2598,7 @@ model CatalogoPais {
   atualizadoEm     DateTime @updatedAt
 
   condicoesPagamento CondicaoPagamentoPais[]
+  taxasPagamento     TaxaPagamentoPais[]
 }
 
 model ModalidadePais {

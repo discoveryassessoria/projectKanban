@@ -155,9 +155,12 @@ sec('4 — interface: apenas selecionável, blocos, sem Perfil/Canal')
 
   const ui = readFileSync(join(RAIZ, 'src/components/gerenciamentoComponents/pagamentoUI.tsx'), 'utf8')
   ok('MultiSelect existe no shell', ui.includes('export function MultiSelect'))
-  ok('MultiSelect não tem input de texto/busca', !/MultiSelect[\s\S]*?<input/.test(ui.slice(ui.indexOf('export function MultiSelect'), ui.indexOf('/** Trilha de passos'))))
+  // A busca do MultiSelect é OPT-IN (`busca`) e filtra apenas a lista de opções
+  // — nunca cria valor. A Condição não a ativa: aqui nada é digitado.
+  ok('MultiSelect só filtra a lista quando busca={true}', ui.includes('busca = false') && ui.includes('if (!busca || !q) return opcoes'))
+  ok('Condição não ativa busca em nenhum seletor', !/<MultiSelect[\s\S]{0,400}?\bbusca\b/.test(tabRaw))
   ok('MultiSelect abre lista de opções', ui.includes('role="listbox"') && ui.includes('aria-multiselectable'))
-  ok('MultiSelect fecha ao clicar fora', ui.includes('mousedown') && ui.includes('contains(e.target'))
+  ok('MultiSelect fecha ao clicar fora', ui.includes("addEventListener('mousedown', fora)") && ui.includes('contains(alvo)'))
   ok('MultiSelect funciona por teclado', ui.includes("'ArrowDown'") && ui.includes("'Escape'") && ui.includes("e.key === 'Enter'"))
   ok('MultiSelect exibe chips removíveis', ui.includes('Remover ${o.label}'))
   ok('MultiSelect não duplica', ui.includes('selecionados.includes(oid)'))
