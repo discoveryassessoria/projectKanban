@@ -31,6 +31,7 @@ export const CODE_PREFIX = {
   APOSTILLE: 'APO',
   ORGANIZATION: 'ORG',
   USER: 'USR',
+  PAYMENT_METHOD: 'FPG', // Forma de Pagamento (cadastro do meio)
 } as const
 
 export type EntidadeCodigo = keyof typeof CODE_PREFIX | 'PROCESS'

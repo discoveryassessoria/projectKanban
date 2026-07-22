@@ -26,11 +26,13 @@ const ADITIVAS = [
   '20260729000000_condicao_regra_reutilizavel',
   '20260730000000_forma_pagamento_capacidades',
   '20260731000000_taxa_pagamento_regra_reutilizavel',
+  '20260732000000_forma_pagamento_uso_e_codigo',
 ]
 
 // Colunas-sentinela p/ verificação pós-aplicação.
 const SENTINELAS = [
-  ['FormaPagamentoCadastro', ['moedasAceitas', 'tipoIntegracao', 'prazoLiquidacao', 'carteirasCompativeis']],
+  ['FormaPagamentoCadastro', ['moedasAceitas', 'tipoIntegracao', 'prazoLiquidacao', 'carteirasCompativeis', 'minParcelas', 'exigeAdquirente', 'usoRecebimento', 'usoPagamento']],
+  ['MoedaCadastro', ['ativo']],
   ['CondicaoPagamento', ['politicaTaxas', 'formaSugeridaId', 'servicos', 'entradaTipo']],
   ['TaxaPagamento', ['formasAplicaveis', 'aplicaParcela', 'anticipationType', 'momentoCambio']],
 ]

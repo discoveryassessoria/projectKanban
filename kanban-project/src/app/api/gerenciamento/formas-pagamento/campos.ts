@@ -33,8 +33,14 @@ export function validarForma(b: Record<string, unknown>): ErroForma[] {
   if (!b.name || !String(b.name).trim()) erros.push({ campo: 'name', mensagem: 'Informe o nome.' })
   const parcela = bool(b.permiteParcelas)
   const max = int(b.maxParcelas)
+  const min = int(b.minParcelas)
   if (parcela && max !== null && max < 1) erros.push({ campo: 'maxParcelas', mensagem: 'Máximo técnico deve ser ≥ 1.' })
   if (!parcela && max !== null && max > 1) erros.push({ campo: 'maxParcelas', mensagem: 'Sem parcelamento, o máximo técnico é 1.' })
+  if (min !== null && min < 1) erros.push({ campo: 'minParcelas', mensagem: 'Mínimo técnico deve ser ≥ 1.' })
+  if (min !== null && max !== null && min > max) erros.push({ campo: 'minParcelas', mensagem: 'Mínimo técnico não pode ser maior que o máximo.' })
+  if (!bool(b.usoRecebimento, true) && !bool(b.usoPagamento, true)) {
+    erros.push({ campo: 'usoRecebimento', mensagem: 'A forma deve servir a recebimentos, a pagamentos, ou a ambos.' })
+  }
   const moedas = listaStr(b.moedasAceitas)
   if (moedas.length === 0 && !str(b.moeda, 10)) erros.push({ campo: 'moedasAceitas', mensagem: 'Selecione ao menos uma moeda aceita.' })
   if (bool(b.integracaoAtiva) && !str(b.provedorIntegracao, 120)) {
@@ -43,12 +49,15 @@ export function validarForma(b: Record<string, unknown>): ErroForma[] {
   return erros
 }
 
-/** Body → colunas. Só campos conhecidos são gravados. */
+/**
+ * Body → colunas. Só campos conhecidos são gravados.
+ * `code` NÃO está aqui de propósito: é gerado pelo CodeGeneratorService na criação
+ * e é IMUTÁVEL — nem POST nem PUT aceitam código vindo do cliente.
+ */
 export function paraColunasForma(b: Record<string, unknown>) {
   const parcela = bool(b.permiteParcelas)
   return {
     // identificação
-    code: str(b.code, 40),
     name: String(b.name).trim().slice(0, 200),
     type: enumOu(b.type, TIPOS_FORMA) ?? str(b.type, 30), // aceita legado string livre
     descricao: str(b.descricao, 300),
@@ -64,7 +73,13 @@ export function paraColunasForma(b: Record<string, unknown>) {
 
     // parcelamento (só limite TÉCNICO)
     permiteParcelas: parcela,
+    minParcelas: int(b.minParcelas) ?? 1,
     maxParcelas: parcela ? int(b.maxParcelas) : null,
+
+    // direção de uso e exigência de adquirente
+    exigeAdquirente: bool(b.exigeAdquirente),
+    usoRecebimento: bool(b.usoRecebimento, true),
+    usoPagamento: bool(b.usoPagamento, true),
 
     // capacidades do meio
     aceitaEntrada: bool(b.aceitaEntrada),

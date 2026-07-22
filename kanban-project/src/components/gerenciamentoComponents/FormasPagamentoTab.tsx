@@ -26,7 +26,8 @@ type MoedaRef = { id: number; code: string; name: string | null }
 type DestinoRef = { id: number; nome: string; moeda: string }
 type Forma = {
   id: number; code: string | null; name: string; type: string | null; descricao: string | null; categoria: string | null
-  moeda: string | null; moedasAceitas: string[]; permiteParcelas: boolean; maxParcelas: number | null
+  moeda: string | null; moedasAceitas: string[]; permiteParcelas: boolean; minParcelas: number | null; maxParcelas: number | null
+  exigeAdquirente: boolean; usoRecebimento: boolean; usoPagamento: boolean
   ativo: boolean; ordem: number; icone: string | null; observacoes: string | null
   aceitaEntrada: boolean; aceitaRecorrencia: boolean; aceitaMoedaEstrangeira: boolean
   permiteCancelamento: boolean; permiteEstorno: boolean; permiteReembolso: boolean; permiteInternacional: boolean
@@ -40,7 +41,9 @@ type Forma = {
 
 const VAZIO = (): Omit<Forma, 'id'> => ({
   code: '', name: '', type: '', descricao: '', categoria: null, moeda: null, moedasAceitas: [],
-  permiteParcelas: false, maxParcelas: null, ativo: true, ordem: 0, icone: '', observacoes: '',
+  permiteParcelas: false, minParcelas: 1, maxParcelas: null,
+  exigeAdquirente: false, usoRecebimento: true, usoPagamento: true,
+  ativo: true, ordem: 0, icone: '', observacoes: '',
   aceitaEntrada: false, aceitaRecorrencia: false, aceitaMoedaEstrangeira: false,
   permiteCancelamento: false, permiteEstorno: false, permiteReembolso: false, permiteInternacional: false,
   liquidacaoAutomatica: false, conciliacaoAutomatica: false, permiteComprovante: false,
@@ -207,7 +210,7 @@ function FormaPanel({ f, set, editId, moedas, carteiras, contas, salvando, erro,
           <Secao icon={CreditCard} titulo="Identificação">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Campo label="Nome *"><input className={input} value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Pix" autoFocus /></Campo>
-              <Campo label="Código"><input className={input} value={f.code ?? ''} onChange={(e) => set('code', e.target.value)} placeholder="PIX-BR" /></Campo>
+              <Campo label="Código"><input className={`${input} cursor-not-allowed opacity-60`} value={f.code ?? ''} readOnly disabled placeholder={editId ? '' : 'gerado automaticamente'} title="Código público gerado pelo sistema — imutável." /></Campo>
               <Campo label="Tipo"><Select value={f.type ?? ''} onChange={(v) => set('type', v)} options={[['', '— selecione —'], ...TIPOS_FORMA.map((t) => [t, TIPOS_FORMA_LABEL[t]] as [string, string])]} /></Campo>
               <Campo label="Categoria"><Select value={f.categoria ?? ''} onChange={(v) => set('categoria', v || null)} options={[['', '— opcional —'], ...CATEGORIAS_FORMA.map((c) => [c, CATEGORIAS_FORMA_LABEL[c]] as [string, string])]} /></Campo>
               <Campo label="Descrição curta" wide><input className={input} value={f.descricao ?? ''} onChange={(e) => set('descricao', e.target.value)} placeholder="Ex.: Pix instantâneo, chave CNPJ" /></Campo>
@@ -227,10 +230,18 @@ function FormaPanel({ f, set, editId, moedas, carteiras, contas, salvando, erro,
           {/* Capacidades + parcelamento */}
           <Secao icon={Settings2} titulo="Capacidades do meio" dica="Só o que o MEIO suporta. Quantidade comercial de parcelas, entrada e cronograma pertencem à Condição de Pagamento — aqui vai apenas o limite técnico.">
             <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
-              <Toggle label="Suporta parcelamento" on={f.permiteParcelas} onChange={(v) => { set('permiteParcelas', v); if (!v) set('maxParcelas', null) }} />
-              {f.permiteParcelas && (
+              <Toggle label="Suporta parcelamento" on={f.permiteParcelas} onChange={(v) => { set('permiteParcelas', v); if (!v) { set('maxParcelas', null); set('minParcelas', 1) } }} />
+              {f.permiteParcelas && (<>
+                <label className="flex items-center gap-2 text-sm text-white/70">Mín. técnico<input type="number" min={1} className="w-20 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-sm text-white outline-none focus:border-white/30" value={f.minParcelas ?? ''} onChange={(e) => set('minParcelas', e.target.value === '' ? null : Number(e.target.value))} placeholder="1" /></label>
                 <label className="flex items-center gap-2 text-sm text-white/70">Máx. técnico<input type="number" min={1} className="w-20 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-sm text-white outline-none focus:border-white/30" value={f.maxParcelas ?? ''} onChange={(e) => set('maxParcelas', e.target.value === '' ? null : Number(e.target.value))} placeholder="12" /></label>
-              )}
+              </>)}
+            </div>
+
+            {/* Direção de uso — a forma serve a entradas, saídas, ou ambas. */}
+            <div className="mb-3 grid grid-cols-1 gap-x-6 gap-y-2 rounded-lg border border-white/10 bg-white/[0.03] p-3 sm:grid-cols-2">
+              <Toggle label="Usar em recebimentos" on={f.usoRecebimento} onChange={(v) => set('usoRecebimento', v)} />
+              <Toggle label="Usar em pagamentos" on={f.usoPagamento} onChange={(v) => set('usoPagamento', v)} />
+              <Toggle label="Exige adquirente" on={f.exigeAdquirente} onChange={(v) => set('exigeAdquirente', v)} />
             </div>
             <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
               <Toggle label="Aceita entrada" on={f.aceitaEntrada} onChange={(v) => set('aceitaEntrada', v)} />

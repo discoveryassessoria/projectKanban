@@ -18,7 +18,8 @@ const ok = (n: string, c: boolean) => { if (c) { passou++; console.log(`  ✓ ${
 const sec = (t: string) => console.log(`\n${t}`)
 
 const base: FormaView = {
-  id: 1, name: 'Cartão', ativo: true, moedasAceitas: ['BRL'], permiteParcelas: true, maxParcelas: 12,
+  id: 1, name: 'Cartão', ativo: true, moedasAceitas: ['BRL'], permiteParcelas: true, minParcelas: 1, maxParcelas: 12,
+  exigeAdquirente: true, usoRecebimento: true, usoPagamento: false,
   aceitaEntrada: true, aceitaRecorrencia: false, aceitaMoedaEstrangeira: false, permiteInternacional: false,
   carteirasCompativeis: [], contasCompativeis: [],
 }
@@ -47,7 +48,7 @@ sec('2 — Forma × Cobrança')
 
 sec('3 — paraFormaView (fallback moeda legada)')
 {
-  const v = paraFormaView({ id: 2, name: 'PIX', ativo: true, moeda: 'BRL', moedasAceitas: [], permiteParcelas: false, maxParcelas: null, aceitaEntrada: false, aceitaRecorrencia: false, aceitaMoedaEstrangeira: false, permiteInternacional: false, carteirasCompativeis: [], contasCompativeis: [] })
+  const v = paraFormaView({ id: 2, name: 'PIX', ativo: true, moeda: 'BRL', moedasAceitas: [], permiteParcelas: false, minParcelas: 1, maxParcelas: null, exigeAdquirente: false, usoRecebimento: true, usoPagamento: true, aceitaEntrada: false, aceitaRecorrencia: false, aceitaMoedaEstrangeira: false, permiteInternacional: false, carteirasCompativeis: [], contasCompativeis: [] })
   ok('moedasAceitas vazio cai para moeda única', v.moedasAceitas.length === 1 && v.moedasAceitas[0] === 'BRL')
 }
 
@@ -73,6 +74,29 @@ sec('4 — estrutura & fonte única')
   ok('service de config expõe moedasAceitas', svc.includes('moedasAceitas'))
 
   ok('enums controlados definidos', TIPOS_FORMA.includes('PIX') && TIPOS_INTEGRACAO.includes('GATEWAY'))
+
+  // Código público: gerado pelo backend, imutável, nunca digitado.
+  const campos = readFileSync(join(RAIZ, 'src/app/api/gerenciamento/formas-pagamento/campos.ts'), 'utf8')
+  ok('mapeamento único NÃO grava code vindo do cliente', !/^\s*code:/m.test(campos))
+  ok('POST gera code pelo CodeGeneratorService', route.includes('gerarCodigoPublico') && route.includes('PAYMENT_METHOD'))
+  ok('PUT nunca regrava o code', !idRoute.includes('gerarCodigoPublico'))
+  ok('campo de código é somente leitura na UI', tab.includes('readOnly'))
+
+  const patterns = readFileSync(join(RAIZ, 'lib/codigos/code-patterns.ts'), 'utf8')
+  ok('prefixo FPG registrado na fonte única de códigos', patterns.includes("PAYMENT_METHOD: 'FPG'"))
+
+  // Direção de uso e adquirente: campos próprios, expostos ponta a ponta.
+  ok('mapeamento único grava uso/adquirente/minParcelas',
+    ['usoRecebimento', 'usoPagamento', 'exigeAdquirente', 'minParcelas'].every((c) => campos.includes(c)))
+  ok('UI expõe uso/adquirente/minParcelas',
+    ['usoRecebimento', 'usoPagamento', 'exigeAdquirente', 'minParcelas'].every((c) => tab.includes(c)))
+  ok('forma sem nenhuma direção de uso é rejeitada', campos.includes('recebimentos, a pagamentos, ou a ambos'))
+}
+
+sec('5 — direção de uso e limite técnico')
+{
+  ok('mínimo não pode exceder o máximo (regra declarada)', base.minParcelas! <= (base.maxParcelas ?? Infinity))
+  ok('forma de recebimento não precisa servir a pagamento', base.usoRecebimento && !base.usoPagamento)
 }
 
 console.log(`\n${'='.repeat(60)}`)

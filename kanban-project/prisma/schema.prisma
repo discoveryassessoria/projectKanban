@@ -2278,6 +2278,7 @@ model MoedaCadastro {
   code         String   @unique @db.VarChar(10)
   name         String?  @db.VarChar(100)
   symbol       String?  @db.VarChar(10)
+  ativo        Boolean  @default(true)
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 }
@@ -2312,6 +2313,18 @@ model FormaPagamentoCadastro {
 
   // Moedas aceitas (multi) — substitui a `moeda` única (preservada p/ backfill).
   moedasAceitas String[] @default([]) // codes de MoedaCadastro (BRL/EUR/USD/GBP...)
+
+  // Limite técnico inferior do parcelamento (par de maxParcelas). Regra comercial
+  // de quantas parcelas cobrar continua sendo da Condição de Pagamento.
+  minParcelas Int? @default(1)
+
+  // Exige adquirente/credenciadora para operar (cartões). Distinto de
+  // `tipoIntegracao = ADQUIRENTE`, que descreve COMO integra, não se EXIGE.
+  exigeAdquirente Boolean @default(false)
+
+  // Direção de uso do meio: entra dinheiro, sai dinheiro, ou ambos.
+  usoRecebimento Boolean @default(true)
+  usoPagamento   Boolean @default(true)
 
   // Capacidades do meio (flags independentes)
   permiteCancelamento   Boolean @default(false)

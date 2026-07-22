@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "prebuild": "node scripts/gerar-manifesto-ambiente.mjs",
-    "build": "prisma generate && node scripts/prod-migrate-guard.mjs && node scripts/prod-apply-cadastros-aditivas.mjs && next build --turbopack",
+    "build": "prisma generate && node scripts/prod-migrate-guard.mjs && node scripts/prod-apply-cadastros-aditivas.mjs && node scripts/prod-seed-formas-pagamento.mjs && next build --turbopack",
     "start": "next start",
     "seed": "tsx prisma/seed.ts",
     "test:cp-sec": "tsx scripts/cp-sec.test.ts",

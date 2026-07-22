@@ -11,7 +11,11 @@ export interface FormaView {
   ativo: boolean
   moedasAceitas: string[]
   permiteParcelas: boolean
+  minParcelas: number | null
   maxParcelas: number | null
+  exigeAdquirente: boolean
+  usoRecebimento: boolean
+  usoPagamento: boolean
   aceitaEntrada: boolean
   aceitaRecorrencia: boolean
   aceitaMoedaEstrangeira: boolean
@@ -98,14 +102,16 @@ export function validarCompatibilidadeCobranca(forma: FormaView, ctx: ContextoCo
 
 export function paraFormaView(f: {
   id: number; name: string; ativo: boolean; moeda: string | null; moedasAceitas: string[]
-  permiteParcelas: boolean; maxParcelas: number | null; aceitaEntrada: boolean
+  permiteParcelas: boolean; minParcelas: number | null; maxParcelas: number | null
+  exigeAdquirente: boolean; usoRecebimento: boolean; usoPagamento: boolean; aceitaEntrada: boolean
   aceitaRecorrencia: boolean; aceitaMoedaEstrangeira: boolean; permiteInternacional: boolean
   carteirasCompativeis: number[]; contasCompativeis: number[]
 }): FormaView {
   const moedas = f.moedasAceitas?.length ? f.moedasAceitas : (f.moeda ? [f.moeda] : [])
   return {
     id: f.id, name: f.name, ativo: f.ativo, moedasAceitas: moedas,
-    permiteParcelas: f.permiteParcelas, maxParcelas: f.maxParcelas,
+    permiteParcelas: f.permiteParcelas, minParcelas: f.minParcelas ?? 1, maxParcelas: f.maxParcelas,
+    exigeAdquirente: f.exigeAdquirente, usoRecebimento: f.usoRecebimento, usoPagamento: f.usoPagamento,
     aceitaEntrada: f.aceitaEntrada, aceitaRecorrencia: f.aceitaRecorrencia,
     aceitaMoedaEstrangeira: f.aceitaMoedaEstrangeira, permiteInternacional: f.permiteInternacional,
     carteirasCompativeis: f.carteirasCompativeis ?? [], contasCompativeis: f.contasCompativeis ?? [],
