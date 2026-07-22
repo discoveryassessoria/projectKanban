@@ -7,7 +7,8 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 // FONTE ÚNICA do mapeamento modo → unidade (compartilhada com a API).
-import { MODOS_CALCULO, rotuloModo, rotuloUnidadeCobranca, estrategiaUsaPrimeiroAdicional, estrategiaUsaFaixaQuantidade } from '@/lib/financeiro/modo-calculo'
+import { ESTRATEGIAS_CALCULO, rotuloEstrategia, estrategiaDoModo, estrategiaUsaPrimeiroAdicional, estrategiaUsaFaixaQuantidade } from '@/lib/financeiro/modo-calculo'
+import { UNIDADES_COBRANCA_OPCOES, rotuloUnidade, rotuloUnidadeMinuscula } from '@/lib/financeiro/unidade-cobranca'
 
 type ConfigRef = { id: number; publicCode: string | null; possuiCusto: boolean; possuiReceita: boolean; origem: string; mestre: string; label: string; moedaPadrao: string }
 type FornecedorRef = { id: number; nome: string; publicCode?: string | null }
@@ -74,6 +75,17 @@ const fmtData = (iso: string | null) => {
   const [y, m, d] = iso.split('-')
   return y && m && d ? `${d}/${m}/${y}` : iso
 }
+// Rótulos DERIVADOS da combinação estratégia × unidade (nunca do nome do serviço):
+//  • primeiro+adic → "Primeiro <unidade>" / "<Unidade> adicional"
+//  • por unidade   → "Valor por <unidade>"  • fixo → "Valor fixo"  • faixa → "Valor aplicável"
+const rotuloPrimeiro = (u: string) => `Primeiro ${rotuloUnidadeMinuscula(u)}`
+const rotuloAdicional = (u: string) => `${rotuloUnidade(u)} adicional`
+const rotuloValorUnico = (modo: string, u: string) => {
+  const est = estrategiaDoModo(modo)
+  if (est === 'fixo') return 'Valor fixo'
+  if (est === 'faixa') return 'Valor aplicável'
+  return u ? `Valor por ${rotuloUnidadeMinuscula(u)}` : 'Valor unitário'
+}
 
 const EMPTY = {
   categoria: '', // filtro de navegação (origem estrutural) — NÃO enviado no payload
@@ -83,9 +95,10 @@ const EMPTY = {
   // Custo: fornecedor + moeda + valor. Venda: moeda + valor (registros independentes).
   fornecedorId: '', moeda: '', valor: '',
   moedaVenda: '', valorVenda: '',
-  // PRIMEIRO (base) + ADICIONAL — só em modo que multiplica por quantidade (ex.: por requerente).
+  // PRIMEIRO (base) + ADICIONAL — só na estratégia "Primeiro + adicionais".
   valorBase: '', valorAdicional: '', valorBaseVenda: '', valorAdicionalVenda: '',
-  modoCalculo: 'fixed', quantidadeMinima: '', quantidadeMaxima: '',
+  // Estratégia de cálculo (modoCalculo canônico) + Unidade de cobrança (o que se conta).
+  modoCalculo: 'fixed', unidade: '', quantidadeMinima: '', quantidadeMaxima: '',
   // Prioridade saiu da UI (não há mais múltiplas tabelas válidas p/ o mesmo contexto).
   // Persistida sempre como 0 no backend — mantida no schema por compatibilidade.
   vigenciaInicio: '', vigenciaFim: '', arquivado: false,
@@ -167,9 +180,10 @@ export default function TabelaValoresTab() {
       valorBase: ehVenda ? '' : baseStr, valorAdicional: ehVenda ? '' : adicStr,
       valorBaseVenda: ehVenda ? baseStr : '', valorAdicionalVenda: ehVenda ? adicStr : '',
       modoCalculo: i.modoCalculo || 'fixed',
-      // unidade é DERIVADA do modo (não editável); qtd só faz sentido em modos != fixed.
-      quantidadeMinima: i.modoCalculo && i.modoCalculo !== 'fixed' && i.quantidadeMinima != null ? String(i.quantidadeMinima) : '',
-      quantidadeMaxima: i.modoCalculo && i.modoCalculo !== 'fixed' && i.quantidadeMaxima != null ? String(i.quantidadeMaxima) : '',
+      // Unidade de cobrança é ESCOLHIDA (normaliza legado lowercase → enum). qtd só na faixa.
+      unidade: i.unidade ? String(i.unidade).toUpperCase() : '',
+      quantidadeMinima: estrategiaUsaFaixaQuantidade(i.modoCalculo) && i.quantidadeMinima != null ? String(i.quantidadeMinima) : '',
+      quantidadeMaxima: estrategiaUsaFaixaQuantidade(i.modoCalculo) && i.quantidadeMaxima != null ? String(i.quantidadeMaxima) : '',
       vigenciaInicio: i.vigenciaInicio || '', vigenciaFim: i.vigenciaFim || '',
       arquivado: i.arquivado,
     })
@@ -183,21 +197,29 @@ export default function TabelaValoresTab() {
     // "Válido a partir de" é obrigatório (início da validade comercial).
     if (!form.vigenciaInicio) { setErroModal('Informe "Válido a partir de".'); return }
     if (form.vigenciaFim && form.vigenciaInicio > form.vigenciaFim) { setErroModal('"Válido até" deve ser igual ou posterior a "Válido a partir de".'); return }
-    // Estratégia "Primeiro requerente + Requerente adicional" → cobra base + adicional.
+    // Estratégias derivam do modoCalculo (fonte única).
     const usaBaseAdic = estrategiaUsaPrimeiroAdicional(form.modoCalculo)
+    const usaFaixa = estrategiaUsaFaixaQuantidade(form.modoCalculo)
+    const ehFixo = estrategiaDoModo(form.modoCalculo) === 'fixo'
+    // Unidade de cobrança: obrigatória fora do "Preço fixo".
+    if (!ehFixo && !form.unidade) { setErroModal('Selecione a Unidade de cobrança.'); return }
+    if (usaFaixa) {
+      if (form.quantidadeMinima === '' || Number(form.quantidadeMinima) < 0) { setErroModal('Informe a Quantidade mínima da faixa.'); return }
+      if (form.quantidadeMaxima !== '' && Number(form.quantidadeMaxima) < Number(form.quantidadeMinima)) { setErroModal('Quantidade máxima deve ser ≥ mínima.'); return }
+    }
     if (form.precoCusto) {
       if (!form.moeda) { setErroModal('Selecione a moeda do custo.'); return }
       if (usaBaseAdic) {
-        if (form.valorBase === '' || Number(form.valorBase) <= 0) { setErroModal('Primeiro requerente (custo) deve ser maior que zero.'); return }
-        if (form.valorAdicional === '' || Number(form.valorAdicional) < 0) { setErroModal('Requerente adicional (custo) não pode ser vazio ou negativo.'); return }
-      } else if (form.valor === '' || Number(form.valor) <= 0) { setErroModal('Valor de custo deve ser maior que zero.'); return }
+        if (form.valorBase === '' || Number(form.valorBase) <= 0) { setErroModal(`${rotuloPrimeiro(form.unidade)} (custo) deve ser maior que zero.`); return }
+        if (form.valorAdicional === '' || Number(form.valorAdicional) < 0) { setErroModal(`${rotuloAdicional(form.unidade)} (custo) não pode ser vazio ou negativo.`); return }
+      } else if (form.valor === '' || Number(form.valor) <= 0) { setErroModal(`${rotuloValorUnico(form.modoCalculo, form.unidade)} (custo) deve ser maior que zero.`); return }
     }
     if (form.precoVenda) {
       if (!form.moedaVenda) { setErroModal('Selecione a moeda da venda.'); return }
       if (usaBaseAdic) {
-        if (form.valorBaseVenda === '' || Number(form.valorBaseVenda) <= 0) { setErroModal('Primeiro requerente (venda) deve ser maior que zero.'); return }
-        if (form.valorAdicionalVenda === '' || Number(form.valorAdicionalVenda) < 0) { setErroModal('Requerente adicional (venda) não pode ser vazio ou negativo.'); return }
-      } else if (form.valorVenda === '' || Number(form.valorVenda) <= 0) { setErroModal('Valor de venda deve ser maior que zero.'); return }
+        if (form.valorBaseVenda === '' || Number(form.valorBaseVenda) <= 0) { setErroModal(`${rotuloPrimeiro(form.unidade)} (venda) deve ser maior que zero.`); return }
+        if (form.valorAdicionalVenda === '' || Number(form.valorAdicionalVenda) < 0) { setErroModal(`${rotuloAdicional(form.unidade)} (venda) não pode ser vazio ou negativo.`); return }
+      } else if (form.valorVenda === '' || Number(form.valorVenda) <= 0) { setErroModal(`${rotuloValorUnico(form.modoCalculo, form.unidade)} (venda) deve ser maior que zero.`); return }
     }
     setSalvando(true); setErroModal(null)
     try {
@@ -266,7 +288,7 @@ export default function TabelaValoresTab() {
         <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5 backdrop-blur">
           <table className="w-full text-[13px]">
             <thead><tr className="bg-white/5">
-              {['Cadastro mestre', 'Origem', 'Papel', 'Fornecedor', 'Modo', 'Preço', 'Vigência', 'Status', ''].map((h, idx) => (
+              {['Cadastro mestre', 'Origem', 'Papel', 'Fornecedor', 'Estratégia', 'Preço', 'Vigência', 'Status', ''].map((h, idx) => (
                 <th key={idx} className={`border-b border-white/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${idx === 5 || idx === 8 ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr></thead>
@@ -279,14 +301,26 @@ export default function TabelaValoresTab() {
                     <td className="px-3 py-2.5 text-white/60">{om.origem}</td>
                     <td className="px-3 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${i.natureza === 'CUSTO' ? 'bg-amber-500/15 text-amber-300' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-white/50'}`}>{i.natureza === 'CUSTO' ? 'Custo' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'Venda' : '—'}</span></td>
                     <td className="px-3 py-2.5 text-white/70">{i.fornecedor ? `${i.fornecedor.publicCode ? i.fornecedor.publicCode + ' — ' : ''}${i.fornecedor.nome}` : '—'}</td>
-                    <td className="px-3 py-2.5 text-white/60">{rotuloModo(i.modoCalculo)}</td>
+                    <td className="px-3 py-2.5 text-white/60">
+                      <span className="inline-flex flex-col leading-tight">
+                        <span>{rotuloEstrategia(i.modoCalculo)}</span>
+                        {i.unidade && <span className="text-[11px] text-white/40">{rotuloUnidade(i.unidade)}</span>}
+                      </span>
+                    </td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-white/90">
-                      {i.valorBase != null && i.valorAdicional != null ? (
+                      {estrategiaUsaPrimeiroAdicional(i.modoCalculo) && i.valorBase != null && i.valorAdicional != null ? (
                         <span className="inline-flex flex-col items-end leading-tight gap-0.5">
-                          <span><span className="text-[11px] text-white/50">Primeiro requerente: </span>{fmtMoeda(i.valorBase, i.moeda)}</span>
-                          <span className="text-[12px]"><span className="text-[11px] text-white/50">Requerente adicional: </span>{fmtMoeda(i.valorAdicional, i.moeda)}</span>
+                          <span><span className="text-[11px] text-white/50">{rotuloPrimeiro(i.unidade || '')}: </span>{fmtMoeda(i.valorBase, i.moeda)}</span>
+                          <span className="text-[12px]"><span className="text-[11px] text-white/50">{rotuloAdicional(i.unidade || '')}: </span>{fmtMoeda(i.valorAdicional, i.moeda)}</span>
                         </span>
-                      ) : fmtMoeda(i.valor, i.moeda)}
+                      ) : (
+                        <span className="inline-flex flex-col items-end leading-tight gap-0.5">
+                          {estrategiaUsaFaixaQuantidade(i.modoCalculo) && (i.quantidadeMinima != null || i.quantidadeMaxima != null) && (
+                            <span className="text-[11px] text-white/40">{Number(i.quantidadeMinima ?? 0)}–{i.quantidadeMaxima != null ? Number(i.quantidadeMaxima) : '∞'} {rotuloUnidadeMinuscula(i.unidade || '')}</span>
+                          )}
+                          <span><span className="text-[11px] text-white/50">{rotuloValorUnico(i.modoCalculo, i.unidade || '')}: </span>{fmtMoeda(i.valor, i.moeda)}</span>
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 text-[11px] text-white/60">
                       {i.vigenciaInicio ? (
@@ -326,6 +360,7 @@ export default function TabelaValoresTab() {
                     value={form.categoria}
                     disabled={!!editando}
                     onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value, configuracaoFinanceiraItemId: '', precoCusto: false, precoVenda: false, moeda: '', valor: '', moedaVenda: '', valorVenda: '', valorBase: '', valorAdicional: '', valorBaseVenda: '', valorAdicionalVenda: '', fornecedorId: '' }))}
+                    // (unidade e estratégia preservadas — não dependem da categoria)
                     className={inputCls + (editando ? ' cursor-not-allowed opacity-60' : '')}
                   >
                     <option value="" className="bg-zinc-900">Selecione uma categoria</option>
@@ -390,6 +425,36 @@ export default function TabelaValoresTab() {
                 )}
               </div>
 
+              {/* ESTRATÉGIA DE CÁLCULO × UNIDADE DE COBRANÇA — eixos independentes e genéricos.
+                  A estratégia define COMO calcula; a unidade define O QUE conta. Qualquer
+                  combinação válida é permitida (nunca condicionada ao nome do serviço). */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-white/60">Estratégia de cálculo *</label>
+                  <select value={form.modoCalculo} onChange={(e) => {
+                    const modo = e.target.value
+                    setForm((f) => ({
+                      ...f, modoCalculo: modo,
+                      // limpa campos que não pertencem à nova estratégia
+                      ...(estrategiaUsaFaixaQuantidade(modo) ? {} : { quantidadeMinima: '', quantidadeMaxima: '' }),
+                      ...(estrategiaUsaPrimeiroAdicional(modo) ? {} : { valorBase: '', valorAdicional: '', valorBaseVenda: '', valorAdicionalVenda: '' }),
+                    }))
+                  }} className={inputCls}>
+                    {ESTRATEGIAS_CALCULO.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-white/60">
+                    Unidade de cobrança {estrategiaDoModo(form.modoCalculo) === 'fixo' ? <span className="text-white/40">(referência)</span> : '*'}
+                  </label>
+                  <select value={form.unidade} onChange={(e) => set('unidade', e.target.value)} className={inputCls}>
+                    <option value="" className="bg-zinc-900">{estrategiaDoModo(form.modoCalculo) === 'fixo' ? '— (opcional) —' : 'Selecione a unidade'}</option>
+                    {UNIDADES_COBRANCA_OPCOES.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
+                  </select>
+                  <p className="mt-1 text-[11px] text-white/40">O que está sendo contado (requerente, documento, página, hora…).</p>
+                </div>
+              </div>
+
               {/* Bloco PREÇO DE CUSTO — Fornecedor + Moeda + Valor */}
               {form.precoCusto && (
                 <div className="rounded-lg border border-amber-400/20 bg-amber-500/[0.04] p-3">
@@ -412,17 +477,17 @@ export default function TabelaValoresTab() {
                     {estrategiaUsaPrimeiroAdicional(form.modoCalculo) ? (
                       <div className="col-span-3 grid grid-cols-2 gap-3">
                         <div>
-                          <label className="mb-1 block text-xs text-white/60">Primeiro requerente *</label>
+                          <label className="mb-1 block text-xs text-white/60">{rotuloPrimeiro(form.unidade)} *</label>
                           <input type="number" min="0" step="0.01" value={form.valorBase} onChange={(e) => set('valorBase', e.target.value)} placeholder="0,00" className={inputCls} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs text-white/60">Requerente adicional *</label>
+                          <label className="mb-1 block text-xs text-white/60">{rotuloAdicional(form.unidade)} *</label>
                           <input type="number" min="0" step="0.01" value={form.valorAdicional} onChange={(e) => set('valorAdicional', e.target.value)} placeholder="0,00" className={inputCls} />
                         </div>
                       </div>
                     ) : (
                       <div>
-                        <label className="mb-1 block text-xs text-white/60">Valor do custo *</label>
+                        <label className="mb-1 block text-xs text-white/60">{rotuloValorUnico(form.modoCalculo, form.unidade)} *</label>
                         <input type="number" min="0" step="0.01" value={form.valor} onChange={(e) => set('valor', e.target.value)} placeholder="0,00" className={inputCls} />
                       </div>
                     )}
@@ -445,43 +510,23 @@ export default function TabelaValoresTab() {
                     {estrategiaUsaPrimeiroAdicional(form.modoCalculo) ? (
                       <div className="col-span-2 grid grid-cols-2 gap-3">
                         <div>
-                          <label className="mb-1 block text-xs text-white/60">Primeiro requerente *</label>
+                          <label className="mb-1 block text-xs text-white/60">{rotuloPrimeiro(form.unidade)} *</label>
                           <input type="number" min="0" step="0.01" value={form.valorBaseVenda} onChange={(e) => set('valorBaseVenda', e.target.value)} placeholder="0,00" className={inputCls} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs text-white/60">Requerente adicional *</label>
+                          <label className="mb-1 block text-xs text-white/60">{rotuloAdicional(form.unidade)} *</label>
                           <input type="number" min="0" step="0.01" value={form.valorAdicionalVenda} onChange={(e) => set('valorAdicionalVenda', e.target.value)} placeholder="0,00" className={inputCls} />
                         </div>
                       </div>
                     ) : (
                       <div>
-                        <label className="mb-1 block text-xs text-white/60">Valor da venda *</label>
+                        <label className="mb-1 block text-xs text-white/60">{rotuloValorUnico(form.modoCalculo, form.unidade)} *</label>
                         <input type="number" min="0" step="0.01" value={form.valorVenda} onChange={(e) => set('valorVenda', e.target.value)} placeholder="0,00" className={inputCls} />
                       </div>
                     )}
                   </div>
                 </div>
               )}
-
-              {/* Parâmetros COMPARTILHADOS (uma vez só) */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs text-white/60">Modo de cálculo *</label>
-                  <select value={form.modoCalculo} onChange={(e) => {
-                    const modo = e.target.value
-                    // Só estratégia de FAIXA usa min/max; nas demais a faixa é sempre limpa.
-                    setForm((f) => estrategiaUsaFaixaQuantidade(modo) ? { ...f, modoCalculo: modo } : { ...f, modoCalculo: modo, quantidadeMinima: '', quantidadeMaxima: '' })
-                  }} className={inputCls}>
-                    {MODOS_CALCULO.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-white/60">Unidade de cobrança</label>
-                  {/* SOMENTE LEITURA — derivada do modo (fonte única). Nunca editável. */}
-                  <div className={inputCls + ' flex items-center text-white/60'}>{rotuloUnidadeCobranca(form.modoCalculo)}</div>
-                  <p className="mt-1 text-[11px] text-white/40">Derivada do modo de cálculo — não editável.</p>
-                </div>
-              </div>
 
               {/* Faixa de quantidade (mín./máx.) — SOMENTE na estratégia de faixa. Oculta em
                   fixo, unitário simples e primeiro+adicional (campos preservados no schema). */}

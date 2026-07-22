@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
-import { modoCalculoValido, unidadeDoModo, estrategiaUsaPrimeiroAdicional, estrategiaUsaFaixaQuantidade } from '@/lib/financeiro/modo-calculo'
+import { modoCalculoValido, estrategiaDoModo, estrategiaUsaPrimeiroAdicional, estrategiaUsaFaixaQuantidade } from '@/lib/financeiro/modo-calculo'
+import { normalizarUnidade } from '@/lib/financeiro/unidade-cobranca'
 import { detectarConflitoPreco, type PrecoRegistro } from '@/lib/financeiro/conflito-preco'
 import type { NaturezaPrecoRaw } from '@/lib/financeiro/natureza-financeira'
 
@@ -53,18 +54,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (b.configuracaoFinanceiraItemId !== undefined && Number(b.configuracaoFinanceiraItemId) !== atual.configuracaoFinanceiraItemId) {
       return NextResponse.json({ error: 'Não é permitido trocar a Configuração Financeira de um preço existente. Crie um novo preço e arquive este.' }, { status: 400 })
     }
-    // Modo efetivo → UNIDADE derivada (fonte única). Ignora `unidade` do cliente e normaliza:
-    // fixed → unidade null + sem faixa de quantidade. Assim, re-salvar um registro legado de
-    // VALOR_FIXO com unidade preenchida normaliza para null. Modo desconhecido preserva o legado.
+    // ESTRATÉGIA efetiva (modoCalculo canônico). A UNIDADE é escolhida pelo usuário
+    // (enum UnidadeItem) — NÃO é mais derivada do modo.
     const modoFinal = b.modoCalculo !== undefined ? (b.modoCalculo ? String(b.modoCalculo) : '') : atual.modoCalculo
     if (b.modoCalculo !== undefined && !modoCalculoValido(modoFinal)) {
-      return NextResponse.json({ error: 'Informe um Modo de cálculo válido.' }, { status: 400 })
+      return NextResponse.json({ error: 'Informe uma Estratégia de cálculo válida.' }, { status: 400 })
     }
     const modoConhecido = modoCalculoValido(modoFinal)
     // Estratégia comercial efetiva (fonte única): base/adicional e faixa de quantidade.
     const usaBaseAdic = estrategiaUsaPrimeiroAdicional(modoFinal)
     const usaFaixa = estrategiaUsaFaixaQuantidade(modoFinal)
+    const ehFixo = estrategiaDoModo(modoFinal) === 'fixo'
     const parseQtd = (v: unknown) => (v === '' || v == null ? null : Number(v))
+    // Unidade efetiva: aceita a enviada (normalizada), senão preserva a atual. Fixo → opcional.
+    let unidadeEff = b.unidade !== undefined ? normalizarUnidade(b.unidade) : (normalizarUnidade(atual.unidade) ?? atual.unidade)
+    if (b.unidade !== undefined && String(b.unidade).trim() !== '' && normalizarUnidade(b.unidade) == null)
+      return NextResponse.json({ error: 'Unidade de cobrança inválida.' }, { status: 400 })
+    if (!ehFixo && unidadeEff == null)
+      return NextResponse.json({ error: 'Selecione a Unidade de cobrança (o que está sendo contado).' }, { status: 400 })
 
     // Valores EFETIVOS pós-edição (natureza é imutável). VENDA não leva fornecedor (invariante
     // do POST). Moeda vazia cai no valor atual (garantidamente não-vazio).
@@ -134,7 +141,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           valorBase: baseEff,
           valorAdicional: adicEff,
           modoCalculo: modoFinal,
-          unidade: modoConhecido ? unidadeDoModo(modoFinal) : atual.unidade,
+          unidade: unidadeEff,
           quantidadeMinima: qMinEff,
           quantidadeMaxima: qMaxEff,
           vigenciaInicio: vigIniEff,

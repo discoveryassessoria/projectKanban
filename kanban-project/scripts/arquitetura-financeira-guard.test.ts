@@ -53,7 +53,7 @@ secao('Item 4 — honorários sem tratamento por nacionalidade')
   ok('sem string "Cidadania Italiana" hardcoded', !exec.includes("'Honorários Contratuais — Cidadania Italiana'"))
   ok('descrição derivada da nacionalidade do tipo de processo', exec.includes('proc.tipoProcessoMotor?.nationalityLabel'))
   ok('preço resolvido por TIPO DE PROCESSO', exec.includes('configuracaoFinanceiraItem: { tipoProcessoId: proc.tipoProcessoMotorId }'))
-  ok('aceita modo oficial e alias legado', exec.includes("['per_applicant', 'honorario_por_requerente']"))
+  ok('aceita estratégia canônica + modos/aliases legados (fonte única)', exec.includes('MODOS_REQUERENTE = MODOS_PRIMEIRO_ADICIONAL'))
   ok('chave idempotente genérica', exec.includes('honorario_por_requerente::VENDA'))
   ok('compat com chave legada', exec.includes('honorario_cidadania_italiana::VENDA'))
   // nenhuma outra nacionalidade citada no fluxo de honorários

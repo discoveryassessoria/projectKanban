@@ -45,9 +45,9 @@ export function normalizarModo(modo: string | null | undefined): ModoCalculo {
   return MODO_ALIASES[modo] ?? MODO.FIXO
 }
 
-/** Modo multiplica valor × quantidade? (todos os "por X", exceto fixed). */
+/** Modo multiplica valor × quantidade? (toda estratégia, exceto fixo). */
 export function modoMultiplicaQuantidade(modo: string | null | undefined): boolean {
-  return normalizarModo(modo) !== MODO.FIXO
+  return estrategiaDoModo(modo) !== 'fixo'
 }
 
 /** Modos válidos, na ordem de exibição. [valor canônico, rótulo do modo]. */
@@ -72,9 +72,13 @@ const UNIDADE_POR_MODO: Record<string, string | null> = {
   per_vendor: 'fornecedor',
 }
 
-/** Verdadeiro só para um modo de cálculo reconhecido. */
+/** Verdadeiro para uma estratégia canônica OU um modo/alias legado reconhecido. */
 export function modoCalculoValido(modo: string | null | undefined): boolean {
-  return typeof modo === 'string' && Object.prototype.hasOwnProperty.call(UNIDADE_POR_MODO, modo)
+  if (typeof modo !== 'string') return false
+  if (Object.values(ESTRATEGIA).includes(modo as EstrategiaCodigo)) return true // 4 estratégias canônicas
+  if (Object.prototype.hasOwnProperty.call(UNIDADE_POR_MODO, modo)) return true // modos legados
+  if (Object.prototype.hasOwnProperty.call(MODO_ALIASES, modo)) return true // aliases legados
+  return false
 }
 
 /** Rótulo legível do MODO (ex.: 'Por documento'). */
@@ -99,35 +103,92 @@ export function rotuloUnidadeCobranca(modo: string | null | undefined): string {
   return u.charAt(0).toUpperCase() + u.slice(1)
 }
 
-/** `fixed` não usa faixa de quantidade (min/max) — normalizada para null na persistência. */
-export function modoUsaQuantidade(modo: string | null | undefined): boolean {
-  return modoCalculoValido(modo) && modo !== 'fixed'
-}
-
-// ── ESTRATÉGIA COMERCIAL derivada do modo ────────────────────────────────────
-// A estratégia é como o PREÇO é cobrado — decide os CAMPOS que a Tabela de Preços
-// mostra. Fonte única para UI e API:
-//   • 'fixo'                → um único Valor (não multiplica).
-//   • 'primeiro_adicional'  → valorBase (1º) + valorAdicional (cada adicional). Só POR_REQUERENTE.
-//   • 'unitario'            → um único Valor × quantidade (por pessoa/documento/geração/…).
-//   • 'faixa'               → RESERVADO: preço por faixa de quantidade (min/max). Nenhum modo
-//                             atual mapeia para 'faixa' — os campos min/max ficam ocultos até
-//                             existir uma estratégia de faixa (schema preservado por compat).
+// ============================================================================
+// ESTRATÉGIA DE CÁLCULO × UNIDADE DE COBRANÇA (modelo genérico e configurável)
+// ----------------------------------------------------------------------------
+// Dois conceitos ORTOGONAIS, separados de propósito:
+//   • ESTRATÉGIA = COMO o preço é calculado. Vive em TabelaValor.modoCalculo.
+//   • UNIDADE    = O QUE está sendo contado (requerente, documento, página, hora,
+//                  processo…). Vive em TabelaValor.unidade (enum UnidadeItem;
+//                  ver lib/financeiro/unidade-cobranca.ts). É livre e cadastrável.
+//
+// NÃO existe uma estratégia por unidade: "Por unidade" + "Documento", "Por unidade"
+// + "Página" e "Primeiro + adicionais" + "Requerente" são combinações da MESMA
+// dupla de eixos. Nenhuma regra olha o NOME do serviço.
+//
+// As 4 estratégias canônicas são gravadas em modoCalculo (VarChar 40). Os modos
+// legados unit-bundled (per_document, per_person, per_applicant, …) continuam
+// reconhecidos e decompostos em (estratégia, unidade) na leitura — sem migration.
+// ============================================================================
+export const ESTRATEGIA = {
+  FIXO: 'fixed',
+  PRIMEIRO_ADICIONAL: 'first_additional',
+  POR_UNIDADE: 'per_unit',
+  FAIXA: 'quantity_range',
+} as const
+export type EstrategiaCodigo = (typeof ESTRATEGIA)[keyof typeof ESTRATEGIA]
 export type EstrategiaPreco = 'fixo' | 'primeiro_adicional' | 'unitario' | 'faixa'
 
+/** Estratégias oficiais para a UI: [código canônico (vai em modoCalculo), rótulo]. */
+export const ESTRATEGIAS_CALCULO: [string, string][] = [
+  [ESTRATEGIA.FIXO, 'Preço fixo'],
+  [ESTRATEGIA.PRIMEIRO_ADICIONAL, 'Primeiro + adicionais'],
+  [ESTRATEGIA.POR_UNIDADE, 'Por unidade'],
+  [ESTRATEGIA.FAIXA, 'Por faixa de quantidade'],
+]
+
+/** Todos os códigos (canônicos + legados) que representam PRIMEIRO + ADICIONAIS. */
+export const MODOS_PRIMEIRO_ADICIONAL = [
+  ESTRATEGIA.PRIMEIRO_ADICIONAL, 'per_applicant', 'honorario_por_requerente',
+]
+
+/** Estratégia a partir de qualquer modo (código canônico OU legado unit-bundled). */
 export function estrategiaDoModo(modo: string | null | undefined): EstrategiaPreco {
-  const m = normalizarModo(modo)
-  if (m === MODO.FIXO) return 'fixo'
-  if (m === MODO.POR_REQUERENTE) return 'primeiro_adicional'
+  const m = (modo ?? '').trim()
+  // 1) códigos canônicos do novo modelo têm precedência (resolvem colisão de alias)
+  if (m === ESTRATEGIA.PRIMEIRO_ADICIONAL) return 'primeiro_adicional'
+  if (m === ESTRATEGIA.POR_UNIDADE) return 'unitario'
+  if (m === ESTRATEGIA.FAIXA) return 'faixa'
+  if (m === ESTRATEGIA.FIXO) return 'fixo'
+  // 2) modos legados (unit-bundled) → estratégia
+  const canon = normalizarModo(m)
+  if (canon === MODO.FIXO) return 'fixo'
+  if (canon === MODO.POR_REQUERENTE) return 'primeiro_adicional'
   return 'unitario'
 }
 
-/** Estratégia "Primeiro requerente + Requerente adicional" (usa valorBase/valorAdicional). */
+/** Código canônico de modoCalculo a GRAVAR para uma estratégia escolhida na UI. */
+export function modoDaEstrategia(est: EstrategiaPreco): string {
+  switch (est) {
+    case 'primeiro_adicional': return ESTRATEGIA.PRIMEIRO_ADICIONAL
+    case 'unitario': return ESTRATEGIA.POR_UNIDADE
+    case 'faixa': return ESTRATEGIA.FAIXA
+    default: return ESTRATEGIA.FIXO
+  }
+}
+
+/** Rótulo legível da estratégia (ex.: 'Por unidade'). */
+export function rotuloEstrategia(modo: string | null | undefined): string {
+  const est = estrategiaDoModo(modo)
+  return ESTRATEGIAS_CALCULO.find(([k]) => estrategiaDoModo(k) === est)?.[1] ?? '—'
+}
+
+/** Estratégia "Primeiro + adicionais" (usa valorBase/valorAdicional). */
 export function estrategiaUsaPrimeiroAdicional(modo: string | null | undefined): boolean {
   return estrategiaDoModo(modo) === 'primeiro_adicional'
 }
 
-/** Faixa de quantidade (min/max) — só em estratégia de FAIXA (nenhuma no conjunto atual). */
+/** Estratégia "Por faixa de quantidade" (usa quantidadeMinima/Maxima). */
 export function estrategiaUsaFaixaQuantidade(modo: string | null | undefined): boolean {
   return estrategiaDoModo(modo) === 'faixa'
+}
+
+/** Estratégia multiplica por quantidade em runtime? (tudo menos fixo.) */
+export function estrategiaMultiplica(modo: string | null | undefined): boolean {
+  return estrategiaDoModo(modo) !== 'fixo'
+}
+
+/** `fixed` não usa faixa de quantidade (min/max) — normalizada para null na persistência. */
+export function modoUsaQuantidade(modo: string | null | undefined): boolean {
+  return estrategiaDoModo(modo) !== 'fixo'
 }

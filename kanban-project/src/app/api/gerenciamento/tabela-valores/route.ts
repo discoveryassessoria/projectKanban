@@ -4,7 +4,8 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { deriveNaturezaFinanceira, validarNaturezaPreco, canonicalNaturezaPreco, admiteCusto, admiteVenda, type NaturezaPrecoRaw } from '@/lib/financeiro/natureza-financeira'
 import { detectarConflitoPreco, type PrecoRegistro } from '@/lib/financeiro/conflito-preco'
-import { modoCalculoValido, unidadeDoModo, estrategiaUsaPrimeiroAdicional, estrategiaUsaFaixaQuantidade } from '@/lib/financeiro/modo-calculo'
+import { modoCalculoValido, estrategiaDoModo, estrategiaUsaPrimeiroAdicional, estrategiaUsaFaixaQuantidade } from '@/lib/financeiro/modo-calculo'
+import { normalizarUnidade } from '@/lib/financeiro/unidade-cobranca'
 import { naturezasDeSelecao, usaNovoModeloSelecao } from '@/lib/financeiro/selecao-natureza'
 import { reprocessarPendenciasFinanceiras } from '@/src/lib/motor/executor'
 
@@ -144,15 +145,20 @@ export async function POST(request: NextRequest) {
     if (vigenciaInicio && vigenciaFim && vigenciaInicio > vigenciaFim) {
       return NextResponse.json({ error: '"Válido até" deve ser igual ou posterior a "Válido a partir de".' }, { status: 400 })
     }
-    // Modo de cálculo OBRIGATÓRIO e válido. A UNIDADE é DERIVADA do modo (fonte única
-    // `unidadeDoModo`) — ignoramos qualquer `unidade` enviada pelo cliente (não confiar na UI).
+    // ESTRATÉGIA de cálculo OBRIGATÓRIA (modoCalculo = código canônico da estratégia).
     const modoCalculo = toStrOrNull(b.modoCalculo) ?? ''
-    if (!modoCalculoValido(modoCalculo)) return NextResponse.json({ error: 'Informe um Modo de cálculo válido.' }, { status: 400 })
-    const unidade = unidadeDoModo(modoCalculo) // fixed → null; demais → unidade canônica
+    if (!modoCalculoValido(modoCalculo)) return NextResponse.json({ error: 'Informe uma Estratégia de cálculo válida.' }, { status: 400 })
     // Estratégia comercial (fonte única): decide base/adicional e faixa de quantidade.
     const usaBaseAdic = estrategiaUsaPrimeiroAdicional(modoCalculo)
-    // min/max só valem em estratégia de FAIXA (nenhuma atual) → sempre normaliza para null.
     const usaFaixa = estrategiaUsaFaixaQuantidade(modoCalculo)
+    const ehFixo = estrategiaDoModo(modoCalculo) === 'fixo'
+    // UNIDADE DE COBRANÇA — escolhida pelo usuário (fonte única enum UnidadeItem), o que se
+    // conta. Obrigatória fora de "Preço fixo" (onde é só referência opcional).
+    const unidade = normalizarUnidade(b.unidade)
+    if (b.unidade != null && String(b.unidade).trim() !== '' && unidade == null)
+      return NextResponse.json({ error: 'Unidade de cobrança inválida.' }, { status: 400 })
+    if (!ehFixo && unidade == null)
+      return NextResponse.json({ error: 'Selecione a Unidade de cobrança (o que está sendo contado).' }, { status: 400 })
     const parseQtdPos = (v: unknown): number | null => {
       if (!usaFaixa || v === '' || v == null) return null
       const n = Number(v)

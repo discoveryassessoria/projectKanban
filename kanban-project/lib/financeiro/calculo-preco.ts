@@ -12,7 +12,7 @@
 //
 // Módulo PURO: sem Prisma, sem React. Determinístico e testável.
 // ============================================================================
-import { MODO, normalizarModo, modoMultiplicaQuantidade } from './modo-calculo'
+import { estrategiaDoModo } from './modo-calculo'
 
 export type EstrategiaCalculo = 'fixo' | 'por_unidade' | 'primeiro_e_adicional'
 
@@ -48,8 +48,8 @@ export function calcularPreco(e: EntradaCalculo): ResultadoCalculo {
   const qtd = Math.max(1, Math.trunc(Number(e.quantidade) || 1))
   const valor = cent(Number(e.valor) || 0)
 
-  // Fixo (ou modo que não multiplica): o preço é o valor, uma vez.
-  if (normalizarModo(e.modoCalculo) === MODO.FIXO || !modoMultiplicaQuantidade(e.modoCalculo)) {
+  // A ESTRATÉGIA decide o algoritmo (fonte única). Fixo → o preço é o valor, uma vez.
+  if (estrategiaDoModo(e.modoCalculo) === 'fixo') {
     return { total: valor, unitario: valor, quantidade: 1, estrategia: 'fixo', memoria: `Valor fixo: ${valor.toFixed(2)}` }
   }
 

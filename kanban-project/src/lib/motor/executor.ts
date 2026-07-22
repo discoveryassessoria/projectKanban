@@ -17,6 +17,7 @@ import type { FaseCode } from '@prisma/client'
 import { getFase, faseCodeToPhaseKey, phaseKeyToFaseCode } from '@/src/lib/process-stage/fases-catalog'
 import { gerarCodigoReceita, gerarCodigoCusto } from '@/lib/financeiro/codigos'
 import { calcularPreco } from '@/lib/financeiro/calculo-preco'
+import { MODOS_PRIMEIRO_ADICIONAL } from '@/lib/financeiro/modo-calculo'
 // Cronograma OFICIAL: a Condição de Pagamento decide entrada, quantidade,
 // periodicidade e vencimentos. O motor consome o plano pronto.
 import { aplicarCondicaoPagamento } from '@/lib/financeiro/aplicar-condicao'
@@ -772,15 +773,18 @@ export async function aplicarHonorariosPorRequerente(processoId: number): Promis
     return { aplicavel: true, n: 0, acao: 'nenhum' }
   }
 
-  // Preço OFICIAL — Tabela de Preços do TIPO DE PROCESSO (base + adicional).
-  // Cadeia: ProdutoFinanceiro(tipoProcessoId) → TabelaValor(modo POR_REQUERENTE).
-  // Modos aceitos: o oficial (per_applicant) e o alias legado, via normalizarModo.
-  const MODOS_REQUERENTE = ['per_applicant', 'honorario_por_requerente']
+  // Preço OFICIAL — Tabela de Preços do TIPO DE PROCESSO (estratégia primeiro + adicional).
+  // Cadeia: ProdutoFinanceiro(tipoProcessoId) → TabelaValor(estratégia PRIMEIRO_ADICIONAL).
+  // Esta rota conta REQUERENTES: restringe à unidade REQUERENTE (ou legado sem unidade).
+  // Aceita o código canônico novo (first_additional) e os legados (per_applicant/alias).
+  const MODOS_REQUERENTE = MODOS_PRIMEIRO_ADICIONAL
+  const UNIDADE_REQUERENTE = { OR: [{ unidade: { in: ['REQUERENTE', 'requerente'] } }, { unidade: null }] }
   let preco = proc.tipoProcessoMotorId
     ? await prisma.tabelaValor.findFirst({
         where: {
           modoCalculo: { in: MODOS_REQUERENTE }, natureza: NaturezaPreco.VENDA, arquivado: false,
           configuracaoFinanceiraItem: { tipoProcessoId: proc.tipoProcessoMotorId },
+          ...UNIDADE_REQUERENTE,
         },
         orderBy: { prioridade: 'desc' },
       })
@@ -788,7 +792,7 @@ export async function aplicarHonorariosPorRequerente(processoId: number): Promis
   // Fallback de compatibilidade: preço global sem vínculo de tipo (dados legados).
   if (!preco) {
     preco = await prisma.tabelaValor.findFirst({
-      where: { modoCalculo: { in: MODOS_REQUERENTE }, natureza: NaturezaPreco.VENDA, arquivado: false },
+      where: { modoCalculo: { in: MODOS_REQUERENTE }, natureza: NaturezaPreco.VENDA, arquivado: false, ...UNIDADE_REQUERENTE },
       orderBy: { prioridade: 'desc' },
     })
   }
