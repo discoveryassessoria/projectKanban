@@ -3,7 +3,7 @@
 // src/components/gerenciamentoComponents/ProdutosServicosTab.tsx
 // CADASTRO MESTRE de Serviços (ServicoProduto) — o que a empresa vende/executa.
 // Operacional puro: código, nome, categoria, descrição, nacionalidade/modalidade,
-// unidade padrão (opcional), status. SEM financeiro (preço/custo/receita/momento/
+// status. SEM financeiro (preço/custo/receita/momento/
 // itens financeiros vivem no Financeiro, que só REFERENCIA este mestre por FK).
 // Cada serviço é espelhado no ItemCatalogo (natureza SERVICO) via dual-write —
 // é isso que aparece no select de "Serviço" em Configurações Financeiras.
@@ -33,12 +33,6 @@ const NACIONALIDADES: [string, string][] = [
 ]
 const nacLabel = (v: string) => NACIONALIDADES.find(([k]) => k === v)?.[1] || v || '—'
 
-// Unidade padrão (UnidadeItem) — opcional.
-const UNIDADES: [string, string][] = [
-  ['', '— (nenhuma)'], ['UNIDADE', 'Unidade'], ['DOCUMENTO', 'Documento'], ['PESSOA', 'Pessoa'],
-  ['REQUERENTE', 'Requerente'], ['PAGINA', 'Página'], ['PACOTE', 'Pacote'], ['PROCESSO', 'Processo'],
-  ['FASE', 'Fase'], ['HORA', 'Hora'], ['DIA', 'Dia'], ['MES', 'Mês'], ['PERCENTUAL', 'Percentual'], ['CUSTOM', 'Custom'],
-]
 
 async function jsonFetch(url: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
@@ -69,7 +63,6 @@ export default function ProdutosServicosTab() {
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
   const [descricao, setDescricao] = useState('')
-  const [unidadePadrao, setUnidadePadrao] = useState('')
   const [nationality, setNationality] = useState('all')
   const [ativo, setAtivo] = useState(true)
   const [salvando, setSalvando] = useState(false)
@@ -101,13 +94,13 @@ export default function ProdutosServicosTab() {
 
   function abrirNovo() {
     setEditando(null)
-    setName(''); setCategory(''); setDescricao(''); setUnidadePadrao(''); setNationality('all'); setAtivo(true)
+    setName(''); setCategory(''); setDescricao(''); setNationality('all'); setAtivo(true)
     setErroModal(null); setModalAberto(true)
   }
   function abrirEditar(s: Servico) {
     setEditando(s)
     setName(s.name); setCategory(s.category || '')
-    setDescricao(s.descricao || ''); setUnidadePadrao(s.unidadePadrao || '')
+    setDescricao(s.descricao || '')
     setNationality(s.nationality || 'all'); setAtivo(s.ativo)
     setErroModal(null); setModalAberto(true)
   }
@@ -122,7 +115,6 @@ export default function ProdutosServicosTab() {
         name: name.trim(),
         category: category.trim() || null,
         descricao: descricao.trim() || null,
-        unidadePadrao: unidadePadrao || null,
         nationality,
         ativo,
       })
@@ -265,18 +257,10 @@ export default function ProdutosServicosTab() {
                 <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} placeholder="O que o serviço entrega..." className={inputCls} />
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs text-white/60">Unidade padrão (opcional)</label>
-                  <select value={unidadePadrao} onChange={(e) => setUnidadePadrao(e.target.value)} className={inputCls}>
-                    {UNIDADES.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
-                  </select>
-                </div>
-                <label className="mt-6 flex items-center gap-2 text-sm text-white/80">
-                  <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="h-4 w-4 accent-blue-500" />
-                  Ativo
-                </label>
-              </div>
+              <label className="flex items-center gap-2 text-sm text-white/80">
+                <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+                Ativo
+              </label>
 
               {erroModal && (
                 <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroModal}</div>
