@@ -1464,6 +1464,9 @@ model Cobranca {
   cotacaoData  DateTime?
   cotacaoFonte String?   @db.VarChar(40)
   congeladaEm  DateTime? // marca o congelamento (confirmação); depois não recalcula
+  // snapshot da adquirente/bandeira usadas (aditivo; populado pelo runtime)
+  adquirenteId Int? // → Adquirente.id
+  bandeiraId   Int? // → Bandeira.id
 
   parcelas ParcelaFinanceira[] @relation("CobrancaParcelas")
   eventos  EventoFinanceiro[]  @relation("CobrancaEventos")
@@ -2470,7 +2473,10 @@ model TaxaPagamento {
   // baseIncidencia/quemAbsorve são VarChar: os valores foram AMPLIADOS (validação no código).
   baseIncidencia      String    @default("TOTAL") @db.VarChar(20) // TOTAL | PARCELA | SALDO | ENTRADA | LIQUIDO | BRUTO
   quemAbsorve         String    @default("EMPRESA") @db.VarChar(20) // EMPRESA | CLIENTE | COMPARTILHADA | COBRANCA
-  adquirente          String?   @db.VarChar(120) // enum controlado na UI (STONE|CIELO|REDE|PAGSEGURO|STRIPE|WISE|OUTRO)
+  adquirente          String?   @db.VarChar(120) // legado (string). A entidade oficial é adquirenteId.
+  // Vínculo com as ENTIDADES oficiais (aditivo; `adquirente` string preservado p/ compat).
+  adquirenteId        Int? // → Adquirente.id
+  bandeiraId          Int? // → Bandeira.id
   ativo               Boolean   @default(true)
   vigenciaInicio      DateTime?
   vigenciaFim         DateTime?
@@ -2577,6 +2583,39 @@ model TaxaPagamentoPais {
   @@unique([taxaId, paisId])
   @@index([taxaId])
   @@index([paisId])
+}
+
+// ADQUIRENTE / GATEWAY — entidade definitiva (antes era só string na Taxa).
+// Referenciada por TaxaPagamento.adquirenteId e Cobranca.adquirenteId (snapshot).
+model Adquirente {
+  id                   Int       @id @default(autoincrement())
+  code                 String?   @unique @db.VarChar(20) // ADQ-n imutável (CodeGeneratorService)
+  slug                 String    @unique @db.VarChar(40) // CIELO|REDE|STONE|GETNET|MERCADO_PAGO|PAGBANK
+  nome                 String    @db.VarChar(120)
+  ativo                Boolean   @default(true)
+  formasSuportadas     Int[]     @default([]) // → FormaPagamentoCadastro.id (ou tipos, na UI)
+  vigenciaInicio       DateTime?
+  vigenciaFim          DateTime?
+  identificadorExterno String?   @db.VarChar(120)
+  metadados            Json?
+  criadoEm             DateTime  @default(now())
+  atualizadoEm         DateTime  @updatedAt
+
+  @@index([ativo])
+}
+
+// BANDEIRA DE CARTÃO — entidade definitiva. Não duplicar por adquirente.
+model Bandeira {
+  id                     Int      @id @default(autoincrement())
+  code                   String?  @unique @db.VarChar(20) // BND-n imutável
+  slug                   String   @unique @db.VarChar(40) // VISA|MASTERCARD|ELO|AMEX|HIPERCARD
+  nome                   String   @db.VarChar(60)
+  ativo                  Boolean  @default(true)
+  adquirentesCompativeis Int[]    @default([]) // → Adquirente.id (vazio = todas)
+  criadoEm               DateTime @default(now())
+  atualizadoEm           DateTime @updatedAt
+
+  @@index([ativo])
 }
 
 // ============================================================

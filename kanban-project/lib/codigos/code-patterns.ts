@@ -33,6 +33,9 @@ export const CODE_PREFIX = {
   USER: 'USR',
   PAYMENT_METHOD: 'FPG', // Forma de Pagamento (cadastro do meio)
   PAYMENT_TERM: 'CPG', // Condição de Pagamento (regra reutilizável)
+  PAYMENT_FEE: 'TXP', // Taxa de Pagamento (tabela comercial)
+  ACQUIRER: 'ADQ', // Adquirente / Gateway
+  CARD_BRAND: 'BND', // Bandeira de cartão
 } as const
 
 export type EntidadeCodigo = keyof typeof CODE_PREFIX | 'PROCESS'
