@@ -180,7 +180,7 @@ export function ProcessoFinanceiro({
         }}
       >
         {aba === 'visao-geral' && (
-          <VisaoGeral processoId={processoId} nomeFamilia={nomeFamilia} />
+          <VisaoGeral processoId={processoId} nomeFamilia={nomeFamilia} onIrPara={setAba} />
         )}
         {aba === 'receitas' && (
           <Receitas
