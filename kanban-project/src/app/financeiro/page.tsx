@@ -25,6 +25,10 @@ const ReceberTab = dynamic(() => import("@/src/components/financeiroComponents/R
   ssr: false,
   loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
 })
+const CobrancasTab = dynamic(() => import("@/src/components/financeiroComponents/CobrancasTab"), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+})
 const PagarTab = dynamic(() => import("@/src/components/financeiroComponents/PagarTab"), {
   ssr: false,
   loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
@@ -63,6 +67,7 @@ const TABS = [
   { key: "dashboard", label: "Dashboard" },
   { key: "tesouraria", label: "Tesouraria" },
   { key: "receber", label: "A Receber" },
+  { key: "cobrancas", label: "Cobranças" },
   { key: "pagar", label: "A Pagar" },
   { key: "fluxo", label: "Fluxo de Caixa" },
   { key: "dre", label: "DRE", avancada: true },
@@ -182,6 +187,8 @@ export default function FinanceiroPage() {
             <TesourariaTab />
           ) : tab === "receber" ? (
             <ReceberTab />
+          ) : tab === "cobrancas" ? (
+            <CobrancasTab />
           ) : tab === "pagar" ? (
             <PagarTab />
           ) : tab === "fluxo" ? (

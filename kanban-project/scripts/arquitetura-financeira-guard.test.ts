@@ -85,6 +85,26 @@ secao('Item 1 — criação manual desativada')
   }
 }
 
+// ── 5 · Financeiro Geral > Cobranças = MESMA base única (sem tabela paralela) ─
+secao('Item 5 — view Cobranças no Financeiro Geral (base única)')
+{
+  const api = readFileSync(join(RAIZ, 'src/app/api/financeiro/cobrancas/route.ts'), 'utf8')
+  ok('lista a MESMA entidade Cobranca', /prisma\.cobranca\.findMany/.test(api))
+  ok('todos os processos (sem filtro fixo de processoId)', !/where:\s*{\s*processoId:/.test(api))
+  ok('processoId é só FILTRO opcional', api.includes("sp.get('processoId')"))
+  ok('exige permissão financeiro.ver', api.includes("verificarPermissao(req, 'financeiro.ver')"))
+  ok('não cria tabela/entidade paralela', !/prisma\.cobrancaGeral|CobrancaGeral|cobrancaEspelho/i.test(api))
+
+  const tab = readFileSync(join(RAIZ, 'src/components/financeiroComponents/CobrancasTab.tsx'), 'utf8')
+  ok('reutiliza o MESMO modal do processo', tab.includes('ReceitaCobrancaModal'))
+  ok('consome a API consolidada', tab.includes('/api/financeiro/cobrancas'))
+  ok('tem busca + filtro de status', tab.includes('setBusca') && tab.includes('STATUS_FILTROS'))
+
+  const page = readFileSync(join(RAIZ, 'src/app/financeiro/page.tsx'), 'utf8')
+  ok('aba Cobranças registrada', /key:\s*"cobrancas"/.test(page))
+  ok('aba Cobranças renderizada', page.includes('<CobrancasTab />'))
+}
+
 console.log(`\n${'='.repeat(60)}`)
 console.log(`Arquitetura financeira: ${passou} passaram, ${falhou} falharam`)
 console.log('='.repeat(60))
