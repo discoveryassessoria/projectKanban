@@ -6,9 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
-import { gerarCronograma, type CondicaoPagamentoView } from '@/lib/financeiro/condicao-pagamento'
-
-const n = (v: unknown) => (v == null ? null : Number(v))
+import { montarECalcular } from '@/lib/financeiro/charge-runtime'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
@@ -20,52 +18,57 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   return NextResponse.json({ cobrancas })
 }
 
+// POST — CONFIRMA uma Cobrança. Recalcula no backend (autoridade), persiste os
+// valores resultantes + auditoria, gera as parcelas e CONGELA. Nunca confia no
+// número enviado pelo cliente.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
   const receitaId = Number((await params).id)
   const b = await req.json().catch(() => ({}))
-  const receita = await prisma.receita.findUnique({ where: { id: receitaId }, select: { id: true, processoId: true, valor: true, moeda: true } })
-  if (!receita) return NextResponse.json({ error: 'Receita não encontrada' }, { status: 404 })
 
-  const condicaoId = Number(b.condicaoPagamentoId) || null
-  let view: CondicaoPagamentoView | null = null
-  let condicaoVersao: number | null = null
-  let condicaoCodigo: string | null = null
-  if (condicaoId) {
-    const cond = await prisma.condicaoPagamento.findUnique({ where: { id: condicaoId } })
-    if (!cond) return NextResponse.json({ error: 'Condição de pagamento inválida' }, { status: 400 })
-    view = JSON.parse(JSON.stringify(cond)) as CondicaoPagamentoView // Decimals→string, Dates→ISO
-    condicaoVersao = cond.versao; condicaoCodigo = cond.codigo
-  }
+  const out = await montarECalcular({
+    receitaId,
+    formaPagamentoId: b.formaPagamentoId ? Number(b.formaPagamentoId) : null,
+    condicaoPagamentoId: b.condicaoPagamentoId ? Number(b.condicaoPagamentoId) : null,
+    carteiraId: b.carteiraId ? Number(b.carteiraId) : null,
+    contaBancariaId: b.contaBancariaId ? Number(b.contaBancariaId) : null,
+    nParcelas: b.nParcelas != null ? Number(b.nParcelas) : null,
+    politicaTaxasEscolhida: b.politicaTaxasEscolhida ?? null,
+    congelar: true,
+  })
+  if ('erro' in out) return NextResponse.json({ error: out.erro }, { status: out.status })
+  const { resultado: r, receita, condicao } = out
+  if (!r.ok) return NextResponse.json({ error: r.erros[0]?.mensagem ?? 'Cobrança inválida', erros: r.erros, codigo: r.erros[0]?.codigo }, { status: 422 })
 
-  const total = Number(receita.valor)
-  const nParcelas = b.nParcelas != null ? Number(b.nParcelas) : undefined
-  const cron = gerarCronograma(view, { total, dataBase: new Date(), nParcelas })
   const actorId = (await extrairUsuarioComPermissoes(req))?.userId ?? null
-
   const cobranca = await prisma.$transaction(async (tx) => {
     const cob = await tx.cobranca.create({
       data: {
         receitaId: receita.id, processoId: receita.processoId,
         formaPagamentoId: b.formaPagamentoId ? Number(b.formaPagamentoId) : null,
-        condicaoPagamentoId: condicaoId,
+        condicaoPagamentoId: condicao?.id ?? null,
         contaBancariaId: b.contaBancariaId ? Number(b.contaBancariaId) : null,
         carteiraId: b.carteiraId ? Number(b.carteiraId) : null,
-        taxaPagamentoId: b.taxaPagamentoId ? Number(b.taxaPagamentoId) : null,
+        taxaPagamentoId: r.taxaAplicada?.id ?? null,
         gateway: b.gateway ? String(b.gateway).slice(0, 40) : null,
-        moeda: receita.moeda, valorTotal: total, status: 'ABERTA',
-        condicaoVersao, condicaoCodigo, criadoPorId: actorId,
-        memoriaCalculo: { periodicidade: cron.periodicidade, nParcelas: cron.nParcelas, valorEntrada: cron.valorEntrada, observacoes: cron.observacoes } as Prisma.InputJsonValue,
+        moeda: receita.moeda as any, valorTotal: r.totalCobrado, status: 'ABERTA',
+        condicaoVersao: condicao?.versao ?? null, condicaoCodigo: condicao?.codigo ?? null, criadoPorId: actorId,
+        // runtime/auditoria (congelado na confirmação)
+        politicaTaxas: r.politicaTaxas, valorBase: r.valorBase, valorTaxa: r.valorTaxa,
+        valorRepassado: r.valorRepassado, valorAbsorvido: r.valorAbsorvido, valorLiquido: r.valorLiquido,
+        moedaOrigem: r.cambio?.moedaOrigem ?? null, cotacao: r.cambio?.cotacao ?? null,
+        cotacaoData: r.cambio?.data ?? null, cotacaoFonte: r.cambio?.fonte ?? null, congeladaEm: new Date(),
+        memoriaCalculo: { snapshot: r.snapshot, memoria: r.memoria } as Prisma.InputJsonValue,
       },
     })
-    // parcelas pertencem à COBRANÇA (cobrancaId). Também referenciam a receita p/ compat de leitura.
-    for (const p of cron.parcelas) {
+    for (const p of r.parcelas) {
       await tx.parcelaFinanceira.create({ data: {
-        cobrancaId: cob.id, receitaId: receita.id, numero: p.numero, vencimento: p.vencimento, valor: p.valor, entrada: p.entrada, status: 'PENDENTE',
+        cobrancaId: cob.id, receitaId: receita.id, numero: p.numero, vencimento: p.vencimento,
+        valor: p.valor, entrada: p.entrada, valorTaxa: p.valorTaxa, valorLiquido: p.valorLiquido, status: 'PENDENTE',
       } })
     }
-    await tx.eventoFinanceiro.create({ data: { receitaId: receita.id, cobrancaId: cob.id, usuarioId: actorId, tipo: 'CRIACAO', descricao: `Cobrança criada: ${cron.nParcelas} parcela(s)`.slice(0, 300), valor: total } })
+    await tx.eventoFinanceiro.create({ data: { receitaId: receita.id, cobrancaId: cob.id, usuarioId: actorId, tipo: 'CRIACAO', descricao: `Cobrança criada: ${r.nParcelas} parcela(s), ${r.politicaTaxas}`.slice(0, 300), valor: r.totalCobrado } })
     return cob
   })
-  return NextResponse.json({ cobranca, parcelas: cron.parcelas.length })
+  return NextResponse.json({ cobranca, parcelas: r.parcelas.length, memoria: r.memoria })
 }

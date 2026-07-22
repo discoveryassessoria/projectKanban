@@ -1,0 +1,254 @@
+// lib/financeiro/charge-calculation-service.ts
+// ============================================================================
+// ChargeCalculationService — AUTORIDADE ÚNICA do cálculo de uma Cobrança.
+//
+// Compõe os motores puros existentes numa única passagem determinística:
+//   payment-method-rules (valida a Forma) → resolução de UMA taxa por prioridade
+//   → matriz de Política de Taxas (IGNORAR/REPASSAR/ABSORVER/ESCOLHER) →
+//   gerarCronograma (parcelas/entrada/vencimentos) → câmbio → memória de cálculo.
+//
+// Usado por SIMULAÇÃO (não persiste) e por CONFIRMAÇÃO (persiste). O backend é a
+// autoridade final: a confirmação recalcula, nunca confia no número do cliente.
+// Módulo PURO: sem Prisma, sem fetch, sem React.
+// ============================================================================
+import { gerarCronograma, type CondicaoPagamentoView } from './condicao-pagamento'
+import { calcularTaxas, type TaxaView } from './taxas-pagamento'
+import { validarCompatibilidadeCobranca, type FormaView } from './payment-method-rules'
+
+export type Direcao = 'RECEBER' | 'PAGAR'
+export type PoliticaTaxas = 'IGNORAR' | 'REPASSAR' | 'ABSORVER' | 'ESCOLHER_NA_COBRANCA'
+const POLITICAS_EFETIVAS: PoliticaTaxas[] = ['IGNORAR', 'REPASSAR', 'ABSORVER']
+
+/** Taxa candidata: TaxaView + campos de seleção (prioridade/forma/moeda). */
+export interface TaxaCandidata extends TaxaView {
+  prioridade?: number | null
+  formasAplicaveis?: number[] | null
+  moedasAplicaveis?: string[] | null
+}
+
+export interface CobrancaInput {
+  aplicaComo: Direcao
+  valorBase: number
+  moeda: string
+  dataBase: Date
+  forma?: FormaView | null
+  condicao?: (CondicaoPagamentoView & { politicaTaxas?: string | null; aplicaA?: string | null; carteiraId?: number | null }) | null
+  /** Escolha explícita quando a política da condição é ESCOLHER_NA_COBRANCA. */
+  politicaTaxasEscolhida?: PoliticaTaxas | null
+  nParcelas?: number | null
+  carteiraId?: number | null
+  contaBancariaId?: number | null
+  /** Taxas vinculadas à condição (pool de candidatas). */
+  taxaCandidatas?: TaxaCandidata[]
+  /** Câmbio quando há conversão (estimado no rascunho; congelado na confirmação). */
+  cambio?: { moedaOrigem?: string | null; cotacao?: number | null; data?: Date | null; fonte?: string | null; congelado?: boolean } | null
+}
+
+export interface CobrancaErro { codigo: string; mensagem: string }
+
+export interface ParcelaCalculada {
+  numero: number
+  vencimento: Date
+  valor: number
+  entrada: boolean
+  valorTaxa: number
+  valorLiquido: number
+}
+
+export interface ResultadoCobranca {
+  ok: boolean
+  erros: CobrancaErro[]
+  aplicaComo: Direcao
+  moeda: string
+  cambio: { moedaOrigem: string; cotacao: number; data: Date | null; fonte: string | null; estimado: boolean } | null
+  politicaTaxas: PoliticaTaxas | null
+  taxaAplicada: { id: number | null; nome: string; tipo: string; adquirente: string | null; prioridade: number | null; formula: string } | null
+  valorBase: number
+  valorTaxa: number
+  valorRepassado: number
+  valorAbsorvido: number
+  totalCobrado: number
+  valorLiquido: number
+  nParcelas: number
+  parcelas: ParcelaCalculada[]
+  memoria: string[]
+  snapshot: Record<string, unknown>
+}
+
+/**
+ * Uma Cobrança pode ser recalculada (rascunho) ou está congelada (confirmada/
+ * com pagamento)? Rascunho = status ABERTA e sem nenhum pagamento registrado.
+ * Nunca reescreve histórico financeiro de cobrança paga.
+ */
+export function podeRecalcular(c: { status?: string | null; temPagamento?: boolean | null; congeladaEm?: Date | string | null }): boolean {
+  if (c.temPagamento) return false
+  if (c.congeladaEm) return false
+  const st = String(c.status ?? 'ABERTA').toUpperCase()
+  return st === 'ABERTA'
+}
+
+const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
+const asData = (v: string | Date | null | undefined): Date | null => {
+  if (!v) return null
+  const d = v instanceof Date ? new Date(v) : new Date(String(v))
+  return isNaN(d.getTime()) ? null : d
+}
+
+/** TaxaPagamento (registro) → TaxaCandidata que os motores consomem. */
+export function taxaParaCandidata(t: any): TaxaCandidata {
+  const feeType = String(t.feeType ?? 'percentage')
+  const tipo = feeType === 'fixed' ? 'FIXA' : feeType === 'percentage_plus_fixed' ? 'PERCENTUAL_MAIS_FIXA' : 'PERCENTUAL'
+  const faixa = String(t.aplicaParcela ?? 'TODAS') === 'FAIXA'
+  return {
+    id: t.id, nome: t.name ?? t.code ?? null, codigo: t.code ?? null,
+    tipo: tipo as any, percentual: t.feePercent ?? null, valorFixo: t.fixedFee ?? null,
+    // o motor base entende TOTAL|PARCELA; bases novas (SALDO/ENTRADA/LIQUIDO/BRUTO) → TOTAL (aprox.)
+    baseIncidencia: String(t.baseIncidencia ?? 'TOTAL') === 'PARCELA' ? 'PARCELA' : 'TOTAL',
+    quemAbsorve: 'EMPRESA', // a política da Condição decide a direção; aqui só o valor
+    adquirente: t.adquirente ?? null,
+    parcelasDe: faixa ? t.installmentsFrom ?? null : null,
+    parcelasAte: faixa ? t.installmentsTo ?? null : null,
+    antecipacaoAtiva: t.anticipationType && t.anticipationType !== 'NAO_POSSUI',
+    antecipacaoPercent: t.anticipationPercent ?? null,
+    ativo: t.ativo ?? true, vigenciaInicio: t.vigenciaInicio ?? null, vigenciaFim: t.vigenciaFim ?? null,
+    prioridade: t.prioridade ?? 0,
+    formasAplicaveis: t.formasAplicaveis ?? [],
+    moedasAplicaveis: t.moedasAplicaveis ?? [],
+  }
+}
+
+/** A taxa candidata é elegível para esta cobrança? (vigência/parcela/forma/moeda) */
+function candidataElegivel(t: TaxaCandidata, ctx: { nParcelas: number; moeda: string; formaId?: number | null; data: Date }): boolean {
+  if (t.ativo === false) return false
+  const ini = asData(t.vigenciaInicio), fim = asData(t.vigenciaFim)
+  if (ini && ctx.data.getTime() < ini.getTime()) return false
+  if (fim && ctx.data.getTime() > fim.getTime()) return false
+  if (t.parcelasDe != null && ctx.nParcelas < t.parcelasDe) return false
+  if (t.parcelasAte != null && ctx.nParcelas > t.parcelasAte) return false
+  if (t.formasAplicaveis && t.formasAplicaveis.length && ctx.formaId != null && !t.formasAplicaveis.includes(ctx.formaId)) return false
+  if (t.moedasAplicaveis && t.moedasAplicaveis.length && !t.moedasAplicaveis.map((m) => m.toUpperCase()).includes(ctx.moeda.toUpperCase())) return false
+  return true
+}
+
+/** Cálculo completo, determinístico, de uma Cobrança. */
+export function calcularCobranca(input: CobrancaInput): ResultadoCobranca {
+  const erros: CobrancaErro[] = []
+  const memoria: string[] = []
+  const valorBase = cent(input.valorBase)
+  const moeda = String(input.moeda || 'BRL').toUpperCase()
+  const cond = input.condicao ?? null
+  const forma = input.forma ?? null
+  memoria.push(`Base: ${valorBase.toFixed(2)} ${moeda} · ${input.aplicaComo === 'RECEBER' ? 'Contas a Receber' : 'Contas a Pagar'}`)
+
+  // ── quantidade de parcelas pedida (validada depois pela condição/forma) ──
+  const nPedido = input.nParcelas ?? cond?.parcelasPadrao ?? 1
+  const nParcelas = Math.max(1, Math.trunc(nPedido))
+
+  // ── 1. Condição × direção (Contas a Receber / a Pagar) ──
+  if (cond?.aplicaA) {
+    const a = String(cond.aplicaA).toUpperCase()
+    if (input.aplicaComo === 'RECEBER' && a === 'CUSTO') erros.push({ codigo: 'CONDICAO_DIRECAO', mensagem: 'Condição é de Contas a Pagar; não se aplica a um recebimento.' })
+    if (input.aplicaComo === 'PAGAR' && a === 'RECEITA') erros.push({ codigo: 'CONDICAO_DIRECAO', mensagem: 'Condição é de Contas a Receber; não se aplica a um pagamento.' })
+  }
+
+  // ── 2. Forma de Pagamento ──
+  if (forma) {
+    if (!forma.ativo) erros.push({ codigo: 'FORMA_INATIVA', mensagem: `Forma "${forma.name}" está inativa.` })
+    if (input.aplicaComo === 'RECEBER' && forma.usoRecebimento === false) erros.push({ codigo: 'FORMA_SEM_RECEBIMENTO', mensagem: `Forma "${forma.name}" não pode ser usada em recebimento.` })
+    if (input.aplicaComo === 'PAGAR' && forma.usoPagamento === false) erros.push({ codigo: 'FORMA_SEM_PAGAMENTO', mensagem: `Forma "${forma.name}" não pode ser usada em pagamento.` })
+    const internacional = !!(input.cambio?.moedaOrigem && String(input.cambio.moedaOrigem).toUpperCase() !== moeda)
+    const compat = validarCompatibilidadeCobranca(forma, { moeda, carteiraId: input.carteiraId, contaBancariaId: input.contaBancariaId, internacional })
+    for (const m of compat.motivos) erros.push({ codigo: 'FORMA_INCOMPATIVEL', mensagem: m })
+    // limites técnicos de parcelamento
+    if (nParcelas > 1 && !forma.permiteParcelas) erros.push({ codigo: 'FORMA_SEM_PARCELAMENTO', mensagem: `Forma "${forma.name}" não permite parcelamento (pedido ${nParcelas}x).` })
+    if (forma.permiteParcelas && forma.maxParcelas != null && nParcelas > forma.maxParcelas) erros.push({ codigo: 'FORMA_MAX_PARCELAS', mensagem: `Forma "${forma.name}" permite no máximo ${forma.maxParcelas}x (pedido ${nParcelas}x).` })
+    if (forma.permiteParcelas && forma.minParcelas != null && nParcelas < forma.minParcelas) erros.push({ codigo: 'FORMA_MIN_PARCELAS', mensagem: `Forma "${forma.name}" exige no mínimo ${forma.minParcelas}x.` })
+    if (cond?.temEntrada && !forma.aceitaEntrada) erros.push({ codigo: 'FORMA_SEM_ENTRADA', mensagem: `Forma "${forma.name}" não aceita entrada.` })
+  }
+
+  // ── 3. Política de Taxas efetiva ──
+  const politicaCond = (String(cond?.politicaTaxas ?? 'IGNORAR').toUpperCase()) as PoliticaTaxas
+  let politica: PoliticaTaxas | null = politicaCond
+  if (politicaCond === 'ESCOLHER_NA_COBRANCA') {
+    const esc = input.politicaTaxasEscolhida ? (String(input.politicaTaxasEscolhida).toUpperCase() as PoliticaTaxas) : null
+    if (!esc || !POLITICAS_EFETIVAS.includes(esc)) {
+      erros.push({ codigo: 'ESCOLHA_TAXA_OBRIGATORIA', mensagem: 'A condição exige escolher explicitamente ignorar, repassar ou absorver a taxa antes de confirmar.' })
+      politica = null
+    } else politica = esc
+  }
+  if (politica) memoria.push(`Política de taxas: ${politica}`)
+
+  // ── 4. Resolver UMA taxa por prioridade ──
+  let valorTaxa = 0
+  let taxaAplicada: ResultadoCobranca['taxaAplicada'] = null
+  if (politica && politica !== 'IGNORAR') {
+    const candidatas = (input.taxaCandidatas ?? []).filter((t) => candidataElegivel(t, { nParcelas, moeda, formaId: forma?.id, data: input.dataBase }))
+    if (candidatas.length > 0) {
+      const maxPri = Math.max(...candidatas.map((t) => t.prioridade ?? 0))
+      const topo = candidatas.filter((t) => (t.prioridade ?? 0) === maxPri)
+      if (topo.length > 1) {
+        erros.push({ codigo: 'TAXA_AMBIGUA', mensagem: `Há ${topo.length} taxas compatíveis com a mesma prioridade (${maxPri}): ${topo.map((t) => t.nome ?? t.id).join(', ')}. Defina prioridade para desempatar.` })
+      } else {
+        const escolhida = topo[0]
+        if (forma?.exigeAdquirente && !escolhida.adquirente) {
+          erros.push({ codigo: 'ADQUIRENTE_OBRIGATORIO', mensagem: `Forma "${forma.name}" exige adquirente, mas a taxa "${escolhida.nome ?? escolhida.id}" não define um.` })
+        }
+        const r = calcularTaxas([escolhida], { valorBruto: valorBase, nParcelas, moeda })
+        valorTaxa = cent(r.valorTaxas + r.valorTaxasRepassadas)
+        const linha = r.linhas[0]
+        taxaAplicada = { id: escolhida.id ?? null, nome: String(escolhida.nome ?? escolhida.id ?? 'taxa'), tipo: String(escolhida.tipo ?? 'PERCENTUAL'), adquirente: escolhida.adquirente ?? null, prioridade: escolhida.prioridade ?? 0, formula: linha?.formula ?? '' }
+        memoria.push(`Taxa "${taxaAplicada.nome}": ${taxaAplicada.formula} = ${valorTaxa.toFixed(2)} (prioridade ${taxaAplicada.prioridade})`)
+      }
+    } else {
+      memoria.push('Nenhuma taxa compatível — nada a aplicar.')
+    }
+  }
+
+  // ── 5. Matriz de política → totais ──
+  let valorRepassado = 0, valorAbsorvido = 0, totalCobrado = valorBase, valorLiquido = valorBase
+  if (politica === 'REPASSAR') { valorRepassado = valorTaxa; totalCobrado = cent(valorBase + valorTaxa); valorLiquido = valorBase }
+  else if (politica === 'ABSORVER') { valorAbsorvido = valorTaxa; totalCobrado = valorBase; valorLiquido = cent(valorBase - valorTaxa) }
+  else { valorTaxa = politica === 'IGNORAR' ? 0 : valorTaxa; totalCobrado = valorBase; valorLiquido = valorBase } // IGNORAR ou bloqueado
+  if (politica === 'IGNORAR') { valorTaxa = 0; taxaAplicada = null }
+  memoria.push(`Total cobrado: ${totalCobrado.toFixed(2)} · líquido previsto: ${valorLiquido.toFixed(2)}`)
+
+  // ── 6. Câmbio ──
+  const moedaOrigem = String(input.cambio?.moedaOrigem ?? moeda).toUpperCase()
+  const cotacao = input.cambio?.cotacao != null ? Number(input.cambio.cotacao) : (moedaOrigem === moeda ? 1 : 1)
+  const cambio = { moedaOrigem, cotacao, data: asData(input.cambio?.data ?? null), fonte: input.cambio?.fonte ?? null, estimado: !input.cambio?.congelado }
+  if (moedaOrigem !== moeda) memoria.push(`Câmbio ${moedaOrigem}→${moeda}: ${cotacao} (${cambio.estimado ? 'estimado' : 'congelado'})`)
+
+  // ── 7. Cronograma (só quando não há erro bloqueante) ──
+  let parcelas: ParcelaCalculada[] = []
+  let nEfetivo = nParcelas
+  if (erros.length === 0) {
+    const cron = gerarCronograma(cond, { total: totalCobrado, dataBase: input.dataBase, nParcelas })
+    nEfetivo = cron.nParcelas
+    // distribui a taxa proporcionalmente ao valor da parcela; a última absorve o resíduo
+    const somaValores = cron.parcelas.reduce((s, p) => s + p.valor, 0) || 1
+    let taxaAcum = 0
+    parcelas = cron.parcelas.map((p, i) => {
+      const ultima = i === cron.parcelas.length - 1
+      const taxaShare = ultima ? cent(valorTaxa - taxaAcum) : cent((valorTaxa * p.valor) / somaValores)
+      taxaAcum = cent(taxaAcum + taxaShare)
+      return { numero: p.numero, vencimento: p.vencimento, valor: cent(p.valor), entrada: p.entrada, valorTaxa: taxaShare, valorLiquido: cent(p.valor - (politica === 'ABSORVER' ? taxaShare : 0)) }
+    })
+    for (const o of cron.observacoes) memoria.push(o)
+    // invariante: soma das parcelas = total
+    const soma = cent(parcelas.reduce((s, p) => s + p.valor, 0))
+    if (soma !== totalCobrado) erros.push({ codigo: 'SOMA_INVARIANTE', mensagem: `Soma das parcelas (${soma}) ≠ total (${totalCobrado}).` })
+  }
+
+  const snapshot = {
+    versao: 1, aplicaComo: input.aplicaComo, moeda, politicaTaxas: politica,
+    condicao: cond ? { id: (cond as any).id ?? null, codigo: (cond as any).codigo ?? null, versao: (cond as any).versao ?? null } : null,
+    forma: forma ? { id: forma.id, nome: forma.name } : null,
+    taxa: taxaAplicada, cambio, valorBase, valorTaxa, valorRepassado, valorAbsorvido, totalCobrado, valorLiquido, nParcelas: nEfetivo,
+  }
+
+  return {
+    ok: erros.length === 0, erros, aplicaComo: input.aplicaComo, moeda, cambio, politicaTaxas: politica,
+    taxaAplicada, valorBase, valorTaxa, valorRepassado, valorAbsorvido, totalCobrado, valorLiquido,
+    nParcelas: nEfetivo, parcelas, memoria, snapshot,
+  }
+}

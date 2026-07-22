@@ -1449,6 +1449,22 @@ model Cobranca {
   criadoPorId    Int?
   criadoEm       DateTime @default(now())
   atualizadoEm   DateTime @updatedAt
+
+  // ── RUNTIME DE CÁLCULO (auditoria; congelado na confirmação) ──
+  // Não é cadastro — é o RESULTADO calculado pelo ChargeCalculationService.
+  politicaTaxas  String?  @db.VarChar(30) // IGNORAR | REPASSAR | ABSORVER (efetiva)
+  valorBase      Decimal? @db.Decimal(12, 2) // valor da Receita antes de taxa
+  valorTaxa      Decimal? @db.Decimal(12, 2)
+  valorRepassado Decimal? @db.Decimal(12, 2) // taxa somada ao total (REPASSAR)
+  valorAbsorvido Decimal? @db.Decimal(12, 2) // taxa que reduz o líquido (ABSORVER)
+  valorLiquido   Decimal? @db.Decimal(12, 2) // previsto para a empresa
+  // câmbio (quando há conversão): estimado no rascunho, congelado na confirmação
+  moedaOrigem  String?   @db.VarChar(10)
+  cotacao      Decimal?  @db.Decimal(12, 6)
+  cotacaoData  DateTime?
+  cotacaoFonte String?   @db.VarChar(40)
+  congeladaEm  DateTime? // marca o congelamento (confirmação); depois não recalcula
+
   parcelas ParcelaFinanceira[] @relation("CobrancaParcelas")
   eventos  EventoFinanceiro[]  @relation("CobrancaEventos")
 
