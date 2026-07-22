@@ -475,16 +475,24 @@ export function ProcessoDetailsModal({
     { id: "historico", label: "Histórico" },
   ]
 
+  // A aba Financeiro do Processo usa o tema escuro/dourado da referência.
+  // As demais abas permanecem exatamente como estão (tema claro).
+  const finDark = activeTab === "faturas"
+
   const modalContent = (
     <>
       <div className="fixed inset-0 bg-black/50 z-[9998]" onClick={handleClose} />
 
       <div 
-        className="fixed z-[9999] bg-white shadow-2xl flex flex-col overflow-hidden rounded-tl-xl rounded-tr-xl"
+        className={`fixed z-[9999] shadow-2xl flex flex-col overflow-hidden rounded-tl-xl rounded-tr-xl ${
+          finDark ? 'bg-[#0b0d10]' : 'bg-white'
+        }`}
         style={{ left: '155px', top: '45px', right: '35px', bottom: '0px' }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-white flex-shrink-0">
+        <div className={`flex items-center justify-between px-6 py-4 border-b flex-shrink-0 ${
+          finDark ? 'bg-[#0b0d10] border-white/10' : 'bg-white'
+        }`}>
           <div className="flex items-center gap-4">
             <button 
               onClick={handleClose}
@@ -494,28 +502,28 @@ export function ProcessoDetailsModal({
             </button>
             
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">{processo.nome}</h1>
-              <span className="text-sm text-gray-500">{paisConfig.label}</span>
+              <h1 className={`text-xl font-semibold ${finDark ? 'text-white' : 'text-gray-900'}`}>{processo.nome}</h1>
+              <span className={`text-sm ${finDark ? 'text-white/55' : 'text-gray-500'}`}>{paisConfig.label}</span>
             </div>
 
             {/* ✅ NOVO: barrinha de progresso da fase do processo */}
-            <div className="border-l border-gray-200 pl-4 ml-2 hidden lg:block min-w-[260px]">
+            <div className={`border-l pl-4 ml-2 hidden lg:block min-w-[260px] ${finDark ? 'border-white/10' : 'border-gray-200'}`}>
               <PhaseProgressHeader
                 processoId={processo.id}
                 refreshKey={phaseRefreshKey}
-                variant="light"
+                variant={finDark ? "dark" : "light"}
               />
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700">
+            <Button variant="ghost" size="icon" className={finDark ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-gray-700'}>
               <Phone className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700">
+            <Button variant="ghost" size="icon" className={finDark ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-gray-700'}>
               <Mail className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700">
+            <Button variant="ghost" size="icon" className={finDark ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-gray-700'}>
               <Settings className="h-5 w-5" />
             </Button>
             {pode('processos.excluir') && (
@@ -532,14 +540,16 @@ export function ProcessoDetailsModal({
         </div>
 
         {/* Abas principais - dinâmicas */}
-        <div className="flex border-b bg-white px-6 flex-shrink-0">
+        <div className={`flex border-b px-6 flex-shrink-0 ${finDark ? 'bg-[#0b0d10] border-white/10' : 'bg-white'}`}>
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
               className={`
                 px-4 py-3 text-sm font-medium border-b-2 transition-colors
-                ${activeTab === tab.id ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}
+                ${activeTab === tab.id
+                  ? (finDark ? 'border-[#d2a948] text-[#d2a948]' : 'border-blue-500 text-blue-600')
+                  : (finDark ? 'border-transparent text-white/60 hover:text-white' : 'border-transparent text-gray-500 hover:text-gray-700')}
               `}
             >
               {tab.label}

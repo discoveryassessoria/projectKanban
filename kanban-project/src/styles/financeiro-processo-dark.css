@@ -1,0 +1,336 @@
+/* src/styles/financeiro-processo-dark.css
+ *
+ * Tema ESCURO do Financeiro do Processo (referência visual: tela dark/dourada).
+ *
+ * Escopo: só vale dentro de `.fin-dark` (raiz do ProcessoFinanceiro).
+ * Nenhuma outra tela que use `.fpag-page` é afetada.
+ *
+ * Estratégia: remapear as variáveis --fpag-* para a paleta escura e sobrescrever
+ * as superfícies com `#fff` fixo do tema claro. Composição, tamanhos, espaçamentos
+ * e hierarquia permanecem exatamente como no tema claro.
+ */
+
+.fin-dark .fpag-page {
+  --fpag-primary: #d2a948;
+  --fpag-primary-dark: #e0b957;
+  --fpag-primary-light: rgba(210, 169, 72, 0.16);
+
+  --fpag-success: #22c55e;
+  --fpag-success-light: rgba(34, 197, 94, 0.14);
+  --fpag-success-dark: #4ade80;
+  --fpag-danger: #ef4444;
+  --fpag-danger-light: rgba(239, 68, 68, 0.14);
+  --fpag-danger-dark: #f87171;
+  --fpag-warning: #f59e0b;
+  --fpag-warning-light: rgba(245, 158, 11, 0.14);
+  --fpag-warning-dark: #fbbf24;
+  --fpag-info: #3b82f6;
+  --fpag-info-light: rgba(59, 130, 246, 0.14);
+  --fpag-info-dark: #60a5fa;
+
+  --fpag-gray-50: rgba(255, 255, 255, 0.04);
+  --fpag-gray-100: rgba(255, 255, 255, 0.07);
+  --fpag-gray-200: rgba(255, 255, 255, 0.10);
+  --fpag-gray-300: rgba(255, 255, 255, 0.20);
+  --fpag-gray-400: rgba(255, 255, 255, 0.38);
+  --fpag-gray-500: rgba(255, 255, 255, 0.52);
+  --fpag-gray-600: rgba(255, 255, 255, 0.66);
+  --fpag-gray-700: rgba(255, 255, 255, 0.78);
+  --fpag-gray-800: #e5e7eb;
+  --fpag-gray-900: #f4f5f7;
+  --fpag-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  color: #f4f5f7;
+  background: transparent;
+}
+
+/* ---------- Superfícies (tudo que era #fff no tema claro) ---------- */
+.fin-dark .fpag-page .vg-kpi,
+.fin-dark .fpag-page .vg-card-clean,
+.fin-dark .fpag-page .vg-card-inad,
+.fin-dark .fpag-page .vg-chart-card,
+.fin-dark .fpag-page .form-card,
+.fin-dark .fpag-page .table-card,
+.fin-dark .fpag-page .kpi,
+.fin-dark .fpag-page .kpi-prem,
+.fin-dark .fpag-page .sidebar-resumo,
+.fin-dark .fpag-page .moeda-card,
+.fin-dark .fpag-page .cart-card,
+.fin-dark .fpag-page .division-card,
+.fin-dark .fpag-page .exchange-rule-card,
+.fin-dark .fpag-page .tl-event-prem,
+.fin-dark .fpag-page .spnl,
+.fin-dark .fpag-page .sp-btn,
+.fin-dark .fpag-page .btn-prem,
+.fin-dark .fpag-page .btn-outline,
+.fin-dark .fpag-page .fbar,
+.fin-dark .fpag-page .tprem {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(255, 255, 255, 0.10);
+  box-shadow: none;
+}
+
+.fin-dark .fpag-page .division-card.selected,
+.fin-dark .fpag-page .exchange-rule-card.selected,
+.fin-dark .fpag-page .filter-tab.active {
+  background: rgba(210, 169, 72, 0.12);
+  border-color: rgba(210, 169, 72, 0.45);
+}
+
+.fin-dark .fpag-page .tprem thead th {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.55);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+.fin-dark .fpag-page .tprem tbody td {
+  border-color: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.85);
+}
+.fin-dark .fpag-page .tprem tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Campos de formulário */
+.fin-dark .fpag-page .form-input,
+.fin-dark .fpag-page .form-select,
+.fin-dark .fpag-page .form-textarea,
+.fin-dark .fpag-page .fbar input,
+.fin-dark .fpag-page .cart-card-h select {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #f4f5f7;
+}
+.fin-dark .fpag-page .form-input::placeholder,
+.fin-dark .fpag-page .fbar input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+.fin-dark .fpag-page .form-input-readonly {
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ---------- Títulos e textos ---------- */
+.fin-dark .fpag-page .vg-card-clean h3,
+.fin-dark .fpag-page .form-card-title,
+.fin-dark .fpag-page .page-title {
+  color: #f4f5f7;
+}
+.fin-dark .fpag-page .page-subtitle,
+.fin-dark .fpag-page .muted,
+.fin-dark .fpag-page .muted-xs,
+.fin-dark .fpag-page .empty-state {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ---------- KPIs (linha 1) ---------- */
+.fin-dark .fpag-page .vg-kpi-label {
+  color: rgba(255, 255, 255, 0.55);
+}
+.fin-dark .fpag-page .vg-kpi-value {
+  color: #ffffff;
+}
+.fin-dark .fpag-page .vg-kpi-sub {
+  color: rgba(255, 255, 255, 0.45);
+}
+.fin-dark .fpag-page .vg-kpi-icon.green { background: rgba(34, 197, 94, 0.16); color: #22c55e; }
+.fin-dark .fpag-page .vg-kpi-icon.blue { background: rgba(59, 130, 246, 0.16); color: #60a5fa; }
+.fin-dark .fpag-page .vg-kpi-icon.amber { background: rgba(245, 158, 11, 0.16); color: #fbbf24; }
+.fin-dark .fpag-page .vg-kpi-icon.red { background: rgba(239, 68, 68, 0.16); color: #f87171; }
+.fin-dark .fpag-page .vg-kpi-icon.purple { background: rgba(139, 92, 246, 0.18); color: #a78bfa; }
+
+/* ---------- Resumo Financeiro ---------- */
+.fin-dark .fpag-page .resumo-fin .rf-row {
+  border-color: rgba(255, 255, 255, 0.07);
+}
+.fin-dark .fpag-page .resumo-fin .rf-l {
+  color: rgba(255, 255, 255, 0.72);
+}
+.fin-dark .fpag-page .resumo-fin .rf-c {
+  color: #ffffff;
+}
+.fin-dark .fpag-page .resumo-fin .rf-row.high {
+  background: rgba(34, 197, 94, 0.08);
+}
+.fin-dark .fpag-page .resumo-fin .rf-row.margem .rf-l,
+.fin-dark .fpag-page .resumo-fin .rf-row.margem .rf-c {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ---------- Donuts ---------- */
+.fin-dark .fpag-page .donut-clean-center .pct {
+  color: #ffffff;
+}
+.fin-dark .fpag-page .donut-clean-center .lbl {
+  color: rgba(255, 255, 255, 0.5);
+}
+.fin-dark .fpag-page .donut-clean-leg .lbl {
+  color: rgba(255, 255, 255, 0.78);
+}
+.fin-dark .fpag-page .donut-clean-leg .val {
+  color: #ffffff;
+}
+.fin-dark .fpag-page .donut-total {
+  border-color: rgba(255, 255, 255, 0.10);
+  color: #ffffff;
+}
+.fin-dark .fpag-page .donut-total span:first-child {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* ---------- Resultado do Processo ---------- */
+.fin-dark .fpag-page .res-proc-val {
+  color: #ffffff;
+}
+.fin-dark .fpag-page .res-proc-lbl {
+  color: rgba(255, 255, 255, 0.5);
+}
+.fin-dark .fpag-page .res-proc-badge {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  color: #4ade80;
+}
+
+/* ---------- Inadimplência ---------- */
+.fin-dark .fpag-page .inad-val {
+  color: #ffffff;
+}
+.fin-dark .fpag-page .inad-val.zero {
+  color: #ffffff;
+}
+.fin-dark .fpag-page .inad-lbl {
+  color: rgba(255, 255, 255, 0.5);
+}
+.fin-dark .fpag-page .inad-empty {
+  background: rgba(34, 197, 94, 0.10);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+.fin-dark .fpag-page .inad-alert {
+  background: rgba(239, 68, 68, 0.10);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+.fin-dark .fpag-page .inad-alert-text strong {
+  color: #ffffff;
+}
+.fin-dark .fpag-page .inad-alert-text small {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ---------- Fluxo de Caixa ---------- */
+.fin-dark .fpag-page .fluxo-row {
+  border-color: rgba(255, 255, 255, 0.07);
+}
+.fin-dark .fpag-page .fluxo-row .fdate,
+.fin-dark .fpag-page .fluxo-row .flbl {
+  color: rgba(255, 255, 255, 0.72);
+}
+.fin-dark .fpag-page .fluxo-row .fval {
+  color: #ffffff;
+}
+.fin-dark .fpag-page .fluxo-saldo {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+.fin-dark .fpag-page .fluxo-saldo-lbl,
+.fin-dark .fpag-page .fluxo-saldo-sub {
+  color: rgba(255, 255, 255, 0.6);
+}
+.fin-dark .fpag-page .fluxo-saldo-val {
+  color: #ffffff;
+}
+
+/* ---------- Saldos por Moeda ---------- */
+.fin-dark .fpag-page .saldo-mc {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+.fin-dark .fpag-page .saldo-mc-lbl {
+  color: rgba(255, 255, 255, 0.6);
+}
+.fin-dark .fpag-page .saldo-mc-val {
+  color: #ffffff;
+}
+.fin-dark .fpag-page .saldo-mc-sub {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* ---------- Resumo Rápido ---------- */
+.fin-dark .fpag-page .rr-cell {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.fin-dark .fpag-page .rr-cell-lbl {
+  color: rgba(255, 255, 255, 0.55);
+}
+.fin-dark .fpag-page .rr-cell-val {
+  color: #ffffff;
+}
+
+/* ---------- Alertas / badges ---------- */
+.fin-dark .fpag-page .alert {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+}
+.fin-dark .fpag-page .alert-warning {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+.fin-dark .fpag-page .alert-success {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #4ade80;
+}
+.fin-dark .fpag-page .alert-info {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+}
+.fin-dark .fpag-page .badge-recebida { background: rgba(34, 197, 94, 0.16); color: #4ade80; }
+.fin-dark .fpag-page .badge-pendente { background: rgba(245, 158, 11, 0.16); color: #fbbf24; }
+.fin-dark .fpag-page .badge-atrasada { background: rgba(239, 68, 68, 0.16); color: #f87171; }
+
+/* ---------- Botões ---------- */
+.fin-dark .fpag-page .btn-primary {
+  background: #d2a948;
+  color: #1b1508;
+}
+.fin-dark .fpag-page .btn-primary:hover {
+  background: #e0b957;
+}
+.fin-dark .fpag-page .btn-outline,
+.fin-dark .fpag-page .btn-prem {
+  color: rgba(255, 255, 255, 0.85);
+}
+.fin-dark .fpag-page .btn-outline:hover,
+.fin-dark .fpag-page .btn-prem:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+.fin-dark .fpag-page .btn-link-sm {
+  color: #d2a948;
+}
+.fin-dark .fpag-page .vg-link-btn {
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.8);
+}
+.fin-dark .fpag-page .vg-link-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* ---------- Indicadores de câmbio na barra de sub-abas ---------- */
+.fin-dark .fpag-fx-indicator {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.65);
+}
+.fin-dark .fpag-fx-indicator-dot {
+  background: #22c55e;
+}
+.fin-dark .fpag-fx-indicator[data-moeda="EUR"] .fpag-fx-indicator-dot {
+  background: #3b82f6;
+}
+
+/* ---------- Resumo Rápido: chips de ícone ---------- */
+.fin-dark .fpag-page .rr-cell-icon.fa { background: rgba(139, 92, 246, 0.18); color: #a78bfa; }
+.fin-dark .fpag-page .rr-cell-icon.re { background: rgba(34, 197, 94, 0.16); color: #4ade80; }
+.fin-dark .fpag-page .rr-cell-icon.in { background: rgba(239, 68, 68, 0.16); color: #f87171; }
+.fin-dark .fpag-page .rr-cell-icon.do { background: rgba(59, 130, 246, 0.16); color: #60a5fa; }

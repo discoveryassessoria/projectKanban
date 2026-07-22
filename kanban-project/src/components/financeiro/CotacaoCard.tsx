@@ -67,7 +67,7 @@ export function CotacaoCard({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div className="fpag-fx-indicator" style={{ cursor: 'pointer' }}>
+      <div className="fpag-fx-indicator" data-moeda={codigo} style={{ cursor: 'pointer' }}>
         <span className="fpag-fx-indicator-dot" />
         <span>{simbolo}1 = {fmtBRL(valor)} (hoje)</span>
       </div>
@@ -79,8 +79,8 @@ export function CotacaoCard({
             top: '100%',
             right: 0,
             marginTop: 8,
-            background: '#fff',
-            border: '1px solid #e5e7eb',
+            background: '#14161a',
+            border: '1px solid rgba(255,255,255,0.12)',
             borderRadius: 10,
             padding: 16,
             minWidth: 280,
@@ -88,10 +88,10 @@ export function CotacaoCard({
             zIndex: 100,
           }}
         >
-          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginBottom: 2 }}>
             1 {nome} igual a
           </div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#111827', lineHeight: 1.1 }}>
+          <div style={{ fontSize: 28, fontWeight: 700, color: '#ffffff', lineHeight: 1.1 }}>
             {fmtBRL(valor)}
           </div>
           <div style={{ fontSize: 13, color: cor, marginTop: 4, fontWeight: 500 }}>

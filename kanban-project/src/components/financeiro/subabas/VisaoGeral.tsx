@@ -549,7 +549,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5 }: VisaoGeralProps) {
                           { value: metrics.recP, color: '#f97316' },
                           { value: 0, color: '#9ca3af' },
                         ]
-                      : [{ value: 1, color: '#e5e7eb' }]
+                      : [{ value: 1, color: '#3a3f47' }]
                   }
                   size={160}
                   thickness={18}
@@ -595,7 +595,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5 }: VisaoGeralProps) {
                           { value: metrics.cusPagos, color: '#ef4444' },
                           { value: metrics.cusAPagar, color: '#fb923c' },
                         ]
-                      : [{ value: 1, color: '#e5e7eb' }]
+                      : [{ value: 1, color: '#3a3f47' }]
                   }
                   size={160}
                   thickness={18}
@@ -663,7 +663,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5 }: VisaoGeralProps) {
               <div className="inad-empty">
                 <div className="inad-empty-icon">✓</div>
                 <div className="inad-alert-text">
-                  <strong style={{ color: '#065f46' }}>Tudo em dia</strong>
+                  <strong style={{ color: 'var(--fpag-success-dark)' }}>Tudo em dia</strong>
                   <small>Sem parcelas em atraso</small>
                 </div>
               </div>

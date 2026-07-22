@@ -15,6 +15,7 @@
 'use client'
 
 import '@/src/styles/financeiro-paginas.css'
+import '@/src/styles/financeiro-processo-dark.css'
 import { useEffect, useState } from 'react'
 import { Receitas } from '@/src/components/financeiro/subabas/Receitas'
 import { Custos } from '@/src/components/financeiro/subabas/Custos'
@@ -95,7 +96,7 @@ export function ProcessoFinanceiro({
 
   return (
     <div
-      className="processo-financeiro-root"
+      className="processo-financeiro-root fin-dark"
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -110,8 +111,8 @@ export function ProcessoFinanceiro({
       {/* ============ Barra de sub-abas (clone visual do .fin-tabs) ============ */}
       <div
         style={{
-          background: '#fff',
-          borderBottom: '1px solid #e5e7eb',
+          background: 'rgba(0,0,0,0.35)',
+          borderBottom: '1px solid rgba(255,255,255,0.10)',
           padding: '0 32px',
           display: 'flex',
           gap: 0,
@@ -126,7 +127,7 @@ export function ProcessoFinanceiro({
         <FinTab
           active={aba === 'visao-geral'}
           onClick={() => setAba('visao-geral')}
-          label="📖 Visão Geral"
+          label="Visão Geral"
         />
         <FinTab
           active={aba === 'receitas'}
@@ -223,7 +224,7 @@ function FinTab({
       style={{
         padding: '14px 18px',
         fontSize: 14,
-        color: active ? '#5b3fff' : '#4b5563',
+        color: active ? '#d2a948' : 'rgba(255,255,255,0.62)',
         fontWeight: active ? 600 : 500,
         display: 'inline-flex',
         alignItems: 'center',
@@ -233,7 +234,7 @@ function FinTab({
         border: 'none',
         borderBottomWidth: 2,
         borderBottomStyle: 'solid',
-        borderBottomColor: active ? '#5b3fff' : 'transparent',
+        borderBottomColor: active ? '#d2a948' : 'transparent',
         cursor: 'pointer',
         whiteSpace: 'nowrap',
       }}
