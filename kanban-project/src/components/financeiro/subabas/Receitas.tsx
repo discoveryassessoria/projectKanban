@@ -36,7 +36,7 @@ import {
   fmtCambio,
   fmtData,
 } from '@/lib/financeiro/apresentacao-lancamento'
-import { ReceitaFinanceiraModal } from '../receita-modal/ReceitaFinanceiraModal'
+import { ReceitaCobrancaModal } from '../ReceitaCobrancaModal'
 
 type ReceitaAPI = LancamentoView & { faseLabel?: string | null }
 
@@ -445,7 +445,7 @@ export function Receitas({ processoId, onUpdate }: ReceitasProps) {
 
       {/* ── 5 · MODAL FINANCEIRO CENTRAL ── */}
       {lancamentoAberto != null && (
-        <ReceitaFinanceiraModal
+        <ReceitaCobrancaModal
           receitaId={lancamentoAberto}
           onClose={() => setLancamentoAberto(null)}
           onChanged={() => { void carregar(); onUpdate?.() }}
