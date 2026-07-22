@@ -14,9 +14,21 @@ export const TIPOS_PAGAMENTO = ['AVISTA', 'PARCELADO']
 export const PERIODICIDADES = ['SEMANAL', 'QUINZENAL', 'MENSAL', 'BIMESTRAL', 'TRIMESTRAL', 'SEMESTRAL', 'ANUAL', 'PERSONALIZADA']
 export const INICIOS = ['IMEDIATA', 'DIAS', 'DATA_ESPECIFICA']
 export const AJUSTES_DIA_UTIL = ['NENHUM', 'ULTIMO_DIA_UTIL', 'PROXIMO_DIA_UTIL']
-export const DISTRIBUICOES = ['IGUAIS', 'ULTIMA_AJUSTA', 'PRIMEIRA_DIFERENCIADA', 'ENTRADA_SALDO', 'PERSONALIZADO']
-export const POLITICAS_CAMBIO = ['FIXO', 'VARIAVEL', 'CONTRATACAO', 'RECEBIMENTO']
-export const APLICA_A = ['RECEITA', 'CUSTO', 'AMBOS']
+// Distribuição — inclui os modos novos (primeira/última maior, entrada fixa/percentual).
+export const DISTRIBUICOES = ['IGUAIS', 'ULTIMA_AJUSTA', 'PRIMEIRA_DIFERENCIADA', 'PRIMEIRA_MAIOR', 'ULTIMA_MAIOR', 'ENTRADA_FIXA', 'ENTRADA_PERCENTUAL', 'ENTRADA_SALDO', 'PERSONALIZADO']
+// Política Cambial (SUGESTÃO — a decisão efetiva é da Cobrança). Valores legados preservados.
+export const POLITICAS_CAMBIO = ['PADRAO_SISTEMA', 'SUGERIR_VARIAVEL', 'SUGERIR_TRAVA', 'FIXO', 'VARIAVEL', 'CONTRATACAO', 'RECEBIMENTO']
+export const APLICA_A = ['RECEITA', 'CUSTO', 'AMBOS'] // rótulos na UI: Contas a Receber | Contas a Pagar | Ambos
+
+// ── novos enums (regra reutilizável) ──
+export const POLITICAS_TAXAS = ['IGNORAR', 'REPASSAR', 'ABSORVER', 'ESCOLHER_NA_COBRANCA']
+export const ENTRADA_TIPOS = ['PERCENTUAL', 'VALOR_FIXO']
+export const DIA_INEXISTENTE = ['ULTIMO_DIA', 'PROX_UTIL', 'ANT_UTIL']
+export const AJUSTE_DATA = ['MANTER', 'PROX_UTIL', 'ANT_UTIL']
+export const MULTA_TIPOS = ['FIXA', 'PERCENTUAL']
+export const JUROS_TIPOS = ['SIMPLES', 'COMPOSTO']
+export const JUROS_PERIODOS = ['DIARIO', 'MENSAL']
+export const DESCONTO_TIPOS = ['COMERCIAL', 'ANTECIPACAO']
 
 export function num(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null

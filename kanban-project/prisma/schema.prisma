@@ -2131,6 +2131,44 @@ model CondicaoPagamento {
 
   observacoes String? @db.Text
 
+  // ── REGRA REUTILIZÁVEL (Receita → Cobrança → Parcelas → Pagamentos) ──
+  // A Condição é apenas a REGRA que o motor usa ao criar uma Cobrança. Ela nunca
+  // congela dados da Cobrança (cliente/conta/cotação/datas reais). Tudo aqui é
+  // POLÍTICA/SUGESTÃO; a decisão efetiva pertence à Cobrança.
+
+  // Política de Taxas: a taxa depende da FORMA escolhida na Cobrança; aqui só a política.
+  politicaTaxas String @default("IGNORAR") @db.VarChar(30) // IGNORAR | REPASSAR | ABSORVER | ESCOLHER_NA_COBRANCA
+
+  // Forma SUGERIDA (não escolhe; apenas sugere). Ref. solta → FormaPagamentoCadastro.
+  formaSugeridaId Int?
+
+  // Entrada (expansão)
+  entradaTipo        String?  @db.VarChar(20) // PERCENTUAL | VALOR_FIXO
+  entradaMin         Decimal? @db.Decimal(12, 2)
+  entradaMax         Decimal? @db.Decimal(12, 2)
+  entradaCompoeTotal Boolean  @default(true)
+  entradaAdicional   Boolean  @default(false)
+
+  // Cronograma — comportamentos explícitos (nunca implícitos)
+  diaInexistente        String? @db.VarChar(20) // ULTIMO_DIA | PROX_UTIL | ANT_UTIL
+  comportamentoFimSemana String? @db.VarChar(20) // MANTER | PROX_UTIL | ANT_UTIL
+  comportamentoFeriado   String? @db.VarChar(20) // MANTER | PROX_UTIL | ANT_UTIL
+
+  // Encargos (expansão)
+  multaTipo               String?  @db.VarChar(20) // FIXA | PERCENTUAL
+  multaValor              Decimal? @db.Decimal(12, 2)
+  jurosTipo               String?  @db.VarChar(20) // SIMPLES | COMPOSTO
+  jurosPeriodo            String?  @db.VarChar(20) // DIARIO | MENSAL
+  carenciaDias            Int?
+  descontoTipo            String?  @db.VarChar(20) // COMERCIAL | ANTECIPACAO
+  descontoAntecipacaoAuto Boolean  @default(false)
+  quemConcedeDesconto     String?  @db.VarChar(40)
+
+  // Aplicabilidade (expansão)
+  perfil   String? @db.VarChar(60)
+  canal    String? @db.VarChar(60)
+  servicos Int[]   @default([]) // restringe a Serviços Financeiros (ref. solta → catálogo)
+
   // ── vínculos ──
   formasPermitidas CondicaoPagamentoForma[]
   taxasVinculadas  CondicaoPagamentoTaxa[]
@@ -2266,6 +2304,46 @@ model FormaPagamentoCadastro {
   aceitaRecorrencia      Boolean @default(false)
   aceitaMoedaEstrangeira Boolean @default(false)
   observacoes            String? @db.Text
+
+  // ── CAPACIDADES TÉCNICAS (regra reutilizável — só descreve o MEIO) ──
+  // `type` string livre continua no banco; a UI passa a usar um enum controlado.
+  descricao String? @db.VarChar(300)
+  categoria String? @db.VarChar(40)
+
+  // Moedas aceitas (multi) — substitui a `moeda` única (preservada p/ backfill).
+  moedasAceitas String[] @default([]) // codes de MoedaCadastro (BRL/EUR/USD/GBP...)
+
+  // Capacidades do meio (flags independentes)
+  permiteCancelamento   Boolean @default(false)
+  permiteEstorno        Boolean @default(false)
+  permiteReembolso      Boolean @default(false)
+  permiteInternacional  Boolean @default(false)
+  liquidacaoAutomatica  Boolean @default(false)
+  conciliacaoAutomatica Boolean @default(false)
+  permiteComprovante    Boolean @default(false)
+  emissaoAutomatica     Boolean @default(false)
+  permiteCobrancaManual Boolean @default(true)
+
+  // Integração
+  tipoIntegracao     String? @db.VarChar(20) // MANUAL | BANCO | GATEWAY | ADQUIRENTE | CARTEIRA | NENHUMA
+  provedorIntegracao String? @db.VarChar(120)
+  integracaoAtiva    Boolean @default(false)
+
+  // Destinos compatíveis (refs por ID — a escolha efetiva é da Cobrança)
+  carteirasCompativeis Int[] @default([]) // → CarteiraRecebimento.id
+  contasCompativeis    Int[] @default([]) // → ContaBancaria.id
+
+  // Liquidação (informativo — apoia projeção de caixa; NÃO marca recebimento)
+  prazoLiquidacao   String? @db.VarChar(10) // IMEDIATO | D0 | D1 | D2 | DN
+  diasLiquidacao    Int?
+  diasCorridos      Boolean @default(true)
+  permiteAntecipacao Boolean @default(false)
+
+  // Taxas — apenas FLAGS de capacidade (valores vêm de TaxaPagamento)
+  utilizaTaxas            Boolean @default(false)
+  permiteTaxaAntecipacao  Boolean @default(false)
+  permiteTaxaParcelamento Boolean @default(false)
+  permiteTaxaInternacional Boolean @default(false)
 
   condicoes CondicaoPagamentoForma[]
 

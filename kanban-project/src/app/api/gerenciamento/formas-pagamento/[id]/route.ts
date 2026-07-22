@@ -2,19 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
+import { validarForma, paraColunasForma } from '../campos'
 
-function toStrOrNull(v: any): string | null {
-  if (v === undefined || v === null) return null
-  const s = String(v).trim()
-  return s === '' ? null : s
-}
-function toIntOrNull(v: any): number | null {
-  if (v === undefined || v === null || v === '') return null
-  const n = Number(v)
-  return Number.isFinite(n) ? Math.trunc(n) : null
-}
-
-// PUT - Atualizar forma de pagamento
+// PUT — Atualizar forma de pagamento (merge campo-a-campo → mapeamento único).
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
@@ -26,25 +16,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!atual) return NextResponse.json({ error: 'Forma de pagamento não encontrada' }, { status: 404 })
 
     const b = await request.json()
-    const forma = await prisma.formaPagamentoCadastro.update({
-      where: { id },
-      data: {
-        code: b.code !== undefined ? toStrOrNull(b.code) : atual.code,
-        name: b.name !== undefined ? String(b.name).trim() : atual.name,
-        type: b.type !== undefined ? toStrOrNull(b.type) : atual.type,
-        moeda: b.moeda !== undefined ? toStrOrNull(b.moeda) : atual.moeda,
-        permiteParcelas: b.permiteParcelas !== undefined ? !!b.permiteParcelas : atual.permiteParcelas,
-        ativo: b.ativo !== undefined ? !!b.ativo : atual.ativo,
-        ordem: b.ordem !== undefined ? (Number.isFinite(Number(b.ordem)) ? Math.trunc(Number(b.ordem)) : atual.ordem) : atual.ordem,
-        icone: b.icone !== undefined ? (b.icone ? String(b.icone).slice(0, 60) : null) : atual.icone,
-        aceitaEntrada: b.aceitaEntrada !== undefined ? !!b.aceitaEntrada : atual.aceitaEntrada,
-        aceitaRecorrencia: b.aceitaRecorrencia !== undefined ? !!b.aceitaRecorrencia : atual.aceitaRecorrencia,
-        aceitaMoedaEstrangeira: b.aceitaMoedaEstrangeira !== undefined ? !!b.aceitaMoedaEstrangeira : atual.aceitaMoedaEstrangeira,
-        observacoes: b.observacoes !== undefined ? (b.observacoes ? String(b.observacoes) : null) : atual.observacoes,
-        maxParcelas: b.maxParcelas !== undefined ? toIntOrNull(b.maxParcelas) : atual.maxParcelas,
-      },
-    })
+    // merge: só sobrescreve o que veio no body; o resto preserva o registro atual
+    const merged = { ...atual, ...b }
+    const erros = validarForma(merged)
+    if (erros.length) return NextResponse.json({ error: erros[0].mensagem, erros }, { status: 400 })
 
+    const forma = await prisma.formaPagamentoCadastro.update({ where: { id }, data: paraColunasForma(merged) })
     return NextResponse.json({ forma })
   } catch (error) {
     console.error('Erro ao atualizar forma de pagamento:', error)
@@ -52,7 +29,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-// DELETE - Excluir forma de pagamento
+// DELETE — bloqueia se houver Cobrança/Condição em uso; prefira desativar.
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
@@ -60,9 +37,20 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     const { id: idStr } = await params
     const id = Number(idStr)
+
+    const [emCondicao, emCobranca] = await Promise.all([
+      prisma.condicaoPagamentoForma.count({ where: { formaId: id } }),
+      prisma.cobranca.count({ where: { formaPagamentoId: id } }),
+    ])
+    if (emCondicao + emCobranca > 0) {
+      return NextResponse.json({
+        error: 'Forma em uso — desative em vez de excluir.',
+        codigo: 'EM_USO', uso: { condicoes: emCondicao, cobrancas: emCobranca },
+      }, { status: 409 })
+    }
+
     await registrarAuditoria(request, { acao: 'EXCLUIR', entidade: 'FormaPagamentoCadastro', entidadeId: id, descricao: `Forma de pagamento excluída (#${id})` })
     await prisma.formaPagamentoCadastro.delete({ where: { id } })
-
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('Erro ao excluir forma de pagamento:', error)

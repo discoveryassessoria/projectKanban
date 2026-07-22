@@ -9,7 +9,12 @@
 import { prisma } from '@/lib/prisma'
 
 export interface ConfiguracaoFinanceira {
-  formasPagamento: { id: number; code: string | null; name: string; icone: string | null; permiteParcelas: boolean; maxParcelas: number | null; moeda: string | null; ativo: boolean }[]
+  formasPagamento: {
+    id: number; code: string | null; name: string; icone: string | null; type: string | null
+    permiteParcelas: boolean; maxParcelas: number | null; moeda: string | null; moedasAceitas: string[]; ativo: boolean
+    aceitaEntrada: boolean; aceitaRecorrencia: boolean; permiteInternacional: boolean
+    carteirasCompativeis: number[]; contasCompativeis: number[]; prazoLiquidacao: string | null
+  }[]
   condicoesPagamento: {
     id: number; name: string; codigo: string | null; versao: number; moeda: string; ativo: boolean
     tipoPagamento: string; parcelas: number; parcelasMin: number | null; parcelasMax: number | null; parcelasPadrao: number | null
@@ -43,7 +48,14 @@ export async function obterConfiguracaoFinanceira(opts?: { incluirInativos?: boo
   ])
 
   return {
-    formasPagamento: formas.map((f) => ({ id: f.id, code: f.code, name: f.name, icone: f.icone, permiteParcelas: f.permiteParcelas, maxParcelas: f.maxParcelas, moeda: f.moeda, ativo: f.ativo })),
+    formasPagamento: formas.map((f) => ({
+      id: f.id, code: f.code, name: f.name, icone: f.icone, type: f.type,
+      permiteParcelas: f.permiteParcelas, maxParcelas: f.maxParcelas, moeda: f.moeda,
+      moedasAceitas: f.moedasAceitas?.length ? f.moedasAceitas : (f.moeda ? [f.moeda] : []),
+      ativo: f.ativo, aceitaEntrada: f.aceitaEntrada, aceitaRecorrencia: f.aceitaRecorrencia,
+      permiteInternacional: f.permiteInternacional, carteirasCompativeis: f.carteirasCompativeis ?? [],
+      contasCompativeis: f.contasCompativeis ?? [], prazoLiquidacao: f.prazoLiquidacao,
+    })),
     condicoesPagamento: condicoes.map((c) => ({
       id: c.id, name: c.name, codigo: c.codigo, versao: c.versao, moeda: String(c.moeda), ativo: c.ativo,
       tipoPagamento: c.tipoPagamento, parcelas: c.parcelas, parcelasMin: c.parcelasMin, parcelasMax: c.parcelasMax, parcelasPadrao: c.parcelasPadrao,
