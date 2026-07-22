@@ -23,8 +23,11 @@ import { createHash } from 'node:crypto'
 export type MoedaEstrangeira = 'EUR' | 'USD'
 export type StatusConsulta = 'OK' | 'CONFIGURACAO_PENDENTE' | 'INDISPONIVEL' | 'INCONSISTENTE'
 
-/** Modalidade comercial oficial usada por moeda (documentada, gravada no registro). */
-export const MODALIDADE_OFICIAL = 'ecommerce_especie_venda'
+/** Modalidade comercial oficial (documentada, gravada no registro): TRANSFERÊNCIA
+ *  INTERNACIONAL (remessa) — venda. É a regra comercial praticada pela Discovery
+ *  (o "você paga" do simulador de Transferências Internacionais). Preço por unidade
+ *  = venda.valor × (1 + IOF/100). A tarifa (taxa%) NÃO entra no valor unitário. */
+export const MODALIDADE_OFICIAL = 'transferencia_internacional_venda'
 export const ORIGEM_AUTOMATICA = 'CONFIDENCE_AUTOMATICO'
 export const FONTE_NOME = 'Confidence Câmbio'
 
@@ -65,8 +68,8 @@ const CONFIDENCE_BASE = process.env.CONFIDENCE_BASE_URL || 'https://b8pybk7hl9.e
 const CONFIDENCE_AUTH = process.env.CONFIDENCE_AUTH || '$2y$12$M4fgZx/W7r9yRWtkqZ7yx.cBlfZjRgvGzVmwOXrUEBiA8BMCn88Bq'
 const CONFIDENCE_CIDADE = process.env.CONFIDENCE_CIDADE_ID || '1'
 const CONFIDENCE_UA = process.env.CONFIDENCE_UA || 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
-// IDs oficiais da modalidade ESPÉCIE no e-commerce (moedas-operacionais): EUR=35, USD=29.
-const MOEDA_ID: Record<MoedaEstrangeira, string> = { EUR: process.env.CONFIDENCE_ID_EUR || '35', USD: process.env.CONFIDENCE_ID_USD || '29' }
+// IDs oficiais da modalidade REMESSA (transferência internacional): EUR=85, USD=34.
+const MOEDA_ID: Record<MoedaEstrangeira, string> = { EUR: process.env.CONFIDENCE_ID_EUR || '85', USD: process.env.CONFIDENCE_ID_USD || '34' }
 
 /**
  * Extrai o valor final de VENDA (espécie) da moeda a partir do payload da fonte.
@@ -117,11 +120,13 @@ export class ConfidenceExchangeProvider implements ExchangeProvider {
       }
       const iof = Number(venda.iof) || 0
       const tarifa = Number(venda.taxa) || 0
-      // PREÇO FINAL comercial (espécie/venda) — composição IOF + tarifa preservada e auditável.
-      const valorFinal = Math.round(venda.valor * (1 + (iof + tarifa) / 100) * 1e6) / 1e6
+      // PREÇO por unidade da TRANSFERÊNCIA INTERNACIONAL (venda) = base × (1 + IOF/100).
+      // Confere com o simulador oficial: 1000 × [valor×(1+IOF/100)] = "você paga". A tarifa
+      // (taxa%) é fee separado, NÃO entra no valor unitário. Composição preservada (auditável).
+      const valorFinal = Math.round(venda.valor * (1 + iof / 100) * 1e6) / 1e6
       const [min, max] = FAIXA[moeda]
       if (valorFinal < min || valorFinal > max) return { ...base, status: 'INCONSISTENTE', detalhe: `valor ${valorFinal} fora da faixa [${min},${max}]`, payloadHash: hashPayload({ moeda, payload }) }
-      const composicao = `Confidence espécie/venda: base=${venda.valor} +IOF ${iof}% +tarifa ${tarifa}% = ${valorFinal}`
+      const composicao = `Confidence remessa/venda: base=${venda.valor} +IOF ${iof}% = ${valorFinal} (tarifa ${tarifa}% à parte)`
       return { ...base, valor: valorFinal, payloadHash: hashPayload({ moeda, valor: venda.valor, iof, tarifa }), status: 'OK', detalhe: composicao }
     } catch (e) {
       return { ...base, status: 'INDISPONIVEL', detalhe: (e instanceof Error ? e.message : String(e)).slice(0, 140) }

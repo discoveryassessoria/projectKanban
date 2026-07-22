@@ -58,7 +58,7 @@ async function buscarComRetry(moeda: MoedaEstrangeira, tentativas = 3): Promise<
 async function persistir(r: CotacaoProviderResult): Promise<{ cotacaoId: number; revisao: boolean; semNovaPublicacao: boolean }> {
   const de = r.moedaOrigem as unknown as Moeda
   const para = Moeda.BRL
-  const dataRef = r.dataReferencia ? new Date(r.dataReferencia + 'T00:00:00Z') : null
+  const dataRef = r.dataReferencia ? new Date(r.dataReferencia + 'T12:00:00Z') : null // meio-dia UTC: evita "voltar 1 dia" em BRT
 
   // idempotência: mesmo (moeda,destino,dataRef,modalidade,origem,payloadHash) → não duplica.
   const igual = await prisma.cotacaoCambio.findFirst({

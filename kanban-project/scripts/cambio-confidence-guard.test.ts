@@ -31,7 +31,7 @@ console.log('\nHash idempotente')
 console.log('\nProvider LIVE (endpoint público do widget) — estrutura correta, sem inventar')
 {
   ;(async () => {
-    T('modalidade oficial documentada', MODALIDADE_OFICIAL === 'ecommerce_especie_venda')
+    T('modalidade oficial documentada (transferência internacional)', MODALIDADE_OFICIAL === 'transferencia_internacional_venda')
     T('origem CONFIDENCE_AUTOMATICO', ORIGEM_AUTOMATICA === 'CONFIDENCE_AUTOMATICO')
 
     console.log('\nGuardas estruturais')
@@ -39,8 +39,8 @@ console.log('\nProvider LIVE (endpoint público do widget) — estrutura correta
     T('não usa BCE/BancoCentral/awesomeapi como fallback', !/bcb|bancocentral|awesomeapi|economia\.awesomeapi|ptax/i.test(provSrc))
     T('endpoint real do widget (moedas-operacionais/{id}/cotacao)', /v2\/moedas-operacionais\/\$\{MOEDA_ID\[moeda\]\}\/cotacao\?cidade-id=/.test(provSrc))
     T('header auth (token público do widget)', /auth: CONFIDENCE_AUTH/.test(provSrc))
-    T('composição IOF + tarifa preservada (auditável)', /venda\.valor \* \(1 \+ \(iof \+ tarifa\) \/ 100\)/.test(provSrc))
-    T('IDs espécie EUR=35 USD=29', /EUR.*'35'/.test(provSrc) && /USD.*'29'/.test(provSrc))
+    T('preço = base × (1 + IOF/100), tarifa à parte (auditável)', /venda\.valor \* \(1 \+ iof \/ 100\)/.test(provSrc))
+    T('IDs remessa EUR=85 USD=34', /EUR.*'85'/.test(provSrc) && /USD.*'34'/.test(provSrc))
     T('rejeita venda.valor ausente/<=0 (não inventa/zero)', /venda\.valor > 0/.test(provSrc) && /INCONSISTENTE/.test(provSrc))
     const svc = src('src/lib/cambio/servico-cambio.ts')
     T('serviço usa trava de concorrência (advisory lock)', /pg_try_advisory_lock/.test(svc))
