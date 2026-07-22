@@ -192,30 +192,24 @@ type DbLancamento = Prisma.TransactionClient | typeof prisma
 async function criarReceita(db: DbLancamento, pid: number, descricao: string, valor: number, moeda: Moeda, fx: number, honorario: boolean, fz: FreezeExec = {}): Promise<number> {
   const codigo = await gerarCodigoReceita()
   const dataBase = new Date()
-  // Condição de Pagamento da Configuração Financeira → cronograma, taxas e
-  // encargos. Sem condição vinculada, cai no comportamento histórico.
-  const ap = await aplicarCondicaoPagamento({
-    configId: fz.configId ?? null, natureza: 'RECEITA', moeda: String(moeda), valor, dataBase,
-  })
-  const parcelas = ap.parcelas
-  const data1 = ap.data1
+  // ARQUITETURA (base ÚNICA): a Receita é SÓ o CONTRATO gerado pelo motor. NÃO nasce
+  // com parcelas, vencimento, forma nem condição de pagamento — isso pertence à COBRANÇA.
+  // As Parcelas nascem apenas quando uma Cobrança é criada (a partir da sua Condição).
+  // Legado intacto (receitas antigas mantêm suas parcelas). `data1` (obrigatório no schema)
+  // recebe a data de criação como valor neutro — não é mais cronograma.
   const valorBrlRef = Number((valor * fx).toFixed(2))
   const rec = await db.receita.create({
     data: {
       codigo, processoId: pid,
       categoria: honorario ? CategoriaReceita.HONORARIOS : CategoriaReceita.OUTROS,
       descricao: descricao.slice(0, 300), moeda, valor,
-      fxEstimado: fx, fxRule: FxRule.VARIAVEL, nParcelas: ap.campos.nParcelas, data1, periodicidade: ap.campos.periodicidade, status: ReceitaStatus.ATIVA,
-      condicaoPagamentoId: ap.campos.condicaoPagamentoId, condicaoVersao: ap.campos.condicaoVersao, condicaoCodigo: ap.campos.condicaoCodigo,
-      valorBruto: ap.campos.valorBruto, valorTaxas: ap.campos.valorTaxas, valorLiquido: ap.campos.valorLiquido,
-      memoriaCalculo: (ap.campos.memoriaCalculo ?? undefined) as Prisma.InputJsonValue | undefined,
+      fxEstimado: fx, fxRule: FxRule.VARIAVEL, nParcelas: 1, data1: dataBase, periodicidade: 'Mensal', status: ReceitaStatus.ATIVA,
       origem: 'motor', origemLancamento: 'PROCESSO', naturezaLancamento: 'RECEITA',
       pricingRuleId: fz.tabelaValorId ?? null, valorUnitario: valor, quantidade: 1, valorTotalCongelado: valor,
       modoCalculoAplicado: fz.tabelaValorId != null ? 'fixed' : 'manual', naturezaPreco: fz.naturezaPreco ?? 'VENDA',
       configFinanceiraId: fz.configId ?? null, regraFinanceiraId: fz.regraId ?? null, contextoAplicado: fz.contexto ?? undefined, dataReferencia: dataBase,
       phaseKey: fz.phaseKey ?? null, phaseCycle: fz.phaseCycle ?? null, chaveIdempotencia: fz.chaveIdempotencia ?? null,
-      parcelas: { create: parcelas },
-      eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Receita criada pelo motor: ${descricao}${ap.resumo}`.slice(0, 500), valor, cambio: fx, valorBrl: valorBrlRef } },
+      eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Receita (contrato) criada pelo motor: ${descricao}`.slice(0, 500), valor, cambio: fx, valorBrl: valorBrlRef } },
     },
   })
   return rec.id
@@ -856,9 +850,13 @@ export async function aplicarHonorariosPorRequerente(processoId: number): Promis
           contextoAplicado: contexto, descricao: desc,
           eventos: { create: { tipo: 'EDICAO', descricao: `Recalculado: ${n} requerente(s) → €${total}`.slice(0, 500), valor: total, cambio: fx, valorBrl: Number((total * fx).toFixed(2)) } },
         } })
-        // reemite a parcela única com o novo valor (nParcelas=1)
-        await tx.parcelaFinanceira.deleteMany({ where: { receitaId: rec.id } })
-        await tx.parcelaFinanceira.create({ data: { receitaId: rec.id, numero: 1, vencimento: new Date(), valor: total, status: 'PENDENTE' } })
+        // Base ÚNICA: a Receita é contrato (sem parcelas). Só re-emite a parcela quando
+        // for LEGADO (receita antiga que já tinha parcelas direto). Novas receitas não
+        // ganham parcela aqui — o parcelamento vive na Cobrança.
+        if (rec.parcelas.length > 0) {
+          await tx.parcelaFinanceira.deleteMany({ where: { receitaId: rec.id, cobrancaId: null } })
+          await tx.parcelaFinanceira.create({ data: { receitaId: rec.id, numero: 1, vencimento: new Date(), valor: total, status: 'PENDENTE' } })
+        }
       }, { timeout: 30000, maxWait: 10000 })
       return { aplicavel: true, n, total, moeda, acao: 'atualizado', receitaId: rec.id }
     }

@@ -217,7 +217,9 @@ secao('Cenário 10 — nenhuma criação manual reintroduzida')
   const proibidos = ['Nova Receita', 'Novo Custo', 'Adicionar Receita', 'Criar Receita', 'Lançamento Manual', 'NovaReceitaPagina', 'LancarParcelaPagina']
   for (const p of proibidos) ok(`sem "${p}"`, !src.includes(p))
   ok('sem POST de criação de receita na tela', !/method:\s*['"]POST['"][\s\S]{0,200}\/api\/financeiro\/receitas['"]/.test(src))
-  ok('modal central é o caminho de operação', src.includes('ReceitaFinanceiraModal'))
+  // Base ÚNICA: o modal de operação virou ReceitaCobrancaModal (Receita=contrato →
+  // Cobrança → Parcelas → Pagamento), na identidade premium do Financeiro.
+  ok('modal central é o caminho de operação (ReceitaCobrancaModal)', src.includes('ReceitaCobrancaModal'))
   ok('drawer lateral removido da tela', !src.includes('ReceitaDrawer'))
   ok('drawer lateral removido do repositório', !existsSync(join(RAIZ, 'src/components/financeiro/ReceitaDrawer.tsx')))
 }

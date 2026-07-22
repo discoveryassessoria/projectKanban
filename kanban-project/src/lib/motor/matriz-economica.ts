@@ -414,27 +414,20 @@ async function criarCusto(pid: number, descricao: string, c: Congelado, v: Vinc)
 async function criarReceita(pid: number, descricao: string, c: Congelado, v: Vinc): Promise<number> {
   const codigo = await gerarCodigoReceita()
   const dataBase = new Date()
-  const ap = await aplicarCondicaoPagamento({
-    configId: c.configId, natureza: 'RECEITA', moeda: String(c.moeda), valor: Number(c.valor), dataBase,
-  })
-  const parcelas = ap.parcelas
-  const data1 = ap.data1
+  // ARQUITETURA (base ÚNICA): Receita = SÓ o contrato. Sem parcelas/condição/vencimento
+  // (isso vive na Cobrança). `data1` obrigatório recebe a data de criação (valor neutro).
   const row = await prisma.receita.create({
     data: {
       codigo, processoId: pid, categoria: CategoriaReceita.PASTA_DOCUMENTAL,
       descricao: descricao.slice(0, 300), moeda: c.moeda, valor: c.valor,
-      fxEstimado: 1, fxRule: FxRule.VARIAVEL, nParcelas: ap.campos.nParcelas, data1, periodicidade: ap.campos.periodicidade, status: ReceitaStatus.ATIVA,
-      condicaoPagamentoId: ap.campos.condicaoPagamentoId, condicaoVersao: ap.campos.condicaoVersao, condicaoCodigo: ap.campos.condicaoCodigo,
-      valorBruto: ap.campos.valorBruto, valorTaxas: ap.campos.valorTaxas, valorLiquido: ap.campos.valorLiquido,
-      memoriaCalculo: (ap.campos.memoriaCalculo ?? undefined) as Prisma.InputJsonValue | undefined,
+      fxEstimado: 1, fxRule: FxRule.VARIAVEL, nParcelas: 1, data1: dataBase, periodicidade: 'Mensal', status: ReceitaStatus.ATIVA,
       personId: v.personId, documentoId: v.documentoId, tipoServicoId: v.tipoServicoId,
       phaseKey: v.phaseKey, phaseCycle: v.phaseCycle, productServiceId: v.productServiceId, origem: 'motor',
       // §6/§8 — preço CONGELADO + rastreabilidade
       pricingRuleId: c.tabelaValorId, valorUnitario: c.valorUnitario, quantidade: c.quantidade, valorTotalCongelado: c.valor,
       modoCalculoAplicado: c.modoCalculo, naturezaPreco: c.natureza, configFinanceiraId: c.configId,
       regraFinanceiraId: c.regraFinanceiraId, contextoAplicado: c.contexto, dataReferencia: c.dataReferencia, chaveIdempotencia: c.chaveIdempotencia,
-      parcelas: { create: parcelas },
-      eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Receita criada pelo motor (Matriz): ${descricao}`.slice(0, 500), valor: c.valor } },
+      eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Receita (contrato) criada pelo motor (Matriz): ${descricao}`.slice(0, 500), valor: c.valor } },
     },
   })
   return row.id

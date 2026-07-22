@@ -251,9 +251,11 @@ secao('FinanceRuleEngine consome a Condição de Pagamento')
   // internamente resolve a condição, gera o cronograma e calcula taxas/encargos.
   ok('executor usa o ponto único de aplicação', executor.includes('aplicarCondicaoPagamento'))
   ok('executor não chama mais gerarParcelas', !executor.includes('gerarParcelas'))
-  ok('nParcelas vem do cronograma', executor.includes('nParcelas: ap.campos.nParcelas'))
-  ok('periodicidade vem do cronograma', executor.includes('periodicidade: ap.campos.periodicidade'))
-  ok('condição aplicada é congelada no lançamento', executor.includes('condicaoPagamentoId: ap.campos.condicaoPagamentoId'))
+  // ARQUITETURA base ÚNICA: o CUSTO ainda aplica a condição (cronograma/parcelas); a
+  // RECEITA virou CONTRATO puro — não nasce com parcelas/condição (isso vive na Cobrança).
+  ok('custo ainda aplica condição (nParcelas do cronograma)', executor.includes('nParcelas: ap.campos.nParcelas'))
+  ok('Receita = contrato: motor NÃO gera parcelas/condição na receita', /a Receita é SÓ o CONTRATO/.test(executor))
+  ok('condição congelada no CUSTO', executor.includes('condicaoPagamentoId: ap.campos.condicaoPagamentoId'))
 
   const aplicar = readFileSync(join(RAIZ, 'lib/financeiro/aplicar-condicao.ts'), 'utf8')
   ok('ponto único usa o motor de cronograma', aplicar.includes('gerarCronograma'))
