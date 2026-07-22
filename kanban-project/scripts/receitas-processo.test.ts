@@ -187,7 +187,7 @@ secao('Cenário 8 — caracteres especiais na interface')
   }
   const receitas = readFileSync(join(RAIZ, 'src/components/financeiro/subabas/Receitas.tsx'), 'utf8')
   ok('travessão — literal presente', receitas.includes('—'))
-  ok('acentuação correta (Honorários)', receitas.includes('Honorários'))
+  ok('acentuação correta (Cobrança)', receitas.includes('Cobrança'))
   ok('sem sequência de surrogate literal', !receitas.includes('\\ud83d'))
 }
 
@@ -214,9 +214,13 @@ secao('Cenário 9 — múltiplas moedas')
 secao('Cenário 10 — nenhuma criação manual reintroduzida')
 {
   const src = readFileSync(join(RAIZ, 'src/components/financeiro/subabas/Receitas.tsx'), 'utf8')
-  const proibidos = ['Nova Receita', 'Novo Custo', 'Adicionar Receita', 'Criar Receita', 'Lançamento Manual', 'NovaReceitaPagina', 'LancarParcelaPagina']
+  // O botão "Nova Receita" do mockup é GUIADO/informativo (explica que receitas
+  // nascem do motor) — nunca cria manualmente. A trava real é a ausência de POST
+  // de criação e das páginas de lançamento manual.
+  const proibidos = ['Novo Custo', 'Adicionar Receita', 'Criar Receita', 'Lançamento Manual', 'NovaReceitaPagina', 'LancarParcelaPagina']
   for (const p of proibidos) ok(`sem "${p}"`, !src.includes(p))
   ok('sem POST de criação de receita na tela', !/method:\s*['"]POST['"][\s\S]{0,200}\/api\/financeiro\/receitas['"]/.test(src))
+  ok('"Nova Receita" não posta criação (é guiada)', !/Nova Receita[\s\S]{0,400}method:\s*['"]POST['"]/.test(src))
   // Base ÚNICA: o modal de operação virou ReceitaCobrancaModal (Receita=contrato →
   // Cobrança → Parcelas → Pagamento), na identidade premium do Financeiro.
   ok('modal central é o caminho de operação (ReceitaCobrancaModal)', src.includes('ReceitaCobrancaModal'))
