@@ -151,25 +151,51 @@ function CobrancaCard({ cobranca, moeda, onPago }: { cobranca: any; moeda: strin
   )
 }
 
-// ── Wizard de Cobrança (Forma → Condição → Conta/Carteira → prévia → confirmar) ──
+// ── Wizard de Cobrança (Forma → Condição → Conta/Carteira → Simulação → Confirmar) ──
+// A prévia é a SIMULAÇÃO oficial do backend (ChargeCalculationService), não um
+// cálculo local. A confirmação recalcula de novo no servidor (autoridade).
 function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receitaId: number; valor: number; moeda: string; onClose: () => void; onCriada: () => void }) {
   const [cfg, setCfg] = React.useState<Cfg | null>(null)
   const [step, setStep] = React.useState(1)
   const [salvando, setSalvando] = React.useState(false)
   const [erro, setErro] = React.useState<string | null>(null)
   const [f, setF] = React.useState<{ formaPagamentoId?: number; condicaoPagamentoId?: number; contaBancariaId?: number; carteiraId?: number; gateway?: string }>({})
+  const [nParcelas, setNParcelas] = React.useState<number | ''>('')
+  const [politicaEscolha, setPoliticaEscolha] = React.useState<string | null>(null)
+  const [sim, setSim] = React.useState<any>(null)
+  const [simulando, setSimulando] = React.useState(false)
 
   React.useEffect(() => { jf('/api/financeiro/config').then(setCfg).catch((e) => setErro(e.message)) }, [])
 
   const condicao = cfg?.condicoesPagamento?.find((c: any) => c.id === f.condicaoPagamentoId)
-  // prévia local aproximada das parcelas (a geração oficial acontece no backend)
-  const nPrev = condicao ? (condicao.parcelasPadrao || condicao.parcelas || 1) : 1
-  const previa = Array.from({ length: nPrev }, (_, i) => ({ numero: i + 1, valor: valor / nPrev }))
+
+  // SIMULAÇÃO oficial no backend (não persiste). Recalcula ao mudar seleção/parcelas/política.
+  const simular = React.useCallback(async () => {
+    if (!f.formaPagamentoId) return
+    setSimulando(true)
+    try {
+      const d = await jf('/api/financeiro/cobrancas/simular', {
+        method: 'POST',
+        body: JSON.stringify({ receitaId, ...f, nParcelas: nParcelas === '' ? undefined : nParcelas, politicaTaxasEscolhida: politicaEscolha ?? undefined }),
+      })
+      setSim(d.simulacao)
+    } catch (e: any) { setSim(null); setErro(e.message) } finally { setSimulando(false) }
+  }, [receitaId, f, nParcelas, politicaEscolha])
+
+  React.useEffect(() => { if (step >= 4) simular() }, [step, f.formaPagamentoId, f.condicaoPagamentoId, f.carteiraId, f.contaBancariaId, nParcelas, politicaEscolha]) // eslint-disable-line
+
+  const precisaEscolha = !!sim && !sim.ok && sim.erros?.some((e: any) => e.codigo === 'ESCOLHA_TAXA_OBRIGATORIA')
+  const podeConfirmar = !!sim && sim.ok
 
   async function confirmar() {
     setSalvando(true); setErro(null)
-    try { await jf(`/api/financeiro/receitas/${receitaId}/cobrancas`, { method: 'POST', body: JSON.stringify(f) }); onCriada() }
-    catch (e: any) { setErro(e.message) } finally { setSalvando(false) }
+    try {
+      await jf(`/api/financeiro/receitas/${receitaId}/cobrancas`, {
+        method: 'POST',
+        body: JSON.stringify({ ...f, nParcelas: nParcelas === '' ? undefined : nParcelas, politicaTaxasEscolhida: politicaEscolha ?? undefined }),
+      })
+      onCriada()
+    } catch (e: any) { setErro(e.message) } finally { setSalvando(false) }
   }
 
   const Passo = ({ n, label, icon: Ic }: { n: number; label: string; icon: any }) => (
@@ -179,6 +205,46 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
     </div>
   )
   const sel = 'w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:border-white/30'
+  const linha = (l: string, v: any) => (<div className="flex justify-between py-0.5"><span className="text-white/45">{l}</span><span className="tabular-nums text-white/85">{v ?? '—'}</span></div>)
+  const POL_LABEL: Record<string, string> = { IGNORAR: 'Ignorar', REPASSAR: 'Repassar ao cliente', ABSORVER: 'Absorver' }
+
+  // painel da simulação (usado nos passos 4 e 5)
+  const Simulacao = () => (
+    <div className="space-y-3">
+      {simulando && <p className="text-sm text-white/50">Simulando no servidor…</p>}
+      {!simulando && sim && !sim.ok && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+          {sim.erros.map((e: any, i: number) => <div key={i}>• {e.mensagem}</div>)}
+          {precisaEscolha && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {['IGNORAR', 'REPASSAR', 'ABSORVER'].map((p) => (
+                <button key={p} onClick={() => setPoliticaEscolha(p)} className={`rounded-md border px-2.5 py-1 text-xs ${politicaEscolha === p ? 'text-[#1b1508]' : 'border-white/20 text-white/80 hover:bg-white/10'}`} style={politicaEscolha === p ? { background: OURO, borderColor: OURO } : undefined}>{POL_LABEL[p]}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {!simulando && sim && sim.ok && (<>
+        <div className={`${GLASS} p-3 text-sm`}>
+          {linha('Valor base', brl(sim.valorBase, moeda))}
+          {sim.valorTaxa > 0 && linha(`Taxa (${POL_LABEL[sim.politicaTaxas] ?? sim.politicaTaxas})${sim.taxaAplicada ? ` · ${sim.taxaAplicada.nome}` : ''}`, brl(sim.valorTaxa, moeda))}
+          {linha('Total cobrado', <b>{brl(sim.totalCobrado, moeda)}</b>)}
+          {linha('Líquido previsto', brl(sim.valorLiquido, moeda))}
+          {sim.cambio && sim.cambio.moedaOrigem !== moeda && linha('Câmbio', `${sim.cambio.moedaOrigem}→${moeda} ${sim.cambio.cotacao} (${sim.cambio.estimado ? 'estimado' : 'congelado'})`)}
+        </div>
+        <div className="overflow-hidden rounded-lg border border-white/10">
+          <table className="w-full text-[13px]"><thead><tr className="bg-white/5 text-left text-[11px] uppercase tracking-wide text-white/45"><th className="px-3 py-1.5">#</th><th className="px-3 py-1.5">Vencimento</th><th className="px-3 py-1.5 text-right">Valor</th></tr></thead><tbody>
+            {sim.parcelas.map((p: any) => <tr key={p.numero} className="border-t border-white/5"><td className="px-3 py-1.5 text-white/60">{p.numero}{p.entrada ? ' · entrada' : ''}</td><td className="px-3 py-1.5 text-white/70">{dt(p.vencimento)}</td><td className="px-3 py-1.5 text-right tabular-nums">{brl(p.valor, moeda)}</td></tr>)}
+          </tbody></table>
+        </div>
+        {Array.isArray(sim.memoria) && (
+          <details className="text-[11px] text-white/50"><summary className="cursor-pointer text-white/60">Memória de cálculo</summary>
+            <div className="mt-1 space-y-0.5 rounded-lg border border-white/10 bg-black/20 p-2">{sim.memoria.map((m: string, i: number) => <div key={i}>{m}</div>)}</div>
+          </details>
+        )}
+      </>)}
+    </div>
+  )
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
@@ -188,7 +254,7 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
           <button onClick={onClose} className="text-white/40 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-white/10 px-5 py-2">
-          <Passo n={1} label="Forma" icon={CreditCard} /><Passo n={2} label="Condição" icon={CalendarClock} /><Passo n={3} label="Conta/Carteira" icon={Landmark} /><Passo n={4} label="Parcelas" icon={Wallet} /><Passo n={5} label="Confirmar" icon={Check} />
+          <Passo n={1} label="Forma" icon={CreditCard} /><Passo n={2} label="Condição" icon={CalendarClock} /><Passo n={3} label="Conta/Carteira" icon={Landmark} /><Passo n={4} label="Simulação" icon={Wallet} /><Passo n={5} label="Confirmar" icon={Check} />
         </div>
 
         <div className="space-y-3 px-5 py-4">
@@ -201,11 +267,17 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
               {cfg.formasPagamento.map((x: any) => <option key={x.id} value={x.id} className="bg-zinc-900">{x.name}</option>)}
             </select></div>)}
 
-          {cfg && step === 2 && (<div><label className="mb-1 block text-xs text-white/60">Condição de pagamento</label>
-            <select className={sel} value={f.condicaoPagamentoId ?? ''} onChange={(e) => setF({ ...f, condicaoPagamentoId: Number(e.target.value) || undefined })}>
-              <option value="" className="bg-zinc-900">Selecione</option>
-              {cfg.condicoesPagamento.filter((c: any) => c.aplicaA !== 'CUSTO').map((x: any) => <option key={x.id} value={x.id} className="bg-zinc-900">{x.name} ({x.tipoPagamento})</option>)}
-            </select></div>)}
+          {cfg && step === 2 && (<div className="space-y-3">
+            <div><label className="mb-1 block text-xs text-white/60">Condição de pagamento</label>
+              <select className={sel} value={f.condicaoPagamentoId ?? ''} onChange={(e) => setF({ ...f, condicaoPagamentoId: Number(e.target.value) || undefined })}>
+                <option value="" className="bg-zinc-900">Selecione</option>
+                {cfg.condicoesPagamento.filter((c: any) => c.aplicaA !== 'CUSTO').map((x: any) => <option key={x.id} value={x.id} className="bg-zinc-900">{x.name} ({x.tipoPagamento})</option>)}
+              </select></div>
+            {condicao && condicao.tipoPagamento === 'PARCELADO' && (
+              <div><label className="mb-1 block text-xs text-white/60">Quantidade de parcelas {condicao.parcelasMin || condicao.parcelasMax ? `(${condicao.parcelasMin ?? 1}–${condicao.parcelasMax ?? '—'})` : ''}</label>
+                <input type="number" min={1} className={sel} value={nParcelas} placeholder={String(condicao.parcelasPadrao || 1)} onChange={(e) => setNParcelas(e.target.value === '' ? '' : Number(e.target.value))} /></div>
+            )}
+          </div>)}
 
           {cfg && step === 3 && (<div className="space-y-3">
             <div><label className="mb-1 block text-xs text-white/60">Carteira de recebimento</label>
@@ -220,30 +292,26 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
               </select></div>
           </div>)}
 
-          {cfg && step === 4 && (<div>
-            <p className="mb-2 text-xs text-white/60">Prévia das parcelas (gerada oficialmente pela Condição ao confirmar):</p>
-            <div className="overflow-hidden rounded-lg border border-white/10">
-              <table className="w-full text-[13px]"><tbody>
-                {previa.map((p) => <tr key={p.numero} className="border-t border-white/5 first:border-0"><td className="px-3 py-1.5 text-white/60">Parcela {p.numero}</td><td className="px-3 py-1.5 text-right tabular-nums">{brl(p.valor, moeda)}</td></tr>)}
-              </tbody></table>
-            </div>
-            <p className="mt-2 text-[11px] text-white/40">Total: {brl(valor, moeda)} · {nPrev}x</p>
-          </div>)}
+          {cfg && step === 4 && <Simulacao />}
 
-          {cfg && step === 5 && (<div className={`${GLASS} p-3 text-sm`}>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-white/50">Confirmação</p>
-            {[['Forma', cfg.formasPagamento.find((x: any) => x.id === f.formaPagamentoId)?.name], ['Condição', condicao?.name], ['Carteira', cfg.carteiras.find((x: any) => x.id === f.carteiraId)?.nome], ['Conta', cfg.contasBancarias.find((x: any) => x.id === f.contaBancariaId)?.nome], ['Total', brl(valor, moeda)]].map(([l, v], i) => (
-              <div key={i} className="flex justify-between py-0.5"><span className="text-white/45">{l}</span><span className="text-white/85">{v ?? '—'}</span></div>
-            ))}
+          {cfg && step === 5 && (<div className="space-y-3">
+            <div className={`${GLASS} p-3 text-sm`}>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-white/50">Confirmação</p>
+              {linha('Forma', cfg.formasPagamento.find((x: any) => x.id === f.formaPagamentoId)?.name)}
+              {linha('Condição', condicao?.name)}
+              {linha('Carteira', cfg.carteiras.find((x: any) => x.id === f.carteiraId)?.nome)}
+              {linha('Conta', cfg.contasBancarias.find((x: any) => x.id === f.contaBancariaId)?.nome)}
+            </div>
+            <Simulacao />
           </div>)}
         </div>
 
         <div className="flex items-center justify-between border-t border-white/10 px-5 py-3">
           <button onClick={() => (step > 1 ? setStep(step - 1) : onClose())} className="inline-flex items-center gap-1 text-sm text-white/60 hover:text-white"><ArrowLeft className="h-4 w-4" /> {step > 1 ? 'Voltar' : 'Cancelar'}</button>
           {step < 5 ? (
-            <button disabled={(step === 1 && !f.formaPagamentoId) || (step === 2 && !f.condicaoPagamentoId)} onClick={() => setStep(step + 1)} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-40" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
+            <button disabled={(step === 1 && !f.formaPagamentoId) || (step === 2 && !f.condicaoPagamentoId) || (step === 4 && !podeConfirmar)} onClick={() => setStep(step + 1)} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-40" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
           ) : (
-            <button disabled={salvando} onClick={confirmar} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? 'Criando…' : 'Criar Cobrança'} <Check className="h-4 w-4" /></button>
+            <button disabled={salvando || !podeConfirmar} onClick={confirmar} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? 'Criando…' : 'Criar Cobrança'} <Check className="h-4 w-4" /></button>
           )}
         </div>
       </div>
