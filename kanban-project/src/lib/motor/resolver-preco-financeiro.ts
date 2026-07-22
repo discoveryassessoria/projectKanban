@@ -27,6 +27,7 @@
 // ============================================================================
 
 import { Moeda, NaturezaPreco } from '@prisma/client'
+import { calcularPreco } from '@/lib/financeiro/calculo-preco'
 import { modoMultiplicaQuantidade } from '@/lib/financeiro/modo-calculo'
 import { canonicalNaturezaPreco } from '@/lib/financeiro/natureza-financeira'
 
@@ -34,6 +35,8 @@ import { canonicalNaturezaPreco } from '@/lib/financeiro/natureza-financeira'
 
 /** Uma linha de preço candidata (subset de TabelaValor relevante à resolução). */
 export interface LinhaPreco {
+  valorBase?: number | null
+  valorAdicional?: number | null
   id: number
   valor: number
   moeda: Moeda
@@ -261,14 +264,16 @@ export function resolverPrecoCore(
       }
     : undefined
 
-  const perUnit = ehPerUnit(escolhida.modoCalculo)
-  const valorFinal = perUnit ? escolhida.valor * quantidade : escolhida.valor
+  // ALGORITMO ÚNICO (lib/financeiro/calculo-preco). base+adicional quando houver;
+  // senão valor×quantidade; fixo → valor. Nenhuma fórmula local.
+  const calc = calcularPreco({ modoCalculo: escolhida.modoCalculo, valor: escolhida.valor, valorBase: escolhida.valorBase, valorAdicional: escolhida.valorAdicional, quantidade })
+  const valorFinal = calc.total
   const moedaDivergente = ctx.moeda != null && ctx.moeda !== escolhida.moeda
   return {
     ok: true,
     valor: valorFinal,
-    valorUnitario: escolhida.valor,
-    quantidade: perUnit ? quantidade : 1,
+    valorUnitario: calc.unitario,
+    quantidade: calc.quantidade,
     modoCalculo: escolhida.modoCalculo ?? 'fixed',
     moeda: escolhida.moeda,
     nivel: `especificidade ${maxEspec} · prioridade ${maxPrio}`,
@@ -276,7 +281,7 @@ export function resolverPrecoCore(
     especificidade: maxEspec,
     tabelaValorId: escolhida.id,
     razao: `Preço resolvido por especificidade ${maxEspec} (prioridade ${maxPrio})`
-      + (perUnit ? `, modo per_unit × ${quantidade}` : '')
+      + (calc.estrategia !== 'fixo' ? `, ${calc.memoria}` : '')
       + (conflito ? '; ⚠ AMBIGUIDADE (empate) — bloquear' : '')
       + (moedaDivergente ? `; ATENÇÃO: moeda desejada ${ctx.moeda} ≠ ${escolhida.moeda} (sem conversão aqui)` : ''),
     moedaDivergente,

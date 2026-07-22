@@ -25,6 +25,9 @@ type Item = {
   fornecedorId: number | null
   moeda: string
   valor: string | number | null
+  // PRIMEIRO + ADICIONAL (estratégia base+adicional; ex.: honorários por requerente).
+  valorBase: string | number | null
+  valorAdicional: string | number | null
   modoCalculo: string
   unidade: string | null
   quantidadeMinima: string | number | null
@@ -74,6 +77,8 @@ const EMPTY = {
   // Custo: fornecedor + moeda + valor. Venda: moeda + valor (registros independentes).
   fornecedorId: '', moeda: '', valor: '',
   moedaVenda: '', valorVenda: '',
+  // PRIMEIRO (base) + ADICIONAL — só em modo que multiplica por quantidade (ex.: por requerente).
+  valorBase: '', valorAdicional: '', valorBaseVenda: '', valorAdicionalVenda: '',
   modoCalculo: 'fixed', quantidadeMinima: '', quantidadeMaxima: '',
   vigenciaInicio: '', vigenciaFim: '', prioridade: '0', arquivado: false,
 }
@@ -140,6 +145,8 @@ export default function TabelaValoresTab() {
     // Edição é sempre de UM registro individual: exatamente uma natureza (RECEITA legado ≡ VENDA).
     const ehVenda = i.natureza === 'VENDA' || i.natureza === 'RECEITA'
     const valorStr = i.valor != null ? String(i.valor) : ''
+    const baseStr = i.valorBase != null ? String(i.valorBase) : ''
+    const adicStr = i.valorAdicional != null ? String(i.valorAdicional) : ''
     setForm({
       categoria,
       configuracaoFinanceiraItemId: i.configuracaoFinanceiraItemId ? String(i.configuracaoFinanceiraItemId) : '',
@@ -148,6 +155,9 @@ export default function TabelaValoresTab() {
       fornecedorId: i.fornecedorId ? String(i.fornecedorId) : '',
       moeda: ehVenda ? '' : (i.moeda || ''), valor: ehVenda ? '' : valorStr,
       moedaVenda: ehVenda ? (i.moeda || '') : '', valorVenda: ehVenda ? valorStr : '',
+      // Primeiro/adicional pertencem ao registro em edição (uma natureza por vez).
+      valorBase: ehVenda ? '' : baseStr, valorAdicional: ehVenda ? '' : adicStr,
+      valorBaseVenda: ehVenda ? baseStr : '', valorAdicionalVenda: ehVenda ? adicStr : '',
       modoCalculo: i.modoCalculo || 'fixed',
       // unidade é DERIVADA do modo (não editável); qtd só faz sentido em modos != fixed.
       quantidadeMinima: i.modoCalculo && i.modoCalculo !== 'fixed' && i.quantidadeMinima != null ? String(i.quantidadeMinima) : '',
@@ -162,24 +172,41 @@ export default function TabelaValoresTab() {
     if (!form.categoria) { setErroModal('Selecione a categoria.'); return }
     if (!form.configuracaoFinanceiraItemId) { setErroModal('Selecione o item.'); return }
     if (!form.precoCusto && !form.precoVenda) { setErroModal('Marque pelo menos uma natureza: Preço de Custo e/ou Preço de Venda.'); return }
+    // Modo que multiplica por quantidade (ex.: por requerente) → cobra PRIMEIRO + ADICIONAL.
+    const porQtd = modoUsaQuantidade(form.modoCalculo)
     if (form.precoCusto) {
       if (!form.moeda) { setErroModal('Selecione a moeda do custo.'); return }
-      if (form.valor === '' || Number(form.valor) <= 0) { setErroModal('Valor de custo deve ser maior que zero.'); return }
+      if (porQtd) {
+        if (form.valorBase === '' || Number(form.valorBase) <= 0) { setErroModal('Primeiro requerente (custo) deve ser maior que zero.'); return }
+        if (form.valorAdicional === '' || Number(form.valorAdicional) < 0) { setErroModal('Requerente adicional (custo) não pode ser vazio ou negativo.'); return }
+      } else if (form.valor === '' || Number(form.valor) <= 0) { setErroModal('Valor de custo deve ser maior que zero.'); return }
     }
     if (form.precoVenda) {
       if (!form.moedaVenda) { setErroModal('Selecione a moeda da venda.'); return }
-      if (form.valorVenda === '' || Number(form.valorVenda) <= 0) { setErroModal('Valor de venda deve ser maior que zero.'); return }
+      if (porQtd) {
+        if (form.valorBaseVenda === '' || Number(form.valorBaseVenda) <= 0) { setErroModal('Primeiro requerente (venda) deve ser maior que zero.'); return }
+        if (form.valorAdicionalVenda === '' || Number(form.valorAdicionalVenda) < 0) { setErroModal('Requerente adicional (venda) não pode ser vazio ou negativo.'); return }
+      } else if (form.valorVenda === '' || Number(form.valorVenda) <= 0) { setErroModal('Valor de venda deve ser maior que zero.'); return }
     }
     setSalvando(true); setErroModal(null)
     try {
       // NOVO CONTRATO: envia os CHECKBOXES + blocos custo/venda. A natureza é derivada no
       // backend (fonte única `naturezasDeSelecao`) — o componente NÃO decide natureza nem
       // envia o campo legado `natureza` no cadastro novo.
-      const { categoria: _c, precoCusto: _pc, precoVenda: _pv, moeda: _m, valor: _v, fornecedorId: _f, moedaVenda: _mv, valorVenda: _vv, ...compartilhados } = form
+      const { categoria: _c, precoCusto: _pc, precoVenda: _pv, moeda: _m, valor: _v, fornecedorId: _f, moedaVenda: _mv, valorVenda: _vv, valorBase: _vb, valorAdicional: _va, valorBaseVenda: _vbv, valorAdicionalVenda: _vav, ...compartilhados } = form
+      const num = (v: string) => (v === '' ? undefined : Number(v))
+      // Bloco de preço: em modo por-quantidade envia valorBase/valorAdicional (o backend usa
+      // valorBase como `valor` de compat); em modo fixo envia só `valor`.
+      const blocoCusto = porQtd
+        ? { moeda: form.moeda, valorBase: num(form.valorBase), valorAdicional: num(form.valorAdicional), fornecedorId: form.fornecedorId ? Number(form.fornecedorId) : null }
+        : { moeda: form.moeda, valor: Number(form.valor), fornecedorId: form.fornecedorId ? Number(form.fornecedorId) : null }
+      const blocoVenda = porQtd
+        ? { moeda: form.moedaVenda, valorBase: num(form.valorBaseVenda), valorAdicional: num(form.valorAdicionalVenda) }
+        : { moeda: form.moedaVenda, valor: Number(form.valorVenda) }
       // Edição = UM registro individual já existente (natureza imutável): payload single.
       const editPayload = form.precoCusto
-        ? { natureza: 'CUSTO', moeda: form.moeda, valor: Number(form.valor), fornecedorId: form.fornecedorId ? Number(form.fornecedorId) : null }
-        : { natureza: 'VENDA', moeda: form.moedaVenda, valor: Number(form.valorVenda), fornecedorId: null }
+        ? { natureza: 'CUSTO', ...blocoCusto }
+        : { natureza: 'VENDA', ...blocoVenda, fornecedorId: null }
       const body = JSON.stringify({
         ...compartilhados,
         configuracaoFinanceiraItemId: Number(form.configuracaoFinanceiraItemId),
@@ -189,8 +216,8 @@ export default function TabelaValoresTab() {
           : {
               precoCusto: form.precoCusto,
               precoVenda: form.precoVenda,
-              custo: form.precoCusto ? { moeda: form.moeda, valor: Number(form.valor), fornecedorId: form.fornecedorId ? Number(form.fornecedorId) : null } : undefined,
-              venda: form.precoVenda ? { moeda: form.moedaVenda, valor: Number(form.valorVenda) } : undefined,
+              custo: form.precoCusto ? blocoCusto : undefined,
+              venda: form.precoVenda ? blocoVenda : undefined,
             }),
       })
       if (editando) await jsonFetch(`/api/gerenciamento/tabela-valores/${editando.id}`, { method: 'PUT', body })
@@ -242,7 +269,14 @@ export default function TabelaValoresTab() {
                     <td className="px-3 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${i.natureza === 'CUSTO' ? 'bg-amber-500/15 text-amber-300' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-white/50'}`}>{i.natureza === 'CUSTO' ? 'Custo' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'Venda' : '—'}</span></td>
                     <td className="px-3 py-2.5 text-white/70">{i.fornecedor ? `${i.fornecedor.publicCode ? i.fornecedor.publicCode + ' — ' : ''}${i.fornecedor.nome}` : '—'}</td>
                     <td className="px-3 py-2.5 text-white/60">{rotuloModo(i.modoCalculo)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-white/90">{fmtMoeda(i.valor, i.moeda)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-white/90">
+                      {i.valorBase != null && i.valorAdicional != null ? (
+                        <span className="inline-flex flex-col items-end leading-tight">
+                          <span>{fmtMoeda(i.valorBase, i.moeda)}<span className="text-white/40"> · 1º</span></span>
+                          <span className="text-[11px] text-white/60">+ {fmtMoeda(i.valorAdicional, i.moeda)} / adic.</span>
+                        </span>
+                      ) : fmtMoeda(i.valor, i.moeda)}
+                    </td>
                     <td className="px-3 py-2.5 text-[11px] text-white/50">{i.vigenciaInicio || '—'}{i.vigenciaFim ? ` → ${i.vigenciaFim}` : ''}</td>
                     <td className="px-3 py-2.5 text-white/60">{i.prioridade}</td>
                     <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-[11px] font-medium ${!i.arquivado ? 'bg-green-500/15 text-green-300' : 'bg-white/10 text-white/50'}`}>{!i.arquivado ? 'Ativo' : 'Inativo'}</span></td>
@@ -274,7 +308,7 @@ export default function TabelaValoresTab() {
                   <select
                     value={form.categoria}
                     disabled={!!editando}
-                    onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value, configuracaoFinanceiraItemId: '', precoCusto: false, precoVenda: false, moeda: '', valor: '', moedaVenda: '', valorVenda: '', fornecedorId: '' }))}
+                    onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value, configuracaoFinanceiraItemId: '', precoCusto: false, precoVenda: false, moeda: '', valor: '', moedaVenda: '', valorVenda: '', valorBase: '', valorAdicional: '', valorBaseVenda: '', valorAdicionalVenda: '', fornecedorId: '' }))}
                     className={inputCls + (editando ? ' cursor-not-allowed opacity-60' : '')}
                   >
                     <option value="" className="bg-zinc-900">Selecione uma categoria</option>
@@ -358,10 +392,23 @@ export default function TabelaValoresTab() {
                         {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                       </select>
                     </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-white/60">Valor do custo *</label>
-                      <input type="number" min="0" step="0.01" value={form.valor} onChange={(e) => set('valor', e.target.value)} placeholder="0,00" className={inputCls} />
-                    </div>
+                    {modoUsaQuantidade(form.modoCalculo) ? (
+                      <div className="col-span-3 grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="mb-1 block text-xs text-white/60">Primeiro requerente *</label>
+                          <input type="number" min="0" step="0.01" value={form.valorBase} onChange={(e) => set('valorBase', e.target.value)} placeholder="0,00" className={inputCls} />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs text-white/60">Requerente adicional *</label>
+                          <input type="number" min="0" step="0.01" value={form.valorAdicional} onChange={(e) => set('valorAdicional', e.target.value)} placeholder="0,00" className={inputCls} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="mb-1 block text-xs text-white/60">Valor do custo *</label>
+                        <input type="number" min="0" step="0.01" value={form.valor} onChange={(e) => set('valor', e.target.value)} placeholder="0,00" className={inputCls} />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -378,10 +425,23 @@ export default function TabelaValoresTab() {
                         {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                       </select>
                     </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-white/60">Valor da venda *</label>
-                      <input type="number" min="0" step="0.01" value={form.valorVenda} onChange={(e) => set('valorVenda', e.target.value)} placeholder="0,00" className={inputCls} />
-                    </div>
+                    {modoUsaQuantidade(form.modoCalculo) ? (
+                      <div className="col-span-2 grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="mb-1 block text-xs text-white/60">Primeiro requerente *</label>
+                          <input type="number" min="0" step="0.01" value={form.valorBaseVenda} onChange={(e) => set('valorBaseVenda', e.target.value)} placeholder="0,00" className={inputCls} />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs text-white/60">Requerente adicional *</label>
+                          <input type="number" min="0" step="0.01" value={form.valorAdicionalVenda} onChange={(e) => set('valorAdicionalVenda', e.target.value)} placeholder="0,00" className={inputCls} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="mb-1 block text-xs text-white/60">Valor da venda *</label>
+                        <input type="number" min="0" step="0.01" value={form.valorVenda} onChange={(e) => set('valorVenda', e.target.value)} placeholder="0,00" className={inputCls} />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

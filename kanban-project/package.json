@@ -52,6 +52,7 @@
     "backfill:codigos-publicos": "tsx prisma/backfill-codigos-publicos.ts --execute",
     "test:preco-fonte-unica": "tsx scripts/preco-fonte-unica.test.ts",
     "test:resolver-preco": "tsx scripts/resolver-preco-financeiro.test.ts",
+    "test:calculo-preco": "tsx scripts/calculo-preco.test.ts",
     "test:financeiro-geral": "tsx scripts/financeiro-geral.test.ts",
     "test:financeiro": "tsx scripts/preco-fonte-unica.test.ts && tsx scripts/resolver-preco-financeiro.test.ts && tsx scripts/financeiro-geral.test.ts && tsx scripts/acoes-lancamento.test.ts && tsx scripts/condicao-pagamento.test.ts && tsx scripts/taxas-encargos.test.ts && tsx scripts/receitas-processo.test.ts && tsx scripts/arquitetura-financeira-guard.test.ts && tsx scripts/cadastro-mestre-guard.test.ts",
     "test:receitas-processo": "tsx scripts/receitas-processo.test.ts",

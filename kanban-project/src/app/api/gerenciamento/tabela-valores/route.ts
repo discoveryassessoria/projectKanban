@@ -13,6 +13,11 @@ function toAmount(v: any): number {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
 }
+function toAmountOrNull(v: any): number | null {
+  if (v === undefined || v === null || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
 function toIntOrNull(v: any): number | null {
   if (v === undefined || v === null || v === '') return null
   const n = Number(v)
@@ -167,12 +172,12 @@ export async function POST(request: NextRequest) {
       linhasRaw = naturezas.map((nat) => {
         const src = (nat === 'CUSTO' ? b.custo : b.venda) ?? {}
         // Venda NÃO leva fornecedor (sem justificativa estrutural para vinculá-lo à venda).
-        return { natureza: nat, moeda: src.moeda, valor: src.valor, fornecedorId: nat === 'CUSTO' ? src.fornecedorId : null }
+        return { natureza: nat, moeda: src.moeda, valor: src.valor, valorBase: src.valorBase, valorAdicional: src.valorAdicional, fornecedorId: nat === 'CUSTO' ? src.fornecedorId : null }
       })
     } else if (Array.isArray(b.linhas) && b.linhas.length > 0) {
       linhasRaw = b.linhas // LEGADO: linhas com natureza explícita
     } else if (toStrOrNull(b.natureza)) {
-      linhasRaw = [{ natureza: b.natureza, moeda: b.moeda, valor: b.valor, fornecedorId: b.fornecedorId }] // LEGADO
+      linhasRaw = [{ natureza: b.natureza, moeda: b.moeda, valor: b.valor, valorBase: b.valorBase, valorAdicional: b.valorAdicional, fornecedorId: b.fornecedorId }] // LEGADO
     } else {
       return NextResponse.json({ error: 'Selecione ao menos uma natureza: Preço de Custo e/ou Preço de Venda.' }, { status: 400 })
     }
@@ -208,7 +213,17 @@ export async function POST(request: NextRequest) {
       const natureza = canonicalNaturezaPreco(naturezaInput) as 'CUSTO' | 'VENDA'
       const rotulo = natureza === 'CUSTO' ? 'custo' : 'venda'
 
-      const valor = toAmount(ln.valor)
+      // Preço PRIMEIRO+ADICIONAL (ex.: honorários por requerente): só faz sentido em modo
+      // que multiplica por quantidade. valorBase = primeiro; valorAdicional = cada adicional.
+      // Quando informados, `valor` acompanha valorBase (compat de leitura/fallback).
+      const valorBase = usaQtd ? toAmountOrNull(ln.valorBase) : null
+      const valorAdicional = usaQtd ? toAmountOrNull(ln.valorAdicional) : null
+      if ((valorBase == null) !== (valorAdicional == null))
+        return NextResponse.json({ error: `Para ${rotulo}, informe Primeiro requerente e Requerente adicional juntos (ou nenhum).` }, { status: 400 })
+      if (valorBase != null && valorBase <= 0) return NextResponse.json({ error: `Primeiro requerente (${rotulo}) deve ser maior que zero.` }, { status: 400 })
+      if (valorAdicional != null && valorAdicional < 0) return NextResponse.json({ error: `Requerente adicional (${rotulo}) não pode ser negativo.` }, { status: 400 })
+
+      const valor = valorBase != null ? valorBase : toAmount(ln.valor)
       if (valor <= 0) return NextResponse.json({ error: `Valor de ${rotulo} deve ser maior que zero (sem negativos; isenção não é modelada aqui).` }, { status: 400 })
       if (!toStrOrNull(ln.moeda) && !cfg.moedaPadrao) return NextResponse.json({ error: `Informe a moeda de ${rotulo}.` }, { status: 400 })
       const fornecedorId = toIntOrNull(ln.fornecedorId)
@@ -231,7 +246,7 @@ export async function POST(request: NextRequest) {
         itemCatalogoId: cfg.itemCatalogoId, // compat de leitura; chave real é a config
         natureza,
         processoTipoId, processoId: toIntOrNull(b.processoId), modalidadeId, fornecedorId, regiao: toStrOrNull(b.regiao),
-        moeda, valor, modoCalculo, unidade, quantidadeMinima, quantidadeMaxima, vigenciaInicio, vigenciaFim,
+        moeda, valor, valorBase, valorAdicional, modoCalculo, unidade, quantidadeMinima, quantidadeMaxima, vigenciaInicio, vigenciaFim,
         prioridade, arquivado: false, legadoPendente: false,
       })
     }

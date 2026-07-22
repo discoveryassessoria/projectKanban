@@ -34,7 +34,7 @@ export async function resolverPrecoPorConfigDB(
     where: { configuracaoFinanceiraItemId: configId, arquivado: false, legadoPendente: false },
   })
   const linhas: LinhaPreco[] = rows.map((r) => ({
-    id: r.id, valor: Number(r.valor), moeda: r.moeda, modoCalculo: r.modoCalculo, natureza: r.natureza,
+    id: r.id, valor: Number(r.valor), valorBase: r.valorBase == null ? null : Number(r.valorBase), valorAdicional: r.valorAdicional == null ? null : Number(r.valorAdicional), moeda: r.moeda, modoCalculo: r.modoCalculo, natureza: r.natureza,
     arquivado: r.arquivado, prioridade: r.prioridade, processoId: r.processoId ?? null, processoTipoId: r.processoTipoId ?? null,
     modalidadeId: r.modalidadeId ?? null, regiao: r.regiao ?? null, fornecedorId: r.fornecedorId ?? null,
     quantidadeMinima: r.quantidadeMinima == null ? null : Number(r.quantidadeMinima), quantidadeMaxima: r.quantidadeMaxima == null ? null : Number(r.quantidadeMaxima),
@@ -54,6 +54,8 @@ export const carregarLinhasPrisma: CarregadorLinhasPreco = async (itemCatalogoId
     (r): LinhaPreco => ({
       id: r.id,
       valor: Number(r.valor),
+      valorBase: r.valorBase == null ? null : Number(r.valorBase),
+      valorAdicional: r.valorAdicional == null ? null : Number(r.valorAdicional),
       moeda: r.moeda,
       modoCalculo: r.modoCalculo,
       natureza: r.natureza,

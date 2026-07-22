@@ -16,6 +16,7 @@ import {
 import type { FaseCode } from '@prisma/client'
 import { getFase, faseCodeToPhaseKey, phaseKeyToFaseCode } from '@/src/lib/process-stage/fases-catalog'
 import { gerarCodigoReceita, gerarCodigoCusto } from '@/lib/financeiro/codigos'
+import { calcularPreco } from '@/lib/financeiro/calculo-preco'
 // Cronograma OFICIAL: a Condição de Pagamento decide entrada, quantidade,
 // periodicidade e vencimentos. O motor consome o plano pronto.
 import { aplicarCondicaoPagamento } from '@/lib/financeiro/aplicar-condicao'
@@ -798,9 +799,11 @@ export async function aplicarHonorariosPorRequerente(processoId: number): Promis
     await registrarPendencia({ processoId, tipoProcessoId: proc.tipoProcessoMotorId ?? null, phaseKey: 'genealogia', configItemId: preco?.configuracaoFinanceiraItemId ?? null, regraId: 0, natureza: NaturezaPreco.VENDA, motivo: 'SEM_PRECO', detalhe: 'Honorários por requerente: Tabela de Preços sem valorBase/valorAdicional cadastrado' })
     return { aplicavel: true, n, acao: 'pendencia', motivo: 'sem preço base/adicional cadastrado (pendência registrada)' }
   }
+  // ALGORITMO ÚNICO — mesma função de todos os fluxos (lib/financeiro/calculo-preco).
+  // Nenhuma fórmula local: base+adicional vem da Tabela de Preços via calcularPreco.
   const base = Number(preco.valorBase)
   const adic = Number(preco.valorAdicional)
-  const total = Number((base + (n - 1) * adic).toFixed(2))
+  const total = calcularPreco({ modoCalculo: preco.modoCalculo, valor: preco.valor == null ? base : Number(preco.valor), valorBase: base, valorAdicional: adic, quantidade: n }).total
 
   const config = preco.configuracaoFinanceiraItemId
     ? await prisma.produtoFinanceiro.findUnique({ where: { id: preco.configuracaoFinanceiraItemId }, select: { id: true, moedaPadrao: true } })

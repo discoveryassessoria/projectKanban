@@ -77,6 +77,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (vigIniEff && vigFimEff && vigIniEff > vigFimEff) {
       return NextResponse.json({ error: 'Vigência inicial deve ser anterior ou igual à final.' }, { status: 400 })
     }
+    // Preço PRIMEIRO+ADICIONAL (só em modo que multiplica por quantidade). Se o modo efetivo
+    // não usa quantidade, zera base/adicional. Ambos juntos ou nenhum.
+    const parseAmt = (v: unknown) => (v === '' || v == null ? null : Number(v))
+    const baseEff = (modoConhecido && usaQtd)
+      ? (b.valorBase !== undefined ? parseAmt(b.valorBase) : (atual.valorBase == null ? null : Number(atual.valorBase)))
+      : null
+    const adicEff = (modoConhecido && usaQtd)
+      ? (b.valorAdicional !== undefined ? parseAmt(b.valorAdicional) : (atual.valorAdicional == null ? null : Number(atual.valorAdicional)))
+      : null
+    if ((baseEff == null) !== (adicEff == null))
+      return NextResponse.json({ error: 'Informe Primeiro requerente e Requerente adicional juntos (ou nenhum).' }, { status: 400 })
+    if (baseEff != null && baseEff <= 0) return NextResponse.json({ error: 'Primeiro requerente deve ser maior que zero.' }, { status: 400 })
+    if (adicEff != null && adicEff < 0) return NextResponse.json({ error: 'Requerente adicional não pode ser negativo.' }, { status: 400 })
 
     // Detecção de CONFLITO na edição (o POST já faz; o PUT não fazia → sobreposição escapava).
     if (atual.configuracaoFinanceiraItemId != null) {
@@ -111,7 +124,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           modalidadeId: b.modalidadeId !== undefined ? (b.modalidadeId ? Number(b.modalidadeId) : null) : atual.modalidadeId,
           fornecedorId: fornecedorIdEff,
           moeda: moedaEff as never,
-          valor: b.valor !== undefined ? toAmount(b.valor) : atual.valor,
+          valor: baseEff != null ? baseEff : (b.valor !== undefined ? toAmount(b.valor) : atual.valor),
+          valorBase: baseEff,
+          valorAdicional: adicEff,
           modoCalculo: modoFinal,
           unidade: modoConhecido ? unidadeDoModo(modoFinal) : atual.unidade,
           quantidadeMinima: qMinEff,
