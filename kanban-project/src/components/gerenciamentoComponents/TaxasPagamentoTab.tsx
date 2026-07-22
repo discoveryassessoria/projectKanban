@@ -11,15 +11,21 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Percent, Search, Plus, X, Check, ArrowRight, ArrowLeft, Loader2, Pencil, Trash2,
-  Tag, Calculator, Layers, Scale, Filter, CalendarClock, Cpu, Sparkles,
+  Tag, Calculator, Layers, Scale, Filter, CalendarClock, Cpu, Sparkles, Table, Copy, Rows3,
 } from 'lucide-react'
 import { OURO, GLASS, INPUT, jf, toggleArr, Secao, Campo, Select, Toggle, ChipsMulti, MultiSelect, ModalWizard, Stepper, fecharTodosMultiSelects } from './pagamentoUI'
 import {
   FEE_TYPES, FEE_TYPES_LABEL, FEE_TYPES_COM_MOEDA, CATEGORIAS_TAXA, CATEGORIAS_TAXA_LABEL,
-  APLICA_PARCELA, APLICA_PARCELA_LABEL, ANTICIPATION_TYPES, ANTICIPATION_TYPES_LABEL,
+  ANTICIPATION_TYPES, ANTICIPATION_TYPES_LABEL,
   BASE_INCIDENCIA, BASE_INCIDENCIA_LABEL, QUEM_ABSORVE, QUEM_ABSORVE_LABEL,
   ADQUIRENTES, ADQUIRENTES_LABEL, MOMENTO_CAMBIO, MOMENTO_CAMBIO_LABEL,
 } from '@/lib/financeiro/taxa-constants'
+
+/** Uma linha da tabela comercial: "1x" (de = até) ou uma faixa "3–6x". */
+type LinhaTabela = {
+  parcelasDe: number; parcelasAte: number
+  feePercent: number | null; fixedFee: number | null; antecipacao: boolean
+}
 
 type Ref = { id: number; name: string; code?: string | null }
 type MoedaRef = { id: number; code: string; name: string | null }
@@ -29,6 +35,8 @@ type Taxa = {
   formaPagamentoId: number | null; formasAplicaveis: number[]
   feeType: string | null; feePercent: number | null; fixedFee: number | null; moeda: string | null
   aplicaParcela: string | null; installmentsFrom: number | null; installmentsTo: number | null
+  // TABELA DE PARCELAMENTO — a tabela comercial da adquirente dentro da taxa.
+  parcelamento?: LinhaTabela[]
   anticipationType: string | null; anticipationPercent: number | null; anticipationFixed: number | null; anticipationMinDays: number | null
   baseIncidencia: string; quemAbsorve: string; absorcaoPercentEmpresa: number | null; adquirente: string | null
   // Projeções legadas (leitura): o motor de cálculo continua consumindo estes arrays.
@@ -41,15 +49,16 @@ type Taxa = {
 
 // O formulário guarda IDs de cadastro real — nunca texto. Os arrays legados
 // (paises/moedasAplicaveis/servicos) saem do estado: viram PROJEÇÃO no backend.
-type Form = Omit<Taxa, 'id' | 'paises' | 'moedasAplicaveis' | 'servicos' | 'moedasVinculadas' | 'paisesPermitidos'> & {
+type Form = Omit<Taxa, 'id' | 'paises' | 'moedasAplicaveis' | 'servicos' | 'moedasVinculadas' | 'paisesPermitidos' | 'parcelamento'> & {
   moedasIds: number[]; paisesIds: number[]; servicosIds: number[]
+  parcelamento: LinhaTabela[]
 }
 
 const VAZIO = (): Form => ({
   code: '', name: '', descricao: '', categoria: null, ativo: true, prioridade: 0,
   formaPagamentoId: null, formasAplicaveis: [],
   feeType: 'percentage', feePercent: null, fixedFee: null, moeda: null,
-  aplicaParcela: 'TODAS', installmentsFrom: null, installmentsTo: null,
+  aplicaParcela: 'TODAS', installmentsFrom: null, installmentsTo: null, parcelamento: [],
   anticipationType: 'NAO_POSSUI', anticipationPercent: null, anticipationFixed: null, anticipationMinDays: null,
   baseIncidencia: 'TOTAL', quemAbsorve: 'EMPRESA', absorcaoPercentEmpresa: null, adquirente: null,
   moedasIds: [], paisesIds: [], servicosIds: [], modalidades: [], tiposProcesso: [],
@@ -144,7 +153,7 @@ export default function TaxasPagamentoTab() {
                   <span>{FEE_TYPES_LABEL[x.feeType || ''] || x.feeType || '—'}</span>
                   {x.feePercent != null && <span>{x.feePercent}%</span>}
                   {x.fixedFee != null && <span>{x.moeda || ''} {x.fixedFee}</span>}
-                  <span>{APLICA_PARCELA_LABEL[x.aplicaParcela || 'TODAS']}</span>
+                  {x.parcelamento?.length ? <span>tabela: {x.parcelamento.length} linha(s)</span> : null}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
@@ -263,17 +272,22 @@ function TaxaWizard({ editando, formas, moedas, paises, servicos, onClose, onSal
             </Secao>
           )}
 
+          {/*
+            Etapa 3 — o antigo seletor de incidência por parcela NÃO existe mais. A incidência por parcela é
+            definida exclusivamente na TABELA DE PARCELAMENTO: uma única taxa
+            representa a tabela comercial inteira da adquirente.
+          */}
           {step === 3 && (
-            <Secao icon={Layers} titulo="Incidência" dica="Sobre o que a taxa incide e a quais parcelas se aplica.">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Campo label="Base de incidência"><Select value={f.baseIncidencia} onChange={(v) => set('baseIncidencia', v)} options={BASE_INCIDENCIA.map((b) => [b, BASE_INCIDENCIA_LABEL[b]] as [string, string])} /></Campo>
-                <Campo label="Aplica-se a"><Select value={f.aplicaParcela ?? 'TODAS'} onChange={(v) => set('aplicaParcela', v)} options={APLICA_PARCELA.map((a) => [a, APLICA_PARCELA_LABEL[a]] as [string, string])} /></Campo>
-                {f.aplicaParcela === 'FAIXA' && <>
-                  <Campo label="Parcela inicial"><input type="number" min={1} className={INPUT} value={f.installmentsFrom ?? ''} onChange={(e) => set('installmentsFrom', e.target.value === '' ? null : Number(e.target.value))} /></Campo>
-                  <Campo label="Parcela final"><input type="number" min={1} className={INPUT} value={f.installmentsTo ?? ''} onChange={(e) => set('installmentsTo', e.target.value === '' ? null : Number(e.target.value))} /></Campo>
-                </>}
-              </div>
-            </Secao>
+            <div className="space-y-4">
+              <Secao icon={Layers} titulo="Incidência" dica="Sobre o que a taxa incide.">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Campo label="Base de incidência"><Select value={f.baseIncidencia} onChange={(v) => set('baseIncidencia', v)} options={BASE_INCIDENCIA.map((b) => [b, BASE_INCIDENCIA_LABEL[b]] as [string, string])} /></Campo>
+                </div>
+              </Secao>
+              <Secao icon={Table} titulo="Tabela de parcelamento" dica="A tabela comercial da adquirente inteira em uma taxa só. Na cobrança, o sistema acha a linha da quantidade de parcelas escolhida e aplica exatamente aquela taxa.">
+                <TabelaParcelamento linhas={f.parcelamento} onChange={(l) => set('parcelamento', l)} />
+              </Secao>
+            </div>
           )}
 
           {step === 4 && (
@@ -353,7 +367,8 @@ function TaxaWizard({ editando, formas, moedas, paises, servicos, onClose, onSal
                     ['Nome', f.name], ['Categoria', f.categoria ? CATEGORIAS_TAXA_LABEL[f.categoria] : '—'],
                     ['Cálculo', FEE_TYPES_LABEL[f.feeType || ''] || '—'],
                     ['Valor', [temPercent && f.feePercent != null ? `${f.feePercent}%` : null, temFixo && f.fixedFee != null ? `${f.moeda || ''} ${f.fixedFee}` : null].filter(Boolean).join(' + ') || '—'],
-                    ['Incidência', BASE_INCIDENCIA_LABEL[f.baseIncidencia]], ['Aplica-se a', APLICA_PARCELA_LABEL[f.aplicaParcela || 'TODAS']],
+                    ['Incidência', BASE_INCIDENCIA_LABEL[f.baseIncidencia]],
+                    ['Tabela de parcelamento', f.parcelamento.length ? `${f.parcelamento.length} linha(s)` : 'sem tabela (valor único)'],
                     ['Absorção', QUEM_ABSORVE_LABEL[f.quemAbsorve]], ['Antecipação', ANTICIPATION_TYPES_LABEL[f.anticipationType || 'NAO_POSSUI']],
                     ['Formas', f.formasAplicaveis.length ? `${f.formasAplicaveis.length} selecionada(s)` : 'qualquer'],
                     ['Moedas', f.moedasIds.length ? `${f.moedasIds.length} selecionada(s)` : 'todas'],
@@ -378,6 +393,127 @@ function TaxaWizard({ editando, formas, moedas, paises, servicos, onClose, onSal
   )
 }
 
+// ── Tabela de parcelamento ──────────────────────────────────────────────────
+// Editor da tabela comercial da adquirente. Uma linha por quantidade de
+// parcelas OU por faixa (1–3, 4–6, 7–12) quando a regra é a mesma para várias.
+// As faixas não podem se sobrepor: uma quantidade de parcelas tem que resolver
+// para uma única linha, senão a cobrança seria ambígua.
+function TabelaParcelamento({ linhas, onChange }: { linhas: LinhaTabela[]; onChange: (l: LinhaTabela[]) => void }) {
+  const proximaParcela = linhas.length ? Math.max(...linhas.map((l) => l.parcelasAte)) + 1 : 1
+  const nova = (de: number, ate: number): LinhaTabela => ({ parcelasDe: de, parcelasAte: ate, feePercent: null, fixedFee: null, antecipacao: false })
+
+  const patch = (i: number, campo: keyof LinhaTabela, valor: unknown) =>
+    onChange(linhas.map((l, j) => (j === i ? { ...l, [campo]: valor } : l)))
+
+  // Sobreposição: a linha i colide com alguma outra?
+  const colide = (i: number) => linhas.some((o, j) => j !== i && linhas[i].parcelasDe <= o.parcelasAte && o.parcelasDe <= linhas[i].parcelasAte)
+  const temColisao = linhas.some((_, i) => colide(i))
+  const invalida = (l: LinhaTabela) => l.parcelasDe < 1 || l.parcelasAte < l.parcelasDe
+
+  const nInput = 'w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm text-white outline-none focus:border-white/30'
+
+  return (
+    <div className="space-y-2">
+      {linhas.length === 0 ? (
+        <p className="text-[11px] text-white/35">
+          Sem tabela: vale o percentual / valor fixo definidos na etapa <b>Cálculo</b>. Adicione linhas para representar a tabela da adquirente.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] text-sm">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wide text-white/40">
+                <th className="pb-1.5 pr-2 font-medium">Parcelas</th>
+                <th className="pb-1.5 pr-2 font-medium">Percentual</th>
+                <th className="pb-1.5 pr-2 font-medium">Valor fixo</th>
+                <th className="pb-1.5 pr-2 font-medium">Antecipação</th>
+                <th className="pb-1.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {linhas.map((l, i) => {
+                const ruim = colide(i) || invalida(l)
+                return (
+                  <tr key={i} className={`border-t border-white/5 ${ruim ? 'bg-red-500/5' : ''}`}>
+                    <td className="py-1.5 pr-2">
+                      <div className="flex items-center gap-1">
+                        <input type="number" min={1} className={`${nInput} w-16`} value={l.parcelasDe}
+                          onChange={(e) => patch(i, 'parcelasDe', Math.max(1, Number(e.target.value) || 1))} />
+                        <span className="text-white/30">–</span>
+                        <input type="number" min={1} className={`${nInput} w-16`} value={l.parcelasAte}
+                          onChange={(e) => patch(i, 'parcelasAte', Math.max(1, Number(e.target.value) || 1))} />
+                        <span className="text-white/40">x</span>
+                      </div>
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      <input type="number" step="0.0001" min={0} placeholder="0,00" className={`${nInput} w-24`} value={l.feePercent ?? ''}
+                        onChange={(e) => patch(i, 'feePercent', e.target.value === '' ? null : Number(e.target.value))} />
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      <input type="number" step="0.01" min={0} placeholder="0,00" className={`${nInput} w-24`} value={l.fixedFee ?? ''}
+                        onChange={(e) => patch(i, 'fixedFee', e.target.value === '' ? null : Number(e.target.value))} />
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      <button type="button" onClick={() => patch(i, 'antecipacao', !l.antecipacao)}
+                        className="grid h-5 w-5 place-items-center rounded border"
+                        aria-label={`Antecipação na linha ${i + 1}`} aria-pressed={l.antecipacao}
+                        style={l.antecipacao ? { background: OURO, borderColor: OURO } : { borderColor: 'rgba(255,255,255,0.25)' }}>
+                        {l.antecipacao && <Check className="h-3 w-3 text-[#1b1508]" />}
+                      </button>
+                    </td>
+                    <td className="py-1.5">
+                      <div className="flex items-center justify-end gap-1">
+                        <button type="button" title="Duplicar linha" aria-label={`Duplicar linha ${i + 1}`}
+                          onClick={() => {
+                            const base = linhas[i]
+                            const dsl = Math.max(...linhas.map((x) => x.parcelasAte)) + 1
+                            const largura = base.parcelasAte - base.parcelasDe
+                            const copia = { ...base, parcelasDe: dsl, parcelasAte: dsl + largura }
+                            onChange([...linhas.slice(0, i + 1), copia, ...linhas.slice(i + 1)])
+                          }}
+                          className="rounded-md border border-white/10 p-1 text-white/60 transition hover:bg-white/10 hover:text-white">
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" title="Remover linha" aria-label={`Remover linha ${i + 1}`}
+                          onClick={() => onChange(linhas.filter((_, j) => j !== i))}
+                          className="rounded-md border border-red-500/20 p-1 text-red-300/80 transition hover:bg-red-500/10">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {temColisao && (
+        <p className="text-[11px] text-red-300/90">
+          Faixas sobrepostas. Cada quantidade de parcelas só pode cair em uma linha.
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 pt-1">
+        <button type="button" onClick={() => onChange([...linhas, nova(proximaParcela, proximaParcela)])}
+          className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2.5 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white">
+          <Plus className="h-3.5 w-3.5" /> Adicionar linha
+        </button>
+        <button type="button" onClick={() => onChange([...linhas, nova(proximaParcela, proximaParcela + 2)])}
+          className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2.5 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white">
+          <Rows3 className="h-3.5 w-3.5" /> Adicionar faixa
+        </button>
+        {linhas.length > 0 && (
+          <span className="text-[11px] text-white/35">
+            {linhas.length} linha(s) — cobre {Math.min(...linhas.map((l) => l.parcelasDe))}x a {Math.max(...linhas.map((l) => l.parcelasAte))}x.
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /** Normaliza a taxa vinda da API (nulls → arrays/strings; datas mantidas ISO). */
 function normalizar(t: Taxa): Partial<Form> {
   const { paises: _p, moedasAplicaveis: _m, servicos: _s, moedasVinculadas, paisesPermitidos, ...resto } = t
@@ -392,6 +528,12 @@ function normalizar(t: Taxa): Partial<Form> {
     paisesIds: (paisesPermitidos ?? []).map((x) => x.paisId),
     servicosIds: t.servicos ?? [],
     modalidades: t.modalidades ?? [], tiposProcesso: t.tiposProcesso ?? [],
+    parcelamento: (t.parcelamento ?? []).map((l) => ({
+      parcelasDe: Number(l.parcelasDe), parcelasAte: Number(l.parcelasAte),
+      feePercent: l.feePercent == null ? null : Number(l.feePercent),
+      fixedFee: l.fixedFee == null ? null : Number(l.fixedFee),
+      antecipacao: !!l.antecipacao,
+    })),
     aplicaParcela: t.aplicaParcela ?? 'TODAS', anticipationType: t.anticipationType ?? 'NAO_POSSUI',
     feeType: t.feeType ?? 'percentage', baseIncidencia: t.baseIncidencia ?? 'TOTAL', quemAbsorve: t.quemAbsorve ?? 'EMPRESA',
     vigenciaInicio: t.vigenciaInicio ?? null, vigenciaFim: t.vigenciaFim ?? null,

@@ -15,6 +15,7 @@ import { gerarCronograma, type CondicaoPagamentoView } from './condicao-pagament
 import { calcularTaxas, type TaxaView } from './taxas-pagamento'
 import { validarCompatibilidadeCobranca, type FormaView } from './payment-method-rules'
 import { formaPermitidaNaCondicao } from './condicao-formas'
+import { linhaParaParcelas, rotuloLinha, type LinhaParcelamento } from './taxa-parcelamento'
 
 export type Direcao = 'RECEBER' | 'PAGAR'
 export type PoliticaTaxas = 'IGNORAR' | 'REPASSAR' | 'ABSORVER' | 'ESCOLHER_NA_COBRANCA'
@@ -25,6 +26,9 @@ export interface TaxaCandidata extends TaxaView {
   prioridade?: number | null
   formasAplicaveis?: number[] | null
   moedasAplicaveis?: string[] | null
+  /** Tabela comercial da adquirente (1x 2,99% / 3–6x 4,19%…). Vazia = usa os
+   *  valores do próprio registro da taxa. */
+  tabelaParcelamento?: LinhaParcelamento[] | null
 }
 
 export interface CobrancaInput {
@@ -121,6 +125,34 @@ export function taxaParaCandidata(t: any): TaxaCandidata {
     prioridade: t.prioridade ?? 0,
     formasAplicaveis: t.formasAplicaveis ?? [],
     moedasAplicaveis: t.moedasAplicaveis ?? [],
+    tabelaParcelamento: Array.isArray(t.parcelamento)
+      ? t.parcelamento.map((l: any) => ({
+          parcelasDe: Number(l.parcelasDe), parcelasAte: Number(l.parcelasAte),
+          feePercent: l.feePercent == null ? null : Number(l.feePercent),
+          fixedFee: l.fixedFee == null ? null : Number(l.fixedFee),
+          antecipacao: !!l.antecipacao,
+        }))
+      : [],
+  }
+}
+
+/**
+ * Aplica a linha da TABELA DE PARCELAMENTO correspondente à quantidade de
+ * parcelas: o percentual e o valor fixo da linha SUBSTITUEM os do registro.
+ * Sem tabela, a taxa segue exatamente como era.
+ */
+function taxaComLinha(t: TaxaCandidata, linha: LinhaParcelamento | null): TaxaCandidata {
+  if (!linha) return t
+  const temPercent = linha.feePercent != null && linha.feePercent !== 0
+  const temFixo = linha.fixedFee != null && linha.fixedFee !== 0
+  const tipo = temPercent && temFixo ? 'PERCENTUAL_MAIS_FIXA' : temFixo ? 'FIXA' : 'PERCENTUAL'
+  return {
+    ...t,
+    tipo: tipo as TaxaCandidata['tipo'],
+    percentual: linha.feePercent ?? 0,
+    valorFixo: linha.fixedFee ?? 0,
+    antecipacaoAtiva: linha.antecipacao,
+    antecipacaoPercent: linha.antecipacao ? t.antecipacaoPercent ?? null : null,
   }
 }
 
@@ -132,6 +164,9 @@ function candidataElegivel(t: TaxaCandidata, ctx: { nParcelas: number; moeda: st
   if (fim && ctx.data.getTime() > fim.getTime()) return false
   if (t.parcelasDe != null && ctx.nParcelas < t.parcelasDe) return false
   if (t.parcelasAte != null && ctx.nParcelas > t.parcelasAte) return false
+  // Com tabela de parcelamento, a taxa só vale para as quantidades que a tabela
+  // cobre — se nenhuma linha atende, ela simplesmente não é candidata.
+  if (t.tabelaParcelamento && t.tabelaParcelamento.length && !linhaParaParcelas(t.tabelaParcelamento, ctx.nParcelas)) return false
   if (t.formasAplicaveis && t.formasAplicaveis.length && ctx.formaId != null && !t.formasAplicaveis.includes(ctx.formaId)) return false
   if (t.moedasAplicaveis && t.moedasAplicaveis.length && !t.moedasAplicaveis.map((m) => m.toUpperCase()).includes(ctx.moeda.toUpperCase())) return false
   return true
@@ -207,10 +242,15 @@ export function calcularCobranca(input: CobrancaInput): ResultadoCobranca {
         if (forma?.exigeAdquirente && !escolhida.adquirente) {
           erros.push({ codigo: 'ADQUIRENTE_OBRIGATORIO', mensagem: `Forma "${forma.name}" exige adquirente, mas a taxa "${escolhida.nome ?? escolhida.id}" não define um.` })
         }
-        const r = calcularTaxas([escolhida], { valorBruto: valorBase, nParcelas, moeda })
+        // Tabela de parcelamento: a linha da quantidade escolhida define o
+        // percentual/valor fixo aplicados. Sem tabela, nada muda.
+        const linha = linhaParaParcelas(escolhida.tabelaParcelamento, nParcelas)
+        if (linha) memoria.push(`Tabela de parcelamento: ${rotuloLinha(linha)} → ${linha.feePercent ?? 0}%${linha.fixedFee ? ` + ${linha.fixedFee}` : ''}${linha.antecipacao ? ' (com antecipação)' : ''}`)
+        const efetiva = taxaComLinha(escolhida, linha)
+        const r = calcularTaxas([efetiva], { valorBruto: valorBase, nParcelas, moeda })
         valorTaxa = cent(r.valorTaxas + r.valorTaxasRepassadas)
-        const linha = r.linhas[0]
-        taxaAplicada = { id: escolhida.id ?? null, nome: String(escolhida.nome ?? escolhida.id ?? 'taxa'), tipo: String(escolhida.tipo ?? 'PERCENTUAL'), adquirente: escolhida.adquirente ?? null, prioridade: escolhida.prioridade ?? 0, formula: linha?.formula ?? '' }
+        const linhaCalc = r.linhas[0]
+        taxaAplicada = { id: escolhida.id ?? null, nome: String(escolhida.nome ?? escolhida.id ?? 'taxa') + (linha ? ` · ${rotuloLinha(linha)}` : ''), tipo: String(efetiva.tipo ?? 'PERCENTUAL'), adquirente: escolhida.adquirente ?? null, prioridade: escolhida.prioridade ?? 0, formula: linhaCalc?.formula ?? '' }
         memoria.push(`Taxa "${taxaAplicada.nome}": ${taxaAplicada.formula} = ${valorTaxa.toFixed(2)} (prioridade ${taxaAplicada.prioridade})`)
       }
     } else {

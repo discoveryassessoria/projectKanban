@@ -5,6 +5,7 @@ import { validarTaxa, paraColunasTaxa } from './campos'
 import {
   INCLUDE_APLICABILIDADE_TAXA, resolverAplicabilidadeTaxa, vinculosTaxaParaCriar,
 } from '@/lib/financeiro/taxa-aplicabilidade'
+import { INCLUDE_PARCELAMENTO, linhasDoBody, linhasParaCriar, validarTabela } from '@/lib/financeiro/taxa-parcelamento'
 
 // GET — taxas (com a aplicabilidade já resolvida) + cadastros de apoio dos
 // seletores (formas / moedas / países / serviços). Uma query por cadastro: a
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
     const [taxas, formasPagamento, moedas, paises, servicos] = await Promise.all([
       prisma.taxaPagamento.findMany({
         orderBy: [{ prioridade: 'desc' }, { name: 'asc' }],
-        include: INCLUDE_APLICABILIDADE_TAXA,
+        include: { ...INCLUDE_APLICABILIDADE_TAXA, ...INCLUDE_PARCELAMENTO },
       }),
       prisma.formaPagamentoCadastro.findMany({ where: { ativo: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
       prisma.moedaCadastro.findMany({ where: { ativo: true }, orderBy: { code: 'asc' }, select: { id: true, code: true, name: true, ativo: true } }),
@@ -50,14 +51,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: aplic.erros[0].mensagem, erros: aplic.erros }, { status: 400 })
     }
 
+    // Tabela de parcelamento: uma taxa representa a tabela comercial inteira.
+    const linhas = linhasDoBody(b)
+    const errosTabela = validarTabela(linhas)
+    if (errosTabela.length) return NextResponse.json({ error: errosTabela[0].mensagem, erros: errosTabela }, { status: 400 })
+
     const taxa = await prisma.taxaPagamento.create({
       data: {
         ...paraColunasTaxa(b),
+        parcelamento: linhasParaCriar(linhas),
         // Projeção legada derivada dos vínculos (o motor de cálculo lê daqui).
         ...aplic.projecao,
         ...vinculosTaxaParaCriar(aplic.selecao),
       },
-      include: INCLUDE_APLICABILIDADE_TAXA,
+      include: { ...INCLUDE_APLICABILIDADE_TAXA, ...INCLUDE_PARCELAMENTO },
     })
     return NextResponse.json({ taxa })
   } catch (error) {

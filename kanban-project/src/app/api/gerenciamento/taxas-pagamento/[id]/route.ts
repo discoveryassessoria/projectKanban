@@ -6,6 +6,7 @@ import { validarTaxa, paraColunasTaxa } from '../campos'
 import {
   INCLUDE_APLICABILIDADE_TAXA, eixosPresentes, regravarVinculosTaxa, resolverAplicabilidadeTaxa,
 } from '@/lib/financeiro/taxa-aplicabilidade'
+import { INCLUDE_PARCELAMENTO, linhasDoBody, regravarLinhas, tabelaPresente, validarTabela } from '@/lib/financeiro/taxa-parcelamento'
 
 // PUT — Atualizar taxa (merge campo-a-campo → mapeamento único).
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -31,8 +32,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: aplic.erros[0].mensagem, erros: aplic.erros }, { status: 400 })
     }
 
+    // Tabela de parcelamento. Ausente do body = não é regravada.
+    const temTabela = tabelaPresente(b)
+    const linhas = temTabela ? linhasDoBody(b) : []
+    if (temTabela) {
+      const errosTabela = validarTabela(linhas)
+      if (errosTabela.length) return NextResponse.json({ error: errosTabela[0].mensagem, erros: errosTabela }, { status: 400 })
+    }
+
     const taxa = await prisma.$transaction(async (tx) => {
       await regravarVinculosTaxa(tx, id, aplic.selecao, presentes)
+      if (temTabela) await regravarLinhas(tx, id, linhas)
 
       // Projeção legada: só dos eixos que o body declarou (o motor de cálculo
       // continua lendo destes arrays — nada nele foi alterado).
@@ -44,7 +54,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return tx.taxaPagamento.update({
         where: { id },
         data: { ...paraColunasTaxa(merged), ...projecao },
-        include: INCLUDE_APLICABILIDADE_TAXA,
+        include: { ...INCLUDE_APLICABILIDADE_TAXA, ...INCLUDE_PARCELAMENTO },
       })
     })
     return NextResponse.json({ taxa })

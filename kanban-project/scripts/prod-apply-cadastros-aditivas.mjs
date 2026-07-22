@@ -30,6 +30,7 @@ const ADITIVAS = [
   '20260801000000_cobranca_runtime_calculo',
   '20260802000000_condicao_aplicabilidade_relacional',
   '20260803000000_taxa_aplicabilidade_relacional',
+  '20260804000000_taxa_tabela_parcelamento',
 ]
 
 // Colunas-sentinela p/ verificação pós-aplicação.
@@ -47,6 +48,8 @@ const SENTINELAS = [
   // Aplicabilidade relacional da Taxa (moeda/país).
   ['TaxaPagamentoMoeda', ['taxaId', 'moedaId']],
   ['TaxaPagamentoPais', ['taxaId', 'paisId']],
+  // Tabela de parcelamento da Taxa (tabela comercial da adquirente).
+  ['TaxaParcelamento', ['taxaId', 'parcelasDe', 'parcelasAte', 'feePercent', 'fixedFee', 'antecipacao']],
 ]
 
 const log = (m) => console.log(`[cadastros-aditivas] ${m}`)
