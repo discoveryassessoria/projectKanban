@@ -95,7 +95,7 @@ export default function DossieReceitaPage() {
       <div className="pointer-events-none fixed inset-0 -z-10 bg-black/85" />
       <HeaderBar title="Receitas" subtitle={dados?.processo?.nome ?? 'Financeiro do processo'} userName={user.nome} userRole={user.tipo === 'admin' ? 'Administrador' : user.tipo || 'Usuário'} userEmail={user.email || ''} projetos={[]} processos={processos} arvores={[]} onLogout={handleLogout} />
 
-      <main className="relative mx-auto max-w-[1400px] px-4 py-5">
+      <main className="relative mx-auto w-[92%] max-w-[1400px] py-5">
         {/* cabeçalho do dossiê */}
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
