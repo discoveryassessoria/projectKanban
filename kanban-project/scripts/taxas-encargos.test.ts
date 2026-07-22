@@ -271,11 +271,13 @@ secao('Reflexo nas telas')
   ok('aba técnica traz a memória de cálculo', tec.includes('Memória de cálculo'))
 
   const cond = readFileSync(join(RAIZ, 'src/components/gerenciamentoComponents/CondicoesPagamentoTab.tsx'), 'utf8')
-  for (const secaoNome of ['Entrada', 'Parcelamento', 'Cronograma', 'Distribuição dos valores', 'Encargos e descontos', 'Câmbio', 'Restrições de utilização']) {
-    ok(`tela de Condições tem a seção "${secaoNome}"`, cond.includes(secaoNome))
+  // wizard premium (regra reutilizável): cobre entrada/parcelamento/cronograma/
+  // distribuição/aplicabilidade/política de taxas/política cambial/encargos.
+  for (const conceito of ['Parcelamento', 'Cronograma', 'distribuicao', 'Aplicabilidade', 'Política de Taxas', 'Política Cambial', 'Encargos']) {
+    ok(`wizard de Condições cobre "${conceito}"`, cond.includes(conceito))
   }
   ok('tela de Condições versiona', cond.includes('EXIGE_NOVA_VERSAO') && cond.includes('Nova versão'))
-  ok('feriados marcados como sem efeito', cond.includes('Sem efeito por enquanto'))
+  ok('cronograma com comportamento explícito de feriado', cond.includes('comportamentoFeriado'))
 
   const formas = readFileSync(join(RAIZ, 'src/components/gerenciamentoComponents/FormasPagamentoTab.tsx'), 'utf8')
   for (const c of ['aceitaEntrada', 'aceitaRecorrencia', 'aceitaMoedaEstrangeira', 'ordem', 'icone', 'observacoes']) {

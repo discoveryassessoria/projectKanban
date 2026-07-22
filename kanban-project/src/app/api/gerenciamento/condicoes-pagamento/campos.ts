@@ -49,9 +49,18 @@ export function lista(v: unknown): string[] {
   if (typeof v === 'string' && v.trim()) return v.split(',').map((x) => x.trim()).filter(Boolean)
   return []
 }
-function enumOu<T extends string>(v: unknown, permitidos: readonly string[], padrao: T): T {
+export function listaInt(v: unknown): number[] {
+  if (Array.isArray(v)) return v.map((x) => Math.trunc(Number(x))).filter((n) => Number.isFinite(n))
+  return []
+}
+function enumOu(v: unknown, permitidos: readonly string[], padrao: string): string {
   const s = v == null ? '' : String(v).toUpperCase()
-  return (permitidos.includes(s) ? s : padrao) as T
+  return permitidos.includes(s) ? s : padrao
+}
+/** Igual a enumOu, mas devolve null quando não bate (campos opcionais). */
+function enumN(v: unknown, permitidos: readonly string[]): string | null {
+  const s = v == null ? '' : String(v).toUpperCase()
+  return permitidos.includes(s) ? s : null
 }
 
 export interface ErroValidacao { campo: string; mensagem: string }
@@ -152,14 +161,38 @@ export function paraColunas(b: Record<string, unknown>) {
     descontoAntecipacaoPercent: num(b.descontoAntecipacaoPercent),
     descontoAVistaPercent: num(b.descontoAVistaPercent),
 
-    // câmbio
-    politicaCambio: enumOu(b.politicaCambio, POLITICAS_CAMBIO, 'VARIAVEL'),
-    travaCambial: !!b.travaCambial,
+    // câmbio — POLÍTICA (sugestão); a Cobrança decide de fato. travaCambial derivado.
+    politicaCambio: enumOu(b.politicaCambio, POLITICAS_CAMBIO, 'PADRAO_SISTEMA'),
+    travaCambial: String(b.politicaCambio ?? '').toUpperCase() === 'SUGERIR_TRAVA' || !!b.travaCambial,
 
-    // taxas
-    aplicarTaxas: !!b.aplicarTaxas,
+    // taxas — POLÍTICA (a taxa depende da Forma escolhida na Cobrança). aplicarTaxas derivado.
+    politicaTaxas: enumOu(b.politicaTaxas, POLITICAS_TAXAS, 'IGNORAR'),
+    aplicarTaxas: enumOu(b.politicaTaxas, POLITICAS_TAXAS, 'IGNORAR') !== 'IGNORAR',
 
-    // restrições
+    // forma/entrada sugeridas
+    formaSugeridaId: inteiro(b.formaSugeridaId),
+    entradaTipo: enumN(b.entradaTipo, ENTRADA_TIPOS),
+    entradaMin: num(b.entradaMin),
+    entradaMax: num(b.entradaMax),
+    entradaCompoeTotal: b.entradaCompoeTotal === undefined ? true : !!b.entradaCompoeTotal,
+    entradaAdicional: !!b.entradaAdicional,
+
+    // cronograma — comportamentos explícitos
+    diaInexistente: enumN(b.diaInexistente, DIA_INEXISTENTE),
+    comportamentoFimSemana: enumN(b.comportamentoFimSemana, AJUSTE_DATA),
+    comportamentoFeriado: enumN(b.comportamentoFeriado, AJUSTE_DATA),
+
+    // encargos expandidos
+    multaTipo: enumN(b.multaTipo, MULTA_TIPOS),
+    multaValor: num(b.multaValor),
+    jurosTipo: enumN(b.jurosTipo, JUROS_TIPOS),
+    jurosPeriodo: enumN(b.jurosPeriodo, JUROS_PERIODOS),
+    carenciaDias: inteiro(b.carenciaDias),
+    descontoTipo: enumN(b.descontoTipo, DESCONTO_TIPOS),
+    descontoAntecipacaoAuto: !!b.descontoAntecipacaoAuto,
+    quemConcedeDesconto: b.quemConcedeDesconto ? String(b.quemConcedeDesconto).slice(0, 40) : null,
+
+    // restrições / aplicabilidade
     aplicaA: enumOu(b.aplicaA, APLICA_A, 'AMBOS'),
     moedasPermitidas: lista(b.moedasPermitidas),
     valorMinimo: num(b.valorMinimo),
@@ -167,6 +200,9 @@ export function paraColunas(b: Record<string, unknown>) {
     paises: lista(b.paises),
     modalidades: lista(b.modalidades),
     tiposProcesso: lista(b.tiposProcesso),
+    perfil: b.perfil ? String(b.perfil).slice(0, 60) : null,
+    canal: b.canal ? String(b.canal).slice(0, 60) : null,
+    servicos: listaInt(b.servicos),
   }
 }
 
@@ -183,6 +219,10 @@ export const CAMPOS_ESTRUTURAIS = [
   'multaPercent', 'jurosMesPercent', 'descontoPercent',
   'descontoAntecipacaoPercent', 'descontoAVistaPercent',
   'politicaCambio', 'travaCambial',
+  // regra reutilizável (expansão)
+  'entradaTipo', 'entradaMin', 'entradaMax', 'entradaCompoeTotal', 'entradaAdicional',
+  'diaInexistente', 'comportamentoFimSemana', 'comportamentoFeriado',
+  'multaTipo', 'multaValor', 'jurosTipo', 'jurosPeriodo', 'carenciaDias',
 ] as const
 
 /** Houve mudança estrutural entre o registro atual e o novo payload? */

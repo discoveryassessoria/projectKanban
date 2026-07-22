@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
 
-    const [condicoes, carteiras, formasPagamento, taxas] = await Promise.all([
+    const [condicoes, carteiras, formasPagamento, taxas, servicos] = await Promise.all([
       prisma.condicaoPagamento.findMany({
         orderBy: [{ name: 'asc' }, { versao: 'desc' }],
         include: {
@@ -43,11 +43,16 @@ export async function GET(request: NextRequest) {
       prisma.taxaPagamento.findMany({
         where: { ativo: true },
         select: { id: true, name: true, code: true, feeType: true, feePercent: true, fixedFee: true },
+        orderBy: [{ prioridade: 'desc' }, { name: 'asc' }],
+      }),
+      prisma.servicoProduto.findMany({
+        where: { ativo: true },
+        select: { id: true, name: true, code: true },
         orderBy: { name: 'asc' },
       }),
     ])
 
-    return NextResponse.json({ condicoes, carteiras, formasPagamento, taxas })
+    return NextResponse.json({ condicoes, carteiras, formasPagamento, taxas, servicos })
   } catch (error) {
     console.error('Erro ao listar condições de pagamento:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
