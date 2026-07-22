@@ -101,6 +101,11 @@ console.log('\nGuardas estruturais (arquitetura)')
   ok('trata ausência de preço (pendência, sem zero)', /!preco\.ok[\s\S]*registrarPendencia/.test(exec))
   ok('P2002 → idempotente (não duplica)', /P2002[\s\S]*inalterado/.test(exec))
 
+  // GUARD anti-dupla-cobrança no honorário AGREGADO legado (aditivo, genérico)
+  ok('legado tem guard anti-dupla-cobrança (person_added)', /aplicarHonorariosPorRequerente[\s\S]*phaseAutomationRule\.findFirst[\s\S]*trigger: 'person_added'[\s\S]*aplicavel: false/.test(exec))
+  ok('guard seleciona por tipoProcessoId (metadados oficiais)', /superseder[\s\S]*tipoProcessoId: proc\.tipoProcessoMotorId/.test(exec))
+  ok('guard NÃO remove histórico (só deixa de criar)', !/superseder[\s\S]{0,400}\.delete\(/.test(exec))
+
   const disp = src('src/services/outbox-dispatcher.ts')
   ok('dispatcher processa requerente.adicionado', disp.includes('"requerente.adicionado"') && disp.includes('processarRequerenteAdicionado'))
   ok('requerente.adicionado nos tipos default drenados', disp.includes('"requerente.adicionado"]') || /tipos = \[[^\]]*requerente\.adicionado/.test(disp))

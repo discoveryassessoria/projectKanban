@@ -737,6 +737,20 @@ export async function aplicarHonorariosPorRequerente(processoId: number): Promis
   })
   if (!proc) return { aplicavel: false, motivo: 'processo não encontrado' }
 
+  // GUARD ANTI-DUPLA-COBRANÇA (aditivo, GENÉRICO — sem condicional por país): se existe uma
+  // automação financeira POR REQUERENTE (person_added) ATIVA para este tipo de processo, ela
+  // é a dona da cobrança e itemiza por requerente. O honorário AGREGADO legado NÃO deve gerar
+  // (evita agregado + por-requerente simultâneos). Aditivo e seguro: só DEIXA DE CRIAR o
+  // agregado; NÃO remove/altera lançamentos históricos. Seleção pelos metadados oficiais da
+  // PhaseAutomationRule (tipoProcessoId + trigger).
+  if (proc.tipoProcessoMotorId) {
+    const superseder = await prisma.phaseAutomationRule.findFirst({
+      where: { kind: 'financial', trigger: 'person_added', active: true, arquivado: false, tipoProcessoId: proc.tipoProcessoMotorId },
+      select: { id: true },
+    })
+    if (superseder) return { aplicavel: false, motivo: `honorário agregado legado desativado p/ este tipo de processo: automação por requerente #${superseder.id} é a fonte da cobrança` }
+  }
+
   // Conta EXCLUSIVAMENTE requerentes marcados na árvore (maior|menor = 1; nunca idade/parentesco).
   const n = proc.arvoreId
     ? await prisma.pessoa.count({ where: { arvoreId: proc.arvoreId, requerente: { in: ['maior', 'menor'] } } })
