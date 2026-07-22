@@ -26,6 +26,8 @@ export interface TaxaCandidata extends TaxaView {
   prioridade?: number | null
   formasAplicaveis?: number[] | null
   moedasAplicaveis?: string[] | null
+  /** Bandeira à qual a taxa é específica. null = vale p/ qualquer bandeira. */
+  bandeiraId?: number | null
   /** Tabela comercial da adquirente (1x 2,99% / 3–6x 4,19%…). Vazia = usa os
    *  valores do próprio registro da taxa. */
   tabelaParcelamento?: LinhaParcelamento[] | null
@@ -49,6 +51,8 @@ export interface CobrancaInput {
   nParcelas?: number | null
   carteiraId?: number | null
   contaBancariaId?: number | null
+  /** Bandeira escolhida (cartão). Desempata taxas específicas por bandeira. */
+  bandeiraId?: number | null
   /** Taxas vinculadas à condição (pool de candidatas). */
   taxaCandidatas?: TaxaCandidata[]
   /** Câmbio quando há conversão (estimado no rascunho; congelado na confirmação). */
@@ -123,6 +127,7 @@ export function taxaParaCandidata(t: any): TaxaCandidata {
     antecipacaoPercent: t.anticipationPercent ?? null,
     ativo: t.ativo ?? true, vigenciaInicio: t.vigenciaInicio ?? null, vigenciaFim: t.vigenciaFim ?? null,
     prioridade: t.prioridade ?? 0,
+    bandeiraId: t.bandeiraId ?? null,
     formasAplicaveis: t.formasAplicaveis ?? [],
     moedasAplicaveis: t.moedasAplicaveis ?? [],
     tabelaParcelamento: Array.isArray(t.parcelamento)
@@ -157,13 +162,15 @@ function taxaComLinha(t: TaxaCandidata, linha: LinhaParcelamento | null): TaxaCa
 }
 
 /** A taxa candidata é elegível para esta cobrança? (vigência/parcela/forma/moeda) */
-function candidataElegivel(t: TaxaCandidata, ctx: { nParcelas: number; moeda: string; formaId?: number | null; data: Date }): boolean {
+function candidataElegivel(t: TaxaCandidata, ctx: { nParcelas: number; moeda: string; formaId?: number | null; bandeiraId?: number | null; data: Date }): boolean {
   if (t.ativo === false) return false
   const ini = asData(t.vigenciaInicio), fim = asData(t.vigenciaFim)
   if (ini && ctx.data.getTime() < ini.getTime()) return false
   if (fim && ctx.data.getTime() > fim.getTime()) return false
   if (t.parcelasDe != null && ctx.nParcelas < t.parcelasDe) return false
   if (t.parcelasAte != null && ctx.nParcelas > t.parcelasAte) return false
+  // taxa específica de bandeira só vale quando a bandeira da cobrança bate
+  if (t.bandeiraId != null && t.bandeiraId !== ctx.bandeiraId) return false
   // Com tabela de parcelamento, a taxa só vale para as quantidades que a tabela
   // cobre — se nenhuma linha atende, ela simplesmente não é candidata.
   if (t.tabelaParcelamento && t.tabelaParcelamento.length && !linhaParaParcelas(t.tabelaParcelamento, ctx.nParcelas)) return false
@@ -231,7 +238,7 @@ export function calcularCobranca(input: CobrancaInput): ResultadoCobranca {
   let valorTaxa = 0
   let taxaAplicada: ResultadoCobranca['taxaAplicada'] = null
   if (politica && politica !== 'IGNORAR') {
-    const candidatas = (input.taxaCandidatas ?? []).filter((t) => candidataElegivel(t, { nParcelas, moeda, formaId: forma?.id, data: input.dataBase }))
+    const candidatas = (input.taxaCandidatas ?? []).filter((t) => candidataElegivel(t, { nParcelas, moeda, formaId: forma?.id, bandeiraId: input.bandeiraId ?? null, data: input.dataBase }))
     if (candidatas.length > 0) {
       const maxPri = Math.max(...candidatas.map((t) => t.prioridade ?? 0))
       const topo = candidatas.filter((t) => (t.prioridade ?? 0) === maxPri)

@@ -38,6 +38,7 @@ export const BANDEIRAS_SEED: BandeiraSeed[] = [
   { slug: 'ELO', nome: 'Elo', adquirentes: [] },
   { slug: 'AMEX', nome: 'American Express', adquirentes: [] },
   { slug: 'HIPERCARD', nome: 'Hipercard', adquirentes: [] },
+  { slug: 'DINERS', nome: 'Diners Club', adquirentes: [] },
 ]
 
 export const ADQUIRENTE_LABEL: Record<string, string> = Object.fromEntries(ADQUIRENTES_SEED.map((a) => [a.slug, a.nome]))

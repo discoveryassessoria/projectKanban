@@ -17,6 +17,7 @@ export interface EntradaRuntime {
   contaBancariaId?: number | null
   nParcelas?: number | null
   politicaTaxasEscolhida?: string | null
+  bandeiraId?: number | null // cartão: desempata a taxa por bandeira
   congelar?: boolean // confirmação congela o câmbio
 }
 
@@ -43,21 +44,31 @@ export async function montarECalcular(e: EntradaRuntime): Promise<SaidaRuntime |
 
   let condicaoView: any = null
   let condMeta: SaidaRuntime['condicao'] = null
-  let taxaCandidatas: ReturnType<typeof taxaParaCandidata>[] = []
+  // Pool de candidatas = TABELA DE TAXAS (fonte única): taxas da FORMA escolhida
+  // (por formasAplicaveis) + as explicitamente vinculadas à condição. Deduplicado
+  // por id; a grade de parcelamento vem junta. A elegibilidade final (forma/
+  // bandeira/parcela/moeda/vigência) e a política são resolvidas no serviço puro.
+  const taxasPorId = new Map<number, any>()
   if (e.condicaoPagamentoId) {
     const cond = await prisma.condicaoPagamento.findUnique({
       where: { id: Number(e.condicaoPagamentoId) },
-      include: { taxasVinculadas: { include: { taxa: true } }, formasPermitidas: { select: { formaId: true } } },
+      include: { taxasVinculadas: { include: { taxa: { include: { parcelamento: true } } } }, formasPermitidas: { select: { formaId: true } } },
     })
     if (!cond) return { erro: 'Condição de pagamento inválida', status: 400 }
-    condicaoView = JSON.parse(JSON.stringify(cond)) // Decimals→string, Dates→ISO
-    // Formas permitidas (vazio = sem restrição) e Forma PADRÃO (só sugestão —
-    // a coluna legada formaSugeridaId é a FK da forma padrão).
+    condicaoView = JSON.parse(JSON.stringify(cond))
     condicaoView.formasPermitidasIds = cond.formasPermitidas.map((x) => x.formaId)
     condicaoView.formaPadraoId = cond.formaSugeridaId ?? null
     condMeta = { id: cond.id, versao: cond.versao, codigo: cond.codigo }
-    taxaCandidatas = cond.taxasVinculadas.map((v) => taxaParaCandidata(JSON.parse(JSON.stringify(v.taxa))))
+    for (const v of cond.taxasVinculadas) taxasPorId.set(v.taxa.id, v.taxa)
   }
+  if (forma) {
+    const daForma = await prisma.taxaPagamento.findMany({
+      where: { ativo: true, formasAplicaveis: { has: forma.id ?? -1 } },
+      include: { parcelamento: true },
+    })
+    for (const t of daForma) taxasPorId.set(t.id, t)
+  }
+  const taxaCandidatas = [...taxasPorId.values()].map((t) => taxaParaCandidata(JSON.parse(JSON.stringify(t))))
 
   const input: CobrancaInput = {
     aplicaComo: 'RECEBER', // Receita ⇒ Contas a Receber
@@ -68,6 +79,7 @@ export async function montarECalcular(e: EntradaRuntime): Promise<SaidaRuntime |
     condicao: condicaoView,
     politicaTaxasEscolhida: (e.politicaTaxasEscolhida as any) ?? null,
     nParcelas: e.nParcelas ?? null,
+    bandeiraId: e.bandeiraId ?? null,
     carteiraId: e.carteiraId ?? condicaoView?.carteiraId ?? null,
     contaBancariaId: e.contaBancariaId ?? null,
     taxaCandidatas,

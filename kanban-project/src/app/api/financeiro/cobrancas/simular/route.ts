@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
     carteiraId: b.carteiraId ? Number(b.carteiraId) : null,
     contaBancariaId: b.contaBancariaId ? Number(b.contaBancariaId) : null,
     nParcelas: b.nParcelas != null ? Number(b.nParcelas) : null,
+    bandeiraId: b.bandeiraId ? Number(b.bandeiraId) : null,
     politicaTaxasEscolhida: b.politicaTaxasEscolhida ?? null,
     congelar: false,
   })

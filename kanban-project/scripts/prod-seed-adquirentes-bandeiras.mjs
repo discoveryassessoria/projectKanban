@@ -26,7 +26,7 @@ const ADQUIRENTES = [
 ]
 const BANDEIRAS = [
   { slug: 'VISA', nome: 'Visa' }, { slug: 'MASTERCARD', nome: 'Mastercard' },
-  { slug: 'ELO', nome: 'Elo' }, { slug: 'AMEX', nome: 'American Express' }, { slug: 'HIPERCARD', nome: 'Hipercard' },
+  { slug: 'ELO', nome: 'Elo' }, { slug: 'AMEX', nome: 'American Express' }, { slug: 'HIPERCARD', nome: 'Hipercard' }, { slug: 'DINERS', nome: 'Diners Club' },
 ]
 
 const { PrismaClient } = await import('@prisma/client')

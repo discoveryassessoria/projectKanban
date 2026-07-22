@@ -33,6 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     carteiraId: b.carteiraId ? Number(b.carteiraId) : null,
     contaBancariaId: b.contaBancariaId ? Number(b.contaBancariaId) : null,
     nParcelas: b.nParcelas != null ? Number(b.nParcelas) : null,
+    bandeiraId: b.bandeiraId ? Number(b.bandeiraId) : null,
     politicaTaxasEscolhida: b.politicaTaxasEscolhida ?? null,
     congelar: true,
   })
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         contaBancariaId: b.contaBancariaId ? Number(b.contaBancariaId) : null,
         carteiraId: b.carteiraId ? Number(b.carteiraId) : null,
         taxaPagamentoId: r.taxaAplicada?.id ?? null,
+        bandeiraId: b.bandeiraId ? Number(b.bandeiraId) : null,
         gateway: b.gateway ? String(b.gateway).slice(0, 40) : null,
         moeda: receita.moeda as any, valorTotal: r.totalCobrado, status: 'ABERTA',
         condicaoVersao: condicao?.versao ?? null, condicaoCodigo: condicao?.codigo ?? null, criadoPorId: actorId,
