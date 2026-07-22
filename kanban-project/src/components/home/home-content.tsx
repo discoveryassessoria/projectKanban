@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import type { HomeData } from "@/src/types/home"
 import { GlobalSearch } from "@/src/components/home/global-search"
+import { CotacoesHojeCard } from "@/src/components/home/cotacoes-hoje-card"
 import {
   EmptyState,
   PriorityBadge,
@@ -453,6 +454,8 @@ export function HomeContent({ data, onLogout, recarregar }: { data: HomeData; on
       ) : (
         <>
           <PriorityAlerts data={data} />
+
+          <CotacoesHojeCard />
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             <div className="space-y-5 lg:col-span-2">

@@ -1749,8 +1749,27 @@ model CotacaoCambio {
   data         DateTime?
   fonte        String?   @db.VarChar(100)
   ativo        Boolean   @default(true)
+  // ── Câmbio automático Confidence (ADITIVO — não duplica conceito) ──────────
+  // Registros manuais legados têm estes campos NULL (compat). A cotação oficial
+  // automática nasce com origem=CONFIDENCE_AUTOMATICO; a manual de contingência
+  // com origem=MANUAL. Unicidade/idempotência por (moeda,destino,dataRef,modalidade,
+  // origem,payloadHash): mesmo conteúdo não duplica; conteúdo novo p/ a mesma data
+  // é REVISÃO auditável (nova linha + substituiId), sem apagar histórico.
+  dataReferencia    DateTime? // data REAL da fonte (dia comercial da cotação)
+  consultadoEm      DateTime? // quando o provider efetivamente consultou
+  origem            String?   @db.VarChar(30) // CONFIDENCE_AUTOMATICO | MANUAL
+  modalidade        String?   @db.VarChar(40) // ex.: ecommerce_especie_venda
+  statusIntegracao  String?   @db.VarChar(30) // ATUALIZADO | SEM_NOVA_PUBLICACAO | DESATUALIZADO | INDISPONIVEL | CONFIGURACAO_PENDENTE
+  payloadHash       String?   @db.VarChar(80)
+  urlFonte          String?   @db.VarChar(300)
+  vigente           Boolean   @default(false) // cotação VIGENTE p/ (moedaDe,moedaPara,modalidade)
+  semNovaPublicacao Boolean   @default(false) // true = manteve a última válida (fonte não publicou hoje)
+  substituiId       Int? // revisão: aponta a versão anterior da mesma dataReferencia
   criadoEm     DateTime  @default(now())
   atualizadoEm DateTime  @updatedAt
+
+  @@unique([moedaDe, moedaPara, dataReferencia, modalidade, origem, payloadHash], name: "uq_cotacao_confidence")
+  @@index([moedaDe, moedaPara, vigente])
 }
 
 model Imposto {
