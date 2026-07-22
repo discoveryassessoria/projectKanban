@@ -31,7 +31,7 @@ console.log('\nHash idempotente')
 console.log('\nProvider LIVE (endpoint público do widget) — estrutura correta, sem inventar')
 {
   ;(async () => {
-    T('modalidade oficial documentada (transferência internacional)', MODALIDADE_OFICIAL === 'transferencia_internacional_venda')
+    T('modalidade oficial = Câmbio final (VET) transf. internacional', MODALIDADE_OFICIAL === 'transferencia_internacional_vet')
     T('origem CONFIDENCE_AUTOMATICO', ORIGEM_AUTOMATICA === 'CONFIDENCE_AUTOMATICO')
 
     console.log('\nGuardas estruturais')

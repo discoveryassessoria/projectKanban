@@ -80,7 +80,7 @@ export function CotacoesHojeCard() {
               <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-slate-400">
                 <span>Cotação: {dt(m?.dataReferencia ?? null)}</span>
                 <span>· Atualiz.: {dth(m?.consultadoEm ?? null)}</span>
-                {m?.modalidade && <span>· {m.modalidade}</span>}
+                {m?.modalidade && <span>· {/vet/i.test(m.modalidade) ? 'Câmbio final (VET) · transf. internacional' : m.modalidade}</span>}
                 {(m?.estado === 'DESATUALIZADO' || m?.estado === 'SEM_NOVA_PUBLICACAO') && (
                   <span className="inline-flex items-center gap-0.5 text-amber-600"><AlertTriangle className="h-3 w-3" /> defasagem</span>
                 )}

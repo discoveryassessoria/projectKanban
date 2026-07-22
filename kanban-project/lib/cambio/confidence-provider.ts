@@ -23,11 +23,11 @@ import { createHash } from 'node:crypto'
 export type MoedaEstrangeira = 'EUR' | 'USD'
 export type StatusConsulta = 'OK' | 'CONFIGURACAO_PENDENTE' | 'INDISPONIVEL' | 'INCONSISTENTE'
 
-/** Modalidade comercial oficial (documentada, gravada no registro): TRANSFERÊNCIA
- *  INTERNACIONAL (remessa) — venda. É a regra comercial praticada pela Discovery
- *  (o "você paga" do simulador de Transferências Internacionais). Preço por unidade
- *  = venda.valor × (1 + IOF/100). A tarifa (taxa%) NÃO entra no valor unitário. */
-export const MODALIDADE_OFICIAL = 'transferencia_internacional_venda'
+/** Modalidade comercial oficial (documentada, gravada no registro): CÂMBIO FINAL (VET)
+ *  de TRANSFERÊNCIA INTERNACIONAL. VET = Valor Efetivo Total = câmbio turismo (venda.valor)
+ *  × (1 + IOF/100). A taxa de serviço (R$ fixa, isenta na 1ª remessa) é fee à parte e não
+ *  entra no câmbio por unidade — confere com o "você paga ÷ você envia" do simulador. */
+export const MODALIDADE_OFICIAL = 'transferencia_internacional_vet'
 export const ORIGEM_AUTOMATICA = 'CONFIDENCE_AUTOMATICO'
 export const FONTE_NOME = 'Confidence Câmbio'
 
@@ -126,7 +126,7 @@ export class ConfidenceExchangeProvider implements ExchangeProvider {
       const valorFinal = Math.round(venda.valor * (1 + iof / 100) * 1e6) / 1e6
       const [min, max] = FAIXA[moeda]
       if (valorFinal < min || valorFinal > max) return { ...base, status: 'INCONSISTENTE', detalhe: `valor ${valorFinal} fora da faixa [${min},${max}]`, payloadHash: hashPayload({ moeda, payload }) }
-      const composicao = `Confidence remessa/venda: base=${venda.valor} +IOF ${iof}% = ${valorFinal} (tarifa ${tarifa}% à parte)`
+      const composicao = `VET transf. internacional: turismo=${venda.valor} +IOF ${iof}% = ${valorFinal} (taxa serviço R$${tarifa} à parte/isenta 1ª)`
       return { ...base, valor: valorFinal, payloadHash: hashPayload({ moeda, valor: venda.valor, iof, tarifa }), status: 'OK', detalhe: composicao }
     } catch (e) {
       return { ...base, status: 'INDISPONIVEL', detalhe: (e instanceof Error ? e.message : String(e)).slice(0, 140) }
