@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { NaturezaItem, UnidadeItem } from '@prisma/client'
 
 function toStrOrNull(v: any): string | null {
@@ -27,6 +28,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (b.unidade !== undefined && UNIDADES.includes(b.unidade)) data.unidade = b.unidade
     if (b.ativo !== undefined) data.ativo = !!b.ativo
     const item = await prisma.itemCatalogo.update({ where: { id: parseInt(id) }, data })
+    await registrarAuditoria(request, { acao: 'EDITAR', entidade: 'ItemCatalogo', entidadeId: item.id, descricao: `Item mestre editado: ${item.name}`, detalhes: data as Record<string, unknown> })
     return NextResponse.json(item)
   } catch (error) {
     console.error('Erro ao editar item do catálogo:', error)
@@ -51,6 +53,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: `Item em uso (${total} vínculo(s)). Desative em vez de excluir.` }, { status: 400 })
     }
     await prisma.itemCatalogo.delete({ where: { id: itemId } })
+    await registrarAuditoria(request, { acao: 'EXCLUIR', entidade: 'ItemCatalogo', entidadeId: itemId, descricao: `Item mestre excluído (#${itemId})` })
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('Erro ao excluir item do catálogo:', error)

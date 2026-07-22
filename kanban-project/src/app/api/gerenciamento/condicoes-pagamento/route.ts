@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { paraColunas, validar, inteiro } from './campos'
 
 // GET - Listar
@@ -111,6 +112,7 @@ export async function POST(request: NextRequest) {
       return criada
     })
 
+    await registrarAuditoria(request, { acao: 'CRIAR', entidade: 'CondicaoPagamento', entidadeId: condicao.id, descricao: `Condição de pagamento criada: ${condicao.name} (v${condicao.versao})` })
     return NextResponse.json({ condicao }, { status: 201 })
   } catch (error) {
     console.error('Erro ao criar condição de pagamento:', error)

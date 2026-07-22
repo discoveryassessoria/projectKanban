@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { NaturezaItem, UnidadeItem } from '@prisma/client'
 import { slugTecnico, gerarChaveUnica } from '@/src/lib/catalogo/chave-tecnica-interna'
+import { parseConsulta, filtroBusca, filtroAtivo, ordenacao, meta } from '@/lib/gerenciamento/consulta'
+import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 
 function toStrOrNull(v: any): string | null {
   if (v === undefined || v === null) return null
@@ -20,13 +22,22 @@ export async function GET(request: NextRequest) {
   try {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
-    const itens = await prisma.itemCatalogo.findMany({
-      orderBy: [{ natureza: 'asc' }, { name: 'asc' }],
-      include: {
-        _count: { select: { tiposDocumento: true, produtos: true, servicos: true, precos: true } },
-      },
-    })
-    return NextResponse.json({ itens, naturezas: NATUREZAS, unidades: UNIDADES })
+    // Busca/ordenação/paginação/ativo via query params OPCIONAIS (retrocompatível).
+    const c = parseConsulta(new URL(request.url).searchParams)
+    const where = { ...filtroBusca(c.q, ['name', 'code', 'categoria']), ...filtroAtivo(c) }
+    const [total, itens] = await Promise.all([
+      prisma.itemCatalogo.count({ where }),
+      prisma.itemCatalogo.findMany({
+        where,
+        orderBy: ordenacao(c, ['name', 'code', 'natureza', 'categoria', 'criadoEm'], [{ natureza: 'asc' }, { name: 'asc' }]),
+        skip: c.skip,
+        take: c.take,
+        include: {
+          _count: { select: { tiposDocumento: true, produtos: true, servicos: true, precos: true } },
+        },
+      }),
+    ])
+    return NextResponse.json({ itens, naturezas: NATUREZAS, unidades: UNIDADES, meta: meta(total, c) })
   } catch (error) {
     console.error('Erro ao listar catálogo mestre:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
@@ -53,6 +64,7 @@ export async function POST(request: NextRequest) {
     const item = await prisma.itemCatalogo.create({
       data: { code, name, descricao: toStrOrNull(b.descricao), natureza, categoria: toStrOrNull(b.categoria), unidade, ativo: b.ativo !== false },
     })
+    await registrarAuditoria(request, { acao: 'CRIAR', entidade: 'ItemCatalogo', entidadeId: item.id, descricao: `Item mestre criado: ${name}`, detalhes: { code, natureza, categoria: item.categoria } })
     return NextResponse.json(item, { status: 201 })
   } catch (error) {
     console.error('Erro ao criar item do catálogo:', error)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { modoCalculoValido, unidadeDoModo, modoUsaQuantidade } from '@/lib/financeiro/modo-calculo'
 import { detectarConflitoPreco, type PrecoRegistro } from '@/lib/financeiro/conflito-preco'
 import type { NaturezaPrecoRaw } from '@/lib/financeiro/natureza-financeira'
@@ -122,6 +123,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         },
         include: { fornecedor: { select: { id: true, nome: true } } },
       })
+    await registrarAuditoria(request, { acao: 'EDITAR', entidade: 'TabelaValor', entidadeId: regra.id, descricao: `Preço editado (#${regra.id})` })
       return NextResponse.json({ regra })
     } catch (e: any) {
       const mapped = mapDbError(e)
@@ -147,6 +149,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     // arquivar (não deletar): sai da tela/resolver mas mantém histórico. O índice
     // parcial (WHERE arquivado=false) libera o contexto para um novo preço.
     await prisma.tabelaValor.update({ where: { id }, data: { arquivado: true } })
+    await registrarAuditoria(request, { acao: 'DESATIVAR', entidade: 'TabelaValor', entidadeId: id, descricao: `Preço arquivado (#${id})` })
 
     return NextResponse.json({ ok: true, arquivado: true })
   } catch (error) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { legacyFromCode } from '@/src/lib/document-category-map'
 
 // Classificação canônica sempre carregada (UI exibe o nome do mestre, sem mapa local).
@@ -53,6 +54,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       },
       include: INCLUDE_CATEGORIA,
     })
+    await registrarAuditoria(request, { acao: 'EDITAR', entidade: 'TipoDocumentoCadastro', entidadeId: tipo.id, descricao: `Tipo documental editado: ${tipo.name}` })
     return NextResponse.json({ tipo })
   } catch (e) {
     console.error('PUT tipos-documento/[id]', e)
@@ -69,6 +71,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const atual = await prisma.tipoDocumentoCadastro.findUnique({ where: { id } })
     if (!atual) return NextResponse.json({ error: 'Tipo não encontrado.' }, { status: 404 })
     await prisma.tipoDocumentoCadastro.delete({ where: { id } })
+    await registrarAuditoria(request, { acao: 'EXCLUIR', entidade: 'TipoDocumentoCadastro', entidadeId: id, descricao: `Tipo documental excluído (#${id})` })
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error('DELETE tipos-documento/[id]', e)

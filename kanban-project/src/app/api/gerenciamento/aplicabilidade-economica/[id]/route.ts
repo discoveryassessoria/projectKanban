@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { validarConfigGeraLancamento } from '@/lib/financeiro/regra-financeira-validacao'
 
 function toStrOrNull(v: any): string | null { if (v === undefined || v === null) return null; const s = String(v).trim(); return s === '' ? null : s }
@@ -42,6 +43,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       if (!v.ok) return NextResponse.json({ error: v.motivo }, { status: 400 })
     }
     const regra = await prisma.phaseEconomicRule.update({ where: { id: parseInt(id) }, data })
+    await registrarAuditoria(request, { acao: 'EDITAR', entidade: 'PhaseEconomicRule', entidadeId: regra.id, descricao: `Regra financeira editada: ${regra.componentName ?? regra.id}`, detalhes: data as Record<string, unknown> })
     return NextResponse.json(regra)
   } catch (error) {
     console.error('Erro ao editar regra econômica:', error)
@@ -55,6 +57,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (erro) return erro
     const { id } = await params
     await prisma.phaseEconomicRule.delete({ where: { id: parseInt(id) } })
+    await registrarAuditoria(request, { acao: 'EXCLUIR', entidade: 'PhaseEconomicRule', entidadeId: parseInt(id), descricao: `Regra financeira excluída (#${id})` })
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('Erro ao excluir regra econômica:', error)

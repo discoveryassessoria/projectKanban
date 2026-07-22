@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { inteiro, mudouEstrutura, paraColunas, validar } from '../campos'
 
 /** Uma condição está "em uso" quando já produziu lançamento ou está vinculada. */
@@ -123,6 +124,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       )
     }
 
+    await registrarAuditoria(request, { acao: 'EXCLUIR', entidade: 'CondicaoPagamento', entidadeId: id, descricao: `Condição de pagamento excluída (#${id})` })
     await prisma.condicaoPagamento.delete({ where: { id } })
     return NextResponse.json({ ok: true })
   } catch (error) {

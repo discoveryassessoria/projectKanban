@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { deriveNaturezaFinanceira, validarNaturezaPreco, canonicalNaturezaPreco, admiteCusto, admiteVenda, type NaturezaPrecoRaw } from '@/lib/financeiro/natureza-financeira'
 import { detectarConflitoPreco, type PrecoRegistro } from '@/lib/financeiro/conflito-preco'
 import { modoCalculoValido, unidadeDoModo, modoUsaQuantidade } from '@/lib/financeiro/modo-calculo'
@@ -244,6 +245,7 @@ export async function POST(request: NextRequest) {
       )
       // P4 — cadastrou preço: reprocessa (best-effort) as pendências financeiras desta config.
       reprocessarPendenciasFinanceiras({ configItemId: configId }).catch((e) => console.error('[reprocesso pendências pós-preço]', e))
+      await registrarAuditoria(request, { acao: 'CRIAR', entidade: 'TabelaValor', entidadeId: regras[0]?.id ?? null, descricao: `Preço cadastrado (${regras.length} linha(s), config #${configId})` })
       return NextResponse.json(regras.length === 1 ? { regra: regras[0] } : { regras })
     } catch (e: any) {
       const mapped = mapDbError(e)

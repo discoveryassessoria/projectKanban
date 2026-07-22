@@ -4,6 +4,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
+import { parseConsulta, filtroBusca, filtroAtivo, ordenacao, meta } from '@/lib/gerenciamento/consulta'
 import { validarRegraEconomica, validarConfigGeraLancamento } from '@/lib/financeiro/regra-financeira-validacao'
 
 function toStrOrNull(v: any): string | null {
@@ -19,13 +21,16 @@ export async function GET(request: NextRequest) {
   try {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
+    const c = parseConsulta(new URL(request.url).searchParams)
+    const whereR = { ...filtroBusca(c.q, ['componentName', 'componentKey', 'phaseKey']), ...filtroAtivo(c) }
+    const totalRegras = await prisma.phaseEconomicRule.count({ where: whereR })
     const [regras, produtos, tiposProcesso, docTypes] = await Promise.all([
-      prisma.phaseEconomicRule.findMany({ orderBy: [{ phaseKey: 'asc' }, { ordem: 'asc' }] }),
+      prisma.phaseEconomicRule.findMany({ where: whereR, orderBy: ordenacao(c, ['componentName', 'phaseKey', 'ordem'], [{ phaseKey: 'asc' }, { ordem: 'asc' }]), skip: c.skip, take: c.take }),
       prisma.produtoFinanceiro.findMany({ where: { ativo: true }, select: { id: true, codigo: true, nome: true, naturezaFinanceira: true, possuiCusto: true, possuiReceita: true, moedaPadrao: true }, orderBy: { nome: 'asc' } }),
       prisma.tipoProcessoNacionalidade.findMany({ where: { ativo: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
       prisma.tipoDocumentoCadastro.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
     ])
-    return NextResponse.json({ regras, produtos, tiposProcesso, docTypes })
+    return NextResponse.json({ regras, produtos, tiposProcesso, docTypes, meta: meta(totalRegras, c) })
   } catch (error) {
     console.error('Erro ao listar aplicabilidade econômica:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
@@ -72,6 +77,7 @@ export async function POST(request: NextRequest) {
         ativo: b.ativo !== false,
       },
     })
+    await registrarAuditoria(request, { acao: 'CRIAR', entidade: 'PhaseEconomicRule', entidadeId: regra.id, descricao: `Regra financeira criada: ${regra.componentName ?? regra.id}` })
     return NextResponse.json(regra, { status: 201 })
   } catch (error) {
     console.error('Erro ao criar regra econômica:', error)

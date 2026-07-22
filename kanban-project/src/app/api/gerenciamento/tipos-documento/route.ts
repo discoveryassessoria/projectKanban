@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
+import { parseConsulta, filtroBusca, filtroAtivo, ordenacao, meta } from '@/lib/gerenciamento/consulta'
 import { legacyFromCode } from '@/src/lib/document-category-map'
 import { slugTecnico, gerarChaveUnica } from '@/src/lib/catalogo/chave-tecnica-interna'
 
@@ -15,8 +17,13 @@ export async function GET(request: NextRequest) {
   const erro = await verificarPermissao(request, 'usuarios.gerenciar')
   if (erro) return erro
   try {
-    const tipos = await prisma.tipoDocumentoCadastro.findMany({ orderBy: { name: 'asc' }, include: INCLUDE_CATEGORIA })
-    return NextResponse.json({ tipos })
+    const c = parseConsulta(new URL(request.url).searchParams)
+    const where = { ...filtroBusca(c.q, ['name', 'code', 'category', 'nature']), ...filtroAtivo(c) }
+    const [total, tipos] = await Promise.all([
+      prisma.tipoDocumentoCadastro.count({ where }),
+      prisma.tipoDocumentoCadastro.findMany({ where, orderBy: ordenacao(c, ['name', 'code', 'category'], [{ name: 'asc' }]), skip: c.skip, take: c.take, include: INCLUDE_CATEGORIA }),
+    ])
+    return NextResponse.json({ tipos, meta: meta(total, c) })
   } catch (e) {
     console.error('GET tipos-documento', e)
     return NextResponse.json({ error: 'Erro ao carregar tipos de documento.' }, { status: 500 })
@@ -66,6 +73,7 @@ export async function POST(request: NextRequest) {
       },
       include: INCLUDE_CATEGORIA,
     })
+    await registrarAuditoria(request, { acao: 'CRIAR', entidade: 'TipoDocumentoCadastro', entidadeId: tipo.id, descricao: `Tipo documental criado: ${tipo.name}`, detalhes: { code: tipo.code, category: tipo.category } })
     return NextResponse.json({ tipo }, { status: 201 })
   } catch (e) {
     console.error('POST tipos-documento', e)

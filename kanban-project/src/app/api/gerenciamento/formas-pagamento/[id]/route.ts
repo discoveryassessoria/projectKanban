@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 
 function toStrOrNull(v: any): string | null {
   if (v === undefined || v === null) return null
@@ -59,6 +60,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     const { id: idStr } = await params
     const id = Number(idStr)
+    await registrarAuditoria(request, { acao: 'EXCLUIR', entidade: 'FormaPagamentoCadastro', entidadeId: id, descricao: `Forma de pagamento excluída (#${id})` })
     await prisma.formaPagamentoCadastro.delete({ where: { id } })
 
     return NextResponse.json({ ok: true })
