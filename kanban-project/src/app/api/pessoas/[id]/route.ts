@@ -3,8 +3,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
+import { houveTransicaoParaRequerente } from "@/lib/genealogia/requerente-flag"
+import { enfileirarEventoRequerente, TIPO_EVENTO_REQUERENTE } from "@/src/services/genealogia/emitir-evento-requerente"
+import { processarOutbox } from "@/src/services/outbox-dispatcher"
 // LEGADO_INATIVO (desativação Genealogia): editar Pessoa NÃO reconcilia mais
 // Documento (reconcileDocsForPessoa removido). A materialização V2 (Fatia 2) é
 // aditiva/idempotente e não cria Documento.
@@ -72,6 +75,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const body = await request.json()
 
+    // Estado ANTERIOR do flag — para detectar a TRANSIÇÃO não→requerente (§1/§9).
+    const antes = await prisma.pessoa.findUnique({ where: { id }, select: { requerente: true } })
+
     const dataToUpdate: Prisma.PessoaUpdateInput = {}
 
     // Campos existentes
@@ -120,15 +126,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // ✅ NOVO (rodada 3): flag de casado pra engine
     if (body.casado !== undefined) dataToUpdate.casado = body.casado === true
 
-    const pessoaAtualizada = await prisma.pessoa.update({
-      where: { id },
-      data: dataToUpdate,
-      include: {
-        pai: true,
-        mae: true,
-        arvore: true,
-        documentos: { orderBy: { createdAt: 'desc' } },
-      },
+    // TRANSIÇÃO não→requerente? Só então o evento é emitido (nunca em edição de dados,
+    // re-save ou reorder). Atualização + enfileiramento do evento na MESMA transação.
+    const houveTransicao = body.requerente !== undefined && houveTransicaoParaRequerente(antes?.requerente, body.requerente)
+    const actorId = houveTransicao ? (await extrairUsuarioComPermissoes(request))?.userId ?? null : null
+    const pessoaAtualizada = await prisma.$transaction(async (tx) => {
+      const p = await tx.pessoa.update({
+        where: { id },
+        data: dataToUpdate,
+        include: { pai: true, mae: true, arvore: true, documentos: { orderBy: { createdAt: 'desc' } } },
+      })
+      if (houveTransicao && p.arvoreId) {
+        await enfileirarEventoRequerente(tx, { pessoaId: p.id, arvoreId: p.arvoreId, actorId })
+      }
+      return p
     })
 
     // ============================================================
@@ -139,6 +150,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // idempotente, sem criar Documento, sem avançar fase). Nunca quebra a edição.
     // ============================================================
     await dispararMaterializacaoPorArvore(pessoaAtualizada.arvoreId)
+    // Drena o evento REQUERENTE_ADICIONADO (best-effort; falha fica PENDENTE p/ retry).
+    if (houveTransicao) await processarOutbox({ tipos: [TIPO_EVENTO_REQUERENTE], limite: 20 }).catch(() => {})
 
     return NextResponse.json(pessoaAtualizada)
   } catch (error) {

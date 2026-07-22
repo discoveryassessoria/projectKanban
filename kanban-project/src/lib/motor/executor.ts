@@ -17,7 +17,9 @@ import type { FaseCode } from '@prisma/client'
 import { getFase, faseCodeToPhaseKey, phaseKeyToFaseCode } from '@/src/lib/process-stage/fases-catalog'
 import { gerarCodigoReceita, gerarCodigoCusto } from '@/lib/financeiro/codigos'
 import { calcularPreco } from '@/lib/financeiro/calculo-preco'
-import { MODOS_PRIMEIRO_ADICIONAL } from '@/lib/financeiro/modo-calculo'
+import { MODOS_PRIMEIRO_ADICIONAL, estrategiaDoModo } from '@/lib/financeiro/modo-calculo'
+import { ehRequerente, REQUERENTE_VALORES } from '@/lib/genealogia/requerente-flag'
+import { ordenarRequerentes, classificarRequerente, valorDoRequerente, chaveIdempotenciaRequerente } from '@/lib/financeiro/classificacao-requerente'
 // Cronograma OFICIAL: a Condição de Pagamento decide entrada, quantidade,
 // periodicidade e vencimentos. O motor consome o plano pronto.
 import { aplicarCondicaoPagamento } from '@/lib/financeiro/aplicar-condicao'
@@ -874,3 +876,153 @@ export async function aplicarHonorariosPorRequerente(processoId: number): Promis
 // COMPATIBILIDADE: nome legado mantido como alias do genérico. Callers antigos
 // (materializar-genealogia, supressao-motor) seguem funcionando sem alteração.
 export const aplicarHonorariosCidadaniaItaliana = aplicarHonorariosPorRequerente
+
+// ============================================================================
+// INFRAESTRUTURA GENÉRICA — AUTOMAÇÃO FINANCEIRA POR REQUERENTE (evento person_added)
+// ----------------------------------------------------------------------------
+// Processa o evento REQUERENTE_ADICIONADO: para CADA PhaseAutomationRule financeira
+// com trigger 'person_added' compatível (tipo de processo + fase atual), gera UM
+// lançamento INDIVIDUAL para o requerente do evento, itemizado e vinculado.
+//
+// • Preço SEMPRE pelo RESOLVER OFICIAL (resolverPrecoPorConfigDB) — vigência,
+//   conflito e ausência tratados lá; nunca findFirst.
+// • Cálculo SEMPRE pelo FinanceRuleEngine (calcularPreco, via valorDoRequerente):
+//   1º requerente = valorBase, adicional = valorAdicional. Sem fórmula paralela.
+// • Idempotência POR REQUERENTE (MotorArtefato.automaticKey @unique + $transaction).
+// • Genérico: nenhuma condicional por país/serviço. Dormant enquanto não houver
+//   uma automação cadastrada (retrocompatível — não altera o fluxo agregado legado).
+// ============================================================================
+export interface EventoRequerentePayload {
+  processoId: number
+  pessoaId: number
+  requerenteId?: number | null
+  tipoProcessoId?: number | null
+  phaseKey?: string | null
+  nacionalidade?: string | null
+  actorId?: number | null
+  occurredAt?: string | null
+}
+export interface ResultadoAutomacaoRequerente {
+  processoId: number
+  pessoaId: number
+  regrasAvaliadas: number
+  criados: number
+  pendencias: number
+  ignorados: string[]
+  detalhes: { ruleId: number; acao: string; receitaId?: number; classificacao?: string; valor?: number; motivo?: string }[]
+}
+
+export async function processarRequerenteAdicionado(evt: EventoRequerentePayload): Promise<ResultadoAutomacaoRequerente> {
+  const res: ResultadoAutomacaoRequerente = { processoId: evt.processoId, pessoaId: evt.pessoaId, regrasAvaliadas: 0, criados: 0, pendencias: 0, ignorados: [], detalhes: [] }
+
+  const proc = await prisma.processo.findUnique({
+    where: { id: evt.processoId },
+    select: { id: true, arvoreId: true, faseAtualKey: true, tipoProcessoMotorId: true,
+      tipoProcessoMotor: { select: { nationalityLabel: true, name: true } } },
+  })
+  if (!proc || !proc.tipoProcessoMotorId) { res.ignorados.push('processo/tipo não encontrado'); return res }
+  const tipoProcessoId = proc.tipoProcessoMotorId
+
+  const pessoa = await prisma.pessoa.findUnique({
+    where: { id: evt.pessoaId },
+    select: { id: true, nome: true, sobrenome: true, requerente: true, arvoreId: true,
+      requerentesVinculados: { select: { id: true }, take: 1 } },
+  })
+  if (!pessoa) { res.ignorados.push('pessoa não encontrada'); return res }
+  // Disparo correto (§9): só age se a pessoa É requerente (defensivo contra reprocesso).
+  if (!ehRequerente(pessoa.requerente)) { res.ignorados.push('pessoa não é requerente'); return res }
+
+  const arvoreId = pessoa.arvoreId ?? proc.arvoreId
+  if (!arvoreId) { res.ignorados.push('sem árvore'); return res }
+
+  // Regras compatíveis — só relações/config, sem condicional por país/serviço.
+  const regras = await prisma.phaseAutomationRule.findMany({
+    where: {
+      kind: 'financial', trigger: 'person_added', active: true, arquivado: false,
+      tipoProcessoId, configItemId: { not: null },
+      ...(proc.faseAtualKey ? { phaseKey: proc.faseAtualKey } : {}),
+    },
+  })
+  res.regrasAvaliadas = regras.length
+  if (regras.length === 0) { res.ignorados.push('nenhuma automação person_added ativa p/ esta fase'); return res }
+
+  // Ordem DETERMINÍSTICA dos requerentes do processo (createdAt, id) — fonte única de flag.
+  const reqArvore = await prisma.pessoa.findMany({
+    where: { arvoreId, requerente: { in: [...REQUERENTE_VALORES] } },
+    select: { id: true, createdAt: true },
+  })
+  const ordenados = ordenarRequerentes(reqArvore.map((p) => ({ pessoaId: p.id, createdAt: p.createdAt })))
+  const cls = classificarRequerente(evt.pessoaId, ordenados)
+  if (!cls) { res.ignorados.push('pessoa não está entre os requerentes do processo'); return res }
+
+  const nomeCompleto = `${pessoa.nome}${pessoa.sobrenome ? ' ' + pessoa.sobrenome : ''}`.trim()
+  const nac = proc.tipoProcessoMotor?.nationalityLabel || proc.tipoProcessoMotor?.name || null
+  const billingReqId = pessoa.requerentesVinculados[0]?.id ?? evt.requerenteId ?? null
+  const fxCache = new Map<string, number>()
+
+  for (const r of regras) {
+    const configId = r.configItemId!
+    // RESOLVER OFICIAL — vigência/conflito/ausência. NUNCA findFirst.
+    const preco = await resolverPrecoPorConfigDB(configId, { processoId: evt.processoId, tipoProcessoId: String(tipoProcessoId), natureza: NaturezaPreco.VENDA })
+    if (!preco.ok) {
+      await registrarPendencia({ processoId: evt.processoId, tipoProcessoId, phaseKey: r.phaseKey, configItemId: configId, regraId: r.id, natureza: NaturezaPreco.VENDA, motivo: preco.motivo, detalhe: `Honorário por requerente: ${preco.razao}` })
+      res.pendencias++; res.detalhes.push({ ruleId: r.id, acao: 'pendencia', motivo: preco.razao }); continue
+    }
+    if (preco.conflito) { // §8 — duas tabelas vigentes: aborta, registra, não escolhe
+      await registrarPendencia({ processoId: evt.processoId, tipoProcessoId, phaseKey: r.phaseKey, configItemId: configId, regraId: r.id, natureza: NaturezaPreco.VENDA, motivo: 'CONFLITO_PRECO', detalhe: preco.conflito.nota })
+      res.pendencias++; res.detalhes.push({ ruleId: r.id, acao: 'conflito', motivo: preco.conflito.nota }); continue
+    }
+    // Valor individual via MOTOR (marginal): primeiro=valorBase, adicional=valorAdicional.
+    const vi = valorDoRequerente(cls.posicao, { modoCalculo: preco.modoCalculo, valor: preco.valor, valorBase: preco.valorBase, valorAdicional: preco.valorAdicional })
+    if (vi.total <= 0) { res.ignorados.push(`valor ${vi.total} inválido p/ requerente ${evt.pessoaId}`); continue }
+    const moeda = preco.moeda
+    const fx = await fxParaBRL(moeda, fxCache)
+    if (fx == null) {
+      await registrarPendencia({ processoId: evt.processoId, tipoProcessoId, phaseKey: r.phaseKey, configItemId: configId, regraId: r.id, natureza: NaturezaPreco.VENDA, motivo: 'SEM_CAMBIO', detalhe: `Honorário por requerente: sem cotação ${moeda}→BRL` })
+      res.pendencias++; res.detalhes.push({ ruleId: r.id, acao: 'pendencia', motivo: `sem câmbio ${moeda}` }); continue
+    }
+
+    // Idempotência POR REQUERENTE.
+    const akey = chaveIdempotenciaRequerente({ processoId: evt.processoId, configId, ruleId: r.id, pessoaId: evt.pessoaId })
+    const jaExiste = await prisma.motorArtefato.findFirst({ where: { automaticKey: akey }, select: { targetId: true } })
+    if (jaExiste) { res.detalhes.push({ ruleId: r.id, acao: 'inalterado', receitaId: jaExiste.targetId ?? undefined, classificacao: cls.classificacao }); continue }
+
+    const rotuloCls = cls.classificacao === 'primeiro' ? 'Primeiro requerente' : 'Requerente adicional'
+    const descricao = ['Honorários', nac, rotuloCls, nomeCompleto].filter(Boolean).join(' — ')
+    const contexto = {
+      fonte: 'automacao_requerente', estrategia: estrategiaDoModo(preco.modoCalculo), unidade: 'REQUERENTE',
+      classificacao: cls.classificacao, posicao: cls.posicao, valorBase: preco.valorBase, valorAdicional: preco.valorAdicional,
+      valorRequerente: vi.total, tabelaValorId: preco.tabelaValorId, vigenteEm: (evt.occurredAt ?? new Date().toISOString()).slice(0, 10),
+      evento: 'REQUERENTE_ADICIONADO', pessoaId: evt.pessoaId, ruleId: r.id, memoriaCalculo: vi.memoria,
+    } as Prisma.InputJsonValue
+
+    try {
+      const receitaId = await prisma.$transaction(async (tx) => {
+        const rid = await criarReceita(tx, evt.processoId, descricao, vi.total, moeda, fx, true, {
+          tabelaValorId: preco.tabelaValorId, configId, regraId: r.id, naturezaPreco: 'VENDA',
+          contexto, phaseKey: r.phaseKey, chaveIdempotencia: akey,
+        })
+        await tx.receita.update({ where: { id: rid }, data: {
+          personId: evt.pessoaId,
+          requerentes: { create: { idx: 0, nome: nomeCompleto.slice(0, 200) || 'Requerente', requerenteId: billingReqId } },
+        } })
+        await tx.motorArtefato.create({ data: {
+          processoId: evt.processoId, tipoProcessoId, phaseKey: r.phaseKey, event: 'entered',
+          ruleKind: 'financial', ruleSource: 'automation', ruleId: r.id, automaticKey: akey,
+          targetTable: 'Receita', targetId: rid, status: 'active', descricao: descricao.slice(0, 300),
+          detalhes: { classificacao: cls.classificacao, posicao: cls.posicao, pessoaId: evt.pessoaId, tabelaValorId: preco.tabelaValorId } as Prisma.InputJsonValue,
+        } })
+        return rid
+      }, { timeout: 30000, maxWait: 10000 })
+      await resolverPendencia(evt.processoId, r.phaseKey, r.id, NaturezaPreco.VENDA)
+      res.criados++; res.detalhes.push({ ruleId: r.id, acao: 'criado', receitaId, classificacao: cls.classificacao, valor: vi.total })
+    } catch (e) {
+      // Corrida no MESMO requerente → automaticKey @unique dispara P2002: idempotente.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        res.detalhes.push({ ruleId: r.id, acao: 'inalterado', classificacao: cls.classificacao }); continue
+      }
+      throw e // erro transitório → propaga p/ o Outbox reprocessar (idempotente)
+    }
+  }
+  return res
+}

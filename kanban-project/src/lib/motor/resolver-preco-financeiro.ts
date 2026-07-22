@@ -112,6 +112,11 @@ export interface ResultadoPrecoOK {
   valor: number // já aplicado modoCalculo/quantidade
   valorUnitario: number
   quantidade: number // quantidade usada no cálculo (1 quando fixo)
+  // Parâmetros BRUTOS da linha escolhida — necessários para ITEMIZAÇÃO (ex.: honorários
+  // por requerente: primeiro = valorBase, adicional = valorAdicional). O cálculo continua
+  // sendo do FinanceRuleEngine (calcularPreco); estes são só os insumos congeláveis.
+  valorBase: number | null
+  valorAdicional: number | null
   modoCalculo: string // modo de cálculo aplicado (congelado no lançamento)
   moeda: Moeda
   nivel: string // descrição da regra escolhida (especificidade/prioridade)
@@ -274,6 +279,8 @@ export function resolverPrecoCore(
     valor: valorFinal,
     valorUnitario: calc.unitario,
     quantidade: calc.quantidade,
+    valorBase: escolhida.valorBase ?? null,
+    valorAdicional: escolhida.valorAdicional ?? null,
     modoCalculo: escolhida.modoCalculo ?? 'fixed',
     moeda: escolhida.moeda,
     nivel: `especificidade ${maxEspec} · prioridade ${maxPrio}`,

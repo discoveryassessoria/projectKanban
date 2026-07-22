@@ -12,7 +12,8 @@
 
 import { prisma } from "@/lib/prisma"
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
-import { reconciliarFinanceiroDaFase } from "@/src/lib/motor/executor"
+import { reconciliarFinanceiroDaFase, processarRequerenteAdicionado } from "@/src/lib/motor/executor"
+import type { EventoRequerentePayload } from "@/src/lib/motor/executor"
 import { reconciliarEconomicoDoProcesso } from "@/src/lib/motor/matriz-economica"
 import { reconciliarOperacoesAntecipadas } from "@/src/services/operacao-antecipada"
 
@@ -90,7 +91,7 @@ export async function processarOutbox(opts?: {
 }): Promise<OutboxProcessResumo> {
   const limite = opts?.limite ?? 50
   // phase.completed entra por padrão só para ARQUIVAR (marca ENVIADO) — não acumula.
-  const tipos = opts?.tipos ?? ["phase.entered", "phase.completed"]
+  const tipos = opts?.tipos ?? ["phase.entered", "phase.completed", "requerente.adicionado"]
 
   const pendentes = await prisma.domainOutbox.findMany({
     where: {
@@ -117,6 +118,14 @@ export async function processarOutbox(opts?: {
     try {
       if (evt.tipo === "phase.entered") {
         await aplicarPhaseEntered((evt.payload ?? {}) as PhaseEnteredPayload, evt.correlationId)
+      } else if (evt.tipo === "requerente.adicionado") {
+        // EFEITO: automações financeiras por requerente (trigger person_added). Idempotente
+        // (MotorArtefato per-requerente). Uma falha transitória PROPAGA → evento volta a
+        // PENDENTE e reprocessa. Pendência de preço/config NÃO é falha (fica registrada).
+        const p = (evt.payload ?? {}) as Partial<EventoRequerentePayload>
+        if (p.processoId && p.pessoaId) {
+          await processarRequerenteAdicionado({ ...p, processoId: p.processoId, pessoaId: p.pessoaId })
+        }
       } else if (!TIPOS_SEM_EFEITO.has(evt.tipo)) {
         // tipo conhecido sem efeito conectado ainda: no-op (será marcado ENVIADO/arquivado).
       }

@@ -3,6 +3,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
+import { ehRequerente } from "@/lib/genealogia/requerente-flag"
+import { emitirEDrenarEventoRequerente } from "@/src/services/genealogia/emitir-evento-requerente"
+import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 // LEGADO_INATIVO (desativação Genealogia): a auto-geração de Documento ao criar
 // Pessoa foi DESLIGADA. Criar Pessoa NÃO gera mais Documento silenciosamente.
 // Import de reconcileDocsForPessoa removido de propósito — não reintroduzir.
@@ -176,6 +179,13 @@ export async function POST(request: NextRequest) {
         documentos: true,
       }
     })
+
+    // TRANSIÇÃO: pessoa NASCE requerente → emite REQUERENTE_ADICIONADO (via Outbox).
+    // Idempotente (chave por processo+pessoa); nunca um efeito financeiro direto aqui.
+    if (ehRequerente(pessoa.requerente) && pessoa.arvoreId) {
+      const actorId = (await extrairUsuarioComPermissoes(request))?.userId ?? null
+      await emitirEDrenarEventoRequerente({ pessoaId: pessoa.id, arvoreId: pessoa.arvoreId, actorId })
+    }
 
     // Se está adicionando como pai ou mãe de um filho existente
     if (filhoId && tipoPai) {
