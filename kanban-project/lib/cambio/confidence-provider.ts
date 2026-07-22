@@ -54,10 +54,19 @@ export function hashPayload(obj: unknown): string {
   return createHash('sha256').update(JSON.stringify(obj)).digest('hex').slice(0, 40)
 }
 
-/** Config do provider a partir do ambiente (sem segredo hardcoded). */
-function configConfidence(): { url: string | null; apiKey: string | null } {
-  return { url: process.env.CONFIDENCE_COTACAO_URL || null, apiKey: process.env.CONFIDENCE_API_KEY || null }
-}
+// ── Endpoint PÚBLICO do widget oficial da Confidence (mesmo que o site incorpora) ──
+// NÃO é API privada de parceiro: são os valores embutidos no bundle JS público do
+// widget (confidencecambio.com.br/widgets-de-cambio). Overridáveis por env caso rotem.
+//   GET {BASE}/v2/moedas-operacionais/{id}/cotacao?cidade-id={cidade}
+//   headers: auth (token público do widget) + UA de browser (exigido pelo WAF).
+//   payload.venda = { valor (base), iof (%), taxa (%) } → preço FINAL espécie/venda =
+//   valor × (1 + (iof + taxa)/100), com a COMPOSIÇÃO preservada (auditável).
+const CONFIDENCE_BASE = process.env.CONFIDENCE_BASE_URL || 'https://b8pybk7hl9.execute-api.sa-east-1.amazonaws.com/production/white-label/cotacao/api'
+const CONFIDENCE_AUTH = process.env.CONFIDENCE_AUTH || '$2y$12$M4fgZx/W7r9yRWtkqZ7yx.cBlfZjRgvGzVmwOXrUEBiA8BMCn88Bq'
+const CONFIDENCE_CIDADE = process.env.CONFIDENCE_CIDADE_ID || '1'
+const CONFIDENCE_UA = process.env.CONFIDENCE_UA || 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
+// IDs oficiais da modalidade ESPÉCIE no e-commerce (moedas-operacionais): EUR=35, USD=29.
+const MOEDA_ID: Record<MoedaEstrangeira, string> = { EUR: process.env.CONFIDENCE_ID_EUR || '35', USD: process.env.CONFIDENCE_ID_USD || '29' }
 
 /**
  * Extrai o valor final de VENDA (espécie) da moeda a partir do payload da fonte.
@@ -86,27 +95,36 @@ export class ConfidenceExchangeProvider implements ExchangeProvider {
   readonly nome = 'CONFIDENCE'
 
   async buscar(moeda: MoedaEstrangeira, agoraISO: string): Promise<CotacaoProviderResult> {
+    const url = `${CONFIDENCE_BASE}/v2/moedas-operacionais/${MOEDA_ID[moeda]}/cotacao?cidade-id=${CONFIDENCE_CIDADE}`
     const base: CotacaoProviderResult = {
       moedaOrigem: moeda, moedaDestino: 'BRL', valor: null, modalidade: MODALIDADE_OFICIAL,
-      dataReferencia: null, consultadoEm: agoraISO, origem: ORIGEM_AUTOMATICA, urlFonte: null, payloadHash: null, status: 'INDISPONIVEL',
+      dataReferencia: agoraISO.slice(0, 10), consultadoEm: agoraISO, origem: ORIGEM_AUTOMATICA, urlFonte: url, payloadHash: null, status: 'INDISPONIVEL',
     }
-    const { url, apiKey } = configConfidence()
-    // Sem endpoint/credencial oficial configurada → PENDENTE (não inventa, não usa outra fonte).
-    if (!url) return { ...base, status: 'CONFIGURACAO_PENDENTE', detalhe: 'CONFIDENCE_COTACAO_URL não configurada (API Cotação de parceiro / endpoint do widget)' }
+    if (!CONFIDENCE_AUTH) return { ...base, status: 'CONFIGURACAO_PENDENTE', detalhe: 'CONFIDENCE_AUTH não configurado' }
     try {
       const ctrl = new AbortController()
       const t = setTimeout(() => ctrl.abort(), 12000)
-      const res = await fetch(url, { signal: ctrl.signal, headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined }).finally(() => clearTimeout(t))
-      if (!res.ok) return { ...base, status: 'INDISPONIVEL', detalhe: `HTTP ${res.status}`, urlFonte: url }
+      const res = await fetch(url, { signal: ctrl.signal, headers: {
+        auth: CONFIDENCE_AUTH, 'user-agent': CONFIDENCE_UA, accept: 'application/json, text/plain, */*',
+        origin: 'https://www.confidencecambio.com.br', referer: 'https://www.confidencecambio.com.br/',
+      } }).finally(() => clearTimeout(t))
+      if (!res.ok) return { ...base, status: 'INDISPONIVEL', detalhe: `HTTP ${res.status}` }
       const payload = await res.json().catch(() => null)
-      const { valor, dataRef, detalhe } = extrairValorVenda(payload, moeda)
-      const hash = hashPayload({ moeda, payload })
-      if (valor == null) return { ...base, status: 'INCONSISTENTE', detalhe: detalhe ?? 'sem valor', urlFonte: url, payloadHash: hash }
+      const venda = payload?.payload?.venda
+      // moeda/modalidade têm de estar claras; venda.valor obrigatório e positivo.
+      if (!venda || typeof venda.valor !== 'number' || !(venda.valor > 0)) {
+        return { ...base, status: 'INCONSISTENTE', detalhe: 'payload.venda.valor ausente/inválido', payloadHash: hashPayload({ moeda, payload }) }
+      }
+      const iof = Number(venda.iof) || 0
+      const tarifa = Number(venda.taxa) || 0
+      // PREÇO FINAL comercial (espécie/venda) — composição IOF + tarifa preservada e auditável.
+      const valorFinal = Math.round(venda.valor * (1 + (iof + tarifa) / 100) * 1e6) / 1e6
       const [min, max] = FAIXA[moeda]
-      if (valor < min || valor > max) return { ...base, status: 'INCONSISTENTE', detalhe: `valor ${valor} fora da faixa [${min},${max}]`, urlFonte: url, payloadHash: hash }
-      return { ...base, valor, dataReferencia: dataRef, urlFonte: url, payloadHash: hash, status: 'OK' }
+      if (valorFinal < min || valorFinal > max) return { ...base, status: 'INCONSISTENTE', detalhe: `valor ${valorFinal} fora da faixa [${min},${max}]`, payloadHash: hashPayload({ moeda, payload }) }
+      const composicao = `Confidence espécie/venda: base=${venda.valor} +IOF ${iof}% +tarifa ${tarifa}% = ${valorFinal}`
+      return { ...base, valor: valorFinal, payloadHash: hashPayload({ moeda, valor: venda.valor, iof, tarifa }), status: 'OK', detalhe: composicao }
     } catch (e) {
-      return { ...base, status: 'INDISPONIVEL', detalhe: (e instanceof Error ? e.message : String(e)).slice(0, 140), urlFonte: url }
+      return { ...base, status: 'INDISPONIVEL', detalhe: (e instanceof Error ? e.message : String(e)).slice(0, 140) }
     }
   }
 }

@@ -86,7 +86,7 @@ async function persistir(r: CotacaoProviderResult): Promise<{ cotacaoId: number;
 
   const nova = await prisma.cotacaoCambio.create({
     data: {
-      moedaDe: de, moedaPara: para, taxa: r.valor!, data: dataRef, fonte: `${FONTE_NOME} (auto)`,
+      moedaDe: de, moedaPara: para, taxa: r.valor!, data: dataRef, fonte: (r.detalhe ? `${FONTE_NOME}: ${r.detalhe}` : `${FONTE_NOME} (auto)`).slice(0, 100),
       ativo: true, dataReferencia: dataRef, consultadoEm: new Date(r.consultadoEm), origem: ORIGEM_AUTOMATICA,
       modalidade: r.modalidade, statusIntegracao: 'ATUALIZADO', payloadHash: r.payloadHash, urlFonte: r.urlFonte,
       vigente: false, semNovaPublicacao, substituiId: anterior?.id ?? null,

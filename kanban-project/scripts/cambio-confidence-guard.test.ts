@@ -28,24 +28,20 @@ console.log('\nHash idempotente')
   T('payload diferente → hash diferente (revisão)', hashPayload({ a: 1 }) !== hashPayload({ a: 2 }))
 }
 
-console.log('\nProvider sem credencial/endpoint → CONFIGURACAO_PENDENTE (nunca inventa/zero/outra fonte)')
+console.log('\nProvider LIVE (endpoint público do widget) — estrutura correta, sem inventar')
 {
-  const prev = process.env.CONFIDENCE_COTACAO_URL
-  delete process.env.CONFIDENCE_COTACAO_URL
-  const p = new ConfidenceExchangeProvider()
-  const r = { then: (f: any) => p.buscar('EUR', new Date().toISOString()).then(f) } as any
-  // resolve síncrono via await no wrapper de teste
   ;(async () => {
-    const res = await p.buscar('EUR', '2026-07-22T00:00:00Z')
-    T('status CONFIGURACAO_PENDENTE', res.status === 'CONFIGURACAO_PENDENTE')
-    T('valor null (não grava zero)', res.valor === null)
-    T('modalidade oficial documentada', res.modalidade === MODALIDADE_OFICIAL)
-    T('origem CONFIDENCE_AUTOMATICO', res.origem === ORIGEM_AUTOMATICA)
-    if (prev) process.env.CONFIDENCE_COTACAO_URL = prev
+    T('modalidade oficial documentada', MODALIDADE_OFICIAL === 'ecommerce_especie_venda')
+    T('origem CONFIDENCE_AUTOMATICO', ORIGEM_AUTOMATICA === 'CONFIDENCE_AUTOMATICO')
 
     console.log('\nGuardas estruturais')
     const provSrc = src('lib/cambio/confidence-provider.ts')
     T('não usa BCE/BancoCentral/awesomeapi como fallback', !/bcb|bancocentral|awesomeapi|economia\.awesomeapi|ptax/i.test(provSrc))
+    T('endpoint real do widget (moedas-operacionais/{id}/cotacao)', /v2\/moedas-operacionais\/\$\{MOEDA_ID\[moeda\]\}\/cotacao\?cidade-id=/.test(provSrc))
+    T('header auth (token público do widget)', /auth: CONFIDENCE_AUTH/.test(provSrc))
+    T('composição IOF + tarifa preservada (auditável)', /venda\.valor \* \(1 \+ \(iof \+ tarifa\) \/ 100\)/.test(provSrc))
+    T('IDs espécie EUR=35 USD=29', /EUR.*'35'/.test(provSrc) && /USD.*'29'/.test(provSrc))
+    T('rejeita venda.valor ausente/<=0 (não inventa/zero)', /venda\.valor > 0/.test(provSrc) && /INCONSISTENTE/.test(provSrc))
     const svc = src('src/lib/cambio/servico-cambio.ts')
     T('serviço usa trava de concorrência (advisory lock)', /pg_try_advisory_lock/.test(svc))
     T('reprocessa SEM_CAMBIO após EUR válido', /euroValido[\s\S]*reprocessarSemCambio/.test(svc))
