@@ -1,99 +1,114 @@
 "use client"
 
-// Primitivas visuais da Central Operacional — superfície clara, alto contraste,
-// cards sólidos (sem glassmorphism, sem imagem de fundo). Reutilizadas por
-// todas as seções da Home.
+// ============================================================================
+// PRIMITIVAS VISUAIS DO CENTRO OPERACIONAL
+// ----------------------------------------------------------------------------
+// MESMA identidade do módulo Financeiro (src/components/financeiro/
+// dashboard-corporativo.tsx): fundo arquitetônico escurecido, cards glass/dark,
+// acento dourado no que é primário e as cores de status verde/vermelho/âmbar.
+// Nada de superfície clara ou paleta própria — a Home é parte do mesmo sistema.
+// ============================================================================
 
 import * as React from "react"
 import { AlertTriangle, Inbox } from "lucide-react"
-import type { NivelPrioridade, PrioridadeTarefa } from "@/src/types/home"
+import type { NivelPrioridade } from "@/src/types/home"
 
-// ---- Estilos por nível de prioridade --------------------------------------
+/** Acento dourado — mesmo token do Financeiro. */
+export const OURO = "#D2A948"
+/** Card glass — mesma composição do Financeiro. */
+export const CARD = "rounded-xl border border-white/10 bg-white/[0.05] backdrop-blur-md"
+
+// ---- Estilos por nível -----------------------------------------------------
 export interface NivelStyle {
-  card: string
   chip: string
-  dot: string
+  ponto: string
   texto: string
+  aro: string
 }
-export function nivelStyle(nivel: NivelPrioridade): NivelStyle {
+export function nivelStyle(nivel: NivelPrioridade | "critico" | "alto"): NivelStyle {
   switch (nivel) {
     case "critico":
-      return { card: "border-red-200 bg-red-50 hover:bg-red-100", chip: "bg-red-100 text-red-700", dot: "bg-red-500", texto: "text-red-700" }
+      return {
+        chip: "bg-red-500/15 text-red-300 border-red-400/30",
+        ponto: "bg-red-400",
+        texto: "text-red-300",
+        aro: "ring-red-400/25",
+      }
     case "alto":
-      return { card: "border-amber-200 bg-amber-50 hover:bg-amber-100", chip: "bg-amber-100 text-amber-800", dot: "bg-amber-500", texto: "text-amber-800" }
+      return {
+        chip: "bg-amber-500/15 text-amber-300 border-amber-400/30",
+        ponto: "bg-amber-400",
+        texto: "text-amber-300",
+        aro: "ring-amber-400/25",
+      }
     case "medio":
-      return { card: "border-sky-200 bg-sky-50 hover:bg-sky-100", chip: "bg-sky-100 text-sky-700", dot: "bg-sky-500", texto: "text-sky-700" }
+      return {
+        chip: "bg-sky-500/15 text-sky-300 border-sky-400/30",
+        ponto: "bg-sky-400",
+        texto: "text-sky-300",
+        aro: "ring-sky-400/25",
+      }
     default:
-      return { card: "border-slate-200 bg-white hover:bg-slate-50", chip: "bg-slate-100 text-slate-600", dot: "bg-slate-400", texto: "text-slate-600" }
+      return {
+        chip: "bg-white/10 text-white/70 border-white/15",
+        ponto: "bg-white/40",
+        texto: "text-white/70",
+        aro: "ring-white/10",
+      }
   }
 }
 
-// ---- Badge de prioridade de tarefa ----------------------------------------
-const PRIORIDADE_STYLE: Record<PrioridadeTarefa, string> = {
-  URGENTE: "bg-red-100 text-red-700 border-red-200",
-  ALTA: "bg-amber-100 text-amber-800 border-amber-200",
-  MEDIA: "bg-sky-100 text-sky-700 border-sky-200",
-  BAIXA: "bg-slate-100 text-slate-600 border-slate-200",
-}
-export function PriorityBadge({ prioridade }: { prioridade: PrioridadeTarefa }) {
-  const label = prioridade.charAt(0) + prioridade.slice(1).toLowerCase()
-  return (
-    <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[11px] font-medium ${PRIORIDADE_STYLE[prioridade]}`}>
-      {label}
-    </span>
-  )
+// ---- Card / cabeçalho de bloco --------------------------------------------
+export function BlocoCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <section className={`${CARD} p-4 md:p-5 ${className}`}>{children}</section>
 }
 
-// ---- Cabeçalho de seção ----------------------------------------------------
-export function SectionHeader({
+export function BlocoHeader({
   titulo,
   descricao,
   acao,
-  icon: Icon,
 }: {
   titulo: string
   descricao?: string
   acao?: React.ReactNode
-  icon?: React.ComponentType<{ className?: string }>
 }) {
   return (
-    <div className="mb-3 flex items-end justify-between gap-3">
-      <div className="flex items-center gap-2">
-        {Icon && <Icon className="h-4 w-4 text-slate-400" />}
-        <div>
-          <h2 className="text-sm font-semibold tracking-tight text-slate-900">{titulo}</h2>
-          {descricao && <p className="text-xs text-slate-500">{descricao}</p>}
-        </div>
+    <div className="mb-4 flex items-end justify-between gap-3">
+      <div className="min-w-0">
+        <h2 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-white/90">{titulo}</h2>
+        {descricao && <p className="mt-0.5 text-xs text-white/50">{descricao}</p>}
       </div>
       {acao}
     </div>
   )
 }
 
-// ---- Card de seção (superfície branca sólida) ------------------------------
-export function SectionCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+// ---- Estados ---------------------------------------------------------------
+export function EmptyState({
+  children,
+  icon: Icon = Inbox,
+}: {
+  children: React.ReactNode
+  icon?: React.ComponentType<{ className?: string }>
+}) {
   return (
-    <section className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${className}`}>{children}</section>
-  )
-}
-
-// ---- Estados vazios / erro -------------------------------------------------
-export function EmptyState({ children, icon: Icon = Inbox }: { children: React.ReactNode; icon?: React.ComponentType<{ className?: string }> }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
-      <Icon className="h-6 w-6 text-slate-300" />
-      <p className="text-sm text-slate-500">{children}</p>
+    <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+      <Icon className="h-6 w-6 text-white/25" />
+      <p className="text-sm text-white/50">{children}</p>
     </div>
   )
 }
 
 export function ErrorState({ onRetry, mensagem }: { onRetry?: () => void; mensagem?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+    <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
       <AlertTriangle className="h-6 w-6 text-red-400" />
-      <p className="text-sm text-slate-600">{mensagem ?? "Não foi possível carregar estes dados."}</p>
+      <p className="text-sm text-white/70">{mensagem ?? "Não foi possível carregar estes dados."}</p>
       {onRetry && (
-        <button onClick={onRetry} className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">
+        <button
+          onClick={onRetry}
+          className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white/10"
+        >
           Tentar novamente
         </button>
       )}
@@ -102,32 +117,29 @@ export function ErrorState({ onRetry, mensagem }: { onRetry?: () => void; mensag
 }
 
 // ---- Formatação ------------------------------------------------------------
-export function tempoRelativo(iso: string): string {
-  const agora = Date.now()
-  const t = new Date(iso).getTime()
-  if (isNaN(t)) return ""
-  const diff = agora - t
-  const min = Math.floor(diff / 60000)
-  if (min < 1) return "agora mesmo"
-  if (min < 60) return `há ${min} min`
-  const h = Math.floor(min / 60)
-  if (h < 24) return `há ${h}h`
-  const d = Math.floor(h / 24)
-  if (d === 1) return "ontem"
-  if (d < 7) return `há ${d} dias`
-  return new Date(iso).toLocaleDateString("pt-BR")
+export function formatarHorario(iso: string | null): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ""
+  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
 }
 
 export function formatarPrazo(iso: string | null): string {
   if (!iso) return "sem prazo"
   const d = new Date(iso)
   if (isNaN(d.getTime())) return "sem prazo"
+  const dias = Math.round(
+    (new Date(d).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86_400_000,
+  )
+  if (dias < 0) return `${Math.abs(dias)}d em atraso`
+  if (dias === 0) return "vence hoje"
+  if (dias === 1) return "vence amanhã"
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
 }
 
-export function formatarHorario(iso: string | null): string {
-  if (!iso) return ""
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return ""
-  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+export function saudacao(agora = new Date()): string {
+  const h = agora.getHours()
+  if (h < 12) return "Bom dia"
+  if (h < 18) return "Boa tarde"
+  return "Boa noite"
 }

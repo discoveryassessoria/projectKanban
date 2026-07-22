@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import type { ProcessoWithStatus } from "@/src/types/kanban"
 import { parseLocalDate, formatDateBR, getToday, isToday, isPast, isWithinDays } from "@/src/lib/date-utils"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { CambioMini } from "@/src/components/cambio/cambio-mini"
 import useSWR from 'swr'
 
 // Mapeamento de bandeiras por país
@@ -37,6 +38,8 @@ interface HeaderBarProps {
     pessoas?: any[]
   }>
   onLogout?: () => void
+  /** Esconde a busca por processos da barra (telas que já têm busca global própria). */
+  ocultarBusca?: boolean
 }
 
 interface TarefaNotificacao {
@@ -57,7 +60,8 @@ export function HeaderBar({
   projetos = [],
   processos = [],
   arvores = [],
-  onLogout 
+  onLogout,
+  ocultarBusca = false,
 }: HeaderBarProps) {
   const [currentTime, setCurrentTime] = useState<string>("")
   const [currentDate, setCurrentDate] = useState<string>("")
@@ -206,6 +210,9 @@ export function HeaderBar({
 
         {/* Lado direito - Ações */}
         <div className="flex items-center gap-4">
+          {/* Câmbio discreto — presente em todas as telas do sistema */}
+          <CambioMini />
+
           {/* Horário e Data */}
           <div className="hidden lg:flex flex-col items-end">
             <span className="text-sm font-medium text-white">{currentTime}</span>
@@ -216,7 +223,7 @@ export function HeaderBar({
           <div className="hidden lg:block h-8 w-px bg-white/20" />
 
           {/* Campo de busca */}
-          {pode('processos.ver') && <div className="relative hidden md:block">
+          {!ocultarBusca && pode('processos.ver') && <div className="relative hidden md:block">
             <div className="flex items-center gap-2 px-3 py-2 rounded-full border border-white/30">
               <Search className="h-4 w-4 text-white/70" />
               <input

@@ -1,98 +1,88 @@
 // ============================================================================
-// Contrato da CENTRAL OPERACIONAL (Home) — resposta agregada de /api/home
+// CONTRATO DA HOME — CENTRO OPERACIONAL (resposta de /api/home)
 // ----------------------------------------------------------------------------
-// Este arquivo define APENAS o formato dos dados que a Home consome. Nenhuma
-// regra de negócio dos processos vive aqui: o backend lê o estado já
-// persistido (faseAtualKey, statusTarefa, PhaseWorkflowInstance.status, etc.)
-// e monta estes blocos. A Home é uma superfície de triagem; a decisão
-// autoritativa (ex.: pendências reais de avanço de fase) continua no detalhe
-// do processo.
+// CONCEITO: a Home não é dashboard nem BI. Tudo o que aparece aqui responde a
+// uma pergunta operacional imediata:
+//   1) O que precisa ser feito agora?   → filas (ações executáveis)
+//   2) Quais são as prioridades?        → nível + ordenação das filas
+//   3) Existe algum problema?           → alertas (só quando existem)
+//   4) O que vence hoje?                → agenda (hoje/amanhã/próximos)
+//   5) Quais filas precisam ser trabalhadas? → filas, com clique direto
+//
+// NÃO há receita, caixa, processos ativos, processos por fase, gargalos,
+// atividade recente ou qualquer indicador histórico: isso vive nos módulos
+// especializados (Financeiro, Processos, Tarefas, Relatórios).
+//
+// NENHUMA regra de negócio nova: os números são LIDOS do estado já persistido
+// pelo motor (PhaseWorkflowStepInstance, PhaseWorkflowInstance, Tarefa,
+// Documento, PendenciaFinanceira, Evento, DomainOutbox).
 // ============================================================================
 
 export type NivelPrioridade = "critico" | "alto" | "medio" | "baixo"
 
-/** Prioridade de tarefa (espelha o enum PrioridadeTarefa do Prisma). */
-export type PrioridadeTarefa = "URGENTE" | "ALTA" | "MEDIA" | "BAIXA"
+/** Módulo dono da informação — usado só para ícone/agrupamento visual. */
+export type ModuloFila = "documentos" | "processos" | "tarefas" | "financeiro"
 
-// ---- 1. Cabeçalho / resumo de atenção -------------------------------------
-export interface AttentionSummary {
-  /** Total de itens realmente acionáveis (soma dos componentes abaixo). */
-  total: number
-  processosBloqueados: number
-  tarefasVencidas: number
-  fasesProntas: number
-  eventosHoje: number
-  minhasPendencias: number
+// ---- 1. Status operacional (cabeçalho) ------------------------------------
+export interface StatusOperacional {
+  nivel: "estavel" | "atencao" | "critico"
+  /** frase curta e acionável ("3 itens exigem atenção hoje") */
+  mensagem: string
+  /** total de itens executáveis somando todas as filas */
+  totalAcoes: number
 }
 
-// ---- 2. Alertas prioritários ----------------------------------------------
-export interface PriorityAlert {
+// ---- 2. Central Operacional (filas de trabalho real) ----------------------
+export interface FilaOperacional {
   key: string
+  /** ação no infinitivo — "Solicitar certidões", não "Documentos" */
   titulo: string
   descricao: string
   quantidade: number
   nivel: NivelPrioridade
-  /** destino já filtrado (rota interna com querystring) */
+  modulo: ModuloFila
+  /** drill-down: abre exatamente esta fila */
   href: string
 }
 
-// ---- 3. Próximas ações -----------------------------------------------------
-export interface NextAction {
-  id: number
+/** Item individual de uma fila (drill-down /dashboard/fila/[key]). */
+export interface FilaItem {
+  id: string
   titulo: string
+  subtitulo: string | null
   processoId: number | null
+  processoCodigo: string | null
   processoNome: string | null
-  familiaNome: string | null
-  faseLabel: string | null
-  responsavelNome: string | null
+  pais: string | null
   prazo: string | null
-  prioridade: PrioridadeTarefa
-  status: string
-  vencida: boolean
-  venceHoje: boolean
+  atrasado: boolean
+  /** destino real do trabalho (processo/tarefa/documento/financeiro) */
   href: string
 }
 
-// ---- 4. Fila da equipe -----------------------------------------------------
-export interface TeamQueueGroup {
-  key: string
-  nome: string
-  /** true para o grupo "Minhas pendências" (destaque no topo) */
-  ehMinhas: boolean
-  /** true para o grupo "Sem responsável" */
-  semResponsavel: boolean
-  pendentes: number
-  vencidas: number
-  criticas: number
-  href: string
-}
-
-// ---- 5. Processos por fase -------------------------------------------------
-export interface PhaseColumn {
-  phaseKey: string
-  label: string
-  ordem: number
-  total: number
-  bloqueados: number
-  prontos: number
-  slaVencido: number
-  href: string
-}
-
-// ---- 6. Gargalos -----------------------------------------------------------
-export interface Bottleneck {
+export interface FilaDetalhe {
   key: string
   titulo: string
-  quantidade: number
+  descricao: string
   nivel: NivelPrioridade
-  href: string
+  modulo: ModuloFila
+  quantidade: number
+  itens: FilaItem[]
+  /** true quando a fila tem mais itens do que o limite retornado */
+  truncado: boolean
 }
 
-// ---- 7. Agenda de hoje -----------------------------------------------------
+// ---- 3. Agenda -------------------------------------------------------------
+export type GrupoAgenda = "hoje" | "amanha" | "proximos"
+
 export interface AgendaItem {
   id: number
+  grupo: GrupoAgenda
+  /** ISO; null quando dia inteiro */
   horario: string | null
   diaInteiro: boolean
+  /** rótulo curto do dia, usado no grupo "próximos" (ex.: "sex, 24/07") */
+  dia: string
   titulo: string
   tipo: string
   processoId: number | null
@@ -101,25 +91,45 @@ export interface AgendaItem {
   href: string
 }
 
-// ---- 8. Atividade recente --------------------------------------------------
-export interface ActivityItem {
-  id: string
-  acao: string
-  entidade: string
-  descricao: string
-  usuarioNome: string | null
-  quando: string
-  tipo: "criacao" | "conclusao" | "movimento" | "fase" | "outro"
-  href: string | null
+export interface Agenda {
+  hoje: AgendaItem[]
+  amanha: AgendaItem[]
+  proximos: AgendaItem[]
 }
 
-// ---- Permissões relevantes à Home -----------------------------------------
+// ---- 4. Alertas (só existem quando há algo crítico) -----------------------
+export type TipoAlerta =
+  | "prazo"
+  | "documento_invalido"
+  | "bloqueio"
+  | "automacao"
+  | "integracao"
+
+export interface AlertaOperacional {
+  key: string
+  tipo: TipoAlerta
+  titulo: string
+  detalhe: string
+  nivel: "critico" | "alto"
+  quantidade: number
+  href: string
+}
+
+// ---- 5. Resumo da operação do dia -----------------------------------------
+export interface ResumoDia {
+  tarefasConcluidas: number
+  aguardandoCliente: number
+  aguardandoCartorio: number
+  emValidacao: number
+  processosBloqueados: number
+}
+
+// ---- Permissões relevantes -------------------------------------------------
 export interface HomePermissions {
   verProcessos: boolean
   verTarefas: boolean
   verEventos: boolean
-  criarProcesso: boolean
-  criarTarefa: boolean
+  verFinanceiro: boolean
   isAdmin: boolean
 }
 
@@ -128,13 +138,10 @@ export interface HomeData {
   usuario: { id: number; nome: string; email: string; tipo: string }
   geradoEm: string
   permissions: HomePermissions
-  attentionSummary: AttentionSummary
-  priorityAlerts: PriorityAlert[]
-  nextActions: NextAction[]
-  nextActionsTotal: number
-  teamQueue: TeamQueueGroup[]
-  processesByPhase: PhaseColumn[]
-  bottlenecks: Bottleneck[]
-  todayAgenda: AgendaItem[]
-  recentActivity: ActivityItem[]
+  status: StatusOperacional
+  filas: FilaOperacional[]
+  agenda: Agenda
+  /** vazio = o bloco de alertas não é renderizado */
+  alertas: AlertaOperacional[]
+  resumoDia: ResumoDia
 }

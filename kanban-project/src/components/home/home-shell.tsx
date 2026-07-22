@@ -1,0 +1,69 @@
+"use client"
+
+// ============================================================================
+// SHELL DO CENTRO OPERACIONAL
+// ----------------------------------------------------------------------------
+// Exatamente a mesma casca do módulo Financeiro (src/app/financeiro/page.tsx):
+// fundo arquitetônico europeu desfocado + overlay escuro + HeaderBar padrão.
+// A Home e o drill-down das filas compartilham este shell — mesma iluminação,
+// mesma tipografia, mesma barra lateral, mesmos componentes.
+// ============================================================================
+
+import * as React from "react"
+import { useRouter } from "next/navigation"
+import { HeaderBar } from "@/src/components/header-bar"
+
+export function HomeShell({
+  titulo = "Centro Operacional",
+  subtitulo = "O que precisa ser feito agora",
+  children,
+}: {
+  titulo?: string
+  subtitulo?: string
+  children: React.ReactNode
+}) {
+  const router = useRouter()
+  const [user, setUser] = React.useState<{ nome?: string; tipo?: string; email?: string }>({ nome: "Usuário" })
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
+    const u = localStorage.getItem("user")
+    if (u) {
+      try {
+        setUser(JSON.parse(u))
+      } catch {
+        /* payload inválido: mantém o placeholder */
+      }
+    }
+  }, [])
+
+  function sair() {
+    localStorage.removeItem("authToken")
+    localStorage.removeItem("user")
+    document.cookie = "authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+    router.replace("/login")
+  }
+
+  return (
+    <div className="relative min-h-screen overflow-x-hidden text-white">
+      {/* Fundo arquitetônico desfocado e escurecido — idêntico ao Financeiro */}
+      <div className="pointer-events-none fixed inset-0 -z-10 scale-105 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat blur-[6px]" />
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-black/85" />
+
+      <HeaderBar
+        title={titulo}
+        subtitle={subtitulo}
+        userName={user?.nome || "Usuário"}
+        userRole={user?.tipo === "admin" ? "Administrador" : user?.tipo || "Usuário"}
+        userEmail={user?.email || ""}
+        ocultarBusca
+        onLogout={sair}
+      />
+
+      <div className="relative min-h-screen">
+        <div className="pointer-events-none absolute inset-0 bg-black/25" />
+        <main className="relative">{children}</main>
+      </div>
+    </div>
+  )
+}

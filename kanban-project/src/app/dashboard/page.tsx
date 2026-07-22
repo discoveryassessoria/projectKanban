@@ -1,30 +1,30 @@
 "use client"
 
 // ============================================================================
-// CENTRAL OPERACIONAL — tela inicial do Discovery.
-// Substitui o antigo "Painel Principal" (Total de Processos / Processos por
-// País / histórico longo sobre foto de fundo). Aqui o foco é ação: o que exige
-// atenção, o que fazer hoje, o que está bloqueado, o que pode avançar, onde
-// estão os gargalos, a agenda e a atividade recente — tudo clicável.
+// HOME — CENTRO OPERACIONAL do escritório
+// ----------------------------------------------------------------------------
+// A tela inicial deixou de ser dashboard executivo: tudo o que aparece aqui
+// ajuda a decidir o que fazer nos próximos minutos. Receita, caixa, processos
+// ativos, processos por fase, workflow macro, indicadores e atividade recente
+// pertencem aos módulos especializados e NÃO voltam para cá.
 //
 // A página é fina: guarda de auth + carga da API agregadora (/api/home) via
-// SWR, com skeleton, estado de erro e estado vazio. Toda a regra de leitura
-// vive no backend; nada de números decorativos.
+// SWR, com skeleton e estado de erro. Toda a leitura vive no backend.
 // ============================================================================
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useHomeData } from "@/src/components/home/use-home"
 import { HomeContent } from "@/src/components/home/home-content"
+import { HomeShell } from "@/src/components/home/home-shell"
 import { HomeSkeleton } from "@/src/components/home/home-skeleton"
-import { ErrorState } from "@/src/components/home/home-primitives"
+import { BlocoCard, ErrorState } from "@/src/components/home/home-primitives"
 
 export default function DashboardPage() {
   const router = useRouter()
   const [autorizado, setAutorizado] = useState(false)
   const { data, error, isLoading, recarregar } = useHomeData()
 
-  // Guarda de autenticação (mesmo padrão do restante do app).
   useEffect(() => {
     const token = localStorage.getItem("authToken")
     const userData = localStorage.getItem("user")
@@ -35,37 +35,40 @@ export default function DashboardPage() {
     setAutorizado(true)
   }, [router])
 
-  function handleLogout() {
-    localStorage.removeItem("authToken")
-    localStorage.removeItem("user")
-    document.cookie = "authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
-    router.replace("/login")
-  }
-
   // Sessão expirada durante a chamada → volta pro login.
   useEffect(() => {
     const status = (error as (Error & { status?: number }) | undefined)?.status
-    if (status === 401) handleLogout()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [error])
+    if (status === 401) {
+      localStorage.removeItem("authToken")
+      localStorage.removeItem("user")
+      document.cookie = "authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+      router.replace("/login")
+    }
+  }, [error, router])
 
-  if (!autorizado) return <div className="min-h-screen bg-slate-50" />
+  if (!autorizado) {
+    return (
+      <HomeShell>
+        <HomeSkeleton />
+      </HomeShell>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <HomeShell>
       {isLoading && !data ? (
         <HomeSkeleton />
       ) : error && !data ? (
-        <div className="mx-auto max-w-7xl px-4 py-10 md:px-6">
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <ErrorState onRetry={() => recarregar()} mensagem="Não foi possível carregar a Central Operacional." />
-          </div>
+        <div className="mx-auto w-full max-w-[1600px] px-4 py-6 md:px-6">
+          <BlocoCard>
+            <ErrorState onRetry={() => recarregar()} mensagem="Não foi possível carregar o Centro Operacional." />
+          </BlocoCard>
         </div>
       ) : data ? (
-        <HomeContent data={data} onLogout={handleLogout} recarregar={() => recarregar()} />
+        <HomeContent data={data} />
       ) : (
         <HomeSkeleton />
       )}
-    </div>
+    </HomeShell>
   )
 }

@@ -54,9 +54,13 @@ console.log('\nProvider LIVE (endpoint público do widget) — estrutura correta
     T('cron protegido (CRON_SECRET ou header vercel-cron)', cron.includes('CRON_SECRET') && cron.includes('x-vercel-cron'))
     const atualizar = src('src/app/api/gerenciamento/cambio/atualizar-agora/route.ts')
     T('“Atualizar agora” usa o MESMO serviço (não paralelo)', atualizar.includes('atualizarCotacoesConfidence'))
-    const card = src('src/components/home/cotacoes-hoje-card.tsx')
-    T('card lê só o snapshot do banco (não Confidence)', card.includes('/api/cambio/snapshot') && !/confidencecambio/i.test(card))
-    T('card clicável → histórico /cambio', card.includes('href="/cambio"'))
+    // Câmbio na Home virou componente DISCRETO da barra superior (todas as telas),
+    // no lugar do card grande — ver src/components/cambio/cambio-mini.tsx.
+    const card = src('src/components/cambio/cambio-mini.tsx')
+    T('componente lê só o snapshot do banco (não Confidence)', card.includes('/api/cambio/snapshot') && !/confidencecambio/i.test(card))
+    T('componente clicável → histórico /cambio', card.includes('href="/cambio"'))
+    const header = src('src/components/header-bar.tsx')
+    T('câmbio discreto na barra superior de todas as telas', header.includes('<CambioMini />'))
     const vjson = JSON.parse(src('vercel.json'))
     T('vercel.json tem cron diário p/ /api/cron/cambio', Array.isArray(vjson.crons) && vjson.crons.some((c: any) => c.path === '/api/cron/cambio'))
 

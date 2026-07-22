@@ -1,23 +1,28 @@
 /**
- * CENTRAL OPERACIONAL — guarda estática da Home (sem banco).
+ * CENTRO OPERACIONAL — guarda estática da Home (sem banco).
  * Rodar: tsx scripts/home-guard.test.ts
  *
- * Protege os critérios de aceite da tela inicial:
- *  - a Home antiga foi substituída (sem "Processos por País", sem foto de fundo,
- *    sem glassmorphism, sem a frase genérica);
- *  - as seções obrigatórias existem;
- *  - a ordem das fases vem da configuração (CatalogoFase), não é fixada no código;
- *  - a API agregadora e a busca global existem e expõem os blocos esperados.
+ * Protege o CONCEITO da tela inicial:
+ *  - Home = centro de operações (só ação executável), não dashboard/BI;
+ *  - blocos removidos não voltam (receita, caixa, processos ativos, processos
+ *    por fase, workflow macro, atividade recente, acesso rápido, gráficos…);
+ *  - identidade visual IDÊNTICA ao módulo Financeiro (fundo europeu, overlay
+ *    escuro, glassmorphism, HeaderBar, mesmos tokens de card);
+ *  - alertas só existem quando há alerta; agenda só hoje/amanhã/próximos;
+ *  - filas clicáveis abrem exatamente aquela fila (drill-down);
+ *  - a API agrega e não duplica lógica (mesma coleta na Home e no drill-down);
+ *  - câmbio é componente discreto da barra superior de todas as telas.
  */
-import { readFileSync } from "fs"
+import { readFileSync, existsSync } from "fs"
 import { fileURLToPath } from "url"
 import { dirname, join } from "path"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const ler = (rel: string) => readFileSync(join(ROOT, rel), "utf8")
-// Remove comentários — as guardas de "UI antiga removida" devem checar o código
-// renderizado, não a prosa que explica o que foi retirado.
-const semComentarios = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
+// As guardas de "bloco removido" devem olhar o código renderizado, não a prosa
+// dos comentários que explicam o que saiu.
+const semComentarios = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/\/\/.*$/gm, "")
 
 let passed = 0
 let failed = 0
@@ -28,71 +33,103 @@ function ok(cond: boolean, nome: string) {
 }
 
 function run() {
-  console.log("CENTRAL OPERACIONAL — guarda estática\n")
+  console.log("CENTRO OPERACIONAL — guarda estática\n")
 
-  const home = ler("src/app/dashboard/page.tsx")
+  const page = ler("src/app/dashboard/page.tsx")
   const content = ler("src/components/home/home-content.tsx")
+  const shell = ler("src/components/home/home-shell.tsx")
+  const primitivas = ler("src/components/home/home-primitives.tsx")
   const api = ler("src/app/api/home/route.ts")
-  const search = ler("src/app/api/home/search/route.ts")
+  const apiFila = ler("src/app/api/home/fila/[key]/route.ts")
+  const coleta = ler("src/lib/home/coleta.ts")
   const logic = ler("src/lib/home/home-logic.ts")
-  const homeAll = semComentarios(home + "\n" + content)
-  const apiCode = semComentarios(api)
+  const filaPage = ler("src/app/dashboard/fila/[key]/page.tsx")
+  const header = ler("src/components/header-bar.tsx")
+  const financeiro = ler("src/app/financeiro/page.tsx")
+  const financeiroDash = ler("src/components/financeiro/dashboard-corporativo.tsx")
 
-  // ---- Home antiga removida ----
-  ok(!/Processos por Pa[íi]s/i.test(homeAll), "sem 'Processos por País' na Home")
-  ok(!/Total de Processos/i.test(homeAll), "sem 'Total de Processos' como destaque")
-  ok(!/Aqui está o resumo dos seus processos e tarefas/i.test(homeAll), "sem a frase genérica de boas-vindas")
-  ok(!/espanha\.jpg|bg-\[url\(/.test(homeAll), "sem imagem de fundo atrás do conteúdo")
-  ok(!/backdrop-blur/.test(homeAll), "sem glassmorphism (backdrop-blur) na Home")
-  ok(!/PAISES_CONFIG|processosPorPais/.test(homeAll), "sem distribuição por país na Home")
+  const uiHome = semComentarios(page + "\n" + content + "\n" + shell)
 
-  // ---- Seções obrigatórias presentes ----
-  const secoes = [
-    "Alertas prioritários",
-    "Próximas ações",
-    "Fila da equipe",
-    "Processos por fase",
-    "Gargalos",
-    "Agenda de hoje",
-    "Atividade recente",
+  // ---- 1. Blocos que NÃO pertencem mais à Home ----
+  console.log("Blocos removidos:")
+  const proibidos: [RegExp, string][] = [
+    [/Receita prevista|Receita realizada|receitaPrevista|receitaRealizada/i, "receita"],
+    [/\bCaixa\b|caixaBRL/i, "caixa"],
+    [/Financeiro resumido|resumoFinanceiro/i, "financeiro resumido"],
+    [/Processos ativos|processosAtivos/i, "processos ativos"],
+    [/Fam[ií]lias ativas|Pessoas na [áa]rvore/i, "famílias ativas / pessoas na árvore"],
+    [/Processos por fase|processesByPhase|Processos em andamento/i, "processos por fase"],
+    [/Workflow Macro|Fluxo Operacional|Indicadores Operacionais/i, "workflow macro / indicadores"],
+    [/Atividade recente|recentActivity|[ÚU]ltimas movimenta/i, "atividade recente"],
+    [/Acesso r[áa]pido|QuickActions/i, "acesso rápido"],
+    [/Fila da equipe|teamQueue|Gargalos|bottlenecks/i, "fila da equipe / gargalos"],
+    [/recharts|<svg[\s\S]*?<path|PieChart|BarChart|Funnel/i, "gráficos"],
   ]
-  for (const s of secoes) ok(content.includes(s), `seção presente: ${s}`)
-  ok(/itens? precisa/.test(content), "cabeçalho mostra resumo de atenção acionável")
-  ok(content.includes("GlobalSearch"), "busca global integrada ao cabeçalho")
+  for (const [re, nome] of proibidos) ok(!re.test(uiHome), `Home não exibe: ${nome}`)
+  ok(!/Cota[çc][õo]es de hoje/i.test(uiHome), "sem card grande de câmbio na Home")
+  ok(!existsSync(join(ROOT, "src/components/home/cotacoes-hoje-card.tsx")), "card antigo de câmbio removido do repo")
 
-  // ---- Estados de carregamento / erro / vazio ----
-  ok(home.includes("HomeSkeleton"), "estado de loading (skeleton)")
-  ok(home.includes("ErrorState"), "estado de erro")
-  ok(content.includes("EmptyState"), "estados vazios nas seções")
-  ok(content.includes("Nenhum compromisso para hoje"), "estado vazio da agenda")
+  // ---- 2. Identidade visual do Financeiro ----
+  console.log("\nIdentidade visual (idêntica ao Financeiro):")
+  const fundoFinanceiro = /bg-\[url\('\/espanha\.jpg'\)\]/
+  ok(fundoFinanceiro.test(financeiro) && fundoFinanceiro.test(shell), "mesma imagem europeia de fundo")
+  ok(/bg-black\/85/.test(shell) && /bg-black\/85/.test(financeiro), "mesmo overlay escuro translúcido")
+  ok(/backdrop-blur/.test(primitivas), "glassmorphism nos cards")
+  ok(shell.includes("<HeaderBar"), "mesma barra superior (HeaderBar)")
+  const cardFinanceiro = 'rounded-xl border border-white/10 bg-white/[0.05] backdrop-blur-md'
+  ok(financeiroDash.includes(cardFinanceiro) && primitivas.includes(cardFinanceiro), "mesmo token de card do Financeiro")
+  ok(/#D2A948/.test(primitivas) && /#D2A948/.test(financeiroDash), "mesmo acento dourado")
+  // bg-white/[0.05] é o vidro do Financeiro; o que não pode é superfície sólida clara.
+  ok(!/bg-slate-50|bg-white(?!\/)/.test(uiHome), "sem superfície clara (a Home é parte do mesmo sistema)")
 
-  // ---- API agregadora expõe todos os blocos numa resposta ----
-  const blocos = [
-    "attentionSummary",
-    "priorityAlerts",
-    "nextActions",
-    "teamQueue",
-    "processesByPhase",
-    "bottlenecks",
-    "todayAgenda",
-    "recentActivity",
-  ]
-  for (const b of blocos) ok(api.includes(b), `API /api/home expõe: ${b}`)
-  ok(/extrairUsuarioComPermissoes/.test(api), "API respeita autenticação/permissões")
-  ok(/Promise\.all\(/.test(api), "API agrega em paralelo (sem 1 consulta por card)")
+  // ---- 3. Blocos obrigatórios ----
+  console.log("\nBlocos obrigatórios:")
+  ok(/saudacao\(/.test(content), "cabeçalho com saudação")
+  ok(/toLocaleDateString\("pt-BR"/.test(content), "cabeçalho com data")
+  ok(/status\.mensagem|s\.mensagem/.test(content), "cabeçalho com status operacional")
+  ok(content.includes("<GlobalSearch"), "busca global no cabeçalho")
+  ok(content.includes("Central Operacional"), "bloco Central Operacional")
+  ok(/titulo="Agenda"/.test(content), "bloco Agenda")
+  ok(/Hoje/.test(content) && /Amanhã/.test(content) && /Próximos dias/.test(content), "agenda: hoje, amanhã, próximos dias")
+  ok(/titulo="Alertas"/.test(content), "bloco Alertas")
+  ok(/Opera[çc][ãa]o de hoje/.test(content), "bloco Resumo da operação do dia")
 
-  // ---- Ordem de fases vem da configuração, não fixada no código ----
-  ok(/catalogoFase\.findMany/.test(api), "fases lidas de CatalogoFase (Workflow Macro)")
-  ok(/orderBy:\s*\{\s*ordemPadrao:\s*"asc"\s*\}/.test(api), "fases ordenadas por ordemPadrao")
-  ok(/\.sort\(\(a, b\) => a\.ordem - b\.ordem\)/.test(logic), "agrupamento respeita a ordem configurada")
+  // ---- 4. Regras de comportamento ----
+  console.log("\nRegras do conceito:")
+  ok(/data\.alertas\.length === 0\) return null/.test(content), "bloco de alertas some quando não há alerta")
+  ok(/filter\(\(f\) => f\.quantidade > 0\)/.test(logic), "fila zerada não aparece")
+  ok(/href=\{fila\.href\}/.test(content), "cada fila é clicável")
+  ok(/\/dashboard\/fila\/\$\{def\.key\}/.test(coleta), "clique abre exatamente aquela fila (drill-down)")
+  ok(/\{fila\.quantidade\}/.test(content), "cada fila mostra quantidade")
+  ok(/nivelStyle\(fila\.nivel\)/.test(content), "cada fila mostra prioridade")
+  ok(/\{fila\.descricao\}/.test(content), "cada fila mostra descrição")
+  ok(existsSync(join(ROOT, "src/app/dashboard/fila/[key]/page.tsx")), "tela da fila existe")
+  ok(/useFila\(/.test(filaPage), "tela da fila consome o drill-down")
 
-  // ---- Busca global real (integrada, não visual) ----
-  for (const modelo of ["processo.findMany", "familia.findMany", "requerente.findMany", "contratante.findMany"]) {
-    ok(search.includes(modelo), `busca global consulta: ${modelo}`)
+  // ---- 5. Arquitetura: agrega, não duplica ----
+  console.log("\nArquitetura:")
+  ok(/from "@\/src\/lib\/home\/coleta"/.test(api), "Home usa o coletor compartilhado")
+  ok(/from "@\/src\/lib\/home\/coleta"/.test(apiFila), "drill-down usa o MESMO coletor (contagem = lista)")
+  ok(/Promise\.all\(/.test(coleta), "coleta em paralelo (sem uma consulta por card)")
+  ok(!/calcularPendencias|simulateAdvance|resolveOperationalProjection/.test(semComentarios(coleta)), "Home não roda o motor por processo (sem recalcular regra)")
+  ok(/Cache-Control/.test(api) && /Cache-Control/.test(apiFila), "resposta com cache curto")
+  ok(/extrairUsuarioComPermissoes/.test(api) && /extrairUsuarioComPermissoes/.test(apiFila), "autenticação e permissões respeitadas")
+  for (const bloco of ["status", "filas", "agenda", "alertas", "resumoDia"]) {
+    ok(new RegExp(`\\b${bloco}\\b`).test(api), `API /api/home expõe: ${bloco}`)
   }
 
-  // ---- Não reintroduz o motor por-processo na Home (evita N+1 pesado) ----
-  ok(!/calcularPendencias|simulateAdvance/.test(apiCode), "Home não roda o motor de pendências por processo (perf)")
+  // ---- 6. Câmbio discreto em todas as telas ----
+  console.log("\nCâmbio:")
+  ok(existsSync(join(ROOT, "src/components/cambio/cambio-mini.tsx")), "componente discreto de câmbio existe")
+  ok(header.includes("<CambioMini />"), "câmbio na barra superior de todas as telas")
+  const mini = ler("src/components/cambio/cambio-mini.tsx")
+  ok(/EUR/.test(mini) && /USD/.test(mini) && /consultadoEm/.test(mini), "mostra EUR/BRL, USD/BRL e última atualização")
+
+  // ---- 7. Responsividade ----
+  console.log("\nResponsividade:")
+  ok(/lg:grid-cols-3/.test(content) && /grid-cols-1/.test(content), "malha responsiva na composição")
+  ok(/sm:grid-cols-3|lg:grid-cols-5/.test(content), "resumo do dia se adapta a telas menores")
+  ok(/md:px-6/.test(content), "espaçamento responsivo")
 
   console.log(`\n${passed} passaram, ${failed} falharam`)
   if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }

@@ -1,71 +1,23 @@
 // ============================================================================
-// LÓGICA PURA DA CENTRAL OPERACIONAL (Home)
+// LÓGICA PURA DO CENTRO OPERACIONAL (Home)
 // ----------------------------------------------------------------------------
-// Funções SEM dependência de banco/rede: recebem linhas simples (já lidas do
-// Prisma na rota /api/home) e produzem os blocos da Home. Isto mantém a regra
-// de apresentação testável sem DB (o repositório roda testes via `tsx`, sem
-// runner e sem banco) e deixa a rota fina.
+// Sem banco, sem rede: recebe linhas simples (já lidas pelo coletor) e produz
+// filas, status, agenda e alertas. Mantém a Home testável sem DB (`tsx`).
 //
-// IMPORTANTE: aqui NÃO se reimplementa regra de negócio de processo. O que
-// determina "bloqueado" / "pronto para avançar" é lido do ESTADO já persistido
-// (Tarefa.statusTarefa, PhaseWorkflowInstance.status, Processo.faseAtualKey).
-// A decisão autoritativa de avanço continua no motor (calcularPendencias), que
-// é acionado no detalhe do processo — não aqui, por custo (evita N+1).
+// REGRA DE OURO: aqui NÃO se reimplementa regra de negócio. "Bloqueado",
+// "pronto", "aberto", "concluído" são LIDOS do estado persistido pelo motor
+// (PhaseWorkflowStepInstance.status, PhaseWorkflowInstance.status,
+// Tarefa.statusTarefa, Documento.status, PendenciaFinanceira.resolvida). Esta
+// camada só classifica, agrupa e ordena para a triagem da manhã.
 // ============================================================================
 
 import type {
-  ActivityItem,
-  AttentionSummary,
-  Bottleneck,
+  FilaOperacional,
+  GrupoAgenda,
+  ModuloFila,
   NivelPrioridade,
-  PhaseColumn,
-  PrioridadeTarefa,
+  StatusOperacional,
 } from "@/src/types/home"
-
-// ---- Prioridade ------------------------------------------------------------
-export const PESO_PRIORIDADE: Record<PrioridadeTarefa, number> = {
-  URGENTE: 0,
-  ALTA: 1,
-  MEDIA: 2,
-  BAIXA: 3,
-}
-
-export function normalizarPrioridade(p: string | null | undefined): PrioridadeTarefa {
-  const v = (p ?? "").toUpperCase()
-  if (v === "URGENTE" || v === "ALTA" || v === "MEDIA" || v === "BAIXA") return v
-  return "MEDIA"
-}
-
-// ---- Status de tarefa ------------------------------------------------------
-/** Estados que encerram a tarefa (não são "abertos"/acionáveis). */
-export const STATUS_TAREFA_TERMINAL = new Set([
-  "CONCLUIDO_RECEBIDO",
-  "CONCLUIDO_NAO_POSSUI",
-  "SUPERSEDIDA",
-  "CANCELADA",
-])
-
-export interface TarefaLike {
-  id: number
-  concluida: boolean
-  statusTarefa: string | null
-  prioridade: string | null
-  dataPrazo: string | Date | null
-  responsavelId?: number | null
-  ordem?: number | null
-}
-
-/** Tarefa "aberta": não concluída e não em estado terminal. */
-export function isTarefaAberta(t: TarefaLike): boolean {
-  if (t.concluida) return false
-  if (t.statusTarefa && STATUS_TAREFA_TERMINAL.has(t.statusTarefa)) return false
-  return true
-}
-
-/** Tarefa impeditiva (bloqueada manualmente). */
-export function isTarefaBloqueada(t: TarefaLike): boolean {
-  return t.statusTarefa === "BLOQUEADA"
-}
 
 // ---- Datas -----------------------------------------------------------------
 export function inicioDoDia(d: Date): Date {
@@ -78,172 +30,289 @@ export function fimDoDia(d: Date): Date {
   x.setHours(23, 59, 59, 999)
   return x
 }
-
-function prazoDate(t: TarefaLike): Date | null {
-  if (!t.dataPrazo) return null
-  const d = new Date(t.dataPrazo)
-  return isNaN(d.getTime()) ? null : d
+export function somarDias(d: Date, dias: number): Date {
+  const x = new Date(d)
+  x.setDate(x.getDate() + dias)
+  return x
+}
+/** Diferença em dias inteiros entre dois instantes (a - b), por dia civil. */
+export function diasEntre(a: Date, b: Date): number {
+  return Math.round((inicioDoDia(a).getTime() - inicioDoDia(b).getTime()) / 86_400_000)
 }
 
-/** Tarefa aberta com prazo estritamente anterior a hoje. */
-export function isVencida(t: TarefaLike, hoje: Date): boolean {
-  if (!isTarefaAberta(t)) return false
-  const p = prazoDate(t)
-  if (!p) return false
-  return inicioDoDia(p).getTime() < inicioDoDia(hoje).getTime()
+/** Prazo já vencido (dia civil anterior a hoje). */
+export function estaAtrasado(prazo: Date | string | null | undefined, hoje: Date): boolean {
+  if (!prazo) return false
+  const d = new Date(prazo)
+  if (isNaN(d.getTime())) return false
+  return inicioDoDia(d).getTime() < inicioDoDia(hoje).getTime()
 }
 
-/** Tarefa aberta com prazo == hoje. */
-export function venceHoje(t: TarefaLike, hoje: Date): boolean {
-  if (!isTarefaAberta(t)) return false
-  const p = prazoDate(t)
-  if (!p) return false
-  return inicioDoDia(p).getTime() === inicioDoDia(hoje).getTime()
+/** Prazo é hoje. */
+export function venceHoje(prazo: Date | string | null | undefined, hoje: Date): boolean {
+  if (!prazo) return false
+  const d = new Date(prazo)
+  if (isNaN(d.getTime())) return false
+  return inicioDoDia(d).getTime() === inicioDoDia(hoje).getTime()
 }
 
-// ---- Próximas ações (ordenação) -------------------------------------------
-// Ordem: 1) vencidas  2) vencem hoje  3) prioridade  4) prazo  5) ordem/id.
-export function compararProximasAcoes(a: TarefaLike, b: TarefaLike, hoje: Date): number {
-  const va = isVencida(a, hoje) ? 0 : 1
-  const vb = isVencida(b, hoje) ? 0 : 1
-  if (va !== vb) return va - vb
+// ---- Estados lidos do motor ------------------------------------------------
+/** Estados que encerram a tarefa — não são trabalho aberto. */
+export const STATUS_TAREFA_TERMINAL = new Set([
+  "CONCLUIDO_RECEBIDO",
+  "CONCLUIDO_NAO_POSSUI",
+  "SUPERSEDIDA",
+  "CANCELADA",
+])
 
-  const ha = venceHoje(a, hoje) ? 0 : 1
-  const hb = venceHoje(b, hoje) ? 0 : 1
-  if (ha !== hb) return ha - hb
+/** Passos que ainda representam trabalho vivo (inclui AGUARDANDO e BLOQUEADO). */
+export const STATUS_PASSO_VIVO = [
+  "PENDENTE",
+  "DISPONIVEL",
+  "EM_ANDAMENTO",
+  "AGUARDANDO",
+  "BLOQUEADO",
+] as const
 
-  const pa = PESO_PRIORIDADE[normalizarPrioridade(a.prioridade)]
-  const pb = PESO_PRIORIDADE[normalizarPrioridade(b.prioridade)]
-  if (pa !== pb) return pa - pb
+/** Passos em que existe ação executável AGORA (aguardar não é ação). */
+export const STATUS_PASSO_ACIONAVEL = new Set(["PENDENTE", "DISPONIVEL", "EM_ANDAMENTO"])
 
-  const da = prazoDate(a)
-  const db = prazoDate(b)
-  if (da && db && da.getTime() !== db.getTime()) return da.getTime() - db.getTime()
-  if (da && !db) return -1
-  if (!da && db) return 1
-
-  const oa = a.ordem ?? 0
-  const ob = b.ordem ?? 0
-  if (oa !== ob) return oa - ob
-  return a.id - b.id
+// ---- Classificação de trabalho por verbo do passo --------------------------
+// O stepKey do catálogo de fases é sempre `verbo_complemento`
+// (solicitar_certidao, conferir_apostilas, montar_pasta_traducao...). A fila é
+// derivada do VERBO — data-driven, sem condicional por fase e sem lista fixa de
+// stepKeys que quebraria ao cadastrar uma fase nova.
+export function verboDoStep(stepKey: string): string {
+  return (stepKey ?? "").split("_")[0].toLowerCase()
 }
 
-export function ordenarProximasAcoes<T extends TarefaLike>(tarefas: T[], hoje: Date): T[] {
-  return [...tarefas].sort((a, b) => compararProximasAcoes(a, b, hoje))
-}
-
-// ---- Processos por fase ----------------------------------------------------
-export interface FaseCatalogoLike {
-  phaseKey: string
-  label: string
-  ordem: number
-}
-
-export interface PhaseCountsInput {
-  catalogo: FaseCatalogoLike[]
-  /** processoId -> phaseKey atual */
-  faseDeProcesso: Map<number, string>
-  bloqueados: Set<number>
-  prontos: Set<number>
-  slaVencidos: Set<number>
-  /** monta o href da coluna a partir do phaseKey */
-  href: (phaseKey: string) => string
-  /** fases que não devem aparecer no board (ex.: finalizado) */
-  ocultar?: Set<string>
-}
-
-export function agruparProcessosPorFase(input: PhaseCountsInput): PhaseColumn[] {
-  const { catalogo, faseDeProcesso, bloqueados, prontos, slaVencidos, href, ocultar } = input
-
-  // Índice fase -> coluna, na ordem do catálogo (Workflow Macro / CatalogoFase).
-  const colunas = new Map<string, PhaseColumn>()
-  const ordenado = [...catalogo].sort((a, b) => a.ordem - b.ordem)
-  for (const f of ordenado) {
-    if (ocultar?.has(f.phaseKey)) continue
-    colunas.set(f.phaseKey, {
-      phaseKey: f.phaseKey,
-      label: f.label,
-      ordem: f.ordem,
-      total: 0,
-      bloqueados: 0,
-      prontos: 0,
-      slaVencido: 0,
-      href: href(f.phaseKey),
-    })
-  }
-
-  for (const [processoId, phaseKey] of faseDeProcesso) {
-    const col = colunas.get(phaseKey)
-    if (!col) continue // fase desconhecida/oculta: não inventa coluna
-    col.total += 1
-    if (bloqueados.has(processoId)) col.bloqueados += 1
-    if (prontos.has(processoId)) col.prontos += 1
-    if (slaVencidos.has(processoId)) col.slaVencido += 1
-  }
-
-  return [...colunas.values()]
-}
-
-// ---- Resumo de atenção -----------------------------------------------------
-export function calcularAttentionSummary(p: {
-  processosBloqueados: number
-  tarefasVencidas: number
-  fasesProntas: number
-  eventosHoje: number
-  minhasPendencias: number
-}): AttentionSummary {
-  const total =
-    p.processosBloqueados + p.tarefasVencidas + p.fasesProntas + p.eventosHoje + p.minhasPendencias
-  return { ...p, total }
-}
-
-// ---- Gargalos --------------------------------------------------------------
-// Remove zeros e ordena por impacto (quantidade desc).
-export function rankBottlenecks(itens: Bottleneck[]): Bottleneck[] {
-  return itens
-    .filter((b) => b.quantidade > 0)
-    .sort((a, b) => b.quantidade - a.quantidade)
-}
-
-export function nivelPorQuantidade(qtd: number, alto = 10, critico = 25): NivelPrioridade {
-  if (qtd >= critico) return "critico"
-  if (qtd >= alto) return "alto"
-  if (qtd > 0) return "medio"
-  return "baixo"
-}
-
-// ---- Atividade recente (limpeza de ruído) ----------------------------------
-export interface LogLike {
-  id: number
-  acao: string
-  entidade: string
+export interface FilaDef {
+  key: string
+  titulo: string
   descricao: string
-  criadoEm: string | Date
-  usuario?: { nome: string } | null
-  entidadeId?: number | null
+  modulo: ModuloFila
+  nivelBase: NivelPrioridade
+  /** verbos de stepKey que caem nesta fila (apenas filas de passo) */
+  verbos?: string[]
 }
+
+/** Filas derivadas dos passos do Workflow (trabalho real do motor). */
+export const FILAS_PASSO: FilaDef[] = [
+  {
+    key: "solicitar",
+    titulo: "Solicitar certidões",
+    descricao: "Requerimentos prontos para envio ao cartório",
+    modulo: "documentos",
+    nivelBase: "alto",
+    verbos: ["solicitar"],
+  },
+  {
+    key: "localizar",
+    titulo: "Localizar registros",
+    descricao: "Registros civis a localizar antes da emissão",
+    modulo: "documentos",
+    nivelBase: "medio",
+    verbos: ["localizar"],
+  },
+  {
+    key: "receber",
+    titulo: "Registrar documentos recebidos",
+    descricao: "Retornos do cartório aguardando upload e registro",
+    modulo: "documentos",
+    nivelBase: "alto",
+    verbos: ["receber"],
+  },
+  {
+    key: "conferir",
+    titulo: "Conferir documentos",
+    descricao: "Inspeção operacional antes da validação jurídica",
+    modulo: "documentos",
+    nivelBase: "alto",
+    verbos: ["conferir"],
+  },
+  {
+    key: "validar",
+    titulo: "Validar documentos",
+    descricao: "Decisão jurídica final do documento",
+    modulo: "documentos",
+    nivelBase: "alto",
+    verbos: ["validar"],
+  },
+  {
+    key: "preparar",
+    titulo: "Preparar e enviar pastas",
+    descricao: "Montagem e envio para tradução, apostila e retificação",
+    modulo: "processos",
+    nivelBase: "medio",
+    verbos: ["montar", "enviar"],
+  },
+  {
+    key: "protocolar",
+    titulo: "Protocolar processos",
+    descricao: "Dossiês prontos para agendamento e protocolo",
+    modulo: "processos",
+    nivelBase: "alto",
+    verbos: ["protocolar", "agendar"],
+  },
+  {
+    key: "acompanhar",
+    titulo: "Acompanhar retificações",
+    descricao: "Estratégia, andamento e decisões de retificação",
+    modulo: "processos",
+    nivelBase: "medio",
+    verbos: ["definir", "acompanhar"],
+  },
+  {
+    key: "outras",
+    titulo: "Outras ações do workflow",
+    descricao: "Passos executáveis fora das filas acima",
+    modulo: "processos",
+    nivelBase: "baixo",
+  },
+]
+
+/** Filas que não vêm de passo (estado próprio já persistido). */
+export const FILAS_ESTADO: FilaDef[] = [
+  {
+    key: "bloqueios",
+    titulo: "Resolver bloqueios",
+    descricao: "Passos e tarefas travados por impedimento",
+    modulo: "processos",
+    nivelBase: "critico",
+  },
+  {
+    key: "tarefas-vencidas",
+    titulo: "Tarefas vencidas",
+    descricao: "Prazo expirado — exigem ação imediata",
+    modulo: "tarefas",
+    nivelBase: "critico",
+  },
+  {
+    key: "tarefas-hoje",
+    titulo: "Tarefas que vencem hoje",
+    descricao: "Precisam ser fechadas até o fim do dia",
+    modulo: "tarefas",
+    nivelBase: "alto",
+  },
+  {
+    key: "aguardando-cliente",
+    titulo: "Documentos aguardando cliente",
+    descricao: "Follow-up pendente com o cliente",
+    modulo: "tarefas",
+    nivelBase: "medio",
+  },
+  {
+    key: "sem-responsavel",
+    titulo: "Processos sem responsável",
+    descricao: "Trabalho aberto sem dono definido",
+    modulo: "processos",
+    nivelBase: "alto",
+  },
+  {
+    key: "processos-parados",
+    titulo: "Processos parados",
+    descricao: "Sem movimentação há mais de 15 dias",
+    modulo: "processos",
+    nivelBase: "alto",
+  },
+  {
+    key: "avancar-fase",
+    titulo: "Avançar fase concluída",
+    descricao: "Workflow interno concluído, aguardando avanço",
+    modulo: "processos",
+    nivelBase: "alto",
+  },
+  {
+    key: "pendencias-financeiras",
+    titulo: "Regularizar pendências financeiras",
+    descricao: "Lançamentos que não puderam ser gerados",
+    modulo: "financeiro",
+    nivelBase: "alto",
+  },
+]
+
+export const TODAS_FILAS: FilaDef[] = [...FILAS_PASSO, ...FILAS_ESTADO]
+
+const FILA_POR_VERBO = new Map<string, string>()
+for (const f of FILAS_PASSO) for (const v of f.verbos ?? []) FILA_POR_VERBO.set(v, f.key)
+
+/** Fila de destino de um passo executável — pelo verbo, com fallback "outras". */
+export function filaDoStepKey(stepKey: string): string {
+  return FILA_POR_VERBO.get(verboDoStep(stepKey)) ?? "outras"
+}
+
+/** Verbo que representa espera de terceiro (não é ação da equipe). */
+export function ehPassoDeEspera(stepKey: string): boolean {
+  return verboDoStep(stepKey) === "aguardar"
+}
+
+export function acharFila(key: string): FilaDef | undefined {
+  return TODAS_FILAS.find((f) => f.key === key)
+}
+
+// ---- Nível / prioridade ----------------------------------------------------
+const PESO_NIVEL: Record<NivelPrioridade, number> = { critico: 0, alto: 1, medio: 2, baixo: 3 }
 
 /**
- * Regra de relevância da Home: mostra marcos humanos e esconde ruído técnico.
- * Ruído = edição e exclusão de TAREFA (tarefas técnicas superseded/regeneradas
- * e microedições). Tudo o mais entra.
+ * Prioridade final da fila: o nível base do tipo de trabalho, escalado para
+ * "crítico" quando existe item atrasado. Volume NÃO define prioridade — 40
+ * certidões no prazo continuam sendo rotina; 1 atrasada é problema.
  */
-export function atividadeRelevante(l: { acao: string; entidade: string }): boolean {
-  const acao = (l.acao ?? "").toLowerCase()
-  const entidade = (l.entidade ?? "").toUpperCase()
-  if (entidade === "TAREFA" && (acao === "editou" || acao === "excluiu")) return false
-  return true
+export function nivelDaFila(nivelBase: NivelPrioridade, atrasados: number): NivelPrioridade {
+  if (atrasados > 0) return "critico"
+  return nivelBase
 }
 
-export function tipoAtividade(acao: string): ActivityItem["tipo"] {
-  const a = (acao ?? "").toLowerCase()
-  if (a === "criou") return "criacao"
-  if (a === "concluiu") return "conclusao"
-  if (a === "moveu") return "movimento"
-  if (a.startsWith("fase")) return "fase"
-  return "outro"
+/** Filas vazias somem; ordena por prioridade e, dentro dela, por volume. */
+export function ordenarFilas(filas: FilaOperacional[]): FilaOperacional[] {
+  return filas
+    .filter((f) => f.quantidade > 0)
+    .sort(
+      (a, b) =>
+        PESO_NIVEL[a.nivel] - PESO_NIVEL[b.nivel] ||
+        b.quantidade - a.quantidade ||
+        a.titulo.localeCompare(b.titulo, "pt-BR"),
+    )
 }
 
-export function filtrarAtividades(logs: LogLike[]): LogLike[] {
-  return logs.filter(atividadeRelevante)
+// ---- Status operacional do cabeçalho --------------------------------------
+export function montarStatus(p: {
+  totalAcoes: number
+  criticos: number
+  alertas: number
+}): StatusOperacional {
+  const { totalAcoes, criticos, alertas } = p
+  if (totalAcoes === 0 && alertas === 0) {
+    return { nivel: "estavel", mensagem: "Operação em dia — nada exige ação agora.", totalAcoes: 0 }
+  }
+  if (criticos > 0 || alertas > 0) {
+    const n = criticos + alertas
+    return {
+      nivel: "critico",
+      mensagem: `${n} ${n === 1 ? "item exige" : "itens exigem"} atenção imediata`,
+      totalAcoes,
+    }
+  }
+  return {
+    nivel: "atencao",
+    mensagem: `${totalAcoes} ${totalAcoes === 1 ? "ação pendente" : "ações pendentes"} nas filas`,
+    totalAcoes,
+  }
+}
+
+// ---- Agenda ----------------------------------------------------------------
+export function grupoDaData(data: Date | string, hoje: Date): GrupoAgenda | null {
+  const d = new Date(data)
+  if (isNaN(d.getTime())) return null
+  const delta = diasEntre(d, hoje)
+  if (delta < 0) return null
+  if (delta === 0) return "hoje"
+  if (delta === 1) return "amanha"
+  return "proximos"
+}
+
+export function rotuloDoDia(data: Date | string): string {
+  const d = new Date(data)
+  if (isNaN(d.getTime())) return ""
+  return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })
 }
