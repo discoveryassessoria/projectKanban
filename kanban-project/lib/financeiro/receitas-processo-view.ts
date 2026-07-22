@@ -203,6 +203,29 @@ export function montarReceitasView(rows: ReceitaRow[], cat: Catalogos, hojeMs: n
   return { fases, resumo }
 }
 
+// Matriz de AÇÕES contextuais do dossiê (pura). Nunca mostra ação impossível
+// para o estado. temCobrancaAtiva = existe cobrança ABERTA/PARCIAL.
+export interface AcoesReceita {
+  gerarCobranca: boolean; registrarPagamento: boolean; enviarCobranca: boolean
+  emitirRecibo: boolean; emitirNotaFiscal: boolean; editarReceita: boolean
+  cancelarReceita: boolean; cancelarCobranca: boolean; reabrir: boolean
+}
+export function acoesReceita(o: { status: StatusFinanceiro; temCobrancaAtiva: boolean }): AcoesReceita {
+  const cancelada = o.status === 'CANCELADO' || o.status === 'ESTORNADO'
+  const quitada = o.status === 'RECEBIDO'
+  return {
+    gerarCobranca: !cancelada && !o.temCobrancaAtiva && !quitada,
+    registrarPagamento: !cancelada && o.temCobrancaAtiva,
+    enviarCobranca: !cancelada && o.temCobrancaAtiva,
+    emitirRecibo: quitada,
+    emitirNotaFiscal: quitada || o.temCobrancaAtiva,
+    editarReceita: !cancelada,
+    cancelarReceita: !cancelada,
+    cancelarCobranca: o.temCobrancaAtiva,
+    reabrir: cancelada,
+  }
+}
+
 function rotularFallback(phaseKey: string): string {
   if (!phaseKey || phaseKey === 'sem_fase') return 'Sem fase'
   return phaseKey.split(/[_\s]+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')

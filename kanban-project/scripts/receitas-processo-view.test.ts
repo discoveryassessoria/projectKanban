@@ -4,7 +4,7 @@
 // Receita→Cobrança→Parcela). Puro: sem banco. Cobre agrupamento, totais,
 // status, filtros e busca.
 // ============================================================================
-import { montarReceitasView, filtrarView, type ReceitaRow, type Catalogos } from '../lib/financeiro/receitas-processo-view'
+import { montarReceitasView, filtrarView, acoesReceita, type ReceitaRow, type Catalogos } from '../lib/financeiro/receitas-processo-view'
 
 let passou = 0, falhou = 0
 const ok = (n: string, c: boolean) => { if (c) { passou++; console.log(`  ✓ ${n}`) } else { falhou++; console.log(`  ✗ ${n}`) } }
@@ -110,6 +110,18 @@ sec('7 — filtros e busca')
   ok('filtro por status VENCIDO', (() => { const f = filtrarView(v, { status: 'VENCIDO' }); return f.length === 1 && f[0].requerentes[0].receitas[0].id === 11 })())
   ok('busca por requerente "maria"', (() => { const f = filtrarView(v, { busca: 'maria' }); return f.length === 1 && f[0].requerentes[0].nome === 'Maria Kruger' })())
   ok('busca sem match → vazio', filtrarView(v, { busca: 'zzz' }).length === 0)
+}
+
+sec('8 — ações contextuais do dossiê (nenhuma ação indevida)')
+{
+  const sem = acoesReceita({ status: 'SEM_COBRANCA', temCobrancaAtiva: false })
+  ok('sem cobrança: gerar ✓, registrar ✗, recibo ✗', sem.gerarCobranca && !sem.registrarPagamento && !sem.emitirRecibo && !sem.enviarCobranca)
+  const aberta = acoesReceita({ status: 'A_VENCER', temCobrancaAtiva: true })
+  ok('com cobrança: registrar ✓, enviar ✓, gerar ✗', aberta.registrarPagamento && aberta.enviarCobranca && !aberta.gerarCobranca && aberta.cancelarCobranca)
+  const quit = acoesReceita({ status: 'RECEBIDO', temCobrancaAtiva: false })
+  ok('quitada: recibo ✓, registrar ✗, gerar ✗', quit.emitirRecibo && !quit.registrarPagamento && !quit.gerarCobranca)
+  const canc = acoesReceita({ status: 'CANCELADO', temCobrancaAtiva: false })
+  ok('cancelada: só reabrir; nada de gerar/registrar/cancelar', canc.reabrir && !canc.gerarCobranca && !canc.registrarPagamento && !canc.cancelarReceita && !canc.editarReceita)
 }
 
 console.log(`\n${'='.repeat(60)}`)

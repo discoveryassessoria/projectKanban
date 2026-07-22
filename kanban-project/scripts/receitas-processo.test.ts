@@ -221,11 +221,16 @@ secao('Cenário 10 — nenhuma criação manual reintroduzida')
   for (const p of proibidos) ok(`sem "${p}"`, !src.includes(p))
   ok('sem POST de criação de receita na tela', !/method:\s*['"]POST['"][\s\S]{0,200}\/api\/financeiro\/receitas['"]/.test(src))
   ok('"Nova Receita" não posta criação (é guiada)', !/Nova Receita[\s\S]{0,400}method:\s*['"]POST['"]/.test(src))
-  // Base ÚNICA: o modal de operação virou ReceitaCobrancaModal (Receita=contrato →
-  // Cobrança → Parcelas → Pagamento), na identidade premium do Financeiro.
-  ok('modal central é o caminho de operação (ReceitaCobrancaModal)', src.includes('ReceitaCobrancaModal'))
-  ok('drawer lateral removido da tela', !src.includes('ReceitaDrawer'))
+  // O detalhe da receita virou PÁGINA CENTRAL (dossiê): a tela NAVEGA (sem modal/
+  // drawer). "Ver dossiê" → /processos/[id]/financeiro/receitas/[receitaId].
+  ok('tela navega para o dossiê (sem modal de detalhe)', src.includes('/financeiro/receitas/') && src.includes('router.push'))
+  ok('não abre mais modal/drawer de detalhe na lista', !src.includes('ReceitaCobrancaModal') && !src.includes('ReceitaDrawer'))
   ok('drawer lateral removido do repositório', !existsSync(join(RAIZ, 'src/components/financeiro/ReceitaDrawer.tsx')))
+  // A página do dossiê existe e reusa o ReceitaCobrancaModal como modal de OPERAÇÃO.
+  const dossie = join(RAIZ, 'src/app/processos/[processoId]/financeiro/receitas/[receitaId]/page.tsx')
+  ok('página central do dossiê existe', existsSync(dossie))
+  ok('dossiê reusa ReceitaCobrancaModal p/ operar', existsSync(dossie) && readFileSync(dossie, 'utf8').includes('ReceitaCobrancaModal'))
+  ok('dossiê consome o agregador /dossie', existsSync(dossie) && readFileSync(dossie, 'utf8').includes('/dossie'))
 }
 
 // ── CENÁRIO 11 — supressão impede recriação ─────────────────────────────────

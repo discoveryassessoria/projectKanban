@@ -3,8 +3,8 @@
 // RECEITAS DO PROCESSO — central financeira operacional organizada por REQUERENTE.
 //
 // Hierarquia: FASE → REQUERENTE → RECEITA → COBRANÇA → PARCELA/PAGAMENTO.
-// Não é uma tabela de lançamentos: cada receita abre o MODAL de Cobrança
-// (ReceitaCobrancaModal), onde a cobrança é gerada, vista e recebida.
+// Não é uma tabela de lançamentos: "Ver dossiê" NAVEGA para a página central da
+// receita (/processos/[id]/financeiro/receitas/[receitaId]) — sem modal/drawer.
 //
 // Os lançamentos nascem EXCLUSIVAMENTE do FinanceRuleEngine — não há criação
 // manual (o botão "Nova Receita" apenas explica isso). Moeda original é a
@@ -15,12 +15,15 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   FileText, Plus, RefreshCw, Search, Filter, ChevronDown, ChevronUp, MoreVertical, User,
   Loader2, Wallet, Database, TrendingUp, PieChart, CalendarClock, Receipt, Printer, Download, X,
 } from 'lucide-react'
 import { filtrarView, type ReceitasView, type FaseVM, type RequerenteVM, type ReceitaVM, type StatusFinanceiro } from '@/lib/financeiro/receitas-processo-view'
-import { ReceitaCobrancaModal } from '../ReceitaCobrancaModal'
+// O detalhe da receita agora é uma PÁGINA CENTRAL (dossiê), não mais modal:
+//   /processos/[processoId]/financeiro/receitas/[receitaId]
+// O modal de OPERAÇÃO (gerar cobrança / registrar pagamento) vive dentro do dossiê.
 
 interface ReceitasProps { processoId: number; onUpdate?: () => void; nomeFamilia?: string; fxHoje?: number }
 
@@ -47,6 +50,7 @@ async function jf(url: string) {
 }
 
 export function Receitas({ processoId, onUpdate, nomeFamilia }: ReceitasProps) {
+  const router = useRouter()
   const [data, setData] = useState<{ processo: { id: number; nome: string }; view: ReceitasView; cambio: any } | null>(null)
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
@@ -55,7 +59,6 @@ export function Receitas({ processoId, onUpdate, nomeFamilia }: ReceitasProps) {
   const [status, setStatus] = useState<StatusFinanceiro | ''>('')
   const [busca, setBusca] = useState('')
   const [recolhidos, setRecolhidos] = useState<Set<string>>(new Set())
-  const [receitaAberta, setReceitaAberta] = useState<number | null>(null)
   const [infoNova, setInfoNova] = useState(false)
 
   const carregar = useCallback(async () => {
@@ -90,7 +93,8 @@ export function Receitas({ processoId, onUpdate, nomeFamilia }: ReceitasProps) {
   const totalRec = fasesVisiveis.reduce((s, f) => s + f.qtdReceitas, 0)
   const cambio = data?.cambio
 
-  function abrir(id: number) { setReceitaAberta(id) }
+  // "Ver dossiê": navega para a PÁGINA CENTRAL da receita (sem modal/drawer).
+  function abrir(id: number) { router.push(`/processos/${processoId}/financeiro/receitas/${id}`) }
   const toggleReq = (k: string) => setRecolhidos((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
   const recolherFase = (f: FaseVM) => setRecolhidos((s) => { const n = new Set(s); const chaves = f.requerentes.map((r) => `${f.faseKey}:${r.pessoaId}`); const todosRecolhidos = chaves.every((c) => n.has(c)); chaves.forEach((c) => todosRecolhidos ? n.delete(c) : n.add(c)); return n })
 
@@ -206,7 +210,6 @@ export function Receitas({ processoId, onUpdate, nomeFamilia }: ReceitasProps) {
         </>
       )}
 
-      {receitaAberta != null && <ReceitaCobrancaModal receitaId={receitaAberta} onClose={() => setReceitaAberta(null)} onChanged={() => { carregar(); onUpdate?.() }} />}
       {infoNova && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setInfoNova(false)}>
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900/95 p-6 text-white" onClick={(e) => e.stopPropagation()}>
@@ -282,7 +285,7 @@ function ReceitaLinha({ r, onAbrir }: { r: ReceitaVM; onAbrir: (id: number) => v
         <td className="px-4 py-3 tabular-nums text-sky-300">{money(r.saldo, r.moeda)}</td>
         <td className="px-4 py-3 text-white/70">{dt(r.vencimento)}</td>
         <td className="px-4 py-3"><Badge s={r.status} /></td>
-        <td className="px-4 py-3"><button onClick={() => onAbrir(r.id)} className="rounded-md border border-white/15 px-3 py-1 text-xs text-white/80 hover:bg-white/10">Abrir</button></td>
+        <td className="px-4 py-3"><button onClick={() => onAbrir(r.id)} className="rounded-md border border-white/15 px-3 py-1 text-xs text-white/80 hover:bg-white/10">Ver dossiê</button></td>
       </tr>
       {cob && (
         <tr className="border-t border-white/5 bg-black/20">
@@ -320,7 +323,7 @@ function ReceitaCardMobile({ r, onAbrir }: { r: ReceitaVM; onAbrir: (id: number)
       </div>
       <div className="mt-2 flex items-center justify-between">
         <span className="text-[11px] text-white/45">{r.temCobranca ? `${r.cobrancas[0]?.label} · ${r.cobrancas[0]?.parcelasPagas}/${r.cobrancas[0]?.nParcelas}` : 'Sem cobrança'}</span>
-        <button onClick={() => onAbrir(r.id)} className={`rounded-md px-3 py-1 text-xs font-medium ${r.temCobranca ? 'border border-white/15 text-white/80' : 'bg-amber-500/15 text-amber-300'}`}>{r.temCobranca ? 'Abrir' : 'Gerar cobrança'}</button>
+        <button onClick={() => onAbrir(r.id)} className={`rounded-md px-3 py-1 text-xs font-medium ${r.temCobranca ? 'border border-white/15 text-white/80' : 'bg-amber-500/15 text-amber-300'}`}>{r.temCobranca ? 'Ver dossiê' : 'Gerar cobrança'}</button>
       </div>
     </div>
   )
