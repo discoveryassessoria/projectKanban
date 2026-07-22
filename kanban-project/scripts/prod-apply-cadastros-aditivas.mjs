@@ -28,6 +28,7 @@ const ADITIVAS = [
   '20260731000000_taxa_pagamento_regra_reutilizavel',
   '20260732000000_forma_pagamento_uso_e_codigo',
   '20260801000000_cobranca_runtime_calculo',
+  '20260802000000_condicao_aplicabilidade_relacional',
 ]
 
 // Colunas-sentinela p/ verificação pós-aplicação.
@@ -37,6 +38,11 @@ const SENTINELAS = [
   ['CondicaoPagamento', ['politicaTaxas', 'formaSugeridaId', 'servicos', 'entradaTipo']],
   ['TaxaPagamento', ['formasAplicaveis', 'aplicaParcela', 'anticipationType', 'momentoCambio']],
   ['Cobranca', ['politicaTaxas', 'valorBase', 'valorTaxa', 'valorLiquido', 'moedaOrigem', 'cotacao', 'congeladaEm']],
+  // Aplicabilidade relacional da Condição (tabelas de vínculo — checadas pelas colunas).
+  ['CondicaoPagamentoMoeda', ['condicaoId', 'moedaId']],
+  ['CondicaoPagamentoPais', ['condicaoId', 'paisId']],
+  ['CondicaoPagamentoModalidade', ['condicaoId', 'modalidadeId']],
+  ['CondicaoPagamentoServico', ['condicaoId', 'servicoId']],
 ]
 
 const log = (m) => console.log(`[cadastros-aditivas] ${m}`)

@@ -32,6 +32,7 @@ export const CODE_PREFIX = {
   ORGANIZATION: 'ORG',
   USER: 'USR',
   PAYMENT_METHOD: 'FPG', // Forma de Pagamento (cadastro do meio)
+  PAYMENT_TERM: 'CPG', // Condição de Pagamento (regra reutilizável)
 } as const
 
 export type EntidadeCodigo = keyof typeof CODE_PREFIX | 'PROCESS'

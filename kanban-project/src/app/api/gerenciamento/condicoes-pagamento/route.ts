@@ -13,6 +13,8 @@ import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { paraColunas, validar, inteiro } from './campos'
+import { gerarCodigoPublico } from '@/lib/codigos/code-generator'
+import { INCLUDE_APLICABILIDADE, resolverAplicabilidade, vinculosParaCriar } from '@/lib/financeiro/condicao-aplicabilidade'
 
 // GET - Listar
 export async function GET(request: NextRequest) {
@@ -20,13 +22,16 @@ export async function GET(request: NextRequest) {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
 
-    const [condicoes, carteiras, formasPagamento, taxas, servicos] = await Promise.all([
+    // Uma query por cadastro: as listas dos multiselects vêm prontas com a
+    // listagem (sem N+1 e sem round-trip extra da tela).
+    const [condicoes, carteiras, formasPagamento, taxas, servicos, moedas, paises, modalidades] = await Promise.all([
       prisma.condicaoPagamento.findMany({
         orderBy: [{ name: 'asc' }, { versao: 'desc' }],
         include: {
           carteira: { select: { id: true, nome: true } },
           formasPermitidas: { select: { formaId: true } },
           taxasVinculadas: { select: { taxaId: true } },
+          ...INCLUDE_APLICABILIDADE,
           _count: { select: { configuracoes: true, receitas: true, custos: true } },
         },
       }),
@@ -50,9 +55,24 @@ export async function GET(request: NextRequest) {
         select: { id: true, name: true, code: true },
         orderBy: { name: 'asc' },
       }),
+      prisma.moedaCadastro.findMany({
+        where: { ativo: true },
+        select: { id: true, code: true, name: true, symbol: true },
+        orderBy: { code: 'asc' },
+      }),
+      prisma.catalogoPais.findMany({
+        where: { ativo: true },
+        select: { id: true, countryKey: true, countryLabel: true, flag: true },
+        orderBy: { countryLabel: 'asc' },
+      }),
+      prisma.modalidadePais.findMany({
+        where: { ativo: true },
+        select: { id: true, countryKey: true, modalityKey: true, modalityLabel: true },
+        orderBy: [{ countryKey: 'asc' }, { ordem: 'asc' }, { modalityLabel: 'asc' }],
+      }),
     ])
 
-    return NextResponse.json({ condicoes, carteiras, formasPagamento, taxas, servicos })
+    return NextResponse.json({ condicoes, carteiras, formasPagamento, taxas, servicos, moedas, paises, modalidades })
   } catch (error) {
     console.error('Erro ao listar condições de pagamento:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
@@ -71,6 +91,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: erros[0].mensagem, erros }, { status: 400 })
     }
 
+    // Aplicabilidade: os ids selecionados são conferidos CONTRA O CADASTRO
+    // (existe? está ativo?) antes de qualquer escrita. O frontend nunca é a
+    // autoridade — id inválido/inativo é rejeitado aqui.
+    const aplic = await resolverAplicabilidade(b)
+    if (aplic.erros.length) {
+      return NextResponse.json({ error: aplic.erros[0].mensagem, erros: aplic.erros }, { status: 400 })
+    }
+
     const colunas = paraColunas(b)
     const substituiId = inteiro(b.substituiId)
 
@@ -78,11 +106,13 @@ export async function POST(request: NextRequest) {
     // é encerrada (vigenciaFim = agora) mas NUNCA é apagada nem alterada nos
     // campos estruturais — lançamentos históricos continuam apontando para ela.
     let versao = 1
-    let codigo = colunas.codigo
+    let codigo: string | null = null
+    let anteriorTinhaCodigo = false
     if (substituiId) {
       const anterior = await prisma.condicaoPagamento.findUnique({ where: { id: substituiId } })
       if (!anterior) return NextResponse.json({ error: 'Condição anterior não encontrada' }, { status: 404 })
-      codigo = anterior.codigo ?? colunas.codigo
+      codigo = anterior.codigo
+      anteriorTinhaCodigo = !!anterior.codigo
       const maxVersao = await prisma.condicaoPagamento.aggregate({
         where: codigo ? { codigo } : { id: substituiId },
         _max: { versao: true },
@@ -96,17 +126,25 @@ export async function POST(request: NextRequest) {
     }
 
     const condicao = await prisma.$transaction(async (tx) => {
+      // CÓDIGO AUTOMÁTICO: gerado pelo serviço central, único e imutável. Uma
+      // nova VERSÃO herda o código da anterior (o código identifica a regra, não
+      // a versão) — nunca se regenera código de registro existente.
+      const codigoFinal = anteriorTinhaCodigo && codigo ? codigo : await gerarCodigoPublico(tx, 'PAYMENT_TERM')
+
       const criada = await tx.condicaoPagamento.create({
         data: {
           ...colunas,
-          codigo,
+          // Projeção legada derivada dos vínculos (o motor de cálculo lê daqui).
+          ...aplic.projecao,
+          codigo: codigoFinal,
           versao,
           substituiId: substituiId ?? null,
           vigenciaInicio: colunas.vigenciaInicio ?? new Date(),
           formasPermitidas: ids.formas.length ? { create: ids.formas.map((formaId: number) => ({ formaId })) } : undefined,
           taxasVinculadas: ids.taxas.length ? { create: ids.taxas.map((taxaId: number) => ({ taxaId })) } : undefined,
+          ...vinculosParaCriar(aplic.selecao),
         },
-        include: { formasPermitidas: true, taxasVinculadas: true },
+        include: { formasPermitidas: true, taxasVinculadas: true, ...INCLUDE_APLICABILIDADE },
       })
       if (substituiId) {
         await tx.condicaoPagamento.update({

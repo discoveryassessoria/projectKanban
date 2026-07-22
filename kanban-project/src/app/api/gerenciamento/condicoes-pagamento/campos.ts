@@ -94,10 +94,21 @@ export function validar(b: Record<string, unknown>): ErroValidacao[] {
   const dia = inteiro(b.diaFixo ?? b.diaVencimento)
   if (dia !== null && (dia < 1 || dia > 31)) erros.push({ campo: 'diaFixo', mensagem: 'Dia fixo deve estar entre 1 e 31' })
 
+  // Vigência: ambas opcionais. Sem início = vale imediatamente; sem fim =
+  // indeterminada. Fim anterior ao início é sempre inválido.
   const ini = data(b.vigenciaInicio)
   const fim = data(b.vigenciaFim)
   if (ini && fim && fim.getTime() < ini.getTime()) {
     erros.push({ campo: 'vigenciaFim', mensagem: 'Fim da vigência não pode ser anterior ao início' })
+  }
+
+  // Faixa de valor: ambas opcionais; mínimo nunca negativo; máximo ≥ mínimo.
+  const vMin = num(b.valorMinimo)
+  const vMax = num(b.valorMaximo)
+  if (vMin !== null && vMin < 0) erros.push({ campo: 'valorMinimo', mensagem: 'Valor mínimo não pode ser negativo' })
+  if (vMax !== null && vMax < 0) erros.push({ campo: 'valorMaximo', mensagem: 'Valor máximo não pode ser negativo' })
+  if (vMin !== null && vMax !== null && vMax < vMin) {
+    erros.push({ campo: 'valorMaximo', mensagem: 'Valor máximo não pode ser menor que o mínimo' })
   }
 
   if (String(b.periodicidade ?? '').toUpperCase() === 'PERSONALIZADA') {
@@ -112,8 +123,9 @@ export function paraColunas(b: Record<string, unknown>) {
   const parcelas = inteiro(b.parcelas)
   return {
     // identificação
+    // `codigo` NÃO entra aqui: é gerado pelo CodeGeneratorService no create e é
+    // IMUTÁVEL depois. A rota decide o valor; o body nunca o define.
     name: String(b.name).trim(),
-    codigo: b.codigo ? String(b.codigo).trim().slice(0, 40) : null,
     descricao: b.descricao ? String(b.descricao) : null,
     moeda: (MOEDAS.includes(String(b.moeda)) ? String(b.moeda) : 'BRL') as 'BRL' | 'EUR' | 'USD',
     formaPagamento: (b.formaPagamento && FORMAS.includes(String(b.formaPagamento)) ? String(b.formaPagamento) : null) as never,
@@ -193,16 +205,19 @@ export function paraColunas(b: Record<string, unknown>) {
     quemConcedeDesconto: b.quemConcedeDesconto ? String(b.quemConcedeDesconto).slice(0, 40) : null,
 
     // restrições / aplicabilidade
+    //
+    // moedasPermitidas / paises / modalidades / servicos NÃO são mais escritos
+    // aqui: viraram RELACIONAMENTO REAL (CondicaoPagamentoMoeda/Pais/Modalidade/
+    // Servico). As rotas gravam esses arrays como PROJEÇÃO derivada dos vínculos
+    // — ver lib/financeiro/condicao-aplicabilidade.ts. Assim o motor de cálculo
+    // (condicaoAplicavel) segue intacto e o histórico é preservado.
+    //
+    // perfil / canal saíram da UI e do payload: não controlam comportamento
+    // nenhum no motor. As colunas e os dados históricos permanecem no banco.
     aplicaA: enumOu(b.aplicaA, APLICA_A, 'AMBOS'),
-    moedasPermitidas: lista(b.moedasPermitidas),
     valorMinimo: num(b.valorMinimo),
     valorMaximo: num(b.valorMaximo),
-    paises: lista(b.paises),
-    modalidades: lista(b.modalidades),
     tiposProcesso: lista(b.tiposProcesso),
-    perfil: b.perfil ? String(b.perfil).slice(0, 60) : null,
-    canal: b.canal ? String(b.canal).slice(0, 60) : null,
-    servicos: listaInt(b.servicos),
   }
 }
 

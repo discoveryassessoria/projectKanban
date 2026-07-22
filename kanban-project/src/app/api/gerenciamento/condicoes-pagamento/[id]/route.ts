@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { inteiro, mudouEstrutura, paraColunas, validar } from '../campos'
+import { INCLUDE_APLICABILIDADE, eixosPresentes, regravarVinculos, resolverAplicabilidade } from '@/lib/financeiro/condicao-aplicabilidade'
 
 /** Uma condição está "em uso" quando já produziu lançamento ou está vinculada. */
 async function usoReal(id: number) {
@@ -38,6 +39,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const b = await request.json()
     const erros = validar({ ...atual, ...b } as Record<string, unknown>)
     if (erros.length) return NextResponse.json({ error: erros[0].mensagem, erros }, { status: 400 })
+
+    // Aplicabilidade: ids conferidos contra o cadastro (existe? ativo?).
+    // Eixo ausente do body não é regravado — PUT parcial não apaga vínculo algum.
+    const presentes = eixosPresentes(b)
+    const aplic = await resolverAplicabilidade(b)
+    if (aplic.erros.length) {
+      return NextResponse.json({ error: aplic.erros[0].mensagem, erros: aplic.erros }, { status: 400 })
+    }
 
     const colunas = paraColunas({ ...atual, ...b } as Record<string, unknown>)
     const estruturais = mudouEstrutura(atual as unknown as Record<string, unknown>, colunas as unknown as Record<string, unknown>)
@@ -81,11 +90,22 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           await tx.condicaoPagamentoTaxa.createMany({ data: ids.taxas.map((taxaId: number) => ({ condicaoId: id, taxaId })) })
         }
       }
+      await regravarVinculos(tx, id, aplic.selecao, presentes)
+
+      // Projeção legada: só dos eixos que o body declarou (o motor de cálculo
+      // continua lendo destes arrays — nada nele foi alterado).
+      const projecao: Record<string, unknown> = {}
+      if (presentes.moedas) projecao.moedasPermitidas = aplic.projecao.moedasPermitidas
+      if (presentes.paises) projecao.paises = aplic.projecao.paises
+      if (presentes.modalidades) projecao.modalidades = aplic.projecao.modalidades
+      if (presentes.servicos) projecao.servicos = aplic.projecao.servicos
+
       return tx.condicaoPagamento.update({
         where: { id },
         // codigo/versao/substituiId não se editam: pertencem ao versionamento.
-        data: { ...colunas, codigo: atual.codigo ?? colunas.codigo },
-        include: { formasPermitidas: true, taxasVinculadas: true },
+        // O código é IMUTÁVEL — nunca regenerado nem sobrescrito pelo body.
+        data: { ...colunas, ...projecao, codigo: atual.codigo },
+        include: { formasPermitidas: true, taxasVinculadas: true, ...INCLUDE_APLICABILIDADE },
       })
     })
 

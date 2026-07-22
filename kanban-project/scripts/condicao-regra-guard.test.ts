@@ -35,8 +35,15 @@ sec('1 — paraColunas: políticas e derivações')
   const enc = paraColunas({ name: 'C', multaTipo: 'FIXA', multaValor: 50, jurosTipo: 'COMPOSTO', jurosPeriodo: 'MENSAL', carenciaDias: 5 })
   ok('encargos expandidos mapeados', enc.multaTipo === 'FIXA' && Number(enc.multaValor) === 50 && enc.jurosTipo === 'COMPOSTO' && enc.carenciaDias === 5)
 
-  const ap = paraColunas({ name: 'C', servicos: [1, 2], formaSugeridaId: 7, perfil: 'VIP', canal: 'web' })
-  ok('serviços/forma sugerida/aplicabilidade mapeados', JSON.stringify(ap.servicos) === '[1,2]' && ap.formaSugeridaId === 7 && ap.perfil === 'VIP' && ap.canal === 'web')
+  // Aplicabilidade virou RELACIONAMENTO REAL: serviços/moedas/países/modalidades
+  // saíram de paraColunas (as rotas gravam a projeção). Perfil e Canal saíram do
+  // payload por não terem regra de negócio — colunas preservadas no banco.
+  const ap = paraColunas({ name: 'C', servicos: [1, 2], formaSugeridaId: 7, perfil: 'VIP', canal: 'web' }) as Record<string, unknown>
+  ok('forma sugerida mapeada', ap.formaSugeridaId === 7)
+  ok('serviços fora de paraColunas (vira vínculo)', !('servicos' in ap))
+  ok('perfil fora do payload', !('perfil' in ap))
+  ok('canal fora do payload', !('canal' in ap))
+  ok('código fora do payload (gerado pelo backend)', !('codigo' in ap))
   ok('enum inválido em campo opcional → null', paraColunas({ name: 'C', entradaTipo: 'xxx' }).entradaTipo === null)
 }
 

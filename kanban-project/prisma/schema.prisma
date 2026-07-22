@@ -2181,13 +2181,24 @@ model CondicaoPagamento {
   quemConcedeDesconto     String?  @db.VarChar(40)
 
   // Aplicabilidade (expansão)
+  // perfil/canal: LEGADO. Não têm regra de negócio no motor (condicaoAplicavel nunca os lê).
+  // Colunas PRESERVADAS com os dados históricos; a UI e o payload deixaram de expô-los.
   perfil   String? @db.VarChar(60)
   canal    String? @db.VarChar(60)
-  servicos Int[]   @default([]) // restringe a Serviços Financeiros (ref. solta → catálogo)
+  servicos Int[]   @default([]) // PROJEÇÃO derivada de servicosPermitidos (ids ServicoProduto)
 
   // ── vínculos ──
   formasPermitidas CondicaoPagamentoForma[]
   taxasVinculadas  CondicaoPagamentoTaxa[]
+
+  // Aplicabilidade por RELACIONAMENTO REAL (fonte da verdade da tela e da API).
+  // As colunas-array acima (moedasPermitidas/paises/modalidades/servicos) seguem
+  // gravadas como PROJEÇÃO derivada destes vínculos, para o motor de cálculo
+  // (condicaoAplicavel) continuar intacto.
+  moedasVinculadas      CondicaoPagamentoMoeda[]
+  paisesPermitidos      CondicaoPagamentoPais[]
+  modalidadesPermitidas CondicaoPagamentoModalidade[]
+  servicosPermitidos    CondicaoPagamentoServico[]
   configuracoes    ProdutoFinanceiro[]      @relation("ConfigFinCondicaoPagamento")
   receitas         Receita[]                @relation("ReceitaCondicaoPagamento")
   custos           Custo[]                  @relation("CustoCondicaoPagamento")
@@ -2224,6 +2235,64 @@ model CondicaoPagamentoTaxa {
   @@unique([condicaoId, taxaId])
   @@index([condicaoId])
   @@index([taxaId])
+}
+
+// ── Aplicabilidade da Condição por RELACIONAMENTO REAL (N:N) ─────────────────
+// Substituem os campos de texto livre da etapa "Aplicabilidade e vigência".
+// Nada é digitado: só se seleciona o que existe no cadastro. Vazio = SEM RESTRIÇÃO.
+// As colunas-array legadas de CondicaoPagamento continuam existindo e são
+// mantidas como projeção derivada (compatibilidade com o motor e o histórico).
+
+model CondicaoPagamentoMoeda {
+  id         Int               @id @default(autoincrement())
+  condicaoId Int
+  condicao   CondicaoPagamento @relation(fields: [condicaoId], references: [id], onDelete: Cascade)
+  moedaId    Int
+  moeda      MoedaCadastro     @relation(fields: [moedaId], references: [id], onDelete: Cascade)
+  criadoEm   DateTime          @default(now())
+
+  @@unique([condicaoId, moedaId])
+  @@index([condicaoId])
+  @@index([moedaId])
+}
+
+model CondicaoPagamentoPais {
+  id         Int               @id @default(autoincrement())
+  condicaoId Int
+  condicao   CondicaoPagamento @relation(fields: [condicaoId], references: [id], onDelete: Cascade)
+  paisId     Int
+  pais       CatalogoPais      @relation(fields: [paisId], references: [id], onDelete: Cascade)
+  criadoEm   DateTime          @default(now())
+
+  @@unique([condicaoId, paisId])
+  @@index([condicaoId])
+  @@index([paisId])
+}
+
+model CondicaoPagamentoModalidade {
+  id           Int               @id @default(autoincrement())
+  condicaoId   Int
+  condicao     CondicaoPagamento @relation(fields: [condicaoId], references: [id], onDelete: Cascade)
+  modalidadeId Int
+  modalidade   ModalidadePais    @relation(fields: [modalidadeId], references: [id], onDelete: Cascade)
+  criadoEm     DateTime          @default(now())
+
+  @@unique([condicaoId, modalidadeId])
+  @@index([condicaoId])
+  @@index([modalidadeId])
+}
+
+model CondicaoPagamentoServico {
+  id         Int               @id @default(autoincrement())
+  condicaoId Int
+  condicao   CondicaoPagamento @relation(fields: [condicaoId], references: [id], onDelete: Cascade)
+  servicoId  Int
+  servico    ServicoProduto    @relation(fields: [servicoId], references: [id], onDelete: Cascade)
+  criadoEm   DateTime          @default(now())
+
+  @@unique([condicaoId, servicoId])
+  @@index([condicaoId])
+  @@index([servicoId])
 }
 
 // ── Honorários (fin_honorariums) ──
@@ -2286,6 +2355,8 @@ model ServicoProduto {
   itemCatalogoId   Int?
   itemCatalogo     ItemCatalogo?       @relation(fields: [itemCatalogoId], references: [id])
 
+  condicoesPagamento CondicaoPagamentoServico[]
+
   @@index([itemCatalogoId])
 }
 
@@ -2297,6 +2368,8 @@ model MoedaCadastro {
   ativo        Boolean  @default(true)
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
+
+  condicoesPagamento CondicaoPagamentoMoeda[]
 }
 
 // FORMA DE PAGAMENTO — cadastro do MEIO utilizado (PIX, boleto, cartão, Stripe…).
@@ -2485,6 +2558,8 @@ model CatalogoPais {
   ativo            Boolean  @default(true)
   criadoEm         DateTime @default(now())
   atualizadoEm     DateTime @updatedAt
+
+  condicoesPagamento CondicaoPagamentoPais[]
 }
 
 model ModalidadePais {
@@ -2498,6 +2573,8 @@ model ModalidadePais {
   criadoEm      DateTime      @default(now())
   atualizadoEm  DateTime      @updatedAt
   precos        TabelaValor[]
+
+  condicoesPagamento CondicaoPagamentoModalidade[]
 
   @@unique([countryKey, modalityKey])
   @@index([countryKey])

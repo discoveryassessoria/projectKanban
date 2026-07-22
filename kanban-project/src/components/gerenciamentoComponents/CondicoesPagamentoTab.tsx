@@ -15,7 +15,7 @@ import {
   CalendarClock, Search, Plus, X, Check, ArrowRight, ArrowLeft, Loader2, Pencil, Trash2,
   Tag, Filter, Layers, CalendarRange, CreditCard, Percent, Coins, Scale, Sparkles, GitBranch,
 } from 'lucide-react'
-import { OURO, GLASS, INPUT, jf, toggleArr, Secao, Campo, Select, Toggle, ChipsMulti, Stepper } from './pagamentoUI'
+import { OURO, GLASS, INPUT, jf, toggleArr, Secao, Campo, Select, Toggle, ChipsMulti, MultiSelect, Stepper } from './pagamentoUI'
 import {
   POLITICAS_TAXAS, POLITICAS_TAXAS_LABEL, POLITICAS_CAMBIO, POLITICAS_CAMBIO_LABEL,
   APLICA_A, APLICA_A_LABEL, TIPOS_PAGAMENTO, TIPOS_PAGAMENTO_LABEL, PERIODICIDADES, PERIODICIDADES_LABEL,
@@ -27,15 +27,21 @@ import {
 type Ref = { id: number; name: string; code?: string | null; icone?: string | null }
 type CarteiraRef = { id: number; nome: string }
 type TaxaRef = { id: number; name: string; feeType?: string | null }
+type MoedaRef = { id: number; code: string; name?: string | null }
+type PaisRef = { id: number; countryKey: string; countryLabel: string; flag?: string | null }
+type ModalidadeRef = { id: number; countryKey: string; modalityKey: string; modalityLabel: string }
 type Condicao = any
 
 const PASSOS = ['Identificação', 'Aplicabilidade', 'Parcelamento', 'Cronograma', 'Formas', 'Política de Taxas', 'Política Cambial', 'Encargos', 'Revisão']
 
 const VAZIO = () => ({
+  // `codigo` é somente leitura: o backend gera pelo serviço central e nunca muda.
   name: '', codigo: '', descricao: '', ativo: true, carteiraId: null as number | null, formaSugeridaId: null as number | null,
   aplicaA: 'AMBOS', vigenciaInicio: '', vigenciaFim: '',
-  moedasPermitidas: [] as string[], paises: [] as string[], modalidades: [] as string[], tiposProcesso: [] as string[],
-  valorMinimo: null as number | null, valorMaximo: null as number | null, perfil: '', canal: '', servicos: [] as number[],
+  // Aplicabilidade por ID de cadastro real (nada de texto livre). Vazio = sem restrição.
+  moedasIds: [] as number[], paisesIds: [] as number[], modalidadesIds: [] as number[], servicosIds: [] as number[],
+  tiposProcesso: [] as string[],
+  valorMinimo: null as number | null, valorMaximo: null as number | null,
   tipoPagamento: 'PARCELADO', temEntrada: false, entradaObrigatoria: false, entradaTipo: 'PERCENTUAL' as string | null,
   percentEntrada: null as number | null, valorEntradaFixo: null as number | null, entradaMin: null as number | null, entradaMax: null as number | null,
   entradaCompoeTotal: true, entradaAdicional: false,
@@ -61,6 +67,9 @@ export default function CondicoesPagamentoTab() {
   const [formas, setFormas] = useState<Ref[]>([])
   const [taxas, setTaxas] = useState<TaxaRef[]>([])
   const [servicos, setServicos] = useState<Ref[]>([])
+  const [moedas, setMoedas] = useState<MoedaRef[]>([])
+  const [paises, setPaises] = useState<PaisRef[]>([])
+  const [modalidades, setModalidades] = useState<ModalidadeRef[]>([])
   const [loading, setLoading] = useState(true)
   const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
@@ -72,6 +81,7 @@ export default function CondicoesPagamentoTab() {
     try {
       const d = await jf('/api/gerenciamento/condicoes-pagamento', { cache: 'no-store' })
       setItens(d.condicoes || []); setCarteiras(d.carteiras || []); setFormas(d.formasPagamento || []); setTaxas(d.taxas || []); setServicos(d.servicos || [])
+      setMoedas(d.moedas || []); setPaises(d.paises || []); setModalidades(d.modalidades || [])
     } catch (e: any) { setErroLista(e.message || 'Não foi possível carregar.') }
     finally { setLoading(false) }
   }, [])
@@ -151,6 +161,7 @@ export default function CondicoesPagamentoTab() {
       {aberto && (
         <CondicaoWizard
           editando={editando} carteiras={carteiras} formas={formas} taxas={taxas} servicos={servicos}
+          moedas={moedas} paises={paises} modalidades={modalidades}
           onClose={() => setAberto(false)} onSalvo={() => { setAberto(false); carregar() }}
         />
       )}
@@ -159,8 +170,10 @@ export default function CondicoesPagamentoTab() {
 }
 
 // ── wizard premium (9 passos) ───────────────────────────────────────────────
-function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, onClose, onSalvo }: {
-  editando: Condicao | null; carteiras: CarteiraRef[]; formas: Ref[]; taxas: TaxaRef[]; servicos: Ref[]; onClose: () => void; onSalvo: () => void
+function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, paises, modalidades, onClose, onSalvo }: {
+  editando: Condicao | null; carteiras: CarteiraRef[]; formas: Ref[]; taxas: TaxaRef[]; servicos: Ref[]
+  moedas: MoedaRef[]; paises: PaisRef[]; modalidades: ModalidadeRef[]
+  onClose: () => void; onSalvo: () => void
 }) {
   const [step, setStep] = useState(1)
   const [f, setF] = useState<Form>(() => editando ? mapear(editando) : VAZIO())
@@ -174,7 +187,9 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, onClose,
     if (!f.name.trim()) { setStep(1); setErro('Informe o nome.'); return }
     setSalvando(true); setErro(null)
     try {
-      const body: any = { ...f }
+      // `codigo` nunca vai no payload: é gerado pelo backend e é imutável.
+      const { codigo: _codigo, ...resto } = f
+      const body: any = { ...resto }
       if (editando && comoNovaVersao) body.substituiId = editando.id
       if (editando && !comoNovaVersao) {
         await jf(`/api/gerenciamento/condicoes-pagamento/${editando.id}`, { method: 'PUT', body: JSON.stringify(body) })
@@ -212,7 +227,13 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, onClose,
             <Secao icon={Tag} titulo="Identificação">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Campo label="Nome *"><input className={INPUT} value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Parcelado 3x sem juros" autoFocus /></Campo>
-                <Campo label="Código"><input className={INPUT} value={f.codigo} onChange={(e) => set('codigo', e.target.value)} placeholder="COND-3X" /></Campo>
+                <Campo label="Código">
+                  <input
+                    className={`${INPUT} cursor-not-allowed opacity-60`} value={f.codigo} readOnly disabled
+                    placeholder={editando ? '' : 'Gerado automaticamente ao salvar'}
+                    title="Código público gerado pelo sistema — imutável."
+                  />
+                </Campo>
                 <Campo label="Descrição" wide><input className={INPUT} value={f.descricao} onChange={(e) => set('descricao', e.target.value)} /></Campo>
                 <Campo label="Forma sugerida"><Select value={f.formaSugeridaId ? String(f.formaSugeridaId) : ''} onChange={(v) => set('formaSugeridaId', v ? Number(v) : null)} options={[['', '— nenhuma —'], ...formas.map((x) => [String(x.id), x.name] as [string, string])]} /></Campo>
                 <Campo label="Carteira sugerida"><Select value={f.carteiraId ? String(f.carteiraId) : ''} onChange={(v) => set('carteiraId', v ? Number(v) : null)} options={[['', '— nenhuma —'], ...carteiras.map((x) => [String(x.id), x.nome] as [string, string])]} /></Campo>
@@ -222,27 +243,70 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, onClose,
             </Secao>
           )}
 
+          {/*
+            Etapa 2 — três blocos claros. Nada aqui é digitado livremente: moeda,
+            país, modalidade e serviço só podem ser SELECIONADOS entre registros
+            do cadastro real. Vazio = sem restrição.
+            Perfil e Canal saíram: não tinham regra de negócio (colunas e dados
+            históricos preservados no banco, apenas não expostos/exigidos).
+          */}
           {step === 2 && (
-            <Secao icon={Filter} titulo="Aplicabilidade e vigência" dica="Onde a condição vale (tudo opcional). Vazio = sem restrição.">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Campo label="Aplica a"><Select value={f.aplicaA} onChange={(v) => set('aplicaA', v)} options={APLICA_A.map((a) => [a, APLICA_A_LABEL[a]] as [string, string])} /></Campo>
-                <Campo label="Moedas permitidas (vírgula)"><input className={INPUT} value={f.moedasPermitidas.join(', ')} onChange={(e) => set('moedasPermitidas', e.target.value.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean))} placeholder="BRL, EUR" /></Campo>
-                <Campo label="Válida a partir de"><input type="date" className={INPUT} value={f.vigenciaInicio?.slice(0, 10) || ''} onChange={(e) => set('vigenciaInicio', e.target.value)} /></Campo>
-                <Campo label="Válida até"><input type="date" className={INPUT} value={f.vigenciaFim?.slice(0, 10) || ''} onChange={(e) => set('vigenciaFim', e.target.value)} /></Campo>
-                <Campo label="Países (vírgula)"><input className={INPUT} value={f.paises.join(', ')} onChange={(e) => set('paises', e.target.value.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean))} placeholder="BR, PT" /></Campo>
-                <Campo label="Modalidades (vírgula)"><input className={INPUT} value={f.modalidades.join(', ')} onChange={(e) => set('modalidades', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))} /></Campo>
-                <Campo label="Valor mínimo"><input type="number" step="0.01" className={INPUT} value={f.valorMinimo ?? ''} onChange={(e) => set('valorMinimo', e.target.value === '' ? null : Number(e.target.value))} /></Campo>
-                <Campo label="Valor máximo"><input type="number" step="0.01" className={INPUT} value={f.valorMaximo ?? ''} onChange={(e) => set('valorMaximo', e.target.value === '' ? null : Number(e.target.value))} /></Campo>
-                <Campo label="Perfil"><input className={INPUT} value={f.perfil} onChange={(e) => set('perfil', e.target.value)} /></Campo>
-                <Campo label="Canal"><input className={INPUT} value={f.canal} onChange={(e) => set('canal', e.target.value)} /></Campo>
-              </div>
-              {servicos.length > 0 && (
-                <div className="mt-3">
-                  <p className="mb-1.5 text-[11px] uppercase tracking-wide text-white/40">Serviços (restringe a — opcional)</p>
-                  <ChipsMulti items={servicos.map((x) => ({ id: x.id, label: x.name }))} selecionados={f.servicos} onToggle={(id) => set('servicos', toggleArr(f.servicos, Number(id)))} />
+            <div className="space-y-4">
+              <Secao icon={ArrowRight} titulo="Direção e vigência" dica="Ambas as datas são opcionais: sem início vale imediatamente; sem fim, vigência indeterminada.">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <Campo label="Aplica a"><Select value={f.aplicaA} onChange={(v) => set('aplicaA', v)} options={APLICA_A.map((a) => [a, APLICA_A_LABEL[a]] as [string, string])} /></Campo>
+                  <Campo label="Válida a partir de"><input type="date" className={INPUT} value={f.vigenciaInicio?.slice(0, 10) || ''} onChange={(e) => set('vigenciaInicio', e.target.value)} /></Campo>
+                  <Campo label="Válida até"><input type="date" className={INPUT} value={f.vigenciaFim?.slice(0, 10) || ''} onChange={(e) => set('vigenciaFim', e.target.value)} /></Campo>
                 </div>
-              )}
-            </Secao>
+              </Secao>
+
+              <Secao icon={Coins} titulo="Restrições financeiras" dica="Nenhuma moeda selecionada = sem restrição de moeda.">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <Campo label="Moedas permitidas">
+                    <MultiSelect
+                      opcoes={moedas.map((m) => ({ id: m.id, label: m.code, hint: m.name || undefined }))}
+                      selecionados={f.moedasIds} onChange={(ids) => set('moedasIds', ids)}
+                      placeholder="Todas as moedas" dicaVazio="Sem restrição de moeda."
+                      vazioMsg="Nenhuma moeda ativa cadastrada."
+                    />
+                  </Campo>
+                  <Campo label="Valor mínimo"><input type="number" min={0} step="0.01" className={INPUT} value={f.valorMinimo ?? ''} onChange={(e) => set('valorMinimo', e.target.value === '' ? null : Number(e.target.value))} /></Campo>
+                  <Campo label="Valor máximo"><input type="number" min={0} step="0.01" className={INPUT} value={f.valorMaximo ?? ''} onChange={(e) => set('valorMaximo', e.target.value === '' ? null : Number(e.target.value))} /></Campo>
+                </div>
+              </Secao>
+
+              <Secao icon={Filter} titulo="Restrições operacionais" dica="Nada selecionado = a condição vale para todos.">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <Campo label="Países permitidos">
+                    <MultiSelect
+                      opcoes={paises.map((p) => ({ id: p.id, label: `${p.flag ? `${p.flag} ` : ''}${p.countryLabel}` }))}
+                      selecionados={f.paisesIds} onChange={(ids) => set('paisesIds', ids)}
+                      placeholder="Todos os países" dicaVazio="Sem restrição de país."
+                      vazioMsg="Nenhum país ativo cadastrado."
+                    />
+                  </Campo>
+                  <Campo label="Serviços permitidos">
+                    <MultiSelect
+                      opcoes={servicos.map((s) => ({ id: s.id, label: s.name, hint: s.code || undefined }))}
+                      selecionados={f.servicosIds} onChange={(ids) => set('servicosIds', ids)}
+                      placeholder="Todos os serviços" dicaVazio="Aplicável a todos os serviços."
+                      vazioMsg="Nenhum serviço ativo cadastrado."
+                    />
+                  </Campo>
+                  {/* Modalidade PERMANECE: tem entidade própria (ModalidadePais),
+                      chave por país e preço vinculado (TabelaValor) — não é
+                      duplicação conceitual de Serviço. */}
+                  <Campo label="Modalidades permitidas">
+                    <MultiSelect
+                      opcoes={modalidades.map((m) => ({ id: m.id, label: m.modalityLabel, hint: m.countryKey }))}
+                      selecionados={f.modalidadesIds} onChange={(ids) => set('modalidadesIds', ids)}
+                      placeholder="Todas as modalidades" dicaVazio="Sem restrição de modalidade."
+                      vazioMsg="Nenhuma modalidade ativa cadastrada."
+                    />
+                  </Campo>
+                </div>
+              </Secao>
+            </div>
           )}
 
           {step === 3 && (
@@ -348,7 +412,12 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, onClose,
             <Secao icon={Check} titulo="Revisão">
               <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
                 {[
-                  ['Nome', f.name], ['Aplica a', APLICA_A_LABEL[f.aplicaA]],
+                  ['Nome', f.name], ['Código', f.codigo || 'gerado ao salvar'],
+                  ['Aplica a', APLICA_A_LABEL[f.aplicaA]],
+                  ['Moedas', f.moedasIds.length ? `${f.moedasIds.length} selecionada(s)` : 'sem restrição'],
+                  ['Países', f.paisesIds.length ? `${f.paisesIds.length} selecionado(s)` : 'sem restrição'],
+                  ['Serviços', f.servicosIds.length ? `${f.servicosIds.length} selecionado(s)` : 'todos'],
+                  ['Modalidades', f.modalidadesIds.length ? `${f.modalidadesIds.length} selecionada(s)` : 'sem restrição'],
                   ['Pagamento', TIPOS_PAGAMENTO_LABEL[f.tipoPagamento] + (parcela ? ` (${f.parcelasMin}–${f.parcelasMax}, padrão ${f.parcelasPadrao})` : '')],
                   ['Entrada', f.temEntrada ? (f.entradaTipo === 'PERCENTUAL' ? `${f.percentEntrada ?? '—'}%` : `fixo ${f.valorEntradaFixo ?? '—'}`) : 'não'],
                   ['Periodicidade', PERIODICIDADES_LABEL[f.periodicidade]], ['Distribuição', DISTRIBUICOES_LABEL[f.distribuicao]],
@@ -384,9 +453,13 @@ function mapear(c: any): Form {
     name: c.name || '', codigo: c.codigo || '', descricao: c.descricao || '', ativo: c.ativo ?? true,
     carteiraId: c.carteiraId ?? null, formaSugeridaId: c.formaSugeridaId ?? null,
     aplicaA: c.aplicaA || 'AMBOS', vigenciaInicio: c.vigenciaInicio || '', vigenciaFim: c.vigenciaFim || '',
-    moedasPermitidas: c.moedasPermitidas || [], paises: c.paises || [], modalidades: c.modalidades || [], tiposProcesso: c.tiposProcesso || [],
+    // Aplicabilidade vem SEMPRE dos vínculos reais (nunca dos arrays legados).
+    moedasIds: (c.moedasVinculadas || []).map((x: any) => x.moedaId),
+    paisesIds: (c.paisesPermitidos || []).map((x: any) => x.paisId),
+    modalidadesIds: (c.modalidadesPermitidas || []).map((x: any) => x.modalidadeId),
+    servicosIds: (c.servicosPermitidos || []).map((x: any) => x.servicoId),
+    tiposProcesso: c.tiposProcesso || [],
     valorMinimo: c.valorMinimo != null ? Number(c.valorMinimo) : null, valorMaximo: c.valorMaximo != null ? Number(c.valorMaximo) : null,
-    perfil: c.perfil || '', canal: c.canal || '', servicos: c.servicos || [],
     tipoPagamento: c.tipoPagamento || 'PARCELADO', temEntrada: !!c.temEntrada, entradaObrigatoria: !!c.entradaObrigatoria,
     entradaTipo: c.entradaTipo || 'PERCENTUAL', percentEntrada: c.percentEntrada != null ? Number(c.percentEntrada) : null,
     valorEntradaFixo: c.valorEntradaFixo != null ? Number(c.valorEntradaFixo) : null,
