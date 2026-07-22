@@ -62,7 +62,9 @@ export default function DossieReceitaPage() {
     if (typeof window !== 'undefined') { const u = localStorage.getItem('user'); if (u) try { setUser(JSON.parse(u)) } catch {} }
     fetch('/api/processos').then((r) => (r.ok ? r.json() : null)).then((d) => setProcessos(d?.processos || [])).catch(() => {})
   }, [])
-  useEffect(() => { if (mounted && !carregando && !pode('financeiro.ver')) router.push('/') }, [mounted, carregando, pode, router])
+  // `pode` do hook muda de identidade a cada render — NÃO colocar nas deps
+  // (senão os effects re-disparam em loop e a tela pisca). Lemos dentro.
+  useEffect(() => { if (mounted && !carregando && !pode('financeiro.ver')) router.push('/') }, [mounted, carregando, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro(null)
@@ -70,7 +72,7 @@ export default function DossieReceitaPage() {
     catch (e: any) { setErro(e.message || 'Não foi possível carregar.') }
     finally { setLoading(false) }
   }, [receitaId, processoId])
-  useEffect(() => { if (mounted && pode('financeiro.ver')) carregar() }, [mounted, carregar, pode])
+  useEffect(() => { if (mounted && !carregando) carregar() }, [mounted, carregando, carregar]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const voltar = () => router.push(`/kanban?processoId=${processoId}&tab=faturas`)
   const handleLogout = () => { localStorage.removeItem('authToken'); localStorage.removeItem('user'); router.push('/login') }
