@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 // FONTE ÚNICA do mapeamento modo → unidade (compartilhada com a API).
-import { MODOS_CALCULO, rotuloModo, rotuloUnidadeCobranca, modoUsaQuantidade } from '@/lib/financeiro/modo-calculo'
+import { MODOS_CALCULO, rotuloModo, rotuloUnidadeCobranca, estrategiaUsaPrimeiroAdicional, estrategiaUsaFaixaQuantidade } from '@/lib/financeiro/modo-calculo'
 
 type ConfigRef = { id: number; publicCode: string | null; possuiCusto: boolean; possuiReceita: boolean; origem: string; mestre: string; label: string; moedaPadrao: string }
 type FornecedorRef = { id: number; nome: string; publicCode?: string | null }
@@ -68,6 +68,12 @@ const fmtMoeda = (v: any, moeda: string) => {
   const n = v === null || v === undefined || v === '' ? 0 : Number(v)
   try { return n.toLocaleString('pt-BR', { style: 'currency', currency: moeda || 'BRL' }) } catch { return `${moeda} ${n.toFixed(2)}` }
 }
+// 'YYYY-MM-DD' → 'DD/MM/YYYY' (sem timezone; a string já é a data comercial).
+const fmtData = (iso: string | null) => {
+  if (!iso) return null
+  const [y, m, d] = iso.split('-')
+  return y && m && d ? `${d}/${m}/${y}` : iso
+}
 
 const EMPTY = {
   categoria: '', // filtro de navegação (origem estrutural) — NÃO enviado no payload
@@ -80,7 +86,9 @@ const EMPTY = {
   // PRIMEIRO (base) + ADICIONAL — só em modo que multiplica por quantidade (ex.: por requerente).
   valorBase: '', valorAdicional: '', valorBaseVenda: '', valorAdicionalVenda: '',
   modoCalculo: 'fixed', quantidadeMinima: '', quantidadeMaxima: '',
-  vigenciaInicio: '', vigenciaFim: '', prioridade: '0', arquivado: false,
+  // Prioridade saiu da UI (não há mais múltiplas tabelas válidas p/ o mesmo contexto).
+  // Persistida sempre como 0 no backend — mantida no schema por compatibilidade.
+  vigenciaInicio: '', vigenciaFim: '', arquivado: false,
 }
 type FormState = typeof EMPTY
 
@@ -163,7 +171,7 @@ export default function TabelaValoresTab() {
       quantidadeMinima: i.modoCalculo && i.modoCalculo !== 'fixed' && i.quantidadeMinima != null ? String(i.quantidadeMinima) : '',
       quantidadeMaxima: i.modoCalculo && i.modoCalculo !== 'fixed' && i.quantidadeMaxima != null ? String(i.quantidadeMaxima) : '',
       vigenciaInicio: i.vigenciaInicio || '', vigenciaFim: i.vigenciaFim || '',
-      prioridade: String(i.prioridade ?? 0), arquivado: i.arquivado,
+      arquivado: i.arquivado,
     })
     setErroModal(null); setModalAberto(true)
   }
@@ -172,18 +180,21 @@ export default function TabelaValoresTab() {
     if (!form.categoria) { setErroModal('Selecione a categoria.'); return }
     if (!form.configuracaoFinanceiraItemId) { setErroModal('Selecione o item.'); return }
     if (!form.precoCusto && !form.precoVenda) { setErroModal('Marque pelo menos uma natureza: Preço de Custo e/ou Preço de Venda.'); return }
-    // Modo que multiplica por quantidade (ex.: por requerente) → cobra PRIMEIRO + ADICIONAL.
-    const porQtd = modoUsaQuantidade(form.modoCalculo)
+    // "Válido a partir de" é obrigatório (início da validade comercial).
+    if (!form.vigenciaInicio) { setErroModal('Informe "Válido a partir de".'); return }
+    if (form.vigenciaFim && form.vigenciaInicio > form.vigenciaFim) { setErroModal('"Válido até" deve ser igual ou posterior a "Válido a partir de".'); return }
+    // Estratégia "Primeiro requerente + Requerente adicional" → cobra base + adicional.
+    const usaBaseAdic = estrategiaUsaPrimeiroAdicional(form.modoCalculo)
     if (form.precoCusto) {
       if (!form.moeda) { setErroModal('Selecione a moeda do custo.'); return }
-      if (porQtd) {
+      if (usaBaseAdic) {
         if (form.valorBase === '' || Number(form.valorBase) <= 0) { setErroModal('Primeiro requerente (custo) deve ser maior que zero.'); return }
         if (form.valorAdicional === '' || Number(form.valorAdicional) < 0) { setErroModal('Requerente adicional (custo) não pode ser vazio ou negativo.'); return }
       } else if (form.valor === '' || Number(form.valor) <= 0) { setErroModal('Valor de custo deve ser maior que zero.'); return }
     }
     if (form.precoVenda) {
       if (!form.moedaVenda) { setErroModal('Selecione a moeda da venda.'); return }
-      if (porQtd) {
+      if (usaBaseAdic) {
         if (form.valorBaseVenda === '' || Number(form.valorBaseVenda) <= 0) { setErroModal('Primeiro requerente (venda) deve ser maior que zero.'); return }
         if (form.valorAdicionalVenda === '' || Number(form.valorAdicionalVenda) < 0) { setErroModal('Requerente adicional (venda) não pode ser vazio ou negativo.'); return }
       } else if (form.valorVenda === '' || Number(form.valorVenda) <= 0) { setErroModal('Valor de venda deve ser maior que zero.'); return }
@@ -195,12 +206,12 @@ export default function TabelaValoresTab() {
       // envia o campo legado `natureza` no cadastro novo.
       const { categoria: _c, precoCusto: _pc, precoVenda: _pv, moeda: _m, valor: _v, fornecedorId: _f, moedaVenda: _mv, valorVenda: _vv, valorBase: _vb, valorAdicional: _va, valorBaseVenda: _vbv, valorAdicionalVenda: _vav, ...compartilhados } = form
       const num = (v: string) => (v === '' ? undefined : Number(v))
-      // Bloco de preço: em modo por-quantidade envia valorBase/valorAdicional (o backend usa
-      // valorBase como `valor` de compat); em modo fixo envia só `valor`.
-      const blocoCusto = porQtd
+      // Bloco de preço: na estratégia primeiro+adicional envia valorBase/valorAdicional (o
+      // backend usa valorBase como `valor` de compat); nas demais envia só `valor`.
+      const blocoCusto = usaBaseAdic
         ? { moeda: form.moeda, valorBase: num(form.valorBase), valorAdicional: num(form.valorAdicional), fornecedorId: form.fornecedorId ? Number(form.fornecedorId) : null }
         : { moeda: form.moeda, valor: Number(form.valor), fornecedorId: form.fornecedorId ? Number(form.fornecedorId) : null }
-      const blocoVenda = porQtd
+      const blocoVenda = usaBaseAdic
         ? { moeda: form.moedaVenda, valorBase: num(form.valorBaseVenda), valorAdicional: num(form.valorAdicionalVenda) }
         : { moeda: form.moedaVenda, valor: Number(form.valorVenda) }
       // Edição = UM registro individual já existente (natureza imutável): payload single.
@@ -210,7 +221,7 @@ export default function TabelaValoresTab() {
       const body = JSON.stringify({
         ...compartilhados,
         configuracaoFinanceiraItemId: Number(form.configuracaoFinanceiraItemId),
-        prioridade: Number(form.prioridade) || 0,
+        prioridade: 0, // não editável — fonte única de vigência dispensa prioridade
         ...(editando
           ? editPayload
           : {
@@ -255,8 +266,8 @@ export default function TabelaValoresTab() {
         <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5 backdrop-blur">
           <table className="w-full text-[13px]">
             <thead><tr className="bg-white/5">
-              {['Cadastro mestre', 'Origem', 'Papel', 'Fornecedor', 'Modo', 'Valor', 'Vigência', 'Prio.', 'Status', ''].map((h, idx) => (
-                <th key={idx} className={`border-b border-white/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${idx === 5 || idx === 9 ? 'text-right' : 'text-left'}`}>{h}</th>
+              {['Cadastro mestre', 'Origem', 'Papel', 'Fornecedor', 'Modo', 'Preço', 'Vigência', 'Status', ''].map((h, idx) => (
+                <th key={idx} className={`border-b border-white/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${idx === 5 || idx === 8 ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
@@ -271,14 +282,20 @@ export default function TabelaValoresTab() {
                     <td className="px-3 py-2.5 text-white/60">{rotuloModo(i.modoCalculo)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-white/90">
                       {i.valorBase != null && i.valorAdicional != null ? (
-                        <span className="inline-flex flex-col items-end leading-tight">
-                          <span>{fmtMoeda(i.valorBase, i.moeda)}<span className="text-white/40"> · 1º</span></span>
-                          <span className="text-[11px] text-white/60">+ {fmtMoeda(i.valorAdicional, i.moeda)} / adic.</span>
+                        <span className="inline-flex flex-col items-end leading-tight gap-0.5">
+                          <span><span className="text-[11px] text-white/50">Primeiro requerente: </span>{fmtMoeda(i.valorBase, i.moeda)}</span>
+                          <span className="text-[12px]"><span className="text-[11px] text-white/50">Requerente adicional: </span>{fmtMoeda(i.valorAdicional, i.moeda)}</span>
                         </span>
                       ) : fmtMoeda(i.valor, i.moeda)}
                     </td>
-                    <td className="px-3 py-2.5 text-[11px] text-white/50">{i.vigenciaInicio || '—'}{i.vigenciaFim ? ` → ${i.vigenciaFim}` : ''}</td>
-                    <td className="px-3 py-2.5 text-white/60">{i.prioridade}</td>
+                    <td className="px-3 py-2.5 text-[11px] text-white/60">
+                      {i.vigenciaInicio ? (
+                        <span className="inline-flex flex-col leading-tight">
+                          <span>Válido desde: {fmtData(i.vigenciaInicio)}</span>
+                          {i.vigenciaFim && <span className="text-white/40">até {fmtData(i.vigenciaFim)}</span>}
+                        </span>
+                      ) : '—'}
+                    </td>
                     <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-[11px] font-medium ${!i.arquivado ? 'bg-green-500/15 text-green-300' : 'bg-white/10 text-white/50'}`}>{!i.arquivado ? 'Ativo' : 'Inativo'}</span></td>
                     <td className="px-3 py-2.5"><div className="flex items-center justify-end gap-2">
                       <button onClick={() => abrirEditar(i)} className="rounded-md border border-white/10 px-2.5 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white">Editar</button>
@@ -392,7 +409,7 @@ export default function TabelaValoresTab() {
                         {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                       </select>
                     </div>
-                    {modoUsaQuantidade(form.modoCalculo) ? (
+                    {estrategiaUsaPrimeiroAdicional(form.modoCalculo) ? (
                       <div className="col-span-3 grid grid-cols-2 gap-3">
                         <div>
                           <label className="mb-1 block text-xs text-white/60">Primeiro requerente *</label>
@@ -425,7 +442,7 @@ export default function TabelaValoresTab() {
                         {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                       </select>
                     </div>
-                    {modoUsaQuantidade(form.modoCalculo) ? (
+                    {estrategiaUsaPrimeiroAdicional(form.modoCalculo) ? (
                       <div className="col-span-2 grid grid-cols-2 gap-3">
                         <div>
                           <label className="mb-1 block text-xs text-white/60">Primeiro requerente *</label>
@@ -452,8 +469,8 @@ export default function TabelaValoresTab() {
                   <label className="mb-1 block text-xs text-white/60">Modo de cálculo *</label>
                   <select value={form.modoCalculo} onChange={(e) => {
                     const modo = e.target.value
-                    // Modo sem quantidade (Valor fixo) → limpa a faixa de quantidade.
-                    setForm((f) => modoUsaQuantidade(modo) ? { ...f, modoCalculo: modo } : { ...f, modoCalculo: modo, quantidadeMinima: '', quantidadeMaxima: '' })
+                    // Só estratégia de FAIXA usa min/max; nas demais a faixa é sempre limpa.
+                    setForm((f) => estrategiaUsaFaixaQuantidade(modo) ? { ...f, modoCalculo: modo } : { ...f, modoCalculo: modo, quantidadeMinima: '', quantidadeMaxima: '' })
                   }} className={inputCls}>
                     {MODOS_CALCULO.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
@@ -466,22 +483,36 @@ export default function TabelaValoresTab() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 gap-3">
+              {/* Faixa de quantidade (mín./máx.) — SOMENTE na estratégia de faixa. Oculta em
+                  fixo, unitário simples e primeiro+adicional (campos preservados no schema). */}
+              {estrategiaUsaFaixaQuantidade(form.modoCalculo) && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs text-white/60">Qtd mín.</label>
+                    <input type="number" min="0" value={form.quantidadeMinima} onChange={(e) => set('quantidadeMinima', e.target.value)} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-white/60">Qtd máx.</label>
+                    <input type="number" min="0" value={form.quantidadeMaxima} onChange={(e) => set('quantidadeMaxima', e.target.value)} className={inputCls} />
+                  </div>
+                </div>
+              )}
+
+              {/* Vigência — pertence à Tabela de Preços. Início obrigatório; fim opcional. */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Qtd mín.</label>
-                  <input type="number" min="0" value={form.quantidadeMinima} disabled={!modoUsaQuantidade(form.modoCalculo)} onChange={(e) => set('quantidadeMinima', e.target.value)} className={inputCls + (!modoUsaQuantidade(form.modoCalculo) ? ' cursor-not-allowed opacity-50' : '')} />
+                  <label className="mb-1 block text-xs text-white/60">Válido a partir de *</label>
+                  <input type="date" value={form.vigenciaInicio} onChange={(e) => set('vigenciaInicio', e.target.value)} className={inputCls} />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Qtd máx.</label>
-                  <input type="number" min="0" value={form.quantidadeMaxima} disabled={!modoUsaQuantidade(form.modoCalculo)} onChange={(e) => set('quantidadeMaxima', e.target.value)} className={inputCls + (!modoUsaQuantidade(form.modoCalculo) ? ' cursor-not-allowed opacity-50' : '')} />
+                  <label className="mb-1 block text-xs text-white/60">Válido até <span className="text-white/40">(opcional)</span></label>
+                  <input type="date" value={form.vigenciaFim} min={form.vigenciaInicio || undefined} onChange={(e) => set('vigenciaFim', e.target.value)} className={inputCls} />
+                  <p className="mt-1 text-[11px] text-white/40">Vazio = vigência indeterminada.</p>
                 </div>
-                <div><label className="mb-1 block text-xs text-white/60">Vig. início</label><input type="date" value={form.vigenciaInicio} onChange={(e) => set('vigenciaInicio', e.target.value)} className={inputCls} /></div>
-                <div><label className="mb-1 block text-xs text-white/60">Vig. fim</label><input type="date" value={form.vigenciaFim} onChange={(e) => set('vigenciaFim', e.target.value)} className={inputCls} /></div>
               </div>
 
               <div className="flex items-center gap-6">
-                <div className="w-28"><label className="mb-1 block text-xs text-white/60">Prioridade</label><input type="number" value={form.prioridade} onChange={(e) => set('prioridade', e.target.value)} className={inputCls} /></div>
-                <label className="mt-5 flex items-center gap-2 text-sm text-white/80"><input type="checkbox" checked={!form.arquivado} onChange={(e) => set('arquivado', !e.target.checked)} className="h-4 w-4 accent-blue-500" />Ativo</label>
+                <label className="flex items-center gap-2 text-sm text-white/80"><input type="checkbox" checked={!form.arquivado} onChange={(e) => set('arquivado', !e.target.checked)} className="h-4 w-4 accent-blue-500" />Ativo</label>
               </div>
 
               {erroModal && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroModal}</div>}

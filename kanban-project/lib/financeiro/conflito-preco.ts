@@ -9,9 +9,9 @@
 //   • mesmo contexto (tipoProcesso, fase, região, modalidade, processo, itemCatalogo);
 //   • mesmo fornecedor (quando aplicável);
 //   • faixa de quantidade sobreposta;
-//   • vigências sobrepostas;
-//   • mesma prioridade.
-// Diferir em QUALQUER dimensão discriminante = contextos distintos = SEM conflito.
+//   • vigências sobrepostas.
+// Prioridade NÃO discrimina: não pode haver duas tabelas simultaneamente válidas para o
+// mesmo contexto comercial. Diferir em QUALQUER outra dimensão = contextos distintos = SEM conflito.
 //
 // Sem Prisma, sem I/O. Espelha a barreira de banco (uniques R16 + EXCLUDE GiST R17),
 // mas devolve mensagem clara ANTES do insert (a spec exige validação no backend).
@@ -74,8 +74,9 @@ function mesmoContexto(a: PrecoRegistro, b: PrecoRegistro): boolean {
     (a.modalidadeId ?? null) === (b.modalidadeId ?? null) &&
     (a.processoId ?? null) === (b.processoId ?? null) &&
     (a.itemCatalogoId ?? null) === (b.itemCatalogoId ?? null) &&
-    (a.fornecedorId ?? null) === (b.fornecedorId ?? null) &&
-    (a.prioridade ?? 0) === (b.prioridade ?? 0)
+    (a.fornecedorId ?? null) === (b.fornecedorId ?? null)
+    // Prioridade NÃO é mais discriminante: não pode haver duas tabelas simultaneamente
+    // válidas para o mesmo contexto comercial, independentemente de prioridade.
   )
 }
 
@@ -111,9 +112,9 @@ export function detectarConflitoPreco(candidata: PrecoRegistro, existentes: Prec
     ok: false,
     conflitantes,
     motivo:
-      `Conflito de preço (${canon}): já existe(m) regra(s) ativa(s) [${conflitantes.join(', ')}] ` +
-      `para a mesma Configuração Financeira, mesmo contexto/fornecedor, ` +
-      `mesma prioridade, com faixa de quantidade e vigência sobrepostas. ` +
-      `Ajuste contexto, fornecedor, faixa, vigência ou prioridade para diferenciá-las.`,
+      `Conflito de vigência (${canon}): já existe(m) tabela(s) ativa(s) [${conflitantes.join(', ')}] ` +
+      `para a mesma Configuração Financeira, mesmo contexto comercial e fornecedor, ` +
+      `com período de validade sobreposto. Não pode haver duas tabelas simultaneamente ` +
+      `válidas para o mesmo contexto — ajuste o contexto, o fornecedor ou o intervalo de vigência.`,
   }
 }

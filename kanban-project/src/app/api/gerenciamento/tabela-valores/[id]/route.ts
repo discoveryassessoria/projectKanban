@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
-import { modoCalculoValido, unidadeDoModo, modoUsaQuantidade } from '@/lib/financeiro/modo-calculo'
+import { modoCalculoValido, unidadeDoModo, estrategiaUsaPrimeiroAdicional, estrategiaUsaFaixaQuantidade } from '@/lib/financeiro/modo-calculo'
 import { detectarConflitoPreco, type PrecoRegistro } from '@/lib/financeiro/conflito-preco'
 import type { NaturezaPrecoRaw } from '@/lib/financeiro/natureza-financeira'
 
@@ -61,7 +61,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Informe um Modo de cálculo válido.' }, { status: 400 })
     }
     const modoConhecido = modoCalculoValido(modoFinal)
-    const usaQtd = modoUsaQuantidade(modoFinal)
+    // Estratégia comercial efetiva (fonte única): base/adicional e faixa de quantidade.
+    const usaBaseAdic = estrategiaUsaPrimeiroAdicional(modoFinal)
+    const usaFaixa = estrategiaUsaFaixaQuantidade(modoFinal)
     const parseQtd = (v: unknown) => (v === '' || v == null ? null : Number(v))
 
     // Valores EFETIVOS pós-edição (natureza é imutável). VENDA não leva fornecedor (invariante
@@ -69,21 +71,25 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const ehVenda = atual.natureza === 'VENDA' || atual.natureza === 'RECEITA'
     const fornecedorIdEff = ehVenda ? null : (b.fornecedorId !== undefined ? (b.fornecedorId ? Number(b.fornecedorId) : null) : atual.fornecedorId)
     const moedaEff = b.moeda !== undefined && String(b.moeda).trim() ? String(b.moeda).trim() : atual.moeda
-    const qMinEff = modoConhecido ? (usaQtd ? (b.quantidadeMinima !== undefined ? parseQtd(b.quantidadeMinima) : atual.quantidadeMinima) : null) : atual.quantidadeMinima
-    const qMaxEff = modoConhecido ? (usaQtd ? (b.quantidadeMaxima !== undefined ? parseQtd(b.quantidadeMaxima) : atual.quantidadeMaxima) : null) : atual.quantidadeMaxima
+    // min/max só em estratégia de FAIXA (nenhuma atual) → normaliza para null.
+    const qMinEff = modoConhecido ? (usaFaixa ? (b.quantidadeMinima !== undefined ? parseQtd(b.quantidadeMinima) : atual.quantidadeMinima) : null) : atual.quantidadeMinima
+    const qMaxEff = modoConhecido ? (usaFaixa ? (b.quantidadeMaxima !== undefined ? parseQtd(b.quantidadeMaxima) : atual.quantidadeMaxima) : null) : atual.quantidadeMaxima
     const vigIniEff = b.vigenciaInicio !== undefined ? (b.vigenciaInicio ? String(b.vigenciaInicio) : null) : atual.vigenciaInicio
     const vigFimEff = b.vigenciaFim !== undefined ? (b.vigenciaFim ? String(b.vigenciaFim) : null) : atual.vigenciaFim
     const prioEff = b.prioridade !== undefined ? (Number(b.prioridade) || 0) : atual.prioridade
-    if (vigIniEff && vigFimEff && vigIniEff > vigFimEff) {
-      return NextResponse.json({ error: 'Vigência inicial deve ser anterior ou igual à final.' }, { status: 400 })
+    // "Válido a partir de" obrigatório (não pode ficar vazio numa edição).
+    if (!vigIniEff) {
+      return NextResponse.json({ error: 'Informe "Válido a partir de" (início da validade comercial).' }, { status: 400 })
     }
-    // Preço PRIMEIRO+ADICIONAL (só em modo que multiplica por quantidade). Se o modo efetivo
-    // não usa quantidade, zera base/adicional. Ambos juntos ou nenhum.
+    if (vigIniEff && vigFimEff && vigIniEff > vigFimEff) {
+      return NextResponse.json({ error: '"Válido até" deve ser igual ou posterior a "Válido a partir de".' }, { status: 400 })
+    }
+    // Preço PRIMEIRO+ADICIONAL (só na estratégia por requerente). Fora dela zera base/adicional.
     const parseAmt = (v: unknown) => (v === '' || v == null ? null : Number(v))
-    const baseEff = (modoConhecido && usaQtd)
+    const baseEff = (modoConhecido && usaBaseAdic)
       ? (b.valorBase !== undefined ? parseAmt(b.valorBase) : (atual.valorBase == null ? null : Number(atual.valorBase)))
       : null
-    const adicEff = (modoConhecido && usaQtd)
+    const adicEff = (modoConhecido && usaBaseAdic)
       ? (b.valorAdicional !== undefined ? parseAmt(b.valorAdicional) : (atual.valorAdicional == null ? null : Number(atual.valorAdicional)))
       : null
     if ((baseEff == null) !== (adicEff == null))

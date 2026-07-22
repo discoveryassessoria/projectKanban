@@ -93,8 +93,8 @@ ok(perUnit.ok && perUnit.valorUnitario === 30 && perUnit.quantidade === 3 && per
 
 console.log('\n§3 — detecção de duplicidade/conflito de preço')
 const base = preco({ id: 1 })
-ok(conflitam(base, preco({ id: 2 })), 'mesmo contexto+prioridade+vigência aberta → conflita')
-ok(!conflitam(base, preco({ id: 2, prioridade: 1 })), 'prioridade distinta → NÃO conflita')
+ok(conflitam(base, preco({ id: 2 })), 'mesmo contexto+vigência aberta → conflita')
+ok(conflitam(base, preco({ id: 2, prioridade: 1 })), 'prioridade distinta AINDA conflita (não é mais discriminante)')
 ok(!conflitam(base, preco({ id: 2, fornecedorId: 9 })), 'fornecedor distinto → NÃO conflita')
 ok(!conflitam(base, preco({ id: 2, natureza: 'VENDA' })), 'natureza distinta → NÃO conflita')
 ok(conflitam(base, preco({ id: 2, quantidadeMinima: 10, quantidadeMaxima: 20 })), 'faixa aberta sobrepõe faixa 10-20 → conflita')

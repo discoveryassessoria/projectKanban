@@ -4,7 +4,7 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { deriveNaturezaFinanceira, validarNaturezaPreco, canonicalNaturezaPreco, admiteCusto, admiteVenda, type NaturezaPrecoRaw } from '@/lib/financeiro/natureza-financeira'
 import { detectarConflitoPreco, type PrecoRegistro } from '@/lib/financeiro/conflito-preco'
-import { modoCalculoValido, unidadeDoModo, modoUsaQuantidade } from '@/lib/financeiro/modo-calculo'
+import { modoCalculoValido, unidadeDoModo, estrategiaUsaPrimeiroAdicional, estrategiaUsaFaixaQuantidade } from '@/lib/financeiro/modo-calculo'
 import { naturezasDeSelecao, usaNovoModeloSelecao } from '@/lib/financeiro/selecao-natureza'
 import { reprocessarPendenciasFinanceiras } from '@/src/lib/motor/executor'
 
@@ -136,18 +136,25 @@ export async function POST(request: NextRequest) {
     const prioridade = toIntOrNull(b.prioridade) ?? 0
     const vigenciaInicio = toStrOrNull(b.vigenciaInicio)
     const vigenciaFim = toStrOrNull(b.vigenciaFim)
+    // "Válido a partir de" é OBRIGATÓRIO — define o início da validade comercial e garante
+    // que sempre exista uma tabela vigente determinável (sem escolha arbitrária).
+    if (!vigenciaInicio) {
+      return NextResponse.json({ error: 'Informe "Válido a partir de" (início da validade comercial).' }, { status: 400 })
+    }
     if (vigenciaInicio && vigenciaFim && vigenciaInicio > vigenciaFim) {
-      return NextResponse.json({ error: 'Vigência inicial deve ser anterior ou igual à final.' }, { status: 400 })
+      return NextResponse.json({ error: '"Válido até" deve ser igual ou posterior a "Válido a partir de".' }, { status: 400 })
     }
     // Modo de cálculo OBRIGATÓRIO e válido. A UNIDADE é DERIVADA do modo (fonte única
     // `unidadeDoModo`) — ignoramos qualquer `unidade` enviada pelo cliente (não confiar na UI).
     const modoCalculo = toStrOrNull(b.modoCalculo) ?? ''
     if (!modoCalculoValido(modoCalculo)) return NextResponse.json({ error: 'Informe um Modo de cálculo válido.' }, { status: 400 })
     const unidade = unidadeDoModo(modoCalculo) // fixed → null; demais → unidade canônica
-    // `fixed` não usa faixa de quantidade → normaliza min/max para null.
-    const usaQtd = modoUsaQuantidade(modoCalculo)
+    // Estratégia comercial (fonte única): decide base/adicional e faixa de quantidade.
+    const usaBaseAdic = estrategiaUsaPrimeiroAdicional(modoCalculo)
+    // min/max só valem em estratégia de FAIXA (nenhuma atual) → sempre normaliza para null.
+    const usaFaixa = estrategiaUsaFaixaQuantidade(modoCalculo)
     const parseQtdPos = (v: unknown): number | null => {
-      if (!usaQtd || v === '' || v == null) return null
+      if (!usaFaixa || v === '' || v == null) return null
       const n = Number(v)
       return Number.isFinite(n) && n >= 0 ? n : null
     }
@@ -213,11 +220,10 @@ export async function POST(request: NextRequest) {
       const natureza = canonicalNaturezaPreco(naturezaInput) as 'CUSTO' | 'VENDA'
       const rotulo = natureza === 'CUSTO' ? 'custo' : 'venda'
 
-      // Preço PRIMEIRO+ADICIONAL (ex.: honorários por requerente): só faz sentido em modo
-      // que multiplica por quantidade. valorBase = primeiro; valorAdicional = cada adicional.
-      // Quando informados, `valor` acompanha valorBase (compat de leitura/fallback).
-      const valorBase = usaQtd ? toAmountOrNull(ln.valorBase) : null
-      const valorAdicional = usaQtd ? toAmountOrNull(ln.valorAdicional) : null
+      // Preço PRIMEIRO+ADICIONAL (estratégia por requerente): valorBase = primeiro;
+      // valorAdicional = cada adicional. `valor` acompanha valorBase (compat de leitura).
+      const valorBase = usaBaseAdic ? toAmountOrNull(ln.valorBase) : null
+      const valorAdicional = usaBaseAdic ? toAmountOrNull(ln.valorAdicional) : null
       if ((valorBase == null) !== (valorAdicional == null))
         return NextResponse.json({ error: `Para ${rotulo}, informe Primeiro requerente e Requerente adicional juntos (ou nenhum).` }, { status: 400 })
       if (valorBase != null && valorBase <= 0) return NextResponse.json({ error: `Primeiro requerente (${rotulo}) deve ser maior que zero.` }, { status: 400 })

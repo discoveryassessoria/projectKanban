@@ -11,6 +11,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { calcularPreco } from '../lib/financeiro/calculo-preco'
+import { estrategiaDoModo, estrategiaUsaPrimeiroAdicional, estrategiaUsaFaixaQuantidade } from '../lib/financeiro/modo-calculo'
 
 let passed = 0
 let failed = 0
@@ -69,6 +70,24 @@ console.log('\nAlgoritmo único de preço')
   // sem base/adicional em modo por-unidade → cai no valor×qtd
   const r = calcularPreco({ modoCalculo: 'per_applicant', valor: 300, quantidade: 4 })
   ok(r.total === 1200 && r.estrategia === 'por_unidade', 'sem base/adic: por_unidade')
+}
+
+// ── ESTRATÉGIA COMERCIAL derivada do modo (fonte única UI/API) ────────────────
+console.log('\nEstratégia comercial por modo')
+{
+  ok(estrategiaDoModo('fixed') === 'fixo', 'fixed → fixo')
+  ok(estrategiaDoModo('per_applicant') === 'primeiro_adicional', 'per_applicant → primeiro_adicional')
+  ok(estrategiaDoModo('honorario_por_requerente') === 'primeiro_adicional', 'alias por requerente → primeiro_adicional')
+  ok(estrategiaDoModo('per_document') === 'unitario', 'per_document → unitario')
+  ok(estrategiaDoModo('per_person') === 'unitario', 'per_person → unitario')
+  // só a estratégia por requerente usa base+adicional
+  ok(estrategiaUsaPrimeiroAdicional('per_applicant') === true, 'usaPrimeiroAdicional: per_applicant')
+  ok(estrategiaUsaPrimeiroAdicional('per_document') === false, 'usaPrimeiroAdicional: per_document não')
+  ok(estrategiaUsaPrimeiroAdicional('fixed') === false, 'usaPrimeiroAdicional: fixed não')
+  // nenhum modo atual é FAIXA → min/max sempre oculto
+  ok(estrategiaUsaFaixaQuantidade('fixed') === false, 'faixa: fixed não')
+  ok(estrategiaUsaFaixaQuantidade('per_applicant') === false, 'faixa: per_applicant não')
+  ok(estrategiaUsaFaixaQuantidade('per_document') === false, 'faixa: per_document (unitário) não')
 }
 
 // ── GUARDA DE ARQUITETURA: nenhum caminho tem fórmula própria ─────────────────

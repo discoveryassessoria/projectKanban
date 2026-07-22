@@ -103,3 +103,31 @@ export function rotuloUnidadeCobranca(modo: string | null | undefined): string {
 export function modoUsaQuantidade(modo: string | null | undefined): boolean {
   return modoCalculoValido(modo) && modo !== 'fixed'
 }
+
+// ── ESTRATÉGIA COMERCIAL derivada do modo ────────────────────────────────────
+// A estratégia é como o PREÇO é cobrado — decide os CAMPOS que a Tabela de Preços
+// mostra. Fonte única para UI e API:
+//   • 'fixo'                → um único Valor (não multiplica).
+//   • 'primeiro_adicional'  → valorBase (1º) + valorAdicional (cada adicional). Só POR_REQUERENTE.
+//   • 'unitario'            → um único Valor × quantidade (por pessoa/documento/geração/…).
+//   • 'faixa'               → RESERVADO: preço por faixa de quantidade (min/max). Nenhum modo
+//                             atual mapeia para 'faixa' — os campos min/max ficam ocultos até
+//                             existir uma estratégia de faixa (schema preservado por compat).
+export type EstrategiaPreco = 'fixo' | 'primeiro_adicional' | 'unitario' | 'faixa'
+
+export function estrategiaDoModo(modo: string | null | undefined): EstrategiaPreco {
+  const m = normalizarModo(modo)
+  if (m === MODO.FIXO) return 'fixo'
+  if (m === MODO.POR_REQUERENTE) return 'primeiro_adicional'
+  return 'unitario'
+}
+
+/** Estratégia "Primeiro requerente + Requerente adicional" (usa valorBase/valorAdicional). */
+export function estrategiaUsaPrimeiroAdicional(modo: string | null | undefined): boolean {
+  return estrategiaDoModo(modo) === 'primeiro_adicional'
+}
+
+/** Faixa de quantidade (min/max) — só em estratégia de FAIXA (nenhuma no conjunto atual). */
+export function estrategiaUsaFaixaQuantidade(modo: string | null | undefined): boolean {
+  return estrategiaDoModo(modo) === 'faixa'
+}
