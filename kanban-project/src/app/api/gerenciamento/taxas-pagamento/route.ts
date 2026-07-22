@@ -1,76 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { validarTaxa, paraColunasTaxa } from './campos'
 
-function toStrOrNull(v: any): string | null {
-  if (v === undefined || v === null) return null
-  const s = String(v).trim()
-  return s === '' ? null : s
-}
-function toIntOrNull(v: any): number | null {
-  if (v === undefined || v === null || v === '') return null
-  const n = Number(v)
-  return Number.isFinite(n) ? Math.trunc(n) : null
-}
-function toNumOrNull(v: any): number | null {
-  if (v === undefined || v === null || v === '') return null
-  const n = Number(v)
-  return Number.isFinite(n) ? n : null
-}
-
-// GET - Listar taxas + formas de pagamento + moedas (p/ os 2 seletores)
+// GET — taxas + cadastros de apoio (formas/moedas/serviços) para os seletores.
 export async function GET(request: NextRequest) {
   try {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
 
-    const [taxas, formasPagamento, moedas] = await Promise.all([
-      prisma.taxaPagamento.findMany({ orderBy: { name: 'asc' } }),
-      prisma.formaPagamentoCadastro.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    const [taxas, formasPagamento, moedas, servicos] = await Promise.all([
+      prisma.taxaPagamento.findMany({ orderBy: [{ prioridade: 'desc' }, { name: 'asc' }] }),
+      prisma.formaPagamentoCadastro.findMany({ where: { ativo: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
       prisma.moedaCadastro.findMany({ orderBy: { code: 'asc' }, select: { id: true, code: true, name: true } }),
+      prisma.servicoProduto.findMany({ where: { ativo: true }, orderBy: { name: 'asc' }, select: { id: true, name: true, code: true } }),
     ])
 
-    return NextResponse.json({ taxas, formasPagamento, moedas })
+    return NextResponse.json({ taxas, formasPagamento, moedas, servicos })
   } catch (error) {
     console.error('Erro ao listar taxas de pagamento:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 }
 
-// POST - Criar taxa
+// POST — Criar taxa
 export async function POST(request: NextRequest) {
   try {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
 
     const b = await request.json()
-    if (!b.name || !String(b.name).trim()) {
-      return NextResponse.json({ error: 'Informe o nome.' }, { status: 400 })
-    }
+    const erros = validarTaxa(b)
+    if (erros.length) return NextResponse.json({ error: erros[0].mensagem, erros }, { status: 400 })
 
-    const taxa = await prisma.taxaPagamento.create({
-      data: {
-        code: toStrOrNull(b.code),
-        name: String(b.name).trim(),
-        formaPagamentoId: toIntOrNull(b.formaPagamentoId),
-        moeda: toStrOrNull(b.moeda),
-        feeType: toStrOrNull(b.feeType),
-        feePercent: toNumOrNull(b.feePercent),
-        fixedFee: toNumOrNull(b.fixedFee),
-        anticipationEnabled: !!b.anticipationEnabled,
-        // incidência e absorção — consumidas por lib/financeiro/taxas-pagamento.ts
-        baseIncidencia: ['TOTAL', 'PARCELA'].includes(String(b.baseIncidencia)) ? String(b.baseIncidencia) : 'TOTAL',
-        quemAbsorve: ['EMPRESA', 'CLIENTE'].includes(String(b.quemAbsorve)) ? String(b.quemAbsorve) : 'EMPRESA',
-        adquirente: b.adquirente ? String(b.adquirente).slice(0, 120) : null,
-        ativo: b.ativo === undefined ? true : !!b.ativo,
-        vigenciaInicio: b.vigenciaInicio ? new Date(String(b.vigenciaInicio)) : null,
-        vigenciaFim: b.vigenciaFim ? new Date(String(b.vigenciaFim)) : null,
-        anticipationPercent: b.anticipationEnabled ? toNumOrNull(b.anticipationPercent) : null,
-        installmentsFrom: toIntOrNull(b.installmentsFrom),
-        installmentsTo: toIntOrNull(b.installmentsTo),
-      },
-    })
-
+    const taxa = await prisma.taxaPagamento.create({ data: paraColunasTaxa(b) })
     return NextResponse.json({ taxa })
   } catch (error) {
     console.error('Erro ao criar taxa de pagamento:', error)

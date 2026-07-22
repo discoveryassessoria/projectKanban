@@ -2,24 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
+import { validarTaxa, paraColunasTaxa } from '../campos'
 
-function toStrOrNull(v: any): string | null {
-  if (v === undefined || v === null) return null
-  const s = String(v).trim()
-  return s === '' ? null : s
-}
-function toIntOrNull(v: any): number | null {
-  if (v === undefined || v === null || v === '') return null
-  const n = Number(v)
-  return Number.isFinite(n) ? Math.trunc(n) : null
-}
-function toNumOrNull(v: any): number | null {
-  if (v === undefined || v === null || v === '') return null
-  const n = Number(v)
-  return Number.isFinite(n) ? n : null
-}
-
-// PUT - Atualizar taxa
+// PUT — Atualizar taxa (merge campo-a-campo → mapeamento único).
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
@@ -31,29 +16,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!atual) return NextResponse.json({ error: 'Taxa não encontrada' }, { status: 404 })
 
     const b = await request.json()
-    const taxa = await prisma.taxaPagamento.update({
-      where: { id },
-      data: {
-        code: b.code !== undefined ? toStrOrNull(b.code) : atual.code,
-        name: b.name !== undefined ? String(b.name).trim() : atual.name,
-        formaPagamentoId: b.formaPagamentoId !== undefined ? toIntOrNull(b.formaPagamentoId) : atual.formaPagamentoId,
-        moeda: b.moeda !== undefined ? toStrOrNull(b.moeda) : atual.moeda,
-        feeType: b.feeType !== undefined ? toStrOrNull(b.feeType) : atual.feeType,
-        feePercent: b.feePercent !== undefined ? toNumOrNull(b.feePercent) : atual.feePercent,
-        fixedFee: b.fixedFee !== undefined ? toNumOrNull(b.fixedFee) : atual.fixedFee,
-        anticipationEnabled: b.anticipationEnabled !== undefined ? !!b.anticipationEnabled : atual.anticipationEnabled,
-        baseIncidencia: b.baseIncidencia !== undefined && ['TOTAL', 'PARCELA'].includes(String(b.baseIncidencia)) ? String(b.baseIncidencia) : atual.baseIncidencia,
-        quemAbsorve: b.quemAbsorve !== undefined && ['EMPRESA', 'CLIENTE'].includes(String(b.quemAbsorve)) ? String(b.quemAbsorve) : atual.quemAbsorve,
-        adquirente: b.adquirente !== undefined ? (b.adquirente ? String(b.adquirente).slice(0, 120) : null) : atual.adquirente,
-        ativo: b.ativo !== undefined ? !!b.ativo : atual.ativo,
-        vigenciaInicio: b.vigenciaInicio !== undefined ? (b.vigenciaInicio ? new Date(String(b.vigenciaInicio)) : null) : atual.vigenciaInicio,
-        vigenciaFim: b.vigenciaFim !== undefined ? (b.vigenciaFim ? new Date(String(b.vigenciaFim)) : null) : atual.vigenciaFim,
-        anticipationPercent: b.anticipationPercent !== undefined ? toNumOrNull(b.anticipationPercent) : atual.anticipationPercent,
-        installmentsFrom: b.installmentsFrom !== undefined ? toIntOrNull(b.installmentsFrom) : atual.installmentsFrom,
-        installmentsTo: b.installmentsTo !== undefined ? toIntOrNull(b.installmentsTo) : atual.installmentsTo,
-      },
-    })
+    const merged = { ...atual, ...b }
+    const erros = validarTaxa(merged)
+    if (erros.length) return NextResponse.json({ error: erros[0].mensagem, erros }, { status: 400 })
 
+    const taxa = await prisma.taxaPagamento.update({ where: { id }, data: paraColunasTaxa(merged) })
     return NextResponse.json({ taxa })
   } catch (error) {
     console.error('Erro ao atualizar taxa de pagamento:', error)
@@ -61,7 +28,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-// DELETE - Excluir taxa
+// DELETE — bloqueia se a taxa estiver vinculada a alguma Condição; prefira desativar.
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
@@ -69,9 +36,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     const { id: idStr } = await params
     const id = Number(idStr)
+
+    const emCondicao = await prisma.condicaoPagamentoTaxa.count({ where: { taxaId: id } })
+    if (emCondicao > 0) {
+      return NextResponse.json({ error: 'Taxa vinculada a condição(ões) — desative em vez de excluir.', codigo: 'EM_USO', uso: { condicoes: emCondicao } }, { status: 409 })
+    }
+
     await registrarAuditoria(request, { acao: 'EXCLUIR', entidade: 'TaxaPagamento', entidadeId: id, descricao: `Taxa de pagamento excluída (#${id})` })
     await prisma.taxaPagamento.delete({ where: { id } })
-
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('Erro ao excluir taxa de pagamento:', error)

@@ -2364,16 +2364,55 @@ model TaxaPagamento {
   installmentsFrom    Int?
   installmentsTo      Int?
   // Incidência e absorção (motor lib/financeiro/taxas-pagamento.ts)
-  baseIncidencia      String    @default("TOTAL") @db.VarChar(20) // TOTAL | PARCELA
-  quemAbsorve         String    @default("EMPRESA") @db.VarChar(20) // EMPRESA | CLIENTE
-  adquirente          String?   @db.VarChar(120)
+  // baseIncidencia/quemAbsorve são VarChar: os valores foram AMPLIADOS (validação no código).
+  baseIncidencia      String    @default("TOTAL") @db.VarChar(20) // TOTAL | PARCELA | SALDO | ENTRADA | LIQUIDO | BRUTO
+  quemAbsorve         String    @default("EMPRESA") @db.VarChar(20) // EMPRESA | CLIENTE | COMPARTILHADA | COBRANCA
+  adquirente          String?   @db.VarChar(120) // enum controlado na UI (STONE|CIELO|REDE|PAGSEGURO|STRIPE|WISE|OUTRO)
   ativo               Boolean   @default(true)
   vigenciaInicio      DateTime?
   vigenciaFim         DateTime?
   criadoEm            DateTime  @default(now())
   atualizadoEm        DateTime  @updatedAt
 
+  // ── REGRA REUTILIZÁVEL de cálculo de taxa (aditivo) ──
+  // A Taxa não conhece Receita/Cobrança/Pagamento — só parametriza o cálculo. A
+  // Cobrança escolhe a Forma, o motor resolve a taxa compatível e CONGELA na Cobrança.
+  descricao        String?  @db.VarChar(300)
+  categoria        String?  @db.VarChar(40) // TAXA_CARTAO | TARIFA_BANCARIA | GATEWAY | ANTECIPACAO | IOF | SPREAD_CAMBIAL | OUTRO
+  formasAplicaveis Int[]    @default([]) // múltiplas Formas (ref. solta); formaPagamentoId única fica p/ compat
+
+  // aplicação por parcela (substitui installmentsFrom/To — mantidos p/ FAIXA/compat)
+  aplicaParcela String? @db.VarChar(20) // TODAS | ENTRADA | PRIMEIRA | ULTIMA | FAIXA
+
+  // antecipação (expansão — anticipationEnabled/Percent mantidos p/ compat)
+  anticipationType    String?  @db.VarChar(20) // NAO_POSSUI | OPCIONAL | OBRIGATORIA
+  anticipationFixed   Decimal? @db.Decimal(12, 2)
+  anticipationMinDays Int?
+
+  // absorção compartilhada
+  absorcaoPercentEmpresa Decimal? @db.Decimal(5, 2)
+
+  // prioridade quando 2 taxas concorrem
+  prioridade Int @default(0)
+
+  // regras de aplicação (tudo opcional)
+  paises          String[] @default([])
+  moedasAplicaveis String[] @default([])
+  servicos        Int[]    @default([])
+  modalidades     String[] @default([])
+  tiposProcesso   String[] @default([])
+  valorMinimo     Decimal? @db.Decimal(12, 2)
+  valorMaximo     Decimal? @db.Decimal(12, 2)
+  canal           String?  @db.VarChar(60)
+  gateway         String?  @db.VarChar(40)
+  perfil          String?  @db.VarChar(60)
+
+  // câmbio (taxa internacional)
+  momentoCambio String? @db.VarChar(20) // ANTES_CONVERSAO | APOS_CONVERSAO | MOEDA_CONTRATUAL | MOEDA_LIQUIDACAO
+
   condicoes CondicaoPagamentoTaxa[]
+
+  @@index([ativo, prioridade])
 }
 
 // ============================================================
