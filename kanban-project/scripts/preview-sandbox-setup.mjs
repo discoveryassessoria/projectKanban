@@ -63,6 +63,20 @@ async function smokeLeitura() {
   } catch { log('SMOKE: a query acima é a que falha no runtime da Posição.') }
 }
 
+// Cenário de CORTE: marca a 1ª parcela de REC-SBX1 como paga no LEGADO (idempotente),
+// dando ao corte algo para reconciliar (saldo alvo = remanescente). Não toca o Ledger.
+async function garantirCenarioCorte() {
+  try {
+    const rec = await prisma.receita.findUnique({ where: { codigo: 'REC-SBX1' }, select: { id: true } })
+    if (!rec) return
+    const p1 = await prisma.parcelaFinanceira.findFirst({ where: { receitaId: rec.id, numero: 1 }, select: { id: true, dataPagamento: true } })
+    if (p1 && !p1.dataPagamento) {
+      await prisma.parcelaFinanceira.update({ where: { id: p1.id }, data: { dataPagamento: new Date('2026-07-01'), status: 'PAGA' } })
+      log('✓ cenário de corte: parcela #1 de REC-SBX1 marcada PAGA no legado (R$ 1.000).')
+    }
+  } catch (e) { log(`AVISO cenário corte: ${String(e?.message ?? e).slice(0, 100)}`) }
+}
+
 // CONFIRMAÇÃO do estado final para o relatório de homologação.
 async function confirmarEstado() {
   try {
@@ -174,7 +188,7 @@ try {
 
   // ── 4) Dataset sintético (idempotente por Receita REC-SBX1) ──
   const jaTem = await prisma.receita.findUnique({ where: { codigo: 'REC-SBX1' }, select: { id: true } }).catch(() => null)
-  if (jaTem) { log(`✓ dataset sintético já existe (Receita REC-SBX1 = #${jaTem.id}). Nada a repetir.`); await smokeLeitura(); process.exit(0) }
+  if (jaTem) { log(`✓ dataset sintético já existe (Receita REC-SBX1 = #${jaTem.id}). Nada a repetir.`); await garantirCenarioCorte(); await smokeLeitura(); await confirmarEstado(); process.exit(0) }
 
   const VALOR = 4000, N = 4, COTA = 1000, MOEDA = 'BRL'
   await prisma.$transaction(async (tx) => {
@@ -210,6 +224,7 @@ try {
     }
     log(`✓ dataset criado — Processo #${proc.id} (SBX-1), Pessoas [${pessoas.map((p) => p.id).join(', ')}], Receita REC-SBX1 #${receita.id}, Obrigação #${obr.id} (saldo ${VALOR} ${MOEDA}, 4×${COTA} parcelas).`)
   })
+  await garantirCenarioCorte()
   await smokeLeitura()
   await confirmarEstado()
   log('SANDBOX PRONTO.')
