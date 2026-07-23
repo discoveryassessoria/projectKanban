@@ -76,8 +76,11 @@ export async function criarObrigacaoEconomicaComLedger(input: {
   moedaContratual?: string
   codigoOperacional?: string | null
   processoId?: number | null
+  faseId?: number | null
   clienteId?: number | null
   regraFinanceiraId?: number | null
+  vencimento?: Date | null
+  observacoes?: string | null
   origemTipo?: string | null // 'Receita' | 'Custo' | 'nativo'
   origemId?: number | null
   criadoPorId?: number | null
@@ -97,10 +100,11 @@ export async function criarObrigacaoEconomicaComLedger(input: {
     const obr = await tx.obrigacaoEconomica.create({ data: {
       codigoOperacional: input.codigoOperacional ?? null,
       natureza: input.natureza, direcao: dir,
-      processoId: input.processoId ?? null, clienteId: input.clienteId ?? null,
+      processoId: input.processoId ?? null, faseId: input.faseId ?? null, clienteId: input.clienteId ?? null,
       regraFinanceiraId: input.regraFinanceiraId ?? null,
       moedaContratual: moeda, moedaContabil: moeda,
       valorContratado: input.valorContratado,
+      vencimento: input.vencimento ?? null, observacoes: input.observacoes ?? null,
       status: 'ATIVO', origemTipo: input.origemTipo ?? 'nativo', origemId: input.origemId ?? null,
       criadoPorId: input.criadoPorId ?? null,
     } })
