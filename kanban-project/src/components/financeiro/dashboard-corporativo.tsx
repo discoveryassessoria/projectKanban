@@ -103,7 +103,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
             <span className="text-white/30">·</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full" style={{ background: OURO }} /><strong className="text-white">{m.colaboradores}</strong> colaboradores</span>
             <span className="text-white/30">·</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-400" /> Ledger balanceado</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-400" /> Contas em dia</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
