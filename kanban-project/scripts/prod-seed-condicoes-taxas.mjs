@@ -108,7 +108,7 @@ try {
         code, name: t.name, descricao: t.descricao, categoria: t.categoria,
         feeType: 'fixed', fixedFee: 5, baseIncidencia: 'PARCELA', quemAbsorve: 'EMPRESA',
         aplicaParcela: 'TODAS', ativo: true, prioridade: 0,
-        formasAplicaveis: BOLETO != null ? [BOLETO] : [], vigenciaInicio: new Date(),
+        formasAplicaveis: fid('BOLETO') != null ? [fid('BOLETO')] : [], vigenciaInicio: new Date(),
       } })
     })
     novasT++; log(`✓ Taxa "${t.name}" criada (R$5 fixo, boleto).`)
