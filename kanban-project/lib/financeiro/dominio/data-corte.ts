@@ -35,6 +35,40 @@ export function resolverAbertura(o: EntradaObrigacaoCorte): AberturaResolvida {
   return { obrigacaoId: o.obrigacaoId, valorAbertura: saldo, precisaAbertura: true }
 }
 
+// ── CORTE LIMPO (opção C): o Ledger passa a ser a fonte na data de corte. ──
+// Obrigações já ESPELHADAS pela escrita dupla nasceram com OBRIGACAO_CRIADA no
+// valor CHEIO. Para não haver dupla contagem, reconcilia-se o que já foi recebido
+// no legado (reduz o "a receber" ao remanescente). Obrigações SEM ledger recebem
+// uma abertura nova direta no remanescente.
+export type AcaoCorte = 'ABERTURA_NOVA' | 'RECONCILIA_ESPELHO' | 'NENHUMA'
+
+export interface ObrigacaoCorte extends EntradaObrigacaoCorte {
+  temLedger: boolean // já existe LedgerFinanceiro/OBRIGACAO_CRIADA (espelho da escrita dupla)
+}
+
+export interface CorteResolvido {
+  obrigacaoId: number
+  acao: AcaoCorte
+  saldoAlvo: number // saldo remanescente que o Ledger deve refletir após o corte
+  valorReconcilia: number // quanto reduzir do "a receber" (= recebido no legado), quando já há espelho
+  motivo?: string
+}
+
+/** Decide a ação de corte de UMA obrigação (puro, idempotente). */
+export function resolverCorte(o: ObrigacaoCorte): CorteResolvido {
+  const base = { obrigacaoId: o.obrigacaoId, saldoAlvo: 0, valorReconcilia: 0 }
+  if (o.jaTemAbertura) return { ...base, acao: 'NENHUMA', motivo: 'já possui abertura de corte' }
+  const remanescente = cent(Math.max(0, cent(o.valorContratado) - cent(o.recebidoLegado)))
+  if (!o.temLedger) {
+    if (remanescente <= 0) return { ...base, acao: 'NENHUMA', motivo: 'sem ledger e saldo ≤ 0' }
+    return { ...base, acao: 'ABERTURA_NOVA', saldoAlvo: remanescente }
+  }
+  // já espelhada: o Ledger reflete o CONTRATADO; só reconcilia se houve recebimento no legado
+  const recebido = cent(o.recebidoLegado)
+  if (recebido <= 0) return { ...base, acao: 'NENHUMA', motivo: 'espelho já reflete o contratado; nada recebido no legado' }
+  return { obrigacaoId: o.obrigacaoId, acao: 'RECONCILIA_ESPELHO', saldoAlvo: remanescente, valorReconcilia: recebido }
+}
+
 /** Resolve o plano de abertura para um lote de obrigações (idempotente, puro). */
 export function planoDeCorte(obrigacoes: EntradaObrigacaoCorte[]): {
   aberturas: AberturaResolvida[]

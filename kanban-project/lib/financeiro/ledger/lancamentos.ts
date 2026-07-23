@@ -77,6 +77,16 @@ export function lancAbertura(valor: number, aReceber: boolean): Lancamento {
 }
 
 /**
+ * Reconciliação de CORTE LIMPO (Fase 3, opção C): obrigação já ESPELHADA nasceu
+ * com o "a receber" no valor cheio; reduz-se o já recebido no legado até o corte
+ * (sem reconstruir o pagamento antigo, sem entrar em caixa).
+ *   D Saldo de Abertura (9.9) / C Clientes a Receber (1.1) — pelo recebido no legado.
+ */
+export function lancReconciliacaoCorte(recebidoLegado: number): Lancamento {
+  return montarLancamento('ABERTURA', [D(CONTA.SALDO_ABERTURA, recebidoLegado), C(CONTA.CLIENTES_A_RECEBER, recebidoLegado)])
+}
+
+/**
  * Pagamento (recebimento): quita `valorQuitado` do a receber; a tarifa bancária
  * reduz o líquido em caixa; a diferença cambial é uma perna própria.
  *   D Caixa (líquido) + D Taxas (tarifa) [+ D/C Diferença] / C Clientes a Receber (quitado)
