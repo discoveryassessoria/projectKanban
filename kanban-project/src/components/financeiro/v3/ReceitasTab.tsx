@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
-  DollarSign, CheckSquare, Clock, CalendarDays, Search, RotateCcw, Plus, MoreVertical, X,
+  DollarSign, CheckSquare, Clock, CalendarDays, Search, RotateCcw, Plus, X,
   ExternalLink, FileText, ChevronDown, ChevronLeft, ChevronRight, Receipt,
 } from "lucide-react"
 
@@ -79,7 +79,7 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
                 <td className="px-5 text-sky-400">{fmt(r.saldo, r.moeda)}</td>
                 <td className="px-5 text-neutral-300">{dataBR(r.vencimento)}</td>
                 <td className="px-5"><span className="rounded bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-400">{r.statusLabel}</span></td>
-                <td className="px-5" onClick={(e) => e.stopPropagation()}><button className="text-neutral-500 hover:text-neutral-300"><MoreVertical className="h-4 w-4" /></button></td>
+                <td className="px-5" onClick={(e) => e.stopPropagation()}><button onClick={() => router.push(`/financeiro/v3/receita/${r.obrigacaoId}`)} className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-200 hover:border-neutral-600 hover:text-white"><ExternalLink className="h-3.5 w-3.5" /> Abrir</button></td>
               </tr>
             ))}{linhas.length === 0 && <tr><td colSpan={9} className="px-5 py-8 text-center text-neutral-500">Nenhuma receita.</td></tr>}</tbody>
           </table>

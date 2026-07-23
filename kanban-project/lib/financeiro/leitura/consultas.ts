@@ -11,6 +11,7 @@ const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 export interface ObrigacaoLista {
   obrigacaoId: number
   codigoOperacional: string | null
+  descricao: string | null
   natureza: string
   direcao: string
   status: string
@@ -41,7 +42,7 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
   return obrs.map((o) => {
     const p = projPor.get(o.id)
     return {
-      obrigacaoId: o.id, codigoOperacional: o.codigoOperacional, natureza: o.natureza, direcao: o.direcao,
+      obrigacaoId: o.id, codigoOperacional: o.codigoOperacional, descricao: o.observacoes ?? null, natureza: o.natureza, direcao: o.direcao,
       status: o.status, processoId: o.processoId, moeda: String(o.moedaContratual),
       valorContratado: Number(o.valorContratado), saldo: p ? Number(p.saldo) : Number(o.valorContratado),
       recebido: p ? Number(p.recebidoBruto) : 0, temAbertura: comAbertura.has(o.id),

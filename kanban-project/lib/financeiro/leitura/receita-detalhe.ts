@@ -95,13 +95,14 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     referencia: o.referencia, status: o.status === 'PROCESSADA' ? 'Confirmado' : o.status,
   }))
 
+  const moeda = String(obr.moedaContratual)
   const historico = obr.ocorrencias.map((o) => {
     const pg = o.pagadorId != null ? pagadores.find((p) => p.id === o.pagadorId) : undefined
     const quem = pg?.parteExternaId != null ? (partes.find((x) => x.id === pg.parteExternaId)?.nome ?? 'Externo') : (pg?.pessoaId != null ? nome(pg.pessoaId) : (criador?.nome ?? 'Usuário'))
     let descricao = ''
-    if (o.tipo === 'OBRIGACAO_CRIADA') descricao = `Receita criada no valor de ${fmtBRL(Number(o.valor))}.`
-    else if (o.tipo === 'PAGAMENTO' || o.tipo === 'PAGAMENTO_PARCIAL') descricao = `Pagamento via ${o.formaLabel ?? 'recurso'} no valor de ${fmtBRL(Number(o.valor))}.`
-    else descricao = `${TITULO[o.tipo] ?? o.tipo} — ${fmtBRL(Number(o.valor))}.`
+    if (o.tipo === 'OBRIGACAO_CRIADA') descricao = `Receita criada no valor de ${fmtMoeda(Number(o.valor), moeda)}.`
+    else if (o.tipo === 'PAGAMENTO' || o.tipo === 'PAGAMENTO_PARCIAL') descricao = `Pagamento via ${o.formaLabel ?? 'recurso'} no valor de ${fmtMoeda(Number(o.valor), moeda)}.`
+    else descricao = `${TITULO[o.tipo] ?? o.tipo} — ${fmtMoeda(Number(o.valor), moeda)}.`
     return { id: o.id, data: o.data.toISOString(), tipo: o.tipo, titulo: TITULO[o.tipo] ?? o.tipo, descricao, ator: quem }
   })
 
@@ -126,7 +127,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     responsavel: primeiro ? { nome: nome(primeiro.pessoaId), papel: 'Principal' } : null,
     servico: tipoServico?.nome ?? (receita?.categoria ? String(receita.categoria) : null),
     formaCobranca: 'À vista',
-    moeda: String(obr.moedaContratual),
+    moeda,
     valorContratado: contratado, recebido, saldo,
     vencimento: (obr.vencimento ?? receita?.data1)?.toISOString() ?? null,
     criadoEm: obr.criadoEm.toISOString(), criadoPor: criador?.nome ?? 'Usuário',
@@ -138,4 +139,4 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   }
 }
 
-function fmtBRL(v: number) { return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }
+function fmtMoeda(v: number, moeda = 'BRL') { return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: moeda }) }
