@@ -1460,13 +1460,20 @@ model Cobranca {
   valorLiquido   Decimal? @db.Decimal(12, 2) // previsto para a empresa
   // câmbio (quando há conversão): estimado no rascunho, congelado na confirmação
   moedaOrigem  String?   @db.VarChar(10)
+  moedaDestino String?   @db.VarChar(10) // moeda de RECEBIMENTO (destino da conversão)
   cotacao      Decimal?  @db.Decimal(12, 6)
   cotacaoData  DateTime?
   cotacaoFonte String?   @db.VarChar(40)
+  cotacaoTipo  String?   @db.VarChar(20) // MESMA | AUTOMATICA | MANUAL | ESTIMADA
+  cotacaoId    Int? // → CotacaoCambio.id (quando automática)
+  cotacaoManualPorId Int? // → Usuario.id (quando manual)
+  cotacaoJustificativa String? @db.VarChar(300)
   congeladaEm  DateTime? // marca o congelamento (confirmação); depois não recalcula
   // snapshot da adquirente/bandeira usadas (aditivo; populado pelo runtime)
   adquirenteId Int? // → Adquirente.id
   bandeiraId   Int? // → Bandeira.id
+  // Idempotência da criação: mesma chave nunca gera duas cobranças (retry seguro).
+  idempotencyKey String? @unique @db.VarChar(80)
 
   parcelas ParcelaFinanceira[] @relation("CobrancaParcelas")
   eventos  EventoFinanceiro[]  @relation("CobrancaEventos")

@@ -33,6 +33,7 @@ const ADITIVAS = [
   '20260804000000_taxa_tabela_parcelamento',
   '20260805000000_adquirente_bandeira',
   '20260806000000_taxa_finalidade',
+  '20260807000000_cobranca_cambio_idempotencia',
 ]
 
 // Colunas-sentinela p/ verificação pós-aplicação.
@@ -43,7 +44,7 @@ const SENTINELAS = [
   ['MoedaCadastro', ['ativo']],
   ['CondicaoPagamento', ['politicaTaxas', 'formaSugeridaId', 'servicos', 'entradaTipo']],
   ['TaxaPagamento', ['formasAplicaveis', 'aplicaParcela', 'anticipationType', 'momentoCambio', 'adquirenteId', 'bandeiraId', 'finalidade']],
-  ['Cobranca', ['politicaTaxas', 'valorBase', 'valorTaxa', 'valorLiquido', 'moedaOrigem', 'cotacao', 'congeladaEm', 'adquirenteId', 'bandeiraId']],
+  ['Cobranca', ['politicaTaxas', 'valorBase', 'valorTaxa', 'valorLiquido', 'moedaOrigem', 'cotacao', 'congeladaEm', 'adquirenteId', 'bandeiraId', 'moedaDestino', 'cotacaoTipo', 'cotacaoId', 'cotacaoManualPorId', 'cotacaoJustificativa', 'idempotencyKey']],
   // Aplicabilidade relacional da Condição (tabelas de vínculo — checadas pelas colunas).
   ['CondicaoPagamentoMoeda', ['condicaoId', 'moedaId']],
   ['CondicaoPagamentoPais', ['condicaoId', 'paisId']],

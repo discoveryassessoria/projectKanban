@@ -27,12 +27,17 @@ ok('geração só no clique final (confirmar)', src.includes('onClick={confirmar
 ok('anti-duplo-clique (botão desabilita ao salvar)', src.includes('disabled={salvando'))
 ok('não cria cobrança ao avançar (avançar só faz setStep)', src.includes('onClick={() => setStep(step + 1)}'))
 
-// ── conversão EUR/BRL (apresentação; runtime é a autoridade do cálculo) ──
-ok('conversão dupla EUR/BRL', src.includes('const temConv') && src.includes('emBRL') && src.includes('cotacao'))
-ok('valores em duas moedas (dual)', src.includes('const dual = ') && src.includes("brl(v, moeda)") && src.includes("brl(emBRL(v), 'BRL')"))
-ok('cronograma com coluna BRL condicional', src.includes('Valor (BRL)') && src.includes('temConv &&'))
-ok('cotação exibida com origem/estado', src.includes('Cotação: 1') && src.includes('congelada nesta cobrança'))
+// ── conversão origem→destino (apresentação; runtime é a autoridade do cálculo) ──
+ok('conversão dupla por moeda de destino', src.includes('const temConv') && src.includes('emDest') && src.includes('moedaDestino'))
+ok('valores em duas moedas (dual)', src.includes('const dual = ') && src.includes('brl(v, moeda)') && src.includes('brl(emDest(v), destino'))
+ok('cronograma com coluna da moeda de destino', src.includes('Valor ({destino})') && src.includes('temConv &&'))
+ok('cotação exibida com origem/tipo', src.includes('Cotação: 1') && src.includes('sim.cambio.tipo'))
 ok('frontend NÃO recalcula taxa (usa sim.*)', src.includes('sim.valorTaxa') && src.includes('sim.totalCobrado') && !src.includes('valorTaxa ='))
+
+// ── etapa Recebimento: moeda de recebimento + cotação (auto/manual) ──
+ok('moeda de recebimento selecionável', src.includes('Moeda de recebimento') && src.includes('moedaRecebimento'))
+ok('cotação manual (com justificativa)', src.includes('cotacaoManualAtiva') && src.includes('justificativaCotacao'))
+ok('idempotência enviada na criação', src.includes('idempotencyKey: idemKey'))
 
 // ── rótulo correto da taxa (não "ao mês") ──
 ok('taxa rotulada como "da operação" (não "ao mês")', src.includes('Taxa da operação') && !src.includes('Taxa (ao mês)'))

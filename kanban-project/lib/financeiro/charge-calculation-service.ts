@@ -62,7 +62,11 @@ export interface CobrancaInput {
   /** Taxas vinculadas à condição (pool de candidatas). */
   taxaCandidatas?: TaxaCandidata[]
   /** Câmbio quando há conversão (estimado no rascunho; congelado na confirmação). */
-  cambio?: { moedaOrigem?: string | null; cotacao?: number | null; data?: Date | null; fonte?: string | null; congelado?: boolean } | null
+  cambio?: {
+    moedaOrigem?: string | null; moedaDestino?: string | null; cotacao?: number | null
+    data?: Date | null; fonte?: string | null; congelado?: boolean
+    tipo?: string | null; estado?: string | null; direcao?: string | null
+  } | null
 }
 
 export interface CobrancaErro { codigo: string; mensagem: string }
@@ -81,7 +85,7 @@ export interface ResultadoCobranca {
   erros: CobrancaErro[]
   aplicaComo: Direcao
   moeda: string
-  cambio: { moedaOrigem: string; cotacao: number; data: Date | null; fonte: string | null; estimado: boolean } | null
+  cambio: { moedaOrigem: string; moedaDestino: string; cotacao: number; data: Date | null; fonte: string | null; estimado: boolean; tipo: string | null; estado: string | null; direcao: string | null } | null
   politicaTaxas: PoliticaTaxas | null
   taxaAplicada: { id: number | null; nome: string; tipo: string; adquirente: string | null; prioridade: number | null; formula: string } | null
   valorBase: number
@@ -261,6 +265,8 @@ export function calcularCobranca(input: CobrancaInput): ResultadoCobranca {
 
   // ── 4. Resolver UMA taxa por prioridade ──
   let valorTaxa = 0
+  // Percentual/valor-fixo EFETIVOS da taxa (para o gross-up no repasse).
+  let pFrac = 0, fixoTaxa = 0
   let taxaAplicada: ResultadoCobranca['taxaAplicada'] = null
   if (politica && politica !== 'IGNORAR') {
     const candidatas = (input.taxaCandidatas ?? []).filter((t) => candidataElegivel(t, { nParcelas, moeda, formaId: forma?.id, bandeiraId: input.bandeiraId ?? null, data: input.dataBase }))
@@ -282,6 +288,8 @@ export function calcularCobranca(input: CobrancaInput): ResultadoCobranca {
         // Taxa incide sobre o SALDO (total − entrada), nunca sobre a entrada.
         const r = calcularTaxas([efetiva], { valorBruto: baseTaxavel, nParcelas, moeda })
         valorTaxa = cent(r.valorTaxas + r.valorTaxasRepassadas)
+        pFrac = Math.max(0, Number(efetiva.percentual ?? 0)) / 100
+        fixoTaxa = Math.max(0, Number(efetiva.valorFixo ?? 0))
         const linhaCalc = r.linhas[0]
         taxaAplicada = { id: escolhida.id ?? null, nome: String(escolhida.nome ?? escolhida.id ?? 'taxa') + (linha ? ` · ${rotuloLinha(linha)}` : ''), tipo: String(efetiva.tipo ?? 'PERCENTUAL'), adquirente: escolhida.adquirente ?? null, prioridade: escolhida.prioridade ?? 0, formula: linhaCalc?.formula ?? '' }
         memoria.push(`Taxa "${taxaAplicada.nome}": ${taxaAplicada.formula} = ${valorTaxa.toFixed(2)} (prioridade ${taxaAplicada.prioridade})`)
@@ -292,18 +300,39 @@ export function calcularCobranca(input: CobrancaInput): ResultadoCobranca {
   }
 
   // ── 5. Matriz de política → totais ──
+  // REPASSAR usa GROSS-UP real sobre o SALDO (nunca sobre a entrada): o cliente
+  // paga o valor que, após o desconto da adquirente (p% + fixo), deixa o líquido
+  // do saldo intacto → totalSaldo = (saldo + fixo) / (1 − p). A entrada é somada
+  // por fora, sem taxa. ABSORVER cobra o valor base e reduz o líquido pela taxa.
   let valorRepassado = 0, valorAbsorvido = 0, totalCobrado = valorBase, valorLiquido = valorBase
-  if (politica === 'REPASSAR') { valorRepassado = valorTaxa; totalCobrado = cent(valorBase + valorTaxa); valorLiquido = valorBase }
-  else if (politica === 'ABSORVER') { valorAbsorvido = valorTaxa; totalCobrado = valorBase; valorLiquido = cent(valorBase - valorTaxa) }
-  else { valorTaxa = politica === 'IGNORAR' ? 0 : valorTaxa; totalCobrado = valorBase; valorLiquido = valorBase } // IGNORAR ou bloqueado
+  if (politica === 'REPASSAR') {
+    if (pFrac >= 1) {
+      erros.push({ codigo: 'TAXA_INVIAVEL', mensagem: 'Taxa de 100% ou mais impossibilita o repasse (gross-up).' })
+    } else {
+      const totalSaldo = cent((baseTaxavel + fixoTaxa) / (1 - pFrac))
+      valorTaxa = cent(totalSaldo - baseTaxavel)
+      valorRepassado = valorTaxa
+      totalCobrado = cent(valorEntrada + totalSaldo)
+      valorLiquido = valorBase // a empresa recebe o base cheio (entrada + saldo)
+      memoria.push(`Gross-up (repasse): saldo ${baseTaxavel.toFixed(2)} / (1 − ${(pFrac * 100).toFixed(4)}%)${fixoTaxa ? ` + fixo ${fixoTaxa.toFixed(2)}` : ''} → cobra saldo ${totalSaldo.toFixed(2)} · taxa ${valorTaxa.toFixed(2)}`)
+    }
+  } else if (politica === 'ABSORVER') {
+    valorAbsorvido = valorTaxa; totalCobrado = valorBase; valorLiquido = cent(valorBase - valorTaxa)
+  } else {
+    valorTaxa = politica === 'IGNORAR' ? 0 : valorTaxa; totalCobrado = valorBase; valorLiquido = valorBase // IGNORAR ou bloqueado
+  }
   if (politica === 'IGNORAR') { valorTaxa = 0; taxaAplicada = null }
   memoria.push(`Total cobrado: ${totalCobrado.toFixed(2)} · líquido previsto: ${valorLiquido.toFixed(2)}`)
 
-  // ── 6. Câmbio ──
+  // ── 6. Câmbio (conversão ORIGEM→DESTINO; valorDestino = valorOrigem × cotação) ──
   const moedaOrigem = String(input.cambio?.moedaOrigem ?? moeda).toUpperCase()
-  const cotacao = input.cambio?.cotacao != null ? Number(input.cambio.cotacao) : (moedaOrigem === moeda ? 1 : 1)
-  const cambio = { moedaOrigem, cotacao, data: asData(input.cambio?.data ?? null), fonte: input.cambio?.fonte ?? null, estimado: !input.cambio?.congelado }
-  if (moedaOrigem !== moeda) memoria.push(`Câmbio ${moedaOrigem}→${moeda}: ${cotacao} (${cambio.estimado ? 'estimado' : 'congelado'})`)
+  const moedaDestino = String(input.cambio?.moedaDestino ?? moedaOrigem).toUpperCase()
+  const cotacao = input.cambio?.cotacao != null ? Number(input.cambio.cotacao) : 1
+  const cambio = {
+    moedaOrigem, moedaDestino, cotacao, data: asData(input.cambio?.data ?? null), fonte: input.cambio?.fonte ?? null,
+    estimado: !input.cambio?.congelado, tipo: input.cambio?.tipo ?? null, estado: input.cambio?.estado ?? null, direcao: input.cambio?.direcao ?? null,
+  }
+  if (moedaDestino !== moedaOrigem) memoria.push(`Câmbio ${moedaOrigem}→${moedaDestino}: ${cotacao} (${cambio.tipo ?? (cambio.estimado ? 'estimado' : 'congelado')})`)
 
   // ── 7. Cronograma (só quando não há erro bloqueante) ──
   let parcelas: ParcelaCalculada[] = []

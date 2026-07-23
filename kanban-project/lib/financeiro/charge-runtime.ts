@@ -8,6 +8,7 @@
 import { prisma } from '@/lib/prisma'
 import { paraFormaView } from './payment-method-rules'
 import { calcularCobranca, taxaParaCandidata, type CobrancaInput, type ResultadoCobranca } from './charge-calculation-service'
+import { resolverCotacao, type CotacaoResolvida } from './cotacao-resolver'
 
 export interface EntradaRuntime {
   receitaId: number
@@ -19,6 +20,14 @@ export interface EntradaRuntime {
   politicaTaxasEscolhida?: string | null
   bandeiraId?: number | null // cartão: desempata a taxa por bandeira
   entradaValor?: number | null // entrada informada na cobrança (PIX/Transferência)
+  // ── câmbio ──
+  moedaRecebimento?: string | null // destino; ausente = mesma da receita
+  cotacaoManual?: number | null // cotação informada (exige permissão)
+  autorizadoManual?: boolean // usuário pode informar cotação manual?
+  fonteCotacao?: string | null
+  dataCotacao?: string | Date | null
+  justificativaCotacaoManual?: string | null
+  usuarioId?: number | null
   congelar?: boolean // confirmação congela o câmbio
 }
 
@@ -26,6 +35,8 @@ export interface SaidaRuntime {
   resultado: ResultadoCobranca
   receita: { id: number; processoId: number; valor: number; moeda: string }
   condicao: { id: number; versao: number | null; codigo: string | null } | null
+  /** Cotação resolvida (para persistir o snapshot cambial na confirmação). */
+  cambio: CotacaoResolvida
 }
 
 /** Carrega tudo por ID e calcula. Não persiste. */
@@ -77,6 +88,22 @@ export async function montarECalcular(e: EntradaRuntime): Promise<SaidaRuntime |
   }
   const taxaCandidatas = [...taxasPorId.values()].map((t) => taxaParaCandidata(JSON.parse(JSON.stringify(t))))
 
+  // ── Cotação (autoridade do backend): automática (CotacaoCambio vigente),
+  //    manual (com permissão) ou estimada (fallback rotulado). Indisponível
+  //    bloqueia a geração — nunca cotação 1 silenciosa entre moedas diferentes.
+  const cambio = await resolverCotacao(prisma, {
+    origem: String(receita.moeda),
+    destino: String(e.moedaRecebimento ?? receita.moeda),
+    cotacaoManual: e.cotacaoManual ?? null,
+    autorizadoManual: !!e.autorizadoManual,
+    fonteManual: e.fonteCotacao ?? null,
+    dataManual: e.dataCotacao ? new Date(e.dataCotacao) : null,
+    justificativa: e.justificativaCotacaoManual ?? null,
+    usuarioId: e.usuarioId ?? null,
+    fxEstimadoFallback: receita.fxEstimado != null ? Number(receita.fxEstimado) : null,
+  })
+  if (cambio.bloqueio) return { erro: cambio.bloqueio, status: 400 }
+
   const input: CobrancaInput = {
     aplicaComo: 'RECEBER', // Receita ⇒ Contas a Receber
     valorBase: Number(receita.valor),
@@ -91,12 +118,17 @@ export async function montarECalcular(e: EntradaRuntime): Promise<SaidaRuntime |
     carteiraId: e.carteiraId ?? condicaoView?.carteiraId ?? null,
     contaBancariaId: e.contaBancariaId ?? null,
     taxaCandidatas,
-    cambio: { moedaOrigem: String(receita.moeda), cotacao: Number(receita.fxEstimado ?? 1), data: receita.fxData ?? null, fonte: 'receita', congelado: !!e.congelar },
+    cambio: {
+      moedaOrigem: cambio.moedaOrigem, moedaDestino: cambio.moedaDestino, cotacao: cambio.cotacao,
+      data: cambio.data, fonte: cambio.fonte, congelado: !!e.congelar,
+      tipo: cambio.tipo, estado: cambio.estado, direcao: cambio.direcao,
+    },
   }
 
   return {
     resultado: calcularCobranca(input),
     receita: { id: receita.id, processoId: receita.processoId, valor: Number(receita.valor), moeda: String(receita.moeda) },
     condicao: condMeta,
+    cambio,
   }
 }

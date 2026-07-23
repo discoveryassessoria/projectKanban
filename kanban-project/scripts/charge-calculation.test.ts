@@ -32,10 +32,12 @@ sec('Cenários obrigatórios')
   const r2 = calcularCobranca(base({ condicao: cond({ politicaTaxas: 'ABSORVER' }), taxaCandidatas: [taxaPct()], nParcelas: 1 }))
   ok('2 taxa absorvida: total=base, líquido=base-taxa', r2.ok && r2.totalCobrado === 100 && r2.valorTaxa === 2.99 && r2.valorLiquido === 97.01 && r2.valorAbsorvido === 2.99)
 
-  // 3. Cartão 12x taxa REPASSADA
+  // 3. Cartão 12x taxa REPASSADA com GROSS-UP (total = base / (1 − p))
+  //    base 100, p 2,99% → total = 100/0,9701 = 103,08; taxa = 3,08; líquido = base.
   const r3 = calcularCobranca(base({ condicao: cond({ politicaTaxas: 'REPASSAR', parcelasMax: 12 }), taxaCandidatas: [taxaPct()], nParcelas: 12 }))
-  ok('3 taxa repassada: total=base+taxa, líquido=base, 12x', r3.ok && r3.totalCobrado === 102.99 && r3.valorLiquido === 100 && r3.valorRepassado === 2.99 && r3.parcelas.length === 12)
-  ok('3 soma das parcelas = total (repasse)', soma(r3) === 102.99)
+  ok('3 taxa repassada com gross-up: total=103,08, líquido=100, 12x', r3.ok && r3.totalCobrado === 103.08 && r3.valorLiquido === 100 && r3.valorRepassado === 3.08 && r3.parcelas.length === 12)
+  ok('3 soma das parcelas = total (repasse gross-up)', soma(r3) === 103.08)
+  ok('3 gross-up confere: total × (1 − 2,99%) ≈ base', Math.abs(r3.totalCobrado * (1 - 0.0299) - 100) < 0.02)
 
   // 4. 13 parcelas quando o máximo é 12
   const r4 = calcularCobranca(base({ nParcelas: 13 }))

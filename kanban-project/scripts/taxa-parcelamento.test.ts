@@ -41,7 +41,9 @@ const formaView = (over: Record<string, unknown> = {}) => ({
 
 const condView = (over: Record<string, unknown> = {}) => ({
   id: 100, tipoPagamento: 'PARCELADO', parcelasPadrao: 1, parcelasMin: 1, parcelasMax: 12,
-  aplicaA: 'RECEITA', politicaTaxas: 'REPASSAR', periodicidade: 'MENSAL', distribuicao: 'ULTIMA_AJUSTA',
+  // ABSORVER isola a SELEÇÃO da linha da grade (valorTaxa = base × %), sem a
+  // matemática de gross-up do repasse (testada em cambio-grossup.test.ts).
+  aplicaA: 'RECEITA', politicaTaxas: 'ABSORVER', periodicidade: 'MENSAL', distribuicao: 'ULTIMA_AJUSTA',
   inicioCronograma: 'IMEDIATA', ...over,
 }) as never
 

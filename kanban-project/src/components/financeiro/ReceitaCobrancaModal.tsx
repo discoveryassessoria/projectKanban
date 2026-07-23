@@ -163,11 +163,20 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
   const [step, setStep] = React.useState(1)
   const [salvando, setSalvando] = React.useState(false)
   const [erro, setErro] = React.useState<string | null>(null)
-  const [f, setF] = React.useState<{ formaPagamentoId?: number; condicaoPagamentoId?: number; contaBancariaId?: number; carteiraId?: number; gateway?: string; adquirenteId?: number; bandeiraId?: number; entradaValor?: number }>({})
+  const [f, setF] = React.useState<{ formaPagamentoId?: number; condicaoPagamentoId?: number; contaBancariaId?: number; carteiraId?: number; gateway?: string; adquirenteId?: number; bandeiraId?: number; entradaValor?: number; moedaRecebimento?: string; cotacaoManual?: number; cotacaoManualAtiva?: boolean; justificativaCotacao?: string }>({})
   const [nParcelas, setNParcelas] = React.useState<number | ''>('')
   const [politicaEscolha, setPoliticaEscolha] = React.useState<string | null>(null)
   const [sim, setSim] = React.useState<any>(null)
   const [simulando, setSimulando] = React.useState(false)
+  // Chave de idempotência: uma por sessão do wizard (retry/duplo-clique não duplica).
+  const idemKey = React.useMemo(() => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `idem-${Date.now()}-${Math.round(Math.random() * 1e9)}`), [])
+  // Campos de câmbio comuns às requisições de simular/criar.
+  const camposCambio = () => ({
+    moedaRecebimento: f.moedaRecebimento ?? undefined,
+    cotacaoManual: f.cotacaoManualAtiva && f.cotacaoManual != null ? f.cotacaoManual : undefined,
+    justificativaCotacaoManual: f.cotacaoManualAtiva ? (f.justificativaCotacao ?? undefined) : undefined,
+    fonteCotacao: f.cotacaoManualAtiva ? 'Manual' : undefined,
+  })
 
   React.useEffect(() => { jf('/api/financeiro/config').then(setCfg).catch((e) => setErro(e.message)) }, [])
 
@@ -214,13 +223,13 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
     try {
       const d = await jf('/api/financeiro/cobrancas/simular', {
         method: 'POST',
-        body: JSON.stringify({ receitaId, ...f, nParcelas: nParcelas === '' ? undefined : nParcelas, politicaTaxasEscolhida: politicaEscolha ?? undefined }),
+        body: JSON.stringify({ receitaId, ...f, ...camposCambio(), nParcelas: nParcelas === '' ? undefined : nParcelas, politicaTaxasEscolhida: politicaEscolha ?? undefined }),
       })
       setSim(d.simulacao)
     } catch (e: any) { setSim(null); setErro(e.message) } finally { setSimulando(false) }
   }, [receitaId, f, nParcelas, politicaEscolha])
 
-  React.useEffect(() => { if (step >= 4) simular() }, [step, f.formaPagamentoId, f.condicaoPagamentoId, f.carteiraId, f.contaBancariaId, f.bandeiraId, f.adquirenteId, f.entradaValor, nParcelas, politicaEscolha]) // eslint-disable-line
+  React.useEffect(() => { if (step >= 3) simular() }, [step, f.formaPagamentoId, f.condicaoPagamentoId, f.carteiraId, f.contaBancariaId, f.bandeiraId, f.adquirenteId, f.entradaValor, f.moedaRecebimento, f.cotacaoManual, f.cotacaoManualAtiva, nParcelas, politicaEscolha]) // eslint-disable-line
 
   const precisaEscolha = !!sim && !sim.ok && sim.erros?.some((e: any) => e.codigo === 'ESCOLHA_TAXA_OBRIGATORIA')
   const podeConfirmar = !!sim && sim.ok
@@ -230,7 +239,7 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
     try {
       await jf(`/api/financeiro/receitas/${receitaId}/cobrancas`, {
         method: 'POST',
-        body: JSON.stringify({ ...f, nParcelas: nParcelas === '' ? undefined : nParcelas, politicaTaxasEscolhida: politicaEscolha ?? undefined }),
+        body: JSON.stringify({ ...f, ...camposCambio(), idempotencyKey: idemKey, nParcelas: nParcelas === '' ? undefined : nParcelas, politicaTaxasEscolhida: politicaEscolha ?? undefined }),
       })
       onCriada()
     } catch (e: any) { setErro(e.message) } finally { setSalvando(false) }
@@ -251,10 +260,12 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
   // apresenta (valorBRL = valorEUR × cotação), nunca recalcula taxa/cronograma.
   const Simulacao = () => {
     const cotacao = sim?.cambio?.cotacao != null ? Number(sim.cambio.cotacao) : null
-    const temConv = !!sim?.cambio && String(sim.cambio.moedaOrigem || '').toUpperCase() !== 'BRL' && cotacao != null && cotacao !== 1
-    const emBRL = (v: number) => (v == null ? 0 : Number(v) * (cotacao ?? 1))
+    const destino = sim?.cambio?.moedaDestino ? String(sim.cambio.moedaDestino).toUpperCase() : null
+    const origem = sim?.cambio?.moedaOrigem ? String(sim.cambio.moedaOrigem).toUpperCase() : moeda
+    const temConv = !!destino && destino !== origem && cotacao != null && cotacao > 0
+    const emDest = (v: number) => (v == null ? 0 : Number(v) * (cotacao ?? 1))
     const dual = (v: number, bold = false) => (
-      <span className="tabular-nums text-white/85">{bold ? <b>{brl(v, moeda)}</b> : brl(v, moeda)}{temConv && <span className="text-white/45"> · {brl(emBRL(v), 'BRL')}</span>}</span>
+      <span className="tabular-nums text-white/85">{bold ? <b>{brl(v, moeda)}</b> : brl(v, moeda)}{temConv && <span className="text-white/45"> · {brl(emDest(v), destino!)}</span>}</span>
     )
     return (
       <div className="space-y-3">
@@ -277,11 +288,11 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
             {sim.valorTaxa > 0 && <div className="flex justify-between gap-3 py-0.5"><span className="text-white/45">Taxa da operação ({POL_LABEL[sim.politicaTaxas] ?? sim.politicaTaxas}){sim.taxaAplicada ? ` · ${sim.taxaAplicada.nome}` : ''}</span>{dual(sim.valorTaxa)}</div>}
             <div className="flex justify-between py-0.5"><span className="text-white/45">Total cobrado</span>{dual(sim.totalCobrado, true)}</div>
             <div className="flex justify-between py-0.5"><span className="text-white/45">Líquido previsto</span>{dual(sim.valorLiquido)}</div>
-            {temConv && <div className="mt-1.5 border-t border-white/10 pt-1.5 text-[11px] text-white/55">Cotação: 1 {sim.cambio.moedaOrigem} = R$ {cotacao} <span className="text-white/40">({sim.cambio.estimado ? 'estimada — será congelada ao gerar' : 'congelada nesta cobrança'})</span></div>}
+            {temConv && <div className="mt-1.5 border-t border-white/10 pt-1.5 text-[11px] text-white/55">Cotação: 1 {origem} = {cotacao} {destino} <span className="text-white/40">({(sim.cambio.tipo || '').toLowerCase() || (sim.cambio.estimado ? 'estimada — será congelada ao gerar' : 'congelada nesta cobrança')})</span></div>}
           </div>
           <div className="overflow-x-auto rounded-lg border border-white/10">
-            <table className="w-full text-[13px]"><thead><tr className="bg-white/5 text-left text-[11px] uppercase tracking-wide text-white/45"><th className="px-3 py-1.5">#</th><th className="px-3 py-1.5">Vencimento</th><th className="px-3 py-1.5 text-right">Valor ({moeda})</th>{temConv && <th className="px-3 py-1.5 text-right">Valor (BRL)</th>}</tr></thead><tbody>
-              {sim.parcelas.map((p: any) => <tr key={p.numero} className="border-t border-white/5"><td className="px-3 py-1.5 text-white/60">{p.numero}{p.entrada ? ' · entrada' : ''}</td><td className="px-3 py-1.5 text-white/70">{dt(p.vencimento)}</td><td className="px-3 py-1.5 text-right tabular-nums">{brl(p.valor, moeda)}</td>{temConv && <td className="px-3 py-1.5 text-right tabular-nums text-white/70">{brl(emBRL(p.valor), 'BRL')}</td>}</tr>)}
+            <table className="w-full text-[13px]"><thead><tr className="bg-white/5 text-left text-[11px] uppercase tracking-wide text-white/45"><th className="px-3 py-1.5">#</th><th className="px-3 py-1.5">Vencimento</th><th className="px-3 py-1.5 text-right">Valor ({moeda})</th>{temConv && <th className="px-3 py-1.5 text-right">Valor ({destino})</th>}</tr></thead><tbody>
+              {sim.parcelas.map((p: any) => <tr key={p.numero} className="border-t border-white/5"><td className="px-3 py-1.5 text-white/60">{p.numero}{p.entrada ? ' · entrada' : ''}</td><td className="px-3 py-1.5 text-white/70">{dt(p.vencimento)}</td><td className="px-3 py-1.5 text-right tabular-nums">{brl(p.valor, moeda)}</td>{temConv && <td className="px-3 py-1.5 text-right tabular-nums text-white/70">{brl(emDest(p.valor), destino!)}</td>}</tr>)}
             </tbody></table>
           </div>
           {Array.isArray(sim.memoria) && (
@@ -360,6 +371,40 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
                 <option value="" className="bg-zinc-900">— (opcional)</option>
                 {cfg.contasBancarias.map((x: any) => <option key={x.id} value={x.id} className="bg-zinc-900">{x.nome} · {x.moeda}</option>)}
               </select></div>
+
+            {/* Moeda e cotação */}
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="mb-1 block text-xs text-white/60">Moeda da cobrança</label>
+                <input className={`${sel} opacity-60`} value={moeda} readOnly title="Vem da receita" /></div>
+              <div><label className="mb-1 block text-xs text-white/60">Moeda de recebimento</label>
+                <select className={sel} value={f.moedaRecebimento ?? moeda} onChange={(e) => setF({ ...f, moedaRecebimento: e.target.value })}>
+                  <option value={moeda} className="bg-zinc-900">{moeda} · mesma da receita</option>
+                  {(cfg.moedas ?? []).filter((m: any) => m.code !== moeda).map((m: any) => <option key={m.code} value={m.code} className="bg-zinc-900">{m.code}{m.name ? ` · ${m.name}` : ''}</option>)}
+                </select></div>
+            </div>
+
+            {f.moedaRecebimento && f.moedaRecebimento !== moeda && (
+              <div className={`${GLASS} space-y-2 p-3 text-sm`}>
+                {sim?.cambio && sim.cambio.estado !== 'INDISPONIVEL' ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-white/70">Cotação {sim.cambio.moedaOrigem}→{sim.cambio.moedaDestino}: <b>{Number(sim.cambio.cotacao)}</b></span>
+                    <span className="text-[11px] text-white/45">{sim.cambio.fonte ?? '—'}{sim.cambio.data ? ` · ${dt(sim.cambio.data)}` : ''} · {(sim.cambio.tipo || '').toLowerCase() || (sim.cambio.estimado ? 'estimada' : 'congelada')}</span>
+                  </div>
+                ) : (
+                  <p className="text-[12px] text-amber-300/80">Sem cotação automática vigente para {moeda}→{f.moedaRecebimento}. Informe uma cotação manual (requer permissão).</p>
+                )}
+                <label className="flex items-center gap-2 text-[12px] text-white/70">
+                  <input type="checkbox" checked={!!f.cotacaoManualAtiva} onChange={(e) => setF({ ...f, cotacaoManualAtiva: e.target.checked })} />
+                  Usar cotação manual
+                </label>
+                {f.cotacaoManualAtiva && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="number" step="0.0001" min={0} className={sel} placeholder={`1 ${moeda} = ? ${f.moedaRecebimento}`} value={f.cotacaoManual ?? ''} onChange={(e) => setF({ ...f, cotacaoManual: e.target.value === '' ? undefined : Number(e.target.value) })} />
+                    <input className={sel} placeholder="Justificativa" value={f.justificativaCotacao ?? ''} onChange={(e) => setF({ ...f, justificativaCotacao: e.target.value })} />
+                  </div>
+                )}
+              </div>
+            )}
           </div>)}
 
           {cfg && step === 4 && (<div className="space-y-3">

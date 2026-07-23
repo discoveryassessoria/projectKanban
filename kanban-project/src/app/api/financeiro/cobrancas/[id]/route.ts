@@ -35,6 +35,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     bandeiraId: b.bandeiraId ? Number(b.bandeiraId) : null,
     entradaValor: b.entradaValor != null ? Number(b.entradaValor) : null,
     politicaTaxasEscolhida: b.politicaTaxasEscolhida ?? null,
+    moedaRecebimento: b.moedaRecebimento ?? null,
     congelar: !!b.confirmar,
   })
   if ('erro' in out) return NextResponse.json({ error: out.erro }, { status: out.status })
