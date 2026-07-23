@@ -32,7 +32,10 @@ type PaisRef = { id: number; countryKey: string; countryLabel: string; flag?: st
 type ModalidadeRef = { id: number; countryKey: string; modalityKey: string; modalityLabel: string }
 type Condicao = any
 
-const PASSOS = ['Identificação', 'Aplicabilidade', 'Parcelamento', 'Cronograma', 'Formas', 'Política de Taxas', 'Política Cambial', 'Encargos', 'Revisão']
+// 4 seções (spec): sem wizard fragmentado. Os 9 blocos foram reagrupados em:
+//   1 Identificação · 2 Parcelamento/entrada/cronograma/formas/política ·
+//   3 Aplicabilidade + câmbio + encargos · 4 Revisão.
+const PASSOS = ['Identificação', 'Parcelamento e vencimentos', 'Aplicabilidade e encargos', 'Revisão']
 
 const VAZIO = () => ({
   // `codigo` é somente leitura: o backend gera pelo serviço central e nunca muda.
@@ -267,7 +270,7 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
             Perfil e Canal saíram: não tinham regra de negócio (colunas e dados
             históricos preservados no banco, apenas não expostos/exigidos).
           */}
-          {step === 2 && (
+          {step === 3 && (
             <div className="space-y-4">
               <Secao icon={ArrowRight} titulo="Direção e vigência" dica="Ambas as datas são opcionais: sem início vale imediatamente; sem fim, vigência indeterminada.">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -326,7 +329,7 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
             </div>
           )}
 
-          {step === 3 && (
+          {step === 2 && (
             <Secao icon={Layers} titulo="Parcelamento e entrada">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <Campo label="Tipo"><Select value={f.tipoPagamento} onChange={(v) => set('tipoPagamento', v)} options={TIPOS_PAGAMENTO.map((t) => [t, TIPOS_PAGAMENTO_LABEL[t]] as [string, string])} /></Campo>
@@ -361,7 +364,7 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
             </Secao>
           )}
 
-          {step === 4 && (
+          {step === 2 && (
             <Secao icon={CalendarRange} titulo="Cronograma" dica="Comportamentos explícitos — nada implícito.">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Campo label="Início"><Select value={f.inicioCronograma} onChange={(v) => set('inicioCronograma', v)} options={INICIOS.map((i) => [i, INICIOS_LABEL[i]] as [string, string])} /></Campo>
@@ -385,7 +388,7 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
             Uma condição "À vista" permite PIX, Transferência, Dinheiro, Débito e
             Boleto ao mesmo tempo — sem duplicar a condição por forma.
           */}
-          {step === 5 && (
+          {step === 2 && (
             <Secao icon={CreditCard} titulo="Compatibilidade com formas de pagamento" dica="A Condição só informa quais Formas são aceitas. Quem escolhe é a Cobrança.">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Campo label="Formas permitidas">
@@ -426,7 +429,7 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
             </Secao>
           )}
 
-          {step === 6 && (
+          {step === 2 && (
             <Secao icon={Percent} titulo="Política de Taxas" dica="A taxa depende da FORMA escolhida na Cobrança — aqui só a política. O valor vem de Taxas de Pagamento.">
               <Campo label="Política"><Select value={f.politicaTaxas} onChange={(v) => set('politicaTaxas', v)} options={POLITICAS_TAXAS.map((p) => [p, POLITICAS_TAXAS_LABEL[p]] as [string, string])} /></Campo>
               {f.politicaTaxas !== 'IGNORAR' && (
@@ -440,13 +443,13 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
             </Secao>
           )}
 
-          {step === 7 && (
+          {step === 3 && (
             <Secao icon={Coins} titulo="Política Cambial" dica="A Condição não congela política cambial — apenas sugere. Quem decide é a Cobrança.">
               <Campo label="Política padrão"><Select value={f.politicaCambio} onChange={(v) => set('politicaCambio', v)} options={POLITICAS_CAMBIO.map((p) => [p, POLITICAS_CAMBIO_LABEL[p]] as [string, string])} /></Campo>
             </Secao>
           )}
 
-          {step === 8 && (
+          {step === 3 && (
             <Secao icon={Scale} titulo="Encargos e descontos">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Campo label="Multa — tipo"><Select value={f.multaTipo ?? ''} onChange={(v) => set('multaTipo', v || null)} options={[['', '— sem multa —'], ...MULTA_TIPOS.map((m) => [m, m === 'FIXA' ? 'Fixa' : 'Percentual'] as [string, string])]} /></Campo>
@@ -465,7 +468,7 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
             </Secao>
           )}
 
-          {step === 9 && (
+          {step === 4 && (
             <Secao icon={Check} titulo="Revisão">
               <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
                 {[

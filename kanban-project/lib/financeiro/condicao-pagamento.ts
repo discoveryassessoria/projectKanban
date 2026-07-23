@@ -111,6 +111,14 @@ export interface ContextoCronograma {
   dataBase: Date
   /** Quantidade pedida; validada contra min/max da condição. */
   nParcelas?: number | null
+  /**
+   * Valor de entrada JÁ RESOLVIDO pelo chamador (runtime da Cobrança). Quando
+   * presente, substitui o cálculo interno — o serviço de cobrança precisa saber
+   * a entrada ANTES de calcular a taxa (a taxa do cartão/boleto incide só sobre
+   * o saldo, nunca sobre a entrada). Ausente = comportamento histórico (calcula
+   * a entrada a partir da própria condição).
+   */
+  entradaValor?: number | null
 }
 
 export interface ParcelaPlanejada {
@@ -307,6 +315,22 @@ export function resolverQuantidade(c: CondicaoPagamentoView, pedido?: number | n
   return { n, observacao: null }
 }
 
+// ── entrada ─────────────────────────────────────────────────────────────────
+
+/**
+ * Valor da entrada previsto pela condição sobre um total. Fonte ÚNICA da regra
+ * de entrada (valor fixo tem precedência sobre percentual). Entrada ≥ total é
+ * inválida e vira 0. Usada pelo cronograma E pelo serviço de cobrança (que
+ * precisa da entrada antes de calcular a taxa, para NÃO taxar a entrada).
+ */
+export function calcularValorEntrada(c: CondicaoPagamentoView, total: number): number {
+  if (!c?.temEntrada || !(total > 0)) return 0
+  const fixo = num(c.valorEntradaFixo)
+  const pct = num(c.percentEntrada)
+  const valor = fixo > 0 ? fixo : pct > 0 ? Number(((total * pct) / 100).toFixed(2)) : 0
+  return valor > 0 && valor < total ? valor : 0
+}
+
 // ── data da primeira parcela ────────────────────────────────────────────────
 
 export function dataPrimeiraParcela(c: CondicaoPagamentoView, dataBase: Date): Date {
@@ -346,30 +370,26 @@ export function gerarCronograma(
   const primeira = ajustarVencimento(dataPrimeiraParcela(c, ctx.dataBase), c)
 
   // ── entrada ──
-  let valorEntrada = 0
-  const temEntrada = !!c.temEntrada
-  if (temEntrada) {
-    const fixo = num(c.valorEntradaFixo)
-    const pct = num(c.percentEntrada)
-    valorEntrada = fixo > 0 ? fixo : pct > 0 ? Number(((total * pct) / 100).toFixed(2)) : 0
-    if (valorEntrada >= total) {
-      valorEntrada = 0
-      observacoes.push('Entrada ignorada: seria igual ou maior que o total contratado.')
-    } else if (valorEntrada > 0) {
-      observacoes.push(
-        fixo > 0
-          ? `Entrada fixa de ${fixo.toFixed(2)}.`
-          : `Entrada de ${pct}% do total.`,
-      )
-    }
+  // Quando o chamador (runtime da Cobrança) já resolveu a entrada, usamos esse
+  // valor — ele já separou a entrada da base tributável da taxa. Senão, a
+  // entrada é derivada da própria condição (comportamento histórico).
+  let valorEntrada = ctx.entradaValor != null
+    ? (Number(ctx.entradaValor) > 0 && Number(ctx.entradaValor) < total ? Number(Number(ctx.entradaValor).toFixed(2)) : 0)
+    : calcularValorEntrada(c, total)
+  if (valorEntrada > 0) {
+    observacoes.push(`Entrada de ${valorEntrada.toFixed(2)} (paga à parte, sem taxa de cartão/boleto).`)
+  } else if (!!c.temEntrada && ctx.entradaValor == null && calcularValorEntrada(c, total) === 0 && (num(c.valorEntradaFixo) > 0 || num(c.percentEntrada) > 0)) {
+    observacoes.push('Entrada ignorada: seria igual ou maior que o total contratado.')
   }
 
   const parcelas: ParcelaPlanejada[] = []
 
   if (valorEntrada > 0) {
-    // A entrada é a parcela 1; o saldo é distribuído nas seguintes.
+    // A entrada é um COMPONENTE À PARTE (parcela 1, no ato). O saldo é parcelado
+    // em `nSolicitado` parcelas — a entrada NÃO consome uma parcela do saldo
+    // (scenario: entrada + Visa 6x = entrada + 6 parcelas de saldo).
     const saldo = Number((total - valorEntrada).toFixed(2))
-    const nSaldo = Math.max(1, nSolicitado - 1)
+    const nSaldo = Math.max(1, nSolicitado)
     const valores = distribuirValores(saldo, nSaldo, c.distribuicao ?? 'ULTIMA_AJUSTA', num(c.primeiraParcelaPercent))
 
     parcelas.push({ numero: 1, vencimento: primeira, valor: valorEntrada, entrada: true })

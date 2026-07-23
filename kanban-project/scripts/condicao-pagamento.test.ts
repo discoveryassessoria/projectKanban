@@ -71,8 +71,9 @@ secao('Entrada')
   eq('entrada de 30%', c.valorEntrada, 300)
   eq('primeira parcela é a entrada', c.parcelas[0].entrada, true)
   eq('entrada vale 300', c.parcelas[0].valor, 300)
-  eq('total de 3 parcelas', c.nParcelas, 3)
-  eq('saldo dividido em 2', c.parcelas[1].valor + c.parcelas[2].valor, 700)
+  // Entrada é COMPONENTE À PARTE: entrada + 3 parcelas de saldo = 4 componentes.
+  eq('entrada + 3 parcelas de saldo = 4', c.nParcelas, 4)
+  eq('saldo (3 parcelas) fecha 700', c.parcelas[1].valor + c.parcelas[2].valor + c.parcelas[3].valor, 700)
   eq('soma fecha o total', soma(c.parcelas), 1000)
 
   const fixa = gerarCronograma(
@@ -233,10 +234,10 @@ secao('Caso real — honorários € 6.290,00')
     moedasPermitidas: ['EUR'],
   }
   const c = gerarCronograma(cond, { total: 6290, dataBase: BASE })
-  eq('6 parcelas', c.nParcelas, 6)
+  eq('entrada + 6 parcelas de saldo = 7', c.nParcelas, 7)
   eq('entrada de 20%', c.valorEntrada, 1258)
   eq('soma fecha € 6.290,00', soma(c.parcelas), 6290)
-  eq('saldo em 5 parcelas', soma(c.parcelas.slice(1)), 5032)
+  eq('saldo em 6 parcelas', soma(c.parcelas.slice(1)), 5032)
   ok('nenhum vencimento em fim de semana',
     c.parcelas.every((p) => p.vencimento.getUTCDay() !== 0 && p.vencimento.getUTCDay() !== 6))
   ok('vencimentos crescentes',

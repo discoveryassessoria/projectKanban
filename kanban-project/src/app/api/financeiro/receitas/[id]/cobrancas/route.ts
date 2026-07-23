@@ -34,6 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     contaBancariaId: b.contaBancariaId ? Number(b.contaBancariaId) : null,
     nParcelas: b.nParcelas != null ? Number(b.nParcelas) : null,
     bandeiraId: b.bandeiraId ? Number(b.bandeiraId) : null,
+    entradaValor: b.entradaValor != null ? Number(b.entradaValor) : null,
     politicaTaxasEscolhida: b.politicaTaxasEscolhida ?? null,
     congelar: true,
   })

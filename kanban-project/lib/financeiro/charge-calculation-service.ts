@@ -11,7 +11,7 @@
 // autoridade final: a confirmação recalcula, nunca confia no número do cliente.
 // Módulo PURO: sem Prisma, sem fetch, sem React.
 // ============================================================================
-import { gerarCronograma, type CondicaoPagamentoView } from './condicao-pagamento'
+import { gerarCronograma, calcularValorEntrada, type CondicaoPagamentoView } from './condicao-pagamento'
 import { calcularTaxas, type TaxaView } from './taxas-pagamento'
 import { validarCompatibilidadeCobranca, type FormaView } from './payment-method-rules'
 import { formaPermitidaNaCondicao } from './condicao-formas'
@@ -53,6 +53,12 @@ export interface CobrancaInput {
   contaBancariaId?: number | null
   /** Bandeira escolhida (cartão). Desempata taxas específicas por bandeira. */
   bandeiraId?: number | null
+  /**
+   * Entrada informada NA COBRANÇA (PIX/Transferência, à parte). Quando > 0 e a
+   * condição permite entrada, separa esse valor da base tributável da taxa.
+   * Ausente = usa a entrada padrão da condição (se houver).
+   */
+  entradaValor?: number | null
   /** Taxas vinculadas à condição (pool de candidatas). */
   taxaCandidatas?: TaxaCandidata[]
   /** Câmbio quando há conversão (estimado no rascunho; congelado na confirmação). */
@@ -193,6 +199,25 @@ export function calcularCobranca(input: CobrancaInput): ResultadoCobranca {
   const nPedido = input.nParcelas ?? cond?.parcelasPadrao ?? 1
   const nParcelas = Math.max(1, Math.trunc(nPedido))
 
+  // ── entrada (resolvida ANTES da taxa) ──
+  // A entrada é um componente financeiro à parte (pago por PIX/Transferência) e
+  // NUNCA entra na base de cálculo da taxa de cartão/boleto. Base tributável da
+  // taxa = total − entrada (o "saldo" que vai para o cartão/boleto).
+  const entradaInformada = Number(input.entradaValor) || 0
+  if (entradaInformada > 0 && !cond?.temEntrada) {
+    erros.push({ codigo: 'ENTRADA_NAO_PERMITIDA', mensagem: 'Esta condição não permite entrada.' })
+  }
+  if (entradaInformada > 0 && entradaInformada >= valorBase) {
+    erros.push({ codigo: 'ENTRADA_MAIOR_TOTAL', mensagem: 'A entrada deve ser menor que o valor total.' })
+  }
+  const valorEntrada = cent(
+    cond?.temEntrada && entradaInformada > 0 && entradaInformada < valorBase
+      ? entradaInformada
+      : calcularValorEntrada(cond ?? {}, valorBase),
+  )
+  const baseTaxavel = cent(valorBase - valorEntrada)
+  if (valorEntrada > 0) memoria.push(`Entrada de ${valorEntrada.toFixed(2)} (à parte, sem taxa) · base da taxa: ${baseTaxavel.toFixed(2)}`)
+
   // ── 1. Condição × direção (Contas a Receber / a Pagar) ──
   if (cond?.aplicaA) {
     const a = String(cond.aplicaA).toUpperCase()
@@ -254,7 +279,8 @@ export function calcularCobranca(input: CobrancaInput): ResultadoCobranca {
         const linha = linhaParaParcelas(escolhida.tabelaParcelamento, nParcelas)
         if (linha) memoria.push(`Tabela de parcelamento: ${rotuloLinha(linha)} → ${linha.feePercent ?? 0}%${linha.fixedFee ? ` + ${linha.fixedFee}` : ''}${linha.antecipacao ? ' (com antecipação)' : ''}`)
         const efetiva = taxaComLinha(escolhida, linha)
-        const r = calcularTaxas([efetiva], { valorBruto: valorBase, nParcelas, moeda })
+        // Taxa incide sobre o SALDO (total − entrada), nunca sobre a entrada.
+        const r = calcularTaxas([efetiva], { valorBruto: baseTaxavel, nParcelas, moeda })
         valorTaxa = cent(r.valorTaxas + r.valorTaxasRepassadas)
         const linhaCalc = r.linhas[0]
         taxaAplicada = { id: escolhida.id ?? null, nome: String(escolhida.nome ?? escolhida.id ?? 'taxa') + (linha ? ` · ${rotuloLinha(linha)}` : ''), tipo: String(efetiva.tipo ?? 'PERCENTUAL'), adquirente: escolhida.adquirente ?? null, prioridade: escolhida.prioridade ?? 0, formula: linhaCalc?.formula ?? '' }
@@ -283,16 +309,25 @@ export function calcularCobranca(input: CobrancaInput): ResultadoCobranca {
   let parcelas: ParcelaCalculada[] = []
   let nEfetivo = nParcelas
   if (erros.length === 0) {
-    const cron = gerarCronograma(cond, { total: totalCobrado, dataBase: input.dataBase, nParcelas })
+    // A entrada resolvida é passada ao cronograma (componente à parte). O saldo
+    // (total − entrada) é o que se parcela no cartão/boleto.
+    const cron = gerarCronograma(cond, { total: totalCobrado, dataBase: input.dataBase, nParcelas, entradaValor: valorEntrada })
     nEfetivo = cron.nParcelas
-    // distribui a taxa proporcionalmente ao valor da parcela; a última absorve o resíduo
-    const somaValores = cron.parcelas.reduce((s, p) => s + p.valor, 0) || 1
+    // A taxa é distribuída SOMENTE entre as parcelas de saldo — a entrada nunca
+    // recebe taxa (regra de negócio: taxa de cartão/boleto só sobre o saldo).
+    const parcelasSaldo = cron.parcelas.filter((p) => !p.entrada)
+    const somaSaldo = parcelasSaldo.reduce((s, p) => s + p.valor, 0) || 1
     let taxaAcum = 0
-    parcelas = cron.parcelas.map((p, i) => {
-      const ultima = i === cron.parcelas.length - 1
-      const taxaShare = ultima ? cent(valorTaxa - taxaAcum) : cent((valorTaxa * p.valor) / somaValores)
+    let idxSaldo = 0
+    parcelas = cron.parcelas.map((p) => {
+      if (p.entrada) {
+        return { numero: p.numero, vencimento: p.vencimento, valor: cent(p.valor), entrada: true, valorTaxa: 0, valorLiquido: cent(p.valor) }
+      }
+      idxSaldo++
+      const ultima = idxSaldo === parcelasSaldo.length
+      const taxaShare = ultima ? cent(valorTaxa - taxaAcum) : cent((valorTaxa * p.valor) / somaSaldo)
       taxaAcum = cent(taxaAcum + taxaShare)
-      return { numero: p.numero, vencimento: p.vencimento, valor: cent(p.valor), entrada: p.entrada, valorTaxa: taxaShare, valorLiquido: cent(p.valor - (politica === 'ABSORVER' ? taxaShare : 0)) }
+      return { numero: p.numero, vencimento: p.vencimento, valor: cent(p.valor), entrada: false, valorTaxa: taxaShare, valorLiquido: cent(p.valor - (politica === 'ABSORVER' ? taxaShare : 0)) }
     })
     for (const o of cron.observacoes) memoria.push(o)
     // invariante: soma das parcelas = total
@@ -300,10 +335,24 @@ export function calcularCobranca(input: CobrancaInput): ResultadoCobranca {
     if (soma !== totalCobrado) erros.push({ codigo: 'SOMA_INVARIANTE', mensagem: `Soma das parcelas (${soma}) ≠ total (${totalCobrado}).` })
   }
 
+  // Snapshot IMUTÁVEL: congela a REGRA da condição usada (não só id/versão), a
+  // entrada e a taxa. Alterações futuras na condição/tabela nunca tocam isto.
+  const c = cond as any
+  const condicaoSnapshot = cond ? {
+    id: c.id ?? null, codigo: c.codigo ?? null, nome: c.nome ?? c.name ?? null, versao: c.versao ?? null,
+    ativo: c.ativo ?? null, tipoPagamento: c.tipoPagamento ?? null,
+    parcelasMin: c.parcelasMin ?? null, parcelasMax: c.parcelasMax ?? null, parcelasEscolhidas: nEfetivo,
+    periodicidade: c.periodicidade ?? 'MENSAL', inicioCronograma: c.inicioCronograma ?? 'IMEDIATA',
+    temEntrada: !!c.temEntrada, formasPermitidasIds: c.formasPermitidasIds ?? null,
+    aplicaA: c.aplicaA ?? null, vigenciaInicio: c.vigenciaInicio ?? null, vigenciaFim: c.vigenciaFim ?? null,
+    geradoEm: input.dataBase,
+  } : null
   const snapshot = {
     versao: 1, aplicaComo: input.aplicaComo, moeda, politicaTaxas: politica,
-    condicao: cond ? { id: (cond as any).id ?? null, codigo: (cond as any).codigo ?? null, versao: (cond as any).versao ?? null } : null,
+    condicao: condicaoSnapshot,
+    entrada: valorEntrada > 0 ? { valor: valorEntrada, base: 'PIX/Transferência (à parte, sem taxa)', baseTaxavel } : null,
     forma: forma ? { id: forma.id, nome: forma.name } : null,
+    bandeiraId: input.bandeiraId ?? null,
     taxa: taxaAplicada, cambio, valorBase, valorTaxa, valorRepassado, valorAbsorvido, totalCobrado, valorLiquido, nParcelas: nEfetivo,
   }
 

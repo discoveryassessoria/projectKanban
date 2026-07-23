@@ -32,32 +32,66 @@ try {
   // formas por tipo (para vínculos e sugestão)
   const formas = await prisma.formaPagamentoCadastro.findMany({ select: { id: true, type: true } })
   const fid = (t) => formas.find((f) => String(f.type).toUpperCase() === t)?.id ?? null
-  const TODAS = ['PIX', 'TRANSFERENCIA', 'DINHEIRO', 'WISE', 'CARTAO_DEBITO', 'CARTAO_CREDITO', 'BOLETO'].map(fid).filter((x) => x != null)
-  const CARTAO = fid('CARTAO_CREDITO'), BOLETO = fid('BOLETO'), PIX = fid('PIX')
 
-  // ── Condições desejadas ──
-  const cond = []
-  cond.push({ name: 'À vista', tipoPagamento: 'AVISTA', n: 1, formas: TODAS, sugerida: PIX })
-  for (let n = 2; n <= 12; n++) cond.push({ name: `Cartão de crédito — ${n}x`, tipoPagamento: 'PARCELADO', n, formas: CARTAO != null ? [CARTAO] : [], sugerida: CARTAO })
-  for (let n = 1; n <= 12; n++) cond.push({ name: `Boleto — ${n}x`, tipoPagamento: n === 1 ? 'AVISTA' : 'PARCELADO', n, formas: BOLETO != null ? [BOLETO] : [], sugerida: BOLETO })
+  // ── 3 condições LÓGICAS (código fixo, idempotente por código). A quantidade
+  //    de parcelas é escolhida na cobrança, dentro de min..max — NÃO há condição
+  //    por parcela. Taxas vêm SEMPRE das Tabelas de Taxas (a condição não guarda %). ──
+  const COND = [
+    { codigo: 'COND-AVISTA', name: 'À Vista', tipoPagamento: 'AVISTA', min: 1, max: 1,
+      formas: ['PIX', 'TRANSFERENCIA', 'DINHEIRO', 'CARTAO_DEBITO', 'WISE'], sugerida: 'PIX',
+      temEntrada: false, politicaTaxas: 'ABSORVER' },
+    { codigo: 'COND-CARTAO-CREDITO', name: 'Cartão de Crédito', tipoPagamento: 'PARCELADO', min: 1, max: 12,
+      formas: ['CARTAO_CREDITO'], sugerida: 'CARTAO_CREDITO',
+      temEntrada: true, politicaTaxas: 'ABSORVER' },
+    // Boleto: política IGNORAR no cálculo da cobrança — emissão/liquidação (R$5)
+    // e multa/juros NÃO são antecipados; são aplicados por EVENTO (lib/financeiro/
+    // encargos-boleto.ts) na emissão/pagamento/atraso reais.
+    { codigo: 'COND-BOLETO', name: 'Boleto Parcelado', tipoPagamento: 'PARCELADO', min: 1, max: 12,
+      formas: ['BOLETO'], sugerida: 'BOLETO',
+      temEntrada: true, politicaTaxas: 'IGNORAR', multaPercent: 2, jurosMesPercent: 1, carenciaDias: 3 },
+  ]
 
-  const existentes = new Set((await prisma.condicaoPagamento.findMany({ select: { name: true } })).map((c) => c.name))
+  const codigosExist = new Set((await prisma.condicaoPagamento.findMany({ select: { codigo: true } })).map((c) => c.codigo).filter(Boolean))
   let novasC = 0
-  for (const c of cond) {
-    if (existentes.has(c.name)) { log(`Condição "${c.name}" já existe — mantida.`); continue }
+  for (const c of COND) {
+    if (codigosExist.has(c.codigo)) { log(`Condição ${c.codigo} já existe — mantida (não sobrescreve).`); continue }
+    const formaIds = c.formas.map(fid).filter((x) => x != null)
     await prisma.$transaction(async (tx) => {
-      const codigo = await proxCod(tx, 'CPG')
       await tx.condicaoPagamento.create({ data: {
-        codigo, versao: 1, name: c.name, ativo: true,
-        tipoPagamento: c.tipoPagamento, parcelas: c.n, parcelasMin: 1, parcelasMax: c.n, parcelasPadrao: c.n,
-        inicioCronograma: 'IMEDIATA', periodicidade: 'MENSAL', // primeira no ato, demais +30d
-        aplicaA: 'RECEITA', politicaTaxas: 'IGNORAR', vigenciaInicio: new Date(),
-        formaSugeridaId: c.sugerida ?? undefined,
-        formasPermitidas: c.formas.length ? { create: c.formas.map((formaId) => ({ formaId })) } : undefined,
+        codigo: c.codigo, versao: 1, name: c.name, ativo: true,
+        tipoPagamento: c.tipoPagamento, parcelas: c.max, parcelasMin: c.min, parcelasMax: c.max, parcelasPadrao: c.min,
+        inicioCronograma: 'IMEDIATA', periodicidade: 'MENSAL', // 1ª no ato; demais por mês de calendário
+        aplicaA: 'RECEITA', politicaTaxas: c.politicaTaxas, vigenciaInicio: new Date(),
+        temEntrada: !!c.temEntrada, // entrada é CAPACIDADE; valor é escolhido na cobrança (PIX/Transferência)
+        multaPercent: c.multaPercent ?? undefined, jurosMesPercent: c.jurosMesPercent ?? undefined, carenciaDias: c.carenciaDias ?? undefined,
+        formaSugeridaId: fid(c.sugerida) ?? undefined,
+        formasPermitidas: formaIds.length ? { create: formaIds.map((formaId) => ({ formaId })) } : undefined,
       } })
     })
-    novasC++; log(`✓ Condição "${c.name}" criada (${c.formas.length} forma(s)).`)
+    novasC++; log(`✓ Condição ${c.codigo} "${c.name}" criada (${formaIds.length} forma(s)).`)
   }
+
+  // ── Inativa (aditivo/reversível) as condições LEGADAS por-parcela SEM USO
+  //    (À vista antigo, "Cartão de crédito — Nx", "Boleto — Nx"). Nunca apaga;
+  //    nunca toca condição usada em receita/custo (histórico preservado). ──
+  const codigosNovos = new Set(COND.map((c) => c.codigo))
+  const legadas = await prisma.condicaoPagamento.findMany({
+    where: {
+      ativo: true,
+      OR: [{ name: 'À vista' }, { name: { startsWith: 'Cartão de crédito — ' } }, { name: { startsWith: 'Boleto — ' } }],
+    },
+    select: { id: true, name: true, codigo: true },
+  })
+  let inativadas = 0
+  for (const l of legadas) {
+    if (l.codigo && codigosNovos.has(l.codigo)) continue // nunca as 3 novas
+    const usoR = await prisma.receita.count({ where: { condicaoPagamentoId: l.id } })
+    const usoC = await prisma.custo.count({ where: { condicaoPagamentoId: l.id } })
+    if (usoR + usoC > 0) { log(`Condição legada "${l.name}" EM USO (${usoR + usoC}) — mantida ativa.`); continue }
+    await prisma.condicaoPagamento.update({ where: { id: l.id }, data: { ativo: false } })
+    inativadas++
+  }
+  if (inativadas) log(`✓ ${inativadas} condição(ões) legada(s) por-parcela inativada(s) (sem uso; reversível).`)
 
   // ── Taxas de boleto (R$5 emissão + R$5 pagamento) ──
   const taxas = [

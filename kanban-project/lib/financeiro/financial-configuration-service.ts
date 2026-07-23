@@ -28,6 +28,10 @@ export interface ConfiguracaoFinanceira {
   carteiras: { id: number; nome: string; moeda: string; contaBancariaId: number | null; contaNome: string | null; isDefault: boolean }[]
   bancos: { id: number; nome: string; sigla: string | null }[]
   moedas: { id: number; code: string; name: string }[]
+  // Adquirentes/bandeiras: alimentam os selects do cartão no wizard de Cobrança
+  // (o motor desempata a taxa por bandeira). Só ativos.
+  adquirentes: { id: number; nome: string; formasSuportadas: number[] }[]
+  bandeiras: { id: number; nome: string }[]
 }
 
 const num = (v: unknown): number | null => (v == null ? null : Number(v))
@@ -35,7 +39,7 @@ const num = (v: unknown): number | null => (v == null ? null : Number(v))
 /** Agrega TODA a configuração financeira oficial (ativa por padrão). */
 export async function obterConfiguracaoFinanceira(opts?: { incluirInativos?: boolean }): Promise<ConfiguracaoFinanceira> {
   const soAtivos = opts?.incluirInativos ? {} : { ativo: true }
-  const [formas, condicoes, taxas, contas, carteiras, bancos, moedas] = await Promise.all([
+  const [formas, condicoes, taxas, contas, carteiras, bancos, moedas, adquirentes, bandeiras] = await Promise.all([
     prisma.formaPagamentoCadastro.findMany({ where: soAtivos, orderBy: [{ ordem: 'asc' }, { name: 'asc' }] }),
     prisma.condicaoPagamento.findMany({
       where: soAtivos,
@@ -47,6 +51,8 @@ export async function obterConfiguracaoFinanceira(opts?: { incluirInativos?: boo
     prisma.carteiraRecebimento.findMany({ where: soAtivos, include: { contaBancaria: { select: { id: true, nome: true } } }, orderBy: [{ isDefault: 'desc' }, { nome: 'asc' }] }),
     prisma.banco.findMany({ where: soAtivos, orderBy: { nome: 'asc' }, select: { id: true, nome: true, sigla: true } }),
     prisma.moedaCadastro.findMany({ orderBy: { code: 'asc' }, select: { id: true, code: true, name: true } }).catch(() => []),
+    prisma.adquirente.findMany({ where: soAtivos, orderBy: { nome: 'asc' }, select: { id: true, nome: true, formasSuportadas: true } }).catch(() => []),
+    prisma.bandeira.findMany({ where: soAtivos, orderBy: { nome: 'asc' }, select: { id: true, nome: true } }).catch(() => []),
   ])
 
   return {
@@ -70,5 +76,7 @@ export async function obterConfiguracaoFinanceira(opts?: { incluirInativos?: boo
     carteiras: carteiras.map((w) => ({ id: w.id, nome: w.nome, moeda: String(w.moeda), contaBancariaId: w.contaBancariaId, contaNome: w.contaBancaria?.nome ?? null, isDefault: w.isDefault })),
     bancos: bancos.map((b) => ({ id: b.id, nome: b.nome, sigla: b.sigla })),
     moedas: (moedas as any[]).map((m) => ({ id: m.id, code: m.code, name: m.name })),
+    adquirentes: (adquirentes as any[]).map((a) => ({ id: a.id, nome: a.nome, formasSuportadas: a.formasSuportadas ?? [] })),
+    bandeiras: (bandeiras as any[]).map((b) => ({ id: b.id, nome: b.nome })),
   }
 }

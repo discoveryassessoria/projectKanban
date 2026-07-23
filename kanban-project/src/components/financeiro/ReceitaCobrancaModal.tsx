@@ -159,7 +159,7 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
   const [step, setStep] = React.useState(1)
   const [salvando, setSalvando] = React.useState(false)
   const [erro, setErro] = React.useState<string | null>(null)
-  const [f, setF] = React.useState<{ formaPagamentoId?: number; condicaoPagamentoId?: number; contaBancariaId?: number; carteiraId?: number; gateway?: string }>({})
+  const [f, setF] = React.useState<{ formaPagamentoId?: number; condicaoPagamentoId?: number; contaBancariaId?: number; carteiraId?: number; gateway?: string; adquirenteId?: number; bandeiraId?: number; entradaValor?: number }>({})
   const [nParcelas, setNParcelas] = React.useState<number | ''>('')
   const [politicaEscolha, setPoliticaEscolha] = React.useState<string | null>(null)
   const [sim, setSim] = React.useState<any>(null)
@@ -168,6 +168,15 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
   React.useEffect(() => { jf('/api/financeiro/config').then(setCfg).catch((e) => setErro(e.message)) }, [])
 
   const condicao = cfg?.condicoesPagamento?.find((c: any) => c.id === f.condicaoPagamentoId)
+  const formaSel = cfg?.formasPagamento?.find((x: any) => x.id === f.formaPagamentoId)
+  // Cartão de crédito exige adquirente + bandeira (o motor desempata a taxa por
+  // bandeira). Débito também usa bandeira; demais formas não.
+  const ehCartaoCredito = formaSel?.type === 'CARTAO_CREDITO'
+  const ehCartao = formaSel?.type === 'CARTAO_CREDITO' || formaSel?.type === 'CARTAO_DEBITO'
+  const adqOpcoes = React.useMemo(
+    () => (cfg?.adquirentes ?? []).filter((a: any) => !a.formasSuportadas?.length || (f.formaPagamentoId && a.formasSuportadas.includes(f.formaPagamentoId))),
+    [cfg, f.formaPagamentoId],
+  )
 
   // Formas que a condição permite (vazio = sem restrição → qualquer forma ativa
   // compatível). A compatibilidade real (moeda/direção/parcelas/adquirente) é do
@@ -207,7 +216,7 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
     } catch (e: any) { setSim(null); setErro(e.message) } finally { setSimulando(false) }
   }, [receitaId, f, nParcelas, politicaEscolha])
 
-  React.useEffect(() => { if (step >= 4) simular() }, [step, f.formaPagamentoId, f.condicaoPagamentoId, f.carteiraId, f.contaBancariaId, nParcelas, politicaEscolha]) // eslint-disable-line
+  React.useEffect(() => { if (step >= 4) simular() }, [step, f.formaPagamentoId, f.condicaoPagamentoId, f.carteiraId, f.contaBancariaId, f.bandeiraId, f.adquirenteId, f.entradaValor, nParcelas, politicaEscolha]) // eslint-disable-line
 
   const precisaEscolha = !!sim && !sim.ok && sim.erros?.some((e: any) => e.codigo === 'ESCOLHA_TAXA_OBRIGATORIA')
   const podeConfirmar = !!sim && sim.ok
@@ -286,13 +295,27 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
           {!cfg && <p className="text-sm text-white/50">Carregando configuração…</p>}
           {erro && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-sm text-red-200">{erro}</div>}
 
-          {cfg && step === 1 && (<div><label className="mb-1 block text-xs text-white/60">Forma de pagamento</label>
-            <select className={sel} value={f.formaPagamentoId ?? ''} onChange={(e) => setF({ ...f, formaPagamentoId: Number(e.target.value) || undefined })}>
+          {cfg && step === 1 && (<div className="space-y-3"><div><label className="mb-1 block text-xs text-white/60">Forma de pagamento</label>
+            <select className={sel} value={f.formaPagamentoId ?? ''} onChange={(e) => { const id = Number(e.target.value) || undefined; setF({ ...f, formaPagamentoId: id, adquirenteId: undefined, bandeiraId: undefined }) }}>
               <option value="" className="bg-zinc-900">Selecione</option>
               {formasDisponiveis.map((x: any) => <option key={x.id} value={x.id} className="bg-zinc-900">{x.name}{condicao?.formaPadraoId === x.id ? ' · padrão' : ''}</option>)}
             </select>
             {avisoForma && <p className="mt-1 text-[11px] text-amber-300/80">{avisoForma}</p>}
             {!!permitidas.length && <p className="mt-1 text-[11px] text-white/40">Somente as formas permitidas pela condição selecionada.</p>}
+            </div>
+            {ehCartao && (<>
+              <div><label className="mb-1 block text-xs text-white/60">Adquirente {ehCartaoCredito ? '' : '(opcional)'}</label>
+                <select className={sel} value={f.adquirenteId ?? ''} onChange={(e) => setF({ ...f, adquirenteId: Number(e.target.value) || undefined })}>
+                  <option value="" className="bg-zinc-900">Selecione</option>
+                  {adqOpcoes.map((a: any) => <option key={a.id} value={a.id} className="bg-zinc-900">{a.nome}</option>)}
+                </select></div>
+              <div><label className="mb-1 block text-xs text-white/60">Bandeira do cartão *</label>
+                <select className={sel} value={f.bandeiraId ?? ''} onChange={(e) => setF({ ...f, bandeiraId: Number(e.target.value) || undefined })}>
+                  <option value="" className="bg-zinc-900">Selecione</option>
+                  {(cfg.bandeiras ?? []).map((b: any) => <option key={b.id} value={b.id} className="bg-zinc-900">{b.nome}</option>)}
+                </select>
+                <p className="mt-1 text-[11px] text-white/40">A taxa do cartão é resolvida pela bandeira × parcelas na Tabela de Taxas.</p></div>
+            </>)}
             </div>)}
 
           {cfg && step === 2 && (<div className="space-y-3">
@@ -304,6 +327,11 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
             {condicao && condicao.tipoPagamento === 'PARCELADO' && (
               <div><label className="mb-1 block text-xs text-white/60">Quantidade de parcelas {condicao.parcelasMin || condicao.parcelasMax ? `(${condicao.parcelasMin ?? 1}–${condicao.parcelasMax ?? '—'})` : ''}</label>
                 <input type="number" min={1} className={sel} value={nParcelas} placeholder={String(condicao.parcelasPadrao || 1)} onChange={(e) => setNParcelas(e.target.value === '' ? '' : Number(e.target.value))} /></div>
+            )}
+            {condicao?.temEntrada && (
+              <div><label className="mb-1 block text-xs text-white/60">Entrada (opcional · PIX/Transferência, à parte)</label>
+                <input type="number" min={0} step="0.01" className={sel} value={f.entradaValor ?? ''} placeholder="0,00" onChange={(e) => setF({ ...f, entradaValor: e.target.value === '' ? undefined : Number(e.target.value) })} />
+                <p className="mt-1 text-[11px] text-white/40">A entrada é paga à parte e NÃO recebe taxa de cartão/boleto. O saldo é parcelado.</p></div>
             )}
           </div>)}
 
@@ -337,7 +365,7 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
         <div className="flex items-center justify-between border-t border-white/10 px-5 py-3">
           <button onClick={() => (step > 1 ? setStep(step - 1) : onClose())} className="inline-flex items-center gap-1 text-sm text-white/60 hover:text-white"><ArrowLeft className="h-4 w-4" /> {step > 1 ? 'Voltar' : 'Cancelar'}</button>
           {step < 5 ? (
-            <button disabled={(step === 1 && !f.formaPagamentoId) || (step === 2 && !f.condicaoPagamentoId) || (step === 4 && !podeConfirmar)} onClick={() => setStep(step + 1)} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-40" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
+            <button disabled={(step === 1 && (!f.formaPagamentoId || (ehCartaoCredito && !f.bandeiraId))) || (step === 2 && !f.condicaoPagamentoId) || (step === 4 && !podeConfirmar)} onClick={() => setStep(step + 1)} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-40" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
           ) : (
             <button disabled={salvando || !podeConfirmar} onClick={confirmar} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? 'Criando…' : 'Criar Cobrança'} <Check className="h-4 w-4" /></button>
           )}

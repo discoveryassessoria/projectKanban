@@ -18,6 +18,7 @@ export interface EntradaRuntime {
   nParcelas?: number | null
   politicaTaxasEscolhida?: string | null
   bandeiraId?: number | null // cartão: desempata a taxa por bandeira
+  entradaValor?: number | null // entrada informada na cobrança (PIX/Transferência)
   congelar?: boolean // confirmação congela o câmbio
 }
 
@@ -55,6 +56,12 @@ export async function montarECalcular(e: EntradaRuntime): Promise<SaidaRuntime |
       include: { taxasVinculadas: { include: { taxa: { include: { parcelamento: true } } } }, formasPermitidas: { select: { formaId: true } } },
     })
     if (!cond) return { erro: 'Condição de pagamento inválida', status: 400 }
+    // Guard de aplicabilidade (backend = autoridade): condição inativa ou fora
+    // da vigência nunca gera cobrança.
+    if (cond.ativo === false) return { erro: 'Condição de pagamento inativa.', status: 400 }
+    const agora = new Date()
+    if (cond.vigenciaInicio && agora.getTime() < new Date(cond.vigenciaInicio).getTime()) return { erro: 'Condição ainda não vigente.', status: 400 }
+    if (cond.vigenciaFim && agora.getTime() > new Date(cond.vigenciaFim).getTime()) return { erro: 'Condição fora da vigência.', status: 400 }
     condicaoView = JSON.parse(JSON.stringify(cond))
     condicaoView.formasPermitidasIds = cond.formasPermitidas.map((x) => x.formaId)
     condicaoView.formaPadraoId = cond.formaSugeridaId ?? null
@@ -80,6 +87,7 @@ export async function montarECalcular(e: EntradaRuntime): Promise<SaidaRuntime |
     politicaTaxasEscolhida: (e.politicaTaxasEscolhida as any) ?? null,
     nParcelas: e.nParcelas ?? null,
     bandeiraId: e.bandeiraId ?? null,
+    entradaValor: e.entradaValor ?? null,
     carteiraId: e.carteiraId ?? condicaoView?.carteiraId ?? null,
     contaBancariaId: e.contaBancariaId ?? null,
     taxaCandidatas,
