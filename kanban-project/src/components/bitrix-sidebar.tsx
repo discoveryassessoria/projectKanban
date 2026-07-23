@@ -80,6 +80,17 @@ const menuItems = [
 
 const adminMenuItems = [
   {
+    // Financeiro V3 (Motor/Ledger) — tela definitiva. Ativação gradual pela feature
+    // flag (a página cai no fallback do legado quando o V3 não está habilitado).
+    title: "Financeiro V3",
+    url: "/financeiro/v3",
+    icon: DollarIcon,
+    textOffset: "",
+    iconOffset: "",
+    permissao: "financeiro.ver",
+  },
+  {
+    // Legado — mantido como fallback temporário durante a transição.
     title: "Financeiro",
     url: "/financeiro",
     icon: DollarIcon,

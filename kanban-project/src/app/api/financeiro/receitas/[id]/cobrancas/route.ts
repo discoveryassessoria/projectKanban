@@ -9,6 +9,7 @@ import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verif
 import { temPermissao } from '@/src/lib/permissoes'
 import { montarECalcular } from '@/lib/financeiro/charge-runtime'
 import { espelharReceitaComoObrigacao } from '@/lib/financeiro/dual-write'
+import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // número enviado pelo cliente.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
+  const bloq = guardLegadoEscrita(); if (bloq) return bloq // legado só-leitura após o corte
   const receitaId = Number((await params).id)
   const b = await req.json().catch(() => ({}))
 

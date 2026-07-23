@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withRetry } from '@/lib/db-retry'
+import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -17,6 +18,7 @@ const FORMAS = ['PIX', 'CARTAO_CREDITO', 'CARTAO_DEBITO', 'BOLETO', 'TRANSFERENC
 
 export async function PATCH(req: NextRequest, ctx: RouteContext) {
   try {
+    const bloq = guardLegadoEscrita(); if (bloq) return bloq // legado só-leitura após o corte
     const { id: idStr } = await ctx.params
     const id = Number(idStr)
     if (!id || isNaN(id)) return NextResponse.json({ error: 'id inválido' }, { status: 400 })

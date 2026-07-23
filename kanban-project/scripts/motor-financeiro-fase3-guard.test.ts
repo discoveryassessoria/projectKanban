@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PERMISSOES, PERMISSOES_OPT_IN } from '../src/lib/permissoes'
+import { legadoEscritaBloqueada } from '../lib/financeiro/legado-guard'
 
 let passou = 0, falhou = 0
 const ok = (n: string, c: boolean) => { if (c) { passou++; console.log(`  ✓ ${n}`) } else { falhou++; console.log(`  ✗ ${n}`) } }
@@ -45,6 +46,27 @@ console.log('\nConciliação — flag-gated e sem resolução silenciosa')
   ok('importação idempotente por identificador', /findUnique\(\{ where: \{ identificadorTransacao/.test(svc))
   const m = R('lib/financeiro/conciliacao/matching.ts')
   ok('divergência nunca silenciosa (DIVERGENTE explícito)', /DIVERGENTE/.test(m) && /SEM_CORRESPONDENCIA/.test(m))
+}
+
+console.log('\nSubstituição das telas — nav, bloqueio legado, telas V3')
+{
+  const nav = R('src/components/bitrix-sidebar.tsx')
+  ok('nav tem item Financeiro V3 (/financeiro/v3)', /Financeiro V3/.test(nav) && /\/financeiro\/v3/.test(nav))
+  ok('legado permanece no nav (fallback temporário)', /url: "\/financeiro"/.test(nav))
+
+  delete process.env.FINANCEIRO_LEGADO_ESCRITA_BLOQUEADA
+  ok('bloqueio de escrita legado desligado por padrão', !legadoEscritaBloqueada())
+  process.env.FINANCEIRO_LEGADO_ESCRITA_BLOQUEADA = '1'
+  ok('bloqueio ligável por flag de ambiente', legadoEscritaBloqueada())
+  delete process.env.FINANCEIRO_LEGADO_ESCRITA_BLOQUEADA
+
+  ok('guard aplicado na criação de cobrança (legado)', /guardLegadoEscrita/.test(R('src/app/api/financeiro/receitas/[id]/cobrancas/route.ts')))
+  ok('guard aplicado no registro de pagamento (legado)', /guardLegadoEscrita/.test(R('src/app/api/financeiro/cobrancas/[id]/pagamentos/route.ts')))
+  ok('guard aplicado no lançamento de parcela (legado)', /guardLegadoEscrita/.test(R('src/app/api/financeiro/parcelas/[id]/lancamento/route.ts')))
+
+  const hub = R('src/app/financeiro/v3/page.tsx')
+  ok('hub V3 tem as telas mínimas (abas)', /Visão geral/.test(hub) && /Obrigações/.test(hub) && /Conciliação/.test(hub) && /Divergências/.test(hub) && /Auditoria/.test(hub) && /Data de corte/.test(hub))
+  ok('hub V3 consome as rotas do Ledger', /financeiro\/v3\/resumo/.test(hub) && /financeiro\/v3\/obrigacoes/.test(hub) && /financeiro\/v3\/divergencias/.test(hub))
 }
 
 console.log(`\n${'='.repeat(60)}`)

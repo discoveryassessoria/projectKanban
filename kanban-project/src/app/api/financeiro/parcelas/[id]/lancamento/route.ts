@@ -12,11 +12,13 @@ import {
   LancarParcelaSchema,
   formatZodError,
 } from "@/lib/financeiro/validacao";
+import { guardLegadoEscrita } from "@/lib/financeiro/legado-guard";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, ctx: RouteContext) {
   try {
+    const bloq = guardLegadoEscrita(); if (bloq) return bloq; // legado só-leitura após o corte
     const { id: idStr } = await ctx.params;
     const id = Number(idStr);
     if (!id || isNaN(id)) {

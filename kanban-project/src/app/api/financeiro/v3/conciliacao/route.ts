@@ -5,7 +5,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { flagAtiva } from '@/lib/financeiro/flags'
 import { importarExtrato, conciliarPendentes } from '@/lib/financeiro/conciliacao/conciliacao-service'
+import { prisma } from '@/lib/prisma'
 import { usuarioFlag } from '../_flags'
+
+export async function GET(req: NextRequest) {
+  const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
+  if (!flagAtiva('conciliacao', await usuarioFlag(req))) return NextResponse.json({ disponivel: false }, { status: 409 })
+  const status = req.nextUrl.searchParams.get('status') ?? undefined
+  const linhas = await prisma.lancamentoBancario.findMany({ where: status ? { status } : {}, orderBy: { data: 'desc' }, take: 300 })
+  const resumo = await prisma.lancamentoBancario.groupBy({ by: ['status'], _count: true }).catch(() => [])
+  return NextResponse.json({ disponivel: true, linhas, resumo: Object.fromEntries((resumo as { status: string; _count: number }[]).map((r) => [r.status, r._count])) })
+}
 
 export async function POST(req: NextRequest) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro

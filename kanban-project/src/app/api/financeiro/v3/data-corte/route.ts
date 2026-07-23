@@ -7,10 +7,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { flagAtiva } from '@/lib/financeiro/flags'
 import { aplicarDataDeCorte, reverterDataDeCorte, auditarCorte } from '@/lib/financeiro/corte/data-corte-service'
+import { prisma } from '@/lib/prisma'
 import { usuarioFlag } from '../_flags'
 
 const FRASE_EXECUTAR = 'EXECUTAR CORTE'
 const FRASE_REVERTER = 'REVERTER CORTE'
+
+export async function GET(req: NextRequest) {
+  const erro = await verificarPermissao(req, 'financeiro.dataCorte'); if (erro) return erro
+  if (!flagAtiva('dataCorte', await usuarioFlag(req))) return NextResponse.json({ disponivel: false }, { status: 409 })
+  const aberturas = await prisma.ledgerOpeningBalance.findMany({ orderBy: { criadoEm: 'desc' }, take: 300 })
+  const ativas = aberturas.filter((a) => !a.revertidoEm).length
+  return NextResponse.json({
+    disponivel: true,
+    totalAberturas: aberturas.length, ativas, revertidas: aberturas.length - ativas,
+    aberturas: aberturas.map((a) => ({ obrigacaoId: a.obrigacaoId, dataCorte: a.dataCorte, valorAbertura: Number(a.valorAbertura), origem: a.origem, revertidoEm: a.revertidoEm, criadoEm: a.criadoEm })),
+  })
+}
 
 export async function POST(req: NextRequest) {
   // permissão EXCLUSIVA (opt-in) + flag da Fase 3

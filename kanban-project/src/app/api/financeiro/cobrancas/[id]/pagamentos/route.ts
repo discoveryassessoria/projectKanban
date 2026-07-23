@@ -4,9 +4,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
+import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
+  const bloq = guardLegadoEscrita(); if (bloq) return bloq // legado só-leitura após o corte
   const cobrancaId = Number((await params).id)
   const b = await req.json().catch(() => ({}))
   const parcelaId = Number(b.parcelaId)
