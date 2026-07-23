@@ -66,8 +66,9 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
 
   // Receita/Processo de origem (metadados) + criador
   const receita = obr.origemTipo === 'Receita' && obr.origemId
-    ? await prisma.receita.findUnique({ where: { id: obr.origemId }, select: { codigo: true, descricao: true, categoria: true, data1: true, createdAt: true, processoId: true } }).catch(() => null)
+    ? await prisma.receita.findUnique({ where: { id: obr.origemId }, select: { codigo: true, descricao: true, categoria: true, data1: true, createdAt: true, processoId: true, tipoServicoId: true } }).catch(() => null)
     : null
+  const tipoServico = receita?.tipoServicoId ? await prisma.tipoServico.findUnique({ where: { id: receita.tipoServicoId }, select: { nome: true } }).catch(() => null) : null
   const processo = obr.processoId ? await prisma.processo.findUnique({ where: { id: obr.processoId }, select: { id: true, codigo: true, nome: true } }) : null
   const criador = obr.criadoPorId ? await prisma.usuario.findUnique({ where: { id: obr.criadoPorId }, select: { nome: true } }).catch(() => null) : null
 
@@ -123,7 +124,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     obrigacaoId: id, codigo: obr.codigoOperacional, descricao: receita?.descricao ?? obr.observacoes ?? null, statusLabel,
     processo: { id: processo?.id ?? null, codigo: processo?.codigo ?? null, nome: processo?.nome ?? null },
     responsavel: primeiro ? { nome: nome(primeiro.pessoaId), papel: 'Principal' } : null,
-    servico: receita?.categoria ? String(receita.categoria) : null,
+    servico: tipoServico?.nome ?? (receita?.categoria ? String(receita.categoria) : null),
     formaCobranca: 'À vista',
     moeda: String(obr.moedaContratual),
     valorContratado: contratado, recebido, saldo,

@@ -82,8 +82,14 @@ async function garantirCenarioCorte() {
 async function garantirReceitaMockup() {
   try {
     const ja = await prisma.obrigacaoEconomica.findFirst({ where: { codigoOperacional: 'REC-SBX1-001' }, select: { id: true } })
-    if (ja) { log('✓ receita mockup REC-SBX1-001 já existe.'); return }
-    const admin = await prisma.usuario.findUnique({ where: { email: 'homolog@sandbox.local' }, select: { id: true } }).catch(() => null)
+    if (ja) {
+      await prisma.saldoProjecao.deleteMany({ where: { obrigacaoId: ja.id } })
+      await prisma.obrigacaoEconomica.delete({ where: { id: ja.id } }) // cascata: ledger/entries/ocorrências/distribuição
+      await prisma.receita.deleteMany({ where: { codigo: 'REC-SBX1-001' } })
+      await prisma.pessoa.deleteMany({ where: { sobrenome: 'Silva', nome: { in: ['Joao', 'Maria'] } } })
+      await prisma.tipoServico.deleteMany({ where: { nome: 'Genealogia' } })
+      log('recriando mockup REC-SBX1-001 (atualização)…')
+    }
     const M = 'BRL', V = 2800, dt = (s) => new Date(s)
     await prisma.$transaction(async (tx) => {
       let proc = await tx.processo.findFirst({ where: { codigo: 'REC-SBX1' } })
@@ -91,23 +97,23 @@ async function garantirReceitaMockup() {
       const tipo = await tx.tipoServico.create({ data: { processoId: proc.id, nome: 'Genealogia' } })
       const joao = await tx.pessoa.create({ data: { nome: 'Joao', sobrenome: 'Silva', requerente: 'sim' } })
       const maria = await tx.pessoa.create({ data: { nome: 'Maria', sobrenome: 'Silva', requerente: 'sim' } })
-      const rec = await tx.receita.create({ data: { codigo: 'REC-SBX1-001', processoId: proc.id, descricao: 'Honorários — Alemã — Primeiro requerente — Joao Silva', moeda: M, valor: V, fxEstimado: 1, nParcelas: 1, data1: dt('2026-07-22'), status: 'ATIVA', origem: 'manual', personId: joao.id, tipoServicoId: tipo.id, createdAt: dt('2026-07-15T10:24:00') } })
-      const obr = await tx.obrigacaoEconomica.create({ data: { codigoOperacional: 'REC-SBX1-001', natureza: 'RECEITA', direcao: 'A_RECEBER', processoId: proc.id, moedaContratual: M, moedaContabil: M, valorContratado: V, status: 'ATIVO', origemTipo: 'Receita', origemId: rec.id, politicaDivisao: 'IGUAL', vencimento: dt('2026-07-22'), criadoPorId: admin?.id ?? null, criadoEm: dt('2026-07-15T10:24:00') } })
+      const rec = await tx.receita.create({ data: { codigo: 'REC-SBX1-001', processoId: proc.id, descricao: 'Honorários — Alemã — Primeiro requerente — Joao Silva', moeda: M, valor: V, fxEstimado: 1, nParcelas: 1, data1: dt('2026-07-22T12:00:00-03:00'), status: 'ATIVA', origem: 'manual', personId: joao.id, tipoServicoId: tipo.id, createdAt: dt('2026-07-15T10:24:00-03:00') } })
+      const obr = await tx.obrigacaoEconomica.create({ data: { codigoOperacional: 'REC-SBX1-001', natureza: 'RECEITA', direcao: 'A_RECEBER', processoId: proc.id, moedaContratual: M, moedaContabil: M, valorContratado: V, status: 'ATIVO', origemTipo: 'Receita', origemId: rec.id, politicaDivisao: 'IGUAL', vencimento: dt('2026-07-22T12:00:00-03:00'), criadoPorId: null, criadoEm: dt('2026-07-15T10:24:00-03:00') } })
       const ledger = await tx.ledgerFinanceiro.create({ data: { obrigacaoId: obr.id, moedaContabil: M } })
       const le = (o) => tx.ledgerEntry.create({ data: o })
-      const ocCriada = await tx.ocorrenciaFinanceira.create({ data: { obrigacaoId: obr.id, tipo: 'OBRIGACAO_CRIADA', valor: V, moeda: M, data: dt('2026-07-15T10:24:00'), status: 'PROCESSADA', idempotencyKey: `obr-criada:${obr.id}`, criadoPorId: admin?.id ?? null } })
+      const ocCriada = await tx.ocorrenciaFinanceira.create({ data: { obrigacaoId: obr.id, tipo: 'OBRIGACAO_CRIADA', valor: V, moeda: M, data: dt('2026-07-15T10:24:00-03:00'), status: 'PROCESSADA', idempotencyKey: `obr-criada:${obr.id}`, criadoPorId: null } })
       const t0 = `obr-criada:${obr.id}`
-      await le({ ledgerId: ledger.id, obrigacaoId: obr.id, ocorrenciaId: ocCriada.id, transacaoId: t0, tipo: 'OBRIGACAO_CRIADA', contaContabil: '1.1', direcao: 'DEBITO', valor: V, valorContabil: V, moeda: M, data: dt('2026-07-15T10:24:00'), sequencia: 1, idempotencyKey: `${t0}#1.1#D#1` })
-      await le({ ledgerId: ledger.id, obrigacaoId: obr.id, ocorrenciaId: ocCriada.id, transacaoId: t0, tipo: 'OBRIGACAO_CRIADA', contaContabil: '4.1', direcao: 'CREDITO', valor: V, valorContabil: V, moeda: M, data: dt('2026-07-15T10:24:00'), sequencia: 2, idempotencyKey: `${t0}#4.1#C#2` })
+      await le({ ledgerId: ledger.id, obrigacaoId: obr.id, ocorrenciaId: ocCriada.id, transacaoId: t0, tipo: 'OBRIGACAO_CRIADA', contaContabil: '1.1', direcao: 'DEBITO', valor: V, valorContabil: V, moeda: M, data: dt('2026-07-15T10:24:00-03:00'), sequencia: 1, idempotencyKey: `${t0}#1.1#D#1` })
+      await le({ ledgerId: ledger.id, obrigacaoId: obr.id, ocorrenciaId: ocCriada.id, transacaoId: t0, tipo: 'OBRIGACAO_CRIADA', contaContabil: '4.1', direcao: 'CREDITO', valor: V, valorContabil: V, moeda: M, data: dt('2026-07-15T10:24:00-03:00'), sequencia: 2, idempotencyKey: `${t0}#4.1#C#2` })
       const mkPag = async (valor, data, forma, banco, ag, cc, refx, seqD, seqC) => {
         const pg = await tx.pagador.create({ data: { tipo: 'REQUERENTE', pessoaId: joao.id } })
-        const oc = await tx.ocorrenciaFinanceira.create({ data: { obrigacaoId: obr.id, tipo: 'PAGAMENTO', valor, moeda: M, data: dt(data), status: 'PROCESSADA', pagadorId: pg.id, formaLabel: forma, contaBanco: banco, contaAgencia: ag, contaNumero: cc, referencia: refx, criadoPorId: admin?.id ?? null } })
+        const oc = await tx.ocorrenciaFinanceira.create({ data: { obrigacaoId: obr.id, tipo: 'PAGAMENTO', valor, moeda: M, data: dt(data), status: 'PROCESSADA', pagadorId: pg.id, formaLabel: forma, contaBanco: banco, contaAgencia: ag, contaNumero: cc, referencia: refx, criadoPorId: null } })
         const t = `oc:${oc.id}`
         await le({ ledgerId: ledger.id, obrigacaoId: obr.id, ocorrenciaId: oc.id, transacaoId: t, tipo: 'PAGAMENTO', contaContabil: '1.0', direcao: 'DEBITO', valor, valorContabil: valor, moeda: M, data: dt(data), sequencia: seqD, idempotencyKey: `${t}#1.0#D#${seqD}` })
         await le({ ledgerId: ledger.id, obrigacaoId: obr.id, ocorrenciaId: oc.id, transacaoId: t, tipo: 'PAGAMENTO', contaContabil: '1.1', direcao: 'CREDITO', valor, valorContabil: valor, moeda: M, data: dt(data), sequencia: seqC, idempotencyKey: `${t}#1.1#C#${seqC}` })
       }
-      await mkPag(1500, '2026-07-15T15:31:00', 'PIX', 'Banco Inter', '0001', '12345-6', 'PIX 15/07 - Joao Silva', 3, 4)
-      await mkPag(1300, '2026-07-22T11:05:00', 'TED', 'Banco Santander', '1234', '98765-4', 'TED 22/07 - Joao Silva', 5, 6)
+      await mkPag(1500, '2026-07-15T15:31:00-03:00', 'PIX', 'Banco Inter', '0001', '12345-6', 'PIX 15/07 - Joao Silva', 3, 4)
+      await mkPag(1300, '2026-07-22T11:05:00-03:00', 'TED', 'Banco Santander', '1234', '98765-4', 'TED 22/07 - Joao Silva', 5, 6)
       await tx.saldoProjecao.create({ data: { obrigacaoId: obr.id, saldo: 0, recebidoBruto: 2800, recebidoLiquido: 2800, ultimaSequenciaAplicada: 6 } })
       const dist = await tx.distribuicaoEconomica.create({ data: { obrigacaoId: obr.id, modo: 'IGUAL', versao: 1 } })
       await tx.participacaoEconomica.create({ data: { distribuicaoId: dist.id, pessoaId: joao.id, incluido: true, valor: 1400, moeda: M, ordem: 0 } })
