@@ -36,10 +36,10 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
       <div className="min-w-0 flex-1">
         {/* KPIs */}
         <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-          <Kpi titulo="Total contratado" valor={fmt(k.totalContratado ?? 0)} sub={`${k.receitas ?? 0} receita(s)`} icon={DollarSign} classe="from-violet-800/50 to-violet-950/30 border-violet-700/40" iconClasse="text-violet-300" />
-          <Kpi titulo="Recebido" valor={fmt(k.recebido ?? 0)} sub={`${pct(k.recebido ?? 0)}% do total`} icon={CheckSquare} classe="from-emerald-800/50 to-emerald-950/30 border-emerald-700/40" iconClasse="text-emerald-300" />
-          <Kpi titulo="Saldo a receber" valor={fmt(k.saldoAReceber ?? 0)} sub={`${pct(k.saldoAReceber ?? 0)}% do total`} icon={Clock} classe="from-sky-800/50 to-sky-950/30 border-sky-700/40" iconClasse="text-sky-300" />
-          <Kpi titulo="A vencer" valor={fmt(k.aVencer ?? 0)} sub={`${k.aVencerParcelas ?? 0} parcela(s) pendente(s)`} icon={CalendarDays} classe="from-yellow-800/40 to-yellow-950/20 border-yellow-700/30" iconClasse="text-yellow-300/80" />
+          <Kpi titulo="Total contratado" valor={fmt(k.totalContratado ?? 0, k.moeda)} sub={`${k.receitas ?? 0} receita(s)`} icon={DollarSign} classe="from-violet-800/50 to-violet-950/30 border-violet-700/40" iconClasse="text-violet-300" />
+          <Kpi titulo="Recebido" valor={fmt(k.recebido ?? 0, k.moeda)} sub={`${pct(k.recebido ?? 0)}% do total`} icon={CheckSquare} classe="from-emerald-800/50 to-emerald-950/30 border-emerald-700/40" iconClasse="text-emerald-300" />
+          <Kpi titulo="Saldo a receber" valor={fmt(k.saldoAReceber ?? 0, k.moeda)} sub={`${pct(k.saldoAReceber ?? 0)}% do total`} icon={Clock} classe="from-sky-800/50 to-sky-950/30 border-sky-700/40" iconClasse="text-sky-300" />
+          <Kpi titulo="A vencer" valor={fmt(k.aVencer ?? 0, k.moeda)} sub={`${k.aVencerParcelas ?? 0} parcela(s) pendente(s)`} icon={CalendarDays} classe="from-yellow-800/40 to-yellow-950/20 border-yellow-700/30" iconClasse="text-yellow-300/80" />
           <Kpi titulo="Receitas" valor={String(k.receitas ?? 0)} sub="Total de receitas" classe="from-neutral-800/40 to-neutral-900/30 border-neutral-700/40" />
         </div>
 

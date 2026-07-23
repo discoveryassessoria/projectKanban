@@ -23,7 +23,7 @@ export interface ReceitaLinha {
 }
 
 export interface ReceitasLista {
-  kpis: { totalContratado: number; recebido: number; saldoAReceber: number; aVencer: number; aVencerParcelas: number; receitas: number }
+  kpis: { totalContratado: number; recebido: number; saldoAReceber: number; aVencer: number; aVencerParcelas: number; receitas: number; moeda: string }
   receitas: ReceitaLinha[]
 }
 
@@ -68,6 +68,10 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
   })
 
   const aReceber = linhas
+  // Moeda dos KPIs: a moeda comum das receitas do processo (se todas iguais); se
+  // houver mistura de moedas, cai para BRL (soma cross-moeda é imprecisa por natureza).
+  const moedasDistintas = [...new Set(aReceber.map((l) => l.moeda))]
+  const moedaKpi = moedasDistintas.length === 1 ? moedasDistintas[0] : 'BRL'
   const kpis = {
     totalContratado: cent(aReceber.reduce((s, l) => s + l.valorContratado, 0)),
     recebido: cent(aReceber.reduce((s, l) => s + l.recebido, 0)),
@@ -75,6 +79,7 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
     aVencer: cent(aReceber.filter((l) => l.statusLabel !== 'QUITADO').reduce((s, l) => s + l.saldo, 0)),
     aVencerParcelas: aReceber.filter((l) => l.statusLabel !== 'QUITADO' && l.saldo > 0.005).length,
     receitas: aReceber.length,
+    moeda: moedaKpi,
   }
   return { kpis, receitas: linhas }
 }
