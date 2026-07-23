@@ -62,9 +62,9 @@ sec('3 — um seletor aberto por vez; troca de etapa fecha tudo')
   ok('abrir um fecha os outros', ui.includes('fecharTodosMultiSelects() // só um seletor aberto por vez'))
   ok('helper exportado para o wizard', ui.includes('export function fecharTodosMultiSelects()'))
 
-  for (const [nome, src] of [['Taxa', taxa], ['Condição', cond]] as const) {
-    // Avançar SEMPRE fecha os menus e valida a etapa 1 (inline no botão OU num
-    // handler `proximo()` extraído — o que importa é o comportamento).
+  // Wizard com MultiSelect = tela de Condições (a de Taxas virou config por forma
+  // com grade, sem MultiSelect/wizard).
+  for (const [nome, src] of [['Condição', cond]] as const) {
     ok(`${nome}: Próximo fecha os menus antes de avançar`, /fecharTodosMultiSelects\(\)[\s\S]{0,80}if \(step === 1/.test(src))
     ok(`${nome}: Voltar fecha os menus`, src.includes('const irPara = (n: number) => { fecharTodosMultiSelects(); setStep(n) }') && src.includes('irPara(step - 1)'))
     ok(`${nome}: fechar o wizard reseta os menus`, src.includes('fecharTodosMultiSelects(); onClose()'))
@@ -82,11 +82,13 @@ sec('4 — casca do wizard: header fixo, corpo rolável, footer fixo')
   ok('corpo rolável (não depende do body)', ui.includes('min-h-0 flex-1 space-y-4 overflow-y-auto'))
   ok('modal não corta os menus (sem overflow-hidden no container)', !/flex max-h-\[90vh\][^"]*overflow-hidden/.test(ui))
 
-  for (const [nome, src] of [['Taxa', taxa], ['Condição', cond]] as const) {
+  for (const [nome, src] of [['Condição', cond]] as const) {
     ok(`${nome}: usa a casca compartilhada`, src.includes('<ModalWizard'))
     ok(`${nome}: não tem mais modal com overflow-auto`, !src.includes('max-h-[92vh] w-full max-w-2xl overflow-auto'))
     ok(`${nome}: footer sempre acessível (Voltar/Próximo)`, src.includes('footer={') && src.includes('Próximo') && src.includes('Voltar'))
   }
+  // Tela de Taxas (config por forma): modal próprio com footer fixo acessível.
+  ok('Taxa: config por forma tem footer fixo (Salvar/Cancelar)', taxa.includes('Salvar configuração') && taxa.includes('Cancelar') && taxa.includes('sticky bottom-0'))
 }
 
 sec('5 — teclado e acessibilidade')

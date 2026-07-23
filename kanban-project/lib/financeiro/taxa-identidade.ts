@@ -168,3 +168,108 @@ export function formaPrincipalId(t: { formasAplicaveis?: number[] | null; formaP
   if (arr.length > 0) return Number(arr[0])
   return t.formaPagamentoId ?? null
 }
+
+// ── AGREGAÇÃO POR FORMA DE PAGAMENTO (camada de apresentação) ────────────────
+// A listagem passa a ter UMA linha por Forma; bandeira/adquirente/parcela ficam
+// DENTRO da configuração. O banco continua normalizado (uma taxa por
+// forma×bandeira com grade) — isto é só leitura agregada.
+
+export interface TaxaParaAgrupar {
+  id: number
+  formasAplicaveis?: number[] | null
+  formaPagamentoId?: number | null
+  adquirenteId?: number | null
+  bandeiraId?: number | null
+  finalidade?: string | null
+  feePercent?: number | null
+  fixedFee?: number | null
+  ativo?: boolean | null
+  vigenciaInicio?: string | Date | null
+  vigenciaFim?: string | Date | null
+  atualizadoEm?: string | Date | null
+  parcelamento?: LinhaGrade[] | null
+}
+
+export interface FormaAgrupada {
+  formaPagamentoId: number
+  nome: string
+  code: string | null
+  type: string | null
+  /** GRADE (crédito) | PERCENTUAL (débito/pix/wise…) | ENCARGOS (boleto). */
+  tipoTaxa: 'GRADE' | 'PERCENTUAL' | 'ENCARGOS'
+  quantidadeAdquirentes: number
+  quantidadeBandeiras: number
+  quantidadeConfiguracoes: number
+  parcelasMin: number | null
+  parcelasMax: number | null
+  possuiEncargos: boolean
+  status: boolean
+  vigenciaInicio: string | null
+  vigenciaFim: string | null
+  versao: number
+  ultimaAlteracao: string | null
+  bandeirasNomes: string[]
+  adquirentesNomes: string[]
+}
+
+/**
+ * Agrupa as taxas normalizadas em UMA linha por Forma de Pagamento. Só formas
+ * que possuem ao menos uma taxa aparecem. A ordem segue a lista de formas.
+ */
+export function agruparTaxasPorForma(
+  taxas: TaxaParaAgrupar[],
+  formas: { id: number; name: string; code?: string | null; type?: string | null; ativo?: boolean | null }[],
+  nomeAdquirente: (id: number) => string | null,
+  nomeBandeira: (id: number) => string | null,
+): FormaAgrupada[] {
+  const porForma = new Map<number, TaxaParaAgrupar[]>()
+  for (const t of taxas) {
+    const fid = formaPrincipalId(t)
+    if (fid == null) continue
+    if (!porForma.has(fid)) porForma.set(fid, [])
+    porForma.get(fid)!.push(t)
+  }
+
+  const out: FormaAgrupada[] = []
+  for (const forma of formas) {
+    const grupo = porForma.get(forma.id)
+    if (!grupo || grupo.length === 0) continue
+    const perfil = perfilForma(forma.type)
+
+    const adqIds = new Set<number>(), bandIds = new Set<number>()
+    const parcelas: number[] = []
+    let vigIni: number | null = null, vigFim: number | null = null, ult: number | null = null
+    let temEncargo = false
+    for (const t of grupo) {
+      if (t.adquirenteId != null) adqIds.add(t.adquirenteId)
+      if (t.bandeiraId != null) bandIds.add(t.bandeiraId)
+      for (const l of t.parcelamento ?? []) { parcelas.push(Number(l.parcelasDe), Number(l.parcelasAte)) }
+      if (t.finalidade) temEncargo = true
+      const vi = t.vigenciaInicio ? new Date(t.vigenciaInicio).getTime() : null
+      const vf = t.vigenciaFim ? new Date(t.vigenciaFim).getTime() : null
+      const at = t.atualizadoEm ? new Date(t.atualizadoEm).getTime() : null
+      if (vi != null) vigIni = vigIni == null ? vi : Math.min(vigIni, vi)
+      if (vf != null) vigFim = vigFim == null ? vf : Math.max(vigFim, vf)
+      if (at != null) ult = ult == null ? at : Math.max(ult, at)
+    }
+    // Parcelas: no crédito vêm da grade; no débito/único é 1x (pagamento único).
+    const parcelasMin = parcelas.length ? Math.min(...parcelas) : (perfil.mostraGrade ? null : 1)
+    const parcelasMax = parcelas.length ? Math.max(...parcelas) : (perfil.mostraGrade ? null : 1)
+
+    out.push({
+      formaPagamentoId: forma.id, nome: forma.name, code: forma.code ?? null, type: forma.type ?? null,
+      tipoTaxa: perfil.calculo === 'BOLETO' ? 'ENCARGOS' : perfil.mostraGrade ? 'GRADE' : 'PERCENTUAL',
+      quantidadeAdquirentes: adqIds.size, quantidadeBandeiras: bandIds.size, quantidadeConfiguracoes: grupo.length,
+      parcelasMin, parcelasMax,
+      possuiEncargos: temEncargo || perfil.calculo === 'BOLETO',
+      status: forma.ativo !== false,
+      vigenciaInicio: vigIni != null ? new Date(vigIni).toISOString() : null,
+      vigenciaFim: vigFim != null ? new Date(vigFim).toISOString() : null,
+      versao: 1,
+      ultimaAlteracao: ult != null ? new Date(ult).toISOString() : null,
+      bandeirasNomes: [...bandIds].map((id) => nomeBandeira(id)).filter((x): x is string => !!x),
+      adquirentesNomes: [...adqIds].map((id) => nomeAdquirente(id)).filter((x): x is string => !!x),
+    })
+  }
+  return out
+}

@@ -93,6 +93,15 @@ try {
   await setFinal('Emiss', 'EMISSAO')
   await setFinal('Pagamento', 'PAGAMENTO')
 
+  // ── Backfill de adquirente (Cielo) nas taxas de CARTÃO sem adquirente — para a
+  //    tela agregada mostrar o adquirente real. Só onde nulo (idempotente). O
+  //    runtime NÃO filtra por adquirente, então isto não altera resolução. ──
+  const cielo = await prisma.adquirente.findFirst({ where: { slug: 'CIELO' }, select: { id: true } })
+  if (cielo) {
+    const rr = await prisma.taxaPagamento.updateMany({ where: { adquirenteId: null, categoria: 'TAXA_CARTAO' }, data: { adquirenteId: cielo.id } })
+    if (rr.count) log(`✓ adquirente Cielo vinculado a ${rr.count} taxa(s) de cartão.`)
+  }
+
   const tt = await prisma.taxaPagamento.count()
   log(`OK — total de taxas: ${tt}. Percentuais são PADRÃO editável.`)
 } catch (err) {

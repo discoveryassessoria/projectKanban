@@ -62,26 +62,26 @@ sec('3 — enums (fonte única, enxutos)')
   ok('ADQUIRENTES enum', ADQUIRENTES.includes('STONE') && ADQUIRENTES.includes('WISE'))
 }
 
-sec('4 — estrutura & premium')
+sec('4 — estrutura & premium (organização POR FORMA)')
 {
   const tab = readFileSync(join(RAIZ, 'src/components/gerenciamentoComponents/TaxasPagamentoTab.tsx'), 'utf8')
   ok('identidade premium (OURO via shell)', tab.includes('pagamentoUI') && tab.includes('OURO'))
-  ok('é um wizard (Stepper + PASSOS)', tab.includes('Stepper') && tab.includes('PASSOS'))
-  ok('consome enums da fonte única', tab.includes('taxa-constants'))
-  ok('nota do Motor (read-only)', tab.includes('Como o motor usa esta tabela'))
   ok('sem azul de CRUD', !tab.includes('bg-blue-600'))
-  // Redesenho: identificação estruturada + nome/código automáticos + grade.
-  ok('nome/código automáticos (não digitáveis)', tab.includes('nomeTaxaAuto') && tab.includes('automático') && !tab.includes("set('name'"))
-  ok('identidade por SELECT (forma/adquirente/bandeira)', tab.includes('perfilForma') && tab.includes('mostraBandeira') && tab.includes('mostraAdquirente'))
-  ok('grade 1x–12x editável em lote', tab.includes('GradeCredito') && tab.includes('Adicionar parcela'))
-  ok('4 seções (não 7 etapas)', tab.includes("'Identificação', 'Cálculo', 'Regras', 'Revisão'"))
-  ok('filtros de listagem (forma/adquirente/bandeira/status)', tab.includes('Todas as formas') && tab.includes('Todos adquirentes') && tab.includes('Todas bandeiras'))
+  // Listagem UMA linha por forma; bandeira/adquirente/parcela DENTRO da config.
+  ok('lista consome API agregada /formas', tab.includes('/api/gerenciamento/taxas-pagamento/formas'))
+  ok('linha por Forma de Pagamento (não por bandeira)', tab.includes('FormaAgrupada') && tab.includes('formaPagamentoId') && tab.includes('Configurar'))
+  ok('tela interna de configuração por forma', tab.includes('function FormaConfig') && tab.includes('/formas/${formaId}'))
+  ok('grade bandeiras × 1x–12x (crédito)', tab.includes('const PARCELAS') && tab.includes('mostraGrade') && tab.includes('setCell'))
+  ok('adquirente selecionável na config do cartão', tab.includes('adqSel') && tab.includes('det.adquirentes'))
+  ok('vazio ≠ 0% (célula vazia = indisponível)', tab.includes('combinação indisponível') && tab.includes('taxa explícita'))
+  ok('salvamento agregado (PUT /formas)', tab.includes("method: 'PUT'") && tab.includes('salvar'))
 
-  const route = readFileSync(join(RAIZ, 'src/app/api/gerenciamento/taxas-pagamento/route.ts'), 'utf8')
-  const idRoute = readFileSync(join(RAIZ, 'src/app/api/gerenciamento/taxas-pagamento/[id]/route.ts'), 'utf8')
-  ok('POST/PUT usam mapeamento único', route.includes('paraColunasTaxa') && idRoute.includes('paraColunasTaxa'))
-  ok('GET traz serviços', route.includes('servicoProduto'))
-  ok('DELETE bloqueia taxa em uso', idRoute.includes('EM_USO') && idRoute.includes('condicaoPagamentoTaxa.count'))
+  const listaRoute = readFileSync(join(RAIZ, 'src/app/api/gerenciamento/taxas-pagamento/formas/route.ts'), 'utf8')
+  const formaRoute = readFileSync(join(RAIZ, 'src/app/api/gerenciamento/taxas-pagamento/formas/[formaId]/route.ts'), 'utf8')
+  ok('GET /formas agrupa por forma', listaRoute.includes('agruparTaxasPorForma'))
+  ok('PUT /formas é transacional', formaRoute.includes('prisma.$transaction') && formaRoute.includes('regravarLinhas'))
+  ok('valida taxa 0–100% e vazio≠0', formaRoute.includes('entre 0% e 100%') && formaRoute.includes("g.feePercent !== null"))
+  ok('registra auditoria', formaRoute.includes('registrarAuditoria'))
 }
 
 console.log(`\n${'='.repeat(60)}`)

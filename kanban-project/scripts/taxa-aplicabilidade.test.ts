@@ -111,29 +111,26 @@ sec('2 — backend valida contra o cadastro (nunca confia no frontend)')
   ok('várias moedas e países são válidos', varias.erros.length === 0 && varias.projecao.paises.length === 2)
 }
 
-sec('3 — interface: multiselect real, nunca textbox')
+sec('3 — aplicabilidade da taxa: model/API relacional intactos; UI por forma')
 {
+  // A UI de Taxas foi reorganizada POR FORMA (uma linha por forma; grade
+  // bandeiras×parcelas dentro). A aplicabilidade relacional por taxa (moeda/país/
+  // serviço) permanece na MODELAGEM e na API — sem texto livre por vírgula.
   const tabRaw = readFileSync(join(RAIZ, 'src/components/gerenciamentoComponents/TaxasPagamentoTab.tsx'), 'utf8')
   const tab = tabRaw.split('\n').filter((l) => !l.trim().startsWith('//') && !l.trim().startsWith('*') && !l.trim().startsWith('/*')).join('\n')
 
-  ok('reutiliza o MultiSelect padrão (sem componente novo)', tab.includes("from './pagamentoUI'") && tab.includes('MultiSelect'))
-  ok('moedas viraram multiselect', /Campo label="Moedas"[\s\S]{0,400}<MultiSelect/.test(tab))
-  ok('países viraram multiselect', /Campo label="Países"[\s\S]{0,400}<MultiSelect/.test(tab))
-  ok('serviços usam o mesmo multiselect', /Campo label="Serviços"[\s\S]{0,400}<MultiSelect/.test(tab))
-
-  ok('sem campo "(vírgula)"', !tab.includes('(vírgula)'))
+  ok('UI de taxas é POR FORMA (config agregada)', tab.includes('FormaConfig') && tab.includes('/formas'))
   ok('sem parsing de texto por vírgula', !tab.includes("split(',')"))
-  ok('sem placeholder "BRL, EUR"', !tab.includes('BRL, EUR') && !tab.includes('BR, PT'))
-  ok('sem join(", ") em moeda/país', !/f\.(paises|moedasAplicaveis)\.join/.test(tab))
+  ok('nada de CSV "BRL, EUR" / "BR, PT"', !tab.includes('BRL, EUR') && !tab.includes('BR, PT'))
 
-  ok('placeholder vazio = "Todas as moedas"', tab.includes('Todas as moedas'))
-  ok('placeholder vazio = "Todos os países"', tab.includes('Todos os países'))
-  ok('busca interna ativada', tab.includes('buscaPlaceholder="Filtrar moeda…"') && tab.includes('buscaPlaceholder="Filtrar país…"'))
-  ok('selecionar todas / limpar ativados', /Campo label="Moedas"[\s\S]{0,400}acoes/.test(tab))
+  // Aplicabilidade relacional continua no backend (nunca CSV):
+  const campos = readFileSync(join(RAIZ, 'lib/financeiro/taxa-aplicabilidade.ts'), 'utf8')
+  ok('resolver relacional por IDs (backend)', campos.includes('resolverAplicabilidadeTaxa') && campos.includes('moedasVinculadas') && campos.includes('paisesPermitidos'))
+  ok('include relacional preserva vínculos', campos.includes('INCLUDE_APLICABILIDADE_TAXA'))
 
-  ok('payload por IDs', tab.includes('moedasIds') && tab.includes('paisesIds') && tab.includes('servicosIds'))
-  ok('edição hidrata dos vínculos reais', tab.includes('moedasVinculadas') && tab.includes('paisesPermitidos'))
-  ok('cadastro de países carregado uma vez (com a listagem)', tab.includes('setPaises(d.paises'))
+  // O MultiSelect compartilhado segue vivo (usado pela tela de Condições):
+  const cond = readFileSync(join(RAIZ, 'src/components/gerenciamentoComponents/CondicoesPagamentoTab.tsx'), 'utf8')
+  ok('MultiSelect ainda usado (Condições)', cond.includes('MultiSelect') && cond.includes("from './pagamentoUI'"))
 
   const ui = readFileSync(join(RAIZ, 'src/components/gerenciamentoComponents/pagamentoUI.tsx'), 'utf8')
   ok('MultiSelect é o componente compartilhado', ui.includes('export function MultiSelect'))

@@ -133,20 +133,19 @@ sec('3 — compatibilidade: taxa sem tabela continua exatamente igual')
   ok('registro sem tabela vira candidata sem tabela', (taxaParaCandidata({ id: 9, name: 'X' }).tabelaParcelamento ?? []).length === 0)
 }
 
-sec('4 — interface: grade 1x–12x editável em lote, sem "Aplica-se a"')
+sec('4 — interface: grade bandeiras × 1x–12x na config da FORMA')
 {
   const tabRaw = readFileSync(join(RAIZ, 'src/components/gerenciamentoComponents/TaxasPagamentoTab.tsx'), 'utf8')
   const tab = tabRaw.split('\n').filter((l) => !l.trim().startsWith('//') && !l.trim().startsWith('*') && !l.trim().startsWith('/*')).join('\n')
 
   ok('campo "Aplica-se a" não existe mais', !tab.includes('Aplica-se a'))
-  ok('parcela inicial/final avulsas saíram', !tab.includes('label="Parcela inicial"') && !tab.includes('label="Parcela final"'))
 
-  // Redesenho: a grade do crédito é editada em UMA tela (1x..12x), no passo Cálculo.
-  ok('editor de grade 1x–12x no passo Cálculo', tab.includes('function GradeCredito') && tab.includes('mostraGrade'))
-  ok('colunas Parcelas / Taxa (%)', tab.includes('>Parcelas<') && tab.includes('>Taxa (%)<'))
-  ok('adicionar/remover parcela (até 12)', tab.includes('Adicionar parcela') && tab.includes('Remover última') && tab.includes('maxN < 12'))
-  ok('grade salva em lote como parcelamento', tab.includes('parcelamento: usaGrade') && tab.includes('parcelasDe: g.n, parcelasAte: g.n'))
-  ok('edição hidrata a grade do registro', tab.includes('(t.parcelamento ?? [])') && tab.includes('.sort((a, b) => a.parcelasDe - b.parcelasDe)'))
+  // A grade do crédito é bandeiras × 1x–12x, dentro da config da forma.
+  ok('grade 1x–12x (cabeçalho de parcelas)', tab.includes('const PARCELAS') && tab.includes('map((p) =>') && tab.includes('{p}x'))
+  ok('linha por bandeira', tab.includes('det.bandeiras.map((band)') && tab.includes('band.nome'))
+  ok('célula editável por parcela (setCell)', tab.includes('setCell(band.id, p') && tab.includes('grade[band.id]?.[p]'))
+  ok('salva em lote transacional via PUT /formas', tab.includes("method: 'PUT'") && tab.includes('gradeSpec'))
+  ok('hidrata a grade do registro (t.grade)', tab.includes('t?.grade') || tab.includes('.grade ?? []'))
 }
 
 sec('5 — persistência e migration aditiva')

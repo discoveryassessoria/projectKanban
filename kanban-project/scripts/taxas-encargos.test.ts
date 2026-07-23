@@ -285,9 +285,11 @@ secao('Reflexo nas telas')
   }
   ok('Formas não duplica regra de parcelamento', formas.includes('pertencem à Condição de Pagamento'))
 
+  // Tela de Taxas reorganizada POR FORMA: edita a grade (bandeiras×parcelas),
+  // adquirente, taxa única e encargos de boleto — no agregado da forma.
   const taxasTela = readFileSync(join(RAIZ, 'src/components/gerenciamentoComponents/TaxasPagamentoTab.tsx'), 'utf8')
-  for (const c of ['baseIncidencia', 'quemAbsorve', 'adquirente', 'vigenciaInicio', 'ativo']) {
-    ok(`tela de Taxas edita ${c}`, taxasTela.includes(c))
+  for (const c of ['adqSel', 'setCell', 'boleto', 'ativo', 'FormaConfig']) {
+    ok(`tela de Taxas (por forma) edita ${c}`, taxasTela.includes(c))
   }
 }
 
