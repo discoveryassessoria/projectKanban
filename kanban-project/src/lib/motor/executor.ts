@@ -988,7 +988,10 @@ export async function processarRequerenteAdicionado(evt: EventoRequerentePayload
     // Valor individual via MOTOR (marginal): primeiro=valorBase, adicional=valorAdicional.
     const vi = valorDoRequerente(cls.posicao, { modoCalculo: preco.modoCalculo, valor: preco.valor, valorBase: preco.valorBase, valorAdicional: preco.valorAdicional })
     if (vi.total <= 0) { res.ignorados.push(`valor ${vi.total} inválido p/ requerente ${evt.pessoaId}`); continue }
-    const moeda = preco.moeda
+    // A moeda do lançamento é a MOEDA PADRÃO da Config Financeira (define o item);
+    // a linha de preço (TabelaValor.moeda) não é a autoridade da moeda aqui.
+    const cfgMoeda = await prisma.produtoFinanceiro.findUnique({ where: { id: configId }, select: { moedaPadrao: true } })
+    const moeda = cfgMoeda?.moedaPadrao ?? preco.moeda
     const fx = await fxParaBRL(moeda, fxCache)
     if (fx == null) {
       await registrarPendencia({ processoId: evt.processoId, tipoProcessoId, phaseKey: r.phaseKey, configItemId: configId, regraId: r.id, natureza: NaturezaPreco.VENDA, motivo: 'SEM_CAMBIO', detalhe: `Honorário por requerente: sem cotação ${moeda}→BRL` })
