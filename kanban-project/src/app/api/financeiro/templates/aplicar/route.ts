@@ -11,8 +11,10 @@
 // parcela/histórico permanecem intocados).
 
 import { NextResponse } from "next/server";
+import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
 
 export async function POST() {
+  const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // legado só-leitura após o corte
   return NextResponse.json(
     {
       ok: false,

@@ -69,6 +69,25 @@ console.log('\nSubstituição das telas — nav, bloqueio legado, telas V3')
   ok('hub V3 consome as rotas do Ledger', /financeiro\/v3\/resumo/.test(hub) && /financeiro\/v3\/obrigacoes/.test(hub) && /financeiro\/v3\/divergencias/.test(hub))
 }
 
+console.log('\nFinanceiro V3 no processo + sweep do guard legado')
+{
+  const comp = R('src/components/financeiro/v3/ProcessoFinanceiroV3.tsx')
+  ok('processo V3 é alimentado pela rota do Ledger', /\/api\/financeiro\/v3\/processo\//.test(comp))
+  ok('processo V3 registra ocorrências pela rota V3 (não legado)', /\/api\/financeiro\/v3\/ocorrencias/.test(comp) && !/\/api\/financeiro\/cobrancas/.test(comp))
+  ok('processo V3 exibe distribuição/responsáveis/timeline/comprovantes', /Distribuição por requerente/.test(comp) && /Responsáveis contratuais/.test(comp) && /Timeline financeira/.test(comp) && /comprovante/.test(comp))
+  const modal = R('src/components/kanban/atividade-details-modal.tsx')
+  ok('modal do processo troca V3×legado por flag (fallback)', /financeiroV3Ativo \? \(/.test(modal) && /ProcessoFinanceiroV3/.test(modal) && /<ProcessoFinanceiro\b/.test(modal))
+
+  // sweep: todos os writes de api/financeiro (não-v3) guardados, exceto simular
+  const dir = 'src/app/api/financeiro'
+  const walk = (d: string): string[] => require('node:fs').readdirSync(join(process.cwd(), d), { withFileTypes: true }).flatMap((e: any) => e.isDirectory() ? walk(`${d}/${e.name}`) : (e.name === 'route.ts' ? [`${d}/${e.name}`] : []))
+  const rotas = walk(dir).filter((f) => !f.includes('/v3/'))
+  const escreve = (s: string) => /export async function (POST|PATCH|PUT|DELETE)/.test(s)
+  // desprotegido = escreve, sem guard, não é simulação e NÃO está já desativado (405)
+  const desprotegidos = rotas.filter((f) => { const s = R(f); return escreve(s) && !/guardLegadoEscrita/.test(s) && !f.includes('/simular/') && !/status: 405/.test(s) })
+  ok(`writes legados guardados (exceto simular e já-405) — desprotegidos: ${desprotegidos.length ? desprotegidos.join(', ') : '0'}`, desprotegidos.length === 0)
+}
+
 console.log(`\n${'='.repeat(60)}`)
 console.log(`Motor Financeiro V3 · Fase 3 (guard): ${passou} passaram, ${falhou} falharam`)
 console.log('='.repeat(60))

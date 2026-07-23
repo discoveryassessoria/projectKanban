@@ -4,12 +4,14 @@
 // (autoridade) e substitui as parcelas PENDENTES; preserva eventos/pagamentos.
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
 import { Prisma } from '@prisma/client'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { montarECalcular } from '@/lib/financeiro/charge-runtime'
 import { podeRecalcular } from '@/lib/financeiro/charge-calculation-service'
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // legado só-leitura após o corte
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
   const id = Number((await params).id)
   const b = await req.json().catch(() => ({}))

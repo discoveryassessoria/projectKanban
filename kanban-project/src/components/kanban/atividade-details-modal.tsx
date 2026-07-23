@@ -20,6 +20,7 @@ import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoInformacoes } from "./ProcessoInformacoes"
 import { ProcessoHistorico } from "./ProcessoHistorico"
 import { ProcessoFinanceiro } from "./ProcessoFinanceiro"
+import { ProcessoFinanceiroV3 } from "@/src/components/financeiro/v3/ProcessoFinanceiroV3"
 // ✅ IMPORTAR o modal e o initialFormData
 import { ContratanteModal, initialFormData } from "../contratantes-tabela"
 import { ProcessoEventos } from "./ProcessoEventos"
@@ -99,6 +100,14 @@ export function ProcessoDetailsModal({
   // ✅ ATUALIZADO: Adicionado "informacoes" como possível aba
   const { pode } = usePermissoes()
   const [activeTab, setActiveTab] = useState<"geral" | "central" | "documentos" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos">("geral")
+  // Financeiro V3 no processo: quando a flag posicaoRead está ativa, a aba usa a
+  // tela V3 (Ledger); senão, o legado como fallback temporário.
+  const [financeiroV3Ativo, setFinanceiroV3Ativo] = useState<boolean | null>(null)
+  useEffect(() => {
+    const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
+    fetch("/api/financeiro/v3/flags", { headers: t ? { Authorization: `Bearer ${t}` } : {} })
+      .then((r) => r.json()).then((d) => setFinanceiroV3Ativo(!!d?.flags?.posicaoRead)).catch(() => setFinanceiroV3Ativo(false))
+  }, [])
 
   // ✅ NOVO: força refetch do PhaseProgressHeader quando algo muda
   const [phaseRefreshKey, setPhaseRefreshKey] = useState(0)
@@ -970,11 +979,15 @@ export function ProcessoDetailsModal({
           )}
 
           {activeTab === "faturas" && pode('financeiro.ver') && (
-            <ProcessoFinanceiro
-            processoId={processo.id}
-            nomeFamilia={processo.nome}
-            onUpdate={onSave}
-            />
+            financeiroV3Ativo ? (
+              <ProcessoFinanceiroV3 processoId={processo.id} />
+            ) : (
+              <ProcessoFinanceiro
+              processoId={processo.id}
+              nomeFamilia={processo.nome}
+              onUpdate={onSave}
+              />
+            )
           )}
 
           {activeTab === "eventos" && (

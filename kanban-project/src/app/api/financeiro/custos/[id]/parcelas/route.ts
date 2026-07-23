@@ -19,6 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
 import { withRetry } from '@/lib/db-retry'
 import { redistribuirParcelas } from '@/lib/financeiro/apresentacao-lancamento'
 import { gerarCronograma } from '@/lib/financeiro/condicao-pagamento'
@@ -27,6 +28,7 @@ import { condicaoPorId } from '@/lib/financeiro/resolver-condicao'
 type RouteContext = { params: Promise<{ id: string }> }
 
 export async function PATCH(req: NextRequest, ctx: RouteContext) {
+  const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // legado só-leitura após o corte
   try {
     const { id: idStr } = await ctx.params
     const id = Number(idStr)

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { origemOperacionalDoLancamento, revogarSupressao } from '@/lib/financeiro/supressao-motor'
 import { prisma } from '@/lib/prisma'
+import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -18,6 +19,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
 }
 
 export async function DELETE(req: NextRequest, ctx: RouteContext) {
+  const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // legado só-leitura após o corte
   try {
     const { id: idStr } = await ctx.params
     const id = Number(idStr)

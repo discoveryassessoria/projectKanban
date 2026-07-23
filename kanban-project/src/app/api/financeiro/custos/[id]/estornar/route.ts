@@ -1,8 +1,10 @@
 // §11 — estornar Custo (lançamento liquidado): cria movimento inverso. Idempotente.
 import { NextRequest, NextResponse } from 'next/server'
+import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
 import { estornarLancamento } from '@/lib/financeiro/cancelamento-estorno'
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // legado só-leitura após o corte
   try {
     const { id } = await ctx.params
     const b = await req.json().catch(() => ({}))

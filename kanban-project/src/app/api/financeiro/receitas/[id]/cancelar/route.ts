@@ -8,8 +8,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cancelarLancamento } from '@/lib/financeiro/cancelamento-estorno'
 import { origemOperacionalDoLancamento, suprimirOrigem } from '@/lib/financeiro/supressao-motor'
 import { prisma } from '@/lib/prisma'
+import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // legado só-leitura após o corte
   try {
     const { id: idStr } = await ctx.params
     const id = Number(idStr)

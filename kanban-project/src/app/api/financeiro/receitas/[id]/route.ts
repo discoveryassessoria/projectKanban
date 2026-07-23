@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
 import {
   EditarReceitaSchema,
   formatZodError,
@@ -103,6 +104,7 @@ const CAMPOS_QUE_AFETAM_PARCELAS = [
 ] as const;
 
 export async function PATCH(req: NextRequest, ctx: RouteContext) {
+  const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // legado só-leitura após o corte
   try {
     const id = await parseId(ctx);
     if (id == null) {
@@ -241,6 +243,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
 // DELETE — soft delete (marca cancelada=true)
 // ============================================================
 export async function DELETE(_req: NextRequest, ctx: RouteContext) {
+  const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // legado só-leitura após o corte
   try {
     const id = await parseId(ctx);
     if (id == null) {
