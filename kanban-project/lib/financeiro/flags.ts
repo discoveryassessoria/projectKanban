@@ -13,6 +13,7 @@ export type FlagV3 =
   | 'extras' // lançamentos financeiros extras
   | 'ocorrencias' // registrar ocorrência financeira
   | 'projecoes' // projeções agregadas (processo/requerente/pagador)
+  | 'dataCorte' // Fase 3 — ativação por data de corte (LedgerOpeningBalance)
   | 'fallbackLegado' // manter legado como fallback (default: ligado)
 
 const ENV: Record<FlagV3, string> = {
@@ -20,6 +21,7 @@ const ENV: Record<FlagV3, string> = {
   extras: 'FINANCEIRO_V3_EXTRAS',
   ocorrencias: 'FINANCEIRO_V3_OCORRENCIAS',
   projecoes: 'FINANCEIRO_V3_PROJECOES',
+  dataCorte: 'FINANCEIRO_V3_DATA_CORTE',
   fallbackLegado: 'FINANCEIRO_V3_FALLBACK_LEGADO',
 }
 
@@ -64,6 +66,7 @@ export function flagsV3(usuario?: UsuarioFlag | null): Record<FlagV3, boolean> {
     extras: flagAtiva('extras', usuario),
     ocorrencias: flagAtiva('ocorrencias', usuario),
     projecoes: flagAtiva('projecoes', usuario),
+    dataCorte: flagAtiva('dataCorte', usuario),
     fallbackLegado: flagAtiva('fallbackLegado', usuario),
   }
 }
