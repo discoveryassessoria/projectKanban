@@ -32,6 +32,7 @@ const ADITIVAS = [
   '20260803000000_taxa_aplicabilidade_relacional',
   '20260804000000_taxa_tabela_parcelamento',
   '20260805000000_adquirente_bandeira',
+  '20260806000000_taxa_finalidade',
 ]
 
 // Colunas-sentinela p/ verificação pós-aplicação.
@@ -41,7 +42,7 @@ const SENTINELAS = [
   ['FormaPagamentoCadastro', ['moedasAceitas', 'tipoIntegracao', 'prazoLiquidacao', 'carteirasCompativeis', 'minParcelas', 'exigeAdquirente', 'usoRecebimento', 'usoPagamento']],
   ['MoedaCadastro', ['ativo']],
   ['CondicaoPagamento', ['politicaTaxas', 'formaSugeridaId', 'servicos', 'entradaTipo']],
-  ['TaxaPagamento', ['formasAplicaveis', 'aplicaParcela', 'anticipationType', 'momentoCambio', 'adquirenteId', 'bandeiraId']],
+  ['TaxaPagamento', ['formasAplicaveis', 'aplicaParcela', 'anticipationType', 'momentoCambio', 'adquirenteId', 'bandeiraId', 'finalidade']],
   ['Cobranca', ['politicaTaxas', 'valorBase', 'valorTaxa', 'valorLiquido', 'moedaOrigem', 'cotacao', 'congeladaEm', 'adquirenteId', 'bandeiraId']],
   // Aplicabilidade relacional da Condição (tabelas de vínculo — checadas pelas colunas).
   ['CondicaoPagamentoMoeda', ['condicaoId', 'moedaId']],

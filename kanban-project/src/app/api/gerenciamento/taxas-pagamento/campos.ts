@@ -7,6 +7,7 @@ import {
   CATEGORIAS_TAXA, APLICA_PARCELA, ANTICIPATION_TYPES, BASE_INCIDENCIA,
   QUEM_ABSORVE, ADQUIRENTES, MOMENTO_CAMBIO,
 } from '@/lib/financeiro/taxa-constants'
+import { FINALIDADES_BOLETO } from '@/lib/financeiro/taxa-identidade'
 
 const str = (v: unknown, max = 300): string | null => {
   if (v === undefined || v === null) return null
@@ -92,6 +93,11 @@ export function paraColunasTaxa(b: Record<string, unknown>) {
     quemAbsorve: enumOu(b.quemAbsorve, QUEM_ABSORVE, 'EMPRESA') ?? 'EMPRESA',
     absorcaoPercentEmpresa: enumOu(b.quemAbsorve, QUEM_ABSORVE) === 'COMPARTILHADA' ? num(b.absorcaoPercentEmpresa) : null,
     adquirente: enumOu(b.adquirente, ADQUIRENTES),
+    // Vínculo com as ENTIDADES oficiais (Adquirente/Bandeira) — o motor usa
+    // bandeiraId para desempatar taxas por bandeira. Finalidade só no boleto.
+    adquirenteId: int(b.adquirenteId),
+    bandeiraId: int(b.bandeiraId),
+    finalidade: enumOu(b.finalidade, FINALIDADES_BOLETO),
 
     // regras de aplicação
     //

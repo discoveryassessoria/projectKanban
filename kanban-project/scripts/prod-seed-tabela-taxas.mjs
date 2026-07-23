@@ -81,6 +81,18 @@ try {
   await upIgnorar({ name: 'À vista' }, { politicaTaxas: 'ABSORVER' }, 'À vista → ABSORVER')
   await upIgnorar({ name: { startsWith: 'Boleto —' } }, { politicaTaxas: 'ABSORVER', multaPercent: 2, jurosMesPercent: 1 }, 'Boleto → ABSORVER + multa 2%/juros 1%')
 
+  // ── Backfill de finalidade do boleto (encargos separados) — só onde nulo, a
+  //    partir do nome. Deixa o nome automático estável (regerar não muda nada). ──
+  const setFinal = async (contem, finalidade) => {
+    const r = await prisma.taxaPagamento.updateMany({
+      where: { finalidade: null, name: { contains: contem, mode: 'insensitive' } },
+      data: { finalidade },
+    })
+    if (r.count) log(`✓ finalidade ${finalidade}: ${r.count} taxa(s).`)
+  }
+  await setFinal('Emiss', 'EMISSAO')
+  await setFinal('Pagamento', 'PAGAMENTO')
+
   const tt = await prisma.taxaPagamento.count()
   log(`OK — total de taxas: ${tt}. Percentuais são PADRÃO editável.`)
 } catch (err) {

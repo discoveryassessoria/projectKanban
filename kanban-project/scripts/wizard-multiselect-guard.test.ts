@@ -63,7 +63,9 @@ sec('3 — um seletor aberto por vez; troca de etapa fecha tudo')
   ok('helper exportado para o wizard', ui.includes('export function fecharTodosMultiSelects()'))
 
   for (const [nome, src] of [['Taxa', taxa], ['Condição', cond]] as const) {
-    ok(`${nome}: Próximo fecha os menus antes de avançar`, /onClick=\{\(\) => \{ fecharTodosMultiSelects\(\); if \(step === 1/.test(src))
+    // Avançar SEMPRE fecha os menus e valida a etapa 1 (inline no botão OU num
+    // handler `proximo()` extraído — o que importa é o comportamento).
+    ok(`${nome}: Próximo fecha os menus antes de avançar`, /fecharTodosMultiSelects\(\)[\s\S]{0,80}if \(step === 1/.test(src))
     ok(`${nome}: Voltar fecha os menus`, src.includes('const irPara = (n: number) => { fecharTodosMultiSelects(); setStep(n) }') && src.includes('irPara(step - 1)'))
     ok(`${nome}: fechar o wizard reseta os menus`, src.includes('fecharTodosMultiSelects(); onClose()'))
   }

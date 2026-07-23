@@ -7,6 +7,7 @@ import {
   INCLUDE_APLICABILIDADE_TAXA, eixosPresentes, regravarVinculosTaxa, resolverAplicabilidadeTaxa,
 } from '@/lib/financeiro/taxa-aplicabilidade'
 import { INCLUDE_PARCELAMENTO, linhasDoBody, regravarLinhas, tabelaPresente, validarTabela } from '@/lib/financeiro/taxa-parcelamento'
+import { resolverIdentidade, acharDuplicata } from '../identidade-server'
 
 // PUT — Atualizar taxa (merge campo-a-campo → mapeamento único).
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -20,9 +21,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!atual) return NextResponse.json({ error: 'Taxa não encontrada' }, { status: 404 })
 
     const b = await request.json()
-    const merged = { ...atual, ...b }
+
+    // Nome recomputado a partir dos cadastros reais (o cliente não é autoridade);
+    // código é IMUTÁVEL (nunca regerado na edição).
+    const ident = await resolverIdentidade(b, atual)
+    const merged = { ...atual, ...b, name: ident.name || atual.name, code: atual.code }
     const erros = validarTaxa(merged)
     if (erros.length) return NextResponse.json({ error: erros[0].mensagem, erros }, { status: 400 })
+
+    // Unicidade lógica (exceto o próprio registro).
+    const vig = b.vigenciaInicio !== undefined ? (b.vigenciaInicio ? new Date(String(b.vigenciaInicio)) : null) : (atual.vigenciaInicio ?? null)
+    const ativo = b.ativo !== undefined ? !!b.ativo : atual.ativo
+    if (ativo) {
+      const dup = await acharDuplicata(ident, vig, id)
+      if (dup) return NextResponse.json({ error: `Já existe uma tabela ativa igual: "${dup.name}". Altere a vigência para criar uma nova versão.`, codigo: 'DUPLICADO', conflito: dup }, { status: 409 })
+    }
 
     // Aplicabilidade: ids conferidos contra o cadastro (existe? ativo?).
     // Eixo ausente do body não é regravado — PUT parcial não apaga vínculo algum.

@@ -133,25 +133,20 @@ sec('3 — compatibilidade: taxa sem tabela continua exatamente igual')
   ok('registro sem tabela vira candidata sem tabela', (taxaParaCandidata({ id: 9, name: 'X' }).tabelaParcelamento ?? []).length === 0)
 }
 
-sec('4 — interface: tabela editável, sem "Aplica-se a"')
+sec('4 — interface: grade 1x–12x editável em lote, sem "Aplica-se a"')
 {
   const tabRaw = readFileSync(join(RAIZ, 'src/components/gerenciamentoComponents/TaxasPagamentoTab.tsx'), 'utf8')
   const tab = tabRaw.split('\n').filter((l) => !l.trim().startsWith('//') && !l.trim().startsWith('*') && !l.trim().startsWith('/*')).join('\n')
 
   ok('campo "Aplica-se a" não existe mais', !tab.includes('Aplica-se a'))
-  ok('enum APLICA_PARCELA saiu da tela', !tab.includes('APLICA_PARCELA'))
   ok('parcela inicial/final avulsas saíram', !tab.includes('label="Parcela inicial"') && !tab.includes('label="Parcela final"'))
 
-  ok('etapa Incidência traz a Tabela de parcelamento', tab.includes('titulo="Tabela de parcelamento"') && tab.includes('<TabelaParcelamento'))
-  ok('colunas Parcelas/Percentual/Valor fixo/Antecipação', ['>Parcelas<', '>Percentual<', '>Valor fixo<', '>Antecipação<'].every((c) => tab.includes(c)))
-  ok('botão Adicionar linha', tab.includes('Adicionar linha'))
-  ok('botão Adicionar faixa', tab.includes('Adicionar faixa'))
-  ok('botão Duplicar linha', tab.includes('title="Duplicar linha"'))
-  ok('botão Remover linha', tab.includes('title="Remover linha"'))
-  ok('avisa sobreposição de faixas', tab.includes('Faixas sobrepostas'))
-  ok('linha nova continua a partir da última', tab.includes('const proximaParcela = linhas.length ? Math.max'))
-  ok('payload envia a tabela', tab.includes('parcelamento: LinhaTabela[]'))
-  ok('edição hidrata a tabela do registro', tab.includes('parcelamento: (t.parcelamento ?? []).map'))
+  // Redesenho: a grade do crédito é editada em UMA tela (1x..12x), no passo Cálculo.
+  ok('editor de grade 1x–12x no passo Cálculo', tab.includes('function GradeCredito') && tab.includes('mostraGrade'))
+  ok('colunas Parcelas / Taxa (%)', tab.includes('>Parcelas<') && tab.includes('>Taxa (%)<'))
+  ok('adicionar/remover parcela (até 12)', tab.includes('Adicionar parcela') && tab.includes('Remover última') && tab.includes('maxN < 12'))
+  ok('grade salva em lote como parcelamento', tab.includes('parcelamento: usaGrade') && tab.includes('parcelasDe: g.n, parcelasAte: g.n'))
+  ok('edição hidrata a grade do registro', tab.includes('(t.parcelamento ?? [])') && tab.includes('.sort((a, b) => a.parcelasDe - b.parcelasDe)'))
 }
 
 sec('5 — persistência e migration aditiva')

@@ -2477,6 +2477,10 @@ model TaxaPagamento {
   // Vínculo com as ENTIDADES oficiais (aditivo; `adquirente` string preservado p/ compat).
   adquirenteId        Int? // → Adquirente.id
   bandeiraId          Int? // → Bandeira.id
+  // Finalidade do encargo (boleto): EMISSAO | PAGAMENTO | MULTA | JUROS. Mantém
+  // emissão/pagamento/multa/juros como registros SEPARADOS (nunca uma taxa
+  // genérica). Nulo para as demais formas. Aditivo — compõe a chave de unicidade.
+  finalidade          String?   @db.VarChar(20)
   ativo               Boolean   @default(true)
   vigenciaInicio      DateTime?
   vigenciaFim         DateTime?
