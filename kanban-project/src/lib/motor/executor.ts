@@ -29,6 +29,7 @@ import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
 // relativo porque os dois arquivos vivem em src/lib/motor/.
 import { gerarEconomicoDaMatriz } from './matriz-economica'
 import { resolverPrecoPorConfigDB } from './resolver-preco-financeiro.prisma'
+ import { espelharReceitaComoObrigacao } from '@/lib/financeiro/dual-write'
 import { NaturezaPreco } from '@prisma/client'
 import { aplicacaoValida, naturezasDaAplicacao, aplicacaoPermitida } from '@/lib/financeiro/aplicacao-financeira'
 import { tituloAutomacaoFinanceira, descricaoLancamentoDaConfig } from '@/lib/financeiro/automacao-financeira-identidade'
@@ -1026,6 +1027,11 @@ export async function processarRequerenteAdicionado(evt: EventoRequerentePayload
         } })
         return rid
       }, { timeout: 30000, maxWait: 10000 })
+      // Espelha a Receita da automação no motor V3 (ObrigacaoEconomica) para
+      // aparecer no Financeiro do processo (aba Receitas). Idempotente por origem
+      // e best-effort — nunca interrompe a automação. Mesma escrita usada na Cobrança.
+      const recEspelho = await prisma.receita.findUnique({ where: { id: receitaId }, select: { id: true, codigo: true, valor: true, moeda: true, processoId: true } })
+      if (recEspelho) await espelharReceitaComoObrigacao({ id: recEspelho.id, codigo: recEspelho.codigo, valor: Number(recEspelho.valor), moeda: String(recEspelho.moeda), processoId: recEspelho.processoId }, { criadoPorId: null })
       await resolverPendencia(evt.processoId, r.phaseKey, r.id, NaturezaPreco.VENDA)
       res.criados++; res.detalhes.push({ ruleId: r.id, acao: 'criado', receitaId, classificacao: cls.classificacao, valor: vi.total })
     } catch (e) {
