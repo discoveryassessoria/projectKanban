@@ -36,6 +36,8 @@ const ADITIVAS = [
   '20260807000000_cobranca_cambio_idempotencia',
   '20260808000000_motor_financeiro_v3_fase1',
   '20260809000000_obrigacao_vencimento',
+  '20260810000000_opening_balance_rollback',
+  '20260811000000_conciliacao_bancaria',
 ]
 
 // Colunas-sentinela p/ verificação pós-aplicação.
@@ -53,7 +55,9 @@ const SENTINELAS = [
   ['LedgerEntry', ['transacaoId', 'contaContabil', 'direcao', 'valorContabil', 'sequencia']],
   ['OcorrenciaFinanceira', ['obrigacaoId', 'tipo', 'status', 'politicaAplicacao']],
   ['SaldoProjecao', ['obrigacaoId', 'saldo', 'ultimaSequenciaAplicada']],
+  ['LedgerOpeningBalance', ['dataCorte', 'valorAbertura', 'revertidoEm']],
   ['PlanoContaFinanceira', ['codigo', 'tipo']],
+  ['LancamentoBancario', ['valorLiquido', 'status', 'ocorrenciaId', 'identificadorTransacao']],
   ['LedgerOpeningBalance', ['obrigacaoId', 'dataCorte', 'valorAbertura']],
   // Aplicabilidade relacional da Condição (tabelas de vínculo — checadas pelas colunas).
   ['CondicaoPagamentoMoeda', ['condicaoId', 'moedaId']],

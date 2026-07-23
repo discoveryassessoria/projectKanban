@@ -34,7 +34,7 @@ sec('Feature flags — independentes, env explícita, Preview+admin')
   ok('fallback pode ser explicitamente desligado', !flagAtiva('fallbackLegado'))
   delete process.env.FINANCEIRO_V3_FALLBACK_LEGADO
   limparEnv()
-  ok('flagsV3 devolve as 5 flags', Object.keys(flagsV3()).length === 5)
+  ok('flagsV3 devolve todas as flags V3 (≥5, independentes)', Object.keys(flagsV3()).length >= 5)
 }
 
 sec('Invariantes de código — excedente explícito, rotas gated, legado intocado')

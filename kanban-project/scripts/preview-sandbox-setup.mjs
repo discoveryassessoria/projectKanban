@@ -16,9 +16,11 @@
 //   • não derruba o build em erro (loga e segue) — o legado do Preview permanece.
 // ============================================================================
 import { execSync } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
+import { writeFileSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CLASSE, classificar, identificador, retratar } from '../lib/db/identidade-banco.mjs'
+
+const statements = (sql) => sql.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n').split(';').map((s) => s.trim()).filter(Boolean)
 
 const log = (m) => console.log(`[sandbox] ${m}`)
 
@@ -109,6 +111,17 @@ try {
     log('✓ schema aplicado (db push).')
   } else {
     log('schema base já presente — seguindo para os seeds.')
+  }
+
+  // ── 2b) Deltas ADITIVOS (Fase 2/3) idempotentes — cobre deploys incrementais
+  // sobre sandbox já existente (db push só roda em banco vazio). Todos IF NOT EXISTS.
+  const DELTAS = ['20260809000000_obrigacao_vencimento', '20260810000000_opening_balance_rollback', '20260811000000_conciliacao_bancaria']
+  for (const m of DELTAS) {
+    try {
+      const sql = readFileSync(join(import.meta.dirname, '..', 'prisma/migrations', m, 'migration.sql'), 'utf8')
+      for (const s of statements(sql)) await prisma.$executeRawUnsafe(s)
+      log(`✓ delta aditivo aplicado: ${m}`)
+    } catch (e) { log(`AVISO: delta ${m} (${String(e?.message ?? e).slice(0, 80)})`) }
   }
 
   // ── 3) Plano de contas (INSERT do ausente) ──

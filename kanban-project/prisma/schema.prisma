@@ -4050,17 +4050,47 @@ model PlanoContaFinanceira {
 
 /// Saldo de abertura na DATA DE CORTE (DecisÃ£o 3). NÃ£o reconstrÃ³i histÃ³rico.
 model LedgerOpeningBalance {
-  id            Int      @id @default(autoincrement())
-  obrigacaoId   Int      @unique
+  id            Int       @id @default(autoincrement())
+  obrigacaoId   Int       @unique
   dataCorte     DateTime
-  valorAbertura Decimal  @db.Decimal(14, 2)
-  moeda         Moeda    @default(BRL)
-  transacaoId   String   @db.VarChar(60)
-  origem        String   @default("backfill-corte") @db.VarChar(30)
-  criadoEm      DateTime @default(now())
+  valorAbertura Decimal   @db.Decimal(14, 2)
+  moeda         Moeda     @default(BRL)
+  transacaoId   String    @db.VarChar(60)
+  origem        String    @default("backfill-corte") @db.VarChar(30)
+  revertidoEm   DateTime? // Fase 3 — rollback operacional: marca a abertura revertida (estorno append-only no Ledger). Não apaga histórico.
+  criadoEm      DateTime  @default(now())
 }
 
 /// Fato financeiro registrado (gatilho dos lanÃ§amentos). Append-only.
+// Motor Financeiro V3 · Fase 3 — CONCILIAÇÃO BANCÁRIA. Linha de extrato bancário
+// (informada/importada), conciliada contra uma OcorrenciaFinanceira de pagamento.
+// Aditiva, "ref solta". Estados: INFORMADO|CONCILIADO|DIVERGENTE|IGNORADO|ESTORNADO.
+model LancamentoBancario {
+  id                    Int       @id @default(autoincrement())
+  data                  DateTime
+  moeda                 Moeda     @default(BRL)
+  valorBruto            Decimal   @db.Decimal(14, 2)
+  valorTarifa           Decimal?  @db.Decimal(14, 2)
+  valorLiquido          Decimal   @db.Decimal(14, 2)
+  identificadorTransacao String?  @db.VarChar(120) // id do banco/gateway (dedup)
+  contaRecebimentoId    Int? // → ContaBancaria/CarteiraRecebimento (solto)
+  descricao             String?   @db.VarChar(300)
+  status                String    @default("INFORMADO") @db.VarChar(16)
+  ocorrenciaId          Int? // OcorrenciaFinanceira conciliada
+  obrigacaoId           Int?
+  divergencia           String?   @db.VarChar(200)
+  origem                String    @default("manual") @db.VarChar(20) // manual|import|api
+  criadoPorId           Int?
+  criadoEm              DateTime  @default(now())
+  atualizadoEm          DateTime  @updatedAt
+
+  @@unique([identificadorTransacao]) // dedup de importação (quando presente)
+  @@index([status])
+  @@index([ocorrenciaId])
+  @@index([obrigacaoId])
+  @@index([data])
+}
+
 model OcorrenciaFinanceira {
   id                Int                @id @default(autoincrement())
   obrigacaoId       Int

@@ -97,6 +97,9 @@ export const PERMISSOES = {
   // SISTEMA — ações destrutivas de infraestrutura. OPT-IN: NÃO é concedida pelo "admin tem tudo"
   // nem pelos perfis padrão; precisa ser atribuída EXPLICITAMENTE a um perfil/usuário.
   'sistema.exclusaoDefinitiva': 'Excluir DEFINITIVAMENTE dados de teste (hard delete de Config Financeira / Catálogo Mestre)',
+  // FINANCEIRO V3 — ativação por DATA DE CORTE (Ledger vira a fonte). OPT-IN: ação
+  // operacional sensível (grava aberturas/estornos no Ledger); exige permissão explícita.
+  'financeiro.dataCorte': 'Administrar a DATA DE CORTE do Motor Financeiro V3 (ativar/reverter aberturas no Ledger)',
 } as const
 
 export type PermissaoChave = keyof typeof PERMISSOES
@@ -211,7 +214,7 @@ export const MODULOS_PERMISSOES = [
 // "admin tem tudo", nem pelos perfis padrão (TODAS_PERMISSOES). Só valem se atribuídas
 // EXPLICITAMENTE no perfil ou nas permissões custom do usuário. Autorização por PERMISSÃO,
 // nunca por tipo de usuário.
-export const PERMISSOES_OPT_IN = new Set<string>(['sistema.exclusaoDefinitiva'])
+export const PERMISSOES_OPT_IN = new Set<string>(['sistema.exclusaoDefinitiva', 'financeiro.dataCorte'])
 
 // Todas as permissões ligadas — EXCETO as opt-in (que exigem concessão explícita).
 const TODAS_PERMISSOES = Object.keys(PERMISSOES).reduce((acc, key) => {

@@ -5,6 +5,7 @@
 import { resolverAbertura, planoDeCorte, resolverCorte } from '../lib/financeiro/dominio/data-corte'
 import { lancAbertura, lancReconciliacaoCorte, lancObrigacaoCriada, somas } from '../lib/financeiro/ledger/lancamentos'
 import { projetar, type EntryProjecao } from '../lib/financeiro/ledger/projecao'
+import { conciliar } from '../lib/financeiro/conciliacao/matching'
 
 let passou = 0, falhou = 0
 const ok = (n: string, c: boolean) => { if (c) { passou++; console.log(`  ✓ ${n}`) } else { falhou++; console.log(`  ✗ ${n}`) } }
@@ -65,6 +66,32 @@ console.log('\nCorte limpo (opção C) — abertura nova × reconciliação do e
     l.flatMap((x) => x.pernas.map((p) => ({ conta: p.conta, direcao: p.direcao, valor: p.valor, sequencia: ++seq })))
   const saldo = projetar(ent(lancObrigacaoCriada(4000, true), lancReconciliacaoCorte(1500))).saldo
   ok('replay pós-corte: espelho 4000 − recebido 1500 = 2500 (sem dupla contagem)', saldo === 2500)
+}
+
+console.log('\nConciliação bancária — matching (puro)')
+{
+  const oc = [
+    { ocorrenciaId: 10, obrigacaoId: 1, data: '2026-07-10', valor: 1000, identificadorTransacao: 'PIX-ABC' },
+    { ocorrenciaId: 11, obrigacaoId: 2, data: '2026-07-11', valor: 500 },
+    { ocorrenciaId: 12, obrigacaoId: 3, data: '2026-07-20', valor: 500 },
+  ]
+  const r = conciliar([
+    { id: 1, data: '2026-07-10', valorLiquido: 1000, identificadorTransacao: 'PIX-ABC' }, // match forte
+    { id: 2, data: '2026-07-11', valorLiquido: 500 }, // valor+data (casa oc 11)
+    { id: 3, data: '2026-07-10', valorLiquido: 999 }, // sem correspondência
+    { id: 4, data: '2026-07-10', valorLiquido: 1000, identificadorTransacao: 'PIX-ABC' }, // id repetido mas oc já usada → sem/diverg
+  ], oc)
+  const l1 = r.linhas.find((x) => x.linhaId === 1)!
+  ok('conciliação: identificador casa (CONCILIADO por IDENTIFICADOR)', l1.status === 'CONCILIADO' && l1.status === 'CONCILIADO' && (l1 as any).criterio === 'IDENTIFICADOR')
+  const l2 = r.linhas.find((x) => x.linhaId === 2)!
+  ok('conciliação: valor+data casa (CONCILIADO por VALOR_DATA)', l2.status === 'CONCILIADO' && (l2 as any).criterio === 'VALOR_DATA')
+  const l3 = r.linhas.find((x) => x.linhaId === 3)!
+  ok('conciliação: valor inexistente → SEM_CORRESPONDENCIA', l3.status === 'SEM_CORRESPONDENCIA')
+  ok('conciliação: uma ocorrência casa no máximo uma linha (oc 10 não reusa)', r.conciliadas === 2)
+
+  const divValor = conciliar([{ id: 1, data: '2026-07-10', valorLiquido: 900, identificadorTransacao: 'PIX-ABC' }],
+    [{ ocorrenciaId: 10, obrigacaoId: 1, data: '2026-07-10', valor: 1000, identificadorTransacao: 'PIX-ABC' }])
+  ok('conciliação: identificador confere mas valor difere → DIVERGENTE (nunca silencioso)', divValor.linhas[0].status === 'DIVERGENTE')
 }
 
 console.log(`\n${'='.repeat(60)}`)
