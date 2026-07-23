@@ -79,8 +79,15 @@ const menuItems = [
 ]
 
 const adminMenuItems = [
-  // Financeiro deixou de ser módulo global: existe apenas dentro do processo
-  // (aba "Financeiro"). Nenhum item financeiro na barra lateral.
+  {
+    // Financeiro geral da empresa — visão consolidada de todos os processos.
+    title: "Financeiro",
+    url: "/financeiro",
+    icon: DollarIcon,
+    textOffset: "",
+    iconOffset: "",
+    permissao: "financeiro.ver",
+  },
   {
     title: "Gerenciamento",
     url: "/administrator",

@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { ReceitasTab } from "./ReceitasTab"
-import { ProcessoFinanceiroV3 } from "./ProcessoFinanceiroV3"
+import { VisaoGeral } from "@/src/components/financeiro/subabas/VisaoGeral"
 import { FileText } from "lucide-react"
 
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
@@ -19,6 +19,8 @@ const SUBTABS: [string, string][] = [["visao", "Visão Geral"], ["receitas", "Re
 
 export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) {
   const [t, setT] = useState("visao")
+  const [fxEur, setFxEur] = useState(5.5)
+  useEffect(() => { fetch("/api/cambio").then((r) => r.json()).then((d) => setFxEur(Number(d?.eur) || 5.5)).catch(() => {}) }, [])
   return (
     <div className="text-neutral-200">
       <div className="mb-5 flex flex-wrap gap-6 border-b border-neutral-800">
@@ -26,7 +28,7 @@ export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) 
           <button key={id} onClick={() => setT(id)} className={`-mb-px border-b-2 px-1 pb-3 pt-1 text-sm ${t === id ? "border-amber-400 font-medium text-amber-400" : "border-transparent text-neutral-400 hover:text-neutral-200"}`}>{label}</button>
         ))}
       </div>
-      {t === "visao" && <ProcessoFinanceiroV3 processoId={processoId} />}
+      {t === "visao" && <VisaoGeral processoId={processoId} fxHoje={fxEur} onIrPara={(a) => setT(a)} />}
       {t === "receitas" && <ReceitasTab processoId={processoId} />}
       {t === "custos" && <CustosTab processoId={processoId} />}
       {t === "extrato" && <Movimentacoes processoId={processoId} modo="extrato" />}
