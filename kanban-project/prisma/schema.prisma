@@ -4106,6 +4106,12 @@ model OcorrenciaFinanceira {
   snapshotCambialId Int?
   comprovanteUrl    String?            @db.VarChar(400)
   observacao        String?            @db.Text
+  // Fase 3 — detalhe de exibição do pagamento (tela Receita V3): forma, conta e referência.
+  formaLabel        String?            @db.VarChar(40) // ex.: PIX, TED, Cartão
+  contaBanco        String?            @db.VarChar(80) // ex.: Banco Inter
+  contaAgencia      String?            @db.VarChar(20)
+  contaNumero       String?            @db.VarChar(30)
+  referencia        String?            @db.VarChar(120) // ex.: "PIX 15/07 - Joao Silva"
   politicaAplicacao String?            @db.VarChar(24) // FIFO|PARCELA_ESPECIFICA|MANUAL|PROPORCIONAL
   status            String             @default("PENDENTE") @db.VarChar(20) // PENDENTE|PROCESSANDO|PROCESSADA|REJEITADA|REVERTIDA
   estornaId         Int?

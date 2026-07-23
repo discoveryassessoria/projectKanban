@@ -38,6 +38,7 @@ const ADITIVAS = [
   '20260809000000_obrigacao_vencimento',
   '20260810000000_opening_balance_rollback',
   '20260811000000_conciliacao_bancaria',
+  '20260812000000_ocorrencia_detalhe_pagamento',
 ]
 
 // Colunas-sentinela p/ verificação pós-aplicação.
@@ -53,7 +54,7 @@ const SENTINELAS = [
   ['ObrigacaoEconomica', ['codigoOperacional', 'natureza', 'direcao', 'valorContratado', 'status', 'version', 'vencimento']],
   ['LedgerFinanceiro', ['obrigacaoId', 'moedaContabil']],
   ['LedgerEntry', ['transacaoId', 'contaContabil', 'direcao', 'valorContabil', 'sequencia']],
-  ['OcorrenciaFinanceira', ['obrigacaoId', 'tipo', 'status', 'politicaAplicacao']],
+  ['OcorrenciaFinanceira', ['obrigacaoId', 'tipo', 'status', 'politicaAplicacao', 'formaLabel', 'referencia']],
   ['SaldoProjecao', ['obrigacaoId', 'saldo', 'ultimaSequenciaAplicada']],
   ['LedgerOpeningBalance', ['dataCorte', 'valorAbertura', 'revertidoEm']],
   ['PlanoContaFinanceira', ['codigo', 'tipo']],
