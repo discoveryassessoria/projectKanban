@@ -40,7 +40,7 @@ ok('cotação manual só p/ admin/edita valores', criar.includes("temPermissao(u
 
 // ── schema/migration aditivos ──
 const schema = rd('prisma/schema.prisma')
-ok('schema: idempotencyKey único', schema.includes('idempotencyKey String? @unique'))
+ok('schema: idempotencyKey único', /idempotencyKey\s+String\?\s+@unique/.test(schema))
 ok('schema: snapshot cambial (moedaDestino/cotacaoTipo/cotacaoId)', schema.includes('moedaDestino') && schema.includes('cotacaoTipo') && schema.includes('cotacaoManualPorId'))
 const mig = rd('prisma/migrations/20260807000000_cobranca_cambio_idempotencia/migration.sql')
 ok('migration idempotente (ADD COLUMN IF NOT EXISTS + índice único)', mig.includes('ADD COLUMN IF NOT EXISTS "idempotencyKey"') && mig.includes('CREATE UNIQUE INDEX IF NOT EXISTS'))

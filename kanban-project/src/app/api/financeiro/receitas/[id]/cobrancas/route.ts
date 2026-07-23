@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { temPermissao } from '@/src/lib/permissoes'
 import { montarECalcular } from '@/lib/financeiro/charge-runtime'
+import { espelharReceitaComoObrigacao } from '@/lib/financeiro/dual-write'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
@@ -122,5 +123,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
     throw e
   }
+  // Escrita dupla (Motor V3) — best-effort, no-op se a flag estiver desligada.
+  await espelharReceitaComoObrigacao(
+    { id: receita.id, codigo: (receita as any).codigo ?? null, valor: receita.valor, moeda: receita.moeda, processoId: receita.processoId },
+    { cobrancaId: cobranca.id, criadoPorId: actorId },
+  )
+
   return NextResponse.json({ cobranca, parcelas: r.parcelas.length, memoria: r.memoria })
 }

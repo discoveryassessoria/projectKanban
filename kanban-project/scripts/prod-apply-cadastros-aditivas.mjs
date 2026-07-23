@@ -34,6 +34,7 @@ const ADITIVAS = [
   '20260805000000_adquirente_bandeira',
   '20260806000000_taxa_finalidade',
   '20260807000000_cobranca_cambio_idempotencia',
+  '20260808000000_motor_financeiro_v3_fase1',
 ]
 
 // Colunas-sentinela p/ verificação pós-aplicação.
@@ -44,7 +45,15 @@ const SENTINELAS = [
   ['MoedaCadastro', ['ativo']],
   ['CondicaoPagamento', ['politicaTaxas', 'formaSugeridaId', 'servicos', 'entradaTipo']],
   ['TaxaPagamento', ['formasAplicaveis', 'aplicaParcela', 'anticipationType', 'momentoCambio', 'adquirenteId', 'bandeiraId', 'finalidade']],
-  ['Cobranca', ['politicaTaxas', 'valorBase', 'valorTaxa', 'valorLiquido', 'moedaOrigem', 'cotacao', 'congeladaEm', 'adquirenteId', 'bandeiraId', 'moedaDestino', 'cotacaoTipo', 'cotacaoId', 'cotacaoManualPorId', 'cotacaoJustificativa', 'idempotencyKey']],
+  ['Cobranca', ['politicaTaxas', 'valorBase', 'valorTaxa', 'valorLiquido', 'moedaOrigem', 'cotacao', 'congeladaEm', 'adquirenteId', 'bandeiraId', 'moedaDestino', 'cotacaoTipo', 'cotacaoId', 'cotacaoManualPorId', 'cotacaoJustificativa', 'idempotencyKey', 'obrigacaoId']],
+  // Motor Financeiro V3 — Fase 1 (tabelas novas presentes)
+  ['ObrigacaoEconomica', ['codigoOperacional', 'natureza', 'direcao', 'valorContratado', 'status', 'version']],
+  ['LedgerFinanceiro', ['obrigacaoId', 'moedaContabil']],
+  ['LedgerEntry', ['transacaoId', 'contaContabil', 'direcao', 'valorContabil', 'sequencia']],
+  ['OcorrenciaFinanceira', ['obrigacaoId', 'tipo', 'status', 'politicaAplicacao']],
+  ['SaldoProjecao', ['obrigacaoId', 'saldo', 'ultimaSequenciaAplicada']],
+  ['PlanoContaFinanceira', ['codigo', 'tipo']],
+  ['LedgerOpeningBalance', ['obrigacaoId', 'dataCorte', 'valorAbertura']],
   // Aplicabilidade relacional da Condição (tabelas de vínculo — checadas pelas colunas).
   ['CondicaoPagamentoMoeda', ['condicaoId', 'moedaId']],
   ['CondicaoPagamentoPais', ['condicaoId', 'paisId']],

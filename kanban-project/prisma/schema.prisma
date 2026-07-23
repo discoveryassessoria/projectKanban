@@ -9,7 +9,7 @@ datasource db {
 }
 
 model Usuario {
-  publicCode         String?            @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
+  publicCode         String?            @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
   id                 Int                @id @default(autoincrement())
   nome               String             @db.VarChar(100)
   email              String             @unique @db.VarChar(100)
@@ -31,7 +31,7 @@ model Usuario {
 }
 
 model Pessoa {
-  publicCode         String?       @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
+  publicCode         String?       @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
   id                 Int           @id @default(autoincrement())
   nome               String        @db.VarChar(50)
   sobrenome          String?       @db.VarChar(40)
@@ -86,11 +86,11 @@ model Pessoa {
   custosFin          Custo[]
   receitasFin        Receita[]
 
-  // CP-1 — papéis contextuais que apontam para esta identidade humana única
+  // CP-1 â papÃ©is contextuais que apontam para esta identidade humana Ãºnica
   contratantesVinculados Contratante[] @relation("ContratantePessoa")
   requerentesVinculados  Requerente[]  @relation("RequerentePessoa")
 
-  // CP-3 — necessidades documentais desta pessoa
+  // CP-3 â necessidades documentais desta pessoa
   necessidades NecessidadeDocumental[]
 
   @@index([arvoreId])
@@ -121,7 +121,7 @@ model Uniao {
   pessoa1         Pessoa    @relation("Pessoa1", fields: [pessoa1Id], references: [id], onDelete: Cascade)
   pessoa2         Pessoa    @relation("Pessoa2", fields: [pessoa2Id], references: [id], onDelete: Cascade)
 
-  // CP-3 — necessidades de vínculo (casamento/união) referenciam a União.
+  // CP-3 â necessidades de vÃ­nculo (casamento/uniÃ£o) referenciam a UniÃ£o.
   necessidades NecessidadeDocumental[]
 
   @@index([pessoa1Id])
@@ -140,15 +140,15 @@ model Arvore {
   pessoas           Pessoa[]   @relation("PessoasNaArvore")
   processos         Processo[]
 
-  // CP-1 — a Árvore pertence a uma Família (nullable até backfill; dual-read)
+  // CP-1 â a Ãrvore pertence a uma FamÃ­lia (nullable atÃ© backfill; dual-read)
   familiaId Int?
   familia   Familia? @relation(fields: [familiaId], references: [id], onDelete: SetNull)
 
   @@index([familiaId])
 }
 
-// CP-1 — Família: entidade administrativa própria (Regras 10/11/12).
-// Agrupa Processos e Árvores. Backfill inicial: 1 Família por Árvore.
+// CP-1 â FamÃ­lia: entidade administrativa prÃ³pria (Regras 10/11/12).
+// Agrupa Processos e Ãrvores. Backfill inicial: 1 FamÃ­lia por Ãrvore.
 model Familia {
   id          Int        @id @default(autoincrement())
   nome        String     @db.VarChar(150)
@@ -161,7 +161,7 @@ model Familia {
 }
 
 model Documento {
-  publicCode            String?         @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
+  publicCode            String?         @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
   id                    Int             @id @default(autoincrement())
   pessoaId              Int
   tipo                  TipoDocumento?
@@ -199,7 +199,7 @@ model Documento {
   data_evento           DateTime?
   pessoa                Pessoa          @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
 
-  // Identificação literal (como aparece na certidão)
+  // IdentificaÃ§Ã£o literal (como aparece na certidÃ£o)
   nome_registrado    String? @db.VarChar(200)
   pai_registrado     String? @db.VarChar(200)
   mae_registrada     String? @db.VarChar(200)
@@ -211,19 +211,19 @@ model Documento {
   // Localidade extra
   comune String? @db.VarChar(100)
 
-  // Referência registral extra
+  // ReferÃªncia registral extra
   matricula String? @db.VarChar(50)
   crc       String? @db.VarChar(50)
   protocolo String? @db.VarChar(50)
 
-  // Rastreamento da solicitação
+  // Rastreamento da solicitaÃ§Ã£o
   nro_pedido          String? @db.VarChar(50)
   canal_solicitacao   String? @db.VarChar(50)
   link_acompanhamento String? @db.VarChar(500)
   localizacao_fisica  String? @db.VarChar(200)
 
   // ============================================================
-  // ✅ NOVO: CAMPOS DE OPERAÇÃO (Central Operacional)
+  // â NOVO: CAMPOS DE OPERAÃÃO (Central Operacional)
   // ============================================================
   responsavelId      Int?
   responsavel        Usuario?  @relation("DocumentoResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
@@ -236,11 +236,11 @@ model Documento {
   origem   String  @default("manual") @db.VarChar(20)
   ruleCode String? @db.VarChar(20)
 
-  // --- Análise Documental v2 (AD2) ---
+  // --- AnÃ¡lise Documental v2 (AD2) ---
   structuredData Json? // dados estruturados por tipo (birth/marriage/death)
   dataStatus     String @default("not_filled") // not_filled | ai_extracted | manual_filled | reviewed
   analysisStatus String @default("not_ready") // not_ready | ready
-  registral      Json? // dados registrais revisados (verdade canônica)
+  registral      Json? // dados registrais revisados (verdade canÃ´nica)
 
   custosFin   Custo[]
   receitasFin Receita[]
@@ -248,12 +248,12 @@ model Documento {
   documentTypeId Int?
   documentType   TipoDocumentoCadastro? @relation(fields: [documentTypeId], references: [id])
 
-  // CP-3 — Documento Operacional atende a uma NecessidadeDocumental de origem.
-  // Nullable (dual-read + backfill); 1 necessidade -> N documentos (múltiplas vias).
+  // CP-3 â Documento Operacional atende a uma NecessidadeDocumental de origem.
+  // Nullable (dual-read + backfill); 1 necessidade -> N documentos (mÃºltiplas vias).
   necessidadeId Int?
   necessidade   NecessidadeDocumental? @relation(fields: [necessidadeId], references: [id], onDelete: SetNull)
 
-  // CP-4A — vínculos operacionais do runtime v2 (back-relations)
+  // CP-4A â vÃ­nculos operacionais do runtime v2 (back-relations)
   tarefasVinculadas Tarefa[]                    @relation("TarefaDocumento")
   stepInstances     PhaseWorkflowStepInstance[]
 
@@ -269,8 +269,8 @@ model Documento {
   @@index([ruleCode])
 }
 
-// Status = coluna/estado de TAREFA (domínio de Tarefa). NÃO representa fase de
-// Processo — a fase do processo é Processo.faseAtualKey (Workflow Macro/Interno).
+// Status = coluna/estado de TAREFA (domÃ­nio de Tarefa). NÃO representa fase de
+// Processo â a fase do processo Ã© Processo.faseAtualKey (Workflow Macro/Interno).
 // O legado Processo.statusId foi removido definitivamente.
 model Status {
   id      Int      @id @default(autoincrement())
@@ -283,10 +283,10 @@ model Status {
   @@index([pais])
 }
 
-// ── CodeGeneratorService — sequências de código público (contador atômico, sem reuso) ──
-// 1 linha por escopo (prefixo): "IT","ES","DE","CLI","REC","CUS"... `ultimo` = último
-// número emitido. Incremento atômico (UPSERT + RETURNING), transacional, à prova de
-// concorrência. Excluir um registro NÃO decrementa → código nunca é reutilizado.
+// ââ CodeGeneratorService â sequÃªncias de cÃ³digo pÃºblico (contador atÃ´mico, sem reuso) ââ
+// 1 linha por escopo (prefixo): "IT","ES","DE","CLI","REC","CUS"... `ultimo` = Ãºltimo
+// nÃºmero emitido. Incremento atÃ´mico (UPSERT + RETURNING), transacional, Ã  prova de
+// concorrÃªncia. Excluir um registro NÃO decrementa â cÃ³digo nunca Ã© reutilizado.
 model CodeSequence {
   id           Int      @id @default(autoincrement())
   scope        String   @unique @db.VarChar(40)
@@ -296,8 +296,8 @@ model CodeSequence {
 
 model Processo {
   id                  Int                   @id @default(autoincrement())
-  // CÓDIGO PÚBLICO (humano) gerado pelo CodeGeneratorService: IT-1, ES-1, DE-1...
-  // (sequência por país). UNIQUE, imutável, nunca reusado. O identificador técnico segue id.
+  // CÃDIGO PÃBLICO (humano) gerado pelo CodeGeneratorService: IT-1, ES-1, DE-1...
+  // (sequÃªncia por paÃ­s). UNIQUE, imutÃ¡vel, nunca reusado. O identificador tÃ©cnico segue id.
   codigo              String?               @unique @db.VarChar(20)
   nome                String                @db.VarChar(100)
   descricao           String?               @db.VarChar(500)
@@ -337,16 +337,16 @@ model Processo {
   retificacaoPacotes  RetificacaoPacote[]
   emissoesRetificadas EmissaoRetificada[]
 
-  // CP-3 — necessidades documentais do processo
+  // CP-3 â necessidades documentais do processo
   necessidades NecessidadeDocumental[]
 
-  // Runtime de workflow do processo. CUTOVER V2 CONCLUÍDO: todo processo NOVO
-  // nasce "v2" (default). O campo permanece só para leitura técnica/histórica;
-  // a UI comum não cria processo legado e a API rejeita "legacy" vindo da interface.
+  // Runtime de workflow do processo. CUTOVER V2 CONCLUÃDO: todo processo NOVO
+  // nasce "v2" (default). O campo permanece sÃ³ para leitura tÃ©cnica/histÃ³rica;
+  // a UI comum nÃ£o cria processo legado e a API rejeita "legacy" vindo da interface.
   workflowRuntime          String                  @default("v2") @db.VarChar(20)
-  lockVersion              Int                     @default(0) // CP-4F — CAS na mudança de fase (v2)
-  // Criação V2-nativa: idempotência (evita processo duplicado em duplo clique/retry)
-  // e snapshot imutável da versão do Workflow Macro aplicada no nascimento.
+  lockVersion              Int                     @default(0) // CP-4F â CAS na mudanÃ§a de fase (v2)
+  // CriaÃ§Ã£o V2-nativa: idempotÃªncia (evita processo duplicado em duplo clique/retry)
+  // e snapshot imutÃ¡vel da versÃ£o do Workflow Macro aplicada no nascimento.
   chaveIdempotenciaCriacao String?                 @unique @db.VarChar(200)
   macroWorkflowVersion     Int?
   phaseWorkflowInstances   PhaseWorkflowInstance[]
@@ -372,7 +372,7 @@ model ProcessoContratante {
 }
 
 model Tarefa {
-  publicCode          String?           @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
+  publicCode          String?           @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
   id                  Int               @id @default(autoincrement())
   titulo              String            @db.VarChar(200)
   descricao           String?
@@ -403,7 +403,7 @@ model Tarefa {
   subtarefas          Tarefa[]          @relation("Subtarefas")
   historico           TarefaHistorico[]
 
-  // CP-4A — vínculos aditivos (nullable) com o runtime de workflow v2.
+  // CP-4A â vÃ­nculos aditivos (nullable) com o runtime de workflow v2.
   workflowInstanceId     Int?
   workflowInstance       PhaseWorkflowInstance?     @relation(fields: [workflowInstanceId], references: [id], onDelete: SetNull)
   workflowStepInstanceId Int?
@@ -422,25 +422,25 @@ model Tarefa {
   previousTarefa         Tarefa?                    @relation("TarefaSupersessao", fields: [previousTarefaId], references: [id], onDelete: SetNull)
   supersededByTarefas    Tarefa[]                   @relation("TarefaSupersessao")
 
-  // CP-4D — sincronização Tarefa↔Passo (CAS otimista, executor, motivo, restauração).
+  // CP-4D â sincronizaÃ§Ã£o TarefaâPasso (CAS otimista, executor, motivo, restauraÃ§Ã£o).
   lockVersion           Int     @default(0)
-  executedById          Int? // quem concluiu (executor) — segregação executor≠aprovador
-  blockedPreviousStatus String? @db.VarChar(30) // estado da Tarefa antes de BLOQUEADA (restauração)
+  executedById          Int? // quem concluiu (executor) â segregaÃ§Ã£o executorâ aprovador
+  blockedPreviousStatus String? @db.VarChar(30) // estado da Tarefa antes de BLOQUEADA (restauraÃ§Ã£o)
   motivoCodigo          String? @db.VarChar(40)
   justificativa         String? @db.Text
 
-  // TAREFA TRANSVERSAL (aditivo) — ação antecipada de OUTRA fase p/ resolver uma necessidade
-  // da fase ATUAL, sem avançar o Macro. Refs "soltas" (padrão executedById): sem relation
-  // p/ não tocar outros models; os serviços resolvem os vínculos. necessidadeId/documentoId/
-  // responsavelId/statusTarefa/dataPrazo/dataConclusao/createdAt/updatedAt já existem acima.
+  // TAREFA TRANSVERSAL (aditivo) â aÃ§Ã£o antecipada de OUTRA fase p/ resolver uma necessidade
+  // da fase ATUAL, sem avanÃ§ar o Macro. Refs "soltas" (padrÃ£o executedById): sem relation
+  // p/ nÃ£o tocar outros models; os serviÃ§os resolvem os vÃ­nculos. necessidadeId/documentoId/
+  // responsavelId/statusTarefa/dataPrazo/dataConclusao/createdAt/updatedAt jÃ¡ existem acima.
   tipo                     TipoTarefa @default(NORMAL)
   faseOrigemCode           String?    @db.VarChar(60) // fase ATIVA onde foi criada
-  faseReferenciaCode       String?    @db.VarChar(60) // fase à qual a AÇÃO pertence
-  workflowInstanceOrigemId Int? // instância da fase de ORIGEM (ativa) no momento da criação
-  pessoaId                 Int? // pessoa correspondente (solto → Pessoa)
-  tipoDocumentoId          Int? // tipo documental correspondente (solto → TipoDocumentoCadastro)
-  acaoStepKey              String?    @db.VarChar(80) // ação de catálogo antecipada (stepKey da fase de referência)
-  motivo                   String?    @db.Text // motivo da antecipação
+  faseReferenciaCode       String?    @db.VarChar(60) // fase Ã  qual a AÃÃO pertence
+  workflowInstanceOrigemId Int? // instÃ¢ncia da fase de ORIGEM (ativa) no momento da criaÃ§Ã£o
+  pessoaId                 Int? // pessoa correspondente (solto â Pessoa)
+  tipoDocumentoId          Int? // tipo documental correspondente (solto â TipoDocumentoCadastro)
+  acaoStepKey              String?    @db.VarChar(80) // aÃ§Ã£o de catÃ¡logo antecipada (stepKey da fase de referÃªncia)
+  motivo                   String?    @db.Text // motivo da antecipaÃ§Ã£o
   resultadoEsperado        String?    @db.Text
   resultadoObtido          String?    @db.Text
   createdBy                Int?
@@ -486,7 +486,7 @@ model ProcessoRequerente {
 }
 
 model Contratante {
-  publicCode     String?               @unique @db.VarChar(20) // CLI — CodeGeneratorService central (cliente), aditivo/único/não editável
+  publicCode     String?               @unique @db.VarChar(20) // CLI â CodeGeneratorService central (cliente), aditivo/Ãºnico/nÃ£o editÃ¡vel
   id             Int                   @id @default(autoincrement())
   nome           String                @db.VarChar(100)
   cpf            String?               @db.VarChar(14)
@@ -516,7 +516,7 @@ model Contratante {
   protocolos     Protocolo[]
   recibosPagos   Recibo[]              @relation("ReciboContratante")
 
-  // CP-1 — vínculo com a identidade humana única (Pessoa). Papel = contexto.
+  // CP-1 â vÃ­nculo com a identidade humana Ãºnica (Pessoa). Papel = contexto.
   personId Int?
   pessoa   Pessoa? @relation("ContratantePessoa", fields: [personId], references: [id], onDelete: SetNull)
 
@@ -524,7 +524,7 @@ model Contratante {
 }
 
 model Requerente {
-  publicCode           String?                 @unique @db.VarChar(20) // CLI — CodeGeneratorService central (cliente, mesma sequência do Contratante)
+  publicCode           String?                 @unique @db.VarChar(20) // CLI â CodeGeneratorService central (cliente, mesma sequÃªncia do Contratante)
   id                   Int                     @id @default(autoincrement())
   nome                 String                  @db.VarChar(100)
   cpf                  String?                 @db.VarChar(14)
@@ -557,7 +557,7 @@ model Requerente {
   receitaParticipacoes ReceitaRequerente[]     @relation("ReceitaRequerentes")
   recibosPagos         Recibo[]                @relation("ReciboRequerente")
 
-  // CP-1 — vínculo com a identidade humana única (Pessoa). Papel = contexto.
+  // CP-1 â vÃ­nculo com a identidade humana Ãºnica (Pessoa). Papel = contexto.
   personId Int?
   pessoa   Pessoa? @relation("RequerentePessoa", fields: [personId], references: [id], onDelete: SetNull)
 
@@ -565,7 +565,7 @@ model Requerente {
 }
 
 model Protocolo {
-  publicCode      String?          @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
+  publicCode      String?          @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
   id              Int              @id @default(autoincrement())
   processoId      Int
   contratanteId   Int?
@@ -770,8 +770,8 @@ model TipoServico {
   custosFin   Custo[]
   receitasFin Receita[]
 
-  // CP-2 — referência aditiva ao Catálogo Mestre (ItemCatalogo).
-  // Nullable; preferir este vínculo quando presente, com fallback legado.
+  // CP-2 â referÃªncia aditiva ao CatÃ¡logo Mestre (ItemCatalogo).
+  // Nullable; preferir este vÃ­nculo quando presente, com fallback legado.
   itemCatalogoId Int?
   itemCatalogo   ItemCatalogo? @relation(fields: [itemCatalogoId], references: [id], onDelete: SetNull)
 
@@ -816,10 +816,10 @@ model CategoriaFinanceira {
   transacoes          Transacao[]
   produtosFinanceiros ProdutoFinanceiro[]
 
-  // MDM — a Categoria Financeira REFERENCIA um cadastro mestre por FK real; nunca
-  // redigita/duplica a entidade. Exatamente UM destes é preenchido (CHECK na migration).
-  // `nome` passa a ser DERIVADO do mestre (system-owned na criação); linhas legadas
-  // sem FK permanecem válidas (nullable) até o backfill.
+  // MDM â a Categoria Financeira REFERENCIA um cadastro mestre por FK real; nunca
+  // redigita/duplica a entidade. Exatamente UM destes Ã© preenchido (CHECK na migration).
+  // `nome` passa a ser DERIVADO do mestre (system-owned na criaÃ§Ã£o); linhas legadas
+  // sem FK permanecem vÃ¡lidas (nullable) atÃ© o backfill.
   origem          OrigemCategoria            @default(LEGADO)
   tipoDocumentoId Int?
   tipoDocumento   TipoDocumentoCadastro?     @relation("CatFinTipoDocumento", fields: [tipoDocumentoId], references: [id])
@@ -830,8 +830,8 @@ model CategoriaFinanceira {
   itemCatalogoId  Int?
   itemCatalogo    ItemCatalogo?              @relation("CatFinItemCatalogo", fields: [itemCatalogoId], references: [id])
 
-  // anti-duplicação: 1 categoria por (mestre × tipo). NULL é distinto no Postgres,
-  // logo só restringe quando a FK está preenchida (legado sem FK não é afetado).
+  // anti-duplicaÃ§Ã£o: 1 categoria por (mestre Ã tipo). NULL Ã© distinto no Postgres,
+  // logo sÃ³ restringe quando a FK estÃ¡ preenchida (legado sem FK nÃ£o Ã© afetado).
   @@unique([tipoDocumentoId, tipo])
   @@unique([honorarioId, tipo])
   @@unique([tipoProcessoId, tipo])
@@ -879,7 +879,7 @@ model ContaBancaria {
 }
 
 model Fornecedor {
-  publicCode         String?             @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
+  publicCode         String?             @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
   id                 Int                 @id @default(autoincrement())
   nome               String              @db.VarChar(150)
   nomeFantasia       String?             @db.VarChar(150)
@@ -948,11 +948,11 @@ model ContaPagar {
   numeroParcela   Int?
   totalParcelas   Int?
   processoId      Int?
-  // §7 — origem do lançamento corporativo. CORPORATIVA = lançado direto no Financeiro
-  // Geral (aluguel, salários…). PROCESSO = espelha um Custo de processo (evitar!) —
-  // o custo do processo é projetado a partir do model Custo, não recriado aqui.
+  // Â§7 â origem do lanÃ§amento corporativo. CORPORATIVA = lanÃ§ado direto no Financeiro
+  // Geral (aluguel, salÃ¡riosâ¦). PROCESSO = espelha um Custo de processo (evitar!) â
+  // o custo do processo Ã© projetado a partir do model Custo, nÃ£o recriado aqui.
   origem          String               @default("CORPORATIVA") @db.VarChar(20)
-  custoOrigemId   Int? // → Custo.id quando esta linha reflete um custo de processo (backfill/vínculo §15)
+  custoOrigemId   Int? // â Custo.id quando esta linha reflete um custo de processo (backfill/vÃ­nculo Â§15)
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
   categoria       CategoriaFinanceira? @relation(fields: [categoriaId], references: [id])
@@ -1012,7 +1012,7 @@ model CentroCusto {
 }
 
 model Evento {
-  publicCode   String?    @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
+  publicCode   String?    @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
   id           Int        @id @default(autoincrement())
   processoId   Int?
   titulo       String     @db.VarChar(200)
@@ -1257,48 +1257,48 @@ model Receita {
   tipoServicoId    Int?
   tipoServico      TipoServico? @relation(fields: [tipoServicoId], references: [id], onDelete: SetNull)
   phaseKey         String?      @db.VarChar(60)
-  productServiceId Int? // → ServicoProduto (catálogo; solto por ora)
+  productServiceId Int? // â ServicoProduto (catÃ¡logo; solto por ora)
   origem           String       @default("manual") @db.VarChar(20) // manual | motor | migration
 
-  phaseCycle    Int? // ciclo da fase (reemissão)
-  pricingRuleId Int? // qual regra de preço (TabelaValor.id) resolveu o valor — congelado
+  phaseCycle    Int? // ciclo da fase (reemissÃ£o)
+  pricingRuleId Int? // qual regra de preÃ§o (TabelaValor.id) resolveu o valor â congelado
 
-  // PREÇO-FONTE-ÚNICA — CONGELAMENTO (§6) + RASTREABILIDADE (§8). Snapshot imutável
-  // do preço/contexto no momento da criação; mudar a TabelaValor depois NÃO altera isto.
+  // PREÃO-FONTE-ÃNICA â CONGELAMENTO (Â§6) + RASTREABILIDADE (Â§8). Snapshot imutÃ¡vel
+  // do preÃ§o/contexto no momento da criaÃ§Ã£o; mudar a TabelaValor depois NÃO altera isto.
   valorUnitario       Decimal?       @db.Decimal(12, 2)
   quantidade          Decimal?       @db.Decimal(12, 2)
   valorTotalCongelado Decimal?       @db.Decimal(12, 2)
   modoCalculoAplicado String?        @db.VarChar(20)
-  naturezaPreco       NaturezaPreco? // CUSTO | VENDA (a Receita é o lançamento; a natureza do PREÇO usado)
-  configFinanceiraId  Int? // → ProdutoFinanceiro.id (Configuração Financeira; solto/snapshot)
-  regraFinanceiraId   Int? // → PhaseEconomicRule/PhaseTriggerRule.id que decidiu a criação (solto/snapshot)
-  contextoAplicado    Json? // dimensões usadas na resolução (tipoProcesso/fornecedor/regiao/qtd…)
-  dataReferencia      DateTime? // data de referência do preço aplicado
-  chaveIdempotencia   String?        @db.VarChar(200) // = MotorArtefato.automaticKey (unicidade vive lá)
+  naturezaPreco       NaturezaPreco? // CUSTO | VENDA (a Receita Ã© o lanÃ§amento; a natureza do PREÃO usado)
+  configFinanceiraId  Int? // â ProdutoFinanceiro.id (ConfiguraÃ§Ã£o Financeira; solto/snapshot)
+  regraFinanceiraId   Int? // â PhaseEconomicRule/PhaseTriggerRule.id que decidiu a criaÃ§Ã£o (solto/snapshot)
+  contextoAplicado    Json? // dimensÃµes usadas na resoluÃ§Ã£o (tipoProcesso/fornecedor/regiao/qtdâ¦)
+  dataReferencia      DateTime? // data de referÃªncia do preÃ§o aplicado
+  chaveIdempotencia   String?        @db.VarChar(200) // = MotorArtefato.automaticKey (unicidade vive lÃ¡)
 
-  // §5/§7 — origem e competência do lançamento canônico do PROCESSO.
+  // Â§5/Â§7 â origem e competÃªncia do lanÃ§amento canÃ´nico do PROCESSO.
   origemLancamento    String    @default("PROCESSO") @db.VarChar(20) // PROCESSO (Receita nasce de processo)
-  naturezaLancamento  String    @default("RECEITA") @db.VarChar(10) // §1 — natureza do LANÇAMENTO (Receita ⇒ RECEITA)
-  eventoOperacionalId String?   @db.VarChar(120) // evento operacional que originou (rastreabilidade §5/§8)
-  dataCompetencia     DateTime? // competência contábil (Fluxo de Caixa projetado / DRE)
-  // §10 CANCELAMENTO (preserva histórico) — cancelada/status seguem como flag/estado.
+  naturezaLancamento  String    @default("RECEITA") @db.VarChar(10) // Â§1 â natureza do LANÃAMENTO (Receita â RECEITA)
+  eventoOperacionalId String?   @db.VarChar(120) // evento operacional que originou (rastreabilidade Â§5/Â§8)
+  dataCompetencia     DateTime? // competÃªncia contÃ¡bil (Fluxo de Caixa projetado / DRE)
+  // Â§10 CANCELAMENTO (preserva histÃ³rico) â cancelada/status seguem como flag/estado.
   canceladoEm         DateTime?
   canceladoMotivo     String?   @db.VarChar(500)
-  canceladoPorId      Int? // → Usuario.id (ator; solto/snapshot)
+  canceladoPorId      Int? // â Usuario.id (ator; solto/snapshot)
   canceladoEventoRef  String?   @db.VarChar(120) // evento de origem do cancelamento
-  chaveCancelamento   String?   @unique @db.VarChar(220) // §12 idempotência do cancelamento
-  // §11 ESTORNO — este lançamento é o movimento INVERSO de estornoDeId (self-relation).
-  estornadoEm         DateTime? // setado no lançamento ORIGINAL quando estornado
+  chaveCancelamento   String?   @unique @db.VarChar(220) // Â§12 idempotÃªncia do cancelamento
+  // Â§11 ESTORNO â este lanÃ§amento Ã© o movimento INVERSO de estornoDeId (self-relation).
+  estornadoEm         DateTime? // setado no lanÃ§amento ORIGINAL quando estornado
   estornoMotivo       String?   @db.VarChar(500)
-  estornoDeId         Int?      @unique // um estorno por original (§12)
+  estornoDeId         Int?      @unique // um estorno por original (Â§12)
   estornoDe           Receita?  @relation("ReceitaEstorno", fields: [estornoDeId], references: [id])
   estornos            Receita[] @relation("ReceitaEstorno")
-  chaveEstorno        String?   @unique @db.VarChar(220) // §12 idempotência do estorno
+  chaveEstorno        String?   @unique @db.VarChar(220) // Â§12 idempotÃªncia do estorno
 
-  // ── CONDIÇÃO DE PAGAMENTO APLICADA (congelada no lançamento) ──
-  // Guarda QUAL condição e QUAL versão geraram este cronograma, o resultado do
-  // cálculo de taxas e a memória. Alterar a condição ou a taxa depois NUNCA
-  // recalcula este lançamento — ele carrega o que foi aplicado.
+  // ââ CONDIÃÃO DE PAGAMENTO APLICADA (congelada no lanÃ§amento) ââ
+  // Guarda QUAL condiÃ§Ã£o e QUAL versÃ£o geraram este cronograma, o resultado do
+  // cÃ¡lculo de taxas e a memÃ³ria. Alterar a condiÃ§Ã£o ou a taxa depois NUNCA
+  // recalcula este lanÃ§amento â ele carrega o que foi aplicado.
   condicaoPagamentoId Int?
   condicaoPagamento   CondicaoPagamento? @relation("ReceitaCondicaoPagamento", fields: [condicaoPagamentoId], references: [id])
   condicaoVersao      Int?
@@ -1356,36 +1356,36 @@ model Custo {
   tipoServicoId    Int?
   tipoServico      TipoServico? @relation(fields: [tipoServicoId], references: [id], onDelete: SetNull)
   phaseKey         String?      @db.VarChar(60)
-  productServiceId Int? // → ServicoProduto (catálogo; solto por ora)
+  productServiceId Int? // â ServicoProduto (catÃ¡logo; solto por ora)
   origem           String       @default("manual") @db.VarChar(20) // manual | motor | migration
 
-  phaseCycle    Int? // ciclo da fase (reemissão)
-  pricingRuleId Int? // qual regra de preço (TabelaValor.id) resolveu o valor — congelado
+  phaseCycle    Int? // ciclo da fase (reemissÃ£o)
+  pricingRuleId Int? // qual regra de preÃ§o (TabelaValor.id) resolveu o valor â congelado
 
-  // PREÇO-FONTE-ÚNICA — CONGELAMENTO (§6) + RASTREABILIDADE (§8). Snapshot imutável.
+  // PREÃO-FONTE-ÃNICA â CONGELAMENTO (Â§6) + RASTREABILIDADE (Â§8). Snapshot imutÃ¡vel.
   valorUnitario       Decimal?       @db.Decimal(12, 2)
   quantidade          Decimal?       @db.Decimal(12, 2)
   valorTotalCongelado Decimal?       @db.Decimal(12, 2)
   modoCalculoAplicado String?        @db.VarChar(20)
-  naturezaPreco       NaturezaPreco? // CUSTO | VENDA (natureza do PREÇO usado)
-  configFinanceiraId  Int? // → ProdutoFinanceiro.id (Configuração Financeira; solto/snapshot)
-  regraFinanceiraId   Int? // → PhaseEconomicRule/PhaseTriggerRule.id que decidiu a criação (solto/snapshot)
-  contextoAplicado    Json? // dimensões usadas na resolução
+  naturezaPreco       NaturezaPreco? // CUSTO | VENDA (natureza do PREÃO usado)
+  configFinanceiraId  Int? // â ProdutoFinanceiro.id (ConfiguraÃ§Ã£o Financeira; solto/snapshot)
+  regraFinanceiraId   Int? // â PhaseEconomicRule/PhaseTriggerRule.id que decidiu a criaÃ§Ã£o (solto/snapshot)
+  contextoAplicado    Json? // dimensÃµes usadas na resoluÃ§Ã£o
   dataReferencia      DateTime?
   chaveIdempotencia   String?        @db.VarChar(200) // = MotorArtefato.automaticKey
 
-  // §5/§7 — origem e competência do lançamento canônico do PROCESSO.
+  // Â§5/Â§7 â origem e competÃªncia do lanÃ§amento canÃ´nico do PROCESSO.
   origemLancamento    String    @default("PROCESSO") @db.VarChar(20)
-  naturezaLancamento  String    @default("CUSTO") @db.VarChar(10) // §1 — Custo ⇒ CUSTO
+  naturezaLancamento  String    @default("CUSTO") @db.VarChar(10) // Â§1 â Custo â CUSTO
   eventoOperacionalId String?   @db.VarChar(120)
   dataCompetencia     DateTime?
-  // §10 CANCELAMENTO
+  // Â§10 CANCELAMENTO
   canceladoEm         DateTime?
   canceladoMotivo     String?   @db.VarChar(500)
   canceladoPorId      Int?
   canceladoEventoRef  String?   @db.VarChar(120)
   chaveCancelamento   String?   @unique @db.VarChar(220)
-  // §11 ESTORNO — movimento inverso (self-relation)
+  // Â§11 ESTORNO â movimento inverso (self-relation)
   estornadoEm         DateTime?
   estornoMotivo       String?   @db.VarChar(500)
   estornoDeId         Int?      @unique
@@ -1393,10 +1393,10 @@ model Custo {
   estornos            Custo[]   @relation("CustoEstorno")
   chaveEstorno        String?   @unique @db.VarChar(220)
 
-  // ── CONDIÇÃO DE PAGAMENTO APLICADA (congelada no lançamento) ──
-  // Guarda QUAL condição e QUAL versão geraram este cronograma, o resultado do
-  // cálculo de taxas e a memória. Alterar a condição ou a taxa depois NUNCA
-  // recalcula este lançamento — ele carrega o que foi aplicado.
+  // ââ CONDIÃÃO DE PAGAMENTO APLICADA (congelada no lanÃ§amento) ââ
+  // Guarda QUAL condiÃ§Ã£o e QUAL versÃ£o geraram este cronograma, o resultado do
+  // cÃ¡lculo de taxas e a memÃ³ria. Alterar a condiÃ§Ã£o ou a taxa depois NUNCA
+  // recalcula este lanÃ§amento â ele carrega o que foi aplicado.
   condicaoPagamentoId Int?
   condicaoPagamento   CondicaoPagamento? @relation("CustoCondicaoPagamento", fields: [condicaoPagamentoId], references: [id])
   condicaoVersao      Int?
@@ -1419,61 +1419,62 @@ model Custo {
 }
 
 // ============================================================================
-// COBRANÇA — COMO uma Receita será cobrada (separada da Receita e do Pagamento).
-// A Receita é só o contrato (o que o motor gerou). A Cobrança define forma/condição/
+// COBRANÃA â COMO uma Receita serÃ¡ cobrada (separada da Receita e do Pagamento).
+// A Receita Ã© sÃ³ o contrato (o que o motor gerou). A CobranÃ§a define forma/condiÃ§Ã£o/
 // parcelamento/conta/carteira/gateway/encargos, consumindo EXCLUSIVAMENTE os cadastros
-// de Gerenciamento por ID (nunca duplica config). Uma Receita pode ter 1..N Cobranças.
-// As Parcelas pertencem à Cobrança; os Pagamentos (EventoFinanceiro) vinculam à Cobrança,
-// nunca à Receita. Aditivo: legado (parcelas direto na Receita) permanece intacto.
+// de Gerenciamento por ID (nunca duplica config). Uma Receita pode ter 1..N CobranÃ§as.
+// As Parcelas pertencem Ã  CobranÃ§a; os Pagamentos (EventoFinanceiro) vinculam Ã  CobranÃ§a,
+// nunca Ã  Receita. Aditivo: legado (parcelas direto na Receita) permanece intacto.
 // ============================================================================
 model Cobranca {
-  id         Int      @id @default(autoincrement())
-  receitaId  Int
-  receita    Receita  @relation("ReceitaCobrancas", fields: [receitaId], references: [id], onDelete: Cascade)
-  processoId Int // snapshot p/ consulta rápida
-  // IDs do Gerenciamento → Financeiro (FONTE ÚNICA — só referência, nunca cópia):
-  formaPagamentoId    Int? // → FormaPagamentoCadastro
-  condicaoPagamentoId Int? // → CondicaoPagamento
-  contaBancariaId     Int? // → ContaBancaria
-  carteiraId          Int? // → CarteiraRecebimento
-  taxaPagamentoId     Int? // → TaxaPagamento
-  gateway             String? @db.VarChar(40)
-  moeda      Moeda    @default(EUR)
-  valorTotal Decimal  @db.Decimal(12, 2)
-  status     String   @default("ABERTA") @db.VarChar(20) // ABERTA | PARCIAL | QUITADA | CANCELADA | RENEGOCIADA
-  // congelamento auditável da condição no momento da criação
-  condicaoVersao Int?
-  condicaoCodigo String? @db.VarChar(60)
-  memoriaCalculo Json?
-  observacoes    String?
-  criadoPorId    Int?
-  criadoEm       DateTime @default(now())
-  atualizadoEm   DateTime @updatedAt
+  id                  Int      @id @default(autoincrement())
+  receitaId           Int
+  receita             Receita  @relation("ReceitaCobrancas", fields: [receitaId], references: [id], onDelete: Cascade)
+  processoId          Int // snapshot p/ consulta rÃ¡pida
+  // IDs do Gerenciamento â Financeiro (FONTE ÃNICA â sÃ³ referÃªncia, nunca cÃ³pia):
+  formaPagamentoId    Int? // â FormaPagamentoCadastro
+  condicaoPagamentoId Int? // â CondicaoPagamento
+  contaBancariaId     Int? // â ContaBancaria
+  carteiraId          Int? // â CarteiraRecebimento
+  taxaPagamentoId     Int? // â TaxaPagamento
+  gateway             String?  @db.VarChar(40)
+  moeda               Moeda    @default(EUR)
+  valorTotal          Decimal  @db.Decimal(12, 2)
+  status              String   @default("ABERTA") @db.VarChar(20) // ABERTA | PARCIAL | QUITADA | CANCELADA | RENEGOCIADA
+  // congelamento auditÃ¡vel da condiÃ§Ã£o no momento da criaÃ§Ã£o
+  condicaoVersao      Int?
+  condicaoCodigo      String?  @db.VarChar(60)
+  memoriaCalculo      Json?
+  observacoes         String?
+  criadoPorId         Int?
+  criadoEm            DateTime @default(now())
+  atualizadoEm        DateTime @updatedAt
 
-  // ── RUNTIME DE CÁLCULO (auditoria; congelado na confirmação) ──
-  // Não é cadastro — é o RESULTADO calculado pelo ChargeCalculationService.
-  politicaTaxas  String?  @db.VarChar(30) // IGNORAR | REPASSAR | ABSORVER (efetiva)
-  valorBase      Decimal? @db.Decimal(12, 2) // valor da Receita antes de taxa
-  valorTaxa      Decimal? @db.Decimal(12, 2)
-  valorRepassado Decimal? @db.Decimal(12, 2) // taxa somada ao total (REPASSAR)
-  valorAbsorvido Decimal? @db.Decimal(12, 2) // taxa que reduz o líquido (ABSORVER)
-  valorLiquido   Decimal? @db.Decimal(12, 2) // previsto para a empresa
-  // câmbio (quando há conversão): estimado no rascunho, congelado na confirmação
-  moedaOrigem  String?   @db.VarChar(10)
-  moedaDestino String?   @db.VarChar(10) // moeda de RECEBIMENTO (destino da conversão)
-  cotacao      Decimal?  @db.Decimal(12, 6)
-  cotacaoData  DateTime?
-  cotacaoFonte String?   @db.VarChar(40)
-  cotacaoTipo  String?   @db.VarChar(20) // MESMA | AUTOMATICA | MANUAL | ESTIMADA
-  cotacaoId    Int? // → CotacaoCambio.id (quando automática)
-  cotacaoManualPorId Int? // → Usuario.id (quando manual)
-  cotacaoJustificativa String? @db.VarChar(300)
-  congeladaEm  DateTime? // marca o congelamento (confirmação); depois não recalcula
+  // ââ RUNTIME DE CÃLCULO (auditoria; congelado na confirmaÃ§Ã£o) ââ
+  // NÃ£o Ã© cadastro â Ã© o RESULTADO calculado pelo ChargeCalculationService.
+  politicaTaxas        String?   @db.VarChar(30) // IGNORAR | REPASSAR | ABSORVER (efetiva)
+  valorBase            Decimal?  @db.Decimal(12, 2) // valor da Receita antes de taxa
+  valorTaxa            Decimal?  @db.Decimal(12, 2)
+  valorRepassado       Decimal?  @db.Decimal(12, 2) // taxa somada ao total (REPASSAR)
+  valorAbsorvido       Decimal?  @db.Decimal(12, 2) // taxa que reduz o lÃ­quido (ABSORVER)
+  valorLiquido         Decimal?  @db.Decimal(12, 2) // previsto para a empresa
+  // cÃ¢mbio (quando hÃ¡ conversÃ£o): estimado no rascunho, congelado na confirmaÃ§Ã£o
+  moedaOrigem          String?   @db.VarChar(10)
+  moedaDestino         String?   @db.VarChar(10) // moeda de RECEBIMENTO (destino da conversÃ£o)
+  cotacao              Decimal?  @db.Decimal(12, 6)
+  cotacaoData          DateTime?
+  cotacaoFonte         String?   @db.VarChar(40)
+  cotacaoTipo          String?   @db.VarChar(20) // MESMA | AUTOMATICA | MANUAL | ESTIMADA
+  cotacaoId            Int? // â CotacaoCambio.id (quando automÃ¡tica)
+  cotacaoManualPorId   Int? // â Usuario.id (quando manual)
+  cotacaoJustificativa String?   @db.VarChar(300)
+  congeladaEm          DateTime? // marca o congelamento (confirmaÃ§Ã£o); depois nÃ£o recalcula
   // snapshot da adquirente/bandeira usadas (aditivo; populado pelo runtime)
-  adquirenteId Int? // → Adquirente.id
-  bandeiraId   Int? // → Bandeira.id
-  // Idempotência da criação: mesma chave nunca gera duas cobranças (retry seguro).
-  idempotencyKey String? @unique @db.VarChar(80)
+  adquirenteId         Int? // â Adquirente.id
+  bandeiraId           Int? // â Bandeira.id
+  // IdempotÃªncia da criaÃ§Ã£o: mesma chave nunca gera duas cobranÃ§as (retry seguro).
+  idempotencyKey       String?   @unique @db.VarChar(80)
+  obrigacaoId          Int? // → ObrigacaoEconomica (motor V3, aditivo)
 
   parcelas ParcelaFinanceira[] @relation("CobrancaParcelas")
   eventos  EventoFinanceiro[]  @relation("CobrancaEventos")
@@ -1499,7 +1500,7 @@ model ParcelaFinanceira {
   comprovanteUrl  String?
   comprovanteNome String?         @db.VarChar(200)
   observacoes     String?
-  // Parcela de ENTRADA definida pela Condição de Pagamento.
+  // Parcela de ENTRADA definida pela CondiÃ§Ã£o de Pagamento.
   entrada         Boolean         @default(false)
   valorTaxa       Decimal?        @db.Decimal(12, 2)
   valorLiquido    Decimal?        @db.Decimal(12, 2)
@@ -1507,7 +1508,7 @@ model ParcelaFinanceira {
   updatedAt       DateTime        @updatedAt
   custo           Custo?          @relation(fields: [custoId], references: [id], onDelete: Cascade)
   receita         Receita?        @relation(fields: [receitaId], references: [id], onDelete: Cascade)
-  cobrancaId      Int? // → Cobranca (parcela pertence à Cobrança no modelo novo). Legado: null.
+  cobrancaId      Int? // â Cobranca (parcela pertence Ã  CobranÃ§a no modelo novo). Legado: null.
   cobranca        Cobranca?       @relation("CobrancaParcelas", fields: [cobrancaId], references: [id], onDelete: Cascade)
 
   @@unique([receitaId, numero])
@@ -1538,22 +1539,22 @@ model ReceitaRequerente {
 }
 
 model EventoFinanceiro {
-  id        Int                  @id @default(autoincrement())
-  receitaId Int?
-  custoId   Int?
-  usuarioId Int?
-  tipo      TipoEventoFinanceiro
-  descricao String               @db.VarChar(500)
-  valor     Decimal?             @db.Decimal(12, 2)
-  cambio    Decimal?             @db.Decimal(10, 4)
-  valorBrl  Decimal?             @db.Decimal(12, 2)
-  dados     Json?
-  createdAt DateTime             @default(now())
-  custo     Custo?               @relation(fields: [custoId], references: [id], onDelete: Cascade)
-  receita   Receita?             @relation(fields: [receitaId], references: [id], onDelete: Cascade)
-  cobrancaId Int? // → Cobranca (pagamento vincula à Cobrança, nunca direto à Receita). Legado: null.
+  id         Int                  @id @default(autoincrement())
+  receitaId  Int?
+  custoId    Int?
+  usuarioId  Int?
+  tipo       TipoEventoFinanceiro
+  descricao  String               @db.VarChar(500)
+  valor      Decimal?             @db.Decimal(12, 2)
+  cambio     Decimal?             @db.Decimal(10, 4)
+  valorBrl   Decimal?             @db.Decimal(12, 2)
+  dados      Json?
+  createdAt  DateTime             @default(now())
+  custo      Custo?               @relation(fields: [custoId], references: [id], onDelete: Cascade)
+  receita    Receita?             @relation(fields: [receitaId], references: [id], onDelete: Cascade)
+  cobrancaId Int? // â Cobranca (pagamento vincula Ã  CobranÃ§a, nunca direto Ã  Receita). Legado: null.
   cobranca   Cobranca?            @relation("CobrancaEventos", fields: [cobrancaId], references: [id], onDelete: Cascade)
-  usuario   Usuario?             @relation("EventoFinanceiroUsuario", fields: [usuarioId], references: [id])
+  usuario    Usuario?             @relation("EventoFinanceiroUsuario", fields: [usuarioId], references: [id])
 
   @@index([receitaId])
   @@index([cobrancaId])
@@ -1563,7 +1564,7 @@ model EventoFinanceiro {
 }
 
 // ============================================================
-// ANÁLISE DOCUMENTAL (fase de PROCESSO — compara árvore × documentos)
+// ANÃLISE DOCUMENTAL (fase de PROCESSO â compara Ã¡rvore Ã documentos)
 // ============================================================
 model AnaliseDocumental {
   id         Int      @id @default(autoincrement())
@@ -1581,7 +1582,7 @@ model AnaliseDocumental {
   camposComparados     Int     @default(0)
   resumoIA             String? @db.Text
 
-  // null (ainda não) | "com_retificacao" | "sem_retificacao"
+  // null (ainda nÃ£o) | "com_retificacao" | "sem_retificacao"
   decisaoJuridica   String? @db.VarChar(20)
   requerRetificacao Boolean @default(false)
 
@@ -1601,7 +1602,7 @@ model Divergencia {
   analiseId Int
   analise   AnaliseDocumental @relation(fields: [analiseId], references: [id], onDelete: Cascade)
 
-  // Snapshots (auto-contido — não quebra se a pessoa/doc mudar depois)
+  // Snapshots (auto-contido â nÃ£o quebra se a pessoa/doc mudar depois)
   pessoaId        Int?
   pessoaNome      String  @db.VarChar(200)
   geracao         Int?
@@ -1616,7 +1617,7 @@ model Divergencia {
   valorArvore    String? @db.VarChar(300)
   valorDocumento String? @db.VarChar(300)
 
-  // Classificação da comparação
+  // ClassificaÃ§Ã£o da comparaÃ§Ã£o
   tipo                String  @db.VarChar(40) // "nome" | "filiacao" | "localidade"...
   severidade          String  @db.VarChar(10) // "baixa" | "media" | "critica"
   sugestaoIA          String? @db.VarChar(300)
@@ -1624,7 +1625,7 @@ model Divergencia {
   impacto             String? @db.VarChar(300)
   requerRetificacaoIA Boolean @default(false)
 
-  // Decisão humana: "pendente" | "aceita" | "ressalva" | "ignorada" | "retificacao" | "apoio_solicitado"
+  // DecisÃ£o humana: "pendente" | "aceita" | "ressalva" | "ignorada" | "retificacao" | "apoio_solicitado"
   status        String    @default("pendente") @db.VarChar(20)
   decididoPorId Int?
   decididoEm    DateTime?
@@ -1644,7 +1645,7 @@ model PastaTraducao {
   processo        Processo                 @relation(fields: [processoId], references: [id], onDelete: Cascade)
   status          String                   @default("em_andamento") // em_andamento | concluida
   currentStep     String                   @default("montar_pasta_traducao")
-  sourceLanguage  String                   @default("Português")
+  sourceLanguage  String                   @default("PortuguÃªs")
   targetLanguage  String                   @default("Italiano")
   translatorName  String?
   translatorEmail String?
@@ -1653,7 +1654,7 @@ model PastaTraducao {
   sentAt          DateTime?
   receivedAt      DateTime?
   validatedAt     DateTime?
-  validatedById   Int? // snapshot, sem FK (mesmo padrão da Análise)
+  validatedById   Int? // snapshot, sem FK (mesmo padrÃ£o da AnÃ¡lise)
   workflow        Json? // 6 passos TR_STEPS: [{id,title,status,doneAt}]
   documentos      PastaTraducaoDocumento[]
   createdAt       DateTime                 @default(now())
@@ -1746,7 +1747,7 @@ model RetificacaoPacote {
   status         String   @default("em_preparacao") // em_preparacao|protocolado|em_exigencia|decisao_recebida|validado|bloqueado
   currentStep    String   @default("definir_estrategia")
   motivo         String?
-  prioridade     String?  @default("Média")
+  prioridade     String?  @default("MÃ©dia")
   proxAcao       String?
   // Judicial
   processoNum    String?
@@ -1764,9 +1765,9 @@ model RetificacaoPacote {
   atendente      String?
   prazo          String?
   statusAdm      String?
-  // Variáveis (Json)
+  // VariÃ¡veis (Json)
   workflow       Json? // 6 passos RET_STEPS
-  divergenceIds  Json? // divergências vinculadas (snapshot)
+  divergenceIds  Json? // divergÃªncias vinculadas (snapshot)
   affectedDocIds Json? // documentos afetados (snapshot)
   movements      Json? // [{data,tipo,desc,resp,prox}]
   attachments    Json? // [{nome,cat,data,por,obs}]
@@ -1790,7 +1791,7 @@ model EmissaoRetificada {
   correcaoOld       String?
   correcaoNovo      String?
   status            String   @default("pendente_averbacao")
-  nextAction        String   @default("Enviar pedido de averbação ao cartório")
+  nextAction        String   @default("Enviar pedido de averbaÃ§Ã£o ao cartÃ³rio")
   workflow          Json // 6 etapas RE_STEPS + blocos averbacao/solicitation/receipt/conference/validation
   retifiedValidated Boolean  @default(false)
   createdAt         DateTime @default(now())
@@ -1803,7 +1804,7 @@ model EmissaoRetificada {
 model Banco {
   id           Int             @id @default(autoincrement())
   codigo       String? // ex.: "341"
-  nome         String // obrigatório
+  nome         String // obrigatÃ³rio
   sigla        String?
   pais         String?
   website      String?
@@ -1814,31 +1815,31 @@ model Banco {
 }
 
 model CotacaoCambio {
-  id           Int       @id @default(autoincrement())
-  moedaDe      Moeda // De
-  moedaPara    Moeda // Para
-  taxa         Decimal   @db.Decimal(14, 6)
-  data         DateTime?
-  fonte        String?   @db.VarChar(100)
-  ativo        Boolean   @default(true)
-  // ── Câmbio automático Confidence (ADITIVO — não duplica conceito) ──────────
-  // Registros manuais legados têm estes campos NULL (compat). A cotação oficial
-  // automática nasce com origem=CONFIDENCE_AUTOMATICO; a manual de contingência
-  // com origem=MANUAL. Unicidade/idempotência por (moeda,destino,dataRef,modalidade,
-  // origem,payloadHash): mesmo conteúdo não duplica; conteúdo novo p/ a mesma data
-  // é REVISÃO auditável (nova linha + substituiId), sem apagar histórico.
-  dataReferencia    DateTime? // data REAL da fonte (dia comercial da cotação)
+  id                Int       @id @default(autoincrement())
+  moedaDe           Moeda // De
+  moedaPara         Moeda // Para
+  taxa              Decimal   @db.Decimal(14, 6)
+  data              DateTime?
+  fonte             String?   @db.VarChar(100)
+  ativo             Boolean   @default(true)
+  // ââ CÃ¢mbio automÃ¡tico Confidence (ADITIVO â nÃ£o duplica conceito) ââââââââââ
+  // Registros manuais legados tÃªm estes campos NULL (compat). A cotaÃ§Ã£o oficial
+  // automÃ¡tica nasce com origem=CONFIDENCE_AUTOMATICO; a manual de contingÃªncia
+  // com origem=MANUAL. Unicidade/idempotÃªncia por (moeda,destino,dataRef,modalidade,
+  // origem,payloadHash): mesmo conteÃºdo nÃ£o duplica; conteÃºdo novo p/ a mesma data
+  // Ã© REVISÃO auditÃ¡vel (nova linha + substituiId), sem apagar histÃ³rico.
+  dataReferencia    DateTime? // data REAL da fonte (dia comercial da cotaÃ§Ã£o)
   consultadoEm      DateTime? // quando o provider efetivamente consultou
   origem            String?   @db.VarChar(30) // CONFIDENCE_AUTOMATICO | MANUAL
   modalidade        String?   @db.VarChar(40) // ex.: ecommerce_especie_venda
   statusIntegracao  String?   @db.VarChar(30) // ATUALIZADO | SEM_NOVA_PUBLICACAO | DESATUALIZADO | INDISPONIVEL | CONFIGURACAO_PENDENTE
   payloadHash       String?   @db.VarChar(80)
   urlFonte          String?   @db.VarChar(300)
-  vigente           Boolean   @default(false) // cotação VIGENTE p/ (moedaDe,moedaPara,modalidade)
-  semNovaPublicacao Boolean   @default(false) // true = manteve a última válida (fonte não publicou hoje)
-  substituiId       Int? // revisão: aponta a versão anterior da mesma dataReferencia
-  criadoEm     DateTime  @default(now())
-  atualizadoEm DateTime  @updatedAt
+  vigente           Boolean   @default(false) // cotaÃ§Ã£o VIGENTE p/ (moedaDe,moedaPara,modalidade)
+  semNovaPublicacao Boolean   @default(false) // true = manteve a Ãºltima vÃ¡lida (fonte nÃ£o publicou hoje)
+  substituiId       Int? // revisÃ£o: aponta a versÃ£o anterior da mesma dataReferencia
+  criadoEm          DateTime  @default(now())
+  atualizadoEm      DateTime  @updatedAt
 
   @@unique([moedaDe, moedaPara, dataReferencia, modalidade, origem, payloadHash], name: "uq_cotacao_confidence")
   @@index([moedaDe, moedaPara, vigente])
@@ -1890,7 +1891,7 @@ model CarteiraRecebimento {
 }
 
 model ProdutoFinanceiro {
-  publicCode          String?              @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
+  publicCode          String?              @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
   id                  Int                  @id @default(autoincrement())
   codigo              String               @db.VarChar(30)
   nome                String               @db.VarChar(200)
@@ -1898,29 +1899,29 @@ model ProdutoFinanceiro {
   tipoFinanceiro      String?              @db.VarChar(20) // financialType
   categoriaId         Int?
   categoria           CategoriaFinanceira? @relation(fields: [categoriaId], references: [id])
-  // CONTA CONTÁBIL — LEGADO (conta única). Preservado (sem DROP). Migrado p/ as duas
-  // contas por natureza abaixo. Não é mais editado na UI; serve de fallback histórico.
+  // CONTA CONTÃBIL â LEGADO (conta Ãºnica). Preservado (sem DROP). Migrado p/ as duas
+  // contas por natureza abaixo. NÃ£o Ã© mais editado na UI; serve de fallback histÃ³rico.
   planoContaId        Int?
   planoConta          PlanoConta?          @relation("ConfigFinPlanoConta", fields: [planoContaId], references: [id])
-  // CONTA CONTÁBIL POR NATUREZA (aditivo) — Receita usada ao gerar RECEITA; Custo ao
-  // gerar CUSTO (FinanceRuleEngine). Exigidas conforme naturezaFin (SOMENTE_RECEITA →
-  // só receita; SOMENTE_CUSTO → só custo; CUSTO_E_RECEITA → ambas).
+  // CONTA CONTÃBIL POR NATUREZA (aditivo) â Receita usada ao gerar RECEITA; Custo ao
+  // gerar CUSTO (FinanceRuleEngine). Exigidas conforme naturezaFin (SOMENTE_RECEITA â
+  // sÃ³ receita; SOMENTE_CUSTO â sÃ³ custo; CUSTO_E_RECEITA â ambas).
   planoContaReceitaId Int?
   planoContaReceita   PlanoConta?          @relation("ConfigFinContaReceita", fields: [planoContaReceitaId], references: [id])
   planoContaCustoId   Int?
   planoContaCusto     PlanoConta?          @relation("ConfigFinContaCusto", fields: [planoContaCustoId], references: [id])
   moedaPadrao         Moeda                @default(BRL)
-  valorPadrao         Decimal?             @db.Decimal(12, 2) // LEGADO: fallback único (pré-unificação). NÃO é preço — migrar p/ TabelaValor.
-  // M-UNIFICA — UMA config por mestre. possuiCusto/possuiReceita seguem sendo a
+  valorPadrao         Decimal?             @db.Decimal(12, 2) // LEGADO: fallback Ãºnico (prÃ©-unificaÃ§Ã£o). NÃO Ã© preÃ§o â migrar p/ TabelaValor.
+  // M-UNIFICA â UMA config por mestre. possuiCusto/possuiReceita seguem sendo a
   // fonte de "o QUE o item pode gerar" (derivam naturezaFin abaixo).
   possuiCusto         Boolean              @default(false)
   possuiReceita       Boolean              @default(false)
-  // PREÇO-FONTE-ÚNICA (aditivo): a Configuração Financeira NÃO guarda mais preço.
-  // Estes campos viram LEGADO — migrados p/ TabelaValor (CUSTO/VENDA) pelo backfill
-  // `backfill-precos-legado-tabelavalor.ts`. Preservados até a migration de remoção.
-  valorCustoPadrao    Decimal?             @db.Decimal(12, 2) // LEGADO → TabelaValor(natureza=CUSTO)
-  valorReceitaPadrao  Decimal?             @db.Decimal(12, 2) // LEGADO → TabelaValor(natureza=VENDA)
-  // Natureza financeira canônica (o QUE é o item). Nullable durante a transição;
+  // PREÃO-FONTE-ÃNICA (aditivo): a ConfiguraÃ§Ã£o Financeira NÃO guarda mais preÃ§o.
+  // Estes campos viram LEGADO â migrados p/ TabelaValor (CUSTO/VENDA) pelo backfill
+  // `backfill-precos-legado-tabelavalor.ts`. Preservados atÃ© a migration de remoÃ§Ã£o.
+  valorCustoPadrao    Decimal?             @db.Decimal(12, 2) // LEGADO â TabelaValor(natureza=CUSTO)
+  valorReceitaPadrao  Decimal?             @db.Decimal(12, 2) // LEGADO â TabelaValor(natureza=VENDA)
+  // Natureza financeira canÃ´nica (o QUE Ã© o item). Nullable durante a transiÃ§Ã£o;
   // deriva de possuiCusto/possuiReceita quando ausente (deriveNaturezaFinanceira).
   naturezaFin         NaturezaFinanceira?
   aplicaA             String?              @db.VarChar(20) // appliesTo
@@ -1929,25 +1930,25 @@ model ProdutoFinanceiro {
   criadoEm            DateTime             @default(now())
   atualizadoEm        DateTime             @updatedAt
   naturezaFinanceira  String?              @default("revenue") @db.VarChar(20)
-  // DEPRECIADO (redundante com naturezaFin): apenas indicava que o item gera custo —
-  // o que já é determinado pela Natureza Financeira (SOMENTE_CUSTO/CUSTO_E_RECEITA).
-  // Removido da UI. Coluna preservada (sem DROP) só por compatibilidade de dados.
+  // DEPRECIADO (redundante com naturezaFin): apenas indicava que o item gera custo â
+  // o que jÃ¡ Ã© determinado pela Natureza Financeira (SOMENTE_CUSTO/CUSTO_E_RECEITA).
+  // Removido da UI. Coluna preservada (sem DROP) sÃ³ por compatibilidade de dados.
   custoInterno        Boolean              @default(false)
-  // REPASSE — conceito ÚNICO: item é um valor de TERCEIROS repassado ao cliente
-  // (pass-through, sem margem/serviço próprio do escritório). NÃO confundir com
+  // REPASSE â conceito ÃNICO: item Ã© um valor de TERCEIROS repassado ao cliente
+  // (pass-through, sem margem/serviÃ§o prÃ³prio do escritÃ³rio). NÃO confundir com
   // TabelaValor/valorRealRepasse (repasse de VALOR em template) nem com cobravelDoCliente.
   repasse             Boolean              @default(false)
-  // REEMBOLSÁVEL — significado EXCLUSIVO: os CUSTOS gerados por este item podem ser
-  // reembolsados pelo cliente. Só faz sentido quando o item gera custo (validado na API).
+  // REEMBOLSÃVEL â significado EXCLUSIVO: os CUSTOS gerados por este item podem ser
+  // reembolsados pelo cliente. SÃ³ faz sentido quando o item gera custo (validado na API).
   reembolsavel        Boolean              @default(false)
   servicos            ServicoProduto[]     @relation("ServicoProdutoItens")
   itemCatalogoId      Int?
   itemCatalogo        ItemCatalogo?        @relation(fields: [itemCatalogoId], references: [id])
 
-  // F1 — Configuração Financeira canônica: FKs DIRETAS aos mestres reais.
-  // itemCatalogoId é o pivô (spine) e alvo de preço (TabelaValor/resolverPreco).
-  // Exatamente UM mestre é apontado. O papel financeiro NÃO vive mais aqui —
-  // custo/receita são valores desta config (M-UNIFICA); papel só em TabelaValor.natureza.
+  // F1 â ConfiguraÃ§Ã£o Financeira canÃ´nica: FKs DIRETAS aos mestres reais.
+  // itemCatalogoId Ã© o pivÃ´ (spine) e alvo de preÃ§o (TabelaValor/resolverPreco).
+  // Exatamente UM mestre Ã© apontado. O papel financeiro NÃO vive mais aqui â
+  // custo/receita sÃ£o valores desta config (M-UNIFICA); papel sÃ³ em TabelaValor.natureza.
   tipoDocumentoId     Int?
   tipoDocumento       TipoDocumentoCadastro?     @relation("ConfigFinTipoDocumento", fields: [tipoDocumentoId], references: [id])
   honorarioId         Int?
@@ -1956,18 +1957,18 @@ model ProdutoFinanceiro {
   tipoProcesso        TipoProcessoNacionalidade? @relation("ConfigFinTipoProcesso", fields: [tipoProcessoId], references: [id])
   fornecedorPadraoId  Int?
   fornecedorPadrao    Fornecedor?                @relation("ConfigFinFornecedor", fields: [fornecedorPadraoId], references: [id])
-  // CONDIÇÃO DE PAGAMENTO PADRÃO — cada serviço/documento carrega a sua regra de
-  // cobrança. Nullable na adoção incremental: sem condição o motor mantém o
-  // comportamento histórico (1 parcela). Torna-se obrigatório após o backfill.
+  // CONDIÃÃO DE PAGAMENTO PADRÃO â cada serviÃ§o/documento carrega a sua regra de
+  // cobranÃ§a. Nullable na adoÃ§Ã£o incremental: sem condiÃ§Ã£o o motor mantÃ©m o
+  // comportamento histÃ³rico (1 parcela). Torna-se obrigatÃ³rio apÃ³s o backfill.
   condicaoPagamentoId Int?
   condicaoPagamento   CondicaoPagamento?         @relation("ConfigFinCondicaoPagamento", fields: [condicaoPagamentoId], references: [id])
-  // F2 — back-relations: aplicabilidade/automação apontam para esta config por FK
+  // F2 â back-relations: aplicabilidade/automaÃ§Ã£o apontam para esta config por FK
   econRulesCusto      PhaseEconomicRule[]        @relation("EconCustoConfig")
   econRulesReceita    PhaseEconomicRule[]        @relation("EconReceitaConfig")
   precosConfig        TabelaValor[]              @relation("PrecoConfig")
 
-  // M-UNIFICA — anti-duplicação: UMA configuração por item mestre (pivô).
-  // itemCatalogoId nulo é distinto no Postgres (não restringe configs sem pivô).
+  // M-UNIFICA â anti-duplicaÃ§Ã£o: UMA configuraÃ§Ã£o por item mestre (pivÃ´).
+  // itemCatalogoId nulo Ã© distinto no Postgres (nÃ£o restringe configs sem pivÃ´).
   @@unique([itemCatalogoId])
   @@index([itemCatalogoId])
   @@index([categoriaId])
@@ -1981,12 +1982,12 @@ model ProdutoFinanceiro {
   @@index([condicaoPagamentoId])
 }
 
-// ── Tabela de Valores (fin_values) ──
+// ââ Tabela de Valores (fin_values) ââ
 model TabelaValor {
-  publicCode                   String?            @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
+  publicCode                   String?            @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
   id                           Int                @id @default(autoincrement())
   name                         String             @db.VarChar(200)
-  // soltos por ora (viram FK quando o motor/serviços existirem)
+  // soltos por ora (viram FK quando o motor/serviÃ§os existirem)
   processoTipoId               String?            @db.VarChar(60)
   faseKey                      String?            @db.VarChar(60)
   produtoServicoId             String?            @db.VarChar(60)
@@ -1995,8 +1996,8 @@ model TabelaValor {
   fornecedor                   Fornecedor?        @relation(fields: [fornecedorId], references: [id])
   moeda                        Moeda              @default(EUR)
   valor                        Decimal            @default(0) @db.Decimal(12, 2)
-  // Preço "base + adicional por unidade" (ex.: honorários por requerente). Aditivo:
-  // quando modoCalculo indica cálculo por unidade, valorBase = 1ª unidade e
+  // PreÃ§o "base + adicional por unidade" (ex.: honorÃ¡rios por requerente). Aditivo:
+  // quando modoCalculo indica cÃ¡lculo por unidade, valorBase = 1Âª unidade e
   // valorAdicional = cada unidade extra. modoCalculo 'fixed' ignora estes campos.
   valorBase                    Decimal?           @db.Decimal(12, 2)
   valorAdicional               Decimal?           @db.Decimal(12, 2)
@@ -2007,13 +2008,13 @@ model TabelaValor {
   arquivado                    Boolean            @default(false)
   criadoEm                     DateTime           @default(now())
   atualizadoEm                 DateTime           @updatedAt
-  itemCatalogoId               Int? // → ItemCatalogo (o QUE está sendo precificado)
+  itemCatalogoId               Int? // â ItemCatalogo (o QUE estÃ¡ sendo precificado)
   itemCatalogo                 ItemCatalogo?      @relation(fields: [itemCatalogoId], references: [id])
-  natureza                     NaturezaPreco? // CUSTO ou RECEITA (independentes!). null = legado/ambíguo
-  regiao                       String?            @db.VarChar(60) // nível país/região da precedência
-  processoId                   Int? // preço específico de UM processo (nível + específico)
-  // F4 — CHAVE PRINCIPAL canônica: o preço pertence a uma Configuração Financeira
-  // (papel financeiro de uma entidade mestre). itemCatalogoId/natureza ficam só como legado.
+  natureza                     NaturezaPreco? // CUSTO ou RECEITA (independentes!). null = legado/ambÃ­guo
+  regiao                       String?            @db.VarChar(60) // nÃ­vel paÃ­s/regiÃ£o da precedÃªncia
+  processoId                   Int? // preÃ§o especÃ­fico de UM processo (nÃ­vel + especÃ­fico)
+  // F4 â CHAVE PRINCIPAL canÃ´nica: o preÃ§o pertence a uma ConfiguraÃ§Ã£o Financeira
+  // (papel financeiro de uma entidade mestre). itemCatalogoId/natureza ficam sÃ³ como legado.
   configuracaoFinanceiraItemId Int?
   configuracaoFinanceiraItem   ProdutoFinanceiro? @relation("PrecoConfig", fields: [configuracaoFinanceiraItemId], references: [id])
   modalidadeId                 Int?
@@ -2022,9 +2023,9 @@ model TabelaValor {
   unidade                      String?            @db.VarChar(20)
   quantidadeMinima             Decimal?           @db.Decimal(12, 2)
   quantidadeMaxima             Decimal?           @db.Decimal(12, 2)
-  legadoPendente               Boolean            @default(false) // sem vínculo canônico seguro → fora da tela/resolver
-  // PREÇO-FONTE-ÚNICA: preço originado da migração dos campos legado de valor da
-  // Configuração Financeira (valorCustoPadrao/valorReceitaPadrao). Rastreabilidade.
+  legadoPendente               Boolean            @default(false) // sem vÃ­nculo canÃ´nico seguro â fora da tela/resolver
+  // PREÃO-FONTE-ÃNICA: preÃ§o originado da migraÃ§Ã£o dos campos legado de valor da
+  // ConfiguraÃ§Ã£o Financeira (valorCustoPadrao/valorReceitaPadrao). Rastreabilidade.
   migradoDeCampoLegado         Boolean            @default(false)
 
   @@index([fornecedorId])
@@ -2034,10 +2035,10 @@ model TabelaValor {
   @@index([modalidadeId])
 }
 
-// PREÇO-FONTE-ÚNICA (§5/§6) — pendência financeira RASTREÁVEL. Registrada quando o
-// motor NÃO consegue resolver um preço válido (sem regra vigente, ou conflito de
-// mesma precedência). NUNCA cria lançamento com valor incorreto/zero: registra aqui
-// para revisão. Idempotente por chaveIdempotencia (mesma do MotorArtefato do lançamento).
+// PREÃO-FONTE-ÃNICA (Â§5/Â§6) â pendÃªncia financeira RASTREÃVEL. Registrada quando o
+// motor NÃO consegue resolver um preÃ§o vÃ¡lido (sem regra vigente, ou conflito de
+// mesma precedÃªncia). NUNCA cria lanÃ§amento com valor incorreto/zero: registra aqui
+// para revisÃ£o. Idempotente por chaveIdempotencia (mesma do MotorArtefato do lanÃ§amento).
 model PendenciaFinanceira {
   id                 Int            @id @default(autoincrement())
   processoId         Int
@@ -2045,18 +2046,18 @@ model PendenciaFinanceira {
   tipoProcessoId     Int?
   phaseKey           String         @db.VarChar(60)
   phaseCycle         Int            @default(1)
-  configFinanceiraId Int? // → ProdutoFinanceiro.id (Configuração Financeira; solto/snapshot)
-  regraFinanceiraId  Int? // → PhaseEconomicRule/PhaseTriggerRule.id (solto/snapshot)
+  configFinanceiraId Int? // â ProdutoFinanceiro.id (ConfiguraÃ§Ã£o Financeira; solto/snapshot)
+  regraFinanceiraId  Int? // â PhaseEconomicRule/PhaseTriggerRule.id (solto/snapshot)
   natureza           NaturezaPreco? // CUSTO | VENDA que faltou resolver
   motivo             String         @db.VarChar(40) // SEM_PRECO | CONFLITO_PRECO | NENHUMA_LINHA | SEM_PRECO_VALIDO
   detalhe            String         @db.VarChar(500)
-  contexto           Json? // dimensões/alternativas descartadas (auditoria)
-  chaveIdempotencia  String         @unique @db.VarChar(220) // anti-duplicação no banco
+  contexto           Json? // dimensÃµes/alternativas descartadas (auditoria)
+  chaveIdempotencia  String         @unique @db.VarChar(220) // anti-duplicaÃ§Ã£o no banco
   resolvida          Boolean        @default(false)
   resolvidaEm        DateTime?
-  resolucao          String?        @db.VarChar(300) // §13 — o que foi feito p/ resolver
+  resolucao          String?        @db.VarChar(300) // Â§13 â o que foi feito p/ resolver
   criadoEm           DateTime       @default(now())
-  // Reprocessamento (P4): a pendência é reprocessável quando o preço/config for cadastrado.
+  // Reprocessamento (P4): a pendÃªncia Ã© reprocessÃ¡vel quando o preÃ§o/config for cadastrado.
   tentativas         Int            @default(0)
   ultimaTentativaEm  DateTime?
   ultimaFalha        String?        @db.VarChar(500)
@@ -2067,18 +2068,18 @@ model PendenciaFinanceira {
   @@index([configFinanceiraId])
 }
 
-// ── Condições de Pagamento (fin_paycond) ──
-// ── CONDIÇÃO DE PAGAMENTO ────────────────────────────────────────────────────
-// Cadastro OFICIAL das regras de cobrança do sistema. É aqui — e só aqui — que
+// ââ CondiÃ§Ãµes de Pagamento (fin_paycond) ââ
+// ââ CONDIÃÃO DE PAGAMENTO ââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Cadastro OFICIAL das regras de cobranÃ§a do sistema. Ã aqui â e sÃ³ aqui â que
 // vivem entrada, quantidade de parcelas, periodicidade, cronograma,
-// distribuição, encargos, política cambial e restrições de uso.
+// distribuiÃ§Ã£o, encargos, polÃ­tica cambial e restriÃ§Ãµes de uso.
 //
-// A Tabela de Preços responde por VALOR; a Condição de Pagamento responde por
-// COMO esse valor é cobrado. O FinanceRuleEngine consome o cronograma pronto
-// (lib/financeiro/condicao-pagamento.ts) em vez de montar parcelas na mão.
+// A Tabela de PreÃ§os responde por VALOR; a CondiÃ§Ã£o de Pagamento responde por
+// COMO esse valor Ã© cobrado. O FinanceRuleEngine consome o cronograma pronto
+// (lib/financeiro/condicao-pagamento.ts) em vez de montar parcelas na mÃ£o.
 //
-// Campos históricos (name/moeda/formaPagamento/parcelas/diaVencimento/...) são
-// PRESERVADOS: a expansão é aditiva e os registros existentes seguem válidos.
+// Campos histÃ³ricos (name/moeda/formaPagamento/parcelas/diaVencimento/...) sÃ£o
+// PRESERVADOS: a expansÃ£o Ã© aditiva e os registros existentes seguem vÃ¡lidos.
 model CondicaoPagamento {
   id             Int                  @id @default(autoincrement())
   name           String               @db.VarChar(200)
@@ -2095,9 +2096,9 @@ model CondicaoPagamento {
   criadoEm       DateTime             @default(now())
   atualizadoEm   DateTime             @updatedAt
 
-  // ── identificação e versionamento ──
-  // Condição já utilizada NUNCA é alterada: cria-se a versão seguinte
-  // (proximaVersao) e encerra-se a vigência da anterior.
+  // ââ identificaÃ§Ã£o e versionamento ââ
+  // CondiÃ§Ã£o jÃ¡ utilizada NUNCA Ã© alterada: cria-se a versÃ£o seguinte
+  // (proximaVersao) e encerra-se a vigÃªncia da anterior.
   codigo      String?             @db.VarChar(40)
   descricao   String?             @db.Text
   versao      Int                 @default(1)
@@ -2108,7 +2109,7 @@ model CondicaoPagamento {
   vigenciaInicio DateTime?
   vigenciaFim    DateTime?
 
-  // ── parcelamento ──
+  // ââ parcelamento ââ
   tipoPagamento                 String   @default("PARCELADO") @db.VarChar(20) // AVISTA | PARCELADO
   entradaObrigatoria            Boolean  @default(false)
   valorEntradaFixo              Decimal? @db.Decimal(12, 2)
@@ -2118,7 +2119,7 @@ model CondicaoPagamento {
   permiteParcelasPersonalizadas Boolean  @default(false)
   permiteEdicaoManual           Boolean  @default(false)
 
-  // ── cronograma ──
+  // ââ cronograma ââ
   inicioCronograma    String    @default("IMEDIATA") @db.VarChar(20) // IMEDIATA | DIAS | DATA_ESPECIFICA
   primeiraParcelaDias Int?
   primeiraParcelaData DateTime?
@@ -2127,26 +2128,26 @@ model CondicaoPagamento {
   diaFixo             Int?
   ajusteDiaUtil       String    @default("NENHUM") @db.VarChar(20) // NENHUM | ULTIMO_DIA_UTIL | PROXIMO_DIA_UTIL
   ajustarFimDeSemana  Boolean   @default(false)
-  // Declarado; o ajuste efetivo depende de um calendário de feriados que o
-  // sistema ainda não possui (ver ajustarVencimento).
+  // Declarado; o ajuste efetivo depende de um calendÃ¡rio de feriados que o
+  // sistema ainda nÃ£o possui (ver ajustarVencimento).
   ajustarFeriados     Boolean   @default(false)
 
-  // ── distribuição ──
+  // ââ distribuiÃ§Ã£o ââ
   distribuicao           String   @default("ULTIMA_AJUSTA") @db.VarChar(30)
   primeiraParcelaPercent Decimal? @db.Decimal(5, 2)
 
-  // ── encargos (armazenados; aplicação em runtime é o próximo incremento) ──
+  // ââ encargos (armazenados; aplicaÃ§Ã£o em runtime Ã© o prÃ³ximo incremento) ââ
   multaPercent               Decimal? @db.Decimal(7, 4)
   jurosMesPercent            Decimal? @db.Decimal(7, 4)
   descontoPercent            Decimal? @db.Decimal(7, 4)
   descontoAntecipacaoPercent Decimal? @db.Decimal(7, 4)
   descontoAVistaPercent      Decimal? @db.Decimal(7, 4)
 
-  // ── câmbio ──
+  // ââ cÃ¢mbio ââ
   politicaCambio String  @default("VARIAVEL") @db.VarChar(20) // FIXO | VARIAVEL | CONTRATACAO | RECEBIMENTO
   travaCambial   Boolean @default(false)
 
-  // ── restrições de uso ──
+  // ââ restriÃ§Ãµes de uso ââ
   aplicaA          String   @default("AMBOS") @db.VarChar(20) // RECEITA | CUSTO | AMBOS
   moedasPermitidas String[] @default([])
   valorMinimo      Decimal? @db.Decimal(12, 2)
@@ -2157,30 +2158,30 @@ model CondicaoPagamento {
 
   observacoes String? @db.Text
 
-  // ── REGRA REUTILIZÁVEL (Receita → Cobrança → Parcelas → Pagamentos) ──
-  // A Condição é apenas a REGRA que o motor usa ao criar uma Cobrança. Ela nunca
-  // congela dados da Cobrança (cliente/conta/cotação/datas reais). Tudo aqui é
-  // POLÍTICA/SUGESTÃO; a decisão efetiva pertence à Cobrança.
+  // ââ REGRA REUTILIZÃVEL (Receita â CobranÃ§a â Parcelas â Pagamentos) ââ
+  // A CondiÃ§Ã£o Ã© apenas a REGRA que o motor usa ao criar uma CobranÃ§a. Ela nunca
+  // congela dados da CobranÃ§a (cliente/conta/cotaÃ§Ã£o/datas reais). Tudo aqui Ã©
+  // POLÃTICA/SUGESTÃO; a decisÃ£o efetiva pertence Ã  CobranÃ§a.
 
-  // Política de Taxas: a taxa depende da FORMA escolhida na Cobrança; aqui só a política.
+  // PolÃ­tica de Taxas: a taxa depende da FORMA escolhida na CobranÃ§a; aqui sÃ³ a polÃ­tica.
   politicaTaxas String @default("IGNORAR") @db.VarChar(30) // IGNORAR | REPASSAR | ABSORVER | ESCOLHER_NA_COBRANCA
 
-  // Forma SUGERIDA (não escolhe; apenas sugere). Ref. solta → FormaPagamentoCadastro.
+  // Forma SUGERIDA (nÃ£o escolhe; apenas sugere). Ref. solta â FormaPagamentoCadastro.
   formaSugeridaId Int?
 
-  // Entrada (expansão)
+  // Entrada (expansÃ£o)
   entradaTipo        String?  @db.VarChar(20) // PERCENTUAL | VALOR_FIXO
   entradaMin         Decimal? @db.Decimal(12, 2)
   entradaMax         Decimal? @db.Decimal(12, 2)
   entradaCompoeTotal Boolean  @default(true)
   entradaAdicional   Boolean  @default(false)
 
-  // Cronograma — comportamentos explícitos (nunca implícitos)
-  diaInexistente        String? @db.VarChar(20) // ULTIMO_DIA | PROX_UTIL | ANT_UTIL
+  // Cronograma â comportamentos explÃ­citos (nunca implÃ­citos)
+  diaInexistente         String? @db.VarChar(20) // ULTIMO_DIA | PROX_UTIL | ANT_UTIL
   comportamentoFimSemana String? @db.VarChar(20) // MANTER | PROX_UTIL | ANT_UTIL
   comportamentoFeriado   String? @db.VarChar(20) // MANTER | PROX_UTIL | ANT_UTIL
 
-  // Encargos (expansão)
+  // Encargos (expansÃ£o)
   multaTipo               String?  @db.VarChar(20) // FIXA | PERCENTUAL
   multaValor              Decimal? @db.Decimal(12, 2)
   jurosTipo               String?  @db.VarChar(20) // SIMPLES | COMPOSTO
@@ -2190,28 +2191,28 @@ model CondicaoPagamento {
   descontoAntecipacaoAuto Boolean  @default(false)
   quemConcedeDesconto     String?  @db.VarChar(40)
 
-  // Aplicabilidade (expansão)
-  // perfil/canal: LEGADO. Não têm regra de negócio no motor (condicaoAplicavel nunca os lê).
-  // Colunas PRESERVADAS com os dados históricos; a UI e o payload deixaram de expô-los.
+  // Aplicabilidade (expansÃ£o)
+  // perfil/canal: LEGADO. NÃ£o tÃªm regra de negÃ³cio no motor (condicaoAplicavel nunca os lÃª).
+  // Colunas PRESERVADAS com os dados histÃ³ricos; a UI e o payload deixaram de expÃ´-los.
   perfil   String? @db.VarChar(60)
   canal    String? @db.VarChar(60)
-  servicos Int[]   @default([]) // PROJEÇÃO derivada de servicosPermitidos (ids ServicoProduto)
+  servicos Int[]   @default([]) // PROJEÃÃO derivada de servicosPermitidos (ids ServicoProduto)
 
-  // ── vínculos ──
+  // ââ vÃ­nculos ââ
   formasPermitidas CondicaoPagamentoForma[]
   taxasVinculadas  CondicaoPagamentoTaxa[]
 
   // Aplicabilidade por RELACIONAMENTO REAL (fonte da verdade da tela e da API).
   // As colunas-array acima (moedasPermitidas/paises/modalidades/servicos) seguem
-  // gravadas como PROJEÇÃO derivada destes vínculos, para o motor de cálculo
+  // gravadas como PROJEÃÃO derivada destes vÃ­nculos, para o motor de cÃ¡lculo
   // (condicaoAplicavel) continuar intacto.
   moedasVinculadas      CondicaoPagamentoMoeda[]
   paisesPermitidos      CondicaoPagamentoPais[]
   modalidadesPermitidas CondicaoPagamentoModalidade[]
   servicosPermitidos    CondicaoPagamentoServico[]
-  configuracoes    ProdutoFinanceiro[]      @relation("ConfigFinCondicaoPagamento")
-  receitas         Receita[]                @relation("ReceitaCondicaoPagamento")
-  custos           Custo[]                  @relation("CustoCondicaoPagamento")
+  configuracoes         ProdutoFinanceiro[]           @relation("ConfigFinCondicaoPagamento")
+  receitas              Receita[]                     @relation("ReceitaCondicaoPagamento")
+  custos                Custo[]                       @relation("CustoCondicaoPagamento")
 
   @@unique([codigo, versao])
   @@index([carteiraId])
@@ -2219,7 +2220,7 @@ model CondicaoPagamento {
   @@index([substituiId])
 }
 
-// Formas de pagamento aceitas por uma condição (N:N).
+// Formas de pagamento aceitas por uma condiÃ§Ã£o (N:N).
 model CondicaoPagamentoForma {
   id         Int                    @id @default(autoincrement())
   condicaoId Int
@@ -2233,7 +2234,7 @@ model CondicaoPagamentoForma {
   @@index([formaId])
 }
 
-// Taxas de pagamento vinculadas automaticamente por uma condição (N:N).
+// Taxas de pagamento vinculadas automaticamente por uma condiÃ§Ã£o (N:N).
 model CondicaoPagamentoTaxa {
   id         Int               @id @default(autoincrement())
   condicaoId Int
@@ -2247,11 +2248,11 @@ model CondicaoPagamentoTaxa {
   @@index([taxaId])
 }
 
-// ── Aplicabilidade da Condição por RELACIONAMENTO REAL (N:N) ─────────────────
-// Substituem os campos de texto livre da etapa "Aplicabilidade e vigência".
-// Nada é digitado: só se seleciona o que existe no cadastro. Vazio = SEM RESTRIÇÃO.
-// As colunas-array legadas de CondicaoPagamento continuam existindo e são
-// mantidas como projeção derivada (compatibilidade com o motor e o histórico).
+// ââ Aplicabilidade da CondiÃ§Ã£o por RELACIONAMENTO REAL (N:N) âââââââââââââââââ
+// Substituem os campos de texto livre da etapa "Aplicabilidade e vigÃªncia".
+// Nada Ã© digitado: sÃ³ se seleciona o que existe no cadastro. Vazio = SEM RESTRIÃÃO.
+// As colunas-array legadas de CondicaoPagamento continuam existindo e sÃ£o
+// mantidas como projeÃ§Ã£o derivada (compatibilidade com o motor e o histÃ³rico).
 
 model CondicaoPagamentoMoeda {
   id         Int               @id @default(autoincrement())
@@ -2305,13 +2306,13 @@ model CondicaoPagamentoServico {
   @@index([servicoId])
 }
 
-// ── Honorários (fin_honorariums) ──
+// ââ HonorÃ¡rios (fin_honorariums) ââ
 model Honorario {
   id                Int                   @id @default(autoincrement())
   code              String                @db.VarChar(40)
   name              String                @db.VarChar(200)
   tipo              String                @default("main") @db.VarChar(30)
-  servico           String?               @db.VarChar(200) // vira FK p/ Serviços quando existir
+  servico           String?               @db.VarChar(200) // vira FK p/ ServiÃ§os quando existir
   moeda             Moeda                 @default(EUR)
   valorPadrao       Decimal?              @db.Decimal(12, 2)
   momentoCobranca   String                @default("contract_signed") @db.VarChar(30)
@@ -2322,11 +2323,11 @@ model Honorario {
   categoriasFin     CategoriaFinanceira[] @relation("CatFinHonorario")
 }
 
-// ── Regras de Comissão (fin_comm) ──
+// ââ Regras de ComissÃ£o (fin_comm) ââ
 model RegraComissao {
   id           Int      @id @default(autoincrement())
   name         String   @db.VarChar(200)
-  papel        String?  @db.VarChar(120) // vira FK p/ Papéis quando existir
+  papel        String?  @db.VarChar(120) // vira FK p/ PapÃ©is quando existir
   modoCalculo  String   @default("percentage") @db.VarChar(20)
   percent      Decimal? @db.Decimal(5, 2)
   valorFixo    Decimal? @db.Decimal(12, 2)
@@ -2336,7 +2337,7 @@ model RegraComissao {
   atualizadoEm DateTime @updatedAt
 }
 
-// ── Regras de Desconto (fin_disc) ──
+// ââ Regras de Desconto (fin_disc) ââ
 model RegraDesconto {
   id                     Int      @id @default(autoincrement())
   name                   String   @db.VarChar(200)
@@ -2349,7 +2350,7 @@ model RegraDesconto {
 }
 
 model ServicoProduto {
-  publicCode       String?             @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
+  publicCode       String?             @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
   id               Int                 @id @default(autoincrement())
   code             String              @unique @db.VarChar(40)
   name             String              @db.VarChar(200)
@@ -2358,7 +2359,7 @@ model ServicoProduto {
   unidadePadrao    UnidadeItem?
   nationality      String              @default("all") @db.VarChar(40)
   ativo            Boolean             @default(true)
-  // relação mantida no banco (dados preservados); NÃO exibida/gravada na tela mestre (F Serviços)
+  // relaÃ§Ã£o mantida no banco (dados preservados); NÃO exibida/gravada na tela mestre (F ServiÃ§os)
   itensFinanceiros ProdutoFinanceiro[] @relation("ServicoProdutoItens")
   criadoEm         DateTime            @default(now())
   atualizadoEm     DateTime            @updatedAt
@@ -2383,9 +2384,9 @@ model MoedaCadastro {
   taxasPagamento     TaxaPagamentoMoeda[]
 }
 
-// FORMA DE PAGAMENTO — cadastro do MEIO utilizado (PIX, boleto, cartão, Stripe…).
-// Sem regra financeira: parcelamento, cronograma e encargos pertencem à
-// Condição de Pagamento. Aqui só ficam as capacidades do meio.
+// FORMA DE PAGAMENTO â cadastro do MEIO utilizado (PIX, boleto, cartÃ£o, Stripeâ¦).
+// Sem regra financeira: parcelamento, cronograma e encargos pertencem Ã 
+// CondiÃ§Ã£o de Pagamento. Aqui sÃ³ ficam as capacidades do meio.
 model FormaPagamentoCadastro {
   id              Int      @id @default(autoincrement())
   code            String?  @db.VarChar(40)
@@ -2397,7 +2398,7 @@ model FormaPagamentoCadastro {
   criadoEm        DateTime @default(now())
   atualizadoEm    DateTime @updatedAt
 
-  // ── capacidades do meio (aditivo) ──
+  // ââ capacidades do meio (aditivo) ââ
   ativo                  Boolean @default(true)
   ordem                  Int     @default(0)
   icone                  String? @db.VarChar(60)
@@ -2406,23 +2407,23 @@ model FormaPagamentoCadastro {
   aceitaMoedaEstrangeira Boolean @default(false)
   observacoes            String? @db.Text
 
-  // ── CAPACIDADES TÉCNICAS (regra reutilizável — só descreve o MEIO) ──
+  // ââ CAPACIDADES TÃCNICAS (regra reutilizÃ¡vel â sÃ³ descreve o MEIO) ââ
   // `type` string livre continua no banco; a UI passa a usar um enum controlado.
   descricao String? @db.VarChar(300)
   categoria String? @db.VarChar(40)
 
-  // Moedas aceitas (multi) — substitui a `moeda` única (preservada p/ backfill).
+  // Moedas aceitas (multi) â substitui a `moeda` Ãºnica (preservada p/ backfill).
   moedasAceitas String[] @default([]) // codes de MoedaCadastro (BRL/EUR/USD/GBP...)
 
-  // Limite técnico inferior do parcelamento (par de maxParcelas). Regra comercial
-  // de quantas parcelas cobrar continua sendo da Condição de Pagamento.
+  // Limite tÃ©cnico inferior do parcelamento (par de maxParcelas). Regra comercial
+  // de quantas parcelas cobrar continua sendo da CondiÃ§Ã£o de Pagamento.
   minParcelas Int? @default(1)
 
-  // Exige adquirente/credenciadora para operar (cartões). Distinto de
-  // `tipoIntegracao = ADQUIRENTE`, que descreve COMO integra, não se EXIGE.
+  // Exige adquirente/credenciadora para operar (cartÃµes). Distinto de
+  // `tipoIntegracao = ADQUIRENTE`, que descreve COMO integra, nÃ£o se EXIGE.
   exigeAdquirente Boolean @default(false)
 
-  // Direção de uso do meio: entra dinheiro, sai dinheiro, ou ambos.
+  // DireÃ§Ã£o de uso do meio: entra dinheiro, sai dinheiro, ou ambos.
   usoRecebimento Boolean @default(true)
   usoPagamento   Boolean @default(true)
 
@@ -2437,25 +2438,25 @@ model FormaPagamentoCadastro {
   emissaoAutomatica     Boolean @default(false)
   permiteCobrancaManual Boolean @default(true)
 
-  // Integração
+  // IntegraÃ§Ã£o
   tipoIntegracao     String? @db.VarChar(20) // MANUAL | BANCO | GATEWAY | ADQUIRENTE | CARTEIRA | NENHUMA
   provedorIntegracao String? @db.VarChar(120)
   integracaoAtiva    Boolean @default(false)
 
-  // Destinos compatíveis (refs por ID — a escolha efetiva é da Cobrança)
-  carteirasCompativeis Int[] @default([]) // → CarteiraRecebimento.id
-  contasCompativeis    Int[] @default([]) // → ContaBancaria.id
+  // Destinos compatÃ­veis (refs por ID â a escolha efetiva Ã© da CobranÃ§a)
+  carteirasCompativeis Int[] @default([]) // â CarteiraRecebimento.id
+  contasCompativeis    Int[] @default([]) // â ContaBancaria.id
 
-  // Liquidação (informativo — apoia projeção de caixa; NÃO marca recebimento)
-  prazoLiquidacao   String? @db.VarChar(10) // IMEDIATO | D0 | D1 | D2 | DN
-  diasLiquidacao    Int?
-  diasCorridos      Boolean @default(true)
+  // LiquidaÃ§Ã£o (informativo â apoia projeÃ§Ã£o de caixa; NÃO marca recebimento)
+  prazoLiquidacao    String? @db.VarChar(10) // IMEDIATO | D0 | D1 | D2 | DN
+  diasLiquidacao     Int?
+  diasCorridos       Boolean @default(true)
   permiteAntecipacao Boolean @default(false)
 
-  // Taxas — apenas FLAGS de capacidade (valores vêm de TaxaPagamento)
-  utilizaTaxas            Boolean @default(false)
-  permiteTaxaAntecipacao  Boolean @default(false)
-  permiteTaxaParcelamento Boolean @default(false)
+  // Taxas â apenas FLAGS de capacidade (valores vÃªm de TaxaPagamento)
+  utilizaTaxas             Boolean @default(false)
+  permiteTaxaAntecipacao   Boolean @default(false)
+  permiteTaxaParcelamento  Boolean @default(false)
   permiteTaxaInternacional Boolean @default(false)
 
   condicoes CondicaoPagamentoForma[]
@@ -2476,17 +2477,17 @@ model TaxaPagamento {
   anticipationPercent Decimal?  @db.Decimal(7, 4)
   installmentsFrom    Int?
   installmentsTo      Int?
-  // Incidência e absorção (motor lib/financeiro/taxas-pagamento.ts)
-  // baseIncidencia/quemAbsorve são VarChar: os valores foram AMPLIADOS (validação no código).
+  // IncidÃªncia e absorÃ§Ã£o (motor lib/financeiro/taxas-pagamento.ts)
+  // baseIncidencia/quemAbsorve sÃ£o VarChar: os valores foram AMPLIADOS (validaÃ§Ã£o no cÃ³digo).
   baseIncidencia      String    @default("TOTAL") @db.VarChar(20) // TOTAL | PARCELA | SALDO | ENTRADA | LIQUIDO | BRUTO
   quemAbsorve         String    @default("EMPRESA") @db.VarChar(20) // EMPRESA | CLIENTE | COMPARTILHADA | COBRANCA
-  adquirente          String?   @db.VarChar(120) // legado (string). A entidade oficial é adquirenteId.
-  // Vínculo com as ENTIDADES oficiais (aditivo; `adquirente` string preservado p/ compat).
-  adquirenteId        Int? // → Adquirente.id
-  bandeiraId          Int? // → Bandeira.id
-  // Finalidade do encargo (boleto): EMISSAO | PAGAMENTO | MULTA | JUROS. Mantém
-  // emissão/pagamento/multa/juros como registros SEPARADOS (nunca uma taxa
-  // genérica). Nulo para as demais formas. Aditivo — compõe a chave de unicidade.
+  adquirente          String?   @db.VarChar(120) // legado (string). A entidade oficial Ã© adquirenteId.
+  // VÃ­nculo com as ENTIDADES oficiais (aditivo; `adquirente` string preservado p/ compat).
+  adquirenteId        Int? // â Adquirente.id
+  bandeiraId          Int? // â Bandeira.id
+  // Finalidade do encargo (boleto): EMISSAO | PAGAMENTO | MULTA | JUROS. MantÃ©m
+  // emissÃ£o/pagamento/multa/juros como registros SEPARADOS (nunca uma taxa
+  // genÃ©rica). Nulo para as demais formas. Aditivo â compÃµe a chave de unicidade.
   finalidade          String?   @db.VarChar(20)
   ativo               Boolean   @default(true)
   vigenciaInicio      DateTime?
@@ -2494,60 +2495,60 @@ model TaxaPagamento {
   criadoEm            DateTime  @default(now())
   atualizadoEm        DateTime  @updatedAt
 
-  // ── REGRA REUTILIZÁVEL de cálculo de taxa (aditivo) ──
-  // A Taxa não conhece Receita/Cobrança/Pagamento — só parametriza o cálculo. A
-  // Cobrança escolhe a Forma, o motor resolve a taxa compatível e CONGELA na Cobrança.
-  descricao        String?  @db.VarChar(300)
-  categoria        String?  @db.VarChar(40) // TAXA_CARTAO | TARIFA_BANCARIA | GATEWAY | ANTECIPACAO | IOF | SPREAD_CAMBIAL | OUTRO
-  formasAplicaveis Int[]    @default([]) // múltiplas Formas (ref. solta); formaPagamentoId única fica p/ compat
+  // ââ REGRA REUTILIZÃVEL de cÃ¡lculo de taxa (aditivo) ââ
+  // A Taxa nÃ£o conhece Receita/CobranÃ§a/Pagamento â sÃ³ parametriza o cÃ¡lculo. A
+  // CobranÃ§a escolhe a Forma, o motor resolve a taxa compatÃ­vel e CONGELA na CobranÃ§a.
+  descricao        String? @db.VarChar(300)
+  categoria        String? @db.VarChar(40) // TAXA_CARTAO | TARIFA_BANCARIA | GATEWAY | ANTECIPACAO | IOF | SPREAD_CAMBIAL | OUTRO
+  formasAplicaveis Int[]   @default([]) // mÃºltiplas Formas (ref. solta); formaPagamentoId Ãºnica fica p/ compat
 
-  // aplicação por parcela (substitui installmentsFrom/To — mantidos p/ FAIXA/compat)
+  // aplicaÃ§Ã£o por parcela (substitui installmentsFrom/To â mantidos p/ FAIXA/compat)
   aplicaParcela String? @db.VarChar(20) // TODAS | ENTRADA | PRIMEIRA | ULTIMA | FAIXA
 
-  // antecipação (expansão — anticipationEnabled/Percent mantidos p/ compat)
+  // antecipaÃ§Ã£o (expansÃ£o â anticipationEnabled/Percent mantidos p/ compat)
   anticipationType    String?  @db.VarChar(20) // NAO_POSSUI | OPCIONAL | OBRIGATORIA
   anticipationFixed   Decimal? @db.Decimal(12, 2)
   anticipationMinDays Int?
 
-  // absorção compartilhada
+  // absorÃ§Ã£o compartilhada
   absorcaoPercentEmpresa Decimal? @db.Decimal(5, 2)
 
   // prioridade quando 2 taxas concorrem
   prioridade Int @default(0)
 
-  // regras de aplicação (tudo opcional)
-  paises          String[] @default([])
+  // regras de aplicaÃ§Ã£o (tudo opcional)
+  paises           String[] @default([])
   moedasAplicaveis String[] @default([])
-  servicos        Int[]    @default([])
-  modalidades     String[] @default([])
-  tiposProcesso   String[] @default([])
-  valorMinimo     Decimal? @db.Decimal(12, 2)
-  valorMaximo     Decimal? @db.Decimal(12, 2)
-  canal           String?  @db.VarChar(60)
-  gateway         String?  @db.VarChar(40)
-  perfil          String?  @db.VarChar(60)
+  servicos         Int[]    @default([])
+  modalidades      String[] @default([])
+  tiposProcesso    String[] @default([])
+  valorMinimo      Decimal? @db.Decimal(12, 2)
+  valorMaximo      Decimal? @db.Decimal(12, 2)
+  canal            String?  @db.VarChar(60)
+  gateway          String?  @db.VarChar(40)
+  perfil           String?  @db.VarChar(60)
 
-  // câmbio (taxa internacional)
+  // cÃ¢mbio (taxa internacional)
   momentoCambio String? @db.VarChar(20) // ANTES_CONVERSAO | APOS_CONVERSAO | MOEDA_CONTRATUAL | MOEDA_LIQUIDACAO
 
   condicoes CondicaoPagamentoTaxa[]
 
   // Aplicabilidade por RELACIONAMENTO REAL (fonte da verdade da tela e da API).
   // `paises` e `moedasAplicaveis` (arrays de texto acima) continuam gravados como
-  // PROJEÇÃO derivada destes vínculos — o motor (candidataElegivel) segue intacto.
+  // PROJEÃÃO derivada destes vÃ­nculos â o motor (candidataElegivel) segue intacto.
   moedasVinculadas TaxaPagamentoMoeda[]
   paisesPermitidos TaxaPagamentoPais[]
 
-  // TABELA DE PARCELAMENTO — a tabela comercial da adquirente dentro de UMA
-  // taxa (1x 2,99% / 2x 3,39% / 3–6x 4,19%…). Vazia = a taxa usa feePercent /
-  // fixedFee do próprio registro (comportamento anterior, intacto).
+  // TABELA DE PARCELAMENTO â a tabela comercial da adquirente dentro de UMA
+  // taxa (1x 2,99% / 2x 3,39% / 3â6x 4,19%â¦). Vazia = a taxa usa feePercent /
+  // fixedFee do prÃ³prio registro (comportamento anterior, intacto).
   parcelamento TaxaParcelamento[]
 
   @@index([ativo, prioridade])
 }
 
-// Uma LINHA da tabela comercial: uma quantidade de parcelas (de = até) ou uma
-// FAIXA (1–3, 4–6, 7–12). As faixas não podem se sobrepor — a cobrança resolve
+// Uma LINHA da tabela comercial: uma quantidade de parcelas (de = atÃ©) ou uma
+// FAIXA (1â3, 4â6, 7â12). As faixas nÃ£o podem se sobrepor â a cobranÃ§a resolve
 // a linha pela quantidade de parcelas escolhida e aplica exatamente aquela taxa.
 model TaxaParcelamento {
   id          Int           @id @default(autoincrement())
@@ -2565,11 +2566,11 @@ model TaxaParcelamento {
   @@index([taxaId])
 }
 
-// ── Aplicabilidade da Taxa por RELACIONAMENTO REAL (N:N) ────────────────────
+// ââ Aplicabilidade da Taxa por RELACIONAMENTO REAL (N:N) ââââââââââââââââââââ
 // Substituem os campos de texto livre ("BRL, EUR" / "BR, PT") da etapa
-// "Aplicabilidade". Nada é digitado: só se seleciona o que existe no cadastro.
-// Vazio = SEM RESTRIÇÃO. Serviço permanece em `servicos Int[]` (já são IDs reais
-// de ServicoProduto — array de IDs, nunca CSV).
+// "Aplicabilidade". Nada Ã© digitado: sÃ³ se seleciona o que existe no cadastro.
+// Vazio = SEM RESTRIÃÃO. ServiÃ§o permanece em `servicos Int[]` (jÃ¡ sÃ£o IDs reais
+// de ServicoProduto â array de IDs, nunca CSV).
 model TaxaPagamentoMoeda {
   id       Int           @id @default(autoincrement())
   taxaId   Int
@@ -2596,15 +2597,15 @@ model TaxaPagamentoPais {
   @@index([paisId])
 }
 
-// ADQUIRENTE / GATEWAY — entidade definitiva (antes era só string na Taxa).
+// ADQUIRENTE / GATEWAY â entidade definitiva (antes era sÃ³ string na Taxa).
 // Referenciada por TaxaPagamento.adquirenteId e Cobranca.adquirenteId (snapshot).
 model Adquirente {
   id                   Int       @id @default(autoincrement())
-  code                 String?   @unique @db.VarChar(20) // ADQ-n imutável (CodeGeneratorService)
+  code                 String?   @unique @db.VarChar(20) // ADQ-n imutÃ¡vel (CodeGeneratorService)
   slug                 String    @unique @db.VarChar(40) // CIELO|REDE|STONE|GETNET|MERCADO_PAGO|PAGBANK
   nome                 String    @db.VarChar(120)
   ativo                Boolean   @default(true)
-  formasSuportadas     Int[]     @default([]) // → FormaPagamentoCadastro.id (ou tipos, na UI)
+  formasSuportadas     Int[]     @default([]) // â FormaPagamentoCadastro.id (ou tipos, na UI)
   vigenciaInicio       DateTime?
   vigenciaFim          DateTime?
   identificadorExterno String?   @db.VarChar(120)
@@ -2615,14 +2616,14 @@ model Adquirente {
   @@index([ativo])
 }
 
-// BANDEIRA DE CARTÃO — entidade definitiva. Não duplicar por adquirente.
+// BANDEIRA DE CARTÃO â entidade definitiva. NÃ£o duplicar por adquirente.
 model Bandeira {
   id                     Int      @id @default(autoincrement())
-  code                   String?  @unique @db.VarChar(20) // BND-n imutável
+  code                   String?  @unique @db.VarChar(20) // BND-n imutÃ¡vel
   slug                   String   @unique @db.VarChar(40) // VISA|MASTERCARD|ELO|AMEX|HIPERCARD
   nome                   String   @db.VarChar(60)
   ativo                  Boolean  @default(true)
-  adquirentesCompativeis Int[]    @default([]) // → Adquirente.id (vazio = todas)
+  adquirentesCompativeis Int[]    @default([]) // â Adquirente.id (vazio = todas)
   criadoEm               DateTime @default(now())
   atualizadoEm           DateTime @updatedAt
 
@@ -2630,7 +2631,7 @@ model Bandeira {
 }
 
 // ============================================================
-// MOTOR — Fase 1A: Tipos de Processo (Processos de Nacionalidade)
+// MOTOR â Fase 1A: Tipos de Processo (Processos de Nacionalidade)
 // ============================================================
 model TipoProcessoNacionalidade {
   id                  Int                   @id @default(autoincrement())
@@ -2693,7 +2694,7 @@ model ModalidadePais {
   @@index([countryKey])
 }
 
-// Catálogo das fases (building blocks do workflow)
+// CatÃ¡logo das fases (building blocks do workflow)
 model CatalogoFase {
   id                Int      @id @default(autoincrement())
   phaseKey          String   @unique @db.VarChar(60)
@@ -2707,20 +2708,20 @@ model CatalogoFase {
   atualizadoEm      DateTime @updatedAt
 }
 
-// Workflow Macro — 1:1 com o tipo de processo
+// Workflow Macro â 1:1 com o tipo de processo
 model MacroWorkflow {
   id             Int                       @id @default(autoincrement())
   tipoProcessoId Int                       @unique
   tipoProcesso   TipoProcessoNacionalidade @relation(fields: [tipoProcessoId], references: [id], onDelete: Cascade)
   name           String                    @db.VarChar(200)
   ativo          Boolean                   @default(true)
-  versao         Int                       @default(1) // CP-4A — versionamento
+  versao         Int                       @default(1) // CP-4A â versionamento
   criadoEm       DateTime                  @default(now())
   atualizadoEm   DateTime                  @updatedAt
   fases          FaseMacro[]
 }
 
-// Fases do workflow (a coluna variável)
+// Fases do workflow (a coluna variÃ¡vel)
 model FaseMacro {
   id              Int           @id @default(autoincrement())
   macroWorkflowId Int
@@ -2734,7 +2735,7 @@ model FaseMacro {
   exitRule        String?       @db.VarChar(120)
   slaDays         Int           @default(30)
   showInKanban    Boolean       @default(true)
-  versao          Int           @default(1) // CP-4A — versionamento
+  versao          Int           @default(1) // CP-4A â versionamento
   criadoEm        DateTime      @default(now())
   atualizadoEm    DateTime      @updatedAt
 
@@ -2745,13 +2746,13 @@ model FaseMacro {
 model PhaseInternalMode {
   id                Int      @id @default(autoincrement())
   modeUid           String   @unique @db.VarChar(140) // {tipoProcessoId|'all'}::{phaseKey}::{key}
-  templateId        Int? // → ModeloInternoFase (solto; null = ad-hoc/seed)
-  tipoProcessoId    Int? // → TipoProcessoNacionalidade (solto; null = todos os processos)
+  templateId        Int? // â ModeloInternoFase (solto; null = ad-hoc/seed)
+  tipoProcessoId    Int? // â TipoProcessoNacionalidade (solto; null = todos os processos)
   phaseKey          String   @db.VarChar(40)
-  key               String   @db.VarChar(60) // chave do modo (slug, único dentro de processo+fase)
+  key               String   @db.VarChar(60) // chave do modo (slug, Ãºnico dentro de processo+fase)
   label             String   @db.VarChar(200)
   description       String?  @db.Text
-  condition         String?  @db.Text // condição de uso (vem de conditionOfUse do modelo)
+  condition         String?  @db.Text // condiÃ§Ã£o de uso (vem de conditionOfUse do modelo)
   impactOperational String?  @db.Text
   impactDocument    String?  @db.Text
   impactFinancial   String?  @db.Text
@@ -2767,16 +2768,16 @@ model PhaseInternalMode {
 
 model PhaseInternalWorkflow {
   id             Int      @id @default(autoincrement())
-  // {tipoProcessoId|'all'}::{phaseKey} para o workflow PRIMÁRIO de uma fase.
-  // (âncora de unicidade — 1 workflow por processo+fase; null = global/todos)
+  // {tipoProcessoId|'all'}::{phaseKey} para o workflow PRIMÃRIO de uma fase.
+  // (Ã¢ncora de unicidade â 1 workflow por processo+fase; null = global/todos)
   wfUid          String   @unique @db.VarChar(140)
-  templateId     Int? // → ModeloWorkflowInterno (solto; null = ad-hoc/seed)
-  tipoProcessoId Int? // → TipoProcessoNacionalidade (solto; null = TODOS os processos)
+  templateId     Int? // â ModeloWorkflowInterno (solto; null = ad-hoc/seed)
+  tipoProcessoId Int? // â TipoProcessoNacionalidade (solto; null = TODOS os processos)
   phaseKey       String   @db.VarChar(60)
   name           String   @db.VarChar(200)
   active         Boolean  @default(true)
   arquivado      Boolean  @default(false)
-  versao         Int      @default(1) // CP-4A — versionamento (definição/template)
+  versao         Int      @default(1) // CP-4A â versionamento (definiÃ§Ã£o/template)
   criadoEm       DateTime @default(now())
   atualizadoEm   DateTime @updatedAt
 
@@ -2790,32 +2791,32 @@ model PhaseInternalWorkflowStep {
   id             Int                   @id @default(autoincrement())
   workflowId     Int
   workflow       PhaseInternalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  key            String                @db.VarChar(80) // slug (único dentro do workflow — controlado na UI)
+  key            String                @db.VarChar(80) // slug (Ãºnico dentro do workflow â controlado na UI)
   label          String                @db.VarChar(200)
   description    String?               @db.Text
   ordem          Int                   @default(0)
   createsTask    Boolean               @default(true) // "Gera tarefa"
-  required       Boolean               @default(true) // "Obrigatório"
-  owner          String?               @db.VarChar(120) // "Responsável padrão"
+  required       Boolean               @default(true) // "ObrigatÃ³rio"
+  owner          String?               @db.VarChar(120) // "ResponsÃ¡vel padrÃ£o"
   priority       String                @default("medium") @db.VarChar(20) // low | medium | high
   slaDays        Int                   @default(0)
-  completionRule String?               @db.Text // "Condição de conclusão"
+  completionRule String?               @db.Text // "CondiÃ§Ã£o de conclusÃ£o"
   checklist      Json?
-  versao         Int                   @default(1) // CP-4A — versionamento (definição/template)
+  versao         Int                   @default(1) // CP-4A â versionamento (definiÃ§Ã£o/template)
 
-  // TRAVA: cada chave só existe UMA vez por workflow (impede duplicação silenciosa)
+  // TRAVA: cada chave sÃ³ existe UMA vez por workflow (impede duplicaÃ§Ã£o silenciosa)
   @@unique([workflowId, key])
 }
 
 model PhaseAutomationRule {
-  publicCode          String? @unique @db.VarChar(20) // CodeGeneratorService central — aditivo, único, não editável
+  publicCode          String? @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
   id                  Int     @id @default(autoincrement())
-  templateId          Int? // → ModeloAutomacao (solto; null = regra ad-hoc)
-  tipoProcessoId      Int // → TipoProcessoNacionalidade (solto) — regra pertence a um processo
+  templateId          Int? // â ModeloAutomacao (solto; null = regra ad-hoc)
+  tipoProcessoId      Int // â TipoProcessoNacionalidade (solto) â regra pertence a um processo
   phaseKey            String  @db.VarChar(60)
-  // LEGADO — texto livre. Regras financeiras NOVAS não preenchem (identidade é derivada
-  // da estrutura: Aplicação + Config Financeira + gatilho + fase). Mantido nullable só p/
-  // leitura de regras antigas. Não usar para gerar título/descrição/lançamento de regras novas.
+  // LEGADO â texto livre. Regras financeiras NOVAS nÃ£o preenchem (identidade Ã© derivada
+  // da estrutura: AplicaÃ§Ã£o + Config Financeira + gatilho + fase). Mantido nullable sÃ³ p/
+  // leitura de regras antigas. NÃ£o usar para gerar tÃ­tulo/descriÃ§Ã£o/lanÃ§amento de regras novas.
   name                String? @db.VarChar(200)
   description         String? @db.Text
   kind                String  @db.VarChar(30) // task | financial | document | event | protocol | phase_advance | alert
@@ -2823,18 +2824,18 @@ model PhaseAutomationRule {
   trigger             String  @default("phase_entered") @db.VarChar(60)
   action              String? @db.VarChar(80)
   conditions          Json? // [{ field, op, value }]
-  params              Json? // blob específico do tipo (owner/priority/slaDays/checklist, amount/currency, targetPhaseKey, ...)
+  params              Json? // blob especÃ­fico do tipo (owner/priority/slaDays/checklist, amount/currency, targetPhaseKey, ...)
   financialType       String? @db.VarChar(20) // LEGADO (kind=financial): atalho de card/consulta do fluxo antigo
-  // FLUXO NOVO (kind=financial): vínculo ESTRUTURAL à Configuração Financeira + direção.
-  // A automação NÃO guarda preço/moeda/valor — o preço vem da Tabela de Preços na execução.
-  configItemId        Int? // → ProdutoFinanceiro.id (solto). Obrigatório em regras financeiras NOVAS.
+  // FLUXO NOVO (kind=financial): vÃ­nculo ESTRUTURAL Ã  ConfiguraÃ§Ã£o Financeira + direÃ§Ã£o.
+  // A automaÃ§Ã£o NÃO guarda preÃ§o/moeda/valor â o preÃ§o vem da Tabela de PreÃ§os na execuÃ§Ã£o.
+  configItemId        Int? // â ProdutoFinanceiro.id (solto). ObrigatÃ³rio em regras financeiras NOVAS.
   aplicacaoFinanceira String? @db.VarChar(10) // RECEITA | CUSTO | AMBOS (fluxo novo; null = legado)
   idempotencyPattern  String  @default("processId+phaseKey") @db.VarChar(120)
   idempotent          Boolean @default(true)
   active              Boolean @default(true)
   arquivado           Boolean @default(false)
 
-  // --- execução (Fase 4 — guardado, fica zerado por ora) ---
+  // --- execuÃ§Ã£o (Fase 4 â guardado, fica zerado por ora) ---
   runCount  Int       @default(0)
   lastRunAt DateTime?
   lastError String?   @db.Text
@@ -2857,7 +2858,7 @@ model Departamento {
   atualizadoEm DateTime @updatedAt
 }
 
-// Órgãos de Protocolo (op_organs) — consulados, comunes, tribunais, cartórios...
+// ÃrgÃ£os de Protocolo (op_organs) â consulados, comunes, tribunais, cartÃ³rios...
 model OrgaoProtocolo {
   id           Int      @id @default(autoincrement())
   name         String   @db.VarChar(200)
@@ -2873,9 +2874,9 @@ model OrgaoProtocolo {
   @@index([type])
 }
 
-// Tipos de Documento (op_doctypes) — tipos documentais usados nos processos
+// Tipos de Documento (op_doctypes) â tipos documentais usados nos processos
 model TipoDocumentoCadastro {
-  publicCode            String?               @unique @db.VarChar(20) // TDOC — código público do tipo (NÃO é o DOC-n do documento concreto)
+  publicCode            String?               @unique @db.VarChar(20) // TDOC â cÃ³digo pÃºblico do tipo (NÃO Ã© o DOC-n do documento concreto)
   id                    Int                   @id @default(autoincrement())
   code                  String?               @db.VarChar(40)
   name                  String                @db.VarChar(200)
@@ -2885,20 +2886,20 @@ model TipoDocumentoCadastro {
   atualizadoEm          DateTime              @updatedAt
   itemCatalogoId        Int?
   itemCatalogo          ItemCatalogo?         @relation(fields: [itemCatalogoId], references: [id])
-  legacyEnumKey         String?               @unique @db.VarChar(60) // ← valor do enum TipoDocumento (ponte)
+  legacyEnumKey         String?               @unique @db.VarChar(60) // â valor do enum TipoDocumento (ponte)
   nature                String?               @db.VarChar(30) // documento|certidao|identidade|... (config futura)
-  countryCode           String?               @db.VarChar(8) // opcional (país)
+  countryCode           String?               @db.VarChar(8) // opcional (paÃ­s)
   description           String?               @db.Text
   documentos            Documento[] // back-relation (docs que apontam pra este tipo)
   configFinanceiras     ProdutoFinanceiro[]   @relation("ConfigFinTipoDocumento")
   categoriasFin         CategoriaFinanceira[] @relation("CatFinTipoDocumento")
   econRules             PhaseEconomicRule[]   @relation("EconTipoDocumento")
   participaPlanilha     Boolean               @default(false)
-  // LOTE A — categoriaDocumentalId é a CLASSIFICAÇÃO CANÔNICA (consumida por ID).
-  // FK nullable p/ backfill seguro. A coluna `category` (String) permanece SÓ como
-  // compatibilidade transitória (dual-read/dual-write). Não remover neste lote.
-  // onDelete: Restrict — a API já proíbe excluir categoria em uso; a FK impede
-  // desclassificação silenciosa via SQL cru (alinha DB e regra de negócio).
+  // LOTE A â categoriaDocumentalId Ã© a CLASSIFICAÃÃO CANÃNICA (consumida por ID).
+  // FK nullable p/ backfill seguro. A coluna `category` (String) permanece SÃ como
+  // compatibilidade transitÃ³ria (dual-read/dual-write). NÃ£o remover neste lote.
+  // onDelete: Restrict â a API jÃ¡ proÃ­be excluir categoria em uso; a FK impede
+  // desclassificaÃ§Ã£o silenciosa via SQL cru (alinha DB e regra de negÃ³cio).
   categoriaDocumentalId Int?
   categoriaDocumental   CategoriaDocumental?  @relation(fields: [categoriaDocumentalId], references: [id], onDelete: Restrict)
 
@@ -2906,30 +2907,30 @@ model TipoDocumentoCadastro {
   @@index([categoriaDocumentalId])
 }
 
-// LOTE A — Cadastro mestre de Categorias Documentais. FONTE CANÔNICA da
-// classificação documental (agrupamento administrativo/estrutural do documento),
-// consumida por ID/code. NÃO configura processo/fase/workflow/financeiro.
-// Eixo distinto de `nature` (subtipo técnico do documento — ver document-type-resolver).
+// LOTE A â Cadastro mestre de Categorias Documentais. FONTE CANÃNICA da
+// classificaÃ§Ã£o documental (agrupamento administrativo/estrutural do documento),
+// consumida por ID/code. NÃO configura processo/fase/workflow/financeiro.
+// Eixo distinto de `nature` (subtipo tÃ©cnico do documento â ver document-type-resolver).
 model CategoriaDocumental {
   id          Int                     @id @default(autoincrement())
-  code        String                  @unique @db.VarChar(40) // estável; imutável após criação (A3)
+  code        String                  @unique @db.VarChar(40) // estÃ¡vel; imutÃ¡vel apÃ³s criaÃ§Ã£o (A3)
   name        String                  @db.VarChar(120)
   description String?                 @db.Text
   ordem       Int                     @default(0)
   ativo       Boolean                 @default(true)
-  sistema     Boolean                 @default(false) // categorias de bootstrap: code imutável, não-excluíveis
+  sistema     Boolean                 @default(false) // categorias de bootstrap: code imutÃ¡vel, nÃ£o-excluÃ­veis
   createdAt   DateTime                @default(now())
   updatedAt   DateTime                @updatedAt
   tipos       TipoDocumentoCadastro[] // back-relation (tipos que usam esta categoria)
 }
 
-// Matriz Documental (documentRequirementMatrix) — quais documentos são
-// exigidos por processo, fase, alvo e regra de geração. Por processo.
+// Matriz Documental (documentRequirementMatrix) â quais documentos sÃ£o
+// exigidos por processo, fase, alvo e regra de geraÃ§Ã£o. Por processo.
 model MatrizDocumental {
   id                    Int      @id @default(autoincrement())
-  tipoProcessoId        Int // → TipoProcessoNacionalidade (solto)
+  tipoProcessoId        Int // â TipoProcessoNacionalidade (solto)
   phaseKey              String?  @db.VarChar(60) // null = qualquer fase (LEGADO; ver faseExigencia)
-  documentTypeCode      String   @db.VarChar(40) // → TipoDocumentoCadastro.code (solto)
+  documentTypeCode      String   @db.VarChar(40) // â TipoDocumentoCadastro.code (solto)
   target                String   @default("direct_line_person") @db.VarChar(40)
   generationRule        String   @default("all_direct_line") @db.VarChar(40)
   required              Boolean  @default(true)
@@ -2941,46 +2942,46 @@ model MatrizDocumental {
   blocksPhaseCompletion Boolean  @default(false)
   usedByCount           Int      @default(0)
   arquivado             Boolean  @default(false)
-  // CP-3 — versão da regra (snapshot imutável por versão; mudança futura
-  // incrementa a versão e NÃO reescreve necessidades já produzidas).
+  // CP-3 â versÃ£o da regra (snapshot imutÃ¡vel por versÃ£o; mudanÃ§a futura
+  // incrementa a versÃ£o e NÃO reescreve necessidades jÃ¡ produzidas).
   versao                Int      @default(1)
   criadoEm              DateTime @default(now())
   atualizadoEm          DateTime @updatedAt
 
   // ============================================================
-  // REGRAS DOCUMENTAIS (estrutura canônica ampliada) — base dos workflows
+  // REGRAS DOCUMENTAIS (estrutura canÃ´nica ampliada) â base dos workflows
   // futuros. Campos ADITIVOS; os campos legados acima permanecem para leitura
-  // (dual-read) até a migração completa da tela. Nada aqui executa runtime.
+  // (dual-read) atÃ© a migraÃ§Ã£o completa da tela. Nada aqui executa runtime.
   // ============================================================
-  // IDENTIFICAÇÃO
-  codigo                               String?                 @db.VarChar(60) // código estável (compartilhado entre versões)
+  // IDENTIFICAÃÃO
+  codigo                               String?                 @db.VarChar(60) // cÃ³digo estÃ¡vel (compartilhado entre versÃµes)
   nome                                 String?                 @db.VarChar(200)
   descricao                            String?                 @db.Text
   status                               RegraDocumentalStatus   @default(RASCUNHO)
   prioridade                           Int                     @default(0)
   vigenciaInicio                       DateTime?
   vigenciaFim                          DateTime?
-  // APLICABILIDADE — múltiplos tipos de processo (ou todos). tipoProcessoId legado
-  // permanece como "primário" (1º item) para dual-read. modalidade/país/região
-  // saíram do ESCOPO (viram condição da regra quando necessário).
+  // APLICABILIDADE â mÃºltiplos tipos de processo (ou todos). tipoProcessoId legado
+  // permanece como "primÃ¡rio" (1Âº item) para dual-read. modalidade/paÃ­s/regiÃ£o
+  // saÃ­ram do ESCOPO (viram condiÃ§Ã£o da regra quando necessÃ¡rio).
   aplicaTodosProcessos                 Boolean                 @default(false)
-  tipoProcessoIds                      Json? // [Int] — coleção; legado: [tipoProcessoId]
-  modalidadeId                         Int? // LEGADO (não usado no escopo; modalidade vira condição)
+  tipoProcessoIds                      Json? // [Int] â coleÃ§Ã£o; legado: [tipoProcessoId]
+  modalidadeId                         Int? // LEGADO (nÃ£o usado no escopo; modalidade vira condiÃ§Ã£o)
   paisCode                             String?                 @db.VarChar(8) // LEGADO
   regiaoCode                           String?                 @db.VarChar(16) // LEGADO
   tipoProcessoVersao                   Int?
   // REQUISITO + DOCUMENTOS ACEITOS (o requisito pode ser atendido por 1+ documentos)
   requisitoNome                        String?                 @db.VarChar(200)
-  documentosAceitos                    Json? // [String] códigos de TipoDocumento; legado: [documentTypeCode]
+  documentosAceitos                    Json? // [String] cÃ³digos de TipoDocumento; legado: [documentTypeCode]
   modoSatisfacao                       ModoSatisfacaoRequisito @default(QUALQUER_UM_ATENDE)
-  // categoriaCode é LEGADO: a categoria é derivada do Tipo de Documento, nunca
-  // redefinida pela regra (a tela não grava mais este campo).
+  // categoriaCode Ã© LEGADO: a categoria Ã© derivada do Tipo de Documento, nunca
+  // redefinida pela regra (a tela nÃ£o grava mais este campo).
   categoriaCode                        String?                 @db.VarChar(40)
   obrigatoriedade                      ObrigatoriedadeRegra    @default(OBRIGATORIA)
-  // PÚBLICO-ALVO — múltiplo. publicoAlvo (singular) permanece como primário (dual-read).
+  // PÃBLICO-ALVO â mÃºltiplo. publicoAlvo (singular) permanece como primÃ¡rio (dual-read).
   publicoAlvo                          PublicoAlvoRegra        @default(PESSOA_DA_LINHA_RETA)
-  publicosAlvo                         Json? // [PublicoAlvoRegra] — coleção
-  // CONDIÇÕES estruturadas: { combinador: TODAS|QUALQUER, regras: [{campo,operador,valor}] }
+  publicosAlvo                         Json? // [PublicoAlvoRegra] â coleÃ§Ã£o
+  // CONDIÃÃES estruturadas: { combinador: TODAS|QUALQUER, regras: [{campo,operador,valor}] }
   condicoes                            Json?
   // FASE E BLOQUEIO
   faseExigencia                        String?                 @db.VarChar(60) // fase em que passa a ser exigido
@@ -2994,7 +2995,7 @@ model MatrizDocumental {
   exigeDataEmissao                     Boolean                 @default(false)
   renovarQuandoExpirado                Boolean                 @default(false)
   antecedenciaRenovacaoDias            Int?
-  // AUDITORIA de versão
+  // AUDITORIA de versÃ£o
   criadoPor                            Int?
   atualizadoPor                        Int?
   publicadoEm                          DateTime?
@@ -3045,7 +3046,7 @@ model MotorArtefato {
   ruleKind       String    @db.VarChar(30) // task | financial | document | event | protocol | alert | phase_advance
   ruleSource     String    @db.VarChar(20) // automation | trigger
   ruleId         Int? // id da regra (solto, snapshot)
-  automaticKey   String    @unique @db.VarChar(200) // chave de idempotência
+  automaticKey   String    @unique @db.VarChar(200) // chave de idempotÃªncia
   targetTable    String    @db.VarChar(40) // Tarefa | Custo | Receita | Evento | Protocolo
   targetId       Int? // id do registro criado (para desfazer)
   status         String    @default("active") @db.VarChar(20) // active | undone
@@ -3060,9 +3061,9 @@ model MotorArtefato {
 }
 
 model MotorConfig {
-  id                    Int      @id @default(1) // sempre a linha 1 (config única)
-  autoExecutarAoAvancar Boolean  @default(false) // motor roda sozinho ao avançar de fase?
-  // CP-4A — kill switch global do runtime v2 (default false = v2 bloqueado
+  id                    Int      @id @default(1) // sempre a linha 1 (config Ãºnica)
+  autoExecutarAoAvancar Boolean  @default(false) // motor roda sozinho ao avanÃ§ar de fase?
+  // CP-4A â kill switch global do runtime v2 (default false = v2 bloqueado
   // em todos os processos, mesmo os marcados workflowRuntime="v2").
   runtimeV2Habilitado   Boolean  @default(false)
   atualizadoEm          DateTime @updatedAt
@@ -3072,12 +3073,12 @@ model RegraTarefaTransversal {
   id               Int     @id @default(autoincrement())
   ruleKey          String? @unique @db.VarChar(80) // cross_rule_* (seed); null p/ criadas na tela
   name             String  @db.VarChar(200)
-  tipoProcessoId   Int? // → TipoProcessoNacionalidade (solto); null = todos
+  tipoProcessoId   Int? // â TipoProcessoNacionalidade (solto); null = todos
   originPhase      String  @db.VarChar(60) // fase onde a regra dispara
-  operationalPhase String  @db.VarChar(60) // fase cujo fluxo é usado
-  templateId       Int? // → ModeloTarefaTransversal (solto)
+  operationalPhase String  @db.VarChar(60) // fase cujo fluxo Ã© usado
+  templateId       Int? // â ModeloTarefaTransversal (solto)
 
-  // config detalhada (as seções do modal)
+  // config detalhada (as seÃ§Ãµes do modal)
   trigger         Json? // { type, watchedField, expectedValue, condition, expression }
   creation        Json? // { mode, mandatory, defaultReason, defaultExpectedResult, defaultResponsibleRoleId, defaultSlaDays, defaultPriority }
   originLink      Json? // { type, useDocument, usePerson, useDivergence, useProtocolRequirement }
@@ -3101,9 +3102,9 @@ model RegraTarefaTransversal {
 
 model PerfilPermissaoMotor {
   id               Int      @id @default(autoincrement())
-  chave            String   @unique @db.VarChar(80) // slug do perfil (admin, analyst, ...) — âncora do seed
+  chave            String   @unique @db.VarChar(80) // slug do perfil (admin, analyst, ...) â Ã¢ncora do seed
   nome             String   @db.VarChar(200)
-  permissoes       Json? // { manageProcessTypes, manageWorkflowMacro, ... } — as 12 permissões (true/false)
+  permissoes       Json? // { manageProcessTypes, manageWorkflowMacro, ... } â as 12 permissÃµes (true/false)
   isSystemTemplate Boolean  @default(false)
   usedByCount      Int      @default(0)
   arquivado        Boolean  @default(false)
@@ -3115,19 +3116,19 @@ model PhaseEconomicRule {
   id                 Int      @id @default(autoincrement())
   tipoProcessoId     Int? // null = vale p/ qualquer tipo de processo
   phaseKey           String   @db.VarChar(60) // ex: "emissao_documental"
-  documentTypeCode   String?  @db.VarChar(40) // null = qualquer doc; senão só p/ esse code (→ TipoDocumentoCadastro.code)
-  appliesTo          String   @default("any") @db.VarChar(30) // any|certificate|translation|original|... (natureza do doc elegível)
+  documentTypeCode   String?  @db.VarChar(40) // null = qualquer doc; senÃ£o sÃ³ p/ esse code (â TipoDocumentoCadastro.code)
+  appliesTo          String   @default("any") @db.VarChar(30) // any|certificate|translation|original|... (natureza do doc elegÃ­vel)
   componentKey       String   @db.VarChar(40) // identidade do componente, ex: "CERTIDAO_INTEIRO_TEOR"
-  componentName      String   @db.VarChar(100) // nome exibido = COLUNA da planilha, ex: "Certidão Inteiro Teor"
-  custoProdutoCode   String?  @db.VarChar(30) // → ProdutoFinanceiro.codigo (CUSTO)   — separado
-  receitaProdutoCode String?  @db.VarChar(30) // → ProdutoFinanceiro.codigo (RECEITA) — separado
+  componentName      String   @db.VarChar(100) // nome exibido = COLUNA da planilha, ex: "CertidÃ£o Inteiro Teor"
+  custoProdutoCode   String?  @db.VarChar(30) // â ProdutoFinanceiro.codigo (CUSTO)   â separado
+  receitaProdutoCode String?  @db.VarChar(30) // â ProdutoFinanceiro.codigo (RECEITA) â separado
   participaPlanilha  Boolean  @default(true) // componente aparece como coluna na Planilha Documental
   ordem              Int      @default(0)
   ativo              Boolean  @default(true)
   criadoEm           DateTime @default(now())
   atualizadoEm       DateTime @updatedAt
 
-  // F2 — vínculos por FK real (dual-read com os códigos-texto legados acima)
+  // F2 â vÃ­nculos por FK real (dual-read com os cÃ³digos-texto legados acima)
   tipoDocumentoId Int?
   tipoDocumento   TipoDocumentoCadastro? @relation("EconTipoDocumento", fields: [tipoDocumentoId], references: [id])
   custoConfigId   Int?
@@ -3144,32 +3145,32 @@ model PhaseEconomicRule {
 
 model ItemCatalogo {
   id           Int          @id @default(autoincrement())
-  code         String       @unique @db.VarChar(60) // identidade única (ex.: CERT_NASCIMENTO_IT)
-  name         String       @db.VarChar(200) // ex.: "Certidão de Nascimento - Inteiro Teor"
+  code         String       @unique @db.VarChar(60) // identidade Ãºnica (ex.: CERT_NASCIMENTO_IT)
+  name         String       @db.VarChar(200) // ex.: "CertidÃ£o de Nascimento - Inteiro Teor"
   descricao    String?      @db.Text
   natureza     NaturezaItem @default(OUTRO)
   categoria    String?      @db.VarChar(60) // ex.: "Registro civil"
   unidade      UnidadeItem  @default(UNIDADE)
   ativo        Boolean      @default(true)
-  metadata     Json? // extensível, sem virar coluna por item novo
+  metadata     Json? // extensÃ­vel, sem virar coluna por item novo
   criadoEm     DateTime     @default(now())
   atualizadoEm DateTime     @updatedAt
 
-  // back-relations (as ilhas apontam pra cá)
+  // back-relations (as ilhas apontam pra cÃ¡)
   tiposDocumento TipoDocumentoCadastro[]
   produtos       ProdutoFinanceiro[]
   servicos       ServicoProduto[]
   precos         TabelaValor[]
-  tiposServico   TipoServico[] // CP-2 — referência aditiva de TipoServico
-  necessidades   NecessidadeDocumental[] // CP-3 — Documento Mestre requerido
-  categoriasFin  CategoriaFinanceira[]   @relation("CatFinItemCatalogo") // serviço (natureza SERVICO)
+  tiposServico   TipoServico[] // CP-2 â referÃªncia aditiva de TipoServico
+  necessidades   NecessidadeDocumental[] // CP-3 â Documento Mestre requerido
+  categoriasFin  CategoriaFinanceira[]   @relation("CatFinItemCatalogo") // serviÃ§o (natureza SERVICO)
 
   @@index([natureza])
   @@index([ativo])
 }
 
 // ============================================================
-// CP-3 — NecessidadeDocumental (cadeia: Documento Mestre -> Necessidade ->
+// CP-3 â NecessidadeDocumental (cadeia: Documento Mestre -> Necessidade ->
 // Documento Operacional -> Arquivo -> Tarefa -> Custo/Receita -> Auditoria)
 // ============================================================
 enum OrigemNecessidade {
@@ -3224,7 +3225,7 @@ model NecessidadeDocumental {
   obrigatoriedade ObrigatoriedadeNecessidade @default(OBRIGATORIA)
   status          StatusNecessidade          @default(PENDENTE)
 
-  // Snapshot IMUTÁVEL da regra da Matriz que originou + auditoria de origem.
+  // Snapshot IMUTÃVEL da regra da Matriz que originou + auditoria de origem.
   matrizRegraId        Int?
   matrizRegraVersao    Int?
   matrizSnapshot       Json?
@@ -3233,8 +3234,8 @@ model NecessidadeDocumental {
   arvoreId             Int?
   ruleCode             String?   @db.VarChar(20)
 
-  // Supersessão: uma nova necessidade pode substituir a anterior, que é
-  // preservada (histórico append-only).
+  // SupersessÃ£o: uma nova necessidade pode substituir a anterior, que Ã©
+  // preservada (histÃ³rico append-only).
   supersedePorId Int?
   supersedePor   NecessidadeDocumental?  @relation("Supersessao", fields: [supersedePorId], references: [id], onDelete: SetNull)
   supersedidas   NecessidadeDocumental[] @relation("Supersessao")
@@ -3245,7 +3246,7 @@ model NecessidadeDocumental {
   documentos Documento[]
   eventos    NecessidadeDocumentalEvento[]
 
-  // CP-4A — vínculos operacionais do runtime v2 (back-relations)
+  // CP-4A â vÃ­nculos operacionais do runtime v2 (back-relations)
   tarefasVinculadas Tarefa[]                    @relation("TarefaNecessidade")
   stepInstances     PhaseWorkflowStepInstance[]
 
@@ -3270,9 +3271,9 @@ model NecessidadeDocumentalEvento {
 }
 
 // ============================================================
-// CP-4A — Runtime de Workflow v2 (instâncias, eventos, outbox).
-// Definições (PhaseInternalWorkflow/Step) permanecem como template; estas são
-// as entidades OPERACIONAIS. É proibido usar a definição como estado do processo.
+// CP-4A â Runtime de Workflow v2 (instÃ¢ncias, eventos, outbox).
+// DefiniÃ§Ãµes (PhaseInternalWorkflow/Step) permanecem como template; estas sÃ£o
+// as entidades OPERACIONAIS. Ã proibido usar a definiÃ§Ã£o como estado do processo.
 // ============================================================
 enum PassoTipo {
   HUMANO
@@ -3324,8 +3325,8 @@ enum OutboxStatus {
   ERRO
 }
 
-// Tipo da Tarefa: NORMAL (do Workflow Interno da fase) ou TRANSVERSAL (ação antecipada de
-// outra fase para resolver uma necessidade da fase atual, SEM avançar o Macro Workflow).
+// Tipo da Tarefa: NORMAL (do Workflow Interno da fase) ou TRANSVERSAL (aÃ§Ã£o antecipada de
+// outra fase para resolver uma necessidade da fase atual, SEM avanÃ§ar o Macro Workflow).
 enum TipoTarefa {
   NORMAL
   TRANSVERSAL
@@ -3374,15 +3375,15 @@ model PhaseWorkflowInstance {
   processoId       Int
   processo         Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
   faseMacroKey     String   @db.VarChar(60)
-  // CP-4B — identidade da fase: id estrutural (solto/snapshot) + versão aplicada.
-  // faseMacroKey continua sendo a identidade lógica estável; label nunca é identidade.
+  // CP-4B â identidade da fase: id estrutural (solto/snapshot) + versÃ£o aplicada.
+  // faseMacroKey continua sendo a identidade lÃ³gica estÃ¡vel; label nunca Ã© identidade.
   faseMacroId      Int?
   faseMacroVersion Int?
 
-  // Snapshot da definição (SOLTO/imutável — alteração de template não altera a instância).
+  // Snapshot da definiÃ§Ã£o (SOLTO/imutÃ¡vel â alteraÃ§Ã£o de template nÃ£o altera a instÃ¢ncia).
   macroWorkflowId       Int?
   macroVersion          Int?
-  workflowDefinitionId  Int? // → PhaseInternalWorkflow (snapshot, sem FK)
+  workflowDefinitionId  Int? // â PhaseInternalWorkflow (snapshot, sem FK)
   workflowVersion       Int?
   snapshot              Json?
   snapshotSchemaVersion Int   @default(1) // CP-4B
@@ -3392,7 +3393,7 @@ model PhaseWorkflowInstance {
   origem            OrigemInstancia        @default(MOTOR)
   instanciadoPor    String?                @db.VarChar(60) // userId ou "MOTOR"
   correlationId     String?                @db.VarChar(60)
-  causationId       String?                @db.VarChar(200) // CP-4B — causa imediata (chave do advance chega a ~74 chars)
+  causationId       String?                @db.VarChar(200) // CP-4B â causa imediata (chave do advance chega a ~74 chars)
   chaveIdempotencia String                 @unique @db.VarChar(200)
 
   previousInstanceId    Int?
@@ -3419,7 +3420,7 @@ model PhaseWorkflowStepInstance {
   workflowInstanceId Int
   workflowInstance   PhaseWorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
 
-  // Snapshot da definição do passo (SOLTO/imutável).
+  // Snapshot da definiÃ§Ã£o do passo (SOLTO/imutÃ¡vel).
   stepDefinitionId      Int?
   stepDefinitionVersion Int?
   stepKey               String @db.VarChar(80)
@@ -3458,10 +3459,10 @@ model PhaseWorkflowStepInstance {
   motivo       String?   @db.VarChar(300)
 
   bloqueadoManual   Boolean @default(false)
-  dependeDeStepKeys Json? // por stepKey/definitionId — nunca label
+  dependeDeStepKeys Json? // por stepKey/definitionId â nunca label
   chaveIdempotencia String  @unique @db.VarChar(200)
   correlationId     String? @db.VarChar(60)
-  causationId       String? @db.VarChar(200) // CP-4B — causa imediata (chave do advance chega a ~74 chars)
+  causationId       String? @db.VarChar(200) // CP-4B â causa imediata (chave do advance chega a ~74 chars)
 
   previousStepInstanceId Int?
   previousStepInstance   PhaseWorkflowStepInstance?  @relation("StepInstanceSupersessao", fields: [previousStepInstanceId], references: [id], onDelete: SetNull)
@@ -3469,7 +3470,7 @@ model PhaseWorkflowStepInstance {
 
   metadata               Json?
   lockVersion            Int      @default(0) // versionamento otimista
-  // CP-4D — estado do Passo antes de BLOQUEADO (para restauração no desbloqueio).
+  // CP-4D â estado do Passo antes de BLOQUEADO (para restauraÃ§Ã£o no desbloqueio).
   statusAnteriorBloqueio String?  @db.VarChar(30)
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
@@ -3484,7 +3485,7 @@ model PhaseWorkflowStepInstance {
   @@index([chaveIdempotencia])
 }
 
-// Eventos append-only (sem rota de update/delete — garantido por contrato).
+// Eventos append-only (sem rota de update/delete â garantido por contrato).
 model WorkflowEvento {
   id                 Int                @id @default(autoincrement())
   tipo               WorkflowEventoTipo
@@ -3495,8 +3496,8 @@ model WorkflowEvento {
   stepInstanceId     Int?
   tarefaId           Int?
   correlationId      String?            @db.VarChar(60)
-  causationId        String?            @db.VarChar(200) // CP-4B — causa imediata (chave do advance chega a ~74 chars)
-  chaveIdempotencia  String?            @unique @db.VarChar(200) // CP-4B — dedup de evento
+  causationId        String?            @db.VarChar(200) // CP-4B â causa imediata (chave do advance chega a ~74 chars)
+  chaveIdempotencia  String?            @unique @db.VarChar(200) // CP-4B â dedup de evento
   dados              Json?
   criadoEm           DateTime           @default(now())
 
@@ -3506,7 +3507,7 @@ model WorkflowEvento {
   @@index([criadoEm])
 }
 
-// CP-4F — auditoria completa de toda tentativa de mudança de fase (v2).
+// CP-4F â auditoria completa de toda tentativa de mudanÃ§a de fase (v2).
 enum AdvanceResultado {
   BLOQUEADO
   AVANCADO
@@ -3548,7 +3549,7 @@ model PhaseAdvanceLog {
   @@index([resultado])
 }
 
-// Outbox transacional (estrutural no CP-4A; worker/publicação em checkpoint futuro).
+// Outbox transacional (estrutural no CP-4A; worker/publicaÃ§Ã£o em checkpoint futuro).
 model DomainOutbox {
   id                Int          @id @default(autoincrement())
   tipo              String       @db.VarChar(80)
@@ -3556,23 +3557,23 @@ model DomainOutbox {
   aggregateId       Int?
   payload           Json
   correlationId     String?      @db.VarChar(60)
-  causationId       String?      @db.VarChar(200) // CP-4B — causa imediata (chave do advance chega a ~74 chars)
-  chaveIdempotencia String?      @unique @db.VarChar(200) // CP-4B — dedup de outbox
+  causationId       String?      @db.VarChar(200) // CP-4B â causa imediata (chave do advance chega a ~74 chars)
+  chaveIdempotencia String?      @unique @db.VarChar(200) // CP-4B â dedup de outbox
   status            OutboxStatus @default(PENDENTE)
   tentativas        Int          @default(0)
   erro              String?      @db.Text
   criadoEm          DateTime     @default(now())
   processadoEm      DateTime?
-  // Claim atômico (P7): reserva a linha p/ um worker (UPDATE ... WHERE reservadoEm IS NULL).
-  // Dois workers não processam o mesmo evento; a idempotência continua obrigatória.
+  // Claim atÃ´mico (P7): reserva a linha p/ um worker (UPDATE ... WHERE reservadoEm IS NULL).
+  // Dois workers nÃ£o processam o mesmo evento; a idempotÃªncia continua obrigatÃ³ria.
   reservadoEm       DateTime?
 
   @@index([status, criadoEm])
   @@index([correlationId])
 }
 
-// F1 — Papel financeiro de uma Configuração Financeira (ProdutoFinanceiro adaptado).
-// Uma MESMA entidade mestre pode ter várias configurações (papéis) — sem duplicar o mestre.
+// F1 â Papel financeiro de uma ConfiguraÃ§Ã£o Financeira (ProdutoFinanceiro adaptado).
+// Uma MESMA entidade mestre pode ter vÃ¡rias configuraÃ§Ãµes (papÃ©is) â sem duplicar o mestre.
 enum PapelFinanceiro {
   CUSTO
   RECEITA
@@ -3585,13 +3586,13 @@ enum PapelFinanceiro {
 
 enum NaturezaPreco {
   CUSTO
-  RECEITA // legado — equivalente a VENDA (ver VENDA). Mantido p/ retrocompat de dados.
-  VENDA // canônico na Tabela de Preços: "quanto o item é VENDIDO" (a RECEITA é o lançamento gerado depois)
+  RECEITA // legado â equivalente a VENDA (ver VENDA). Mantido p/ retrocompat de dados.
+  VENDA // canÃ´nico na Tabela de PreÃ§os: "quanto o item Ã© VENDIDO" (a RECEITA Ã© o lanÃ§amento gerado depois)
 }
 
-// Natureza financeira da Configuração Financeira (o QUE o item pode gerar).
-// Uma ÚNICA config por item; define quais preços/regras/lançamentos são válidos.
-// Deriva de possuiCusto/possuiReceita (legado) — ver deriveNaturezaFinanceira().
+// Natureza financeira da ConfiguraÃ§Ã£o Financeira (o QUE o item pode gerar).
+// Uma ÃNICA config por item; define quais preÃ§os/regras/lanÃ§amentos sÃ£o vÃ¡lidos.
+// Deriva de possuiCusto/possuiReceita (legado) â ver deriveNaturezaFinanceira().
 enum NaturezaFinanceira {
   SOMENTE_CUSTO
   SOMENTE_RECEITA
@@ -3610,7 +3611,7 @@ enum NaturezaItem {
 }
 
 // Origem do cadastro mestre que ORIGINA uma Categoria Financeira.
-// LEGADO = linha antiga (texto livre) ainda não vinculada a um mestre.
+// LEGADO = linha antiga (texto livre) ainda nÃ£o vinculada a um mestre.
 enum OrigemCategoria {
   DOCUMENTO
   SERVICO
@@ -3882,12 +3883,12 @@ enum FaseCode {
   FINALIZADO
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// OPERAÇÃO ANTECIPADA — capacidade NATIVA do Workflow Engine (não pertence a
-// nenhuma fase específica). Orquestradora pura: NÃO possui etapas próprias; aponta
-// para uma operação OFICIAL (targetOperationType + targetOperationId), cujo workflow
-// oficial é a única execução real. Resolução por CATÁLOGO/adaptador (sem switch de
-// negócio). Ver src/lib/operacoes/* e src/services/operacao-antecipada.ts.
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// OPERAÃÃO ANTECIPADA â capacidade NATIVA do Workflow Engine (nÃ£o pertence a
+// nenhuma fase especÃ­fica). Orquestradora pura: NÃO possui etapas prÃ³prias; aponta
+// para uma operaÃ§Ã£o OFICIAL (targetOperationType + targetOperationId), cujo workflow
+// oficial Ã© a Ãºnica execuÃ§Ã£o real. ResoluÃ§Ã£o por CATÃLOGO/adaptador (sem switch de
+// negÃ³cio). Ver src/lib/operacoes/* e src/services/operacao-antecipada.ts.
 enum StatusOperacaoAntecipada {
   CRIADA
   EM_EXECUCAO
@@ -3900,32 +3901,32 @@ enum StatusOperacaoAntecipada {
 
 model OperacaoAntecipada {
   id                         Int                      @id @default(autoincrement())
-  // Código público operacional (OPA-n) gerado pelo CodeGeneratorService central. Aditivo/único;
-  // nullable p/ backfill seguro. Não editável pelo usuário; identidade permanente (id/UUID é a chave técnica).
+  // CÃ³digo pÃºblico operacional (OPA-n) gerado pelo CodeGeneratorService central. Aditivo/Ãºnico;
+  // nullable p/ backfill seguro. NÃ£o editÃ¡vel pelo usuÃ¡rio; identidade permanente (id/UUID Ã© a chave tÃ©cnica).
   publicCode                 String?                  @unique @db.VarChar(20)
   processoId                 Int
-  // Instância do Workflow Interno da fase de ORIGEM (a que solicitou a antecipação).
+  // InstÃ¢ncia do Workflow Interno da fase de ORIGEM (a que solicitou a antecipaÃ§Ã£o).
   workflowInstanceId         Int?
   originPhaseCode            String?                  @db.VarChar(60)
   originStepKey              String?                  @db.VarChar(80)
-  // Necessidade de origem que a operação pretende atender (loose ref).
+  // Necessidade de origem que a operaÃ§Ã£o pretende atender (loose ref).
   necessidadeId              Int?
-  // Destino: fase e workflow oficiais a que a operação pertence.
+  // Destino: fase e workflow oficiais a que a operaÃ§Ã£o pertence.
   targetPhaseCode            String?                  @db.VarChar(60)
   targetWorkflowDefinitionId String?                  @db.VarChar(80)
-  // Tipo operacional do CATÁLOGO (ex.: "documento") — resolvido por adaptador.
+  // Tipo operacional do CATÃLOGO (ex.: "documento") â resolvido por adaptador.
   targetOperationType        String                   @db.VarChar(40)
-  // Documento-alvo (mestre) escolhido — pode DIFERIR do documento exigido pela necessidade de
-  // origem (nesse caso é documento de APOIO e NÃO substitui a necessidade). Parâmetro tipado.
+  // Documento-alvo (mestre) escolhido â pode DIFERIR do documento exigido pela necessidade de
+  // origem (nesse caso Ã© documento de APOIO e NÃO substitui a necessidade). ParÃ¢metro tipado.
   targetTipoDocumentoId      Int?
-  // Params tipados da criação (pessoaId, paisId, jurisdicaoId, documentoExistenteId, …).
+  // Params tipados da criaÃ§Ã£o (pessoaId, paisId, jurisdicaoId, documentoExistenteId, â¦).
   params                     Json?
-  // Id da operação oficial criada/vinculada pelo adaptador (ex.: documentoId).
+  // Id da operaÃ§Ã£o oficial criada/vinculada pelo adaptador (ex.: documentoId).
   targetOperationId          Int?
   objetivo                   String?                  @db.Text
   resultadoEsperado          String?                  @db.Text
   resultadoObtido            String?                  @db.Text
-  // Resultado ESTRUTURADO interpretado (ex.: cartório/livro/folha/termo do registro localizado).
+  // Resultado ESTRUTURADO interpretado (ex.: cartÃ³rio/livro/folha/termo do registro localizado).
   resultadoDados             Json?
   status                     StatusOperacaoAntecipada @default(CRIADA)
   responsavelId              Int?
@@ -3937,13 +3938,297 @@ model OperacaoAntecipada {
   completedAt                DateTime?
   cancelledAt                DateTime?
 
-  // Idempotência do documento-alvo explícito: 1 operação por (processo, necessidade, tipo op,
-  // tipo documento-alvo). NULLs são distintos no Postgres → o Modo 2 (sem tipo) é deduplicado
-  // pela pré-checagem no serviço, não por este índice.
+  // IdempotÃªncia do documento-alvo explÃ­cito: 1 operaÃ§Ã£o por (processo, necessidade, tipo op,
+  // tipo documento-alvo). NULLs sÃ£o distintos no Postgres â o Modo 2 (sem tipo) Ã© deduplicado
+  // pela prÃ©-checagem no serviÃ§o, nÃ£o por este Ã­ndice.
   @@unique([processoId, necessidadeId, targetOperationType, targetTipoDocumentoId])
   @@index([processoId])
   @@index([necessidadeId])
   @@index([targetOperationType, targetOperationId])
   @@index([targetTipoDocumentoId])
   @@index([status])
+}
+
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// MOTOR FINANCEIRO V3 â FASE 1 (infraestrutura ADITIVA; nÃ£o altera o legado).
+// Ledger double-entry como fonte da verdade; saldos = projeÃ§Ã£o. Enums como
+// VarChar (extensÃ­vel sem migration de enum). Refs ao legado = Int solto.
+// Ver docs/motor-financeiro-discovery-spec.md (V3 congelada).
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+/// Aggregate root do ciclo financeiro. Reusa o cÃ³digo operacional atual (REC-n).
+model ObrigacaoEconomica {
+  id                Int      @id @default(autoincrement())
+  codigoOperacional String?  @db.VarChar(40) // = cÃ³digo da Receita/Custo (ex.: REC-105)
+  natureza          String   @db.VarChar(30) // RECEITA|CUSTO|RECEITA_EXTRA|DESCONTO|CREDITO|REEMBOLSO|JUROS|MULTA|AJUSTE|ESTORNO|RENEGOCIACAO|OUTRO
+  direcao           String   @db.VarChar(12) // A_RECEBER|A_PAGAR
+  processoId        Int?
+  faseId            Int?
+  clienteId         Int?
+  regraFinanceiraId Int?
+  moedaContratual   Moeda    @default(BRL)
+  moedaContabil     Moeda    @default(BRL)
+  valorContratado   Decimal  @db.Decimal(14, 2)
+  politicaCambialId Int?
+  politicaDivisao   String?  @db.VarChar(20) // SEM_DIVISAO|IGUAL|PERCENTUAL|VALOR|GRUPO|PERSONALIZADA
+  contaContabilId   Int?
+  centroCustoId     Int?
+  status            String   @default("RASCUNHO") @db.VarChar(20) // RASCUNHO|ATIVO|SUSPENSO|LIQUIDADO|CANCELADO
+  versao            Int      @default(1)
+  substituiId       Int?
+  origemTipo        String?  @db.VarChar(20) // Receita|Custo|nativo
+  origemId          Int?
+  observacoes       String?  @db.Text
+  version           Int      @default(0) // optimistic locking (aggregate)
+  criadoPorId       Int?
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  ledger        LedgerFinanceiro?
+  ocorrencias   OcorrenciaFinanceira[]
+  distribuicoes DistribuicaoEconomica[]
+
+  @@unique([origemTipo, origemId]) // 1:1 com a Receita/Custo de origem (idempotÃªncia do backfill/dual-write)
+  @@index([processoId])
+  @@index([status])
+  @@index([natureza])
+  @@index([codigoOperacional])
+}
+
+/// Livro-razÃ£o (double-entry) de UMA obrigaÃ§Ã£o. Ãnica fonte da verdade.
+model LedgerFinanceiro {
+  id            Int                @id @default(autoincrement())
+  obrigacaoId   Int                @unique
+  obrigacao     ObrigacaoEconomica @relation(fields: [obrigacaoId], references: [id], onDelete: Cascade)
+  moedaContabil Moeda              @default(BRL)
+  criadoEm      DateTime           @default(now())
+
+  entries LedgerEntry[]
+}
+
+/// Perna de um lanÃ§amento contÃ¡bil balanceado (imutÃ¡vel, append-only).
+model LedgerEntry {
+  id                Int              @id @default(autoincrement())
+  ledgerId          Int
+  ledger            LedgerFinanceiro @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  obrigacaoId       Int
+  parcelaId         Int?
+  ocorrenciaId      Int?
+  transacaoId       String           @db.VarChar(60) // agrupa as pernas de um mesmo lanÃ§amento
+  tipo              String           @db.VarChar(30) // OBRIGACAO_CRIADA|PAGAMENTO|DESCONTO|JUROS|MULTA|ESTORNO|DIFERENCA_CAMBIAL|CANCELAMENTO|BAIXA|AJUSTE|ABERTURA...
+  contaContabil     String           @db.VarChar(20) // cÃ³digo do plano de contas
+  direcao           String           @db.VarChar(8) // DEBITO|CREDITO
+  valor             Decimal          @db.Decimal(14, 2)
+  moeda             Moeda            @default(BRL)
+  valorContabil     Decimal          @db.Decimal(14, 2) // BRL
+  snapshotCambialId Int?
+  data              DateTime
+  sequencia         Int // monotÃ´nica por ledger
+  estornaEntryId    Int?
+  idempotencyKey    String?          @unique @db.VarChar(120)
+  correlacaoId      String?          @db.VarChar(60)
+  criadoPorId       Int?
+  criadoEm          DateTime         @default(now())
+
+  @@index([ledgerId, sequencia])
+  @@index([transacaoId])
+  @@index([obrigacaoId, data])
+  @@index([ocorrenciaId])
+  @@index([contaContabil, data])
+}
+
+/// Plano de contas (cadastro extensÃ­vel).
+model PlanoContaFinanceira {
+  id       Int      @id @default(autoincrement())
+  codigo   String   @unique @db.VarChar(20)
+  nome     String   @db.VarChar(120)
+  tipo     String   @db.VarChar(20) // ATIVO|PASSIVO|RECEITA|DESPESA|RESULTADO
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now())
+}
+
+/// Saldo de abertura na DATA DE CORTE (DecisÃ£o 3). NÃ£o reconstrÃ³i histÃ³rico.
+model LedgerOpeningBalance {
+  id            Int      @id @default(autoincrement())
+  obrigacaoId   Int      @unique
+  dataCorte     DateTime
+  valorAbertura Decimal  @db.Decimal(14, 2)
+  moeda         Moeda    @default(BRL)
+  transacaoId   String   @db.VarChar(60)
+  origem        String   @default("backfill-corte") @db.VarChar(30)
+  criadoEm      DateTime @default(now())
+}
+
+/// Fato financeiro registrado (gatilho dos lanÃ§amentos). Append-only.
+model OcorrenciaFinanceira {
+  id                Int                @id @default(autoincrement())
+  obrigacaoId       Int
+  obrigacao         ObrigacaoEconomica @relation(fields: [obrigacaoId], references: [id], onDelete: Cascade)
+  cobrancaId        Int?
+  tipo              String             @db.VarChar(30) // PAGAMENTO|PAGAMENTO_PARCIAL|DESCONTO|JUROS|MULTA|ESTORNO|REEMBOLSO|CREDITO|RENEGOCIACAO|CANCELAMENTO|BAIXA|AJUSTE|DIFERENCA_CAMBIAL|OBRIGACAO_CRIADA
+  valor             Decimal            @db.Decimal(14, 2)
+  moeda             Moeda              @default(BRL)
+  data              DateTime
+  formaPagamentoId  Int?
+  origemRecurso     String?            @db.VarChar(20) // CONTA|PIX|CARTAO|TERCEIRO|EMPRESA|OUTRO
+  pagadorId         Int?
+  snapshotCambialId Int?
+  comprovanteUrl    String?            @db.VarChar(400)
+  observacao        String?            @db.Text
+  politicaAplicacao String?            @db.VarChar(24) // FIFO|PARCELA_ESPECIFICA|MANUAL|PROPORCIONAL
+  status            String             @default("PENDENTE") @db.VarChar(20) // PENDENTE|PROCESSANDO|PROCESSADA|REJEITADA|REVERTIDA
+  estornaId         Int?
+  correlacaoId      String?            @db.VarChar(60)
+  idempotencyKey    String?            @unique @db.VarChar(120)
+  criadoPorId       Int?
+  criadoEm          DateTime           @default(now())
+
+  aplicacoes AplicacaoFinanceira[]
+
+  @@index([obrigacaoId, data])
+  @@index([tipo, status])
+}
+
+/// ImputaÃ§Ã£o explÃ­cita de uma ocorrÃªncia a parcelas/obrigaÃ§Ãµes.
+model AplicacaoFinanceira {
+  id            Int                  @id @default(autoincrement())
+  ocorrenciaId  Int
+  ocorrencia    OcorrenciaFinanceira @relation(fields: [ocorrenciaId], references: [id], onDelete: Cascade)
+  parcelaId     Int?
+  cobrancaId    Int?
+  valorAplicado Decimal              @db.Decimal(14, 2)
+  moeda         Moeda                @default(BRL)
+  ordem         Int                  @default(0)
+  criadoEm      DateTime             @default(now())
+
+  @@index([ocorrenciaId])
+  @@index([parcelaId])
+}
+
+/// DistribuiÃ§Ã£o econÃ´mica (independe do pagador).
+model DistribuicaoEconomica {
+  id             Int                @id @default(autoincrement())
+  obrigacaoId    Int
+  obrigacao      ObrigacaoEconomica @relation(fields: [obrigacaoId], references: [id], onDelete: Cascade)
+  modo           String             @default("SEM_DIVISAO") @db.VarChar(20) // SEM_DIVISAO|IGUAL|PERCENTUAL|VALOR|GRUPO|PERSONALIZADA
+  versao         Int                @default(1)
+  arredondamento String             @default("ULTIMO_ABSORVE") @db.VarChar(20)
+  criadoEm       DateTime           @default(now())
+
+  participacoes ParticipacaoEconomica[]
+
+  @@index([obrigacaoId])
+}
+
+/// Cota de um requerente/beneficiÃ¡rio na distribuiÃ§Ã£o.
+model ParticipacaoEconomica {
+  id             Int                   @id @default(autoincrement())
+  distribuicaoId Int
+  distribuicao   DistribuicaoEconomica @relation(fields: [distribuicaoId], references: [id], onDelete: Cascade)
+  pessoaId       Int
+  incluido       Boolean               @default(true)
+  percentual     Decimal?              @db.Decimal(7, 4)
+  valor          Decimal?              @db.Decimal(14, 2)
+  moeda          Moeda                 @default(BRL)
+  ordem          Int                   @default(0)
+
+  @@index([distribuicaoId])
+  @@index([pessoaId])
+}
+
+/// Quem efetivamente pagou (independe da distribuiÃ§Ã£o).
+model Pagador {
+  id             Int      @id @default(autoincrement())
+  tipo           String   @db.VarChar(12) // REQUERENTE|EMPRESA|TERCEIRO|EXTERNO
+  pessoaId       Int?
+  parteExternaId Int?
+  criadoEm       DateTime @default(now())
+}
+
+/// Parte externa (pagador/terceiro fora do cadastro de Pessoas).
+model ParteExterna {
+  id         Int      @id @default(autoincrement())
+  nome       String   @db.VarChar(160)
+  documento  String?  @db.VarChar(40)
+  tipo       String?  @db.VarChar(4) // PF|PJ
+  observacao String?  @db.Text
+  processoId Int?
+  ativo      Boolean  @default(true)
+  criadoEm   DateTime @default(now())
+}
+
+/// PolÃ­tica cambial (diferenÃ§a configurÃ¡vel pela Regra Financeira).
+model PoliticaCambial {
+  id                  Int      @id @default(autoincrement())
+  escopo              String   @db.VarChar(12) // CONTRATO|OBRIGACAO
+  tipo                String   @db.VarChar(12) // FIXO|VARIAVEL|SNAPSHOT|MESMA|MANUAL
+  permiteOverride     Boolean  @default(false)
+  fonteDefault        String?  @db.VarChar(60)
+  tratamentoDiferenca String   @default("CONTABIL") @db.VarChar(12) // ABSORVIDA|REPASSADA|CONTABIL|MANUAL
+  criadoEm            DateTime @default(now())
+}
+
+/// Snapshot cambial imutÃ¡vel por ocorrÃªncia (com diferenÃ§a cambial separada).
+model SnapshotCambial {
+  id                  Int      @id @default(autoincrement())
+  moedaOrigem         String   @db.VarChar(10)
+  moedaDestino        String   @db.VarChar(10)
+  taxa                Decimal  @db.Decimal(14, 6)
+  direcao             String   @db.VarChar(8) // DIRETA|INVERSA|MESMA
+  fonte               String?  @db.VarChar(60)
+  tipo                String   @db.VarChar(12) // AUTOMATICA|MANUAL|ESTIMADA|MESMA
+  data                DateTime
+  usuarioId           Int?
+  justificativa       String?  @db.VarChar(300)
+  precisao            Int      @default(6)
+  valorOriginal       Decimal? @db.Decimal(14, 2)
+  valorRecebido       Decimal? @db.Decimal(14, 2)
+  diferencaCambial    Decimal? @db.Decimal(14, 2)
+  tratamentoDiferenca String?  @db.VarChar(12)
+  motivo              String?  @db.VarChar(300)
+  criadoEm            DateTime @default(now())
+}
+
+/// CrÃ©dito/excedente (crÃ©dito entre requerentes Ã© INFORMATIVO).
+model CreditoFinanceiro {
+  id                    Int      @id @default(autoincrement())
+  obrigacaoId           Int?
+  pessoaId              Int?
+  origemOcorrenciaId    Int?
+  valor                 Decimal  @db.Decimal(14, 2)
+  moeda                 Moeda    @default(BRL)
+  destino               String   @db.VarChar(24) // CREDITO|ADIANTAMENTO|QUITAR_OUTRO|DEVOLUCAO|NAO_IDENTIFICADO|INFORMATIVO
+  pagoEmNomeDeTerceiros Decimal? @db.Decimal(14, 2)
+  status                String   @default("ABERTO") @db.VarChar(16)
+  aprovadoPorId         Int?
+  criadoEm              DateTime @default(now())
+
+  @@index([obrigacaoId])
+  @@index([pessoaId])
+}
+
+/// ProjeÃ§Ã£o materializada (CACHE; nunca fonte). ReconstruÃ­vel do Ledger.
+model SaldoProjecao {
+  id                      Int      @id @default(autoincrement())
+  obrigacaoId             Int      @unique
+  recebidoBruto           Decimal  @default(0) @db.Decimal(14, 2)
+  recebidoLiquido         Decimal  @default(0) @db.Decimal(14, 2)
+  saldo                   Decimal  @default(0) @db.Decimal(14, 2)
+  vencido                 Decimal  @default(0) @db.Decimal(14, 2)
+  aVencer                 Decimal  @default(0) @db.Decimal(14, 2)
+  ultimaSequenciaAplicada Int      @default(0)
+  atualizadoEm            DateTime @updatedAt
+}
+
+/// Snapshot de saldo (cache de desempenho para replay). DescartÃ¡vel.
+model SaldoSnapshot {
+  id                Int      @id @default(autoincrement())
+  obrigacaoId       Int
+  sequenciaAplicada Int
+  saldo             Decimal  @db.Decimal(14, 2)
+  recebidoBruto     Decimal  @db.Decimal(14, 2)
+  recebidoLiquido   Decimal  @db.Decimal(14, 2)
+  criadoEm          DateTime @default(now())
+
+  @@index([obrigacaoId, sequenciaAplicada])
 }

@@ -170,7 +170,7 @@ sec('4 — backend, projeção legada e migration aditiva')
   const schema = readFileSync(join(RAIZ, 'prisma/schema.prisma'), 'utf8')
   ok('tabelas de vínculo no schema', ['TaxaPagamentoMoeda', 'TaxaPagamentoPais'].every((m) => schema.includes(`model ${m} {`)))
   ok('unicidade impede duplicidade no banco', schema.includes('@@unique([taxaId, moedaId])') && schema.includes('@@unique([taxaId, paisId])'))
-  ok('arrays legados preservados no schema', schema.includes('moedasAplicaveis String[]') && schema.includes('paises          String[]'))
+  ok('arrays legados preservados no schema', /moedasAplicaveis\s+String\[\]/.test(schema) && /\bpaises\s+String\[\]/.test(schema))
 
   const aplicador = readFileSync(join(RAIZ, 'scripts/prod-apply-cadastros-aditivas.mjs'), 'utf8')
   ok('migration registrada no aplicador do build', aplicador.includes('20260803000000_taxa_aplicabilidade_relacional'))
