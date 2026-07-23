@@ -15,8 +15,9 @@ console.log('\nWizard Cadastrar Cobrança — 4 etapas + EUR/BRL')
 
 // ── fluxo de 4 etapas, sem etapa 5 ──
 ok('é o componente real (título Cadastrar Cobrança)', src.includes('Cadastrar Cobrança'))
-ok('exatamente 4 Passos no indicador', (src.match(/<Passo n=\{[1-4]\}/g) || []).length === 4 && !src.includes('<Passo n={5}'))
-ok('Simulação e geração é a etapa 4', src.includes('label="Simulação e geração" icon={Wallet} />') && !src.includes('label="Simulação e geração" icon={Wallet} /><Passo'))
+ok('exatamente 4 etapas no indicador (PASSOS)', (src.match(/n: [1-4], label:/g) || []).length === 4 && !src.includes('n: 5, label:') && src.includes('const PASSOS ='))
+ok('Simulação e geração é a etapa 4', src.includes("{ n: 4, label: 'Simulação e geração'"))
+ok('etapas full-page (barra + resumo lateral)', src.includes('PASSOS.map') && src.includes('Resumo da configuração') && src.includes('Receita selecionada'))
 ok('NÃO existe render de step === 5', !/step === 5/.test(src))
 ok('NÃO há navegação para etapa 5 (step < 5 / setStep(5))', !src.includes('step < 5') && !src.includes('setStep(5'))
 ok('Próximo só até a etapa 3 (step < 4)', src.includes('step < 4 ?'))
@@ -31,8 +32,14 @@ ok('não cria cobrança ao avançar (avançar só faz setStep)', src.includes('o
 ok('conversão dupla por moeda de destino', src.includes('const temConv') && src.includes('emDest') && src.includes('moedaDestino'))
 ok('valores em duas moedas (dual)', src.includes('const dual = ') && src.includes('brl(v, moeda)') && src.includes('brl(emDest(v), destino'))
 ok('cronograma com coluna da moeda de destino', src.includes('Valor ({destino})') && src.includes('temConv &&'))
-ok('cotação exibida com origem/tipo', src.includes('Cotação: 1') && src.includes('sim.cambio.tipo'))
+ok('cotação exibida com origem/fonte/tipo', src.includes('Cotação:') && src.includes('sim.cambio.tipo') && src.includes('sim.cambio.fonte'))
 ok('frontend NÃO recalcula taxa (usa sim.*)', src.includes('sim.valorTaxa') && src.includes('sim.totalCobrado') && !src.includes('valorTaxa ='))
+// ── full-page + sucesso ──
+ok('layout full-page (não modal pequeno)', src.includes('max-w-[1400px]') && src.includes('h-[92vh]') && !src.includes('max-w-lg'))
+ok('resumo lateral persistente (aside)', src.includes('<aside') && src.includes('Valores de referência'))
+ok('cards de valores (total/entrada/saldo/líquido)', src.includes('const Card =') && src.includes('Saldo financiado') && src.includes('Valor líquido'))
+ok('tela de sucesso pós-geração', src.includes('Cobrança criada com sucesso') && src.includes('setSucesso'))
+ok('barra "Etapa X de 4"', src.includes('Etapa {step} de 4'))
 
 // ── etapa Recebimento: moeda de recebimento + cotação (auto/manual) ──
 ok('moeda de recebimento selecionável', src.includes('Moeda de recebimento') && src.includes('moedaRecebimento'))

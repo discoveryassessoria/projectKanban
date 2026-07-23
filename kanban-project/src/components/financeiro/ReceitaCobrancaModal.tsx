@@ -103,7 +103,7 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
         </div>
       </div>
 
-      {wizard && <CobrancaWizard receitaId={receitaId} valor={contratado} moeda={moeda} onClose={() => setWizard(false)} onCriada={() => { setWizard(false); carregar(); onChanged?.() }} />}
+      {wizard && <CobrancaWizard receitaId={receitaId} valor={contratado} moeda={moeda} receita={r} onClose={() => setWizard(false)} onCriada={() => { setWizard(false); carregar(); onChanged?.() }} />}
     </div>
   )
 }
@@ -158,11 +158,12 @@ function CobrancaCard({ cobranca, moeda, onPago }: { cobranca: any; moeda: strin
 // "Confirmar e gerar cobrança". A prévia é a SIMULAÇÃO oficial do backend
 // (ChargeCalculationService); a criação RECALCULA no servidor (autoridade) e
 // congela a cotação no snapshot. Valores em EUR e BRL quando há conversão.
-function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receitaId: number; valor: number; moeda: string; onClose: () => void; onCriada: () => void }) {
+function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }: { receitaId: number; valor: number; moeda: string; receita?: any; onClose: () => void; onCriada: () => void }) {
   const [cfg, setCfg] = React.useState<Cfg | null>(null)
   const [step, setStep] = React.useState(1)
   const [salvando, setSalvando] = React.useState(false)
   const [erro, setErro] = React.useState<string | null>(null)
+  const [sucesso, setSucesso] = React.useState<any>(null)
   const [f, setF] = React.useState<{ formaPagamentoId?: number; condicaoPagamentoId?: number; contaBancariaId?: number; carteiraId?: number; gateway?: string; adquirenteId?: number; bandeiraId?: number; entradaValor?: number; moedaRecebimento?: string; cotacaoManual?: number; cotacaoManualAtiva?: boolean; justificativaCotacao?: string }>({})
   const [nParcelas, setNParcelas] = React.useState<number | ''>('')
   const [politicaEscolha, setPoliticaEscolha] = React.useState<string | null>(null)
@@ -237,86 +238,147 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
   async function confirmar() {
     setSalvando(true); setErro(null)
     try {
-      await jf(`/api/financeiro/receitas/${receitaId}/cobrancas`, {
+      const d = await jf(`/api/financeiro/receitas/${receitaId}/cobrancas`, {
         method: 'POST',
         body: JSON.stringify({ ...f, ...camposCambio(), idempotencyKey: idemKey, nParcelas: nParcelas === '' ? undefined : nParcelas, politicaTaxasEscolhida: politicaEscolha ?? undefined }),
       })
-      onCriada()
+      setSucesso(d) // tela de sucesso (não fecha direto)
     } catch (e: any) { setErro(e.message) } finally { setSalvando(false) }
   }
 
-  const Passo = ({ n, label, icon: Ic }: { n: number; label: string; icon: any }) => (
-    <div className={`flex items-center gap-1.5 text-xs ${step === n ? 'text-white' : step > n ? 'text-emerald-400' : 'text-white/35'}`}>
-      <span className={`grid h-5 w-5 place-items-center rounded-full border text-[10px] ${step === n ? 'border-white/40' : step > n ? 'border-emerald-400/40 bg-emerald-400/10' : 'border-white/15'}`}>{step > n ? <Check className="h-3 w-3" /> : n}</span>
-      <Ic className="h-3.5 w-3.5" /> {label}
-    </div>
-  )
   const sel = 'w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:border-white/30'
-  const linha = (l: string, v: any) => (<div className="flex justify-between py-0.5"><span className="text-white/45">{l}</span><span className="tabular-nums text-white/85">{v ?? '—'}</span></div>)
+  const linha = (l: string, v: any) => (<div className="flex justify-between gap-3 py-0.5"><span className="text-white/45">{l}</span><span className="truncate text-right tabular-nums text-white/85">{v ?? '—'}</span></div>)
   const POL_LABEL: Record<string, string> = { IGNORAR: 'Ignorar', REPASSAR: 'Repassar ao cliente', ABSORVER: 'Absorver' }
 
-  // Painel da SIMULAÇÃO (última etapa). Mostra valores em EUR e BRL quando há
-  // conversão (moeda da receita ≠ BRL). A cotação vem do runtime — o frontend só
-  // apresenta (valorBRL = valorEUR × cotação), nunca recalcula taxa/cronograma.
-  const Simulacao = () => {
-    const cotacao = sim?.cambio?.cotacao != null ? Number(sim.cambio.cotacao) : null
-    const destino = sim?.cambio?.moedaDestino ? String(sim.cambio.moedaDestino).toUpperCase() : null
-    const origem = sim?.cambio?.moedaOrigem ? String(sim.cambio.moedaOrigem).toUpperCase() : moeda
-    const temConv = !!destino && destino !== origem && cotacao != null && cotacao > 0
-    const emDest = (v: number) => (v == null ? 0 : Number(v) * (cotacao ?? 1))
-    const dual = (v: number, bold = false) => (
-      <span className="tabular-nums text-white/85">{bold ? <b>{brl(v, moeda)}</b> : brl(v, moeda)}{temConv && <span className="text-white/45"> · {brl(emDest(v), destino!)}</span>}</span>
-    )
-    return (
-      <div className="space-y-3">
-        {simulando && <p className="text-sm text-white/50">Simulando no servidor…</p>}
-        {!simulando && sim && !sim.ok && (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
-            {sim.erros.map((e: any, i: number) => <div key={i}>• {e.mensagem}</div>)}
-            {precisaEscolha && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {['IGNORAR', 'REPASSAR', 'ABSORVER'].map((p) => (
-                  <button key={p} onClick={() => setPoliticaEscolha(p)} className={`rounded-md border px-2.5 py-1 text-xs ${politicaEscolha === p ? 'text-[#1b1508]' : 'border-white/20 text-white/80 hover:bg-white/10'}`} style={politicaEscolha === p ? { background: OURO, borderColor: OURO } : undefined}>{POL_LABEL[p]}</button>
-                ))}
-              </div>
-            )}
+  // ── câmbio derivado (usado pela Simulação E pelo resumo lateral) ──
+  const cotacao = sim?.cambio?.cotacao != null ? Number(sim.cambio.cotacao) : null
+  const origem = sim?.cambio?.moedaOrigem ? String(sim.cambio.moedaOrigem).toUpperCase() : moeda
+  const destino = sim?.cambio?.moedaDestino ? String(sim.cambio.moedaDestino).toUpperCase() : null
+  const temConv = !!destino && destino !== origem && cotacao != null && cotacao > 0
+  const emDest = (v: number) => (v == null ? 0 : Math.round(Number(v) * (cotacao ?? 1) * 100) / 100)
+  const dual = (v: number, bold = false) => (
+    <span className="tabular-nums text-white/85">{bold ? <b>{brl(v, moeda)}</b> : brl(v, moeda)}{temConv && <span className="text-white/45"> · {brl(emDest(v), destino!)}</span>}</span>
+  )
+  const nomeForma = (id?: number) => cfg?.formasPagamento?.find((x: any) => x.id === id)?.name
+  const nomeAdq = (id?: number) => (cfg?.adquirentes ?? []).find((x: any) => x.id === id)?.nome
+  const nomeBand = (id?: number) => (cfg?.bandeiras ?? []).find((x: any) => x.id === id)?.nome
+  const entradaSim = sim?.ok ? Number(sim.parcelas?.find((p: any) => p.entrada)?.valor ?? 0) : 0
+  const saldoSim = sim?.ok ? Math.round((Number(sim.valorBase) - entradaSim) * 100) / 100 : 0
+
+  const PASSOS = [
+    { n: 1, label: 'Forma e configuração', desc: 'Forma, adquirente, bandeira e parcelas', icon: CreditCard },
+    { n: 2, label: 'Entrada e vencimentos', desc: 'Entrada e cronograma', icon: CalendarClock },
+    { n: 3, label: 'Recebimento', desc: 'Conta, moeda e cotação', icon: Landmark },
+    { n: 4, label: 'Simulação e geração', desc: 'Revise, valide e gere', icon: Wallet },
+  ]
+  const Card = ({ label, children, destaque }: { label: string; children: React.ReactNode; destaque?: boolean }) => (
+    <div className="rounded-xl border p-3" style={destaque ? { borderColor: `${OURO}55`, background: `${OURO}12` } : { borderColor: 'rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.03)' }}>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-white/45">{label}</p>
+      <div className="mt-1 text-sm font-semibold">{children}</div>
+    </div>
+  )
+
+  // Painel da SIMULAÇÃO (etapa 4). Cards + cronograma em EUR e na moeda de
+  // destino. A cotação/valores vêm do runtime — o frontend só apresenta.
+  const Simulacao = () => (
+    <div className="space-y-4">
+      {simulando && <p className="text-sm text-white/50">Simulando no servidor…</p>}
+      {!simulando && sim && !sim.ok && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+          {sim.erros.map((e: any, i: number) => <div key={i}>• {e.mensagem}</div>)}
+          {precisaEscolha && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {['IGNORAR', 'REPASSAR', 'ABSORVER'].map((p) => (
+                <button key={p} onClick={() => setPoliticaEscolha(p)} className={`rounded-md border px-2.5 py-1 text-xs ${politicaEscolha === p ? 'text-[#1b1508]' : 'border-white/20 text-white/80 hover:bg-white/10'}`} style={politicaEscolha === p ? { background: OURO, borderColor: OURO } : undefined}>{POL_LABEL[p]}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {!simulando && sim && sim.ok && (<>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <Card label="Valor contratado">{dual(sim.valorBase)}</Card>
+          {entradaSim > 0 && <Card label="Entrada">{dual(entradaSim)}</Card>}
+          {entradaSim > 0 && <Card label="Saldo financiado">{dual(saldoSim)}</Card>}
+          <Card label={`Taxa da operação (${POL_LABEL[sim.politicaTaxas] ?? sim.politicaTaxas})`}>{sim.valorTaxa > 0 ? dual(sim.valorTaxa) : '—'}</Card>
+          <Card label="Total cobrado" destaque>{dual(sim.totalCobrado, true)}</Card>
+          <Card label="Valor líquido">{dual(sim.valorLiquido)}</Card>
+        </div>
+        {temConv && (
+          <div className={`${GLASS} flex flex-wrap items-center justify-between gap-2 p-3 text-[12px]`}>
+            <span className="text-white/70">Cotação: <b>1 {origem} = {cotacao} {destino}</b></span>
+            <span className="text-white/45">{sim.cambio.fonte ?? '—'}{sim.cambio.data ? ` · ${dt(sim.cambio.data)}` : ''} · {(sim.cambio.tipo || '').toLowerCase() || (sim.cambio.estimado ? 'estimada — congelada ao gerar' : 'congelada nesta cobrança')}</span>
           </div>
         )}
-        {!simulando && sim && sim.ok && (<>
-          <div className={`${GLASS} p-3 text-sm`}>
-            <div className="flex justify-between py-0.5"><span className="text-white/45">Valor base</span>{dual(sim.valorBase)}</div>
-            {sim.valorTaxa > 0 && <div className="flex justify-between gap-3 py-0.5"><span className="text-white/45">Taxa da operação ({POL_LABEL[sim.politicaTaxas] ?? sim.politicaTaxas}){sim.taxaAplicada ? ` · ${sim.taxaAplicada.nome}` : ''}</span>{dual(sim.valorTaxa)}</div>}
-            <div className="flex justify-between py-0.5"><span className="text-white/45">Total cobrado</span>{dual(sim.totalCobrado, true)}</div>
-            <div className="flex justify-between py-0.5"><span className="text-white/45">Líquido previsto</span>{dual(sim.valorLiquido)}</div>
-            {temConv && <div className="mt-1.5 border-t border-white/10 pt-1.5 text-[11px] text-white/55">Cotação: 1 {origem} = {cotacao} {destino} <span className="text-white/40">({(sim.cambio.tipo || '').toLowerCase() || (sim.cambio.estimado ? 'estimada — será congelada ao gerar' : 'congelada nesta cobrança')})</span></div>}
-          </div>
+        <div>
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/50">Cronograma de parcelas</p>
           <div className="overflow-x-auto rounded-lg border border-white/10">
-            <table className="w-full text-[13px]"><thead><tr className="bg-white/5 text-left text-[11px] uppercase tracking-wide text-white/45"><th className="px-3 py-1.5">#</th><th className="px-3 py-1.5">Vencimento</th><th className="px-3 py-1.5 text-right">Valor ({moeda})</th>{temConv && <th className="px-3 py-1.5 text-right">Valor ({destino})</th>}</tr></thead><tbody>
-              {sim.parcelas.map((p: any) => <tr key={p.numero} className="border-t border-white/5"><td className="px-3 py-1.5 text-white/60">{p.numero}{p.entrada ? ' · entrada' : ''}</td><td className="px-3 py-1.5 text-white/70">{dt(p.vencimento)}</td><td className="px-3 py-1.5 text-right tabular-nums">{brl(p.valor, moeda)}</td>{temConv && <td className="px-3 py-1.5 text-right tabular-nums text-white/70">{brl(emDest(p.valor), destino!)}</td>}</tr>)}
+            <table className="w-full text-[13px]"><thead><tr className="bg-white/5 text-left text-[11px] uppercase tracking-wide text-white/45"><th className="px-3 py-2">#</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">Vencimento</th><th className="px-3 py-2 text-right">Valor ({moeda})</th>{temConv && <th className="px-3 py-2 text-right">Valor ({destino})</th>}</tr></thead><tbody>
+              {sim.parcelas.map((p: any) => <tr key={p.numero} className="border-t border-white/5"><td className="px-3 py-1.5 text-white/60">{p.numero}</td><td className="px-3 py-1.5 text-white/70">{p.entrada ? 'Entrada' : `Parcela ${p.entrada ? '' : p.numero}`}</td><td className="px-3 py-1.5 text-white/70">{dt(p.vencimento)}</td><td className="px-3 py-1.5 text-right tabular-nums">{brl(p.valor, moeda)}</td>{temConv && <td className="px-3 py-1.5 text-right tabular-nums text-white/70">{brl(emDest(p.valor), destino!)}</td>}</tr>)}
             </tbody></table>
           </div>
-          {Array.isArray(sim.memoria) && (
-            <details className="text-[11px] text-white/50"><summary className="cursor-pointer text-white/60">Memória de cálculo</summary>
-              <div className="mt-1 space-y-0.5 rounded-lg border border-white/10 bg-black/20 p-2">{sim.memoria.map((m: string, i: number) => <div key={i}>{m}</div>)}</div>
-            </details>
-          )}
-        </>)}
+        </div>
+        {Array.isArray(sim.memoria) && (
+          <details className="text-[11px] text-white/50"><summary className="cursor-pointer text-white/60">Memória de cálculo</summary>
+            <div className="mt-1 space-y-0.5 rounded-lg border border-white/10 bg-black/20 p-2">{sim.memoria.map((m: string, i: number) => <div key={i}>{m}</div>)}</div>
+          </details>
+        )}
+      </>)}
+    </div>
+  )
+
+  // ── Tela de SUCESSO após gerar ──
+  if (sucesso) {
+    const cob = sucesso.cobranca
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm" onClick={() => onCriada()}>
+        <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900/95 p-6 text-center text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full" style={{ background: `${OURO}22`, color: OURO }}><Check className="h-7 w-7" /></div>
+          <h3 className="text-lg font-semibold">Cobrança criada com sucesso</h3>
+          <p className="mt-1 text-sm text-white/55">A cobrança foi gerada e vinculada à receita.</p>
+          <div className={`${GLASS} mt-4 space-y-1 p-4 text-left text-sm`}>
+            {linha('Cobrança', `#${cob?.id}`)}
+            {linha('Valor total', brl(cob?.valorTotal, cob?.moeda ?? moeda))}
+            {linha('Parcelas', sucesso.parcelas)}
+            {linha('Status', cob?.status)}
+            {sucesso.idempotente && linha('Idempotência', 'requisição reaproveitada')}
+          </div>
+          <div className="mt-4 flex justify-center gap-2">
+            <button onClick={() => onCriada()} className="rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508]" style={{ background: OURO }}>Ver cobrança</button>
+            <button onClick={onClose} className="rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Voltar para receita</button>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
-          <h3 className="text-base font-semibold">Cadastrar Cobrança</h3>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-3 backdrop-blur-sm sm:p-6" onClick={onClose}>
+      <div className="flex h-[92vh] w-full max-w-[1400px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <div>
+            <h3 className="text-lg font-semibold">Cadastrar Cobrança</h3>
+            <p className="text-xs text-white/50">Crie uma nova cobrança vinculada à receita selecionada.</p>
+          </div>
           <button onClick={onClose} className="text-white/40 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-white/10 px-5 py-2">
-          <Passo n={1} label="Forma e configuração" icon={CreditCard} /><Passo n={2} label="Condição e entrada" icon={CalendarClock} /><Passo n={3} label="Recebimento" icon={Landmark} /><Passo n={4} label="Simulação e geração" icon={Wallet} />
+        {/* Barra de etapas */}
+        <div className="flex flex-wrap gap-2 border-b border-white/10 px-6 py-3">
+          {PASSOS.map((p) => (
+            <div key={p.n} className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg border px-3 py-2 ${step === p.n ? 'border-white/25 bg-white/[0.04]' : 'border-transparent'}`}>
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px]" style={step === p.n ? { background: OURO, borderColor: OURO, color: '#1b1508' } : step > p.n ? { borderColor: '#34d39955', background: '#34d39914', color: '#6ee7b7' } : { borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)' }}>{step > p.n ? <Check className="h-3.5 w-3.5" /> : p.n}</span>
+              <div className="min-w-0">
+                <p className={`truncate text-[13px] font-medium ${step === p.n ? 'text-white' : 'text-white/60'}`}>{p.label}</p>
+                <p className="truncate text-[10px] text-white/40">{p.desc}</p>
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div className="space-y-3 px-5 py-4">
+        {/* Corpo: conteúdo (esq) + resumo lateral persistente (dir) */}
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
           {!cfg && <p className="text-sm text-white/50">Carregando configuração…</p>}
           {erro && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-sm text-red-200">{erro}</div>}
 
@@ -407,27 +469,65 @@ function CobrancaWizard({ receitaId, valor, moeda, onClose, onCriada }: { receit
             )}
           </div>)}
 
-          {cfg && step === 4 && (<div className="space-y-3">
-            {/* Etapa final: revisão da configuração + simulação oficial + geração. */}
-            <div className={`${GLASS} p-3 text-sm`}>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-white/50">Resumo da configuração</p>
-              {linha('Forma', cfg.formasPagamento.find((x: any) => x.id === f.formaPagamentoId)?.name)}
-              {f.bandeiraId != null && linha('Bandeira', (cfg.bandeiras ?? []).find((x: any) => x.id === f.bandeiraId)?.nome)}
-              {f.adquirenteId != null && linha('Adquirente', (cfg.adquirentes ?? []).find((x: any) => x.id === f.adquirenteId)?.nome)}
-              {linha('Condição', condicao?.name)}
-              {linha('Conta / Carteira', cfg.contasBancarias.find((x: any) => x.id === f.contaBancariaId)?.nome ?? cfg.carteiras.find((x: any) => x.id === f.carteiraId)?.nome)}
+          {cfg && step === 4 && (<div className="space-y-4">
+            <div>
+              <h4 className="text-base font-semibold">Simulação da cobrança</h4>
+              <p className="text-xs text-white/50">Confira os valores, o cronograma e as conversões antes de gerar a cobrança.</p>
             </div>
             <Simulacao />
           </div>)}
-        </div>
+          </div>{/* fim conteúdo esquerdo */}
 
-        <div className="flex items-center justify-between border-t border-white/10 px-5 py-3">
+          {/* Resumo lateral persistente */}
+          <aside className="w-full shrink-0 space-y-3 overflow-y-auto border-t border-white/10 bg-black/20 px-5 py-5 lg:w-80 lg:border-l lg:border-t-0">
+            <div className={`${GLASS} p-4`}>
+              <div className="flex items-center gap-2 text-sm font-semibold"><ReceiptText className="h-4 w-4" style={{ color: OURO }} /> Receita selecionada</div>
+              <p className="mt-1 text-xs text-white/50">{receita?.codigo ?? `#${receitaId}`}{receita?.descricao ? ` · ${receita.descricao}` : ''}</p>
+              <div className="mt-3 space-y-1 text-sm">
+                {linha('Valor contratado', brl(valor, moeda))}
+                {linha('Moeda', moeda)}
+                {linha('Processo', receita?.processoId ?? '—')}
+                {linha('Regra financeira', receita?.regraFinanceiraId ?? '—')}
+              </div>
+            </div>
+
+            <div className={`${GLASS} p-4`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-white/50">Resumo da configuração</p>
+              <div className="mt-2 space-y-1 text-sm">
+                {linha('Forma', nomeForma(f.formaPagamentoId))}
+                {ehCartao && linha('Adquirente', nomeAdq(f.adquirenteId))}
+                {ehCartao && linha('Bandeira', nomeBand(f.bandeiraId))}
+                {condicao?.tipoPagamento === 'PARCELADO' && linha('Parcelas', `${nParcelas || condicao?.parcelasPadrao || 1}x`)}
+                {linha('Condição', condicao?.name)}
+                {linha('Taxa', sim?.taxaAplicada?.nome ?? (sim?.valorTaxa ? 'resolvida' : '—'))}
+                {linha('Política', sim?.politicaTaxas ? POL_LABEL[sim.politicaTaxas] : '—')}
+              </div>
+            </div>
+
+            {temConv && (
+              <div className={`${GLASS} p-4`}>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/50">Valores de referência</p>
+                <div className="mt-2 space-y-1 text-sm">
+                  {linha('Cotação', `1 ${origem} = ${cotacao} ${destino}`)}
+                  {linha(`Contratado (${destino})`, brl(emDest(valor), destino!))}
+                  {sim?.ok && linha(`Total a receber (${destino})`, brl(emDest(sim.totalCobrado), destino!))}
+                </div>
+              </div>
+            )}
+          </aside>
+        </div>{/* fim corpo */}
+
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t border-white/10 px-6 py-3">
           <button onClick={() => (step > 1 ? setStep(step - 1) : onClose())} className="inline-flex items-center gap-1 text-sm text-white/60 hover:text-white"><ArrowLeft className="h-4 w-4" /> {step > 1 ? 'Voltar' : 'Cancelar'}</button>
-          {step < 4 ? (
-            <button disabled={(step === 1 && (!f.formaPagamentoId || (ehCartaoCredito && !f.bandeiraId))) || (step === 2 && !f.condicaoPagamentoId)} onClick={() => setStep(step + 1)} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-40" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
-          ) : (
-            <button disabled={salvando || !podeConfirmar} onClick={confirmar} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? 'Gerando…' : 'Confirmar e gerar cobrança'} <Check className="h-4 w-4" /></button>
-          )}
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-white/40">Etapa {step} de 4</span>
+            {step < 4 ? (
+              <button disabled={(step === 1 && (!f.formaPagamentoId || (ehCartaoCredito && !f.bandeiraId))) || (step === 2 && !f.condicaoPagamentoId)} onClick={() => setStep(step + 1)} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-40" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
+            ) : (
+              <button disabled={salvando || !podeConfirmar} onClick={confirmar} className="inline-flex items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? 'Gerando…' : 'Confirmar e gerar cobrança'} <Check className="h-4 w-4" /></button>
+            )}
+          </div>
         </div>
       </div>
     </div>
