@@ -18,14 +18,14 @@ const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "c
 const dataBR = (s?: string | null) => s ? new Date(s).toLocaleDateString("pt-BR") : "—"
 const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 
-export function ReceitasTab() {
+export function ReceitasTab({ processoId }: { processoId?: number }) {
   const router = useRouter()
   const [d, setD] = useState<any>(null)
   const [busca, setBusca] = useState("")
   const [sel, setSel] = useState<any>(null)
   const [subtab, setSubtab] = useState("receitas")
 
-  useEffect(() => { fetch("/api/financeiro/v3/receitas", { headers: authHeaders() }).then((r) => r.json()).then((j) => setD(j)).catch(() => setD({ kpis: {}, receitas: [] })) }, [])
+  useEffect(() => { fetch(`/api/financeiro/v3/receitas${processoId ? `?processoId=${processoId}` : ""}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setD(j)).catch(() => setD({ kpis: {}, receitas: [] })) }, [processoId])
   const linhas = useMemo(() => (d?.receitas ?? []).filter((r: any) => !busca || `${r.descricao} ${r.requerente?.nome} ${r.servico} ${r.codigo}`.toLowerCase().includes(busca.toLowerCase())), [d, busca])
   if (!d) return <div className="py-10 text-sm text-neutral-500">carregando…</div>
   const k = d.kpis ?? {}
@@ -116,7 +116,7 @@ function Drawer({ r, onClose, onRegistrar }: { r: any; onClose: () => void; onRe
   return (
     <div className="w-[320px] shrink-0 self-start rounded-xl border border-neutral-800 bg-[#0f1114] p-4">
       <div className="flex items-center justify-between"><h3 className="text-sm font-semibold text-neutral-200">Detalhes da receita</h3><button onClick={onClose} className="text-neutral-500 hover:text-neutral-300"><X className="h-4 w-4" /></button></div>
-      <div className="mt-3 flex items-center justify-between"><span className="rounded bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-400">{r.statusLabel}</span><a href={`/financeiro/v3/receita/${r.obrigacaoId}`} className="inline-flex items-center gap-1 text-xs text-sky-400 hover:underline">Ver no Ledger <ExternalLink className="h-3 w-3" /></a></div>
+      <div className="mt-3 flex items-center justify-between"><span className="rounded bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-400">{r.statusLabel}</span><a href={`/financeiro/v3/receita/${r.obrigacaoId}`} className="inline-flex items-center gap-1 text-xs text-sky-400 hover:underline">Ver movimentações <ExternalLink className="h-3 w-3" /></a></div>
       <div className="mt-4 space-y-3">
         <Campo k="Descrição" v={r.descricao ?? "—"} />
         <Campo k="Processo" v={r.codigo ?? "—"} />

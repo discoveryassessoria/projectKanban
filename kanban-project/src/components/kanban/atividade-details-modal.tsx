@@ -20,7 +20,7 @@ import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoInformacoes } from "./ProcessoInformacoes"
 import { ProcessoHistorico } from "./ProcessoHistorico"
 import { ProcessoFinanceiro } from "./ProcessoFinanceiro"
-import { ProcessoFinanceiroV3 } from "@/src/components/financeiro/v3/ProcessoFinanceiroV3"
+import { ProcessoFinanceiroShell } from "@/src/components/financeiro/v3/ProcessoFinanceiroShell"
 // ✅ IMPORTAR o modal e o initialFormData
 import { ContratanteModal, initialFormData } from "../contratantes-tabela"
 import { ProcessoEventos } from "./ProcessoEventos"
@@ -979,15 +979,7 @@ export function ProcessoDetailsModal({
           )}
 
           {activeTab === "faturas" && pode('financeiro.ver') && (
-            financeiroV3Ativo ? (
-              <ProcessoFinanceiroV3 processoId={processo.id} />
-            ) : (
-              <ProcessoFinanceiro
-              processoId={processo.id}
-              nomeFamilia={processo.nome}
-              onUpdate={onSave}
-              />
-            )
+            <ProcessoFinanceiroShell processoId={processo.id} />
           )}
 
           {activeTab === "eventos" && (

@@ -45,7 +45,7 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
               <span className="rounded-md bg-amber-500/15 px-2.5 py-1 text-xs font-semibold tracking-wide text-amber-400">{d.statusLabel}</span>
             </div>
             <div className="mt-2 flex items-center gap-1.5 text-[13px] text-neutral-500">
-              <Receipt className="h-3.5 w-3.5" /> Financeiro V3 <span className="text-neutral-600">›</span> Receitas <span className="text-neutral-600">›</span>
+              <Receipt className="h-3.5 w-3.5" /> Financeiro <span className="text-neutral-600">›</span> Receitas <span className="text-neutral-600">›</span>
               <span className="text-neutral-400">{d.descricao ?? d.codigo}</span>
             </div>
           </div>
@@ -59,7 +59,7 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <a href={`/financeiro/v3/processo-preview?processoId=${d.processo.id ?? ""}`} className="inline-flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900 px-3.5 py-2 text-sm text-neutral-200 hover:border-neutral-600">Ver no Ledger <ExternalLink className="h-3.5 w-3.5" /></a>
+              <a href={`/financeiro/v3/processo-preview?processoId=${d.processo.id ?? ""}`} className="inline-flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900 px-3.5 py-2 text-sm text-neutral-200 hover:border-neutral-600">Ver movimentações <ExternalLink className="h-3.5 w-3.5" /></a>
               <button className="inline-flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900 px-3.5 py-2 text-sm text-neutral-200 hover:border-neutral-600">Mais ações <MoreVertical className="h-3.5 w-3.5" /></button>
             </div>
           </div>

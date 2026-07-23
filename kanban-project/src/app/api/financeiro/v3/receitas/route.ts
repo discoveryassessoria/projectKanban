@@ -8,5 +8,5 @@ import { usuarioFlag } from '../_flags'
 export async function GET(req: NextRequest) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
   if (!flagAtiva('posicaoRead', await usuarioFlag(req))) return NextResponse.json({ disponivel: false, fallbackLegado: true }, { status: 409 })
-  return NextResponse.json({ disponivel: true, ...(await listarReceitas()) })
+  const processoId = req.nextUrl.searchParams.get("processoId"); return NextResponse.json({ disponivel: true, ...(await listarReceitas(processoId ? Number(processoId) : undefined)) })
 }

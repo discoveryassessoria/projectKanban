@@ -27,9 +27,9 @@ export interface ReceitasLista {
   receitas: ReceitaLinha[]
 }
 
-export async function listarReceitas(): Promise<ReceitasLista> {
+export async function listarReceitas(processoId?: number): Promise<ReceitasLista> {
   const obrs = await prisma.obrigacaoEconomica.findMany({
-    where: { natureza: 'RECEITA', direcao: 'A_RECEBER' },
+    where: { natureza: 'RECEITA', direcao: 'A_RECEBER', ...(processoId ? { processoId } : {}) },
     include: { distribuicoes: { orderBy: { versao: 'desc' }, include: { participacoes: true } } },
     orderBy: { id: 'desc' }, take: 500,
   })
