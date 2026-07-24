@@ -150,12 +150,12 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
     } catch { setErro("Erro de conexão ao salvar.") } finally { setSalvando(null) }
   }
 
-  const inputCls = "mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/95 outline-none placeholder:text-white/30"
-  const labelCls = "block text-xs text-white/55"
+  const inputCls = "mt-1 w-full rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/95 outline-none placeholder:text-white/30"
+  const labelCls = "block text-xs text-white/68"
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4" onClick={onClose}>
-      <div className="my-6 w-full max-w-2xl rounded-xl border border-white/10 bg-white/[0.04] p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="my-6 w-full max-w-2xl rounded-xl border border-white/10 bg-[#1b2027] p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="text-base font-semibold text-white">{receita ? "Nova Receita" : "Novo Custo"}</h3>
           <button onClick={onClose} className="text-white/40 hover:text-white/70"><X className="h-4 w-4" /></button>
@@ -243,8 +243,8 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
         </div>
 
         {/* ── Vínculo / Rateio ── */}
-        <div className="mt-4 rounded-lg border border-white/10 bg-black/20 p-3">
-          <div className="mb-2 text-xs font-medium text-white/55">Vínculo</div>
+        <div className="mt-4 rounded-lg border border-white/10 bg-[#12161c] p-3">
+          <div className="mb-2 text-xs font-medium text-white/68">Vínculo</div>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => setVinculo("processo")} className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${vinculo === "processo" ? "border-[#d2a948]/50 bg-[#d2a948]/12 text-[#d2a948]" : "border-white/15 text-white/70"}`}><Building2 className="h-3.5 w-3.5" /> Processo inteiro</button>
             <button onClick={() => setVinculo("requerentes")} className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${vinculo === "requerentes" ? "border-[#d2a948]/50 bg-[#d2a948]/12 text-[#d2a948]" : "border-white/15 text-white/70"}`}><Users className="h-3.5 w-3.5" /> Requerente(s)</button>
@@ -261,7 +261,7 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
               )}
               {reqSelecionados.length > 1 && (
                 <div className="mt-3">
-                  <div className="mb-1 text-xs text-white/55">Rateio</div>
+                  <div className="mb-1 text-xs text-white/68">Rateio</div>
                   <div className="flex gap-2">
                     {(["IGUAL", "PERCENTUAL", "VALOR"] as ModoRateio[]).map((m) => (
                       <button key={m} onClick={() => setModoRateio(m)} className={`rounded-lg border px-2.5 py-1 text-xs ${modoRateio === m ? "border-[#d2a948]/50 bg-[#d2a948]/12 text-[#d2a948]" : "border-white/15 text-white/70"}`}>{m === "IGUAL" ? "Igual" : m === "PERCENTUAL" ? "Percentual" : "Valor"}</button>
@@ -272,7 +272,7 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
                       {reqSelecionados.map((r) => (
                         <div key={r.id} className="flex items-center gap-2">
                           <span className="w-40 truncate text-xs text-white/70">{r.nome}</span>
-                          <input value={rateioVal[r.id] ?? ""} onChange={(e) => setRateioVal((s) => ({ ...s, [r.id]: e.target.value }))} inputMode="decimal" placeholder={modoRateio === "PERCENTUAL" ? "%" : moeda} className="w-28 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-xs text-white/95 outline-none" />
+                          <input value={rateioVal[r.id] ?? ""} onChange={(e) => setRateioVal((s) => ({ ...s, [r.id]: e.target.value }))} inputMode="decimal" placeholder={modoRateio === "PERCENTUAL" ? "%" : moeda} className="w-28 rounded-lg border border-white/10 bg-[#12161c] px-2 py-1 text-xs text-white/95 outline-none" />
                         </div>
                       ))}
                     </div>
@@ -284,10 +284,10 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
         </div>
 
         {/* ── Prévia ── */}
-        <div className="mt-4 rounded-lg border border-white/10 bg-black/20 p-3 text-sm">
-          <div className="flex justify-between text-white/55"><span>Subtotal</span><span className="text-white/80">{fmt(subtotal, moeda)}</span></div>
-          {desc > 0 && <div className="flex justify-between text-white/55"><span>Desconto</span><span className="text-red-300">− {fmt(desc, moeda)}</span></div>}
-          {!receita && acr > 0 && <div className="flex justify-between text-white/55"><span>Acréscimos</span><span className="text-white/80">+ {fmt(acr, moeda)}</span></div>}
+        <div className="mt-4 rounded-lg border border-white/10 bg-[#12161c] p-3 text-sm">
+          <div className="flex justify-between text-white/68"><span>Subtotal</span><span className="text-white/80">{fmt(subtotal, moeda)}</span></div>
+          {desc > 0 && <div className="flex justify-between text-white/68"><span>Desconto</span><span className="text-red-300">− {fmt(desc, moeda)}</span></div>}
+          {!receita && acr > 0 && <div className="flex justify-between text-white/68"><span>Acréscimos</span><span className="text-white/80">+ {fmt(acr, moeda)}</span></div>}
           <div className="mt-1 flex justify-between border-t border-white/10 pt-1 font-semibold text-white"><span>Total</span><span>{fmt(total, moeda)}</span></div>
           {distribuicao.length > 0 && (
             <div className="mt-2 border-t border-white/10 pt-2">
@@ -301,7 +301,7 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
         {erro && <div className="mt-3 rounded-lg border border-red-800/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">{erro}</div>}
 
         <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-white/15 bg-white/[0.03] px-3.5 py-2 text-sm text-white/70 hover:border-white/25">Cancelar</button>
+          <button onClick={onClose} className="rounded-lg border border-white/15 bg-[#1b2027] px-3.5 py-2 text-sm text-white/70 hover:border-white/25">Cancelar</button>
           <button onClick={() => salvar(true)} disabled={!!salvando} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-700/50 bg-emerald-600/15 px-3.5 py-2 text-sm font-medium text-emerald-300 hover:bg-emerald-600/25 disabled:opacity-50"><Plus className="h-4 w-4" /> {salvando === "pagamento" ? "Salvando…" : "Salvar e registrar pagamento"}</button>
           <button onClick={() => salvar(false)} disabled={!!salvando} className="rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-medium text-[#1b1508] hover:bg-[#e0b957] disabled:opacity-50">{salvando === "salvar" ? "Salvando…" : receita ? "Salvar receita" : "Salvar custo"}</button>
         </div>

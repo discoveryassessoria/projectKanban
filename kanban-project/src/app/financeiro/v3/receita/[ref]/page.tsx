@@ -30,28 +30,28 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
       .catch(() => setErro("Falha ao carregar."))
   }, [ref])
 
-  if (erro) return <div className="min-h-screen bg-black/20 p-8 text-sm text-white/55">{erro}</div>
-  if (!d) return <div className="min-h-screen bg-black/20 p-8 text-sm text-white/40">carregando…</div>
+  if (erro) return <div className="min-h-screen bg-[#12161c] p-8 text-sm text-white/68">{erro}</div>
+  if (!d) return <div className="min-h-screen bg-[#12161c] p-8 text-sm text-white/40">carregando…</div>
 
   return (
-    <div className="min-h-screen bg-black/20 text-white/80">
+    <div className="min-h-screen bg-[#12161c] text-white/80">
       <div className="mx-auto max-w-[1400px] px-8 py-6">
         {/* ── Top bar ── */}
         <div className="flex items-start justify-between">
           <div>
-            <button onClick={() => router.back()} className="mb-3 flex items-center gap-2 text-sm text-white/55 hover:text-white/80"><ArrowLeft className="h-4 w-4" /> Voltar para Receitas</button>
+            <button onClick={() => router.back()} className="mb-3 flex items-center gap-2 text-sm text-white/68 hover:text-white/80"><ArrowLeft className="h-4 w-4" /> Voltar para Receitas</button>
             <div className="flex items-center gap-3">
               <h1 className="text-[28px] font-bold leading-none text-white">Receita</h1>
               <span className="rounded-md bg-[#d2a948]/15 px-2.5 py-1 text-xs font-semibold tracking-wide text-[#d2a948]">{d.statusLabel}</span>
             </div>
             <div className="mt-2 flex items-center gap-1.5 text-[13px] text-white/40">
               <Receipt className="h-3.5 w-3.5" /> Financeiro <span className="text-white/30">›</span> Receitas <span className="text-white/30">›</span>
-              <span className="text-white/55">{d.descricao ?? d.codigo}</span>
+              <span className="text-white/68">{d.descricao ?? d.codigo}</span>
             </div>
           </div>
           <div className="flex flex-col items-end gap-4">
             <div className="flex items-center gap-4">
-              <div className="relative"><Bell className="h-5 w-5 text-white/55" /><span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#7dd3fc] text-[10px] font-bold text-white">3</span></div>
+              <div className="relative"><Bell className="h-5 w-5 text-white/68" /><span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#7dd3fc] text-[10px] font-bold text-white">3</span></div>
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-600 text-sm font-semibold text-white">U</div>
                 <div className="leading-tight"><div className="text-sm font-medium text-white/80">Usuário</div><div className="text-xs text-white/40">Administrador</div></div>
@@ -59,14 +59,14 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <a href={`/financeiro/v3/processo-preview?processoId=${d.processo.id ?? ""}`} className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.03] px-3.5 py-2 text-sm text-white/80 hover:border-white/25">Ver movimentações <ExternalLink className="h-3.5 w-3.5" /></a>
-              <button className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.03] px-3.5 py-2 text-sm text-white/80 hover:border-white/25">Mais ações <MoreVertical className="h-3.5 w-3.5" /></button>
+              <a href={`/financeiro/v3/processo-preview?processoId=${d.processo.id ?? ""}`} className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-[#1b2027] px-3.5 py-2 text-sm text-white/80 hover:border-white/25">Ver movimentações <ExternalLink className="h-3.5 w-3.5" /></a>
+              <button className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-[#1b2027] px-3.5 py-2 text-sm text-white/80 hover:border-white/25">Mais ações <MoreVertical className="h-3.5 w-3.5" /></button>
             </div>
           </div>
         </div>
 
         {/* ── Info card ── */}
-        <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.04] p-5">
+        <div className="mt-5 rounded-xl border border-white/10 bg-[#1b2027] p-5">
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-6">
             <Info rotulo="Receita"><span className="inline-flex items-center gap-1.5 font-medium text-white/95">{d.codigo}<Copy className="h-3.5 w-3.5 text-white/40" /></span></Info>
             <Info rotulo="Descrição"><span className="text-white/80">{d.descricao ?? "—"}</span></Info>
@@ -89,8 +89,8 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
         {/* ── Abas ── */}
         <div className="mt-5 flex items-center gap-7 border-b border-white/10">
           {[["resumo", "Resumo", Receipt, 0], ["cobrancas", "Cobranças", CreditCard, 1], ["pagamentos", "Pagamentos", Wallet, 0], ["documentos", "Documentos", FileCheck, 1], ["timeline", "Timeline", Clock, 0]].map(([id, label, Icon, badge]: any) => (
-            <button key={id} onClick={() => setTab(id)} className={`-mb-px flex items-center gap-2 border-b-2 px-1 pb-3 pt-2 text-sm ${tab === id ? "border-[#d2a948] font-medium text-[#d2a948]" : "border-transparent text-white/55 hover:text-white/80"}`}>
-              <Icon className="h-4 w-4" /> {label}{badge ? <span className="ml-1 rounded-full bg-white/[0.06] px-1.5 text-[11px] text-white/70">{badge}</span> : null}
+            <button key={id} onClick={() => setTab(id)} className={`-mb-px flex items-center gap-2 border-b-2 px-1 pb-3 pt-2 text-sm ${tab === id ? "border-[#d2a948] font-medium text-[#d2a948]" : "border-transparent text-white/68 hover:text-white/80"}`}>
+              <Icon className="h-4 w-4" /> {label}{badge ? <span className="ml-1 rounded-full bg-[#252c35] px-1.5 text-[11px] text-white/70">{badge}</span> : null}
             </button>
           ))}
         </div>
@@ -99,15 +99,15 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
         <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_320px]">
           <div className="space-y-5">
             {/* Pagamentos */}
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
+            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">Pagamentos</h2><span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs text-white/70">{d.pagamentos.length}</span></div>
+                <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">Pagamentos</h2><span className="rounded-full bg-[#252c35] px-2 py-0.5 text-xs text-white/70">{d.pagamentos.length}</span></div>
                 <button className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-emerald-500"><Plus className="h-4 w-4" /> Registrar pagamento</button>
               </div>
               <div className="mt-4 flex items-center gap-3">
-                <div className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" /><input placeholder="Buscar pagamentos..." className="w-full rounded-lg border border-white/10 bg-black/20 py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
-                <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70"><SlidersHorizontal className="h-4 w-4" /> Filtros</button>
-                <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70"><Calendar className="h-4 w-4" /> Período <ChevronDown className="h-3.5 w-3.5" /></button>
+                <div className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" /><input placeholder="Buscar pagamentos..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
+                <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><SlidersHorizontal className="h-4 w-4" /> Filtros</button>
+                <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><Calendar className="h-4 w-4" /> Período <ChevronDown className="h-3.5 w-3.5" /></button>
               </div>
               <table className="mt-4 w-full text-sm">
                 <thead><tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/40">
@@ -117,9 +117,9 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
                   <tr key={p.id} className="border-b border-white/10">
                     <td className="py-3.5 text-white/70">{dataBR(p.data)}</td>
                     <td className="font-medium text-white/95">{fmt(p.valor, d.moeda)}</td>
-                    <td><span className="inline-flex items-center gap-1.5 text-white/70"><span className="flex h-5 w-5 items-center justify-center rounded bg-white/[0.06] text-[10px]">{(p.formaLabel ?? "?").slice(0, 1)}</span>{p.formaLabel ?? "—"}</span></td>
+                    <td><span className="inline-flex items-center gap-1.5 text-white/70"><span className="flex h-5 w-5 items-center justify-center rounded bg-[#252c35] text-[10px]">{(p.formaLabel ?? "?").slice(0, 1)}</span>{p.formaLabel ?? "—"}</span></td>
                     <td><div className="text-white/70">{p.banco ?? "—"}</div>{(p.agencia || p.conta) && <div className="text-xs text-white/40">Ag: {p.agencia ?? "—"} Cc: {p.conta ?? "—"}</div>}</td>
-                    <td className="text-white/55">{p.referencia ?? "—"}</td>
+                    <td className="text-white/68">{p.referencia ?? "—"}</td>
                     <td><span className="inline-flex items-center gap-1.5 text-[#4ade80]"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />{p.status}</span></td>
                     <td><div className="flex items-center gap-2 text-white/40"><Pencil className="h-4 w-4 hover:text-white/70" /><FileText className="h-4 w-4 hover:text-white/70" /><MoreVertical className="h-4 w-4 hover:text-white/70" /></div></td>
                   </tr>
@@ -127,27 +127,27 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
               </table>
               <div className="mt-4 flex items-center justify-between text-sm text-white/40">
                 <span>Mostrando {d.pagamentos.length} de {d.pagamentos.length} pagamentos</span>
-                <div className="flex items-center gap-1"><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded border border-white/15 bg-white/[0.06] px-2.5 py-1 text-xs text-white/80">1</span><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronRight className="h-4 w-4" /></button></div>
+                <div className="flex items-center gap-1"><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded border border-white/15 bg-[#252c35] px-2.5 py-1 text-xs text-white/80">1</span><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronRight className="h-4 w-4" /></button></div>
               </div>
             </div>
 
             {/* Histórico de movimentações */}
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
+            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-white">Histórico de movimentações</h2>
                 <button className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/70">Ver timeline completa <ExternalLink className="h-3 w-3" /></button>
               </div>
               <div className="mt-4">{d.historico.map((h: any, i: number) => {
                 const Icon = h.tipo === "OBRIGACAO_CRIADA" ? UserPlus : (h.tipo.startsWith("PAGAMENTO") ? ArrowDownCircle : Receipt)
-                const cor = h.tipo === "OBRIGACAO_CRIADA" ? "text-violet-400" : (h.tipo.startsWith("PAGAMENTO") ? "text-[#4ade80]" : "text-white/55")
+                const cor = h.tipo === "OBRIGACAO_CRIADA" ? "text-violet-400" : (h.tipo.startsWith("PAGAMENTO") ? "text-[#4ade80]" : "text-white/68")
                 const ultimo = i === d.historico.length - 1
                 return (
                   <div key={h.id} className="flex gap-4">
                     <div className="w-16 shrink-0 pt-0.5 text-right text-[11px] leading-tight text-white/40">{dataBR(h.data)}<br />{new Date(h.data).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</div>
-                    <div className="flex flex-col items-center"><div className={`flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] ${cor}`}><Icon className="h-4 w-4" /></div>{!ultimo && <div className="w-px flex-1 bg-white/[0.06]" />}</div>
+                    <div className="flex flex-col items-center"><div className={`flex h-8 w-8 items-center justify-center rounded-full bg-[#252c35] ${cor}`}><Icon className="h-4 w-4" /></div>{!ultimo && <div className="w-px flex-1 bg-[#252c35]" />}</div>
                     <div className={`flex-1 ${ultimo ? "" : "pb-6"}`}>
                       <div className="flex items-start justify-between"><div className="font-medium text-white/95">{h.titulo}</div><span className="text-xs text-[#7dd3fc]">{h.ator}</span></div>
-                      <div className="mt-0.5 text-sm text-white/55">{h.descricao}</div>
+                      <div className="mt-0.5 text-sm text-white/68">{h.descricao}</div>
                     </div>
                   </div>
                 )
@@ -176,7 +176,7 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
             </Painel>
             <Painel titulo={`Responsáveis (${d.responsaveis.length})`} />
             <Painel titulo={`Pagadores (${d.pagadores.length})`} />
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4"><div className="text-sm font-medium text-white/70">Observação</div><div className="mt-1 text-sm text-white/40">{d.observacao ?? "—"}</div></div>
+            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4"><div className="text-sm font-medium text-white/70">Observação</div><div className="mt-1 text-sm text-white/40">{d.observacao ?? "—"}</div></div>
           </div>
         </div>
       </div>
@@ -188,12 +188,12 @@ function Info({ rotulo, children }: { rotulo: string; children: React.ReactNode 
   return <div className="py-1"><div className="mb-1 text-xs text-white/40">{rotulo}</div><div className="text-sm">{children}</div></div>
 }
 function Linha({ k, v, cor }: { k: string; v: string; cor?: string }) {
-  return <div className="flex items-center justify-between py-1.5 text-sm"><span className="text-white/55">{k}</span><span className={cor ?? "text-white/80"}>{v}</span></div>
+  return <div className="flex items-center justify-between py-1.5 text-sm"><span className="text-white/68">{k}</span><span className={cor ?? "text-white/80"}>{v}</span></div>
 }
 function Painel({ titulo, children, aberto }: { titulo: string; children?: React.ReactNode; aberto?: boolean }) {
   const [open, setOpen] = useState(!!aberto)
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+    <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between"><span className="text-sm font-semibold text-white/80">{titulo}</span>{open ? <ChevronUp className="h-4 w-4 text-white/40" /> : <ChevronDown className="h-4 w-4 text-white/40" />}</button>
       {open && children && <div className="mt-3">{children}</div>}
     </div>

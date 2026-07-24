@@ -238,7 +238,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
       {/* 3 · fluxo / moeda / requerente */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Painel titulo="Fluxo de Caixa Previsto" acao={
-          <select value={mesesFluxo} onChange={(e) => setMesesFluxo(Number(e.target.value))} className="rounded-md border border-white/15 bg-white/[0.03] px-2 py-1 text-xs text-white/70 outline-none">
+          <select value={mesesFluxo} onChange={(e) => setMesesFluxo(Number(e.target.value))} className="rounded-md border border-white/15 bg-[#1b2027] px-2 py-1 text-xs text-white/70 outline-none">
             {[3, 6, 12].map((n) => <option key={n} value={n} className="bg-[#14161a]">{n} meses</option>)}
           </select>
         }>
@@ -279,7 +279,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
 }
 
 // ── auxiliares de UI (identidade Receitas/Dossiê) ───────────────────────────
-const CARD = 'rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-sm'
+const CARD = 'rounded-xl border border-white/10 bg-[#1b2027]'
 function Card({ titulo, valor, sub, icon: Ic, cor, valorCor }: { titulo: string; valor: string; sub: string; icon: any; cor: string; valorCor?: string }) {
   return (
     <div className={`${CARD} relative overflow-hidden p-4`}>
@@ -302,7 +302,7 @@ function Painel({ titulo, acao, children }: { titulo: string; acao?: React.React
 }
 function Acao({ icon: Ic, cor, titulo, sub, onClick }: { icon: any; cor: string; titulo: string; sub: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="group flex w-full items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3 text-left transition hover:bg-white/[0.06]">
+    <button onClick={onClick} className="group flex w-full items-center gap-3 rounded-lg border border-white/10 bg-[#1b2027] p-3 text-left transition hover:bg-[#252c35]">
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: `${cor}22`, color: cor }}><Ic className="h-4.5 w-4.5" /></span>
       <div className="min-w-0 flex-1"><p className="text-sm font-medium text-white">{titulo}</p><p className="truncate text-[11px] text-white/45">{sub}</p></div>
       <ChevronRight className="h-4 w-4 text-white/30 transition group-hover:text-white/60" />
@@ -378,7 +378,7 @@ function LegendaFluxo({ cor, label, valor }: { cor: string; label: string; valor
   return (
     <span className="inline-flex items-center gap-1.5">
       <span className="h-2 w-2 rounded-full" style={{ background: cor }} />
-      <span className="text-white/55">{label} - </span>
+      <span className="text-white/68">{label} - </span>
       <span className="tabular-nums text-white/85">{brl(valor)}</span>
     </span>
   )

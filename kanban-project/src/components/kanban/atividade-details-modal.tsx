@@ -494,13 +494,13 @@ export function ProcessoDetailsModal({
 
       <div 
         className={`fixed z-[9999] shadow-2xl flex flex-col overflow-hidden rounded-tl-xl rounded-tr-xl ${
-          finDark ? 'bg-[#0b0d10]' : 'bg-white'
+          finDark ? 'bg-[#15191f]' : 'bg-white'
         }`}
         style={{ left: '155px', top: '45px', right: '35px', bottom: '0px' }}
       >
         {/* Header */}
         <div className={`flex items-center justify-between px-6 py-4 border-b flex-shrink-0 ${
-          finDark ? 'bg-[#0b0d10] border-white/10' : 'bg-white'
+          finDark ? 'bg-[#15191f] border-white/10' : 'bg-white'
         }`}>
           <div className="flex items-center gap-4">
             <button 
@@ -512,7 +512,7 @@ export function ProcessoDetailsModal({
             
             <div>
               <h1 className={`text-xl font-semibold ${finDark ? 'text-white' : 'text-gray-900'}`}>{processo.nome}</h1>
-              <span className={`text-sm ${finDark ? 'text-white/55' : 'text-gray-500'}`}>{paisConfig.label}</span>
+              <span className={`text-sm ${finDark ? 'text-white/68' : 'text-gray-500'}`}>{paisConfig.label}</span>
             </div>
 
             {/* ✅ NOVO: barrinha de progresso da fase do processo */}
@@ -549,7 +549,7 @@ export function ProcessoDetailsModal({
         </div>
 
         {/* Abas principais - dinâmicas */}
-        <div className={`flex border-b px-6 flex-shrink-0 ${finDark ? 'bg-[#0b0d10] border-white/10' : 'bg-white'}`}>
+        <div className={`flex border-b px-6 flex-shrink-0 ${finDark ? 'bg-[#15191f] border-white/10' : 'bg-white'}`}>
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -588,7 +588,7 @@ export function ProcessoDetailsModal({
                   ) : (
                     <button
                       onClick={handleCancelEdit}
-                      className="text-sm text-white/55 hover:text-white/80"
+                      className="text-sm text-white/68 hover:text-white/80"
                     >
                       cancelar
                     </button>
@@ -621,19 +621,19 @@ export function ProcessoDetailsModal({
                             <div
                               key={cont.id}
                               onClick={() => pode('clientes.ver') && abrirDetalhesCliente(cont, "contratante")}
-                              className={`p-4 bg-white/[0.03] border border-white/10 rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-white/[0.06] cursor-pointer' : 'cursor-default'}`}
+                              className={`p-4 bg-[#1b2027] border border-white/10 rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-[#252c35] cursor-pointer' : 'cursor-default'}`}
                             >
                               <p className="text-white/95 font-semibold">{cont.publicCode ? cont.publicCode + ' — ' : ''}{cont.nome}</p>
 
                               {cont.telefone && (
-                                <div className="flex items-center gap-2 text-sm text-white/55 mt-2">
+                                <div className="flex items-center gap-2 text-sm text-white/68 mt-2">
                                   <Phone className="h-4 w-4" />
                                   <span>{cont.telefone}</span>
                                 </div>
                               )}
 
                               {cont.email && (
-                                <div className="flex items-center gap-2 text-sm text-white/55 mt-1">
+                                <div className="flex items-center gap-2 text-sm text-white/68 mt-1">
                                   <Mail className="h-4 w-4" />
                                   <span>{cont.email}</span>
                                 </div>
@@ -641,7 +641,7 @@ export function ProcessoDetailsModal({
 
                               {cont.endereco && (
                                 <div
-                                  className="flex items-start gap-2 text-sm text-white/55 mt-2"
+                                  className="flex items-start gap-2 text-sm text-white/68 mt-2"
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <MapTooltip
@@ -666,13 +666,13 @@ export function ProcessoDetailsModal({
                               )}
 
                               <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
-                                <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-white/70 hover:bg-white/[0.06] hover:text-white">
+                                <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-white/70 hover:bg-[#252c35] hover:text-white">
                                   <Phone className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-white/70 hover:bg-white/[0.06] hover:text-white">
+                                <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-white/70 hover:bg-[#252c35] hover:text-white">
                                   <Mail className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-white/70 hover:bg-white/[0.06] hover:text-white">
+                                <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-white/70 hover:bg-[#252c35] hover:text-white">
                                   <MessageSquare className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -693,24 +693,24 @@ export function ProcessoDetailsModal({
                             <div
                               key={req.id}
                               onClick={() => pode('clientes.ver') && abrirDetalhesCliente(req, "requerente")}
-                              className={`p-3 bg-white/[0.03] border border-white/10 rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-white/[0.06] cursor-pointer' : 'cursor-default'}`}
+                              className={`p-3 bg-[#1b2027] border border-white/10 rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-[#252c35] cursor-pointer' : 'cursor-default'}`}
                             >
                               <p className="text-white/95 font-medium">{req.publicCode ? req.publicCode + ' — ' : ''}{req.nome}</p>
                               {req.telefone && (
-                                <div className="flex items-center gap-2 text-sm text-white/55 mt-1">
+                                <div className="flex items-center gap-2 text-sm text-white/68 mt-1">
                                   <Phone className="h-3 w-3" />
                                   <span>{req.telefone}</span>
                                 </div>
                               )}
                               {req.email && (
-                                <div className="flex items-center gap-2 text-sm text-white/55 mt-1">
+                                <div className="flex items-center gap-2 text-sm text-white/68 mt-1">
                                   <Mail className="h-3 w-3" />
                                   <span>{req.email}</span>
                                 </div>
                               )}
                               {req.endereco && (
                                 <div
-                                  className="flex items-start gap-2 text-sm text-white/55 mt-2"
+                                  className="flex items-start gap-2 text-sm text-white/68 mt-2"
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <MapTooltip
@@ -750,7 +750,7 @@ export function ProcessoDetailsModal({
                       <Input
                         value={nomeEditado}
                         onChange={(e) => setNomeEditado(e.target.value)}
-                        className="w-full bg-white/[0.03] border-white/15 text-white/95 placeholder:text-white/40"
+                        className="w-full bg-[#1b2027] border-white/15 text-white/95 placeholder:text-white/40"
                       />
                     </div>
 
@@ -761,9 +761,9 @@ export function ProcessoDetailsModal({
                       {contratantesSelecionados.length > 0 && (
                         <div className="space-y-2 mb-3">
                           {[...contratantesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((cont) => (
-                            <div key={cont.id} className="flex items-center justify-between p-2 bg-white/[0.03] border border-white/10 rounded-xl">
+                            <div key={cont.id} className="flex items-center justify-between p-2 bg-[#1b2027] border border-white/10 rounded-xl">
                               <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-white/55" />
+                                <User className="h-4 w-4 text-white/68" />
                                 <span className="text-white/95 text-sm">{cont.publicCode ? cont.publicCode + ' — ' : ''}{cont.nome}</span>
                               </div>
                               <button
@@ -780,7 +780,7 @@ export function ProcessoDetailsModal({
                       <div className="relative">
                         <button
                           onClick={() => setShowContratanteDropdown(!showContratanteDropdown)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#7dd3fc] hover:bg-white/[0.06] rounded-md transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#7dd3fc] hover:bg-[#252c35] rounded-md transition-colors"
                         >
                           <Plus className="h-4 w-4" />
                           Adicionar contratante
@@ -793,7 +793,7 @@ export function ProcessoDetailsModal({
                                 placeholder="Buscar contratante..."
                                 value={buscaContratante}
                                 onChange={(e) => setBuscaContratante(e.target.value)}
-                                className="h-8 text-sm bg-white/[0.03] border-white/15 text-white/95 placeholder:text-white/40"
+                                className="h-8 text-sm bg-[#1b2027] border-white/15 text-white/95 placeholder:text-white/40"
                                 autoFocus
                               />
                             </div>
@@ -803,7 +803,7 @@ export function ProcessoDetailsModal({
                                   <button
                                     key={c.id}
                                     onClick={() => addContratante(c)}
-                                    className="w-full px-4 py-2 text-left hover:bg-white/[0.06] flex items-center gap-3"
+                                    className="w-full px-4 py-2 text-left hover:bg-[#252c35] flex items-center gap-3"
                                   >
                                     <div className="w-8 h-8 bg-[#7dd3fc]/15 rounded-full flex items-center justify-center">
                                       <User className="h-4 w-4 text-[#7dd3fc]" />
@@ -832,7 +832,7 @@ export function ProcessoDetailsModal({
                       {requerentesSelecionados.length > 0 && (
                         <div className="space-y-2 mb-3">
                           {[...requerentesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((req) => (
-                            <div key={req.id} className="flex items-center justify-between p-2 bg-white/[0.03] border border-white/10 rounded-xl">
+                            <div key={req.id} className="flex items-center justify-between p-2 bg-[#1b2027] border border-white/10 rounded-xl">
                               <div className="flex items-center gap-2">
                                 <User className="h-4 w-4 text-[#7dd3fc]" />
                                 <span className="text-white/95 text-sm">{req.publicCode ? req.publicCode + ' — ' : ''}{req.nome}</span>
@@ -851,7 +851,7 @@ export function ProcessoDetailsModal({
                       <div className="relative">
                         <button
                           onClick={() => setShowRequerenteDropdown(!showRequerenteDropdown)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#7dd3fc] hover:bg-white/[0.06] rounded-md transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#7dd3fc] hover:bg-[#252c35] rounded-md transition-colors"
                         >
                           <Plus className="h-4 w-4" />
                           Adicionar requerente
@@ -864,7 +864,7 @@ export function ProcessoDetailsModal({
                                 placeholder="Buscar requerente..."
                                 value={buscaRequerente}
                                 onChange={(e) => setBuscaRequerente(e.target.value)}
-                                className="h-8 text-sm bg-white/[0.03] border-white/15 text-white/95 placeholder:text-white/40"
+                                className="h-8 text-sm bg-[#1b2027] border-white/15 text-white/95 placeholder:text-white/40"
                                 autoFocus
                               />
                             </div>
@@ -874,7 +874,7 @@ export function ProcessoDetailsModal({
                                   <button
                                     key={r.id}
                                     onClick={() => addRequerente(r)}
-                                    className="w-full px-4 py-2 text-left hover:bg-white/[0.06] flex items-center gap-3"
+                                    className="w-full px-4 py-2 text-left hover:bg-[#252c35] flex items-center gap-3"
                                   >
                                     <div className="w-8 h-8 bg-[#4ade80]/15 rounded-full flex items-center justify-center">
                                       <User className="h-4 w-4 text-[#4ade80]" />
@@ -901,7 +901,7 @@ export function ProcessoDetailsModal({
                       <Button onClick={handleSaveEdit} className="bg-[#d2a948] hover:bg-[#e0b957] text-[#1b1508]">
                         Salvar
                       </Button>
-                      <Button variant="outline" onClick={handleCancelEdit} className="border-white/15 bg-transparent text-white/80 hover:bg-white/[0.06] hover:text-white">
+                      <Button variant="outline" onClick={handleCancelEdit} className="border-white/15 bg-transparent text-white/80 hover:bg-[#252c35] hover:text-white">
                         Cancelar
                       </Button>
                     </div>

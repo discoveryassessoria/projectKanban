@@ -47,23 +47,23 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
         </div>
 
         {/* Filtros */}
-        <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.04] p-4">
+        <div className="mt-5 rounded-xl border border-white/10 bg-[#1b2027] p-4">
           <div className="flex flex-wrap items-end gap-3">
             <Filtro rotulo="Agrupar por" valor="Requerente" />
             <Filtro rotulo="Fase" valor="Todas" />
             <Filtro rotulo="Status" valor="Todos" />
             <Filtro rotulo="Forma de cobrança" valor="Todas" />
-            <div className="relative min-w-[280px] flex-1"><div className="mb-1 text-xs text-white/40">&nbsp;</div><Search className="pointer-events-none absolute left-3 top-[30px] h-4 w-4 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por requerente, serviço, descrição..." className="w-full rounded-lg border border-white/10 bg-black/20 py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
-            <button onClick={() => setBusca("")} className="mb-[1px] inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
+            <div className="relative min-w-[280px] flex-1"><div className="mb-1 text-xs text-white/40">&nbsp;</div><Search className="pointer-events-none absolute left-3 top-[30px] h-4 w-4 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por requerente, serviço, descrição..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
+            <button onClick={() => setBusca("")} className="mb-[1px] inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
           </div>
         </div>
 
         {/* Tabela */}
-        <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.04]">
+        <div className="mt-5 rounded-xl border border-white/10 bg-[#1b2027]">
           <div className="flex items-center justify-between border-b border-white/10 px-5 pt-4">
             <div className="flex items-center gap-6">
               {[["receitas", `Receitas (${linhas.length})`], ["req", "Por requerente"], ["forma", "Por forma de cobrança"], ["fase", "Por fase"]].map(([id, label]) => (
-                <button key={id} onClick={() => setSubtab(id)} className={`-mb-px border-b-2 pb-3 text-sm ${subtab === id ? "border-[#d2a948] font-medium text-[#d2a948]" : "border-transparent text-white/55 hover:text-white/80"}`}>{label}</button>
+                <button key={id} onClick={() => setSubtab(id)} className={`-mb-px border-b-2 pb-3 text-sm ${subtab === id ? "border-[#d2a948] font-medium text-[#d2a948]" : "border-transparent text-white/68 hover:text-white/80"}`}>{label}</button>
               ))}
             </div>
             <button onClick={() => setNovo(true)} className="mb-2 inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-medium text-[#1b1508] hover:bg-[#e0b957]"><Plus className="h-4 w-4" /> Nova Receita</button>
@@ -73,7 +73,7 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
               {["Receita", "Requerente", "Serviço", "Valor contratado", "Recebido", "Saldo", "Vencimento", "Status", "Ações"].map((h) => <th key={h} className="px-5 py-3 font-medium">{h}</th>)}
             </tr></thead>
             <tbody>{linhas.map((r: any) => (
-              <tr key={r.obrigacaoId} onClick={() => setSel(r)} className="cursor-pointer border-t border-white/10 hover:bg-white/[0.04]">
+              <tr key={r.obrigacaoId} onClick={() => setSel(r)} className="cursor-pointer border-t border-white/10 hover:bg-[#252c35]">
                 <td className="px-5 py-4"><div className="max-w-[240px] text-white/95">{r.descricao ?? r.codigo}</div><div className="text-xs text-white/40">{r.codigo}</div></td>
                 <td className="px-5">{r.requerente ? <span className="inline-flex items-center gap-2 text-white/80">{r.requerente.nome}<span className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] text-white/70">{r.requerente.papel}</span></span> : "—"}</td>
                 <td className="px-5 text-white/70">{r.servico ?? "—"}</td>
@@ -82,7 +82,7 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
                 <td className="px-5 text-[#7dd3fc]">{fmt(r.saldo, r.moeda)}</td>
                 <td className="px-5 text-white/70">{dataBR(r.vencimento)}</td>
                 <td className="px-5"><span className="rounded bg-[#fbbf24]/15 px-2 py-0.5 text-[11px] font-semibold text-[#fbbf24]">{r.statusLabel}</span></td>
-                <td className="px-5" onClick={(e) => e.stopPropagation()}><button onClick={() => router.push(`/financeiro/v3/receita/${r.obrigacaoId}`)} className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-white/80 hover:border-white/25 hover:text-white"><ExternalLink className="h-3.5 w-3.5" /> Abrir</button></td>
+                <td className="px-5" onClick={(e) => e.stopPropagation()}><button onClick={() => router.push(`/financeiro/v3/receita/${r.obrigacaoId}`)} className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#1b2027] px-3 py-1.5 text-xs font-medium text-white/80 hover:border-white/25 hover:text-white"><ExternalLink className="h-3.5 w-3.5" /> Abrir</button></td>
               </tr>
             ))}{linhas.length === 0 && <tr><td colSpan={9} className="px-5 py-8 text-center text-white/40">Nenhuma receita.</td></tr>}</tbody>
           </table>
@@ -110,7 +110,7 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
 
 function Kpi({ titulo, valor, sub, icon: Icon, cor }: any) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+    <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
       <div className="flex items-start justify-between gap-2">
         <span className="text-xs font-medium text-white/50">{titulo}</span>
         {Icon && <span className="grid h-8 w-8 place-items-center rounded-lg" style={{ background: `${cor}22`, color: cor }}><Icon className="h-4 w-4" /></span>}
@@ -123,13 +123,13 @@ function Kpi({ titulo, valor, sub, icon: Icon, cor }: any) {
 function Filtro({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <label className="text-xs text-white/40">{rotulo}
-      <div className="mt-1 flex items-center justify-between gap-6 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/80"><span>{valor}</span><ChevronDown className="h-3.5 w-3.5 text-white/40" /></div>
+      <div className="mt-1 flex items-center justify-between gap-6 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/80"><span>{valor}</span><ChevronDown className="h-3.5 w-3.5 text-white/40" /></div>
     </label>
   )
 }
 function Drawer({ r, onClose, onRegistrar, onCancelar }: { r: any; onClose: () => void; onRegistrar: () => void; onCancelar: () => void }) {
   return (
-    <div className="w-[320px] shrink-0 self-start rounded-xl border border-white/10 bg-white/[0.04] p-4">
+    <div className="w-[320px] shrink-0 self-start rounded-xl border border-white/10 bg-[#1b2027] p-4">
       <div className="flex items-center justify-between"><h3 className="text-sm font-semibold text-white/80">Detalhes da receita</h3><button onClick={onClose} className="text-white/40 hover:text-white/70"><X className="h-4 w-4" /></button></div>
       <div className="mt-3 flex items-center justify-between"><span className="rounded bg-[#fbbf24]/15 px-2 py-0.5 text-[11px] font-semibold text-[#fbbf24]">{r.statusLabel}</span><a href={`/financeiro/v3/receita/${r.obrigacaoId}`} className="inline-flex items-center gap-1 text-xs text-[#7dd3fc] hover:underline">Ver movimentações <ExternalLink className="h-3 w-3" /></a></div>
       <div className="mt-4 space-y-3">

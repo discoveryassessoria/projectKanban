@@ -26,7 +26,7 @@ export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) 
     <div className="text-white/80">
       <div className="mb-5 flex flex-wrap gap-6 border-b border-white/10">
         {SUBTABS.map(([id, label]) => (
-          <button key={id} onClick={() => setT(id)} className={`-mb-px border-b-2 px-1 pb-3 pt-1 text-sm ${t === id ? "border-[#d2a948] font-medium text-[#d2a948]" : "border-transparent text-white/55 hover:text-white/80"}`}>{label}</button>
+          <button key={id} onClick={() => setT(id)} className={`-mb-px border-b-2 px-1 pb-3 pt-1 text-sm ${t === id ? "border-[#d2a948] font-medium text-[#d2a948]" : "border-transparent text-white/68 hover:text-white/80"}`}>{label}</button>
         ))}
       </div>
       {t === "visao" && <VisaoGeral processoId={processoId} fxHoje={fxEur} onIrPara={(a) => setT(a)} />}
@@ -71,7 +71,7 @@ function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
   const lista = obrs.filter((o) => sub === "pagos" ? quitado(o) : sub === "apagar" ? !quitado(o) : true)
 
   const KpiC = ({ titulo, valor, sub: s, icon: Ic, cor }: any) => (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+    <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
       <div className="flex items-start justify-between gap-2"><span className="text-[11px] font-medium uppercase tracking-wide text-white/45">{titulo}</span>{Ic && <span className="grid h-8 w-8 place-items-center rounded-lg" style={{ background: `${cor}22`, color: cor }}><Ic className="h-4 w-4" /></span>}</div>
       <div className="mt-2 text-2xl font-bold text-white">{valor}</div>
       <div className="mt-1 text-[11px] text-white/40">{s}</div>
@@ -84,7 +84,7 @@ function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
       <div className="flex items-start justify-between gap-3">
         <div><h2 className="text-lg font-semibold text-white">Custos</h2><p className="text-sm text-white/45">Despesas e custos do processo</p></div>
         <div className="flex items-center gap-2">
-          <button className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.03] px-3.5 py-2 text-sm text-white/80 hover:bg-white/[0.06]"><Layers className="h-4 w-4" /> Fases aplicadas</button>
+          <button className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#1b2027] px-3.5 py-2 text-sm text-white/80 hover:bg-[#252c35]"><Layers className="h-4 w-4" /> Fases aplicadas</button>
           <button onClick={() => setNovo(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-medium text-[#1b1508] hover:bg-[#e0b957]"><Plus className="h-4 w-4" /> Novo Custo</button>
         </div>
       </div>
@@ -98,10 +98,10 @@ function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
       </div>
 
       {/* Tabela */}
-      <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.04]">
+      <div className="mt-5 rounded-xl border border-white/10 bg-[#1b2027]">
         <div className="flex items-center gap-6 border-b border-white/10 px-5 pt-4">
           {([["todos", "Todos"], ["pagos", "Pagos"], ["apagar", "A Pagar"]] as const).map(([id, label]) => (
-            <button key={id} onClick={() => setSub(id)} className={`-mb-px border-b-2 pb-3 text-sm ${sub === id ? "border-[#d2a948] font-medium text-[#d2a948]" : "border-transparent text-white/55 hover:text-white/80"}`}>{label}</button>
+            <button key={id} onClick={() => setSub(id)} className={`-mb-px border-b-2 pb-3 text-sm ${sub === id ? "border-[#d2a948] font-medium text-[#d2a948]" : "border-transparent text-white/68 hover:text-white/80"}`}>{label}</button>
           ))}
         </div>
         <div className="overflow-x-auto">
@@ -111,7 +111,7 @@ function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
               const prog = o.valorContratado > 0 ? Math.min(100, Math.round((o.recebido / o.valorContratado) * 100)) : 0
               const quit = quitado(o)
               return (
-                <tr key={o.obrigacaoId} className="border-t border-white/10 hover:bg-white/[0.03]">
+                <tr key={o.obrigacaoId} className="border-t border-white/10 hover:bg-[#20262e]">
                   <td className="px-5 py-4"><div className="max-w-[220px] text-white/95">{o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`}</div>{o.codigoOperacional && <div className="text-xs text-white/40">{o.codigoOperacional}</div>}</td>
                   <td className="px-5 text-white/70">{o.categoria ?? "—"}</td>
                   <td className="px-5 text-white/95">{fmt(o.valorContratado, o.moeda)}</td>
@@ -160,16 +160,16 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
   const totCustos = movs.filter((m) => !m.receita).reduce((s, m) => s + m.valorBRL, 0)
   const saldoProc = totReceitas - totCustos
   const nReceb = movs.filter((m) => m.receita).length
-  const selCls = "rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/80 outline-none"
+  const selCls = "rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/80 outline-none"
   return (
     <div>
       <div className="flex items-start justify-between gap-3">
         <div><h2 className="text-lg font-semibold text-white">Extrato financeiro</h2><p className="text-sm text-white/45">Histórico completo de receitas, custos e movimentações financeiras do processo.</p></div>
-        <button className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.03] px-3.5 py-2 text-sm text-white/80 hover:bg-white/[0.06]"><Download className="h-4 w-4" /> Exportar</button>
+        <button className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#1b2027] px-3.5 py-2 text-sm text-white/80 hover:bg-[#252c35]"><Download className="h-4 w-4" /> Exportar</button>
       </div>
 
       {/* Filtros */}
-      <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] p-4">
+      <div className="mt-4 rounded-xl border border-white/10 bg-[#1b2027] p-4">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           <label className="text-xs text-white/40">Período<div className={`mt-1 flex items-center justify-between ${selCls}`}><span className="text-white/70">01/06/2026 - 24/07/2026</span><CalendarDays className="h-3.5 w-3.5 text-white/40" /></div></label>
           <FiltroBox label="Tipo" valor="Todos" />
@@ -181,12 +181,12 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
           <FiltroBox label="Fase" valor="Todas" className="w-[150px]" />
           <FiltroBox label="Responsável" valor="Todos" className="w-[150px]" />
           <FiltroBox label="Status" valor="Todos" className="w-[150px]" />
-          <div className="relative min-w-[240px] flex-1"><div className="mb-1 text-xs text-white/40">Buscar</div><Search className="pointer-events-none absolute left-3 top-[30px] h-4 w-4 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar descrição, documento, origem..." className="w-full rounded-lg border border-white/10 bg-black/20 py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
-          <button onClick={() => setBusca("")} className="mb-[1px] inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
+          <div className="relative min-w-[240px] flex-1"><div className="mb-1 text-xs text-white/40">Buscar</div><Search className="pointer-events-none absolute left-3 top-[30px] h-4 w-4 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar descrição, documento, origem..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
+          <button onClick={() => setBusca("")} className="mb-[1px] inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {([["todos", "Todos"], ["receitas", "Receitas"], ["custos", "Custos"]] as const).map(([id, label]) => (
-            <button key={id} onClick={() => setTipo(id)} className={`rounded-lg border px-3 py-1.5 text-xs ${tipo === id ? "border-[#d2a948]/50 bg-[#d2a948]/12 text-[#d2a948]" : "border-white/10 bg-white/[0.03] text-white/55 hover:text-white/80"}`}>{label}</button>
+            <button key={id} onClick={() => setTipo(id)} className={`rounded-lg border px-3 py-1.5 text-xs ${tipo === id ? "border-[#d2a948]/50 bg-[#d2a948]/12 text-[#d2a948]" : "border-white/10 bg-[#1b2027] text-white/68 hover:text-white/80"}`}>{label}</button>
           ))}
         </div>
       </div>
@@ -200,16 +200,16 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
       </div>
 
       {/* Tabela */}
-      <div className="mt-5 overflow-x-auto rounded-xl border border-white/10 bg-white/[0.04]">
+      <div className="mt-5 overflow-x-auto rounded-xl border border-white/10 bg-[#1b2027]">
         <table className="w-full text-sm">
           <thead><tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wide text-white/40">{["Data", "Tipo", "Categoria", "Descrição", "Documento", "Receitas", "Custos", "Saldo acumulado", "Status", ""].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}</tr></thead>
           <tbody>{lista.map((mv) => (
-            <tr key={mv.id} className="border-t border-white/10 hover:bg-white/[0.03]">
+            <tr key={mv.id} className="border-t border-white/10 hover:bg-[#20262e]">
               <td className="px-4 py-3.5 text-white/70">{mv.vencimento ? dataBR(mv.vencimento) : "—"}</td>
               <td className="px-4"><span className="inline-flex items-center gap-1.5" style={{ color: mv.receita ? "#4ade80" : "#fbbf24" }}>{mv.receita ? <ArrowDownRight className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}{mv.receita ? "Receita" : "Custo"}</span></td>
               <td className="px-4"><span className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] text-white/70">{mv.categoria}</span></td>
               <td className="px-4"><div className="max-w-[220px] text-white/90">{mv.descricao}</div></td>
-              <td className="px-4 text-white/55">{mv.codigo}</td>
+              <td className="px-4 text-white/68">{mv.codigo}</td>
               <td className="px-4 tabular-nums text-[#4ade80]">{mv.receita ? fmt(mv.valorBRL) : "—"}</td>
               <td className="px-4 tabular-nums text-[#fbbf24]">{mv.receita ? "—" : fmt(mv.valorBRL)}</td>
               <td className="px-4 tabular-nums text-[#7dd3fc]">{fmt(mv.saldoAcum)}</td>
@@ -231,13 +231,13 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
 function FiltroBox({ label, valor, className = "" }: { label: string; valor: string; className?: string }) {
   return (
     <label className={`text-xs text-white/40 ${className}`}>{label}
-      <div className="mt-1 flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm"><span className="text-white/70">{valor}</span><ChevronDown className="h-3.5 w-3.5 text-white/40" /></div>
+      <div className="mt-1 flex items-center justify-between rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm"><span className="text-white/70">{valor}</span><ChevronDown className="h-3.5 w-3.5 text-white/40" /></div>
     </label>
   )
 }
 function ExtKpi({ titulo, valor, sub, icon: Ic, cor }: any) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+    <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
       <div className="flex items-start justify-between gap-2"><span className="text-[11px] font-medium uppercase tracking-wide text-white/45">{titulo}</span><Ic className="h-4 w-4" style={{ color: cor }} /></div>
       <div className="mt-2 text-2xl font-bold" style={{ color: cor }}>{valor}</div>
       <div className="mt-1 text-[11px] text-white/40">{sub}</div>
@@ -285,28 +285,28 @@ function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
     <div>
       <div className="flex items-start justify-between gap-3">
         <div><h2 className="text-lg font-semibold text-white">Timeline financeira</h2><p className="text-sm text-white/45">Linha do tempo completa de todas as movimentações e eventos financeiros do processo.</p></div>
-        <button className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.03] px-3.5 py-2 text-sm text-white/80 hover:bg-white/[0.06]"><Download className="h-4 w-4" /> Exportar</button>
+        <button className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#1b2027] px-3.5 py-2 text-sm text-white/80 hover:bg-[#252c35]"><Download className="h-4 w-4" /> Exportar</button>
       </div>
 
       {/* Filtros */}
-      <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] p-4">
+      <div className="mt-4 rounded-xl border border-white/10 bg-[#1b2027] p-4">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-          <label className="text-xs text-white/40">Período<div className="mt-1 flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm"><span className="text-white/70">01/06/2026 - 24/07/2026</span><CalendarDays className="h-3.5 w-3.5 text-white/40" /></div></label>
+          <label className="text-xs text-white/40">Período<div className="mt-1 flex items-center justify-between rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm"><span className="text-white/70">01/06/2026 - 24/07/2026</span><CalendarDays className="h-3.5 w-3.5 text-white/40" /></div></label>
           <FiltroBox label="Tipo" valor="Todos" />
           <FiltroBox label="Categoria" valor="Todas" />
           <FiltroBox label="Fase" valor="Todas" />
           <FiltroBox label="Responsável" valor="Todos" />
         </div>
         <div className="mt-3 flex flex-wrap items-end gap-3">
-          <div className="relative min-w-[240px] flex-1"><div className="mb-1 text-xs text-white/40">Buscar</div><Search className="pointer-events-none absolute left-3 top-[30px] h-4 w-4 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar descrição, documento, origem..." className="w-full rounded-lg border border-white/10 bg-black/20 py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
-          <button className="mb-[1px] inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70"><SlidersHorizontal className="h-3.5 w-3.5" /> Filtros rápidos</button>
-          <button onClick={() => setBusca("")} className="mb-[1px] inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
+          <div className="relative min-w-[240px] flex-1"><div className="mb-1 text-xs text-white/40">Buscar</div><Search className="pointer-events-none absolute left-3 top-[30px] h-4 w-4 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar descrição, documento, origem..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
+          <button className="mb-[1px] inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><SlidersHorizontal className="h-3.5 w-3.5" /> Filtros rápidos</button>
+          <button onClick={() => setBusca("")} className="mb-[1px] inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
         </div>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_320px]">
         {/* Timeline */}
-        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+        <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
           <div className="mb-3 text-xs text-white/40">Ordenado por: Data (mais recente)</div>
           {movs.length === 0 ? <div className="py-10 text-center text-sm text-white/40">Sem movimentações financeiras.</div> : (
             <div className="relative pl-1">
@@ -346,18 +346,18 @@ function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
 
         {/* Sidebar */}
         <div className="space-y-4">
-          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
             <div className="mb-3 text-sm font-semibold text-white">Resumo do período</div>
             <div className="space-y-1.5 text-sm">
-              <div className="flex justify-between"><span className="text-white/55">Saldo inicial</span><span className="tabular-nums text-white/80">{fmt(0)}</span></div>
-              <div className="flex justify-between"><span className="text-white/55">Total receitas</span><span className="tabular-nums text-[#4ade80]">{fmt(totReceitas)}</span></div>
-              <div className="flex justify-between"><span className="text-white/55">Total custos</span><span className="tabular-nums text-[#fbbf24]">{fmt(totCustos)}</span></div>
-              <div className="flex justify-between"><span className="text-white/55">Ajustes</span><span className="tabular-nums text-white/70">{fmt(0)}</span></div>
+              <div className="flex justify-between"><span className="text-white/68">Saldo inicial</span><span className="tabular-nums text-white/80">{fmt(0)}</span></div>
+              <div className="flex justify-between"><span className="text-white/68">Total receitas</span><span className="tabular-nums text-[#4ade80]">{fmt(totReceitas)}</span></div>
+              <div className="flex justify-between"><span className="text-white/68">Total custos</span><span className="tabular-nums text-[#fbbf24]">{fmt(totCustos)}</span></div>
+              <div className="flex justify-between"><span className="text-white/68">Ajustes</span><span className="tabular-nums text-white/70">{fmt(0)}</span></div>
               <div className="mt-1 flex justify-between border-t border-white/10 pt-2"><span className="font-medium text-white/80">Saldo final</span><span className="tabular-nums font-semibold text-[#7dd3fc]">{fmt(saldoFinal)}</span></div>
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
             <div className="mb-3 text-sm font-semibold text-white">Resumo por categoria</div>
             <div className="flex items-center gap-4">
               <MiniDonut itens={categorias} total={totCat === 1 ? 0 : totCat} />
@@ -369,16 +369,16 @@ function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
             <div className="mb-3 text-sm font-semibold text-white">Atividade recente</div>
             <div className="space-y-1.5 text-sm">
-              <div className="flex justify-between"><span className="text-white/55">{hojeN} movimentação(ões) hoje</span></div>
-              <div className="flex justify-between"><span className="text-white/55">{pendentes} pendente(s)</span></div>
-              <div className="flex justify-between"><span className="text-white/55">{recebidas} recebida(s)</span><span className="tabular-nums text-[#4ade80]">{fmt(movs.filter((m) => m.receita && m.quitado).reduce((s, m) => s + m.valorBRL, 0))}</span></div>
+              <div className="flex justify-between"><span className="text-white/68">{hojeN} movimentação(ões) hoje</span></div>
+              <div className="flex justify-between"><span className="text-white/68">{pendentes} pendente(s)</span></div>
+              <div className="flex justify-between"><span className="text-white/68">{recebidas} recebida(s)</span><span className="tabular-nums text-[#4ade80]">{fmt(movs.filter((m) => m.receita && m.quitado).reduce((s, m) => s + m.valorBRL, 0))}</span></div>
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
             <div className="mb-2 text-sm font-semibold text-white">Legenda de tipos</div>
             <div className="grid grid-cols-2 gap-y-1.5 text-xs text-white/60">
               <span className="inline-flex items-center gap-1.5"><ArrowDownRight className="h-3.5 w-3.5 text-[#4ade80]" /> Receita</span>
@@ -419,21 +419,21 @@ function Movimentacoes({ processoId, modo }: { processoId: number; modo: "extrat
   if (!pos) return <div className="py-8 text-sm text-white/40">carregando…</div>
   const ENTRADA = new Set(["PAGAMENTO", "PAGAMENTO_PARCIAL", "JUROS", "MULTA"])
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
+    <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
       <div className="mb-3 text-sm font-semibold text-white/80">{modo === "extrato" ? "Extrato do processo" : "Timeline financeira"}</div>
       {eventos.length === 0 ? <div className="text-sm text-white/40">Sem movimentações.</div> : modo === "extrato" ? (
         <table className="w-full text-sm">
           <thead><tr className="text-left text-xs text-white/40">{["Data", "Descrição", "Origem", "Valor", "Status", ""].map((h) => <th key={h} className="py-2 font-medium">{h}</th>)}</tr></thead>
           <tbody>{eventos.map((e, i) => (
-            <tr key={i} className="border-t border-white/10"><td className="py-2.5 text-white/70">{dataBR(e.data)}</td><td className="text-white/80">{e.tipo}{e.manual && <span className="ml-2 rounded bg-[#7dd3fc]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#7dd3fc]">manual</span>}</td><td className="text-white/55">{e.obrigacao ?? "—"}</td><td className={ENTRADA.has(e.tipo) ? "text-[#4ade80]" : "text-white/80"}>{ENTRADA.has(e.tipo) ? "+" : ""}{fmt(e.valor, e.moeda)}</td><td className="text-white/55">{e.status}</td><td>{e.comprovanteUrl && <a href={e.comprovanteUrl} target="_blank" rel="noreferrer" className="text-xs text-[#7dd3fc]">comprovante</a>}</td></tr>
+            <tr key={i} className="border-t border-white/10"><td className="py-2.5 text-white/70">{dataBR(e.data)}</td><td className="text-white/80">{e.tipo}{e.manual && <span className="ml-2 rounded bg-[#7dd3fc]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#7dd3fc]">manual</span>}</td><td className="text-white/68">{e.obrigacao ?? "—"}</td><td className={ENTRADA.has(e.tipo) ? "text-[#4ade80]" : "text-white/80"}>{ENTRADA.has(e.tipo) ? "+" : ""}{fmt(e.valor, e.moeda)}</td><td className="text-white/68">{e.status}</td><td>{e.comprovanteUrl && <a href={e.comprovanteUrl} target="_blank" rel="noreferrer" className="text-xs text-[#7dd3fc]">comprovante</a>}</td></tr>
           ))}</tbody>
         </table>
       ) : (
         <div className="space-y-4">{eventos.map((e, i) => (
           <div key={i} className="flex gap-3">
             <div className="w-16 shrink-0 text-right text-[11px] text-white/40">{dataBR(e.data)}</div>
-            <div className="flex flex-col items-center"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.06] text-[#4ade80]"><FileText className="h-3.5 w-3.5" /></div>{i < eventos.length - 1 && <div className="mt-1 w-px flex-1 bg-white/[0.06]" />}</div>
-            <div className="flex-1 pb-2"><div className="text-sm font-medium text-white/95">{e.tipo} <span className="text-xs text-white/40">· {e.obrigacao}</span></div><div className="text-sm text-white/55">{fmt(e.valor, e.moeda)}</div></div>
+            <div className="flex flex-col items-center"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#252c35] text-[#4ade80]"><FileText className="h-3.5 w-3.5" /></div>{i < eventos.length - 1 && <div className="mt-1 w-px flex-1 bg-[#252c35]" />}</div>
+            <div className="flex-1 pb-2"><div className="text-sm font-medium text-white/95">{e.tipo} <span className="text-xs text-white/40">· {e.obrigacao}</span></div><div className="text-sm text-white/68">{fmt(e.valor, e.moeda)}</div></div>
           </div>
         ))}</div>
       )}
