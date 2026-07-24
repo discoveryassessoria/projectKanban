@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { LancamentoManualModal } from "./LancamentoManualModal"
+import RegistrarPagamentoModal from "./RegistrarPagamentoModal"
 import {
   DollarSign, CheckSquare, Clock, CalendarDays, Search, RotateCcw, Plus, X,
   ExternalLink, FileText, ChevronDown, ChevronLeft, ChevronRight, Receipt,
@@ -26,6 +27,7 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
   const [sel, setSel] = useState<any>(null)
   const [subtab, setSubtab] = useState("receitas")
   const [novo, setNovo] = useState(false)
+  const [pagar, setPagar] = useState<any | null>(null)
 
   const carregar = () => { fetch(`/api/financeiro/v3/receitas${processoId ? `?processoId=${processoId}` : ""}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setD(j)).catch(() => setD({ kpis: {}, receitas: [] })) }
   useEffect(() => { carregar() }, [processoId])
@@ -94,7 +96,7 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
       </div>
 
       {/* Drawer lateral */}
-      {sel && <Drawer r={sel} onClose={() => setSel(null)} onRegistrar={() => router.push(`/financeiro/v3/receita/${sel.obrigacaoId}`)} onCancelar={async () => {
+      {sel && <Drawer r={sel} onClose={() => setSel(null)} onRegistrar={() => setPagar(sel)} onCancelar={async () => {
         if (!window.confirm("Cancelar esta receita? O histórico é preservado (estorno auditável).")) return
         const res = await fetch(`/api/financeiro/v3/obrigacoes/${sel.obrigacaoId}/cancelar`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: "{}" })
         const j = await res.json().catch(() => ({}))
@@ -104,6 +106,7 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
 
       {/* Modal Nova Receita (lançamento manual) */}
       {novo && processoId != null && <LancamentoManualModal natureza="RECEITA" processoId={processoId} onClose={() => setNovo(false)} onCriado={() => { setNovo(false); carregar() }} />}
+      {pagar && <RegistrarPagamentoModal obrigacaoId={pagar.obrigacaoId} moeda={pagar.moeda} saldo={pagar.saldo} natureza="RECEITA" onClose={() => setPagar(null)} onDone={() => { setPagar(null); setSel(null); carregar() }} />}
     </div>
   )
 }
