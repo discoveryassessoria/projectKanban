@@ -14,6 +14,7 @@ import {
   Landmark, CreditCard, Users, FileText, Eye, Building2, User as UserIcon, UsersRound,
 } from "lucide-react"
 import { uploadFiles } from "@/src/lib/storage"
+import { calcularTaxas, type TaxaView } from "@/lib/financeiro/taxas-pagamento"
 
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
 const brl = (v: number) => fmt(v || 0, "BRL")
@@ -26,7 +27,7 @@ const hoje = () => new Date().toISOString().slice(0, 10)
 const num = (v: unknown) => { const n = Number(String(v ?? "").replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : Number(v) || 0 }
 
 let _rid = 0
-const novaLinha = () => ({ _id: ++_rid, formaPagamentoId: "" as number | "", valor: "" as string, contaKey: "" as string, dataRec: hoje(), dataComp: "", referencia: "" })
+const novaLinha = () => ({ _id: ++_rid, formaPagamentoId: "" as number | "", valor: "" as string, contaKey: "" as string, dataRec: hoje(), dataComp: "", referencia: "", adquirenteId: "" as number | "", bandeiraId: "" as number | "", parcelas: 1 })
 
 const statusCls = (s?: string | null) => {
   const S = (s ?? "").toUpperCase()
@@ -49,6 +50,9 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
   const [participantes, setParticipantes] = useState<any[]>([])
   const [formasCad, setFormasCad] = useState<any[]>([])
   const [contasOpts, setContasOpts] = useState<any[]>([])
+  const [adquirentes, setAdquirentes] = useState<any[]>([])
+  const [bandeiras, setBandeiras] = useState<any[]>([])
+  const [taxas, setTaxas] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -91,6 +95,9 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
         const contas = (rCad?.contas ?? []).map((c: any) => ({ key: `c:${c.id}`, id: c.id, tipo: "conta", label: c.nome, sub: [c.banco, [c.agencia, c.conta].filter(Boolean).join("/")].filter(Boolean).join(" · "), banco: c.banco ?? c.nome, agencia: c.agencia ?? null, numero: c.conta ?? null }))
         const cart = (rCad?.carteiras ?? []).map((c: any) => ({ key: `w:${c.id}`, id: c.id, tipo: "carteira", label: c.nome, sub: "Carteira", banco: c.nome, agencia: null, numero: null }))
         setContasOpts([...contas, ...cart])
+        setAdquirentes(rCad?.adquirentes ?? [])
+        setBandeiras(rCad?.bandeiras ?? [])
+        setTaxas(rCad?.taxas ?? [])
         if (!d) setErro("Não foi possível carregar a cobrança.")
       } catch { if (vivo) setErro("Falha ao carregar.") } finally { if (vivo) setLoading(false) }
     })()
@@ -99,6 +106,20 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
 
   // ── cálculos live ─────────────────────────────────────────────────────────
   const totalInformado = useMemo(() => linhas.reduce((s, l) => s + num(l.valor), 0), [linhas])
+  const formaDe = (l: Linha) => formasCad.find((f) => f.id === Number(l.formaPagamentoId)) ?? null
+  const ehCartao = (l: Linha) => !!formaDe(l)?.exigeAdquirente
+  const bandeirasDe = (adqId: number | "") => bandeiras.filter((b) => !adqId || !b.adquirentesCompativeis?.length || b.adquirentesCompativeis.includes(Number(adqId)))
+  const tarifaDe = (l: Linha): number => {
+    const forma = formaDe(l)
+    if (!forma?.exigeAdquirente || !l.adquirenteId) return 0
+    const relevantes: TaxaView[] = taxas.filter((t) =>
+      (t.formaPagamentoId == null || t.formaPagamentoId === forma.id) &&
+      (t.adquirenteId == null || t.adquirenteId === Number(l.adquirenteId)) &&
+      (t.bandeiraId == null || t.bandeiraId === Number(l.bandeiraId)))
+    if (!relevantes.length) return 0
+    return calcularTaxas(relevantes, { valorBruto: num(l.valor), nParcelas: Number(l.parcelas) || 1 }).valorTaxas
+  }
+  const totalTarifas = useMemo(() => linhas.reduce((s, l) => s + tarifaDe(l), 0), [linhas, taxas, formasCad, bandeiras])
   const desconto = num(ajustes.desconto), juros = num(ajustes.juros), multa = num(ajustes.multa), acrescimo = num(ajustes.acrescimo), creditoUtilizado = num(ajustes.creditoUtilizado)
   const acrescimos = juros + multa + acrescimo
   const saldoCobranca = Number(det?.saldoBrl ?? 0)
@@ -162,6 +183,9 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
           contaBanco: conta?.banco ?? null, contaAgencia: conta?.agencia ?? null, contaNumero: conta?.numero ?? null,
           dataRecebimento: l.dataRec || null, dataCompensacao: l.dataComp || null, referencia: l.referencia || null,
           origemRecurso: forma ? origemRecurso(forma) : null,
+          tarifa: tarifaDe(l) || null,
+          adquirenteLabel: adquirentes.find((a) => a.id === Number(l.adquirenteId))?.nome ?? null,
+          bandeiraLabel: bandeiras.find((b) => b.id === Number(l.bandeiraId))?.nome ?? null,
         }
       })
       const pagador = pagadorTipo === "EXTERNO"
@@ -247,7 +271,23 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
                     <tbody>
                       {linhas.map((l) => (
                         <tr key={l._id} className="border-t border-white/5">
-                          <td className="px-2 py-1.5"><select value={l.formaPagamentoId} onChange={(e) => setLinha(l._id, { formaPagamentoId: e.target.value ? Number(e.target.value) : "" })} className={inputCls}><option value="">Selecione…</option>{formasCad.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select></td>
+                          <td className="px-2 py-1.5 align-top">
+                            <select value={l.formaPagamentoId} onChange={(e) => setLinha(l._id, { formaPagamentoId: e.target.value ? Number(e.target.value) : "", adquirenteId: "", bandeiraId: "", parcelas: 1 })} className={inputCls}><option value="">Selecione…</option>{formasCad.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
+                            {ehCartao(l) && (
+                              <div className="mt-1.5 space-y-1.5 rounded-md border border-white/10 bg-[#161b21] p-2">
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  <select value={l.adquirenteId} onChange={(e) => setLinha(l._id, { adquirenteId: e.target.value ? Number(e.target.value) : "", bandeiraId: "" })} className={`${inputCls} !py-1 text-xs`}><option value="">Adquirente…</option>{adquirentes.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}</select>
+                                  <select value={l.bandeiraId} onChange={(e) => setLinha(l._id, { bandeiraId: e.target.value ? Number(e.target.value) : "" })} className={`${inputCls} !py-1 text-xs`} disabled={!l.adquirenteId}><option value="">Bandeira…</option>{bandeirasDe(l.adquirenteId).map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}</select>
+                                </div>
+                                {formaDe(l)?.permiteParcelas && (
+                                  <select value={l.parcelas} onChange={(e) => setLinha(l._id, { parcelas: Number(e.target.value) })} className={`${inputCls} !py-1 text-xs`}>{Array.from({ length: Math.max(1, formaDe(l)?.maxParcelas ?? 12) }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}x</option>)}</select>
+                                )}
+                                {l.adquirenteId ? (tarifaDe(l) > 0
+                                  ? <p className="text-[10px] text-white/50">Taxa: <span className="text-[#d2a948]">{brl(tarifaDe(l))}</span> · líquido <span className="text-[#4ade80]">{brl(Math.max(0, num(l.valor) - tarifaDe(l)))}</span></p>
+                                  : <p className="text-[10px] text-white/30">Sem taxa cadastrada para esta combinação.</p>) : null}
+                              </div>
+                            )}
+                          </td>
                           <td className="px-2 py-1.5"><input inputMode="decimal" value={l.valor} onChange={(e) => setLinha(l._id, { valor: e.target.value })} placeholder="0,00" className={`${inputCls} w-28 text-right`} /></td>
                           <td className="px-2 py-1.5"><select value={l.contaKey} onChange={(e) => setLinha(l._id, { contaKey: e.target.value })} className={inputCls}><option value="">Selecione…</option>{contasOpts.map((c) => <option key={c.key} value={c.key}>{c.label}{c.sub ? ` — ${c.sub}` : ""}</option>)}</select></td>
                           <td className="px-2 py-1.5"><input type="date" value={l.dataRec} onChange={(e) => setLinha(l._id, { dataRec: e.target.value })} className={`${inputCls} w-36`} /></td>
@@ -388,7 +428,9 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
                   <Row k="Juros" cls="text-[#d2a948]">+ {brl(juros)}</Row>
                   <Row k="Multas" cls="text-[#d2a948]">+ {brl(multa)}</Row>
                   <Row k="Acréscimos" cls="text-[#d2a948]">+ {brl(acrescimo)}</Row>
+                  {totalTarifas > 0.005 && <Row k="Taxas (cartão)" cls="text-[#f87171]">− {brl(totalTarifas)}</Row>}
                   <div className="my-2 border-t border-white/10" />
+                  {totalTarifas > 0.005 && <Row k="Líquido em caixa" cls="text-white/70">{brl(Math.max(0, totalInformado - totalTarifas))}</Row>}
                   <Row k="Valor Líquido Recebido" cls="font-semibold text-[#7dd3fc]">{brl(recebido)}</Row>
                   <Row k="Saldo Restante" cls={saldoRestante > 0.005 ? "text-[#f87171]" : "text-[#4ade80]"}>{brl(saldoRestante)}</Row>
                   <div className="flex items-center justify-between pt-1"><dt className="text-white/50">Situação Final</dt><dd><span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${statusCls(situacao)}`}>{situacao === "QUITADA" ? "Quitada" : situacao === "EXCEDENTE" ? "Excedente" : "Parcial"}</span></dd></div>

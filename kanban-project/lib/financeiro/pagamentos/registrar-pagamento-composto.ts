@@ -27,6 +27,10 @@ export interface FormaLinhaEntrada {
   dataCompensacao?: string | null
   referencia?: string | null
   origemRecurso?: string | null
+  // cartão: adquirente/bandeira e a TARIFA calculada (reduz o líquido, lança em Taxas)
+  tarifa?: number | null
+  adquirenteLabel?: string | null
+  bandeiraLabel?: string | null
 }
 export interface PagadorEntrada {
   tipo: 'REQUERENTE' | 'EMPRESA' | 'TERCEIRO' | 'EXTERNO'
@@ -170,6 +174,7 @@ export async function registrarPagamentoComposto(input: RegistrarPagamentoCompos
   for (let i = 0; i < formas.length; i++) {
     const f = formas[i]
     const ultima = i === formas.length - 1
+    const tarifa = Math.max(0, cent(f.tarifa ?? 0))
     const r = (await registrarOcorrencia({
       obrigacaoId: obr.id, tipo: 'PAGAMENTO', valor: cent(f.valor), moeda,
       data: f.dataRecebimento ? new Date(f.dataRecebimento) : undefined,
@@ -177,6 +182,7 @@ export async function registrarPagamentoComposto(input: RegistrarPagamentoCompos
       origemRecurso: cut(f.origemRecurso, 20),
       pagador, aplicacao: { politica, manual: input.aplicacao?.manual ?? undefined },
       excedenteDestino: ultima ? excedenteDestino : null,
+      tarifa: tarifa > 0 ? tarifa : null,
       observacao: obsBase, idempotencyKey: `${correlacaoId}:forma:${i}`, criadoPorId,
     })) as OcResp
     ocorrenciasCriadas++
@@ -190,7 +196,7 @@ export async function registrarPagamentoComposto(input: RegistrarPagamentoCompos
           contaBanco: cut(f.contaBanco ?? f.contaLabel, 80),
           contaAgencia: cut(f.contaAgencia, 20),
           contaNumero: cut(f.contaNumero, 30),
-          referencia: cut(f.referencia, 120),
+          referencia: cut([f.referencia, [f.adquirenteLabel, f.bandeiraLabel].filter(Boolean).join(" "), tarifa > 0 ? `taxa ${brl(tarifa)}` : null].filter(Boolean).join(" · ") || null, 120),
           correlacaoId: cut(correlacaoId, 60),
         },
       }).catch(() => {})
