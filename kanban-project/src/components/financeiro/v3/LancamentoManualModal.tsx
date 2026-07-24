@@ -150,15 +150,15 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
     } catch { setErro("Erro de conexão ao salvar.") } finally { setSalvando(null) }
   }
 
-  const inputCls = "mt-1 w-full rounded-lg border border-neutral-800 bg-[#0a0b0d] px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-600"
-  const labelCls = "block text-xs text-neutral-400"
+  const inputCls = "mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/95 outline-none placeholder:text-white/30"
+  const labelCls = "block text-xs text-white/55"
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4" onClick={onClose}>
-      <div className="my-6 w-full max-w-2xl rounded-xl border border-neutral-800 bg-[#0f1114] p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="my-6 w-full max-w-2xl rounded-xl border border-white/10 bg-white/[0.04] p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="text-base font-semibold text-white">{receita ? "Nova Receita" : "Novo Custo"}</h3>
-          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-300"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="text-white/40 hover:text-white/70"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3">
@@ -177,7 +177,7 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
           </label>
 
           {/* Descrição complementar */}
-          <label className={`${labelCls} col-span-2`}>Descrição {receita ? "" : ""}<span className="text-neutral-600"> (complementar, opcional)</span>
+          <label className={`${labelCls} col-span-2`}>Descrição {receita ? "" : ""}<span className="text-white/30"> (complementar, opcional)</span>
             <input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Padrão: nome do item" className={inputCls} />
           </label>
 
@@ -214,7 +214,7 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
             </label>
           )}
           {!receita && (
-            <label className={labelCls}>Centro de custo <span className="text-neutral-600">(opcional)</span>
+            <label className={labelCls}>Centro de custo <span className="text-white/30">(opcional)</span>
               <select value={centroCustoId} onChange={(e) => setCentroCustoId(e.target.value)} className={inputCls}>
                 <option value="">—</option>
                 {centros.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
@@ -226,13 +226,13 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
           </label>
 
           {/* Fase / Vencimento */}
-          <label className={labelCls}>Fase <span className="text-neutral-600">(opcional)</span>
+          <label className={labelCls}>Fase <span className="text-white/30">(opcional)</span>
             <select value={faseKey} onChange={(e) => setFaseKey(e.target.value)} className={inputCls}>
               <option value="">—</option>
               {fases.map((f) => <option key={f.phaseKey} value={f.phaseKey}>{f.label}</option>)}
             </select>
           </label>
-          <label className={labelCls}>Vencimento <span className="text-neutral-600">(opcional)</span>
+          <label className={labelCls}>Vencimento <span className="text-white/30">(opcional)</span>
             <input type="date" value={vencimento} onChange={(e) => setVencimento(e.target.value)} className={inputCls} />
           </label>
 
@@ -243,36 +243,36 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
         </div>
 
         {/* ── Vínculo / Rateio ── */}
-        <div className="mt-4 rounded-lg border border-neutral-800 bg-[#0a0b0d] p-3">
-          <div className="mb-2 text-xs font-medium text-neutral-400">Vínculo</div>
+        <div className="mt-4 rounded-lg border border-white/10 bg-black/20 p-3">
+          <div className="mb-2 text-xs font-medium text-white/55">Vínculo</div>
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => setVinculo("processo")} className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${vinculo === "processo" ? "border-amber-500/50 bg-amber-500/10 text-amber-300" : "border-neutral-700 text-neutral-300"}`}><Building2 className="h-3.5 w-3.5" /> Processo inteiro</button>
-            <button onClick={() => setVinculo("requerentes")} className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${vinculo === "requerentes" ? "border-amber-500/50 bg-amber-500/10 text-amber-300" : "border-neutral-700 text-neutral-300"}`}><Users className="h-3.5 w-3.5" /> Requerente(s)</button>
+            <button onClick={() => setVinculo("processo")} className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${vinculo === "processo" ? "border-[#d2a948]/50 bg-[#d2a948]/12 text-[#d2a948]" : "border-white/15 text-white/70"}`}><Building2 className="h-3.5 w-3.5" /> Processo inteiro</button>
+            <button onClick={() => setVinculo("requerentes")} className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${vinculo === "requerentes" ? "border-[#d2a948]/50 bg-[#d2a948]/12 text-[#d2a948]" : "border-white/15 text-white/70"}`}><Users className="h-3.5 w-3.5" /> Requerente(s)</button>
           </div>
 
           {vinculo === "requerentes" && (
             <div className="mt-3">
-              {requerentes.length === 0 ? <div className="text-xs text-neutral-500">Este processo não tem requerentes cadastrados.</div> : (
+              {requerentes.length === 0 ? <div className="text-xs text-white/40">Este processo não tem requerentes cadastrados.</div> : (
                 <div className="flex flex-wrap gap-2">
                   {requerentes.map((r) => (
-                    <button key={r.id} onClick={() => toggleReq(r.id)} title={r.personId == null ? "Sem identidade vinculada — não entra em rateio" : ""} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs ${selReq.has(r.id) ? "border-violet-500/50 bg-violet-500/10 text-violet-200" : "border-neutral-700 text-neutral-300"} ${r.personId == null ? "opacity-60" : ""}`}><User className="h-3 w-3" /> {r.nome}</button>
+                    <button key={r.id} onClick={() => toggleReq(r.id)} title={r.personId == null ? "Sem identidade vinculada — não entra em rateio" : ""} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs ${selReq.has(r.id) ? "border-violet-500/50 bg-violet-500/10 text-violet-200" : "border-white/15 text-white/70"} ${r.personId == null ? "opacity-60" : ""}`}><User className="h-3 w-3" /> {r.nome}</button>
                   ))}
                 </div>
               )}
               {reqSelecionados.length > 1 && (
                 <div className="mt-3">
-                  <div className="mb-1 text-xs text-neutral-400">Rateio</div>
+                  <div className="mb-1 text-xs text-white/55">Rateio</div>
                   <div className="flex gap-2">
                     {(["IGUAL", "PERCENTUAL", "VALOR"] as ModoRateio[]).map((m) => (
-                      <button key={m} onClick={() => setModoRateio(m)} className={`rounded-lg border px-2.5 py-1 text-xs ${modoRateio === m ? "border-amber-500/50 bg-amber-500/10 text-amber-300" : "border-neutral-700 text-neutral-300"}`}>{m === "IGUAL" ? "Igual" : m === "PERCENTUAL" ? "Percentual" : "Valor"}</button>
+                      <button key={m} onClick={() => setModoRateio(m)} className={`rounded-lg border px-2.5 py-1 text-xs ${modoRateio === m ? "border-[#d2a948]/50 bg-[#d2a948]/12 text-[#d2a948]" : "border-white/15 text-white/70"}`}>{m === "IGUAL" ? "Igual" : m === "PERCENTUAL" ? "Percentual" : "Valor"}</button>
                     ))}
                   </div>
                   {modoRateio !== "IGUAL" && (
                     <div className="mt-2 space-y-1.5">
                       {reqSelecionados.map((r) => (
                         <div key={r.id} className="flex items-center gap-2">
-                          <span className="w-40 truncate text-xs text-neutral-300">{r.nome}</span>
-                          <input value={rateioVal[r.id] ?? ""} onChange={(e) => setRateioVal((s) => ({ ...s, [r.id]: e.target.value }))} inputMode="decimal" placeholder={modoRateio === "PERCENTUAL" ? "%" : moeda} className="w-28 rounded-lg border border-neutral-800 bg-[#0a0b0d] px-2 py-1 text-xs text-neutral-100 outline-none" />
+                          <span className="w-40 truncate text-xs text-white/70">{r.nome}</span>
+                          <input value={rateioVal[r.id] ?? ""} onChange={(e) => setRateioVal((s) => ({ ...s, [r.id]: e.target.value }))} inputMode="decimal" placeholder={modoRateio === "PERCENTUAL" ? "%" : moeda} className="w-28 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-xs text-white/95 outline-none" />
                         </div>
                       ))}
                     </div>
@@ -284,16 +284,16 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
         </div>
 
         {/* ── Prévia ── */}
-        <div className="mt-4 rounded-lg border border-neutral-800 bg-[#0a0b0d] p-3 text-sm">
-          <div className="flex justify-between text-neutral-400"><span>Subtotal</span><span className="text-neutral-200">{fmt(subtotal, moeda)}</span></div>
-          {desc > 0 && <div className="flex justify-between text-neutral-400"><span>Desconto</span><span className="text-red-300">− {fmt(desc, moeda)}</span></div>}
-          {!receita && acr > 0 && <div className="flex justify-between text-neutral-400"><span>Acréscimos</span><span className="text-neutral-200">+ {fmt(acr, moeda)}</span></div>}
-          <div className="mt-1 flex justify-between border-t border-neutral-800 pt-1 font-semibold text-white"><span>Total</span><span>{fmt(total, moeda)}</span></div>
+        <div className="mt-4 rounded-lg border border-white/10 bg-black/20 p-3 text-sm">
+          <div className="flex justify-between text-white/55"><span>Subtotal</span><span className="text-white/80">{fmt(subtotal, moeda)}</span></div>
+          {desc > 0 && <div className="flex justify-between text-white/55"><span>Desconto</span><span className="text-red-300">− {fmt(desc, moeda)}</span></div>}
+          {!receita && acr > 0 && <div className="flex justify-between text-white/55"><span>Acréscimos</span><span className="text-white/80">+ {fmt(acr, moeda)}</span></div>}
+          <div className="mt-1 flex justify-between border-t border-white/10 pt-1 font-semibold text-white"><span>Total</span><span>{fmt(total, moeda)}</span></div>
           {distribuicao.length > 0 && (
-            <div className="mt-2 border-t border-neutral-800 pt-2">
-              <div className="mb-1 text-xs text-neutral-500">Distribuição por requerente</div>
-              {distribuicao.map((d, i) => <div key={i} className="flex justify-between text-xs text-neutral-300"><span>{d.nome} <span className="text-neutral-500">({d.pct.toFixed(1)}%)</span></span><span>{fmt(d.valor, moeda)}</span></div>)}
-              {Math.abs(somaRateio - total) > 0.01 && <div className="mt-1 text-xs text-amber-400">⚠ Soma do rateio ({fmt(somaRateio, moeda)}) difere do total ({fmt(total, moeda)}).</div>}
+            <div className="mt-2 border-t border-white/10 pt-2">
+              <div className="mb-1 text-xs text-white/40">Distribuição por requerente</div>
+              {distribuicao.map((d, i) => <div key={i} className="flex justify-between text-xs text-white/70"><span>{d.nome} <span className="text-white/40">({d.pct.toFixed(1)}%)</span></span><span>{fmt(d.valor, moeda)}</span></div>)}
+              {Math.abs(somaRateio - total) > 0.01 && <div className="mt-1 text-xs text-[#d2a948]">⚠ Soma do rateio ({fmt(somaRateio, moeda)}) difere do total ({fmt(total, moeda)}).</div>}
             </div>
           )}
         </div>
@@ -301,9 +301,9 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
         {erro && <div className="mt-3 rounded-lg border border-red-800/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">{erro}</div>}
 
         <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-neutral-700 bg-neutral-900 px-3.5 py-2 text-sm text-neutral-300 hover:border-neutral-600">Cancelar</button>
+          <button onClick={onClose} className="rounded-lg border border-white/15 bg-white/[0.03] px-3.5 py-2 text-sm text-white/70 hover:border-white/25">Cancelar</button>
           <button onClick={() => salvar(true)} disabled={!!salvando} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-700/50 bg-emerald-600/15 px-3.5 py-2 text-sm font-medium text-emerald-300 hover:bg-emerald-600/25 disabled:opacity-50"><Plus className="h-4 w-4" /> {salvando === "pagamento" ? "Salvando…" : "Salvar e registrar pagamento"}</button>
-          <button onClick={() => salvar(false)} disabled={!!salvando} className="rounded-lg bg-amber-500/90 px-3.5 py-2 text-sm font-medium text-neutral-950 hover:bg-amber-400 disabled:opacity-50">{salvando === "salvar" ? "Salvando…" : receita ? "Salvar receita" : "Salvar custo"}</button>
+          <button onClick={() => salvar(false)} disabled={!!salvando} className="rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-medium text-[#1b1508] hover:bg-[#e0b957] disabled:opacity-50">{salvando === "salvar" ? "Salvando…" : receita ? "Salvar receita" : "Salvar custo"}</button>
         </div>
       </div>
     </div>

@@ -23,10 +23,10 @@ export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) 
   const [fxEur, setFxEur] = useState(5.5)
   useEffect(() => { fetch("/api/cambio").then((r) => r.json()).then((d) => setFxEur(Number(d?.eur) || 5.5)).catch(() => {}) }, [])
   return (
-    <div className="text-neutral-200">
-      <div className="mb-5 flex flex-wrap gap-6 border-b border-neutral-800">
+    <div className="text-white/80">
+      <div className="mb-5 flex flex-wrap gap-6 border-b border-white/10">
         {SUBTABS.map(([id, label]) => (
-          <button key={id} onClick={() => setT(id)} className={`-mb-px border-b-2 px-1 pb-3 pt-1 text-sm ${t === id ? "border-amber-400 font-medium text-amber-400" : "border-transparent text-neutral-400 hover:text-neutral-200"}`}>{label}</button>
+          <button key={id} onClick={() => setT(id)} className={`-mb-px border-b-2 px-1 pb-3 pt-1 text-sm ${t === id ? "border-[#d2a948] font-medium text-[#d2a948]" : "border-transparent text-white/55 hover:text-white/80"}`}>{label}</button>
         ))}
       </div>
       {t === "visao" && <VisaoGeral processoId={processoId} fxHoje={fxEur} onIrPara={(a) => setT(a)} />}
@@ -416,24 +416,24 @@ function Movimentacoes({ processoId, modo }: { processoId: number; modo: "extrat
     for (const o of pos?.obrigacoes ?? []) for (const t of o.timeline ?? []) out.push({ ...t, obrigacao: o.codigoOperacional })
     return out.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
   }, [pos])
-  if (!pos) return <div className="py-8 text-sm text-neutral-500">carregando…</div>
+  if (!pos) return <div className="py-8 text-sm text-white/40">carregando…</div>
   const ENTRADA = new Set(["PAGAMENTO", "PAGAMENTO_PARCIAL", "JUROS", "MULTA"])
   return (
-    <div className="rounded-xl border border-neutral-800 bg-[#0f1114] p-5">
-      <div className="mb-3 text-sm font-semibold text-neutral-200">{modo === "extrato" ? "Extrato do processo" : "Timeline financeira"}</div>
-      {eventos.length === 0 ? <div className="text-sm text-neutral-500">Sem movimentações.</div> : modo === "extrato" ? (
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
+      <div className="mb-3 text-sm font-semibold text-white/80">{modo === "extrato" ? "Extrato do processo" : "Timeline financeira"}</div>
+      {eventos.length === 0 ? <div className="text-sm text-white/40">Sem movimentações.</div> : modo === "extrato" ? (
         <table className="w-full text-sm">
-          <thead><tr className="text-left text-xs text-neutral-500">{["Data", "Descrição", "Origem", "Valor", "Status", ""].map((h) => <th key={h} className="py-2 font-medium">{h}</th>)}</tr></thead>
+          <thead><tr className="text-left text-xs text-white/40">{["Data", "Descrição", "Origem", "Valor", "Status", ""].map((h) => <th key={h} className="py-2 font-medium">{h}</th>)}</tr></thead>
           <tbody>{eventos.map((e, i) => (
-            <tr key={i} className="border-t border-neutral-800/60"><td className="py-2.5 text-neutral-300">{dataBR(e.data)}</td><td className="text-neutral-200">{e.tipo}{e.manual && <span className="ml-2 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-medium text-sky-300">manual</span>}</td><td className="text-neutral-400">{e.obrigacao ?? "—"}</td><td className={ENTRADA.has(e.tipo) ? "text-emerald-400" : "text-neutral-200"}>{ENTRADA.has(e.tipo) ? "+" : ""}{fmt(e.valor, e.moeda)}</td><td className="text-neutral-400">{e.status}</td><td>{e.comprovanteUrl && <a href={e.comprovanteUrl} target="_blank" rel="noreferrer" className="text-xs text-sky-400">comprovante</a>}</td></tr>
+            <tr key={i} className="border-t border-white/10"><td className="py-2.5 text-white/70">{dataBR(e.data)}</td><td className="text-white/80">{e.tipo}{e.manual && <span className="ml-2 rounded bg-[#7dd3fc]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#7dd3fc]">manual</span>}</td><td className="text-white/55">{e.obrigacao ?? "—"}</td><td className={ENTRADA.has(e.tipo) ? "text-[#4ade80]" : "text-white/80"}>{ENTRADA.has(e.tipo) ? "+" : ""}{fmt(e.valor, e.moeda)}</td><td className="text-white/55">{e.status}</td><td>{e.comprovanteUrl && <a href={e.comprovanteUrl} target="_blank" rel="noreferrer" className="text-xs text-[#7dd3fc]">comprovante</a>}</td></tr>
           ))}</tbody>
         </table>
       ) : (
         <div className="space-y-4">{eventos.map((e, i) => (
           <div key={i} className="flex gap-3">
-            <div className="w-16 shrink-0 text-right text-[11px] text-neutral-500">{dataBR(e.data)}</div>
-            <div className="flex flex-col items-center"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-800 text-emerald-400"><FileText className="h-3.5 w-3.5" /></div>{i < eventos.length - 1 && <div className="mt-1 w-px flex-1 bg-neutral-800" />}</div>
-            <div className="flex-1 pb-2"><div className="text-sm font-medium text-neutral-100">{e.tipo} <span className="text-xs text-neutral-500">· {e.obrigacao}</span></div><div className="text-sm text-neutral-400">{fmt(e.valor, e.moeda)}</div></div>
+            <div className="w-16 shrink-0 text-right text-[11px] text-white/40">{dataBR(e.data)}</div>
+            <div className="flex flex-col items-center"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.06] text-[#4ade80]"><FileText className="h-3.5 w-3.5" /></div>{i < eventos.length - 1 && <div className="mt-1 w-px flex-1 bg-white/[0.06]" />}</div>
+            <div className="flex-1 pb-2"><div className="text-sm font-medium text-white/95">{e.tipo} <span className="text-xs text-white/40">· {e.obrigacao}</span></div><div className="text-sm text-white/55">{fmt(e.valor, e.moeda)}</div></div>
           </div>
         ))}</div>
       )}
