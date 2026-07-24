@@ -59,6 +59,7 @@ export interface ReceitaDetalhe {
   responsaveis: { id: number; nome: string }[]
   pagadores: { nome: string; valor: number }[]
   observacao: string | null
+  documentos: { id: number; nome: string; tipo: string | null; url: string; tamanho: number | null; criadoEm: string }[]
 }
 
 const TITULO: Record<string, string> = {
@@ -136,6 +137,12 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     ? await prisma.parcelaFinanceira.findMany({ where: { receitaId: obr.origemId }, orderBy: { numero: 'asc' }, select: { numero: true, vencimento: true, valor: true, status: true, cambioAplicado: true, valorBrl: true, formaPagamento: true } }).catch(() => [])
     : []
   const parcelasRec = parcelasAll.filter((p) => p.status !== 'CANCELADA')
+  // Documentos vinculados à Receita (resiliente durante rollout: [] se a tabela não existir)
+  const documentos = obr.origemTipo === 'Receita' && obr.origemId
+    ? await prisma.receitaDocumento.findMany({ where: { receitaId: obr.origemId }, orderBy: { criadoEm: 'desc' } })
+        .then((rows) => rows.map((r) => ({ id: r.id, nome: r.arquivoNome, tipo: r.tipo, url: r.arquivoUrl, tamanho: r.tamanho, criadoEm: r.criadoEm.toISOString() })))
+        .catch(() => [] as { id: number; nome: string; tipo: string | null; url: string; tamanho: number | null; criadoEm: string }[])
+    : []
   const live = await cotacoesVivas()
   const ca = computeCambioAging({
     moedaBase: moeda, valorBase: contratado, saldoLedger: saldo, recebidoLedger: recebido,
@@ -247,6 +254,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     distribuicao, distribuicaoTotal: { percentual: cent(distribuicao.reduce((s, d) => s + d.percentual, 0)), valor: cent(distribuicao.reduce((s, d) => s + d.valor, 0)) },
     responsaveis: responsaveisSet, pagadores: [...pagadoresAgg.entries()].map(([nome, valor]) => ({ nome, valor })),
     observacao: obr.observacoes ?? null,
+    documentos,
   }
 }
 

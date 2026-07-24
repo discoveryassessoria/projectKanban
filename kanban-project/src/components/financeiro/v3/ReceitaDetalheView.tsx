@@ -9,16 +9,18 @@
 // ============================================================================
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import RegistrarPagamentoModal from "@/src/components/financeiro/v3/RegistrarPagamentoModal"
 import { NovaFaturaModal } from "@/src/components/kanban/NovaFaturaModal"
+import { uploadFiles } from "@/src/lib/storage"
 import {
   ArrowLeft, ExternalLink, MoreVertical, Copy, ChevronDown, ChevronUp,
   Receipt, CreditCard, Wallet, FileCheck, Clock, Search, SlidersHorizontal, Calendar,
   Plus, Pencil, ChevronLeft, ChevronRight, UserPlus, ArrowDownCircle, CheckCircle2,
   Info as InfoIcon, X, AlertTriangle, Send, FileText, Loader2, ChevronRight as ChevronRightSm,
+  Download, File as FileIcon,
 } from "lucide-react"
 
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
@@ -27,6 +29,7 @@ const dataBR = (s?: string | null) => s ? new Date(s).toLocaleDateString("pt-BR"
 const horaBR = (s?: string | null) => s ? new Date(s).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""
 const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 const iniciais = (n?: string | null) => (n ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?"
+const fmtTamanho = (b?: number | null) => { if (b == null) return null; if (b < 1024) return `${b} B`; if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`; return `${(b / (1024 * 1024)).toFixed(1)} MB` }
 
 // classe do badge de status (amber A VENCER · red VENCIDO · blue PARCIAL · green QUITADO)
 const statusCls = (s?: string | null) => {
@@ -65,6 +68,8 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const [pResp, setPResp] = useState("TODAS")
   const [pBusca, setPBusca] = useState("")
   const [pPage, setPPage] = useState(1)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const carregar = useCallback(() => {
     fetch(`/api/financeiro/v3/receita/${encodeURIComponent(refParam)}`, { headers: authHeaders() })
@@ -85,6 +90,30 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
       if (!res.ok || !j.ok) alert(j?.erro || j?.motivo || `Falha ao estornar (HTTP ${res.status}).`)
       else carregar()
     } catch { alert("Falha de rede ao estornar o pagamento.") }
+  }
+
+  // Anexar documento: upload ao R2 → vincula na Receita → refetch.
+  const onSelecionarArquivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (e.target) e.target.value = "" // permite reanexar o mesmo arquivo
+    if (!file || d?.receitaId == null) return
+    setUploading(true)
+    try {
+      const [enviado] = await uploadFiles([file], { prefix: "financeiro/documentos" })
+      if (!enviado) throw new Error("Falha no upload do arquivo.")
+      const res = await fetch(`/api/financeiro/receitas/${d.receitaId}/documentos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ arquivoUrl: enviado.url, arquivoNome: enviado.name, tipo: null, tamanho: enviado.size }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || !j.ok) alert(j?.error || `Falha ao vincular documento (HTTP ${res.status}).`)
+      else carregar()
+    } catch (err) {
+      alert((err as Error)?.message || "Falha ao anexar o documento.")
+    } finally {
+      setUploading(false)
+    }
   }
 
   if (erro) return <div className="p-8 text-sm text-white/68">{erro}</div>
@@ -136,6 +165,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const dist: any[] = d.distribuicaoRequerentes ?? []
   const divisaoIgual = dist.length > 1 && new Set(dist.map((r) => Math.round(Number(r.percentual)))).size === 1
   const historico: any[] = d.historico ?? []
+  const documentos: any[] = d.documentos ?? []
 
   // botão de ação para "Próximas ações"
   const acaoBotao = (acao: string) => {
@@ -163,7 +193,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const tabs: [string, string, any, number][] = [
     ["cobrancas", "Cobranças", CreditCard, rp.total],
     ["pagamentos", "Pagamentos", Wallet, (d.pagamentos ?? []).length],
-    ["documentos", "Documentos", FileCheck, 0],
+    ["documentos", "Documentos", FileCheck, documentos.length],
     ["timeline", "Timeline", Clock, historico.length],
   ]
 
@@ -355,11 +385,26 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
               </div>
             </div>
 
-            {/* Documentos principais (placeholder — relação vem em fase posterior) */}
+            {/* Documentos principais */}
             <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
               <span className="text-sm font-semibold text-white/85">Documentos principais</span>
-              <div className="mt-3 rounded-lg border border-dashed border-white/10 bg-[#161b21] px-3 py-6 text-center text-xs text-white/40">Nenhum documento vinculado ainda</div>
-              <button disabled title="em breve" className="mt-3 w-full cursor-not-allowed rounded-lg border border-white/10 py-2 text-xs text-white/40 opacity-60">Ver todos os documentos</button>
+              {documentos.length === 0 ? (
+                <div className="mt-3 rounded-lg border border-dashed border-white/10 bg-[#161b21] px-3 py-6 text-center text-xs text-white/40">Nenhum documento vinculado ainda.</div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {documentos.slice(0, 4).map((doc: any) => (
+                    <div key={doc.id} className="flex items-center gap-2.5 rounded-lg border border-white/10 bg-[#161b21] px-3 py-2.5">
+                      <FileIcon className="h-4 w-4 shrink-0 text-white/45" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm text-white/85">{doc.nome}</div>
+                        <div className="text-[11px] text-white/40">{[doc.tipo, fmtTamanho(doc.tamanho), dataBR(doc.criadoEm)].filter(Boolean).join(" · ")}</div>
+                      </div>
+                      <a href={doc.url} target="_blank" rel="noreferrer" download title="Baixar documento" className="shrink-0 rounded-lg border border-white/10 p-1.5 text-white/45 hover:border-white/25 hover:text-white/80"><Download className="h-4 w-4" /></a>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => setTab("documentos")} className="mt-3 w-full rounded-lg border border-white/10 py-2 text-xs text-white/70 hover:border-white/25">Ver todos os documentos ({documentos.length})</button>
             </div>
 
             {/* Alertas */}
@@ -533,8 +578,32 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
           {/* Documentos */}
           {tab === "documentos" && (
             <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-              <h2 className="text-lg font-semibold text-white">Documentos</h2>
-              <div className="mt-6 rounded-lg border border-dashed border-white/10 bg-[#12161c] px-4 py-8 text-center text-sm text-white/40">Nenhum documento vinculado a esta receita.</div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">Documentos</h2><span className="rounded-full bg-[#252c35] px-2 py-0.5 text-xs text-white/70">{documentos.length}</span></div>
+                <input ref={fileInputRef} type="file" className="hidden" onChange={onSelecionarArquivo} />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading || d.receitaId == null}
+                  title={d.receitaId == null ? "Anexo disponível apenas para receitas de origem" : "Anexar documento"}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957] disabled:cursor-not-allowed disabled:opacity-50"
+                >{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} {uploading ? "Enviando…" : "Anexar documento"}</button>
+              </div>
+              {documentos.length === 0 ? (
+                <div className="mt-6 rounded-lg border border-dashed border-white/10 bg-[#12161c] px-4 py-8 text-center text-sm text-white/40">Nenhum documento vinculado a esta receita.</div>
+              ) : (
+                <div className="mt-4 space-y-2">
+                  {documentos.map((doc: any) => (
+                    <div key={doc.id} className="flex items-center gap-3 rounded-lg border border-white/10 bg-[#161b21] px-4 py-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#252c35] text-white/60"><FileIcon className="h-4.5 w-4.5" /></div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-white/90">{doc.nome}</div>
+                        <div className="mt-0.5 text-xs text-white/40">{[doc.tipo, fmtTamanho(doc.tamanho), `Anexado em ${dataBR(doc.criadoEm)}`].filter(Boolean).join(" · ")}</div>
+                      </div>
+                      <a href={doc.url} target="_blank" rel="noreferrer" download className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-white/80 hover:border-white/25"><Download className="h-4 w-4" /> Baixar</a>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

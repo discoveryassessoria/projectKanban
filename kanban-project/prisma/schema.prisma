@@ -1254,6 +1254,7 @@ model Receita {
   cobrancas     Cobranca[]          @relation("ReceitaCobrancas")
   processo      Processo            @relation(fields: [processoId], references: [id], onDelete: Cascade)
   requerentes   ReceitaRequerente[]
+  documentos    ReceitaDocumento[]
 
   personId         Int?
   pessoa           Pessoa?      @relation(fields: [personId], references: [id], onDelete: SetNull)
@@ -1541,6 +1542,23 @@ model ReceitaRequerente {
   @@unique([receitaId, idx])
   @@index([receitaId])
   @@index([requerenteId])
+}
+
+// Documentos financeiros vinculados a uma Receita (contrato, proposta, fatura,
+// comprovante...). Aditivo/reversível — não interfere no Documento (genealogia).
+model ReceitaDocumento {
+  id          Int      @id @default(autoincrement())
+  receitaId   Int
+  obrigacaoId Int?
+  arquivoUrl  String
+  arquivoNome String   @db.VarChar(255)
+  tipo        String?  @db.VarChar(60) // contrato | proposta | fatura | comprovante | recibo | outro
+  tamanho     Int?
+  criadoPorId Int?
+  criadoEm    DateTime @default(now())
+  receita     Receita  @relation(fields: [receitaId], references: [id], onDelete: Cascade)
+
+  @@index([receitaId])
 }
 
 model EventoFinanceiro {
