@@ -15,7 +15,7 @@ import {
 } from "lucide-react"
 
 interface LogItem {
-  id: number
+  id: string | number
   acao: string
   entidade: string
   entidadeId: number | null
