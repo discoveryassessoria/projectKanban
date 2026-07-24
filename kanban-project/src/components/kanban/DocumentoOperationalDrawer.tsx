@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { createPortal } from "react-dom"
-import { X, Loader2, AlertTriangle } from "lucide-react"
+import { X, Loader2, AlertTriangle, UserRound, Clock, CalendarDays, FileText } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { WorkflowTab } from "./workflow/WorkflowTab"
 import { InitOperationModal } from "./InitOperationModal"
@@ -58,21 +58,16 @@ const STATUS_LABELS: Record<string, string> = {
   NAO_ENCONTRADO: "Não encontrado",
 }
 
+// Mapeamento de cor da pílula por status (mockup): Solicitado = amber,
+// Recebido/Entregue = verde, Inválido/Não encontrado = vermelho, restante neutro.
+const STATUS_NEUTRAL_PILL = "bg-white/10 text-white/50"
 const STATUS_PILL_CLS: Record<string, string> = {
-  PENDENTE: "bg-white/25/20 text-white/40",
-  SOLICITADO: "bg-[#a78bfa]/20 text-violet-300",
-  EM_BUSCA: "bg-[#d2a948]/20 text-amber-300",
-  SOLICITAR: "bg-[#a78bfa]/20 text-violet-300",
-  RECEBIDO: "bg-emerald-500/20 text-emerald-300",
-  EM_ANALISE: "bg-[#7dd3fc]/20 text-blue-300",
-  RETIFICANDO: "bg-orange-500/20 text-orange-300",
-  EM_TRADUCAO: "bg-cyan-500/20 text-cyan-300",
-  TRADUZIDO: "bg-emerald-500/20 text-emerald-300",
-  EM_APOSTILAMENTO: "bg-cyan-500/20 text-cyan-300",
-  APOSTILADO: "bg-emerald-500/20 text-emerald-300",
-  ENTREGUE: "bg-emerald-500/20 text-emerald-300",
-  INVALIDO: "bg-[#f87171]/20 text-red-300",
-  NAO_ENCONTRADO: "bg-[#20262e]0/20 text-white/40",
+  SOLICITADO: "bg-[#d2a948]/15 text-[#d2a948]",
+  SOLICITAR: "bg-[#d2a948]/15 text-[#d2a948]",
+  RECEBIDO: "bg-[#4ade80]/15 text-[#4ade80]",
+  ENTREGUE: "bg-[#4ade80]/15 text-[#4ade80]",
+  INVALIDO: "bg-[#f87171]/15 text-[#f87171]",
+  NAO_ENCONTRADO: "bg-[#f87171]/15 text-[#f87171]",
 }
 
 // ============================================================
@@ -213,10 +208,25 @@ const computeSla = (prazo: string | null): { text: string; cls: string } => {
   if (!prazo) return { text: "—", cls: "" }
   const d = new Date(prazo), now = new Date()
   const dias = diffDays(d, now)
-  if (dias < -5) return { text: `${Math.abs(dias)}d crítico`, cls: "text-red-300" }
-  if (dias < 0) return { text: `${Math.abs(dias)}d atrasado`, cls: "text-red-300" }
-  if (dias < 1) return { text: "vence hoje", cls: "text-amber-300" }
-  return { text: `${dias} dia(s) restantes`, cls: "text-emerald-300" }
+  if (dias < -5) return { text: `${Math.abs(dias)}d crítico`, cls: "text-[#f87171]" }
+  if (dias < 0) return { text: `${Math.abs(dias)}d atrasado`, cls: "text-[#f87171]" }
+  if (dias < 1) return { text: "vence hoje", cls: "text-[#d2a948]" }
+  return { text: `${dias} dia(s) restantes`, cls: "text-[#4ade80]" }
+}
+
+// Relativo "há Xmin/Xh/N dias" para a última movimentação.
+const relativeTime = (s: string | null): string => {
+  if (!s) return ""
+  try {
+    const diff = Math.max(0, Date.now() - new Date(s).getTime())
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return "agora há pouco"
+    if (mins < 60) return `há ${mins}min`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `há ${hrs}h`
+    const days = Math.floor(hrs / 24)
+    return `há ${days} dia${days === 1 ? "" : "s"}`
+  } catch { return "" }
 }
 
 // ============================================================
@@ -381,7 +391,7 @@ export function DocumentoOperationalDrawer({
   if (!isOpen) return null
 
   const sla = doc ? computeSla(doc.dataPrazoOperacao) : { text: "—", cls: "" }
-  const statusCls = doc ? (STATUS_PILL_CLS[doc.status] || "bg-[#20262e]0/20 text-white/40") : ""
+  const statusCls = doc ? (STATUS_PILL_CLS[doc.status] || STATUS_NEUTRAL_PILL) : ""
   const tipoLabel = doc ? (TIPO_LABELS[doc.tipo] || doc.tipo) : ""
   const statusLabel = doc ? (STATUS_LABELS[doc.status] || doc.status) : ""
 
@@ -428,9 +438,9 @@ export function DocumentoOperationalDrawer({
               <Loader2 className="w-4 h-4 animate-spin" />
               <span className="text-[12px]">Carregando operação…</span>
             </div>
-            <div className="h-16 rounded-lg bg-[#1b2027]/5 animate-pulse" />
-            <div className="h-24 rounded-lg bg-[#1b2027]/5 animate-pulse" />
-            <div className="h-40 rounded-lg bg-[#1b2027]/5 animate-pulse" />
+            <div className="h-16 rounded-lg bg-[#161b21] animate-pulse" />
+            <div className="h-24 rounded-lg bg-[#161b21] animate-pulse" />
+            <div className="h-40 rounded-lg bg-[#161b21] animate-pulse" />
           </div>
         )}
 
@@ -441,7 +451,7 @@ export function DocumentoOperationalDrawer({
             <p className="text-sm">{erro || "Não foi possível abrir a operação."}</p>
             <button
               onClick={onClose}
-              className="px-3 py-1.5 text-xs bg-[#1b2027]/10 hover:bg-[#1b2027]/15 rounded-md"
+              className="px-3 py-1.5 text-xs bg-[#20262e] hover:bg-[#252c35] rounded-md"
             >
               Fechar
             </button>
@@ -455,45 +465,57 @@ export function DocumentoOperationalDrawer({
               className="flex-shrink-0 px-6 pt-5 pb-4 border-b border-white/10"
               style={{ background: "linear-gradient(180deg,#181d24 0%,#11151b 100%)" }}
             >
-              <div className="flex items-center justify-between mb-3.5">
+              {/* Breadcrumb + fechar */}
+              <div className="flex items-center justify-between mb-4">
                 {onBack ? (
                   <button
                     onClick={onBack}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/70 hover:text-white transition-colors -ml-1 px-1 py-0.5 rounded hover:bg-[#1b2027]/5"
+                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/70 hover:text-white transition-colors -ml-1 px-1 py-0.5 rounded hover:bg-[#20262e]"
                   >
                     <span className="text-[14px] leading-none">←</span>
                     {backLabel || nomeCompleto(doc.pessoa)}
                   </button>
                 ) : (
-                  <div className="text-[10px] uppercase font-semibold tracking-wider text-white/50">
-                    Central Operacional · {nomeCompleto(doc.pessoa)}
+                  <div className="text-[10px] uppercase tracking-wide">
+                    <span className="font-bold text-[#7dd3fc]">Central Operacional</span>
+                    <span className="text-white/50"> · {nomeCompleto(doc.pessoa)}</span>
                   </div>
                 )}
                 <button
                   onClick={onClose}
-                  className="w-[30px] h-[30px] rounded-md bg-[#1b2027]/5 hover:bg-[#1b2027]/15 flex items-center justify-center text-white"
+                  className="w-[30px] h-[30px] rounded-md bg-[#20262e] hover:bg-[#252c35] flex items-center justify-center text-white"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="text-[18px] font-bold tracking-tight leading-tight text-white mb-0.5">
-                {tipoLabel}
-              </div>
-              <div className="text-[13px] text-white/65 mb-3.5">
-                {nomeCompleto(doc.pessoa)}
+              {/* Identidade do documento: tile de ícone + título + pessoa */}
+              <div className="flex items-center gap-3.5 mb-4">
+                <div className="w-11 h-11 rounded-lg bg-[#20262e] border border-white/10 flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-5 h-5 text-white/60" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[22px] font-bold tracking-tight leading-tight text-white truncate">
+                    {tipoLabel}
+                  </div>
+                  <div className="text-sm text-white/50 truncate">
+                    {nomeCompleto(doc.pessoa)}
+                  </div>
+                </div>
               </div>
 
               {bannerAntecipada && (
-                <div className="mb-3.5 rounded-lg border border-violet-400/30 bg-[#a78bfa]/15 px-3 py-2 text-[12px] text-violet-100 flex items-start gap-2">
+                <div className="mb-4 rounded-lg border border-violet-400/30 bg-[#a78bfa]/15 px-3 py-2 text-[12px] text-violet-100 flex items-start gap-2">
                   <span className="text-[13px] leading-none mt-0.5">⇄</span>
                   <span>{bannerAntecipada}</span>
                 </div>
               )}
 
-              <div className="grid grid-cols-4 gap-3.5 mb-3">
-                <div className="flex flex-col gap-0.5">
-                  <div className="text-[9.5px] uppercase font-semibold tracking-wider text-white/45">
+              {/* STATUS BAR — card sólido único, 4 colunas */}
+              <div className="bg-[#161b21] border border-white/10 rounded-xl px-4 py-3.5 grid grid-cols-4 gap-4">
+                {/* STATUS */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">
                     Status
                   </div>
                   <div>
@@ -503,28 +525,46 @@ export function DocumentoOperationalDrawer({
                     </span>
                   </div>
                 </div>
-                <div className="flex flex-col gap-0.5">
-                  <div className="text-[9.5px] uppercase font-semibold tracking-wider text-white/45">
+                {/* RESPONSÁVEL */}
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">
                     Responsável
                   </div>
-                  <div className="text-[13px] font-semibold text-white truncate">
-                    {doc.responsavel?.nome || "Não atribuído"}
+                  <div className="flex items-center gap-1.5 text-[13px] text-white/85 min-w-0">
+                    <UserRound className="w-4 h-4 text-white/50 flex-shrink-0" />
+                    <span className="truncate">{doc.responsavel?.nome || "Não atribuído"}</span>
                   </div>
+                  <button
+                    onClick={() => setActiveTab("operation")}
+                    className="self-start text-[#7dd3fc] text-[12px] hover:underline"
+                  >
+                    Delegar
+                  </button>
                 </div>
-                <div className="flex flex-col gap-0.5">
-                  <div className="text-[9.5px] uppercase font-semibold tracking-wider text-white/45">
+                {/* SLA */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">
                     SLA
                   </div>
-                  <div className={`text-[13px] font-semibold ${sla.cls || "text-white"}`}>
-                    {sla.text}
+                  <div className={`flex items-center gap-1.5 text-[13px] font-semibold ${sla.cls || "text-white/85"}`}>
+                    <Clock className="w-4 h-4 flex-shrink-0" />
+                    <span>{sla.text}</span>
+                  </div>
+                  <div className="text-white/40 text-[11px]">
+                    Prazo: {fmtDateTime(doc.dataPrazoOperacao)}
                   </div>
                 </div>
-                <div className="flex flex-col gap-0.5">
-                  <div className="text-[9.5px] uppercase font-semibold tracking-wider text-white/45">
+                {/* ÚLTIMA MOVIMENTAÇÃO */}
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">
                     Última movimentação
                   </div>
-                  <div className="text-[11.5px] font-bold text-white font-mono">
-                    {fmtDateTime(doc.ultimaMovimentacao || doc.updatedAt)}
+                  <div className="flex items-center gap-1.5 text-[13px] text-white/85 min-w-0">
+                    <CalendarDays className="w-4 h-4 text-white/50 flex-shrink-0" />
+                    <span className="truncate">{fmtDateTime(doc.ultimaMovimentacao || doc.updatedAt)}</span>
+                  </div>
+                  <div className="text-white/40 text-[11px]">
+                    {relativeTime(doc.ultimaMovimentacao || doc.updatedAt)}
                   </div>
                 </div>
               </div>
@@ -554,14 +594,14 @@ export function DocumentoOperationalDrawer({
                   onClick={() => setActiveTab(t.id)}
                   className={`flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 text-[11.5px] font-semibold border-b-2 transition-colors -mb-px ${
                     activeTab === t.id
-                      ? "text-white border-blue-500"
-                      : "text-white/55 hover:text-white border-transparent"
+                      ? "text-[#7dd3fc] border-[#7dd3fc]"
+                      : "text-white/55 hover:text-white/80 border-transparent"
                   }`}
                 >
                   {t.label}
                   {t.count !== undefined && (
                     <span className={`text-[9.5px] px-1.5 rounded-full font-bold ${
-                      activeTab === t.id ? "bg-[#7dd3fc]/30 text-blue-200" : "bg-[#1b2027]/10 text-white/70"
+                      activeTab === t.id ? "bg-[#7dd3fc]/30 text-blue-200" : "bg-[#20262e] text-white/70"
                     }`}>
                       {t.count}
                     </span>
@@ -707,7 +747,7 @@ function TabOperation({
   }
 
   const inputDarkCls =
-    "w-full bg-[#1b2027]/5 border border-white/10 rounded-md px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30"
+    "w-full bg-[#12161c] border border-white/10 rounded-md px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30"
 
   return (
     <div className="space-y-5">
@@ -890,7 +930,7 @@ function TabHistory({ doc }: { doc: Documento }) {
       <Section title="Timeline do documento">
         <div className="space-y-2.5">
           {eventos.map((e, i) => (
-            <div key={i} className="flex items-start gap-3 p-2.5 rounded-md bg-[#1b2027]/5 border border-white/5">
+            <div key={i} className="flex items-start gap-3 p-2.5 rounded-md bg-[#161b21] border border-white/5">
               <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-white">{e.label}</div>
@@ -949,7 +989,7 @@ function GridFields({ fields }: { fields: Array<[string, string | null | undefin
 function Placeholder({ titulo, descricao, pendencia }: { titulo: string; descricao: string; pendencia: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
-      <div className="w-12 h-12 rounded-full bg-[#1b2027]/5 border border-white/10 flex items-center justify-center mb-4">
+      <div className="w-12 h-12 rounded-full bg-[#161b21] border border-white/10 flex items-center justify-center mb-4">
         <AlertTriangle className="w-5 h-5 text-amber-400/70" />
       </div>
       <div className="text-base font-semibold text-white mb-2">{titulo}</div>

@@ -229,8 +229,9 @@ export function WorkflowMacroTrilha({
                   )}
                 </div>
 
-                {/* nome */}
-                <span className="text-[11px] font-semibold text-white/95 text-center leading-tight min-h-[26px] flex items-center">
+                {/* nome — altura fixa p/ que badges e % de TODAS as fases fiquem alinhados
+                    na mesma linha, independente de o título ter 1, 2 ou 3 linhas */}
+                <span className="text-[11px] font-semibold text-white/95 text-center leading-tight h-[42px] flex items-center justify-center">
                   {title}
                 </span>
 

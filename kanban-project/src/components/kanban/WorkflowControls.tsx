@@ -125,83 +125,83 @@ export function WorkflowControls({
   // ============================================================
 
   return (
-    <div className="px-6 pb-4 pt-1 border-b border-white/5 bg-slate-900/50">
+    <div className="px-6 py-3 border-b border-white/10" style={{ background: "#11151b" }}>
+      <div className="bg-[#161b21] border border-white/10 rounded-xl px-4 py-3.5">
 
-      {/* Barra de progresso */}
-      <div className="mb-3">
-        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+        {/* Barra de progresso */}
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+            Progresso operacional
+          </span>
+          <span className="text-[11px] font-mono text-white/50">
+            {progress}% · {isCancelado && cancelledAt ? `Cancelado em ${cancelledAt}` : `Iniciado em ${startedAt}`}
+          </span>
+        </div>
+        <div className="h-1.5 bg-[#252c35] rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-500"
+            className="h-full bg-[#2563eb] rounded-full transition-all duration-500"
             style={{ width: `${progress}%` }}
           />
         </div>
-        <div className="flex justify-between items-center mt-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-white/50">
-            Progresso operacional
-          </span>
-          <span className="text-[10px] font-mono text-white/60">
-            {progress}% · {isCancelado && cancelledAt ? `cancelado em ${cancelledAt}` : `iniciado em ${startedAt}`}
-          </span>
-        </div>
+
+        {/* Banner de status */}
+        {isPausado && (
+          <div className="mt-3 px-3 py-2 bg-amber-500/15 border border-amber-500/30 rounded-md text-[11px] text-amber-200 flex items-center gap-2">
+            <Pause className="w-3 h-3 flex-shrink-0" />
+            <span><strong>Operação PAUSADA</strong> · use Retomar quando estiver pronto pra continuar</span>
+          </div>
+        )}
+        {isCancelado && (
+          <div className="mt-3 px-3 py-2 bg-red-500/15 border border-red-500/30 rounded-md text-[11px] text-red-200 flex items-center gap-2">
+            <Ban className="w-3 h-3 flex-shrink-0" />
+            <span><strong>Operação CANCELADA</strong> · documento voltou pra fila de pendentes</span>
+          </div>
+        )}
+
+        {/* Botões (só aparecem se workflow não está cancelado) */}
+        {!isCancelado && (
+          <div className="flex gap-2 flex-wrap mt-3.5">
+            {isAndamento && (
+              <button
+                onClick={handlePausar}
+                disabled={!!actionLoading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[#2563eb]/50 text-[#7dd3fc] bg-transparent hover:bg-[#2563eb]/10"
+              >
+                {actionLoading === "pausar" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Pause className="w-3 h-3" />}
+                Pausar operação
+              </button>
+            )}
+            {isPausado && (
+              <button
+                onClick={handleRetomar}
+                disabled={!!actionLoading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[#4ade80]/40 text-[#4ade80] bg-transparent hover:bg-[#4ade80]/10"
+              >
+                {actionLoading === "retomar" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                Retomar operação
+              </button>
+            )}
+            <button
+              onClick={() => setConfirmAction("cancelar")}
+              disabled={!!actionLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-white/12 text-white/80 bg-[#20262e] hover:bg-[#252c35]"
+            >
+              <X className="w-3 h-3" />
+              Cancelar operação
+            </button>
+            {isAndamento && (
+              <button
+                onClick={() => setConfirmAction("invalidar")}
+                disabled={!!actionLoading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[#f87171]/40 text-[#f87171] bg-transparent hover:bg-[#f87171]/10"
+              >
+                <Ban className="w-3 h-3" />
+                Invalidar operação
+              </button>
+            )}
+          </div>
+        )}
       </div>
-
-      {/* Banner de status */}
-      {isPausado && (
-        <div className="mb-3 px-3 py-2 bg-amber-500/15 border border-amber-500/30 rounded-md text-[11px] text-amber-200 flex items-center gap-2">
-          <Pause className="w-3 h-3 flex-shrink-0" />
-          <span><strong>Operação PAUSADA</strong> · use Retomar quando estiver pronto pra continuar</span>
-        </div>
-      )}
-      {isCancelado && (
-        <div className="mb-3 px-3 py-2 bg-red-500/15 border border-red-500/30 rounded-md text-[11px] text-red-200 flex items-center gap-2">
-          <Ban className="w-3 h-3 flex-shrink-0" />
-          <span><strong>Operação CANCELADA</strong> · documento voltou pra fila de pendentes</span>
-        </div>
-      )}
-
-      {/* Botões (só aparecem se workflow não está cancelado) */}
-      {!isCancelado && (
-        <div className="flex gap-1.5 flex-wrap">
-          {isAndamento && (
-            <button
-              onClick={handlePausar}
-              disabled={!!actionLoading}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-white/85 bg-white/8 hover:bg-white/15 border border-white/10 rounded-md transition-colors disabled:opacity-50"
-            >
-              {actionLoading === "pausar" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Pause className="w-3 h-3" />}
-              Pausar operação
-            </button>
-          )}
-          {isPausado && (
-            <button
-              onClick={handleRetomar}
-              disabled={!!actionLoading}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-md transition-colors disabled:opacity-50"
-            >
-              {actionLoading === "retomar" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-              Retomar operação
-            </button>
-          )}
-          <button
-            onClick={() => setConfirmAction("cancelar")}
-            disabled={!!actionLoading}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-white/85 bg-white/8 hover:bg-white/15 border border-white/10 rounded-md transition-colors disabled:opacity-50"
-          >
-            <X className="w-3 h-3" />
-            Cancelar operação
-          </button>
-          {isAndamento && (
-            <button
-              onClick={() => setConfirmAction("invalidar")}
-              disabled={!!actionLoading}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-white/85 bg-white/8 hover:bg-white/15 border border-white/10 rounded-md transition-colors disabled:opacity-50"
-            >
-              <Ban className="w-3 h-3" />
-              Invalidar operação
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Modal de Cancelar/Invalidar — reproduz fielmente o openOpManageModal do mockup */}
       <OpManageModal

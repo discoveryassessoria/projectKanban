@@ -290,8 +290,8 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
         total: 0,
         responsavel: q.responsavelNome,
         proximaAcao: q.noOwner
-          ? { txt: "Solicitar certidão", cls: "crit", semResp: true }
-          : { txt: q.proximoPasso === "normal" ? "Solicitar certidão" : (q.proximoPasso || "—") },
+          ? { txt: "Solicitar certidão", cls: "crit", semResp: true, sub: "Aguardando solicitação" }
+          : { txt: q.proximoPasso === "normal" ? "Solicitar certidão" : (q.proximoPasso || "—"), sub: "Aguardando solicitação" },
         docs: [],
       })
     }

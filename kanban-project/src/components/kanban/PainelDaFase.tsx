@@ -30,6 +30,9 @@ import {
   Star,
   Users,
   ArrowLeftRight,
+  UserRound,
+  Ban,
+  CalendarDays,
 } from "lucide-react"
 import { FASES } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
@@ -87,7 +90,7 @@ export interface FasePersonRow {
   validados: number
   total: number
   responsavel?: string | null
-  proximaAcao?: { txt: string; cls?: "crit" | "" ; semResp?: boolean } | null
+  proximaAcao?: { txt: string; cls?: "crit" | "" ; semResp?: boolean; sub?: string | null } | null
   docs: FaseDocRow[]
 }
 
@@ -288,7 +291,8 @@ export function PainelDaFase({
         <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: `repeat(${kpis.length}, 1fr)` }}>
           {kpis.map((k, i) => {
             const valColor =
-              k.tone === "ok" ? "text-[#4ade80]"
+              k.label === "Solicitados" ? "text-[#7dd3fc]"
+              : k.tone === "ok" ? "text-[#4ade80]"
               : k.tone === "busca" ? "text-[#d2a948]"
               : k.tone === "late" ? "text-[#f87171]"
               : "text-white/95"
@@ -323,15 +327,25 @@ export function PainelDaFase({
           {/* Cabeçalho de colunas */}
           <div
             className="grid items-center gap-2.5 px-5 py-2.5 text-[10px] font-bold text-white/40 uppercase tracking-wider bg-[#20262e] border-b border-white/10"
-            style={{ gridTemplateColumns: "52px minmax(160px,1.6fr) 1fr 1.2fr 0.9fr 1.2fr 124px" }}
+            style={{ gridTemplateColumns: "52px minmax(160px,1.6fr) 1fr 1.2fr 1fr 0.7fr 1.2fr 124px" }}
           >
-            <div>G</div>
-            <div>Pessoa</div>
-            <div>Transmissão</div>
-            <div>Documentos</div>
-            <div>Responsável</div>
-            <div>Próxima ação</div>
-            <div className="text-right">Ação</div>
+            <div />
+            <div>
+              PESSOA
+              <div className="text-[9px] font-semibold text-white/25 normal-case tracking-normal mt-0.5">Linha / Código</div>
+            </div>
+            <div>
+              TRANSMISSÃO
+              <div className="text-[9px] font-semibold text-white/25 normal-case tracking-normal mt-0.5">Status</div>
+            </div>
+            <div>
+              DOCUMENTOS
+              <div className="text-[9px] font-semibold text-white/25 normal-case tracking-normal mt-0.5">Solicitados / Recebidos</div>
+            </div>
+            <div>RESPONSÁVEL</div>
+            <div>PRAZO</div>
+            <div>PRÓXIMA AÇÃO</div>
+            <div className="text-right">AÇÃO</div>
           </div>
 
           {/* Grupo Linha Principal */}
@@ -433,11 +447,16 @@ function PersonRow({
 
   const pctVal = p.total > 0 ? Math.round((p.validados / p.total) * 100) : 0
 
+  // Delegação em nível de pessoa: aplica a TODAS as necessidades dos documentos.
+  const necIds = p.docs.map((d) => d.necessidadeId).filter((v): v is number => v != null)
+  const respIds = new Set(p.docs.map((d) => d.responsavelId ?? null))
+  const commonResp = respIds.size === 1 ? [...respIds][0] : null
+
   return (
     <>
       <div
         className={`grid items-center gap-2.5 px-5 py-3 border-b border-white/10 hover:bg-[#20262e] transition-colors ${borderCls}`}
-        style={{ gridTemplateColumns: "52px minmax(160px,1.6fr) 1fr 1.2fr 0.9fr 1.2fr 124px" }}
+        style={{ gridTemplateColumns: "52px minmax(160px,1.6fr) 1fr 1.2fr 1fr 0.7fr 1.2fr 124px" }}
       >
         {/* G */}
         <div className="text-center text-[11px] font-extrabold text-white/55 bg-[#1b2027] border border-white/10 rounded-lg py-1.5 leading-tight">
@@ -501,22 +520,53 @@ function PersonRow({
         </div>
 
         {/* Responsável */}
-        <div className="text-[12px] font-bold text-white/85">
+        <div className="text-[12px]">
           {p.responsavel ? (
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-white/25" />
-              {p.responsavel.toUpperCase()}
+            <div className="flex items-center gap-1.5 font-bold text-white/85">
+              <span className="w-1.5 h-1.5 rounded-full bg-white/25 flex-none" />
+              {p.responsavel}
             </div>
           ) : (
-            <span className="font-medium text-white/85">sem responsável</span>
+            <div className="flex items-center gap-1.5 text-white/60 font-semibold">
+              <UserRound className="w-3.5 h-3.5 flex-none" />
+              Sem responsável
+            </div>
+          )}
+          {!readOnly && onDelegar && usuarios && usuarios.length > 0 && necIds.length > 0 && (
+            <select
+              value={commonResp ?? ""}
+              onChange={(e) => {
+                const v = e.target.value ? Number(e.target.value) : null
+                necIds.forEach((nid) => onDelegar(nid, v))
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className={`mt-1 text-[12px] rounded-md border px-1.5 py-1 bg-[#1b2027] max-w-[150px] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 ${commonResp ? "text-white/80 border-white/10" : "text-white/40 border-dashed border-white/15"}`}
+              title="Delegar responsável"
+            >
+              <option value="">Delegar…</option>
+              {usuarios.map((u) => (
+                <option key={u.id} value={u.id}>{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>
+              ))}
+            </select>
           )}
         </div>
 
-        {/* Próxima ação — somente a ação */}
-        <div className="text-[13px] font-semibold text-white/55">
-          <div className={p.proximaAcao?.cls === "crit" ? "text-white/80 font-semibold" : ""}>
-            {p.proximaAcao?.txt || <span className="text-white/40">—</span>}
-          </div>
+        {/* Prazo — vazio para a linha da pessoa */}
+        <div />
+
+        {/* Próxima ação — ação + subtítulo */}
+        <div>
+          {p.proximaAcao?.txt ? (
+            <>
+              <div className="flex items-center gap-1.5">
+                {p.proximaAcao.cls === "crit" && <Ban className="text-[#f87171] w-3.5 h-3.5 flex-none" />}
+                <span className="text-white/90 font-semibold text-[13px]">{p.proximaAcao.txt}</span>
+              </div>
+              <div className="text-[11px] text-white/40 mt-0.5">{p.proximaAcao.sub || "Aguardando solicitação"}</div>
+            </>
+          ) : (
+            <span className="text-white/40">—</span>
+          )}
         </div>
 
         {/* Ação */}
@@ -545,59 +595,75 @@ function PersonRow({
         return (
           <div key={d.id}>
           <div
-            className="grid items-center gap-3 border-t border-white/10 py-3 pr-5"
-            style={{ gridTemplateColumns: "minmax(200px,2fr) 0.9fr 1fr 0.8fr 1.2fr 124px", paddingLeft: 76 }}
+            className="grid items-center gap-2.5 border-t border-white/10 py-3 px-5"
+            style={{ gridTemplateColumns: "52px minmax(160px,1.6fr) 1fr 1.2fr 1fr 0.7fr 1.2fr 124px" }}
           >
-            {/* Nome do doc */}
+            {/* (1) G — vazio */}
+            <div />
+
+            {/* (2) Pessoa — nome do doc (indenta sob Pessoa) */}
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-lg bg-[#1b2027] border border-white/10 grid place-items-center text-white/55 flex-none">
                 <FileText className="w-3.5 h-3.5" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <b className="text-[13px] font-bold block leading-tight">{d.tipoLabel}</b>
                 <span className="text-[11px] text-white/40">{d.subtitulo || "Inteiro teor"}</span>
               </div>
             </div>
 
-            {/* Status pill */}
-            <div>
-              <span className={`inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full uppercase ${pillCls(d.statusCls)}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${docDot(d.statusCls)}`} />
-                {d.statusLabel}
-              </span>
+            {/* (3) Transmissão — vazio */}
+            <div />
+
+            {/* (4) Documentos — vazio */}
+            <div />
+
+            {/* (5) Responsável — "Sem responsável" + seletor de delegação */}
+            <div className="text-[12px]">
+              {d.responsavel ? (
+                <div className="flex items-center gap-1.5 font-semibold text-white/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/25 flex-none" />
+                  {d.responsavel}
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-white/60 font-semibold">
+                  <UserRound className="w-3.5 h-3.5 flex-none" />
+                  Sem responsável
+                </div>
+              )}
+              {onDelegar && usuarios && usuarios.length > 0 && d.necessidadeId != null ? (
+                <select
+                  value={d.responsavelId ?? ""}
+                  onChange={(e) => onDelegar(d.necessidadeId as number, e.target.value ? Number(e.target.value) : null)}
+                  onClick={(e) => e.stopPropagation()}
+                  className={`mt-1 text-[12px] rounded-md border px-1.5 py-1 bg-[#1b2027] max-w-[150px] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 ${d.responsavelId ? "text-white/80 border-white/10" : "text-white/40 border-dashed border-white/15"}`}
+                  title="Delegar responsável"
+                >
+                  <option value="">Delegar…</option>
+                  {usuarios.map((u) => (
+                    <option key={u.id} value={u.id}>{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>
+                  ))}
+                </select>
+              ) : null}
             </div>
 
-            {/* Responsável — seletor de delegação quando disponível */}
-            {onDelegar && usuarios && usuarios.length > 0 && d.necessidadeId != null ? (
-              <select
-                value={d.responsavelId ?? ""}
-                onChange={(e) => onDelegar(d.necessidadeId as number, e.target.value ? Number(e.target.value) : null)}
-                onClick={(e) => e.stopPropagation()}
-                className={`text-[12px] rounded-md border px-1.5 py-1 bg-[#1b2027] max-w-[150px] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 ${d.responsavelId ? "text-white/80 border-white/10" : "text-white/40 border-dashed border-white/15"}`}
-                title="Delegar responsável"
-              >
-                <option value="">Delegar…</option>
-                {usuarios.map((u) => (
-                  <option key={u.id} value={u.id}>{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>
-                ))}
-              </select>
-            ) : (
-              <span className={`text-[12px] ${d.responsavel ? "text-white/80" : "text-white/40"}`}>
-                {d.responsavel || "—"}
-              </span>
-            )}
+            {/* (6) Prazo — SLA + rótulo */}
+            <div>
+              {d.sla ? (
+                <>
+                  <div className="flex items-center gap-1.5 text-[12px] text-white/80">
+                    <CalendarDays className="w-3.5 h-3.5 text-white/40 flex-none" />
+                    {d.sla}
+                  </div>
+                  <div className="text-[11px] text-white/40 mt-0.5">Prazo</div>
+                </>
+              ) : (
+                <span className="text-[12px] text-white/40">—</span>
+              )}
+            </div>
 
-            {/* SLA */}
-            <span className={`text-[12px] ${d.sla ? "text-white/80" : "text-white/40"}`}>
-              {d.sla || "—"}
-            </span>
-
-            {/* Próxima ação */}
-            <span className="text-[12px] text-white/68">{d.proximaAcao || "—"}</span>
-
-            {/* Botão — em consulta (readOnly) não há ação de mutação; só o status acima. */}
-            <div className="flex justify-end items-center gap-2">
-              {/* Ação DISCRETA: nova Operação Antecipada p/ atender esta necessidade via operação oficial de outra fase. */}
+            {/* (7) Próxima ação — botão "+ Operação antecipada" */}
+            <div>
               {!readOnly && onNovaOperacao && d.necessidadeId != null && !d.emissaoConcluida && (
                 <button
                   onClick={() => onNovaOperacao(d.necessidadeId as number, p.pessoaId ?? null, `${d.tipoLabel}${d.subtitulo ? " · " + d.subtitulo : ""} — ${p.nome}`)}
@@ -607,6 +673,10 @@ function PersonRow({
                   + Operação antecipada
                 </button>
               )}
+            </div>
+
+            {/* (8) Ação — botão abrir/ver/somente leitura */}
+            <div className="flex justify-end items-center gap-2">
               {readOnly || !onAbrirOperacao ? (
                 <span className="text-[11px] font-semibold text-white/40 px-3 py-2">Somente leitura</span>
               ) : (
@@ -742,9 +812,14 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
 
 function docCls(cls: string): string {
   switch (cls) {
+    case "localizado":
+    case "validado":
+    case "recebido": return "text-[#4ade80]"
+    case "em_busca":
+    case "solicitado": return "text-[#d2a948]"
     case "bloqueado": return "text-[#f87171]"
     case "desnecessario": return "text-white/40"
-    default: return "text-white/85"
+    default: return "text-white/40"
   }
 }
 
@@ -760,15 +835,3 @@ function docDot(cls: string): string {
   }
 }
 
-function pillCls(cls: string): string {
-  switch (cls) {
-    case "localizado":
-    case "validado":
-    case "recebido": return "bg-[#4ade80]/15 text-[#4ade80]"
-    case "em_busca":
-    case "solicitado": return "bg-[#d2a948]/15 text-[#d2a948]"
-    case "bloqueado": return "bg-[#f87171]/15 text-[#f87171]"
-    case "desnecessario": return "bg-[#252c35] text-white/40"
-    default: return "bg-[#252c35] text-white/55"
-  }
-}
