@@ -979,7 +979,9 @@ export function ProcessoDetailsModal({
           )}
 
           {activeTab === "faturas" && pode('financeiro.ver') && (
-            <ProcessoFinanceiroShell processoId={processo.id} />
+            <div className="h-full min-h-0 overflow-y-auto p-6">
+              <ProcessoFinanceiroShell processoId={processo.id} />
+            </div>
           )}
 
           {activeTab === "eventos" && (
