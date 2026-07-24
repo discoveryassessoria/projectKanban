@@ -484,9 +484,9 @@ export function ProcessoDetailsModal({
     { id: "historico", label: "Histórico" },
   ]
 
-  // A aba Financeiro do Processo usa o tema escuro/dourado da referência.
-  // As demais abas permanecem exatamente como estão (tema claro).
-  const finDark = activeTab === "faturas"
+  // Abas com o Discovery Design System (dark glass/dourado). As demais permanecem
+  // no tema claro. Skin only — layout idêntico.
+  const finDark = activeTab === "faturas" || activeTab === "geral"
 
   const modalContent = (
     <>
@@ -571,24 +571,24 @@ export function ProcessoDetailsModal({
           {activeTab === "geral" && (
             <div className="grid grid-cols-2 h-full overflow-hidden">
               {/* ========== COLUNA ESQUERDA - SOBRE O NEGÓCIO ========== */}
-              <div className="border-r overflow-y-auto p-6 min-h-0">
+              <div className="border-r border-white/10 overflow-y-auto p-6 min-h-0">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                  <h2 className="text-sm font-semibold text-white/40 uppercase tracking-wide">
                     Sobre o Negócio
                   </h2>
                   {!isEditing ? (
                     pode('processos.editar') && (
-                      <button 
+                      <button
                         onClick={() => setIsEditing(true)}
-                        className="text-sm text-blue-600 hover:text-blue-700"
+                        className="text-sm text-[#7dd3fc] hover:text-[#a5e0fc]"
                       >
                         editar
                       </button>
                     )
                   ) : (
-                    <button 
+                    <button
                       onClick={handleCancelEdit}
-                      className="text-sm text-gray-500 hover:text-gray-700"
+                      className="text-sm text-white/55 hover:text-white/80"
                     >
                       cancelar
                     </button>
@@ -600,48 +600,48 @@ export function ProcessoDetailsModal({
                   <>
                     {/* Etapa */}
                     <div className="mb-6">
-                      <label className="text-xs text-gray-500 uppercase">Etapa</label>
-                      <p className="text-gray-900 font-medium">
+                      <label className="text-xs text-white/40 uppercase">Etapa</label>
+                      <p className="text-white/95 font-medium">
                         {processo.faseAtualKey ?? "—"}
                       </p>
                     </div>
 
                     {/* País */}
                     <div className="mb-6">
-                      <label className="text-xs text-gray-500 uppercase">País</label>
-                      <p className="text-gray-900 font-medium">{paisConfig.label}</p>
+                      <label className="text-xs text-white/40 uppercase">País</label>
+                      <p className="text-white/95 font-medium">{paisConfig.label}</p>
                     </div>
 
                     {/* Contratantes - ✅ ORDENADOS ALFABETICAMENTE */}
                     <div className="mb-6">
-                      <label className="text-xs text-gray-500 uppercase mb-2 block">Contratantes</label>
+                      <label className="text-xs text-white/40 uppercase mb-2 block">Contratantes</label>
                       {contratantesSelecionados.length > 0 ? (
                         <div className="space-y-3">
                           {[...contratantesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((cont) => (
-                            <div 
-                              key={cont.id} 
+                            <div
+                              key={cont.id}
                               onClick={() => pode('clientes.ver') && abrirDetalhesCliente(cont, "contratante")}
-                              className={`p-4 bg-gray-50 rounded-lg transition-colors ${pode('clientes.ver') ? 'hover:bg-gray-100 cursor-pointer' : 'cursor-default'}`}
+                              className={`p-4 bg-white/[0.03] border border-white/10 rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-white/[0.06] cursor-pointer' : 'cursor-default'}`}
                             >
-                              <p className="text-gray-900 font-semibold">{cont.publicCode ? cont.publicCode + ' — ' : ''}{cont.nome}</p>
-                              
+                              <p className="text-white/95 font-semibold">{cont.publicCode ? cont.publicCode + ' — ' : ''}{cont.nome}</p>
+
                               {cont.telefone && (
-                                <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
+                                <div className="flex items-center gap-2 text-sm text-white/55 mt-2">
                                   <Phone className="h-4 w-4" />
                                   <span>{cont.telefone}</span>
                                 </div>
                               )}
-                              
+
                               {cont.email && (
-                                <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
+                                <div className="flex items-center gap-2 text-sm text-white/55 mt-1">
                                   <Mail className="h-4 w-4" />
                                   <span>{cont.email}</span>
                                 </div>
                               )}
-                              
+
                               {cont.endereco && (
-                                <div 
-                                  className="flex items-start gap-2 text-sm text-gray-600 mt-2"
+                                <div
+                                  className="flex items-start gap-2 text-sm text-white/55 mt-2"
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <MapTooltip
@@ -652,7 +652,7 @@ export function ProcessoDetailsModal({
                                     estado={cont.estado}
                                     cep={cont.cep}
                                   >
-                                    <div className="flex items-start gap-2 cursor-pointer hover:text-blue-600">
+                                    <div className="flex items-start gap-2 cursor-pointer hover:text-[#7dd3fc]">
                                       <MapPin className="h-4 w-4 mt-0.5" />
                                       <div className="underline decoration-dotted underline-offset-2">
                                         <p>{cont.endereco}{cont.numero && `, ${cont.numero}`}</p>
@@ -666,13 +666,13 @@ export function ProcessoDetailsModal({
                               )}
 
                               <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
-                                <Button variant="outline" size="sm" className="text-gray-600">
+                                <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-white/70 hover:bg-white/[0.06] hover:text-white">
                                   <Phone className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="sm" className="text-gray-600">
+                                <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-white/70 hover:bg-white/[0.06] hover:text-white">
                                   <Mail className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="sm" className="text-gray-600">
+                                <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-white/70 hover:bg-white/[0.06] hover:text-white">
                                   <MessageSquare className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -680,37 +680,37 @@ export function ProcessoDetailsModal({
                           ))}
                         </div>
                       ) : (
-                        <p className="text-gray-400 italic">Nenhum contratante vinculado</p>
+                        <p className="text-white/40 italic">Nenhum contratante vinculado</p>
                       )}
                     </div>
 
                     {/* Requerentes - ✅ ORDENADOS ALFABETICAMENTE */}
                     <div className="mb-6">
-                      <label className="text-xs text-gray-500 uppercase mb-2 block">Requerentes</label>
+                      <label className="text-xs text-white/40 uppercase mb-2 block">Requerentes</label>
                       {requerentesSelecionados.length > 0 ? (
                         <div className="space-y-3">
                           {[...requerentesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((req) => (
-                            <div 
-                              key={req.id} 
+                            <div
+                              key={req.id}
                               onClick={() => pode('clientes.ver') && abrirDetalhesCliente(req, "requerente")}
-                              className={`p-3 bg-blue-50 rounded-lg transition-colors ${pode('clientes.ver') ? 'hover:bg-blue-100 cursor-pointer' : 'cursor-default'}`}
+                              className={`p-3 bg-white/[0.03] border border-white/10 rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-white/[0.06] cursor-pointer' : 'cursor-default'}`}
                             >
-                              <p className="text-gray-900 font-medium">{req.publicCode ? req.publicCode + ' — ' : ''}{req.nome}</p>
+                              <p className="text-white/95 font-medium">{req.publicCode ? req.publicCode + ' — ' : ''}{req.nome}</p>
                               {req.telefone && (
-                                <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
+                                <div className="flex items-center gap-2 text-sm text-white/55 mt-1">
                                   <Phone className="h-3 w-3" />
                                   <span>{req.telefone}</span>
                                 </div>
                               )}
                               {req.email && (
-                                <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
+                                <div className="flex items-center gap-2 text-sm text-white/55 mt-1">
                                   <Mail className="h-3 w-3" />
                                   <span>{req.email}</span>
                                 </div>
                               )}
                               {req.endereco && (
-                                <div 
-                                  className="flex items-start gap-2 text-sm text-gray-600 mt-2"
+                                <div
+                                  className="flex items-start gap-2 text-sm text-white/55 mt-2"
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <MapTooltip
@@ -721,7 +721,7 @@ export function ProcessoDetailsModal({
                                     estado={req.estado}
                                     cep={req.cep}
                                   >
-                                    <div className="flex items-start gap-2 cursor-pointer hover:text-blue-600">
+                                    <div className="flex items-start gap-2 cursor-pointer hover:text-[#7dd3fc]">
                                       <MapPin className="h-3 w-3 mt-0.5" />
                                       <div className="underline decoration-dotted underline-offset-2">
                                         <p>{req.endereco}{req.numero && `, ${req.numero}`}</p>
@@ -737,7 +737,7 @@ export function ProcessoDetailsModal({
                           ))}
                         </div>
                       ) : (
-                        <p className="text-gray-400 italic">Nenhum requerente vinculado</p>
+                        <p className="text-white/40 italic">Nenhum requerente vinculado</p>
                       )}
                     </div>
                   </>
@@ -746,29 +746,29 @@ export function ProcessoDetailsModal({
                   <>
                     {/* Nome */}
                     <div className="mb-6">
-                      <label className="text-xs text-gray-500 uppercase mb-1 block">Nome</label>
+                      <label className="text-xs text-white/40 uppercase mb-1 block">Nome</label>
                       <Input
                         value={nomeEditado}
                         onChange={(e) => setNomeEditado(e.target.value)}
-                        className="w-full"
+                        className="w-full bg-white/[0.03] border-white/15 text-white/95 placeholder:text-white/40"
                       />
                     </div>
 
                     {/* Contratantes (busca múltipla) - ✅ ORDENADOS ALFABETICAMENTE */}
                     <div className="mb-6" ref={contratanteRef}>
-                      <label className="text-xs text-gray-500 uppercase mb-1 block">Contratantes</label>
-                      
+                      <label className="text-xs text-white/40 uppercase mb-1 block">Contratantes</label>
+
                       {contratantesSelecionados.length > 0 && (
                         <div className="space-y-2 mb-3">
                           {[...contratantesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((cont) => (
-                            <div key={cont.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                            <div key={cont.id} className="flex items-center justify-between p-2 bg-white/[0.03] border border-white/10 rounded-xl">
                               <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-gray-600" />
-                                <span className="text-gray-900 text-sm">{cont.publicCode ? cont.publicCode + ' — ' : ''}{cont.nome}</span>
+                                <User className="h-4 w-4 text-white/55" />
+                                <span className="text-white/95 text-sm">{cont.publicCode ? cont.publicCode + ' — ' : ''}{cont.nome}</span>
                               </div>
-                              <button 
+                              <button
                                 onClick={() => removeContratante(cont.id)}
-                                className="text-gray-400 hover:text-red-500"
+                                className="text-white/40 hover:text-[#f87171]"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -776,24 +776,24 @@ export function ProcessoDetailsModal({
                           ))}
                         </div>
                       )}
-                      
+
                       <div className="relative">
                         <button
                           onClick={() => setShowContratanteDropdown(!showContratanteDropdown)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#7dd3fc] hover:bg-white/[0.06] rounded-md transition-colors"
                         >
                           <Plus className="h-4 w-4" />
                           Adicionar contratante
                         </button>
-                        
+
                         {showContratanteDropdown && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                            <div className="p-2 border-b">
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-[#14161a] border border-white/10 rounded-xl shadow-lg z-10">
+                            <div className="p-2 border-b border-white/10">
                               <Input
                                 placeholder="Buscar contratante..."
                                 value={buscaContratante}
                                 onChange={(e) => setBuscaContratante(e.target.value)}
-                                className="h-8 text-sm"
+                                className="h-8 text-sm bg-white/[0.03] border-white/15 text-white/95 placeholder:text-white/40"
                                 autoFocus
                               />
                             </div>
@@ -803,19 +803,19 @@ export function ProcessoDetailsModal({
                                   <button
                                     key={c.id}
                                     onClick={() => addContratante(c)}
-                                    className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
+                                    className="w-full px-4 py-2 text-left hover:bg-white/[0.06] flex items-center gap-3"
                                   >
-                                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                      <User className="h-4 w-4 text-blue-600" />
+                                    <div className="w-8 h-8 bg-[#7dd3fc]/15 rounded-full flex items-center justify-center">
+                                      <User className="h-4 w-4 text-[#7dd3fc]" />
                                     </div>
                                     <div>
-                                      <p className="font-medium text-gray-900 text-sm">{c.publicCode ? c.publicCode + ' — ' : ''}{c.nome}</p>
-                                      <p className="text-xs text-gray-500">{c.email || c.telefone}</p>
+                                      <p className="font-medium text-white/95 text-sm">{c.publicCode ? c.publicCode + ' — ' : ''}{c.nome}</p>
+                                      <p className="text-xs text-white/40">{c.email || c.telefone}</p>
                                     </div>
                                   </button>
                                 ))
                               ) : (
-                                <p className="px-4 py-3 text-sm text-gray-500 text-center">
+                                <p className="px-4 py-3 text-sm text-white/40 text-center">
                                   Nenhum contratante encontrado
                                 </p>
                               )}
@@ -827,19 +827,19 @@ export function ProcessoDetailsModal({
 
                     {/* Requerentes (busca múltipla) - ✅ ORDENADOS ALFABETICAMENTE */}
                     <div className="mb-6" ref={requerenteRef}>
-                      <label className="text-xs text-gray-500 uppercase mb-1 block">Requerentes</label>
-                      
+                      <label className="text-xs text-white/40 uppercase mb-1 block">Requerentes</label>
+
                       {requerentesSelecionados.length > 0 && (
                         <div className="space-y-2 mb-3">
                           {[...requerentesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((req) => (
-                            <div key={req.id} className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
+                            <div key={req.id} className="flex items-center justify-between p-2 bg-white/[0.03] border border-white/10 rounded-xl">
                               <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-blue-600" />
-                                <span className="text-gray-900 text-sm">{req.publicCode ? req.publicCode + ' — ' : ''}{req.nome}</span>
+                                <User className="h-4 w-4 text-[#7dd3fc]" />
+                                <span className="text-white/95 text-sm">{req.publicCode ? req.publicCode + ' — ' : ''}{req.nome}</span>
                               </div>
-                              <button 
+                              <button
                                 onClick={() => removeRequerente(req.id)}
-                                className="text-gray-400 hover:text-red-500"
+                                className="text-white/40 hover:text-[#f87171]"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -847,24 +847,24 @@ export function ProcessoDetailsModal({
                           ))}
                         </div>
                       )}
-                      
+
                       <div className="relative">
                         <button
                           onClick={() => setShowRequerenteDropdown(!showRequerenteDropdown)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#7dd3fc] hover:bg-white/[0.06] rounded-md transition-colors"
                         >
                           <Plus className="h-4 w-4" />
                           Adicionar requerente
                         </button>
-                        
+
                         {showRequerenteDropdown && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                            <div className="p-2 border-b">
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-[#14161a] border border-white/10 rounded-xl shadow-lg z-10">
+                            <div className="p-2 border-b border-white/10">
                               <Input
                                 placeholder="Buscar requerente..."
                                 value={buscaRequerente}
                                 onChange={(e) => setBuscaRequerente(e.target.value)}
-                                className="h-8 text-sm"
+                                className="h-8 text-sm bg-white/[0.03] border-white/15 text-white/95 placeholder:text-white/40"
                                 autoFocus
                               />
                             </div>
@@ -874,19 +874,19 @@ export function ProcessoDetailsModal({
                                   <button
                                     key={r.id}
                                     onClick={() => addRequerente(r)}
-                                    className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
+                                    className="w-full px-4 py-2 text-left hover:bg-white/[0.06] flex items-center gap-3"
                                   >
-                                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                      <User className="h-4 w-4 text-green-600" />
+                                    <div className="w-8 h-8 bg-[#4ade80]/15 rounded-full flex items-center justify-center">
+                                      <User className="h-4 w-4 text-[#4ade80]" />
                                     </div>
                                     <div>
-                                      <p className="font-medium text-gray-900 text-sm">{r.publicCode ? r.publicCode + ' — ' : ''}{r.nome}</p>
-                                      <p className="text-xs text-gray-500">{r.email || r.telefone}</p>
+                                      <p className="font-medium text-white/95 text-sm">{r.publicCode ? r.publicCode + ' — ' : ''}{r.nome}</p>
+                                      <p className="text-xs text-white/40">{r.email || r.telefone}</p>
                                     </div>
                                   </button>
                                 ))
                               ) : (
-                                <p className="px-4 py-3 text-sm text-gray-500 text-center">
+                                <p className="px-4 py-3 text-sm text-white/40 text-center">
                                   Nenhum requerente encontrado
                                 </p>
                               )}
@@ -897,11 +897,11 @@ export function ProcessoDetailsModal({
                     </div>
 
                     {/* Botões salvar/cancelar */}
-                    <div className="flex gap-3 pt-4 border-t">
-                      <Button onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-700">
+                    <div className="flex gap-3 pt-4 border-t border-white/10">
+                      <Button onClick={handleSaveEdit} className="bg-[#d2a948] hover:bg-[#e0b957] text-[#1b1508]">
                         Salvar
                       </Button>
-                      <Button variant="outline" onClick={handleCancelEdit}>
+                      <Button variant="outline" onClick={handleCancelEdit} className="border-white/15 bg-transparent text-white/80 hover:bg-white/[0.06] hover:text-white">
                         Cancelar
                       </Button>
                     </div>

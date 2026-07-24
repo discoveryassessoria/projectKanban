@@ -117,11 +117,17 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
 
   const riscoValor = risco.bloqueantes || risco.graves || 'OK'
   const riscoCor =
-    risco.bloqueantes ? 'text-red-600' :
-    risco.graves      ? 'text-amber-600' :
-                        'text-green-600'
+    risco.bloqueantes ? 'text-[#f87171]' :
+    risco.graves      ? 'text-[#fbbf24]' :
+                        'text-[#4ade80]'
 
-  const protocoloCor = protocolo.apto ? 'text-green-600' : 'text-amber-600'
+  const protocoloCor = protocolo.apto ? 'text-[#4ade80]' : 'text-[#fbbf24]'
+
+  // Discovery Design System — dark glass (skin only; layout preservado)
+  const cardCls = "bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3.5"
+  const labelCls = "text-[10px] font-bold text-white/40 uppercase tracking-[0.08em] mb-1.5"
+  const valueCls = "text-[22px] font-bold text-white/95 leading-tight tracking-tight"
+  const subCls = "text-[11px] text-white/40 mt-1.5 leading-relaxed"
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -130,23 +136,23 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
       <div className="grid grid-cols-2 gap-3.5 mb-5">
 
         {/* Card 1: Linhagem */}
-        <div className="bg-white border border-gray-200 rounded-lg px-4 py-3.5">
-          <div className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.08em] mb-1.5">
+        <div className={cardCls}>
+          <div className={labelCls}>
             Linhagem
           </div>
-          <div className="text-[22px] font-bold text-gray-900 leading-tight tracking-tight">
+          <div className={valueCls}>
             {linhagem.emLinhaDireta}
-            <span className="text-[11px] text-gray-500 font-medium block mt-0.5">em linha direta</span>
+            <span className="text-[11px] text-white/40 font-medium block mt-0.5">em linha direta</span>
           </div>
-          <div className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
+          <div className={subCls}>
             {linhagem.origem ? (
-              <>Origem: <strong className="text-gray-900 font-semibold">{linhagem.origem}</strong></>
+              <>Origem: <strong className="text-white/95 font-semibold">{linhagem.origem}</strong></>
             ) : (
               'Sem origem definida'
             )}
             <br/>
             {linhagem.requerentePrincipal ? (
-              <>Requerente: <strong className="text-gray-900 font-semibold">{linhagem.requerentePrincipal}</strong></>
+              <>Requerente: <strong className="text-white/95 font-semibold">{linhagem.requerentePrincipal}</strong></>
             ) : (
               'Sem requerente definido'
             )}
@@ -154,41 +160,41 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
         </div>
 
         {/* Card 2: Documentação */}
-        <div className="bg-white border border-gray-200 rounded-lg px-4 py-3.5">
-          <div className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.08em] mb-1.5">
+        <div className={cardCls}>
+          <div className={labelCls}>
             Documentação
           </div>
-          <div className="text-[22px] font-bold text-gray-900 leading-tight tracking-tight">
+          <div className={valueCls}>
             {documentacao.percentual}%
           </div>
-          <div className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
+          <div className={subCls}>
             {documentacao.recebidos} de {documentacao.total} documentos recebidos
           </div>
         </div>
 
         {/* Card 3: Risco */}
-        <div className="bg-white border border-gray-200 rounded-lg px-4 py-3.5">
-          <div className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.08em] mb-1.5">
+        <div className={cardCls}>
+          <div className={labelCls}>
             Risco
           </div>
           <div className={`text-[22px] font-bold leading-tight tracking-tight ${riscoCor}`}>
             {riscoValor}
           </div>
-          <div className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
+          <div className={subCls}>
             {risco.bloqueantes ? `${risco.bloqueantes} bloqueante(s) · ` : ''}
             {risco.graves ? `${risco.graves} grave(s)` : (!risco.bloqueantes ? 'Sem divergências críticas' : '')}
           </div>
         </div>
 
         {/* Card 4: Protocolo */}
-        <div className="bg-white border border-gray-200 rounded-lg px-4 py-3.5">
-          <div className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.08em] mb-1.5">
+        <div className={cardCls}>
+          <div className={labelCls}>
             Protocolo
           </div>
           <div className={`text-[22px] font-bold leading-tight tracking-tight ${protocoloCor}`}>
             {protocolo.apto ? 'Apto' : 'Não apto'}
           </div>
-          <div className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
+          <div className={subCls}>
             {protocolo.impeditivos} impeditivo(s)
           </div>
         </div>
@@ -196,21 +202,21 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
       </div>
 
       {/* ============== ALERTAS EXECUTIVOS ============== */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3.5 mb-4">
-        <div className="text-[11px] font-bold text-gray-600 uppercase tracking-[0.08em] mb-2.5">
+      <div className="bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3.5 mb-4">
+        <div className="text-[11px] font-bold text-white/55 uppercase tracking-[0.08em] mb-2.5">
           Alertas executivos
         </div>
         {alertas.length === 0 ? (
-          <div className="text-xs text-gray-400 italic">Nenhum alerta executivo no momento.</div>
+          <div className="text-xs text-white/40 italic">Nenhum alerta executivo no momento.</div>
         ) : (
           <div className="space-y-0">
             {alertas.map((a, i) => {
               const corTag =
-                a.sev === 'crit' ? 'bg-red-600 ring-red-600/15' :
-                a.sev === 'warn' ? 'bg-amber-500 ring-amber-500/15' :
-                                    'bg-blue-500 ring-blue-500/15'
+                a.sev === 'crit' ? 'bg-[#f87171] ring-[#f87171]/15' :
+                a.sev === 'warn' ? 'bg-[#fbbf24] ring-[#fbbf24]/15' :
+                                    'bg-[#7dd3fc] ring-[#7dd3fc]/15'
               return (
-                <div key={i} className="flex items-center gap-2.5 text-[12.5px] text-gray-900 py-1.5">
+                <div key={i} className="flex items-center gap-2.5 text-[12.5px] text-white/95 py-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ring-[3px] ${corTag}`}></span>
                   {a.label}
                 </div>
@@ -222,16 +228,17 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
 
       {/* ============== AVISO TEMPORÁRIO (endpoint pendente) ============== */}
       {!loading && !endpointDisponivel && (
-        <div className="mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800">
+        <div className="mb-4 px-3 py-2 bg-[#fbbf24]/10 border border-[#fbbf24]/25 rounded text-[11px] text-[#fbbf24]">
           ⚠ Endpoint <code className="font-mono">/api/processos/{processo.id}/estatisticas</code> ainda não existe — cards mostrando valores zerados.
         </div>
       )}
 
       {/* ============== ATALHOS DE NAVEGAÇÃO ============== */}
-      <div className="flex gap-2 pt-3.5 border-t border-gray-200">
+      <div className="flex gap-2 pt-3.5 border-t border-white/10">
         <Button
           variant="outline"
           size="sm"
+          className="border-white/15 bg-transparent text-white/80 hover:bg-white/[0.06] hover:text-white"
           onClick={() => onNavigate?.('arvore')}
         >
           → Árvore Genealógica
@@ -241,12 +248,14 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
           size="sm"
           disabled
           title="Aba ainda não implementada"
+          className="border-white/15 bg-transparent text-white/80 hover:bg-white/[0.06] hover:text-white"
         >
           → Central Operacional
         </Button>
         <Button
           variant="outline"
           size="sm"
+          className="border-white/15 bg-transparent text-white/80 hover:bg-white/[0.06] hover:text-white"
           onClick={() => onNavigate?.('documentos')}
         >
           → Documentos
