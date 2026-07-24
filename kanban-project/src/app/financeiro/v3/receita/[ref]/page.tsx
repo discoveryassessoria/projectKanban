@@ -51,6 +51,7 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
   if (erro) return <div className="min-h-screen bg-[#12161c] p-8 text-sm text-white/68">{erro}</div>
   if (!d) return <div className="min-h-screen bg-[#12161c] p-8 text-sm text-white/40">carregando…</div>
 
+  const isCusto = d.natureza === "CUSTO"
   const pagamentosFiltrados = (d.pagamentos ?? []).filter((p: any) => {
     if (!busca.trim()) return true
     const q = busca.toLowerCase()
@@ -63,13 +64,13 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
         {/* ── Top bar ── */}
         <div className="flex items-start justify-between">
           <div>
-            <button onClick={() => router.back()} className="mb-3 flex items-center gap-2 text-sm text-white/68 hover:text-white/80"><ArrowLeft className="h-4 w-4" /> Voltar para Receitas</button>
+            <button onClick={() => router.back()} className="mb-3 flex items-center gap-2 text-sm text-white/68 hover:text-white/80"><ArrowLeft className="h-4 w-4" /> Voltar para {isCusto ? "Custos" : "Receitas"}</button>
             <div className="flex items-center gap-3">
-              <h1 className="text-[28px] font-bold leading-none text-white">Receita</h1>
+              <h1 className="text-[28px] font-bold leading-none text-white">{isCusto ? "Custo" : "Receita"}</h1>
               <span className="rounded-md bg-[#d2a948]/15 px-2.5 py-1 text-xs font-semibold tracking-wide text-[#d2a948]">{d.statusLabel}</span>
             </div>
             <div className="mt-2 flex items-center gap-1.5 text-[13px] text-white/40">
-              <Receipt className="h-3.5 w-3.5" /> Financeiro <span className="text-white/30">›</span> Receitas <span className="text-white/30">›</span>
+              <Receipt className="h-3.5 w-3.5" /> Financeiro <span className="text-white/30">›</span> {isCusto ? "Custos" : "Receitas"} <span className="text-white/30">›</span>
               <span className="text-white/68">{d.descricao ?? d.codigo}</span>
             </div>
           </div>
@@ -92,7 +93,7 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
         {/* ── Info card ── */}
         <div className="mt-5 rounded-xl border border-white/10 bg-[#1b2027] p-5">
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-6">
-            <Info rotulo="Receita"><span className="inline-flex items-center gap-1.5 font-medium text-white/95">{d.codigo}<button onClick={copiarCodigo} title="Copiar código" className="text-white/40 hover:text-white/80">{copiado ? <CheckCircle2 className="h-3.5 w-3.5 text-[#4ade80]" /> : <Copy className="h-3.5 w-3.5" />}</button></span></Info>
+            <Info rotulo={isCusto ? "Custo" : "Receita"}><span className="inline-flex items-center gap-1.5 font-medium text-white/95">{d.codigo}<button onClick={copiarCodigo} title="Copiar código" className="text-white/40 hover:text-white/80">{copiado ? <CheckCircle2 className="h-3.5 w-3.5 text-[#4ade80]" /> : <Copy className="h-3.5 w-3.5" />}</button></span></Info>
             <Info rotulo="Descrição"><span className="text-white/80">{d.descricao ?? "—"}</span></Info>
             <Info rotulo="Processo"><div className="text-white/80">{d.processo.codigo ?? "—"}{d.processo.nome ? ` – ${d.processo.nome}` : ""}</div>{d.processo.id && <a href={`/financeiro/v3/processo-preview?processoId=${d.processo.id}`} className="inline-flex items-center gap-1 text-xs text-[#7dd3fc] hover:underline">Abrir processo <ExternalLink className="h-3 w-3" /></a>}</Info>
             <Info rotulo="Responsável">{d.responsavel ? <span className="inline-flex items-center gap-2 text-white/80">{d.responsavel.nome}<span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[11px] text-violet-300">{d.responsavel.papel}</span></span> : "—"}</Info>
@@ -102,7 +103,7 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
           <div className="my-4 border-t border-white/10" />
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-6">
             <Info rotulo="Valor contratado"><span className="text-lg font-semibold text-white/95">{fmt(d.valorContratado, d.moeda)}</span></Info>
-            <Info rotulo="Recebido"><span className="text-lg font-semibold text-[#4ade80]">{fmt(d.recebido, d.moeda)}</span></Info>
+            <Info rotulo={isCusto ? "Pago" : "Recebido"}><span className="text-lg font-semibold text-[#4ade80]">{fmt(d.recebido, d.moeda)}</span></Info>
             <Info rotulo="Saldo"><span className="text-lg font-semibold text-[#7dd3fc]">{fmt(d.saldo, d.moeda)}</span></Info>
             <Info rotulo="Vencimento"><span className="text-white/80">{dataBR(d.vencimento)}</span></Info>
             <Info rotulo="Status"><span className="inline-block rounded bg-[#d2a948]/15 px-2 py-0.5 text-xs font-semibold text-[#d2a948]">{d.statusLabel}</span></Info>
@@ -214,7 +215,7 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
           <div className="space-y-4">
             <Painel titulo="Resumo financeiro" aberto>
               <Linha k="Valor contratado" v={fmt(d.resumo.contratado, d.moeda)} />
-              <Linha k="Total recebido" v={fmt(d.resumo.recebido, d.moeda)} cor="text-[#4ade80]" />
+              <Linha k={isCusto ? "Total pago" : "Total recebido"} v={fmt(d.resumo.recebido, d.moeda)} cor="text-[#4ade80]" />
               <Linha k="Saldo" v={fmt(d.resumo.saldo, d.moeda)} cor="text-[#7dd3fc]" />
               <Linha k="Descontos" v={fmt(d.resumo.descontos, d.moeda)} />
               <Linha k="Ajustes" v={fmt(d.resumo.ajustes, d.moeda)} />
@@ -240,7 +241,7 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
           obrigacaoId={d.obrigacaoId}
           moeda={d.moeda}
           saldo={d.saldo}
-          natureza="RECEITA"
+          natureza={isCusto ? "CUSTO" : "RECEITA"}
           onClose={() => setPagOpen(false)}
           onDone={() => { setPagOpen(false); setCobrancas(null); carregar() }}
         />

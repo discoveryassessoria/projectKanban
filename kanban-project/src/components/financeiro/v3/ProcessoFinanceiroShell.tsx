@@ -155,6 +155,8 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
   const [tipo, setTipo] = useState<"todos" | "receitas" | "custos">("todos")
   const [fCat, setFCat] = useState("Todas")
   const [fStatus, setFStatus] = useState("Todos")
+  const [fPessoa, setFPessoa] = useState("Todos")
+  const [fResp, setFResp] = useState("Todos")
   const [busca, setBusca] = useState("")
   useEffect(() => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }, [processoId])
   const movs = useMemo(() => {
@@ -163,6 +165,7 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
       id: o.obrigacaoId, receita: o.direcao === "A_RECEBER", codigo: o.codigoOperacional ?? `#${o.obrigacaoId}`,
       descricao: o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`, categoria: o.categoria ?? (o.direcao === "A_RECEBER" ? "Receita" : "Custo"),
       valorBRL: toBRL(o.valorContratado, o.moeda), moeda: o.moeda, vencimento: o.vencimento,
+      requerente: o.requerente ?? null, responsavel: o.responsavel ?? null,
       quitado: o.recebido >= o.valorContratado - 0.005,
     }))
     // ordena crescente para acumular saldo; exibe decrescente
@@ -172,7 +175,9 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
     return comSaldo.reverse()
   }, [obrs, fx])
   const cats = useMemo(() => ["Todas", ...Array.from(new Set(movs.map((mv) => mv.categoria)))], [movs])
-  const lista = useMemo(() => movs.filter((mv) => (tipo === "receitas" ? mv.receita : tipo === "custos" ? !mv.receita : true) && (fCat === "Todas" || mv.categoria === fCat) && (fStatus === "Todos" || (fStatus === "Quitado" ? mv.quitado : !mv.quitado)) && (!busca || `${mv.descricao} ${mv.codigo} ${mv.categoria}`.toLowerCase().includes(busca.toLowerCase()))), [movs, tipo, fCat, fStatus, busca])
+  const pessoasOpts = useMemo(() => ["Todos", ...Array.from(new Set(movs.map((mv) => mv.requerente).filter((v): v is string => !!v)))], [movs])
+  const respOpts = useMemo(() => ["Todos", ...Array.from(new Set(movs.map((mv) => mv.responsavel).filter((v): v is string => !!v)))], [movs])
+  const lista = useMemo(() => movs.filter((mv) => (tipo === "receitas" ? mv.receita : tipo === "custos" ? !mv.receita : true) && (fCat === "Todas" || mv.categoria === fCat) && (fPessoa === "Todos" || mv.requerente === fPessoa) && (fResp === "Todos" || mv.responsavel === fResp) && (fStatus === "Todos" || (fStatus === "Quitado" ? mv.quitado : !mv.quitado)) && (!busca || `${mv.descricao} ${mv.codigo} ${mv.categoria}`.toLowerCase().includes(busca.toLowerCase()))), [movs, tipo, fCat, fPessoa, fResp, fStatus, busca])
   if (!obrs) return <div className="py-8 text-sm text-white/40">carregando…</div>
   const totReceitas = movs.filter((m) => m.receita).reduce((s, m) => s + m.valorBRL, 0)
   const totCustos = movs.filter((m) => !m.receita).reduce((s, m) => s + m.valorBRL, 0)
@@ -192,12 +197,12 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
           <label className="text-xs text-white/40">Período<div className={`mt-1 flex items-center justify-between ${selCls}`}><span className="text-white/70">01/06/2026 - 24/07/2026</span><CalendarDays className="h-3.5 w-3.5 text-white/40" /></div></label>
           <FiltroBox label="Tipo" valor={tipo === "receitas" ? "Receitas" : tipo === "custos" ? "Custos" : "Todos"} options={["Todos", "Receitas", "Custos"]} onChange={(v) => setTipo(v === "Receitas" ? "receitas" : v === "Custos" ? "custos" : "todos")} />
           <FiltroBox label="Categoria" valor={fCat} options={cats} onChange={setFCat} />
-          <FiltroBox label="Pessoa / Requerente" valor="Todos" />
+          <FiltroBox label="Pessoa / Requerente" valor={fPessoa} options={pessoasOpts} onChange={setFPessoa} />
           <FiltroBox label="Documento" valor="Todos" />
         </div>
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <FiltroBox label="Fase" valor="Todas" className="w-[150px]" />
-          <FiltroBox label="Responsável" valor="Todos" className="w-[150px]" />
+          <FiltroBox label="Responsável" valor={fResp} options={respOpts} onChange={setFResp} className="w-[150px]" />
           <FiltroBox label="Status" valor={fStatus} options={["Todos", "Quitado", "Pendente"]} onChange={setFStatus} className="w-[150px]" />
           <div className="relative min-w-[240px] flex-1"><div className="mb-1 text-xs text-white/40">Buscar</div><Search className="pointer-events-none absolute left-3 top-[30px] h-4 w-4 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar descrição, documento, origem..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
           <button onClick={() => setBusca("")} className="mb-[1px] inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
@@ -281,6 +286,8 @@ function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
   const router = useRouter()
   const [obrs, setObrs] = useState<any[] | null>(null)
   const [fCat, setFCat] = useState("Todas")
+  const [fResp, setFResp] = useState("Todos")
+  const [soPend, setSoPend] = useState(false)
   const [busca, setBusca] = useState("")
   useEffect(() => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }, [processoId])
   const movsAll = useMemo(() => {
@@ -288,7 +295,7 @@ function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
     const base = (obrs ?? []).filter((o) => o.status !== "CANCELADO").map((o) => ({
       id: o.obrigacaoId, receita: o.direcao === "A_RECEBER", codigo: o.codigoOperacional ?? `#${o.obrigacaoId}`,
       descricao: o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`, categoria: o.categoria ?? (o.direcao === "A_RECEBER" ? "Receita" : "Custo"),
-      valorBRL: toBRL(o.valorContratado, o.moeda), data: o.criadoEm ?? o.vencimento, responsavel: o.responsavel ?? null, quitado: o.recebido >= o.valorContratado - 0.005,
+      valorBRL: toBRL(o.valorContratado, o.moeda), data: o.criadoEm ?? o.vencimento, responsavel: o.responsavel ?? null, requerente: o.requerente ?? null, quitado: o.recebido >= o.valorContratado - 0.005,
     }))
     const asc = [...base].sort((a, b) => a.id - b.id)
     let acc = 0
@@ -296,7 +303,8 @@ function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
     return comSaldo.reverse()
   }, [obrs, fx])
   const cats = useMemo(() => ["Todas", ...Array.from(new Set(movsAll.map((mv) => mv.categoria)))], [movsAll])
-  const movs = useMemo(() => movsAll.filter((mv) => (fCat === "Todas" || mv.categoria === fCat) && (!busca || `${mv.descricao} ${mv.codigo} ${mv.categoria} ${mv.responsavel ?? ""}`.toLowerCase().includes(busca.toLowerCase()))), [movsAll, fCat, busca])
+  const respOpts = useMemo(() => ["Todos", ...Array.from(new Set(movsAll.map((mv) => mv.responsavel).filter((v): v is string => !!v)))], [movsAll])
+  const movs = useMemo(() => movsAll.filter((mv) => (fCat === "Todas" || mv.categoria === fCat) && (fResp === "Todos" || mv.responsavel === fResp) && (!soPend || !mv.quitado) && (!busca || `${mv.descricao} ${mv.codigo} ${mv.categoria} ${mv.responsavel ?? ""}`.toLowerCase().includes(busca.toLowerCase()))), [movsAll, fCat, fResp, soPend, busca])
   const iniciais = (nome: string | null) => (nome ?? "").split(" ").filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join("") || "—"
   const horaBR = (iso?: string | null) => iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""
   if (!obrs) return <div className="py-8 text-sm text-white/40">carregando…</div>
@@ -328,11 +336,11 @@ function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
           <FiltroBox label="Tipo" valor="Todos" />
           <FiltroBox label="Categoria" valor={fCat} options={cats} onChange={setFCat} />
           <FiltroBox label="Fase" valor="Todas" />
-          <FiltroBox label="Responsável" valor="Todos" />
+          <FiltroBox label="Responsável" valor={fResp} options={respOpts} onChange={setFResp} />
         </div>
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <div className="relative min-w-[240px] flex-1"><div className="mb-1 text-xs text-white/40">Buscar</div><Search className="pointer-events-none absolute left-3 top-[30px] h-4 w-4 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar descrição, documento, origem..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
-          <button className="mb-[1px] inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><SlidersHorizontal className="h-3.5 w-3.5" /> Filtros rápidos</button>
+          <button onClick={() => setSoPend((v) => !v)} className={`mb-[1px] inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${soPend ? "border-[#d2a948]/50 bg-[#d2a948]/12 text-[#d2a948]" : "border-white/10 bg-[#12161c] text-white/70"}`}><SlidersHorizontal className="h-3.5 w-3.5" /> {soPend ? "Só pendentes" : "Filtros rápidos"}</button>
           <button onClick={() => setBusca("")} className="mb-[1px] inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
         </div>
       </div>

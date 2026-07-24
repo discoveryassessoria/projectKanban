@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { LancamentoManualModal } from "./LancamentoManualModal"
 import RegistrarPagamentoModal from "./RegistrarPagamentoModal"
+import { ReceitaCobrancaModal } from "@/src/components/financeiro/ReceitaCobrancaModal"
 import {
   DollarSign, CheckSquare, Clock, CalendarDays, Search, RotateCcw, Plus, X,
   ExternalLink, FileText, ChevronDown, ChevronLeft, ChevronRight, Receipt,
@@ -28,6 +29,7 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
   const [subtab, setSubtab] = useState("receitas")
   const [novo, setNovo] = useState(false)
   const [pagar, setPagar] = useState<any | null>(null)
+  const [cobrar, setCobrar] = useState<number | null>(null)
 
   const carregar = () => { fetch(`/api/financeiro/v3/receitas${processoId ? `?processoId=${processoId}` : ""}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setD(j)).catch(() => setD({ kpis: {}, receitas: [] })) }
   useEffect(() => { carregar() }, [processoId])
@@ -96,7 +98,7 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
       </div>
 
       {/* Drawer lateral */}
-      {sel && <Drawer r={sel} onClose={() => setSel(null)} onRegistrar={() => setPagar(sel)} onCancelar={async () => {
+      {sel && <Drawer r={sel} onClose={() => setSel(null)} onRegistrar={() => setPagar(sel)} onCobrar={() => sel.receitaId ? setCobrar(sel.receitaId) : alert("Esta receita não tem origem vinculada para gerar cobrança.")} onCancelar={async () => {
         if (!window.confirm("Cancelar esta receita? O histórico é preservado (estorno auditável).")) return
         const res = await fetch(`/api/financeiro/v3/obrigacoes/${sel.obrigacaoId}/cancelar`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: "{}" })
         const j = await res.json().catch(() => ({}))
@@ -107,6 +109,7 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
       {/* Modal Nova Receita (lançamento manual) */}
       {novo && processoId != null && <LancamentoManualModal natureza="RECEITA" processoId={processoId} onClose={() => setNovo(false)} onCriado={() => { setNovo(false); carregar() }} />}
       {pagar && <RegistrarPagamentoModal obrigacaoId={pagar.obrigacaoId} moeda={pagar.moeda} saldo={pagar.saldo} natureza="RECEITA" onClose={() => setPagar(null)} onDone={() => { setPagar(null); setSel(null); carregar() }} />}
+      {cobrar != null && <ReceitaCobrancaModal receitaId={cobrar} onClose={() => setCobrar(null)} onChanged={() => { setCobrar(null); carregar() }} />}
     </div>
   )
 }
@@ -130,7 +133,7 @@ function Filtro({ rotulo, valor }: { rotulo: string; valor: string }) {
     </label>
   )
 }
-function Drawer({ r, onClose, onRegistrar, onCancelar }: { r: any; onClose: () => void; onRegistrar: () => void; onCancelar: () => void }) {
+function Drawer({ r, onClose, onRegistrar, onCobrar, onCancelar }: { r: any; onClose: () => void; onRegistrar: () => void; onCobrar: () => void; onCancelar: () => void }) {
   return (
     <div className="w-[320px] shrink-0 self-start rounded-xl border border-white/10 bg-[#1b2027] p-4">
       <div className="flex items-center justify-between"><h3 className="text-sm font-semibold text-white/80">Detalhes da receita</h3><button onClick={onClose} className="text-white/40 hover:text-white/70"><X className="h-4 w-4" /></button></div>
@@ -152,8 +155,8 @@ function Drawer({ r, onClose, onRegistrar, onCancelar }: { r: any; onClose: () =
       <div className="mt-5 text-sm font-medium text-white/70">Ações rápidas</div>
       <div className="mt-2 space-y-2">
         <button onClick={onRegistrar} className="flex w-full items-center gap-2 rounded-lg border border-[#4ade80]/40 bg-[#4ade80]/10 px-3 py-2 text-sm text-[#4ade80] hover:bg-[#4ade80]/20"><FileText className="h-4 w-4" /> Registrar pagamento</button>
-        <button className="flex w-full items-center gap-2 rounded-lg border border-[#d2a948]/40 bg-[#d2a948]/10 px-3 py-2 text-sm text-[#d2a948] hover:bg-[#d2a948]/20"><FileText className="h-4 w-4" /> Emitir cobrança</button>
-        <button className="flex w-full items-center gap-2 rounded-lg border border-[#7dd3fc]/40 bg-[#7dd3fc]/10 px-3 py-2 text-sm text-[#7dd3fc] hover:bg-[#7dd3fc]/20"><FileText className="h-4 w-4" /> Emitir nota fiscal</button>
+        <button onClick={onCobrar} className="flex w-full items-center gap-2 rounded-lg border border-[#d2a948]/40 bg-[#d2a948]/10 px-3 py-2 text-sm text-[#d2a948] hover:bg-[#d2a948]/20"><FileText className="h-4 w-4" /> Emitir cobrança</button>
+        <button disabled title="Emissão de nota fiscal ainda não disponível" className="flex w-full cursor-not-allowed items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/40"><FileText className="h-4 w-4" /> Emitir nota fiscal <span className="ml-auto text-[10px] uppercase tracking-wide text-white/30">em breve</span></button>
         <button onClick={onCancelar} className="flex w-full items-center gap-2 rounded-lg border border-red-800/40 bg-red-950/20 px-3 py-2 text-sm text-red-300 hover:bg-red-950/40"><Receipt className="hidden" />Cancelar lançamento</button>
       </div>
     </div>

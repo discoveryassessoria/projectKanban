@@ -9,6 +9,7 @@ const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
 export interface ReceitaLinha {
   obrigacaoId: number
+  receitaId: number | null
   codigo: string | null
   descricao: string | null
   requerente: { nome: string; papel: string } | null
@@ -64,7 +65,7 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
     const primeiro = (o.distribuicoes[0]?.participacoes ?? []).filter((p) => p.incluido)[0]
     const statusLabel = saldo <= 0.005 ? 'QUITADO' : (venc && new Date(venc).getTime() < agora ? 'VENCIDO' : 'A VENCER')
     return {
-      obrigacaoId: o.id, codigo: o.codigoOperacional, descricao: itemMestre?.name ?? rec?.descricao ?? o.observacoes ?? null,
+      obrigacaoId: o.id, receitaId: o.origemTipo === 'Receita' ? (o.origemId ?? null) : null, codigo: o.codigoOperacional, descricao: itemMestre?.name ?? rec?.descricao ?? o.observacoes ?? null,
       requerente: primeiro ? { nome: nome(primeiro.pessoaId), papel: 'Principal' } : null,
       servico: itemMestre?.name ?? (rec?.tipoServicoId ? tipoPor.get(rec.tipoServicoId) : null) ?? (rec?.categoria ? String(rec.categoria) : null) ?? (itemMestre?.categoria ?? null),
       formaCobranca: 'À vista',

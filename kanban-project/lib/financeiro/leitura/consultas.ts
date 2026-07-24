@@ -24,6 +24,7 @@ export interface ObrigacaoLista {
   origemTipo: string | null
   criadoEm: string | null
   responsavel: string | null
+  requerente: string | null
   temAbertura: boolean
 }
 
@@ -39,6 +40,7 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
     },
     orderBy: { id: 'desc' },
     take: 500,
+    include: { distribuicoes: { orderBy: { versao: 'desc' }, take: 1, include: { participacoes: true } } },
   })
   const ids = obrs.map((o) => o.id)
   const projs = ids.length ? await prisma.saldoProjecao.findMany({ where: { obrigacaoId: { in: ids } } }) : []
@@ -53,6 +55,16 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
   const userIds = [...new Set(obrs.map((o) => o.criadoPorId).filter((v): v is number => v != null))]
   const usuarios = userIds.length ? await prisma.usuario.findMany({ where: { id: { in: userIds } }, select: { id: true, nome: true } }).catch(() => []) : []
   const userPor = new Map(usuarios.map((u) => [u.id, u.nome]))
+  // Requerente principal (1ª participação incluída da distribuição vigente) — nomes em lote.
+  const primPart = new Map<number, number>()
+  const pessoaIdSet = new Set<number>()
+  for (const ob of obrs) {
+    const dist = ob.distribuicoes[0]
+    const part = dist?.participacoes.find((p) => p.incluido) ?? dist?.participacoes[0]
+    if (part?.pessoaId != null) { primPart.set(ob.id, part.pessoaId); pessoaIdSet.add(part.pessoaId) }
+  }
+  const pessoasReq = pessoaIdSet.size ? await prisma.pessoa.findMany({ where: { id: { in: [...pessoaIdSet] } }, select: { id: true, nome: true, sobrenome: true } }).catch(() => []) : []
+  const pessoaNomeReq = new Map(pessoasReq.map((p) => [p.id, [p.nome, p.sobrenome].filter(Boolean).join(' ')]))
   return obrs.map((o) => {
     const p = projPor.get(o.id)
     return {
@@ -63,6 +75,7 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
       vencimento: o.vencimento ? o.vencimento.toISOString() : null, origemTipo: o.origemTipo ?? null,
       criadoEm: o.criadoEm ? o.criadoEm.toISOString() : null,
       responsavel: o.criadoPorId != null ? (userPor.get(o.criadoPorId) ?? null) : null,
+      requerente: (() => { const pid = primPart.get(o.id); return pid != null ? (pessoaNomeReq.get(pid) ?? null) : null })(),
       temAbertura: comAbertura.has(o.id),
     }
   })
