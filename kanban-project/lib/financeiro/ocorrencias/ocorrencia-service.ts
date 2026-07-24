@@ -110,7 +110,15 @@ export async function registrarOcorrencia(e: EntradaOcorrencia) {
       lancPernas = lancEncargo(e.valor, e.tipo)
     } else if (e.tipo === 'ESTORNO' && e.estornaOcorrenciaId) {
       const orig = await tx.ledgerEntry.findMany({ where: { obrigacaoId: obr.id, ocorrenciaId: e.estornaOcorrenciaId }, select: { contaContabil: true, direcao: true, valorContabil: true } })
-      if (orig.length) lancPernas = lancEstorno(orig.map((o): Perna => ({ conta: o.contaContabil, direcao: o.direcao as Direcao, valor: Number(o.valorContabil) })))
+      if (orig.length) {
+        // ESTORNO PARCIAL: escala as pernas revertidas por (valorEstorno / valorOriginal).
+        // Total por padrão (fator 1); nunca apaga/edita o lançamento original.
+        const origOc = await tx.ocorrenciaFinanceira.findUnique({ where: { id: e.estornaOcorrenciaId }, select: { valor: true } })
+        const origValor = origOc ? cent(Number(origOc.valor)) : 0
+        const pedido = cent(e.valor)
+        const fator = pedido > 0 && origValor > 0 && pedido < origValor - 0.005 ? pedido / origValor : 1
+        lancPernas = lancEstorno(orig.map((o): Perna => ({ conta: o.contaContabil, direcao: o.direcao as Direcao, valor: cent(Number(o.valorContabil) * fator) })))
+      }
     }
 
     if (lancPernas) {

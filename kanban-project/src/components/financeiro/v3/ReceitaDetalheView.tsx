@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation"
 import RegistrarPagamentoModal from "@/src/components/financeiro/v3/RegistrarPagamentoModal"
 import RegistrarPagamentoView from "@/src/components/financeiro/v3/RegistrarPagamentoView"
 import EditarDistribuicaoView from "@/src/components/financeiro/v3/EditarDistribuicaoView"
+import EstornoModal from "@/src/components/financeiro/v3/EstornoModal"
 import { NovaFaturaModal } from "@/src/components/kanban/NovaFaturaModal"
 import { uploadFiles } from "@/src/lib/storage"
 import {
@@ -22,7 +23,7 @@ import {
   Receipt, CreditCard, Wallet, FileCheck, Clock, Search, SlidersHorizontal, Calendar,
   Plus, Pencil, ChevronLeft, ChevronRight, UserPlus, ArrowDownCircle, CheckCircle2,
   Info as InfoIcon, X, AlertTriangle, Send, FileText, Loader2, ChevronRight as ChevronRightSm,
-  Download, File as FileIcon, Users, StickyNote,
+  Download, File as FileIcon, Users, StickyNote, RotateCcw,
 } from "lucide-react"
 
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
@@ -86,16 +87,9 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
 
   const copiarCodigo = () => { if (!d?.codigo) return; navigator.clipboard?.writeText(d.codigo).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 1500) }).catch(() => {}) }
 
-  // "Editar" um pagamento confirmado = estornar (auditável) e registrar de novo — não há edição in-place de lançamento financeiro (integridade contábil).
-  const estornarPagamento = async (pgId: number, valor: number) => {
-    if (!window.confirm("Estornar este pagamento? Ele será revertido (auditável). Depois você pode registrar novamente para corrigir.")) return
-    try {
-      const res = await fetch("/api/financeiro/v3/ocorrencias", { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ obrigacaoId: d.obrigacaoId, tipo: "ESTORNO", valor, estornaOcorrenciaId: pgId }) })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok || !j.ok) alert(j?.erro || j?.motivo || `Falha ao estornar (HTTP ${res.status}).`)
-      else carregar()
-    } catch { alert("Falha de rede ao estornar o pagamento.") }
-  }
+  // "Editar" um pagamento confirmado = estornar (auditável, total ou parcial) via EstornoModal.
+  // Nunca edição in-place de lançamento financeiro (integridade contábil).
+  const [estornoAlvo, setEstornoAlvo] = useState<any>(null)
 
   // "Enviar cobrança" (Fase D) = marcar a Cobrança como enviada ao cliente
   // (estado auditável — não há entrega real de e-mail/WhatsApp).
@@ -647,7 +641,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                     <td><div className="text-white/70">{p.banco ?? "—"}</div>{(p.agencia || p.conta) && <div className="text-xs text-white/40">Ag: {p.agencia ?? "—"} Cc: {p.conta ?? "—"}</div>}</td>
                     <td className="text-white/68">{p.referencia ?? "—"}</td>
                     <td><span className="inline-flex items-center gap-1.5 text-[#4ade80]"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />{p.status}</span></td>
-                    <td><div className="flex items-center gap-2"><button onClick={() => estornarPagamento(p.id, p.valor)} title="Estornar pagamento (para corrigir: estorne e registre novamente)" className="text-white/40 hover:text-[#f87171]"><Pencil className="h-4 w-4" /></button></div></td>
+                    <td><div className="flex items-center gap-2"><button onClick={() => setEstornoAlvo(p)} title="Estornar pagamento (total ou parcial)" className="text-white/40 hover:text-[#f87171]"><RotateCcw className="h-4 w-4" /></button></div></td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -866,6 +860,15 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
           receitaRef={String(d.obrigacaoId)}
           onClose={() => setDistribuicaoOpen(false)}
           onDone={() => { setDistribuicaoOpen(false); carregar() }}
+        />
+      )}
+      {estornoAlvo && d && (
+        <EstornoModal
+          obrigacaoId={d.obrigacaoId}
+          moeda={d.moeda}
+          pagamento={estornoAlvo}
+          onClose={() => setEstornoAlvo(null)}
+          onDone={() => { setEstornoAlvo(null); carregar() }}
         />
       )}
       {faturaOpen && temProcesso && (
