@@ -5,12 +5,13 @@
 // ============================================================================
 "use client"
 
-import { use, useEffect, useState } from "react"
+import { use, useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import RegistrarPagamentoModal from "@/src/components/financeiro/v3/RegistrarPagamentoModal"
 import {
   ArrowLeft, ExternalLink, MoreVertical, Copy, FileText, Bell, ChevronDown, ChevronUp,
   Receipt, CreditCard, Wallet, FileCheck, Clock, Search, SlidersHorizontal, Calendar,
-  Plus, Pencil, ChevronLeft, ChevronRight, UserPlus, ArrowDownCircle,
+  Plus, Pencil, ChevronLeft, ChevronRight, UserPlus, ArrowDownCircle, CheckCircle2,
 } from "lucide-react"
 
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
@@ -22,16 +23,39 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
   const router = useRouter()
   const [d, setD] = useState<any>(null)
   const [erro, setErro] = useState<string | null>(null)
-  const [tab, setTab] = useState("pagamentos")
+  const [tab, setTab] = useState("resumo")
+  const [pagOpen, setPagOpen] = useState(false)
+  const [busca, setBusca] = useState("")
+  const [copiado, setCopiado] = useState(false)
+  const [cobrancas, setCobrancas] = useState<any[] | null>(null)
 
-  useEffect(() => {
+  const carregar = useCallback(() => {
     fetch(`/api/financeiro/v3/receita/${encodeURIComponent(ref)}`, { headers: authHeaders() })
-      .then(async (r) => { const j = await r.json(); if (r.ok && j.disponivel) setD(j.receita); else setErro(j.fallbackLegado ? "Financeiro V3 indisponível." : "Receita não encontrada.") })
+      .then(async (r) => { const j = await r.json(); if (r.ok && j.disponivel) { setD(j.receita); setErro(null) } else setErro(j.fallbackLegado ? "Financeiro V3 indisponível." : "Receita não encontrada.") })
       .catch(() => setErro("Falha ao carregar."))
   }, [ref])
 
+  useEffect(() => { carregar() }, [carregar])
+
+  // Cobranças reais da receita de origem — lazy, só quando a aba abre
+  useEffect(() => {
+    if (tab !== "cobrancas" || cobrancas !== null || !d?.receitaId) return
+    fetch(`/api/financeiro/receitas/${d.receitaId}/cobrancas`, { headers: authHeaders() })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setCobrancas(Array.isArray(j) ? j : (j?.cobrancas ?? [])))
+      .catch(() => setCobrancas([]))
+  }, [tab, cobrancas, d])
+
+  const copiarCodigo = () => { if (!d?.codigo) return; navigator.clipboard?.writeText(d.codigo).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 1500) }).catch(() => {}) }
+
   if (erro) return <div className="min-h-screen bg-[#12161c] p-8 text-sm text-white/68">{erro}</div>
   if (!d) return <div className="min-h-screen bg-[#12161c] p-8 text-sm text-white/40">carregando…</div>
+
+  const pagamentosFiltrados = (d.pagamentos ?? []).filter((p: any) => {
+    if (!busca.trim()) return true
+    const q = busca.toLowerCase()
+    return [p.formaLabel, p.banco, p.referencia, p.status, fmt(p.valor, d.moeda)].filter(Boolean).some((s: any) => String(s).toLowerCase().includes(q))
+  })
 
   return (
     <div className="min-h-screen bg-[#12161c] text-white/80">
@@ -68,7 +92,7 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
         {/* ── Info card ── */}
         <div className="mt-5 rounded-xl border border-white/10 bg-[#1b2027] p-5">
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-6">
-            <Info rotulo="Receita"><span className="inline-flex items-center gap-1.5 font-medium text-white/95">{d.codigo}<Copy className="h-3.5 w-3.5 text-white/40" /></span></Info>
+            <Info rotulo="Receita"><span className="inline-flex items-center gap-1.5 font-medium text-white/95">{d.codigo}<button onClick={copiarCodigo} title="Copiar código" className="text-white/40 hover:text-white/80">{copiado ? <CheckCircle2 className="h-3.5 w-3.5 text-[#4ade80]" /> : <Copy className="h-3.5 w-3.5" />}</button></span></Info>
             <Info rotulo="Descrição"><span className="text-white/80">{d.descricao ?? "—"}</span></Info>
             <Info rotulo="Processo"><div className="text-white/80">{d.processo.codigo ?? "—"}{d.processo.nome ? ` – ${d.processo.nome}` : ""}</div>{d.processo.id && <a href={`/financeiro/v3/processo-preview?processoId=${d.processo.id}`} className="inline-flex items-center gap-1 text-xs text-[#7dd3fc] hover:underline">Abrir processo <ExternalLink className="h-3 w-3" /></a>}</Info>
             <Info rotulo="Responsável">{d.responsavel ? <span className="inline-flex items-center gap-2 text-white/80">{d.responsavel.nome}<span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[11px] text-violet-300">{d.responsavel.papel}</span></span> : "—"}</Info>
@@ -99,13 +123,14 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
         <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_320px]">
           <div className="space-y-5">
             {/* Pagamentos */}
+            {(tab === "resumo" || tab === "pagamentos") && (
             <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">Pagamentos</h2><span className="rounded-full bg-[#252c35] px-2 py-0.5 text-xs text-white/70">{d.pagamentos.length}</span></div>
-                <button className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-emerald-500"><Plus className="h-4 w-4" /> Registrar pagamento</button>
+                <button onClick={() => setPagOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-emerald-500"><Plus className="h-4 w-4" /> Registrar pagamento</button>
               </div>
               <div className="mt-4 flex items-center gap-3">
-                <div className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" /><input placeholder="Buscar pagamentos..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
+                <div className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar pagamentos..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
                 <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><SlidersHorizontal className="h-4 w-4" /> Filtros</button>
                 <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><Calendar className="h-4 w-4" /> Período <ChevronDown className="h-3.5 w-3.5" /></button>
               </div>
@@ -113,7 +138,7 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
                 <thead><tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/40">
                   <th className="pb-2 font-medium">Data</th><th className="pb-2 font-medium">Valor</th><th className="pb-2 font-medium">Forma</th><th className="pb-2 font-medium">Conta recebida</th><th className="pb-2 font-medium">Referência</th><th className="pb-2 font-medium">Status</th><th className="pb-2 font-medium">Ações</th>
                 </tr></thead>
-                <tbody>{d.pagamentos.map((p: any) => (
+                <tbody>{pagamentosFiltrados.map((p: any) => (
                   <tr key={p.id} className="border-b border-white/10">
                     <td className="py-3.5 text-white/70">{dataBR(p.data)}</td>
                     <td className="font-medium text-white/95">{fmt(p.valor, d.moeda)}</td>
@@ -126,12 +151,41 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
                 ))}</tbody>
               </table>
               <div className="mt-4 flex items-center justify-between text-sm text-white/40">
-                <span>Mostrando {d.pagamentos.length} de {d.pagamentos.length} pagamentos</span>
+                <span>Mostrando {pagamentosFiltrados.length} de {d.pagamentos.length} pagamentos</span>
                 <div className="flex items-center gap-1"><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded border border-white/15 bg-[#252c35] px-2.5 py-1 text-xs text-white/80">1</span><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronRight className="h-4 w-4" /></button></div>
               </div>
             </div>
+            )}
+
+            {/* Cobranças */}
+            {tab === "cobrancas" && (
+              <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+                <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">Cobranças</h2>{cobrancas && <span className="rounded-full bg-[#252c35] px-2 py-0.5 text-xs text-white/70">{cobrancas.length}</span>}</div>
+                {cobrancas === null ? (
+                  <div className="mt-6 text-sm text-white/40">Carregando…</div>
+                ) : cobrancas.length === 0 ? (
+                  <div className="mt-6 rounded-lg border border-dashed border-white/10 bg-[#12161c] px-4 py-8 text-center text-sm text-white/40">Nenhuma cobrança emitida para esta receita.</div>
+                ) : (
+                  <table className="mt-4 w-full text-sm">
+                    <thead><tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/40"><th className="pb-2 font-medium">Vencimento</th><th className="pb-2 font-medium">Valor</th><th className="pb-2 font-medium">Status</th></tr></thead>
+                    <tbody>{cobrancas.map((c: any, i: number) => (
+                      <tr key={c.id ?? i} className="border-b border-white/10"><td className="py-3 text-white/70">{dataBR(c.vencimento ?? c.dataVencimento)}</td><td className="font-medium text-white/95">{fmt(c.valor ?? c.total ?? 0, d.moeda)}</td><td className="text-white/70">{c.status ?? c.situacao ?? "—"}</td></tr>
+                    ))}</tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
+            {/* Documentos */}
+            {tab === "documentos" && (
+              <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+                <h2 className="text-lg font-semibold text-white">Documentos</h2>
+                <div className="mt-6 rounded-lg border border-dashed border-white/10 bg-[#12161c] px-4 py-8 text-center text-sm text-white/40">Nenhum documento vinculado a esta receita.</div>
+              </div>
+            )}
 
             {/* Histórico de movimentações */}
+            {(tab === "resumo" || tab === "timeline") && (
             <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-white">Histórico de movimentações</h2>
@@ -153,6 +207,7 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
                 )
               })}</div>
             </div>
+            )}
           </div>
 
           {/* ── Painel direito ── */}
@@ -180,6 +235,16 @@ export default function ReceitaV3Page({ params }: { params: Promise<{ ref: strin
           </div>
         </div>
       </div>
+      {pagOpen && d && (
+        <RegistrarPagamentoModal
+          obrigacaoId={d.obrigacaoId}
+          moeda={d.moeda}
+          saldo={d.saldo}
+          natureza="RECEITA"
+          onClose={() => setPagOpen(false)}
+          onDone={() => { setPagOpen(false); setCobrancas(null); carregar() }}
+        />
+      )}
     </div>
   )
 }

@@ -835,7 +835,7 @@ export function ProcessoCentralOperacional({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setSelectedPhaseKey(null)}
-                className="inline-flex items-center gap-1.5 border-[1.5px] border-white/10 bg-[#1b2027] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg hover:border-blue-500 hover:text-[#7dd3fc] transition-colors"
+                className="inline-flex items-center gap-1.5 border-[1.5px] border-white/10 bg-[#1b2027] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg hover:border-white/20 hover:text-white transition-colors"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Voltar à fase ativa
               </button>

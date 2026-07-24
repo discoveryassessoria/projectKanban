@@ -196,7 +196,7 @@ export function PainelDaFase({
           </div>
           <button
             onClick={onAbrirPainelCompleto}
-            className="inline-flex items-center gap-1.5 border-[1.5px] border-white/10 bg-[#1b2027] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg whitespace-nowrap hover:border-blue-500 hover:text-[#7dd3fc] transition-colors"
+            className="inline-flex items-center gap-1.5 border-[1.5px] border-white/10 bg-[#1b2027] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg whitespace-nowrap hover:border-white/20 hover:text-white transition-colors"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             Abrir painel da fase
@@ -212,7 +212,7 @@ export function PainelDaFase({
               onClick={() => setAbaAtiva(t)}
               className={`text-[12.5px] font-semibold px-3 py-2.5 border-b-2 whitespace-nowrap transition-colors ${
                 abaAtiva === t
-                  ? "text-[#7dd3fc] border-blue-600"
+                  ? "border-[#2563eb] text-white"
                   : "text-white/55 border-transparent hover:text-white/95"
               }`}
             >
@@ -250,8 +250,8 @@ export function PainelDaFase({
               : s.status === "em_andamento" ? "active"
               : "pend"
             const icBorder =
-              cls === "done" ? "border-green-600 text-[#4ade80]"
-              : cls === "active" ? "border-blue-600 text-[#7dd3fc]"
+              cls === "done" ? "border-[#4ade80]/40 text-[#4ade80]"
+              : cls === "active" ? "border-[#2563eb] text-[#7dd3fc]"
               : "border-white/10 text-white/40"
             const titColor = cls === "pend" ? "text-white/40" : "text-white/95"
             const subColor =
@@ -420,9 +420,9 @@ function PersonRow({
   const borderCls = !p.isLinha
     ? "border-l-[3px] border-white/10 bg-[#15191f]"
     : p.transmissao.state === "BLOQUEADA"
-    ? "border-l-[3px] border-red-500"
+    ? "border-l-[3px] border-white/10"
     : p.transmissao.state === "OK"
-    ? "border-l-[3px] border-green-500"
+    ? "border-l-[3px] border-white/10"
     : "border-l-[3px] border-transparent"
 
   const transDot =
@@ -518,11 +518,11 @@ function PersonRow({
         {/* Próxima ação */}
         <div className="text-[13px] font-semibold text-white/55">
           {p.proximaAcao?.semResp && (
-            <span className="inline-block text-[10.5px] font-extrabold bg-[#d2a948]/15 text-[#d2a948] px-2 py-0.5 rounded-md mb-1">
+            <span className="inline-block text-[10.5px] font-extrabold bg-white/[0.06] text-white/55 border border-white/10 px-2 py-0.5 rounded-md mb-1">
               sem responsável
             </span>
           )}
-          <div className={p.proximaAcao?.cls === "crit" ? "text-[#f87171] font-bold" : ""}>
+          <div className={p.proximaAcao?.cls === "crit" ? "text-white/80 font-semibold" : ""}>
             {p.proximaAcao?.txt || <span className="text-white/40">—</span>}
           </div>
         </div>
@@ -581,7 +581,7 @@ function PersonRow({
                 value={d.responsavelId ?? ""}
                 onChange={(e) => onDelegar(d.necessidadeId as number, e.target.value ? Number(e.target.value) : null)}
                 onClick={(e) => e.stopPropagation()}
-                className={`text-[12px] rounded-md border px-1.5 py-1 bg-[#1b2027] max-w-[150px] focus:outline-none focus:border-blue-400 ${d.responsavelId ? "text-white/80 border-white/10" : "text-white/40 border-dashed border-white/15"}`}
+                className={`text-[12px] rounded-md border px-1.5 py-1 bg-[#1b2027] max-w-[150px] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 ${d.responsavelId ? "text-white/80 border-white/10" : "text-white/40 border-dashed border-white/15"}`}
                 title="Delegar responsável"
               >
                 <option value="">Delegar…</option>
@@ -645,7 +645,7 @@ const ST_OP_LABEL: Record<string, { t: string; c: string }> = {
   EM_EXECUCAO: { t: "Em execução", c: "bg-[#7dd3fc]/15 text-[#7dd3fc]" },
   AGUARDANDO_RESULTADO: { t: "Aguardando avaliação", c: "bg-[#d2a948]/15 text-[#d2a948]" },
   CONCLUIDA: { t: "Concluída", c: "bg-[#4ade80]/15 text-[#4ade80]" },
-  CONCLUIDA_PARCIAL: { t: "Concluída parcial", c: "bg-teal-100 text-teal-700" },
+  CONCLUIDA_PARCIAL: { t: "Concluída parcial", c: "bg-teal-500/15 text-teal-300" },
   NAO_ATINGIDA: { t: "Não atingida", c: "bg-[#f87171]/15 text-[#f87171]" },
   CANCELADA: { t: "Cancelada", c: "bg-[#252c35] text-white/40" },
 }
@@ -661,12 +661,12 @@ function OperacoesAntecipadasInline({ ops, readOnly, onAvaliar, onAbrir }: {
   const abertas = ops.filter((o) => !o.encerrada).length
   return (
     <div className="pr-5 pb-2" style={{ paddingLeft: 76 }}>
-      <div className="rounded-lg border border-violet-100 bg-[#a78bfa]/12/50 overflow-hidden">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-violet-100/70 text-[10.5px] font-bold uppercase tracking-wide text-[#a78bfa]">
+      <div className="rounded-lg border border-[#a78bfa]/25 bg-[#a78bfa]/12 overflow-hidden">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-[#a78bfa]/20 text-[10.5px] font-bold uppercase tracking-wide text-[#a78bfa]">
           <ArrowLeftRight className="w-3 h-3" /> Operações antecipadas
-          <span className="font-semibold text-violet-400 normal-case tracking-normal">· {ops.length}{abertas > 0 ? ` (${abertas} aberta${abertas > 1 ? "s" : ""})` : ""}</span>
+          <span className="font-semibold text-[#a78bfa]/70 normal-case tracking-normal">· {ops.length}{abertas > 0 ? ` (${abertas} aberta${abertas > 1 ? "s" : ""})` : ""}</span>
         </div>
-        <div className="divide-y divide-violet-100/70">
+        <div className="divide-y divide-[#a78bfa]/15">
           {ops.map((o) => (
             <OperacaoAntecipadaItem key={o.id} o={o} readOnly={readOnly} onAvaliar={onAvaliar} onAbrir={onAbrir} />
           ))}
@@ -723,14 +723,14 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
             {apoio && (
               <div className="grid grid-cols-2 gap-2">
                 {[["cartorio", "Cartório"], ["municipio", "Município"], ["livro", "Livro"], ["folha", "Folha"], ["termo", "Termo"], ["data", "Data"], ["fonte", "Fonte da informação"]].map(([k, label]) => (
-                  <input key={k} value={dados[k] ?? ""} onChange={(e) => setD(k, e.target.value)} placeholder={label} className="text-[12px] rounded-md border border-white/10 px-2 py-1.5 focus:outline-none focus:border-blue-400" />
+                  <input key={k} value={dados[k] ?? ""} onChange={(e) => setD(k, e.target.value)} placeholder={label} className="text-[12px] rounded-md border border-white/10 px-2 py-1.5 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25" />
                 ))}
               </div>
             )}
-            <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder={apoio ? "Observações" : "Resultado obtido"} className="w-full text-[12px] rounded-md border border-white/10 px-2 py-1.5 focus:outline-none focus:border-blue-400" autoFocus />
+            <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder={apoio ? "Observações" : "Resultado obtido"} className="w-full text-[12px] rounded-md border border-white/10 px-2 py-1.5 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25" autoFocus />
             <div className="flex items-center gap-2 flex-wrap">
               <button onClick={() => enviar("SIM")} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40 hover:bg-[#4ade80]/25"><CheckCircle2 className="w-3.5 h-3.5" /> Objetivo atingido</button>
-              <button onClick={() => enviar("PARCIAL")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-teal-200 text-teal-700 hover:bg-teal-50">Parcialmente</button>
+              <button onClick={() => enviar("PARCIAL")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-teal-500/25 text-teal-300 hover:bg-teal-500/10">Parcialmente</button>
               <button onClick={() => enviar("NAO")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-white/10 text-white/80 hover:bg-[#20262e]">Não atingido</button>
               <button onClick={() => enviar("CANCELAR")} className="text-[11.5px] text-white/40 hover:text-[#f87171] ml-auto">Cancelar operação</button>
             </div>

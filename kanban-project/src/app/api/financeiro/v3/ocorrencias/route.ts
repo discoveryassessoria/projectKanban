@@ -10,7 +10,10 @@ import { usuarioFlag } from '../_flags'
 export async function POST(req: NextRequest) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
   const u = await usuarioFlag(req)
-  if (!flagAtiva('ocorrencias', u)) {
+  // Registrar ocorrência é o par de escrita da leitura da Posição: se a Posição
+  // V3 (posicaoRead) está habilitada, o registro também está. Mantém compat com a
+  // flag específica 'ocorrencias' (aditivo — só afrouxa, nunca restringe).
+  if (!flagAtiva('ocorrencias', u) && !flagAtiva('posicaoRead', u)) {
     return NextResponse.json({ ok: false, motivo: 'Ocorrências V3 não habilitadas neste ambiente/usuário.' }, { status: 409 })
   }
   const b = await req.json().catch(() => ({}))

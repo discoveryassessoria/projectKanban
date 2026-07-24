@@ -37,7 +37,7 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 // ==========================================
 // STYLES (reusados do ProcessoTarefas)
 // ==========================================
-const selectClass = "w-full px-3 py-2 border border-white/15 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7dd3fc]/40 bg-[#1b2027] text-sm h-[42px] appearance-none cursor-pointer"
+const selectClass = "w-full px-3 py-2 border border-white/15 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#7dd3fc]/25 focus:border-[#7dd3fc]/50 bg-[#1b2027] text-sm h-[42px] appearance-none cursor-pointer"
 
 const selectStyle = {
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
@@ -413,7 +413,7 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
           <button
             onClick={handleIniciar}
             disabled={processando}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-[#d2a948] hover:bg-[#d2a948]/15 rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#0c0f13] bg-[#d2a948] hover:bg-[#c19a3e] rounded-lg transition-colors disabled:opacity-50"
           >
             {processando ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
             Iniciar
@@ -492,7 +492,7 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
           {editando ? (
             <div className="bg-[#20262e] rounded-lg p-3 space-y-2 border border-white/10">
               <Input value={editForm.titulo} onChange={(e) => setEditForm({...editForm, titulo: e.target.value})} className="bg-[#1b2027] text-sm" placeholder="Nome" />
-              <textarea value={editForm.observacoes} onChange={(e) => setEditForm({...editForm, observacoes: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-sm bg-[#1b2027] resize-none focus:outline-none focus:ring-2 focus:ring-[#7dd3fc]/40" rows={2} placeholder="Observações..." />
+              <textarea value={editForm.observacoes} onChange={(e) => setEditForm({...editForm, observacoes: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-sm bg-[#1b2027] resize-none focus:outline-none focus:ring-1 focus:ring-[#7dd3fc]/25 focus:border-[#7dd3fc]/50" rows={2} placeholder="Observações..." />
               <div className="flex gap-2">
                 <select value={editForm.prioridade} onChange={(e) => setEditForm({...editForm, prioridade: e.target.value})} className="flex-1 px-2 py-1.5 border border-white/15 rounded-lg text-xs bg-[#1b2027] appearance-none cursor-pointer" style={selectStyle}>
                   <option value="BAIXA">🟢 Baixa</option>
@@ -507,7 +507,7 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setEditando(false)} className="h-7 text-xs">Cancelar</Button>
-                <Button size="sm" onClick={handleSalvar} disabled={salvando} className="h-7 text-xs bg-[#7dd3fc] hover:bg-[#7dd3fc]/15">
+                <Button size="sm" onClick={handleSalvar} disabled={salvando} className="h-7 text-xs bg-[#2563eb] hover:bg-[#1d4ed8] text-white">
                   {salvando ? <Loader2 className="w-3 h-3 animate-spin" /> : "Salvar"}
                 </Button>
               </div>
@@ -821,7 +821,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                     type="text"
                     value={tituloEditado}
                     onChange={(e) => setTituloEditado(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-white/15 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7dd3fc]/40 text-lg font-semibold"
+                    className="flex-1 px-3 py-2 border border-white/15 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#7dd3fc]/25 focus:border-[#7dd3fc]/50 text-lg font-semibold"
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleSalvarTitulo()
@@ -920,7 +920,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                     </div>
                     <div>
                       <label className="text-xs text-white/55 mb-1 block">Observações</label>
-                      <textarea value={editForm.observacoes} onChange={(e) => setEditForm({...editForm, observacoes: e.target.value})} className="w-full px-3 py-2 border border-white/15 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#7dd3fc]/40" rows={3} placeholder="Observações da tarefa..." />
+                      <textarea value={editForm.observacoes} onChange={(e) => setEditForm({...editForm, observacoes: e.target.value})} className="w-full px-3 py-2 border border-white/15 rounded-lg text-sm resize-none focus:outline-none focus:ring-1 focus:ring-[#7dd3fc]/25 focus:border-[#7dd3fc]/50" rows={3} placeholder="Observações da tarefa..." />
                     </div>
                   </div>
                 ) : (
@@ -1006,7 +1006,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                     disabled={criandoTarefa}
                     className="flex-1 h-9 text-sm"
                   />
-                  <Button onClick={handleCriarTarefa} disabled={criandoTarefa || !novaTarefa.trim()} size="sm" className="h-9 bg-[#7dd3fc] hover:bg-[#7dd3fc]/15">
+                  <Button onClick={handleCriarTarefa} disabled={criandoTarefa || !novaTarefa.trim()} size="sm" className="h-9 bg-[#2563eb] hover:bg-[#1d4ed8] text-white">
                     {criandoTarefa ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                   </Button>
                 </div>
@@ -1032,7 +1032,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                     value={novoComentario}
                     onChange={(e) => setNovoComentario(e.target.value)}
                     placeholder="Escreva um comentário..."
-                    className="flex-1 px-3 py-2 border border-white/10 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#7dd3fc]/40 focus:border-transparent min-h-[38px] max-h-[120px]"                    rows={1}
+                    className="flex-1 px-3 py-2 border border-white/10 rounded-lg text-sm resize-none focus:outline-none focus:ring-1 focus:ring-[#7dd3fc]/25 focus:border-[#7dd3fc]/50 focus:border-transparent min-h-[38px] max-h-[120px]"                    rows={1}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault()
@@ -1048,7 +1048,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                 <button
                     onClick={handleEnviarComentario}
                     disabled={enviandoComentario || !novoComentario.trim()}
-                    className="self-center p-2 bg-[#7dd3fc] hover:bg-[#7dd3fc]/15 text-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="self-center p-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {enviandoComentario ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>

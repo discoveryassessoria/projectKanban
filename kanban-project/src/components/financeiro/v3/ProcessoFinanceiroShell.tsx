@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { ReceitasTab } from "./ReceitasTab"
 import { LancamentoManualModal } from "./LancamentoManualModal"
+import RegistrarPagamentoModal from "./RegistrarPagamentoModal"
 import { VisaoGeral } from "@/src/components/financeiro/subabas/VisaoGeral"
 import { FileText, FileMinus, CheckSquare, CalendarDays, AlertTriangle, Plus, Eye, Layers, ChevronLeft, ChevronRight, ChevronDown, ArrowDownRight, ArrowUpRight, RefreshCw, SlidersHorizontal, Download, Search, Wallet, BarChart3, Settings, RotateCcw } from "lucide-react"
 
@@ -43,6 +44,7 @@ function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
   const [obrs, setObrs] = useState<any[] | null>(null)
   const [novo, setNovo] = useState(false)
   const [cancelando, setCancelando] = useState<number | null>(null)
+  const [pagar, setPagar] = useState<any | null>(null)
   const [sub, setSub] = useState<"todos" | "pagos" | "apagar">("todos")
   const carregar = () => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}&natureza=CUSTO`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }
   async function cancelar(id: number) {
@@ -120,7 +122,7 @@ function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
                   <td className="px-5 text-white/70">{o.vencimento ? dataBR(o.vencimento) : "—"}</td>
                   <td className="px-5"><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[#4ade80]" style={{ width: `${prog}%` }} /></div><span className="text-[11px] text-white/50">{prog}%</span></div></td>
                   <td className="px-5">{quit ? <span className="rounded bg-[#4ade80]/15 px-2 py-0.5 text-[11px] font-semibold text-[#4ade80]">Pago</span> : <span className="rounded bg-[#fbbf24]/15 px-2 py-0.5 text-[11px] font-semibold text-[#fbbf24]">A pagar</span>}</td>
-                  <td className="px-5"><button onClick={() => cancelar(o.obrigacaoId)} disabled={cancelando === o.obrigacaoId} className="rounded-lg border border-white/15 px-2.5 py-1 text-xs text-white/70 hover:border-[#f87171]/50 hover:text-[#f87171] disabled:opacity-50">{cancelando === o.obrigacaoId ? "…" : "Cancelar"}</button></td>
+                  <td className="px-5"><div className="flex items-center gap-2">{!quit && <button onClick={() => setPagar(o)} className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-500">Pagar</button>}<button onClick={() => cancelar(o.obrigacaoId)} disabled={cancelando === o.obrigacaoId} className="rounded-lg border border-white/15 px-2.5 py-1 text-xs text-white/70 hover:border-[#f87171]/50 hover:text-[#f87171] disabled:opacity-50">{cancelando === o.obrigacaoId ? "…" : "Cancelar"}</button></div></td>
                 </tr>
               )
             })}{lista.length === 0 && <tr><td colSpan={9} className="px-5 py-8 text-center text-white/40">Nenhum custo neste processo.</td></tr>}</tbody>
@@ -129,6 +131,7 @@ function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
         <div className="flex items-center justify-between px-5 py-4 text-sm text-white/40"><span>Mostrando {lista.length} de {lista.length} registro{lista.length === 1 ? "" : "s"}</span><div className="flex items-center gap-1"><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded border border-[#d2a948]/40 bg-[#d2a948]/12 px-2.5 py-1 text-xs text-[#d2a948]">1</span><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronRight className="h-4 w-4" /></button></div></div>
       </div>
       {novo && <LancamentoManualModal natureza="CUSTO" processoId={processoId} onClose={() => setNovo(false)} onCriado={() => { setNovo(false); carregar() }} />}
+      {pagar && <RegistrarPagamentoModal obrigacaoId={pagar.obrigacaoId} moeda={pagar.moeda} saldo={pagar.saldo} natureza="CUSTO" onClose={() => setPagar(null)} onDone={() => { setPagar(null); carregar() }} />}
     </div>
   )
 }

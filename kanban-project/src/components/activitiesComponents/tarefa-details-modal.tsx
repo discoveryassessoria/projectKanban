@@ -36,9 +36,9 @@ const PAIS_LABELS: Record<string, string> = {
 
 const PRIORIDADE_CONFIG = {
   BAIXA: { label: 'Baixa', color: 'bg-gray-100 text-gray-600 border-gray-300', icon: '⚪' },
-  MEDIA: { label: 'Média', color: 'bg-yellow-100 text-yellow-700 border-yellow-300', icon: '🟡' },
-  ALTA: { label: 'Alta', color: 'bg-orange-100 text-orange-700 border-orange-300', icon: '🟠' },
-  URGENTE: { label: 'Urgente', color: 'bg-red-100 text-red-700 border-red-300', icon: '🔴' }
+  MEDIA: { label: 'Média', color: 'bg-amber-500/15 text-amber-300 border border-amber-500/25', icon: '🟡' },
+  ALTA: { label: 'Alta', color: 'bg-orange-500/15 text-orange-300 border border-orange-500/25', icon: '🟠' },
+  URGENTE: { label: 'Urgente', color: 'bg-red-500/15 text-red-300 border border-red-500/25', icon: '🔴' }
 }
 
 interface Subtarefa {
@@ -320,7 +320,7 @@ export function TarefaDetailsModal({
                 onClick={() => setConcluida(false)}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   !concluida 
-                    ? 'bg-yellow-100 text-yellow-700 border border-yellow-300' 
+                    ? 'bg-amber-500/15 text-amber-300 border border-amber-500/25'
                     : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
                 }`}
               >
@@ -331,7 +331,7 @@ export function TarefaDetailsModal({
                 onClick={() => setConcluida(true)}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   concluida 
-                    ? 'bg-green-100 text-green-700 border border-green-300' 
+                    ? 'bg-green-500/15 text-green-300 border border-green-500/25'
                     : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
                 }`}
               >
@@ -527,7 +527,7 @@ export function TarefaDetailsModal({
             variant="ghost"
             onClick={handleDelete}
             disabled={isDeleting}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            className="text-[#f87171] hover:bg-[#f87171]/10"
           >
             {isDeleting ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -550,7 +550,7 @@ export function TarefaDetailsModal({
               type="button"
               onClick={handleSave}
               disabled={isSaving || !titulo.trim()}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white"
             >
               {isSaving ? (
                 <>

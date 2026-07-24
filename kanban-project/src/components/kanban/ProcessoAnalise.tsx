@@ -50,10 +50,10 @@ const DECISOES: Array<[string, string]> = [
 const SEV_LABEL: Record<string, string> = { baixa: "Leve", media: "Média", critica: "Crítica" }
 const SEV_STYLE: Record<string, string> = {
   baixa: "bg-[#d2a948]/12 text-[#d2a948]",
-  media: "bg-orange-50 text-orange-700",
+  media: "bg-[#d2a948]/12 text-[#d2a948]",
   critica: "bg-[#f87171]/12 text-[#f87171]",
 }
-const SEV_DOT: Record<string, string> = { baixa: "bg-amber-400", media: "bg-orange-500", critica: "bg-[#f87171]" }
+const SEV_DOT: Record<string, string> = { baixa: "bg-amber-400", media: "bg-[#d2a948]", critica: "bg-[#f87171]" }
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("authToken")}` })
 const ini = (nome: string) => {
@@ -166,8 +166,8 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
             <Stat label="Ressalvas" value={ress} />
             <Stat label="Aprovados" value={aprov} />
           </div>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-500/15 text-sky-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
             {analise.status === "concluida" ? "Análise concluída" : "Em análise"}
           </span>
         </div>
@@ -181,20 +181,20 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
                 <div className="flex flex-col items-center text-center w-[88px] shrink-0">
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                     e.st === "concluida" ? "bg-[#4ade80] text-white"
-                    : e.st === "em_andamento" ? "bg-indigo-600 text-white"
+                    : e.st === "em_andamento" ? "bg-[#2563eb] text-white"
                     : "bg-[#252c35] text-white/55"}`}>
                     {e.st === "concluida" ? <Check className="w-4 h-4" /> : i + 1}
                   </div>
                   <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{e.label}</div>
                   <div className={`text-[10px] ${
                     e.st === "concluida" ? "text-[#4ade80]"
-                    : e.st === "em_andamento" ? "text-indigo-600"
+                    : e.st === "em_andamento" ? "text-[#7dd3fc]"
                     : "text-white/40"}`}>
                     {e.st === "concluida" ? "Concluído" : e.st === "em_andamento" ? "Em andamento" : "Pendente"}
                   </div>
                 </div>
                 {i < etapas.length - 1 && (
-                  <div className={`flex-1 h-0.5 mt-3.5 ${e.st === "concluida" ? "bg-green-400" : "bg-[#252c35]"}`} />
+                  <div className={`flex-1 h-0.5 mt-3.5 ${e.st === "concluida" ? "bg-[#4ade80]" : "bg-[#252c35]"}`} />
                 )}
               </div>
             ))}
@@ -203,12 +203,12 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
       )}
 
       <div className="rounded-xl border border-white/10 bg-[#20262e] p-4 flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0"><Sparkles className="w-5 h-5" /></div>
+        <div className="w-9 h-9 rounded-lg bg-[#20262e] text-white/80 flex items-center justify-center flex-shrink-0"><Sparkles className="w-5 h-5" /></div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-white/95">Assistente de Divergências</div>
           <p className="text-xs text-white/68 mt-0.5">Compara os dados da árvore com os dados das certidões e aponta possíveis divergências. A decisão final é sua.</p>
         </div>
-        <button onClick={rodar} disabled={running} className="px-3 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md inline-flex items-center gap-2 disabled:opacity-50 flex-shrink-0">
+        <button onClick={rodar} disabled={running} className="px-3 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50 flex-shrink-0">
           {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Rodar análise IA
         </button>
       </div>
@@ -252,12 +252,12 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
                     <td className="px-3 py-2.5"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${SEV_STYLE[d.severidade] || "bg-[#252c35] text-white/80"}`}><span className={`w-1.5 h-1.5 rounded-full ${SEV_DOT[d.severidade] || "bg-white/25"}`} />{SEV_LABEL[d.severidade] || d.severidade}</span></td>
                     <td className="px-3 py-2.5 text-xs text-white/68 max-w-[200px]">{d.sugestaoIA || "—"}</td>
                     <td className="px-3 py-2.5">
-                      <select value={d.status} onChange={(e) => decidir(d.id, e.target.value)} className={`text-xs border rounded-md px-2 py-1.5 bg-[#1b2027] focus:outline-none ${d.status === "retificacao" ? "border-red-300 text-[#f87171]" : d.status === "aceita" ? "border-green-300 text-[#4ade80]" : d.status === "pendente" ? "border-white/10 text-white/68" : "border-amber-300 text-[#d2a948]"}`}>
+                      <select value={d.status} onChange={(e) => decidir(d.id, e.target.value)} className={`text-xs border rounded-md px-2 py-1.5 bg-[#1b2027] focus:outline-none ${d.status === "retificacao" ? "border-[#f87171]/30 text-[#f87171]" : d.status === "aceita" ? "border-[#4ade80]/30 text-[#4ade80]" : d.status === "pendente" ? "border-white/10 text-white/68" : "border-[#d2a948]/30 text-[#d2a948]"}`}>
                         {DECISOES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      <button onClick={() => setDrawerDiv(d)} className="text-white/40 hover:text-indigo-600 p-1" title="Ver detalhes"><ArrowRight className="w-4 h-4" /></button>
+                      <button onClick={() => setDrawerDiv(d)} className="text-white/40 hover:text-white/80 p-1" title="Ver detalhes"><ArrowRight className="w-4 h-4" /></button>
                     </td>
                   </tr>
                 ))}
@@ -353,8 +353,8 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
           </div>
 
           {(div.sugestaoIA || div.motivoIA || div.impacto) && (
-            <div className="rounded-lg bg-indigo-50 border border-indigo-100 p-3 text-sm">
-              <div className="text-xs font-semibold text-indigo-700 mb-1">Sugestão da IA</div>
+            <div className="rounded-lg bg-sky-500/12 border border-sky-500/25 p-3 text-sm">
+              <div className="text-xs font-semibold text-sky-300 mb-1">Sugestão da IA</div>
               {div.sugestaoIA && <div className="text-white/80">{div.sugestaoIA}</div>}
               {div.motivoIA && <div className="text-white/68 text-xs mt-1">{div.motivoIA}</div>}
               {div.impacto && <div className="text-white/68 text-xs mt-1">Impacto: {div.impacto}</div>}
@@ -380,7 +380,7 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
         {!readOnly && (
           <div className="bg-[#1b2027] border-t border-white/10 px-5 py-3 flex justify-end gap-2">
             <button onClick={onClose} className="px-3 py-2 text-sm text-white/68 hover:bg-[#20262e] rounded-md">Cancelar</button>
-            <button onClick={salvar} disabled={salvando} className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md inline-flex items-center gap-2 disabled:opacity-50">
+            <button onClick={salvar} disabled={salvando} className="px-4 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50">
               {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Salvar decisão
             </button>
           </div>

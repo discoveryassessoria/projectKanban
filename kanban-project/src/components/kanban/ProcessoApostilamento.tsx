@@ -82,7 +82,7 @@ const PILL_DOT: Record<string, string> = {
 const pillCls = (s: string) => PILL[s] || "bg-[#d2a948]/12 text-[#d2a948]"
 const pillDot = (s: string) => PILL_DOT[s] || "bg-amber-400"
 
-const EC = "w-full text-sm border border-white/10 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+const EC = "w-full text-sm border border-white/10 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#7dd3fc]/25 focus:border-[#7dd3fc]/50"
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("authToken")}` })
 const jsonHeaders = () => ({ "Content-Type": "application/json", ...authHeaders() })
@@ -219,8 +219,8 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
           <Stat label="Documentos validados" value={`${k.valid} / ${k.total}`} ok={k.valid > 0} />
           <Stat label="Progresso da fase" value={`${progress}%`} />
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-            concluida ? "bg-[#4ade80]/12 text-[#4ade80]" : "bg-indigo-50 text-indigo-700"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${concluida ? "bg-[#4ade80]" : "bg-indigo-500"}`} />
+            concluida ? "bg-[#4ade80]/12 text-[#4ade80]" : "bg-sky-500/15 text-sky-300"}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${concluida ? "bg-[#4ade80]" : "bg-sky-400"}`} />
             {concluida ? "Concluída" : "Em andamento"}
           </span>
         </div>
@@ -244,18 +244,18 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
                     >
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                         done ? "bg-[#4ade80] text-white"
-                          : active ? "bg-indigo-600 text-white ring-2 ring-indigo-200"
+                          : active ? "bg-[#2563eb] text-white"
                             : "bg-[#252c35] text-white/55"}`}>
                         {done ? <Check className="w-4 h-4" /> : i + 1}
                       </div>
                       <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{AP_SHORT[i]}</div>
                       <div className={`text-[10px] ${
-                        done ? "text-[#4ade80]" : active ? "text-indigo-600" : "text-white/40"}`}>
+                        done ? "text-[#4ade80]" : active ? "text-[#7dd3fc]" : "text-white/40"}`}>
                         {done ? "Concluído" : active ? "Em andamento" : "Pendente"}
                       </div>
                     </button>
                     {i < pasta.workflow.length - 1 && (
-                      <div className={`flex-1 h-0.5 mt-3.5 ${done ? "bg-green-400" : "bg-[#252c35]"}`} />
+                      <div className={`flex-1 h-0.5 mt-3.5 ${done ? "bg-[#4ade80]" : "bg-[#252c35]"}`} />
                     )}
                   </div>
                 )
@@ -266,7 +266,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
               <div className="mt-3 pt-3 border-t border-white/10 flex justify-end">
                 <button
                   onClick={() => setModalStep(activeStep.id)}
-                  className="px-3 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md inline-flex items-center gap-2"
+                  className="px-3 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2"
                 >
                   {activeStep.title}
                 </button>
@@ -276,7 +276,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
 
           {/* Card de contexto */}
           <div className="rounded-xl border border-white/10 bg-[#20262e] p-4 flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-[#20262e] text-white/80 flex items-center justify-center flex-shrink-0">
               <FolderOpen className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
@@ -381,7 +381,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
                 <AlertTriangle className="w-4 h-4 shrink-0" /> {k.total - k.valid} documento(s) de apostila pendente(s)
               </div>
               {k.corr > 0 && (
-                <div className="flex items-center gap-2 text-orange-700 bg-orange-50 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2 text-[#d2a948] bg-[#d2a948]/12 border border-[#d2a948]/25 rounded-lg px-3 py-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" /> {k.corr} correção(ões) solicitada(s)
                 </div>
               )}
@@ -399,7 +399,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
       </div>
 
       {erro && <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-4 py-3 text-sm text-[#f87171]">{erro}</div>}
-      {aviso && <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">{aviso}</div>}
+      {aviso && <div className="bg-sky-500/12 border border-sky-500/25 rounded-lg px-4 py-3 text-sm text-sky-300">{aviso}</div>}
 
       {modalStep && (
         <EtapaModal
@@ -540,7 +540,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
       <div className="relative w-full max-w-lg bg-[#1b2027] rounded-xl shadow-xl max-h-[85vh] flex flex-col">
         <div className="flex items-start justify-between px-5 py-4 border-b border-white/10">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600">Etapa {num} de 6 · Workflow do Apostilamento</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-[#7dd3fc]">Etapa {num} de 6 · Workflow do Apostilamento</div>
             <h3 className="text-base font-bold text-white/95 mt-0.5">{title}</h3>
           </div>
           <button onClick={onClose} className="text-white/40 hover:text-white/80 p-1"><X className="w-5 h-5" /></button>
@@ -570,7 +570,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
                   <div className="flex gap-2">
                     {TIPO_APOSTILA.map(([v, l]) => (
                       <button key={v} type="button" onClick={() => setTipo(v)}
-                        className={`flex-1 px-3 py-2 text-xs font-semibold rounded-md border ${tipo === v ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-white/10 text-white/80"}`}>{l}</button>
+                        className={`flex-1 px-3 py-2 text-xs font-semibold rounded-md border ${tipo === v ? "border-[#2563eb] bg-[#20262e] text-white" : "border-white/10 text-white/80"}`}>{l}</button>
                     ))}
                   </div>
                 </Field>
@@ -582,7 +582,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
               <div className="space-y-2">
                 {MONTAR_CHK.map(([key, label]) => (
                   <button key={key} type="button" onClick={() => setMontarChk((p) => ({ ...p, [key]: !p[key] }))}
-                    className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-left ${montarChk[key] ? "border-green-300 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/80"}`}>
+                    className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-left ${montarChk[key] ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/80"}`}>
                     <span className={`w-4 h-4 rounded flex items-center justify-center ${montarChk[key] ? "bg-[#4ade80] text-white" : "border border-white/15"}`}>
                       {montarChk[key] && <Check className="w-3 h-3" />}
                     </span>
@@ -607,7 +607,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
                 <div className="flex flex-wrap gap-2">
                   {CANAIS.map(([v, l]) => (
                     <button key={v} type="button" onClick={() => setCanal(v)}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${canal === v ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-white/10 text-white/80"}`}>{l}</button>
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${canal === v ? "border-[#2563eb] bg-[#20262e] text-white" : "border-white/10 text-white/80"}`}>{l}</button>
                   ))}
                 </div>
               </Field>
@@ -654,7 +654,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
                       <input className="text-xs border border-white/10 rounded-md px-2 py-1.5 w-28" placeholder="Data"
                         value={dates[d.documentoId] || ""} onChange={(e) => setDates((p) => ({ ...p, [d.documentoId]: e.target.value }))} />
                       <button type="button" onClick={() => setFiles((p) => ({ ...p, [d.documentoId]: `apostilado_${d.documentoId}.pdf` }))}
-                        className={`inline-flex items-center gap-1.5 text-xs font-semibold rounded-md border px-3 py-1.5 ${files[d.documentoId] ? "border-green-300 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/80"}`}>
+                        className={`inline-flex items-center gap-1.5 text-xs font-semibold rounded-md border px-3 py-1.5 ${files[d.documentoId] ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/80"}`}>
                         {files[d.documentoId] ? <Check className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
                         {files[d.documentoId] ? "Anexado" : "Anexar"}
                       </button>
@@ -685,7 +685,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
                       const on = confChk[key]
                       return (
                         <button key={ci} type="button" onClick={() => setConfChk((p) => ({ ...p, [key]: !p[key] }))}
-                          className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${on ? "border-green-300 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/68"}`}>
+                          className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${on ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/68"}`}>
                           <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${on ? "bg-[#4ade80] text-white" : "border border-white/15"}`}>{on && <Check className="w-2.5 h-2.5" />}</span>
                           {c}
                         </button>
@@ -696,10 +696,10 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
                     {CONF_RES.map(([v, l, tone]) => {
                       const sel = confRes[d.documentoId] === v
                       const selCls = !sel ? "border-white/10 text-white/80"
-                        : tone === "ok" ? "border-green-400 bg-[#4ade80]/12 text-[#4ade80]"
-                          : tone === "warn" ? "border-amber-400 bg-[#d2a948]/12 text-[#d2a948]"
-                            : tone === "crit" ? "border-red-400 bg-[#f87171]/12 text-[#f87171]"
-                              : "border-indigo-400 bg-indigo-50 text-indigo-700"
+                        : tone === "ok" ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]"
+                          : tone === "warn" ? "border-[#d2a948]/25 bg-[#d2a948]/12 text-[#d2a948]"
+                            : tone === "crit" ? "border-[#f87171]/25 bg-[#f87171]/12 text-[#f87171]"
+                              : "border-[#2563eb] bg-[#20262e] text-white"
                       return (
                         <button key={v} type="button" onClick={() => setConfRes((p) => ({ ...p, [d.documentoId]: v }))}
                           className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${selCls}`}>{l}</button>
@@ -726,7 +726,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
               <div className="space-y-2">
                 {VALIDAR_DECS.map(([v, l, sub]) => (
                   <button key={v} type="button" onClick={() => setDecision(v)}
-                    className={`w-full text-left border rounded-lg px-3 py-2.5 ${decision === v ? "border-indigo-500 bg-indigo-50" : "border-white/10"}`}>
+                    className={`w-full text-left border rounded-lg px-3 py-2.5 ${decision === v ? "border-[#2563eb] bg-[#20262e]" : "border-white/10"}`}>
                     <div className="text-sm font-semibold text-white/95">{l}</div>
                     <div className="text-[11px] text-white/55">{sub}</div>
                   </button>
@@ -742,7 +742,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
         <div className="border-t border-white/10 px-5 py-3 flex justify-end gap-2">
           <button onClick={onClose} className="px-3 py-2 text-sm text-white/68 hover:bg-[#20262e] rounded-md">Cancelar</button>
           <button onClick={submit} disabled={!podeSalvar || posting}
-            className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            className="px-4 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
             {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
             {stepId === "validar_pasta_apostilada" ? "Confirmar decisão" : "Concluir etapa"}
           </button>

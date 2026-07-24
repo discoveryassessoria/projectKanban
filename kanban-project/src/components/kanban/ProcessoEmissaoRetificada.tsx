@@ -125,7 +125,7 @@ interface Props {
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("authToken")}` })
 const jsonHeaders = () => ({ "Content-Type": "application/json", ...authHeaders() })
-const EC = "w-full text-sm border border-white/10 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+const EC = "w-full text-sm border border-white/10 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#7dd3fc]/25 focus:border-[#7dd3fc]/50"
 const ini = (nome: string) => {
   const p = (nome || "").trim().split(/\s+/)
   return ((p[0]?.[0] || "") + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase() || "—"
@@ -242,8 +242,8 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
         <div className="flex items-center gap-2 shrink-0">
           <Stat label="Documentos validados" value={`${k.valid} / ${k.total}`} ok={k.valid > 0} />
           <Stat label="Progresso da fase" value={`${pct}%`} />
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${pct >= 100 ? "bg-[#4ade80]/12 text-[#4ade80]" : "bg-indigo-50 text-indigo-700"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${pct >= 100 ? "bg-[#4ade80]" : "bg-indigo-500"}`} />
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${pct >= 100 ? "bg-[#4ade80]/12 text-[#4ade80]" : "bg-sky-500/15 text-sky-300"}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${pct >= 100 ? "bg-[#4ade80]" : "bg-sky-400"}`} />
             {pct >= 100 ? "Concluída" : "Em andamento"}
           </span>
         </div>
@@ -262,11 +262,11 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
                   return (
                     <div key={s.id} className={`flex items-start ${i < foco.workflow.length - 1 ? "flex-1" : ""}`}>
                       <div className="flex flex-col items-center text-center w-[100px] shrink-0">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${done ? "bg-[#4ade80] text-white" : active ? "bg-indigo-600 text-white" : "bg-[#252c35] text-white/55"}`}>{done ? <Check className="w-4 h-4" /> : i + 1}</div>
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${done ? "bg-[#4ade80] text-white" : active ? "bg-[#2563eb] text-white" : "bg-[#252c35] text-white/55"}`}>{done ? <Check className="w-4 h-4" /> : i + 1}</div>
                         <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{RE_SHORT[i]}</div>
-                        <div className={`text-[10px] ${done ? "text-[#4ade80]" : active ? "text-indigo-600" : "text-white/40"}`}>{done ? "Concluída" : active ? "Atual" : "Pendente"}</div>
+                        <div className={`text-[10px] ${done ? "text-[#4ade80]" : active ? "text-[#7dd3fc]" : "text-white/40"}`}>{done ? "Concluída" : active ? "Atual" : "Pendente"}</div>
                       </div>
-                      {i < foco.workflow.length - 1 && <div className={`flex-1 h-0.5 mt-3.5 ${done ? "bg-green-400" : "bg-[#252c35]"}`} />}
+                      {i < foco.workflow.length - 1 && <div className={`flex-1 h-0.5 mt-3.5 ${done ? "bg-[#4ade80]" : "bg-[#252c35]"}`} />}
                     </div>
                   )
                 })}
@@ -276,7 +276,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
 
           {/* Contexto */}
           <div className="rounded-xl border border-white/10 bg-[#20262e] p-4 flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0"><FileText className="w-5 h-5" /></div>
+            <div className="w-9 h-9 rounded-lg bg-[#20262e] text-white/80 flex items-center justify-center flex-shrink-0"><FileText className="w-5 h-5" /></div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold text-white/95">Documentos pós-retificação</div>
               <p className="text-xs text-white/68 mt-0.5">Esta fase emite novamente apenas os documentos impactados pela retificação de registros. A fase conclui quando todas as certidões retificadas forem validadas.</p>
@@ -327,7 +327,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
                         <td className="px-3 py-2.5"><RePill status={d.status} /></td>
                         <td className="px-3 py-2.5 text-white/68">{d.nextAction}</td>
                         <td className="px-3 py-2.5 text-right">
-                          <button onClick={(e) => { e.stopPropagation(); setDrawerId(d.id); setDrawerTab(reDone(d) ? "Workflow" : "Operação") }} className={`text-xs font-semibold rounded-md px-2.5 py-1.5 border ${reDone(d) ? "border-[#4ade80]/30 text-[#4ade80]" : "border-indigo-200 text-indigo-600 hover:text-indigo-800"}`}>{reDone(d) ? "Ver workflow" : "Abrir operação"}</button>
+                          <button onClick={(e) => { e.stopPropagation(); setDrawerId(d.id); setDrawerTab(reDone(d) ? "Workflow" : "Operação") }} className={`text-xs font-semibold rounded-md px-2.5 py-1.5 border ${reDone(d) ? "border-[#4ade80]/30 text-[#4ade80]" : "border-white/10 bg-[#20262e] text-white hover:bg-[#252c35]"}`}>{reDone(d) ? "Ver workflow" : "Abrir operação"}</button>
                         </td>
                       </tr>
                     ))}
@@ -351,7 +351,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
           <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
             <h3 className="text-sm font-semibold text-white/95 mb-2.5">Alertas</h3>
             <div className="space-y-2 text-xs">
-              {k.bloq > 0 && <div className="flex items-center gap-2 text-orange-700 bg-orange-50 rounded-lg px-3 py-2"><AlertTriangle className="w-4 h-4 shrink-0" /> {k.bloq} documento(s) com divergência pós-retificação</div>}
+              {k.bloq > 0 && <div className="flex items-center gap-2 text-[#d2a948] bg-[#d2a948]/12 border border-[#d2a948]/25 rounded-lg px-3 py-2"><AlertTriangle className="w-4 h-4 shrink-0" /> {k.bloq} documento(s) com divergência pós-retificação</div>}
               <div className="flex items-center gap-2 text-[#d2a948] bg-[#d2a948]/12 rounded-lg px-3 py-2"><AlertTriangle className="w-4 h-4 shrink-0" /> {k.total - k.valid} certidão(ões) retificada(s) pendente(s)</div>
               <div className="flex items-center gap-2 text-[#4ade80] bg-[#4ade80]/12 rounded-lg px-3 py-2"><CheckCircle2 className="w-4 h-4 shrink-0" /> {k.valid} validada(s)</div>
             </div>
@@ -360,7 +360,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
       </div>
 
       {erro && <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-4 py-3 text-sm text-[#f87171]">{erro}</div>}
-      {aviso && <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">{aviso}</div>}
+      {aviso && <div className="bg-sky-500/12 border border-sky-500/25 rounded-lg px-4 py-3 text-sm text-sky-300">{aviso}</div>}
 
       {/* Drawer do documento */}
       {drawerDoc && (
@@ -440,7 +440,7 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
         {/* Header */}
         <div className="px-5 py-4 border-b border-white/10">
           <button onClick={onClose} className="text-white/40 hover:text-white/80 float-right p-1"><X className="w-5 h-5" /></button>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600">Emissão documental retificada · {pk.pessoaNome}</div>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-[#7dd3fc]">Emissão documental retificada · {pk.pessoaNome}</div>
           <h3 className="text-base font-bold text-white/95 mt-0.5">{pk.documentoTitulo} retificada</h3>
           <div className="text-xs text-white/55">{pk.pessoaNome} · documento pós-retificação</div>
           <div className="grid grid-cols-3 gap-2 mt-3">
@@ -448,14 +448,14 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
             <MetaCell k="Responsável"><b className="text-white/95 text-xs">Equipe Documental</b></MetaCell>
             <MetaCell k="Próxima ação"><b className="text-white/95 text-xs">{pk.nextAction}</b></MetaCell>
           </div>
-          <div className="mt-3 h-1.5 bg-[#252c35] rounded-full overflow-hidden"><div className="h-full bg-indigo-500" style={{ width: `${prog}%` }} /></div>
+          <div className="mt-3 h-1.5 bg-[#252c35] rounded-full overflow-hidden"><div className="h-full bg-[#7dd3fc]" style={{ width: `${prog}%` }} /></div>
           <div className="flex justify-between text-[11px] text-white/55 mt-1"><span>Progresso operacional</span><span>{prog}% · workflow retificado</span></div>
         </div>
 
         {/* Tabs */}
         <div className="border-b border-white/10 px-3 flex gap-1 overflow-x-auto">
           {DRAWER_TABS.map((t) => (
-            <button key={t} onClick={() => onTab(t)} className={`px-2.5 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 ${t === tab ? "border-indigo-600 text-indigo-700" : "border-transparent text-white/55 hover:text-white/80"}`}>{t}</button>
+            <button key={t} onClick={() => onTab(t)} className={`px-2.5 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 ${t === tab ? "border-[#2563eb] text-white" : "border-transparent text-white/55 hover:text-white/80"}`}>{t}</button>
           ))}
         </div>
 
@@ -470,10 +470,10 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
               </div>
             ) : cur ? (
               <div className="rounded-lg border border-white/10 p-4 text-center">
-                <div className="w-9 h-9 mx-auto rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center mb-2"><FileText className="w-5 h-5" /></div>
+                <div className="w-9 h-9 mx-auto rounded-full bg-[#20262e] text-white/80 flex items-center justify-center mb-2"><FileText className="w-5 h-5" /></div>
                 <h4 className="text-sm font-bold text-white/95">{cur.title}</h4>
                 <p className="text-xs text-white/68 mb-3">Etapa atual do workflow retificado. Abra para registrar e concluir.</p>
-                <button onClick={() => onAbrirEtapa(cur.id)} className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md inline-flex items-center gap-2">Abrir etapa <ArrowRight className="w-4 h-4" /></button>
+                <button onClick={() => onAbrirEtapa(cur.id)} className="px-4 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2">Abrir etapa <ArrowRight className="w-4 h-4" /></button>
               </div>
             ) : null
           )}
@@ -487,9 +487,9 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
                 const meta = isDone ? `concluída${s.doneAt ? " em " + s.doneAt : ""}` : active ? "etapa atual" : "bloqueada · conclua a anterior"
                 return (
                   <div key={s.id} className="flex items-center gap-3 border border-white/10 rounded-lg px-3 py-2.5">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${isDone ? "bg-[#4ade80]/15 text-[#4ade80]" : active ? "bg-indigo-100 text-indigo-700" : "bg-[#252c35] text-white/40"}`}>{isDone ? "✓" : i + 1}</span>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${isDone ? "bg-[#4ade80]/15 text-[#4ade80]" : active ? "bg-[#2563eb] text-white" : "bg-[#252c35] text-white/40"}`}>{isDone ? "✓" : i + 1}</span>
                     <div className="flex-1 min-w-0"><div className="text-sm font-medium text-white/95">{i + 1}. {s.title}</div><div className="text-[11px] text-white/55">{meta}</div></div>
-                    {active && <button onClick={() => onAbrirEtapa(s.id)} className="text-xs font-semibold text-indigo-600 border border-indigo-200 rounded-md px-2.5 py-1.5">Central da etapa</button>}
+                    {active && <button onClick={() => onAbrirEtapa(s.id)} className="text-xs font-semibold text-white bg-[#20262e] border border-white/10 hover:bg-[#252c35] rounded-md px-2.5 py-1.5">Central da etapa</button>}
                   </div>
                 )
               })}
@@ -697,8 +697,8 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
             <Sec>2. Tipo de mídia</Sec>
             <div className="space-y-2">
               {MIDIAS.map(([v, l]) => (
-                <button key={v} type="button" onClick={() => setReMidia(v)} className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-left ${reMidia === v ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-white/10 text-white/80"}`}>
-                  <span className={`w-3.5 h-3.5 rounded-full border ${reMidia === v ? "border-indigo-500 bg-indigo-500" : "border-white/15"}`} />{l}
+                <button key={v} type="button" onClick={() => setReMidia(v)} className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-left ${reMidia === v ? "border-[#2563eb] bg-[#20262e] text-white" : "border-white/10 text-white/80"}`}>
+                  <span className={`w-3.5 h-3.5 rounded-full border ${reMidia === v ? "border-[#2563eb] bg-[#2563eb]" : "border-white/15"}`} />{l}
                 </button>
               ))}
             </div>
@@ -721,7 +721,7 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
             <Sec>Checklist de conferência</Sec>
             <div className="flex flex-wrap gap-1.5">
               {CONF_CHK.map(([key, label]) => (
-                <button key={key} type="button" onClick={() => setCfChk((p) => ({ ...p, [key]: !p[key] }))} className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${cfChk[key] ? "border-green-300 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/68"}`}>
+                <button key={key} type="button" onClick={() => setCfChk((p) => ({ ...p, [key]: !p[key] }))} className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${cfChk[key] ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/68"}`}>
                   <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${cfChk[key] ? "bg-[#4ade80] text-white" : "border border-white/15"}`}>{cfChk[key] && <Check className="w-2.5 h-2.5" />}</span>{label}
                 </button>
               ))}
@@ -730,7 +730,7 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
             <div className="grid grid-cols-3 gap-2">
               {CONF_RES.map(([v, l, hint, tone]) => {
                 const sel = cfRes === v
-                const cls = !sel ? "border-white/10 text-white/80" : tone === "ok" ? "border-green-400 bg-[#4ade80]/12 text-[#4ade80]" : tone === "warn" ? "border-red-400 bg-[#f87171]/12 text-[#f87171]" : "border-white/20 bg-[#20262e] text-white/80"
+                const cls = !sel ? "border-white/10 text-white/80" : tone === "ok" ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : tone === "warn" ? "border-[#f87171]/25 bg-[#f87171]/12 text-[#f87171]" : "border-white/20 bg-[#20262e] text-white/80"
                 return <button key={v} type="button" onClick={() => setCfRes(v)} className={`border rounded-lg px-2 py-2 text-center ${cls}`}><div className="text-xs font-semibold">{l}</div><div className="text-[10px] text-white/55">{hint}</div></button>
               })}
             </div>
@@ -748,7 +748,7 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
             <Sec>Decisão final</Sec>
             <div className="space-y-2">
               {VAL_DECS.map(([v, l, sub, tone]) => (
-                <button key={v} type="button" onClick={() => setVlDec(v)} className={`w-full text-left border rounded-lg px-3 py-2.5 ${vlDec === v ? (tone === "ok" ? "border-green-400 bg-[#4ade80]/12" : "border-indigo-500 bg-indigo-50") : "border-white/10"}`}>
+                <button key={v} type="button" onClick={() => setVlDec(v)} className={`w-full text-left border rounded-lg px-3 py-2.5 ${vlDec === v ? (tone === "ok" ? "border-[#4ade80]/25 bg-[#4ade80]/12" : "border-[#2563eb] bg-[#20262e]") : "border-white/10"}`}>
                   <div className="text-sm font-semibold text-white/95">{l}</div><div className="text-[11px] text-white/55">{sub}</div>
                 </button>
               ))}
@@ -762,7 +762,7 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
 
       <div className="border-t border-white/10 px-5 py-3 -mx-5 -mb-5 mt-4 flex justify-end gap-2">
         <button onClick={onClose} className="px-3 py-2 text-sm text-white/68 hover:bg-[#20262e] rounded-md">Cancelar</button>
-        <button onClick={submit} disabled={!podeSalvar || posting} className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+        <button onClick={submit} disabled={!podeSalvar || posting} className="px-4 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
           {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
           {isLast ? "Confirmar · finalizar documento" : "Confirmar · concluir etapa"}
         </button>
@@ -788,9 +788,9 @@ function ModalShell({ children, onClose, title, sub, eyebrow, danger, maxW = "ma
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className={`relative w-full ${maxW} bg-[#1b2027] rounded-xl shadow-xl max-h-[85vh] flex flex-col`}>
-        <div className={`flex items-start justify-between px-5 py-4 border-b ${danger ? "border-red-100" : "border-white/10"}`}>
+        <div className={`flex items-start justify-between px-5 py-4 border-b ${danger ? "border-white/10" : "border-white/10"}`}>
           <div>
-            {eyebrow && <div className={`text-[11px] font-semibold uppercase tracking-wider ${danger ? "text-[#f87171]" : "text-indigo-600"}`}>{eyebrow}</div>}
+            {eyebrow && <div className={`text-[11px] font-semibold uppercase tracking-wider ${danger ? "text-[#f87171]" : "text-[#7dd3fc]"}`}>{eyebrow}</div>}
             <h3 className="text-base font-bold text-white/95 mt-0.5">{title}</h3>
             {sub && <p className="text-xs text-white/55 mt-0.5">{sub}</p>}
           </div>
@@ -820,14 +820,14 @@ function Chips({ opts, value, onChange }: { opts: Array<[string, string]>; value
   return (
     <div className="flex flex-wrap gap-2">
       {opts.map(([v, l]) => (
-        <button key={v} type="button" onClick={() => onChange(v)} className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${value === v ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-white/10 text-white/80"}`}>{l}</button>
+        <button key={v} type="button" onClick={() => onChange(v)} className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${value === v ? "border-[#2563eb] bg-[#20262e] text-white" : "border-white/10 text-white/80"}`}>{l}</button>
       ))}
     </div>
   )
 }
 function FakeFile({ ok, onClick, label, okLabel }: { ok: boolean; onClick: () => void; label: string; okLabel: string }) {
   return (
-    <button type="button" onClick={onClick} className={`w-full inline-flex items-center gap-2 text-sm font-semibold rounded-md border px-3 py-2.5 ${ok ? "border-green-300 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/80"}`}>
+    <button type="button" onClick={onClick} className={`w-full inline-flex items-center gap-2 text-sm font-semibold rounded-md border px-3 py-2.5 ${ok ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/80"}`}>
       {ok ? <Check className="w-4 h-4" /> : <Upload className="w-4 h-4" />}{ok ? okLabel : label}
     </button>
   )

@@ -10,6 +10,7 @@ const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
 export interface ReceitaDetalhe {
   obrigacaoId: number
+  receitaId: number | null
   codigo: string | null
   descricao: string | null
   statusLabel: string // A VENCER | QUITADO | ...
@@ -124,7 +125,8 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   const primeiro = parts[0]
 
   return {
-    obrigacaoId: id, codigo: obr.codigoOperacional, descricao: itemMestre?.name ?? receita?.descricao ?? obr.observacoes ?? null, statusLabel,
+    obrigacaoId: id, receitaId: obr.origemTipo === 'Receita' ? (obr.origemId ?? null) : null,
+    codigo: obr.codigoOperacional, descricao: itemMestre?.name ?? receita?.descricao ?? obr.observacoes ?? null, statusLabel,
     processo: { id: processo?.id ?? null, codigo: processo?.codigo ?? null, nome: processo?.nome ?? null },
     responsavel: primeiro ? { nome: nome(primeiro.pessoaId), papel: 'Principal' } : null,
     servico: itemMestre?.name ?? tipoServico?.nome ?? (receita?.categoria ? String(receita.categoria) : null),

@@ -505,7 +505,7 @@ export function ProcessoDetailsModal({
           <div className="flex items-center gap-4">
             <button 
               onClick={handleClose}
-              className="w-10 h-10 bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center justify-center transition-colors"
+              className="w-10 h-10 bg-[#2563eb] hover:bg-[#1d4ed8] rounded-lg flex items-center justify-center transition-colors"
             >
               <X className="h-5 w-5 text-white" />
             </button>
@@ -557,7 +557,7 @@ export function ProcessoDetailsModal({
               className={`
                 px-4 py-3 text-sm font-medium border-b-2 transition-colors
                 ${activeTab === tab.id
-                  ? (finDark ? 'border-[#d2a948] text-[#d2a948]' : 'border-blue-500 text-blue-600')
+                  ? (finDark ? 'border-[#d2a948] text-[#d2a948]' : 'border-[#2563eb] text-white')
                   : (finDark ? 'border-transparent text-white/60 hover:text-white' : 'border-transparent text-gray-500 hover:text-gray-700')}
               `}
             >

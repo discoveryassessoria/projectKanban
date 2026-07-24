@@ -112,7 +112,7 @@ export function TarefaTransversalModal({ processoId, necessidadeId, necessidadeL
           ) : (
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Necessidade a atender</span>
-              <select value={necSel} onChange={(e) => setNecSel(e.target.value)} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[#1b2027] focus:outline-none focus:border-amber-400">
+              <select value={necSel} onChange={(e) => setNecSel(e.target.value)} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[#1b2027] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25">
                 <option value="">— selecione —</option>
                 {necessidades.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
               </select>
@@ -122,14 +122,14 @@ export function TarefaTransversalModal({ processoId, necessidadeId, necessidadeL
           <div className="grid grid-cols-2 gap-2">
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Fase da operação oficial</span>
-              <select value={faseRef} onChange={(e) => { setFaseRef(e.target.value); setAcaoStepKey("") }} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[#1b2027] focus:outline-none focus:border-amber-400">
+              <select value={faseRef} onChange={(e) => { setFaseRef(e.target.value); setAcaoStepKey("") }} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[#1b2027] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25">
                 <option value="">— selecione —</option>
                 {fases.map((f) => <option key={f.faseCode} value={f.faseCode}>{f.faseLabel}</option>)}
               </select>
             </label>
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Ação oficial referenciada</span>
-              <select value={acaoStepKey} onChange={(e) => setAcaoStepKey(e.target.value)} disabled={!faseRef} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[#1b2027] focus:outline-none focus:border-amber-400 disabled:opacity-50">
+              <select value={acaoStepKey} onChange={(e) => setAcaoStepKey(e.target.value)} disabled={!faseRef} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[#1b2027] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 disabled:opacity-50">
                 <option value="">— selecione —</option>
                 {acoesDaFase.map((a) => <option key={a.stepKey} value={a.stepKey}>{a.title}</option>)}
               </select>
@@ -138,16 +138,16 @@ export function TarefaTransversalModal({ processoId, necessidadeId, necessidadeL
 
           <label className="block">
             <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Objetivo</span>
-            <input value={objetivo} onChange={(e) => setObjetivo(e.target.value)} placeholder="Ex.: antecipar tradução da certidão" className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[#1b2027] focus:outline-none focus:border-amber-400" />
+            <input value={objetivo} onChange={(e) => setObjetivo(e.target.value)} placeholder="Ex.: antecipar tradução da certidão" className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[#1b2027] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25" />
           </label>
           <label className="block">
             <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Resultado esperado (opcional)</span>
-            <input value={resultadoEsperado} onChange={(e) => setResultadoEsperado(e.target.value)} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[#1b2027] focus:outline-none focus:border-amber-400" />
+            <input value={resultadoEsperado} onChange={(e) => setResultadoEsperado(e.target.value)} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[#1b2027] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25" />
           </label>
           {usuarios && usuarios.length > 0 && (
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Responsável (opcional)</span>
-              <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[#1b2027] focus:outline-none focus:border-amber-400">
+              <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[#1b2027] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25">
                 <option value="">— sem responsável —</option>
                 {usuarios.map((u) => <option key={u.id} value={u.id}>{u.publicCode ? u.publicCode + " — " : ""}{u.nome}</option>)}
               </select>
@@ -158,7 +158,7 @@ export function TarefaTransversalModal({ processoId, necessidadeId, necessidadeL
         </div>
         <div className="flex items-center justify-end gap-2 px-5 pb-4">
           <button onClick={onClose} disabled={enviando} className="text-[13px] font-semibold px-3.5 py-2 rounded-lg text-white/68 hover:bg-[#252c35]">Cancelar</button>
-          <button onClick={criar} disabled={enviando} className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60">
+          <button onClick={criar} disabled={enviando} className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-4 py-2 rounded-lg bg-[#2563eb] text-white hover:bg-[#1d4ed8] disabled:opacity-60">
             {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowLeftRight className="w-4 h-4" />} Criar tarefa transversal
           </button>
         </div>
