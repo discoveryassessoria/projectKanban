@@ -39,6 +39,7 @@ const ADITIVAS = [
   '20260810000000_opening_balance_rollback',
   '20260811000000_conciliacao_bancaria',
   '20260812000000_ocorrencia_detalhe_pagamento',
+  '20260815000000_evento_status_responsavel',
 ]
 
 // Colunas-sentinela p/ verificação pós-aplicação.
@@ -70,6 +71,8 @@ const SENTINELAS = [
   ['TaxaPagamentoPais', ['taxaId', 'paisId']],
   // Tabela de parcelamento da Taxa (tabela comercial da adquirente).
   ['TaxaParcelamento', ['taxaId', 'parcelasDe', 'parcelasAte', 'feePercent', 'fixedFee', 'antecipacao']],
+  // Evento: campos aditivos status + responsável.
+  ['Evento', ['status', 'responsavelId']],
 ]
 
 const log = (m) => console.log(`[cadastros-aditivas] ${m}`)

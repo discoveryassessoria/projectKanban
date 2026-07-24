@@ -26,6 +26,7 @@ model Usuario {
   perfil             Perfil?            @relation(fields: [perfilId], references: [id])
 
   documentosResponsavel Documento[] @relation("DocumentoResponsavel")
+  eventosResponsavel    Evento[]    @relation("EventoResponsavel")
 
   @@index([perfilId])
 }
@@ -1025,13 +1026,17 @@ model Evento {
   lembreteDias Int?
   cor          String?    @db.VarChar(7)
   observacoes  String?
+  status       String     @default("PENDENTE") @db.VarChar(20) // CONFIRMADO | PENDENTE | CANCELADO — aditivo
+  responsavelId Int?      // responsável pelo evento — aditivo
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   processo     Processo?  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  responsavel  Usuario?   @relation("EventoResponsavel", fields: [responsavelId], references: [id])
 
   @@index([processoId])
   @@index([dataInicio])
   @@index([tipo])
+  @@index([responsavelId])
 }
 
 model BlogPost {

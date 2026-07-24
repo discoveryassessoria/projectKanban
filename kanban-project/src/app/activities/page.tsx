@@ -587,7 +587,7 @@ function CreateActivityModal() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="text-[#1b1508] hover:opacity-90 inline-flex items-center justify-center gap-1.5 h-9 font-semibold" style={{ background: "var(--accent-primary)" }}>
+        <Button className="bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center justify-center gap-1.5 h-9">
           <span className="-mt-[2px]">+</span>
           <span>Nova Atividade</span>
         </Button>

@@ -30,6 +30,11 @@ import {
 import { BandeiraPais } from "@/src/components/ui/bandeira-pais"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import {
+  KpiCard, StatusBadge, FilterChip, ActionMenu, Pagination, SurfaceCard,
+  Thead, Th, Tr, EmptyState, SearchInput, SecondaryButton, type Tone,
+} from "@/src/components/financeiroComponents/ui/kit"
+import { Search, ChevronDown } from "lucide-react"
 
 interface Usuario {
   id: number
@@ -49,10 +54,23 @@ interface Evento {
   local?: string
   lembreteDias?: number
   cor?: string
+  status?: string
+  responsavel?: { id: number; nome: string } | null
   processo: {
     id: number
     nome: string
     pais: string
+    codigo?: string | null
+  }
+}
+
+// Status do evento → cor semântica (badge)
+function statusEventoBadge(status?: string): { label: string; tone: Tone } {
+  switch ((status || "PENDENTE").toUpperCase()) {
+    case "CONFIRMADO": return { label: "Confirmado", tone: "success" }
+    case "CANCELADO": return { label: "Cancelado", tone: "neutral" }
+    case "ATRASADO": return { label: "Atrasado", tone: "danger" }
+    default: return { label: "Pendente", tone: "warning" }
   }
 }
 
@@ -79,6 +97,9 @@ export default function EventosPage() {
   const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista")
   const [mesAtual, setMesAtual] = useState(new Date())
   const [filtroTipo, setFiltroTipo] = useState<string | null>(null)
+  const [busca, setBusca] = useState("")
+  const [pagina, setPagina] = useState(1)
+  const porPagina = 20
   
 const [showForm, setShowForm] = useState(false)
 const [editingId, setEditingId] = useState<number | null>(null)
@@ -346,7 +367,8 @@ const handleSubmit = async () => {
 
   return (
     <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
+      <div className="pointer-events-none fixed inset-0 -z-10 scale-105 blur-[6px] bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-black/85" />
 
       <HeaderBar
         title="Eventos"
@@ -361,7 +383,7 @@ const handleSubmit = async () => {
       />
 
       <div className="min-h-screen relative">
-        <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+        <div className="absolute inset-0 bg-black/25 pointer-events-none" />
         <main className="relative px-6 py-6 space-y-6">
           {/* Header com ações */}
           <section className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -374,15 +396,16 @@ const handleSubmit = async () => {
             <div className="flex flex-wrap items-center gap-2">
             {/* Toggle Lista/Calendário */}
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "lista" | "calendario")}>
-              <TabsList className="bg-transparent border border-white/30">
-                <TabsTrigger value="lista" className="data-[state=active]:bg-white/20 text-white">Lista</TabsTrigger>
-                <TabsTrigger value="calendario" className="data-[state=active]:bg-white/20 text-white">Calendário</TabsTrigger>
+              <TabsList className="bg-transparent border border-white/15">
+                <TabsTrigger value="lista" className="text-white/60 data-[state=active]:bg-[#d2a948]/15 data-[state=active]:text-[#d2a948]">Lista</TabsTrigger>
+                <TabsTrigger value="calendario" className="text-white/60 data-[state=active]:bg-[#d2a948]/15 data-[state=active]:text-[#d2a948]">Calendário</TabsTrigger>
               </TabsList>
             </Tabs>
               {pode('eventos.criar') && (
                 <Button
                   onClick={() => setShowForm(true)}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="text-[#1b1508] hover:opacity-90 font-semibold"
+                  style={{ background: "var(--accent-primary)" }}
                 >
                   <Plus className="h-4 w-4 mr-1.5" />
                   Novo Evento
@@ -391,54 +414,11 @@ const handleSubmit = async () => {
             </div>
           </section>
 
-          {/* Cards de resumo */}
+          {/* Cards de resumo (fiel ao oficial) — valor branco, ícone preenchido à direita */}
           <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-white/10 backdrop-blur-sm border border-white/20 text-white">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-white/60 font-medium">Eventos Hoje</p>
-                    <p className="text-3xl font-bold mt-2">{eventosHoje.length}</p>
-                    <p className="text-xs text-white/50 mt-1">
-                      {eventosHoje.length === 0 ? "nenhum evento" : "agendados"}
-                    </p>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-emerald-500">
-                    <Calendar className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/10 backdrop-blur-sm border border-white/20 text-white">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-white/60 font-medium">Esta Semana</p>
-                    <p className="text-3xl font-bold mt-2">{eventosSemana.length}</p>
-                    <p className="text-xs text-white/50 mt-1">eventos agendados</p>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-sky-500">
-                    <CalendarDays className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/10 backdrop-blur-sm border border-white/20 text-white">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-white/60 font-medium">Este Mês</p>
-                    <p className="text-3xl font-bold mt-2">{eventosMes.length}</p>
-                    <p className="text-xs text-white/50 mt-1">eventos no total</p>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-amber-500">
-                    <CalendarClock className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <KpiCard iconRight iconVariant="filled" iconTone="success" icon={<Calendar className="h-5 w-5" />} label="Eventos Hoje" value={eventosHoje.length} sub={`${eventosHoje.length} eventos agendados`} />
+            <KpiCard iconRight iconVariant="filled" iconTone="info" icon={<CalendarDays className="h-5 w-5" />} label="Esta Semana" value={eventosSemana.length} sub={`${eventosSemana.length} eventos agendados`} />
+            <KpiCard iconRight iconVariant="filled" iconTone="warning" icon={<CalendarClock className="h-5 w-5" />} label="Este Mês" value={eventosMes.length} sub={`${eventosMes.length} eventos no total`} />
           </section>
 
 {/* Formulário de Novo Evento */}
@@ -618,191 +598,90 @@ const handleSubmit = async () => {
           )}
 
           {/* Filtros */}
-          <section className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-2 text-sm text-white/60">
-              <Filter className="h-4 w-4" />
-              Filtrar:
+          <section className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+                <Filter className="h-4 w-4" /> Filtrar:
+              </div>
+              <FilterChip gold active={filtroTipo === null} onClick={() => { setFiltroTipo(null); setPagina(1) }}>Todos</FilterChip>
+              {TIPOS_EVENTO.map((tipo) => (
+                <FilterChip key={tipo.value} active={filtroTipo === tipo.value} onClick={() => { setFiltroTipo(tipo.value); setPagina(1) }} dot={tipo.cor}>{tipo.label}</FilterChip>
+              ))}
             </div>
-            <button
-              onClick={() => setFiltroTipo(null)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                filtroTipo === null
-                  ? "bg-white text-gray-900"
-                  : "bg-white/10 text-white/70 hover:bg-white/20"
-              }`}
-            >
-              Todos
-            </button>
-            {TIPOS_EVENTO.map((tipo) => (
-              <button
-                key={tipo.value}
-                onClick={() => setFiltroTipo(tipo.value)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                  filtroTipo === tipo.value
-                    ? "bg-white text-gray-900"
-                    : "bg-white/10 text-white/70 hover:bg-white/20"
-                }`}
-              >
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: tipo.cor }}
-                />
-                {tipo.label}
-              </button>
-            ))}
+            <div className="flex items-center gap-2">
+              <SecondaryButton icon={<Filter className="h-3.5 w-3.5" />}>Filtros <ChevronDown className="h-3 w-3" /></SecondaryButton>
+              <SearchInput value={busca} onChange={(v) => { setBusca(v); setPagina(1) }} icon={<Search className="h-4 w-4" />} placeholder="Pesquisar…" className="w-48" />
+            </div>
           </section>
 
           {/* Conteúdo principal */}
           {viewMode === "lista" ? (
-            /* ========== VISUALIZAÇÃO EM LISTA ========== */
+            /* ========== VISUALIZAÇÃO EM LISTA (tabela, fiel ao oficial) ========== */
             <section>
-              <Card className="bg-white/5 backdrop-blur-sm border border-white/10">
-                <CardContent className="p-6">
-                  {eventosFiltrados.length === 0 ? (
-                    <div className="text-center py-12">
-                      <div className="p-4 rounded-full bg-white/10 w-fit mx-auto mb-4">
-                        <Calendar className="h-12 w-12 text-white/40" />
-                      </div>
-                      <h3 className="text-lg font-medium text-white mb-2">
-                        Nenhum evento encontrado
-                      </h3>
-                      <p className="text-sm text-white/50 mb-6 max-w-md mx-auto">
-                        {filtroTipo
-                          ? "Não há eventos com este filtro. Tente outro filtro ou crie um novo evento."
-                          : "Comece criando eventos nos processos para organizar seus compromissos."}
-                      </p>
-                      <Button
-                        onClick={() => router.push('/kanban')}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                      >
-                        Ir para Processos
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {eventosFiltrados
-                        .sort(
-                          (a, b) =>
-                            new Date(a.dataInicio).getTime() -
-                            new Date(b.dataInicio).getTime()
-                        )
-                        .map((evento) => {
-                          const tipoConfig = getTipoConfig(evento.tipo)
-                          const Icon = tipoConfig.icon
-                          const dataEvento = new Date(evento.dataInicio)
-                          dataEvento.setHours(0, 0, 0, 0)
-                          const isPassado = dataEvento < hoje
-                          const isEventoHoje = dataEvento.getTime() === hoje.getTime()
-
-                          return (
-                            <div
-                              key={evento.id}
-                              className={`p-4 rounded-xl border transition-colors cursor-pointer ${
-                                isPassado
-                                  ? "bg-white/5 border-white/10"
-                                  : isEventoHoje
-                                  ? "bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20"
-                                  : "bg-white/5 border-white/10 hover:bg-white/10"
-                              }`}
-                              onClick={() => {
-  if (evento.processo) {
-    router.push(`/kanban?processoId=${evento.processo.id}&tab=eventos&pais=${evento.processo.pais}`)
-  }
-}}
-                            >
-                              <div className="flex items-start gap-4">
-                                <div
-                                  className="p-2.5 rounded-lg flex-shrink-0"
-                                  style={{ backgroundColor: `${tipoConfig.cor}20` }}
-                                >
-                                  <Icon
-                                    className="h-5 w-5"
-                                    style={{ color: tipoConfig.cor }}
-                                  />
-                                </div>
-
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-start justify-between gap-4">
+              {(() => {
+                const ordenados = [...eventosFiltrados].sort((a, b) => new Date(a.dataInicio).getTime() - new Date(b.dataInicio).getTime())
+                const q = busca.trim().toLowerCase()
+                const filtrados = q ? ordenados.filter((e) => `${e.titulo} ${e.descricao ?? ""} ${e.processo?.nome ?? ""} ${e.processo?.codigo ?? ""} ${e.responsavel?.nome ?? ""}`.toLowerCase().includes(q)) : ordenados
+                const totalE = filtrados.length
+                const pages = Math.max(1, Math.ceil(totalE / porPagina))
+                const pag = Math.min(pagina, pages)
+                const start = (pag - 1) * porPagina
+                const vis = filtrados.slice(start, start + porPagina)
+                return (
+                  <SurfaceCard padding="p-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm min-w-[1080px]">
+                        <Thead>
+                          <Th>Data e Hora</Th><Th>Evento</Th><Th>Processo</Th><Th>Vinculado a</Th>
+                          <Th>Tipo</Th><Th>Local</Th><Th align="center">Status</Th><Th>Responsável</Th><Th align="right">Ações</Th>
+                        </Thead>
+                        <tbody>
+                          {vis.map((evento) => {
+                            const tc = getTipoConfig(evento.tipo)
+                            const Icon = tc.icon
+                            const stb = statusEventoBadge(evento.status)
+                            const d = new Date(evento.dataInicio)
+                            const clickProc = () => { if (evento.processo) router.push(`/kanban?processoId=${evento.processo.id}&tab=eventos&pais=${evento.processo.pais}`) }
+                            return (
+                              <Tr key={evento.id} onClick={clickProc}>
+                                <td className="py-2.5 px-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="grid place-items-center h-8 w-8 rounded-md border shrink-0" style={{ background: `color-mix(in srgb, ${tc.cor} 15%, transparent)`, borderColor: `color-mix(in srgb, ${tc.cor} 30%, transparent)`, color: tc.cor }}><Icon className="h-4 w-4" /></span>
                                     <div>
-                                      <h4 className="font-medium text-white">
-                                        {evento.titulo}
-                                      </h4>
-                                      <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                                        <span className="flex items-center gap-1 text-sm text-white/60">
-                                          <Clock className="h-3.5 w-3.5" />
-                                          {formatarData(evento.dataInicio, evento.diaInteiro)}
-                                        </span>
-                                        {evento.local && (
-                                          <span className="flex items-center gap-1 text-sm text-white/60">
-                                            <MapPin className="h-3.5 w-3.5" />
-                                            {evento.local}
-                                          </span>
-                                        )}
-                                      </div>
-                                      {evento.descricao && (
-                                        <p className="text-sm text-white/50 mt-2 line-clamp-2">
-                                          {evento.descricao}
-                                        </p>
-                                      )}
-                                    </div>
-
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                       {pode('eventos.editar') && (
-                                          <button
-                                              onClick={(e) => {
-                                                  e.stopPropagation()
-                                                  handleEdit(evento)
-                                              }}
-                                          className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                                          >
-                                          <Edit2 className="h-4 w-4" />
-                                          </button>
-                                        )}
-
-                                        {pode('eventos.excluir') && (
-                                          <button
-                                              onClick={(e) => {
-                                                  e.stopPropagation()
-                                                  if (confirm("Tem certeza que deseja excluir este evento?")) {
-                                                    const token = localStorage.getItem('authToken')
-                                                    fetch(`/api/eventos/${evento.id}`, { 
-                                                      method: "DELETE",
-                                                      headers: {
-                                                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                                                      },
-                                                    }).then(res => {
-                                                      if (res.ok) fetchEventos()
-                                                    })
-                                                  }
-                                              }}
-                                          className="p-2 text-white/40 hover:text-red-400 hover:bg-white/10 rounded-lg transition-colors"
-                                          >
-                                          <Trash2 className="h-4 w-4" />
-                                          </button>
-                                        )}
-                                      {evento.processo && <BandeiraPais pais={evento.processo.pais as any} size="sm" />}
-                                      <span className="text-sm text-white/60">
-                                        {evento.processo?.nome || "Sem processo"}
-                                      </span>
+                                      <div className="tabular-nums" style={{ color: "var(--text-primary)" }}>{d.toLocaleDateString("pt-BR")}</div>
+                                      <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>{evento.diaInteiro ? "dia inteiro" : d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</div>
                                     </div>
                                   </div>
-                                </div>
-                              </div>
-
-                              {isEventoHoje && (
-                                <div className="mt-3 pt-3 border-t border-emerald-500/20">
-                                  <span className="text-xs font-medium text-emerald-400">
-                                    📅 Evento de hoje
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
+                                </td>
+                                <td className="py-2.5 px-2">
+                                  <div style={{ color: "var(--text-primary)" }}>{evento.titulo}</div>
+                                  {evento.descricao && <div className="text-[11px] truncate max-w-[240px]" style={{ color: "var(--text-muted)" }}>{evento.descricao}</div>}
+                                </td>
+                                <td className="py-2.5 px-2" style={{ color: "var(--text-secondary)" }}>{evento.processo?.codigo ?? "—"}</td>
+                                <td className="py-2.5 px-2" style={{ color: "var(--text-secondary)" }}>{evento.processo?.nome ?? "—"}</td>
+                                <td className="py-2.5 px-2">
+                                  <span className="inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium" style={{ background: `color-mix(in srgb, ${tc.cor} 14%, transparent)`, borderColor: `color-mix(in srgb, ${tc.cor} 35%, transparent)`, color: tc.cor }}>{tc.label}</span>
+                                </td>
+                                <td className="py-2.5 px-2" style={{ color: "var(--text-secondary)" }}>{evento.local || "-"}</td>
+                                <td className="py-2.5 px-2 text-center"><StatusBadge tone={stb.tone}>{stb.label}</StatusBadge></td>
+                                <td className="py-2.5 px-2" style={{ color: "var(--text-secondary)" }}>{evento.responsavel?.nome ?? "—"}</td>
+                                <td className="py-2.5 px-2 text-right" onClick={(e) => e.stopPropagation()}><ActionMenu onClick={() => { if (pode('eventos.editar')) handleEdit(evento) }} /></td>
+                              </Tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                    {totalE === 0 ? (
+                      <EmptyState icon={<Calendar className="h-6 w-6" />} title="Nenhum evento encontrado." subtitle={filtroTipo || busca ? "Ajuste os filtros ou a busca." : "Crie eventos para organizar seus compromissos."} />
+                    ) : (
+                      <div className="px-3 pb-3">
+                        <Pagination from={start + 1} to={Math.min(start + porPagina, totalE)} total={totalE} unit="eventos" page={pag} pages={pages} onPage={setPagina} perPage={porPagina} />
+                      </div>
+                    )}
+                  </SurfaceCard>
+                )
+              })()}
             </section>
           ) : (
             /* ========== VISUALIZAÇÃO EM CALENDÁRIO ========== */

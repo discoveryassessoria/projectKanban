@@ -36,8 +36,10 @@ export async function GET(request: NextRequest) {
             id: true,
             nome: true,
             pais: true,
+            codigo: true,
           },
         },
+        responsavel: { select: { id: true, nome: true } },
       },
       orderBy: { dataInicio: "asc" },
     })
@@ -71,6 +73,8 @@ export async function POST(request: NextRequest) {
       lembreteDias,
       cor,
       observacoes,
+      status,
+      responsavelId,
     } = body
 
     if (!titulo || !dataInicio) {
@@ -93,6 +97,8 @@ export async function POST(request: NextRequest) {
     lembreteDias: lembreteDias ? parseInt(lembreteDias) : null,
     cor,
     observacoes,
+    ...(status && { status }),
+    ...(responsavelId && { responsavelId: parseInt(responsavelId) }),
   },
   include: processoId ? {
     processo: {

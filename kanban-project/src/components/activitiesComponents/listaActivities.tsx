@@ -374,7 +374,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       </div>
       {/* Table Header */}
       <div className="px-4 py-3 border-b border-white/10">
-        <div className="grid gap-4 items-center text-sm font-medium text-white/60" style={{ gridTemplateColumns: '28px 2.5fr 0.8fr 1.2fr 0.7fr 0.7fr 0.7fr 0.5fr 0.7fr 0.4fr' }}>
+        <div className="grid gap-4 items-center text-sm font-medium text-white/60" style={{ gridTemplateColumns: '28px 2.3fr 0.8fr 1fr 0.7fr 0.7fr 0.95fr 0.5fr 0.7fr 0.4fr' }}>
           <div className="">
             {(pode('tarefas.excluir') || pode('tarefas.editar')) && (
               <input
@@ -419,7 +419,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
               className="px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer"
               onClick={() => handleAtividadeClick(atividade)}
             >
-              <div className="grid gap-4 items-center text-white/80" style={{ gridTemplateColumns: '28px 2.5fr 0.8fr 1.2fr 0.7fr 0.7fr 0.7fr 0.5fr 0.7fr 0.4fr' }}>
+              <div className="grid gap-4 items-center text-white/80" style={{ gridTemplateColumns: '28px 2.3fr 0.8fr 1fr 0.7fr 0.7fr 0.95fr 0.5fr 0.7fr 0.4fr' }}>
                 <div className="">
                   {(pode('tarefas.excluir') || pode('tarefas.editar')) && (
                     <input
