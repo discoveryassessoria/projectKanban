@@ -14,10 +14,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { parseLista } from '@/src/lib/financeiro/parseLista'
-import RegistrarPagamentoModal from '@/src/components/financeiro/v3/RegistrarPagamentoModal'
 import {
   DollarSign, CreditCard, Database, BarChart3, CheckCircle2, AlertTriangle, ChevronRight,
-  Loader2, Calendar, Receipt, Wallet, FileDown, ArrowRight,
+  Loader2, Calendar, Receipt, Wallet, ArrowRight,
 } from 'lucide-react'
 
 type Moeda = 'BRL' | 'EUR' | 'USD'
@@ -83,15 +82,6 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [mesesFluxo, setMesesFluxo] = useState(6)
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [obrsAbertas, setObrsAbertas] = useState<any[] | null>(null)
-  const [pagSel, setPagSel] = useState<any | null>(null)
-
-  const abrirPicker = () => {
-    setPickerOpen(true); setObrsAbertas(null)
-    fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}`, { headers: { Authorization: `Bearer ${localStorage.getItem('authToken') || ''}` } })
-      .then((r) => r.json()).then((j) => setObrsAbertas((j.obrigacoes ?? []).filter((o: any) => o.saldo > 0.005))).catch(() => setObrsAbertas([]))
-  }
 
   useEffect(() => {
     let cancelado = false
@@ -206,8 +196,8 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
         <Card titulo="Situação Financeira" valor={emDia ? 'Tudo em dia' : `${m.inadCount} parcela(s) vencida(s)`} valorCor={emDia ? 'text-[#4ade80]' : 'text-red-400'} sub={emDia ? 'Nenhuma pendência' : brl(m.inadBrl)} icon={emDia ? CheckCircle2 : AlertTriangle} cor={emDia ? '#4ade80' : '#f87171'} />
       </div>
 
-      {/* 2 · eventos + ações */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_340px]">
+      {/* 2 · próximos eventos financeiros */}
+      <div className="grid grid-cols-1 gap-4">
         <Painel titulo="Próximos eventos financeiros" acao={<button onClick={() => onIrPara?.('receitas')} className="rounded-md border border-white/15 px-2.5 py-1 text-xs text-white/70 hover:bg-white/10">Ver todos</button>}>
           {eventos.length === 0 ? (
             <div className="py-10 text-center text-sm text-white/40">Nenhum evento financeiro pendente.</div>
@@ -234,15 +224,6 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
           )}
         </Painel>
 
-        <Painel titulo="Ações rápidas">
-          <div className="space-y-2">
-            <Acao icon={DollarSign} cor="#4ade80" titulo="Abrir Receitas" sub="Visualizar todas as receitas do processo" onClick={() => onIrPara?.('receitas')} />
-            <Acao icon={Database} cor="#fbbf24" titulo="Abrir Custos" sub="Visualizar todos os custos do processo" onClick={() => onIrPara?.('custos')} />
-            <Acao icon={Receipt} cor="#D2A948" titulo="Gerar Cobrança" sub="Gerar nova cobrança para o processo" onClick={() => onIrPara?.('receitas')} />
-            <Acao icon={CreditCard} cor="#7dd3fc" titulo="Registrar Pagamento" sub="Registrar pagamento recebido" onClick={abrirPicker} />
-            <Acao icon={FileDown} cor="#a78bfa" titulo="Exportar Financeiro" sub="Exportar relatório financeiro" onClick={() => window.print()} />
-          </div>
-        </Painel>
       </div>
 
       {/* 3 · fluxo / moeda / requerente */}
@@ -285,26 +266,6 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
         </Painel>
       </div>
 
-      {/* Seletor de lançamento p/ "Registrar pagamento" (ação rápida) */}
-      {pickerOpen && (
-        <div className="fixed inset-0 z-[10030] flex items-center justify-center bg-black/65 p-4" onClick={() => setPickerOpen(false)}>
-          <div className="max-h-[80vh] w-full max-w-md overflow-hidden rounded-xl border border-white/10 bg-[#0d1117] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-white/10 bg-[#161b21] px-5 py-4"><div className="text-[15px] font-bold text-white">Registrar pagamento</div><button onClick={() => setPickerOpen(false)} className="text-white/60 hover:text-white">✕</button></div>
-            <div className="max-h-[60vh] overflow-y-auto p-3">
-              <div className="px-2 pb-2 text-xs text-white/45">Escolha o lançamento em aberto:</div>
-              {obrsAbertas === null ? <div className="px-2 py-6 text-sm text-white/40">carregando…</div>
-                : obrsAbertas.length === 0 ? <div className="px-2 py-6 text-sm text-white/40">Nenhum lançamento em aberto neste processo.</div>
-                : obrsAbertas.map((o: any) => (
-                  <button key={o.obrigacaoId} onClick={() => { setPagSel(o); setPickerOpen(false) }} className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-[#20262e]">
-                    <span className="min-w-0"><span className="block truncate text-sm text-white/90">{o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`}</span><span className="text-[11px] text-white/45">{o.direcao === 'A_PAGAR' ? 'Custo' : 'Receita'}{o.requerente ? ` · ${o.requerente}` : ''}</span></span>
-                    <span className="shrink-0 text-sm tabular-nums text-[#7dd3fc]">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: o.moeda || 'BRL' }).format(o.saldo || 0)}</span>
-                  </button>
-                ))}
-            </div>
-          </div>
-        </div>
-      )}
-      {pagSel && <RegistrarPagamentoModal obrigacaoId={pagSel.obrigacaoId} moeda={pagSel.moeda} saldo={pagSel.saldo} natureza={pagSel.direcao === 'A_PAGAR' ? 'CUSTO' : 'RECEITA'} onClose={() => setPagSel(null)} onDone={() => { setPagSel(null); onIrPara?.('extrato') }} />}
     </div>
   )
 }
@@ -329,15 +290,6 @@ function Painel({ titulo, acao, children }: { titulo: string; acao?: React.React
       <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-white">{titulo}</h3>{acao}</div>
       {children}
     </section>
-  )
-}
-function Acao({ icon: Ic, cor, titulo, sub, onClick }: { icon: any; cor: string; titulo: string; sub: string; onClick: () => void }) {
-  return (
-    <button onClick={onClick} className="group flex w-full items-center gap-3 rounded-lg border border-white/10 bg-[#1b2027] p-3 text-left transition hover:bg-[#252c35]">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: `${cor}22`, color: cor }}><Ic className="h-4.5 w-4.5" /></span>
-      <div className="min-w-0 flex-1"><p className="text-sm font-medium text-white">{titulo}</p><p className="truncate text-[11px] text-white/45">{sub}</p></div>
-      <ChevronRight className="h-4 w-4 text-white/30 transition group-hover:text-white/60" />
-    </button>
   )
 }
 function Tag({ cor, children }: { cor: string; children: React.ReactNode }) {
