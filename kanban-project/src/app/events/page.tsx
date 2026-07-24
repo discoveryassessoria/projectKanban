@@ -368,7 +368,7 @@ const handleSubmit = async () => {
   return (
     <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
       <div className="pointer-events-none fixed inset-0 -z-10 scale-105 blur-[6px] bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-black/85" />
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-black/60" />
 
       <HeaderBar
         title="Eventos"
@@ -383,7 +383,7 @@ const handleSubmit = async () => {
       />
 
       <div className="min-h-screen relative">
-        <div className="absolute inset-0 bg-black/25 pointer-events-none" />
+        <div className="absolute inset-0 bg-black/10 pointer-events-none" />
         <main className="relative px-6 py-6 space-y-6">
           {/* Header com ações */}
           <section className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">

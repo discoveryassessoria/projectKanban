@@ -138,7 +138,7 @@ export default function FinanceiroPage() {
     <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
       {/* Fundo arquitetônico desfocado e escurecido (somente desta tela) */}
       <div className="pointer-events-none fixed inset-0 -z-10 scale-105 blur-[6px] bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-black/85" />
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-black/60" />
 
       <HeaderBar
         title="Financeiro Geral"
@@ -153,7 +153,7 @@ export default function FinanceiroPage() {
       />
 
       <div className="min-h-screen relative">
-        <div className="absolute inset-0 bg-black/25 pointer-events-none" />
+        <div className="absolute inset-0 bg-black/10 pointer-events-none" />
         <main className="relative px-4 py-4 max-w-full">
 
           {/* NAV DE ABAS — ativa com sublinhado dourado */}

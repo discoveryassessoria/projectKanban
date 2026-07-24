@@ -190,7 +190,7 @@ function ActivitiesPageInner() {
     <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
       {/* BACKGROUND FIXO — mesma densidade escura das telas financeiras */}
       <div className="pointer-events-none fixed inset-0 -z-10 scale-105 blur-[6px] bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-black/85" />
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-black/60" />
 
       {/* HEADER - Componente reutilizável */}
       <HeaderBar
@@ -208,7 +208,7 @@ function ActivitiesPageInner() {
       {/* CONTEÚDO COM OVERLAY ESCURO IGUAL DASHBOARD */}
       <div className="min-h-screen relative">
         {/* Overlay apenas na área do conteúdo */}
-        <div className="absolute inset-0 bg-black/25 pointer-events-none" />
+        <div className="absolute inset-0 bg-black/10 pointer-events-none" />
         <main className="relative px-4 py-4 max-w-full">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
