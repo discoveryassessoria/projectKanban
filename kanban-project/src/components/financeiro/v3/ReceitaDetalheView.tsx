@@ -92,6 +92,21 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
     } catch { alert("Falha de rede ao estornar o pagamento.") }
   }
 
+  // "Enviar cobrança" (Fase D) = marcar a Cobrança como enviada ao cliente
+  // (estado auditável — não há entrega real de e-mail/WhatsApp).
+  const enviarCobranca = async () => {
+    const cobs: any[] = d?.cobrancas ?? []
+    if (cobs.length === 0) { alert("Nenhuma cobrança para enviar. Gere uma cobrança primeiro."); return }
+    const alvo = cobs.find((c) => c.enviadaEm == null) ?? cobs[0]
+    if (!window.confirm("Marcar esta cobrança como enviada ao cliente?")) return
+    try {
+      const res = await fetch(`/api/financeiro/cobrancas/${alvo.id}/enviar`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() } })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || !j.ok) alert(j?.erro || `Falha ao enviar a cobrança (HTTP ${res.status}).`)
+      else carregar()
+    } catch { alert("Falha de rede ao enviar a cobrança.") }
+  }
+
   // Anexar documento: upload ao R2 → vincula na Receita → refetch.
   const onSelecionarArquivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -173,7 +188,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
       case "COBRAR_VENCIDA": return { label: "Ver cobranças", onClick: () => setTab("cobrancas"), disabled: false, title: "" }
       case "REGISTRAR_PAGAMENTO": return { label: "Registrar", onClick: () => setPagOpen(true), disabled: false, title: "" }
       case "EMITIR_FATURA": return temProcesso ? { label: "Emitir fatura", onClick: () => setFaturaOpen(true), disabled: false, title: "" } : { label: "Emitir fatura", onClick: () => {}, disabled: true, title: "Processo não vinculado" }
-      case "ENVIAR_COBRANCA": return { label: "Enviar", onClick: () => {}, disabled: true, title: "Envio de cobrança em breve" }
+      case "ENVIAR_COBRANCA": return { label: d.cobrancaEnviada ? "Reenviar" : "Enviar", onClick: enviarCobranca, disabled: false, title: d.cobrancaEnviada ? "Cobrança já enviada — marcar novamente?" : "" }
       default: return { label: "Abrir", onClick: () => {}, disabled: true, title: "" }
     }
   }

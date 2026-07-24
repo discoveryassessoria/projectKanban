@@ -1459,6 +1459,10 @@ model Cobranca {
   criadoPorId         Int?
   criadoEm            DateTime @default(now())
   atualizadoEm        DateTime @updatedAt
+  // Envio da cobrança ao cliente (aditivo) — marca quando foi enviada + link de pagamento.
+  enviadaEm           DateTime?
+  linkPagamento       String?  @db.VarChar(500)
+  enviadaPorId        Int?
 
   // ââ RUNTIME DE CÃLCULO (auditoria; congelado na confirmaÃ§Ã£o) ââ
   // NÃ£o Ã© cadastro â Ã© o RESULTADO calculado pelo ChargeCalculationService.

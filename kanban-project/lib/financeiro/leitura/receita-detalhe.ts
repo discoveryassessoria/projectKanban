@@ -62,6 +62,8 @@ export interface ReceitaDetalhe {
   documentos: { id: number; nome: string; tipo: string | null; url: string; tamanho: number | null; criadoEm: string }[]
   faturaEmitida: boolean
   fatura: { id: number; descricao: string; status: string; valor: number; url: string | null } | null
+  cobrancas: { id: number; status: string; valorTotal: number; moeda: string; enviadaEm: string | null }[]
+  cobrancaEnviada: boolean
 }
 
 const TITULO: Record<string, string> = {
@@ -235,11 +237,18 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   if (resumoParcelas.vencidas.qtd > 0) alertas.push({ tipo: 'PARCELA_VENCIDA', severidade: 'crit', label: `${resumoParcelas.vencidas.qtd} parcela(s) vencida(s)`, valor: resumoParcelas.vencidas.valor })
   if (!faturaEmitida) alertas.push({ tipo: 'FATURA_NAO_EMITIDA', severidade: 'warn', label: 'Fatura não emitida', valor: null })
   if (semPagamento) alertas.push({ tipo: 'SEM_PAGAMENTO', severidade: 'info', label: 'Nenhum pagamento registrado', valor: null })
+  // Cobranças da Receita (Fase D) — resiliente durante rollout ([] se indisponível)
+  const cobrancasRows = obr.origemTipo === 'Receita' && obr.origemId
+    ? await prisma.cobranca.findMany({ where: { receitaId: obr.origemId }, orderBy: { criadoEm: 'desc' } }).catch(() => [])
+    : []
+  const cobrancas = cobrancasRows.map((c) => ({ id: c.id, status: String(c.status), valorTotal: Number(c.valorTotal), moeda: String(c.moeda), enviadaEm: c.enviadaEm?.toISOString() ?? null }))
+  const cobrancaEnviada = cobrancas.some((c) => c.enviadaEm != null)
+
   const proximasAcoes = [
     ...(resumoParcelas.vencidas.qtd > 0 ? [{ acao: 'COBRAR_VENCIDA', label: `Existe ${resumoParcelas.vencidas.qtd} parcela vencida`, descricao: `Parcela de ${fmtMoeda(resumoParcelas.vencidas.valor, 'BRL')} vencida.`, disponivel: true }] : []),
     { acao: 'REGISTRAR_PAGAMENTO', label: 'Registrar pagamento', descricao: semPagamento ? 'Nenhum pagamento registrado ainda.' : 'Registrar novo pagamento recebido.', disponivel: true },
     { acao: 'EMITIR_FATURA', label: 'Emitir fatura', descricao: 'Fatura ainda não emitida para esta receita.', disponivel: true },
-    { acao: 'ENVIAR_COBRANCA', label: 'Enviar cobrança', descricao: 'Cobrança ainda não enviada ao cliente.', disponivel: true },
+    { acao: 'ENVIAR_COBRANCA', label: 'Enviar cobrança', descricao: cobrancaEnviada ? 'Cobrança já enviada ao cliente.' : 'Cobrança ainda não enviada ao cliente.', disponivel: true },
   ]
 
   return {
@@ -266,6 +275,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     observacao: obr.observacoes ?? null,
     documentos,
     faturaEmitida, fatura,
+    cobrancas, cobrancaEnviada,
   }
 }
 
