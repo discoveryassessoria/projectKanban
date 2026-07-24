@@ -186,34 +186,34 @@ export function PainelDaFase({
   return (
     <div>
       {/* ============== CABEÇALHO DA FASE (shell pps) ============== */}
-      <div className="bg-white border border-gray-200 border-b-0 rounded-t-2xl px-5 pt-4">
+      <div className="bg-[#1b2027] border border-white/10 border-b-0 rounded-t-2xl px-5 pt-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3 flex-wrap">
-            <h2 className="text-[19px] font-extrabold text-gray-900">{faseNome}</h2>
-            <span className="text-[11.5px] font-bold px-3 py-1 rounded-full bg-blue-100 text-blue-700 whitespace-nowrap">
+            <h2 className="text-[19px] font-extrabold text-white/95">{faseNome}</h2>
+            <span className="text-[11.5px] font-bold px-3 py-1 rounded-full bg-[#7dd3fc]/15 text-[#7dd3fc] whitespace-nowrap">
               Fase atual · operacional
             </span>
           </div>
           <button
             onClick={onAbrirPainelCompleto}
-            className="inline-flex items-center gap-1.5 border-[1.5px] border-gray-200 bg-white text-gray-700 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg whitespace-nowrap hover:border-blue-500 hover:text-blue-600 transition-colors"
+            className="inline-flex items-center gap-1.5 border-[1.5px] border-white/10 bg-[#1b2027] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg whitespace-nowrap hover:border-blue-500 hover:text-[#7dd3fc] transition-colors"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             Abrir painel da fase
           </button>
         </div>
-        <div className="text-[13px] text-gray-500 mt-1.5">{faseSub}</div>
+        <div className="text-[13px] text-white/55 mt-1.5">{faseSub}</div>
 
         {/* Abas */}
-        <div className="flex gap-1 overflow-x-auto mt-3.5 border-b border-gray-200">
+        <div className="flex gap-1 overflow-x-auto mt-3.5 border-b border-white/10">
           {faseTabs.map((t) => (
             <button
               key={t}
               onClick={() => setAbaAtiva(t)}
               className={`text-[12.5px] font-semibold px-3 py-2.5 border-b-2 whitespace-nowrap transition-colors ${
                 abaAtiva === t
-                  ? "text-blue-600 border-blue-600"
-                  : "text-gray-500 border-transparent hover:text-gray-900"
+                  ? "text-[#7dd3fc] border-blue-600"
+                  : "text-white/55 border-transparent hover:text-white/95"
               }`}
             >
               {t}
@@ -223,19 +223,19 @@ export function PainelDaFase({
       </div>
 
       {/* ============== CORPO DA FASE ============== */}
-      <div className="bg-white border border-gray-200 border-t-0 rounded-b-2xl px-5 py-5">
+      <div className="bg-[#1b2027] border border-white/10 border-t-0 rounded-b-2xl px-5 py-5">
 
         {modoReestruturacao ? (
           /* --- LEGADO_INATIVO: aviso neutro de reestruturação --- */
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 mb-5">
-            <div className="text-[13px] font-bold text-amber-800 mb-1">
+          <div className="bg-[#d2a948]/12 border border-[#d2a948]/30 rounded-xl px-5 py-4 mb-5">
+            <div className="text-[13px] font-bold text-[#d2a948] mb-1">
               Fase em reestruturação
             </div>
-            <div className="text-[12.5px] text-amber-700 leading-relaxed">
+            <div className="text-[12.5px] text-[#d2a948] leading-relaxed">
               {avisoReestruturacao ||
                 "A definição documental da Genealogia está em reestruturação. Nenhum progresso automático é calculado nesta etapa."}
             </div>
-            <div className="text-[11.5px] text-amber-600/80 mt-2">
+            <div className="text-[11.5px] text-[#d2a948]/80 mt-2">
               A árvore e os dados civis continuam disponíveis. Documentos exibidos são
               registros operacionais existentes — não representam obrigatoriedade nem validação.
             </div>
@@ -250,14 +250,14 @@ export function PainelDaFase({
               : s.status === "em_andamento" ? "active"
               : "pend"
             const icBorder =
-              cls === "done" ? "border-green-600 text-green-600"
-              : cls === "active" ? "border-blue-600 text-blue-600"
-              : "border-gray-200 text-gray-400"
-            const titColor = cls === "pend" ? "text-gray-400" : "text-gray-900"
+              cls === "done" ? "border-green-600 text-[#4ade80]"
+              : cls === "active" ? "border-blue-600 text-[#7dd3fc]"
+              : "border-white/10 text-white/40"
+            const titColor = cls === "pend" ? "text-white/40" : "text-white/95"
             const subColor =
-              cls === "done" ? "text-green-600"
-              : cls === "active" ? "text-blue-600"
-              : "text-gray-400"
+              cls === "done" ? "text-[#4ade80]"
+              : cls === "active" ? "text-[#7dd3fc]"
+              : "text-white/40"
             const subTxt =
               s.status === "concluida" ? "Concluído"
               : s.status === "em_andamento" ? "Em andamento"
@@ -265,7 +265,7 @@ export function PainelDaFase({
             return (
               <div key={i} className="flex items-center flex-none">
                 <div className="flex items-center gap-2.5">
-                  <div className={`w-7 h-7 rounded-full grid place-items-center border-[1.5px] bg-white ${icBorder}`}>
+                  <div className={`w-7 h-7 rounded-full grid place-items-center border-[1.5px] bg-[#1b2027] ${icBorder}`}>
                     {s.status === "concluida" ? (
                       <CheckCircle2 className="w-3.5 h-3.5" />
                     ) : s.status === "em_andamento" ? (
@@ -280,7 +280,7 @@ export function PainelDaFase({
                   </div>
                 </div>
                 {i < steps.length - 1 && (
-                  <div className={`h-px min-w-[28px] flex-1 mx-2.5 ${s.status === "concluida" ? "bg-green-600" : "bg-gray-200"}`} style={{ width: 60 }} />
+                  <div className={`h-px min-w-[28px] flex-1 mx-2.5 ${s.status === "concluida" ? "bg-[#4ade80]" : "bg-[#252c35]"}`} style={{ width: 60 }} />
                 )}
               </div>
             )
@@ -291,41 +291,41 @@ export function PainelDaFase({
         <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: `repeat(${kpis.length}, 1fr)` }}>
           {kpis.map((k, i) => {
             const valColor =
-              k.tone === "ok" ? "text-green-600"
-              : k.tone === "busca" ? "text-amber-600"
-              : k.tone === "late" ? "text-red-600"
-              : "text-gray-900"
+              k.tone === "ok" ? "text-[#4ade80]"
+              : k.tone === "busca" ? "text-[#d2a948]"
+              : k.tone === "late" ? "text-[#f87171]"
+              : "text-white/95"
             return (
-              <div key={i} className="bg-white border border-gray-200 rounded-[10px] px-4 py-3">
+              <div key={i} className="bg-[#1b2027] border border-white/10 rounded-[10px] px-4 py-3">
                 <b className={`text-[22px] font-extrabold block leading-none ${valColor}`}>{k.value}</b>
-                <span className="text-[11px] text-gray-400 font-semibold block mt-1.5">{k.label}</span>
+                <span className="text-[11px] text-white/40 font-semibold block mt-1.5">{k.label}</span>
               </div>
             )
           })}
         </div>
 
         {/* --- BARRA DE PROGRESSO DA FASE --- */}
-        <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 mb-5">
+        <div className="bg-[#1b2027] border border-white/10 rounded-xl px-5 py-4 mb-5">
           <div className="flex items-center justify-between gap-4 mb-2 flex-wrap">
             <div>
-              <div className="text-[13px] font-semibold text-gray-500 mb-1">Progresso da fase {faseNome}</div>
-              <div className="text-[28px] font-extrabold text-gray-900 leading-none">{progressoPct}%</div>
+              <div className="text-[13px] font-semibold text-white/55 mb-1">Progresso da fase {faseNome}</div>
+              <div className="text-[28px] font-extrabold text-white/95 leading-none">{progressoPct}%</div>
             </div>
-            <div className="text-[13px] text-gray-500">{progressoConcluidos} de {progressoTotal} documentos validados</div>
+            <div className="text-[13px] text-white/55">{progressoConcluidos} de {progressoTotal} documentos validados</div>
           </div>
-          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-3">
-            <div className="h-full bg-blue-600 transition-all duration-500" style={{ width: `${progressoPct}%` }} />
+          <div className="h-1.5 bg-[#252c35] rounded-full overflow-hidden mt-3">
+            <div className="h-full bg-[#7dd3fc] transition-all duration-500" style={{ width: `${progressoPct}%` }} />
           </div>
-          <div className="text-center text-[12.5px] text-gray-400 mt-3">{progressoTexto}</div>
+          <div className="text-center text-[12.5px] text-white/40 mt-3">{progressoTexto}</div>
         </div>
         </>
         )}
 
         {/* --- TABELA POR PESSOA --- */}
-        <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <div className="border border-white/10 rounded-xl overflow-hidden">
           {/* Cabeçalho de colunas */}
           <div
-            className="grid items-center gap-2.5 px-5 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50 border-b border-gray-200"
+            className="grid items-center gap-2.5 px-5 py-2.5 text-[10px] font-bold text-white/40 uppercase tracking-wider bg-[#20262e] border-b border-white/10"
             style={{ gridTemplateColumns: "52px minmax(160px,1.6fr) 1fr 1.2fr 0.9fr 1.2fr 124px" }}
           >
             <div>G</div>
@@ -380,12 +380,12 @@ function GroupBar({
   tone: "linha" | "fora"
 }) {
   return (
-    <div className={`flex items-center gap-2.5 px-5 py-2.5 border-b border-gray-200 ${tone === "fora" ? "bg-gray-100" : "bg-slate-50/70"}`}>
-      <span className={`w-[22px] h-[22px] rounded-lg grid place-items-center flex-none ${tone === "fora" ? "bg-gray-200 text-gray-400" : "bg-gray-100 text-gray-500"}`}>
+    <div className={`flex items-center gap-2.5 px-5 py-2.5 border-b border-white/10 ${tone === "fora" ? "bg-[#252c35]" : "bg-[#20262e]/70"}`}>
+      <span className={`w-[22px] h-[22px] rounded-lg grid place-items-center flex-none ${tone === "fora" ? "bg-[#252c35] text-white/40" : "bg-[#252c35] text-white/55"}`}>
         {icon}
       </span>
-      <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-gray-500">{title}</b>
-      <span className="ml-auto text-[11px] font-bold text-gray-400 bg-white border border-gray-200 rounded-full px-2.5 py-0.5">
+      <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-white/55">{title}</b>
+      <span className="ml-auto text-[11px] font-bold text-white/40 bg-[#1b2027] border border-white/10 rounded-full px-2.5 py-0.5">
         {count} pessoa(s)
       </span>
     </div>
@@ -418,7 +418,7 @@ function PersonRow({
   const [exp, setExp] = useState(false)
 
   const borderCls = !p.isLinha
-    ? "border-l-[3px] border-gray-200 bg-gray-50/60"
+    ? "border-l-[3px] border-white/10 bg-[#15191f]"
     : p.transmissao.state === "BLOQUEADA"
     ? "border-l-[3px] border-red-500"
     : p.transmissao.state === "OK"
@@ -426,28 +426,28 @@ function PersonRow({
     : "border-l-[3px] border-transparent"
 
   const transDot =
-    p.transmissao.state === "OK" ? "bg-green-500"
-    : p.transmissao.state === "BLOQUEADA" ? "bg-red-500"
-    : "bg-gray-400"
+    p.transmissao.state === "OK" ? "bg-[#4ade80]/120"
+    : p.transmissao.state === "BLOQUEADA" ? "bg-[#f87171]/120"
+    : "bg-white/25"
   const transColor =
-    p.transmissao.state === "OK" ? "text-green-600"
-    : p.transmissao.state === "BLOQUEADA" ? "text-red-700"
-    : "text-gray-400"
+    p.transmissao.state === "OK" ? "text-[#4ade80]"
+    : p.transmissao.state === "BLOQUEADA" ? "text-[#f87171]"
+    : "text-white/40"
 
   const pctVal = p.total > 0 ? Math.round((p.validados / p.total) * 100) : 0
 
   return (
     <>
       <div
-        className={`grid items-center gap-2.5 px-5 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${borderCls}`}
+        className={`grid items-center gap-2.5 px-5 py-3 border-b border-white/10 hover:bg-[#20262e] transition-colors ${borderCls}`}
         style={{ gridTemplateColumns: "52px minmax(160px,1.6fr) 1fr 1.2fr 0.9fr 1.2fr 124px" }}
       >
         {/* G */}
-        <div className="text-center text-[11px] font-extrabold text-gray-500 bg-white border border-gray-200 rounded-lg py-1.5 leading-tight">
+        <div className="text-center text-[11px] font-extrabold text-white/55 bg-[#1b2027] border border-white/10 rounded-lg py-1.5 leading-tight">
           {p.geracao === "Atual" ? (
             <>
               <span className="text-[13px]">{p.iniciais}</span>
-              <small className="block text-[8.5px] font-bold text-gray-400">Atual</small>
+              <small className="block text-[8.5px] font-bold text-white/40">Atual</small>
             </>
           ) : (
             p.geracao
@@ -456,12 +456,12 @@ function PersonRow({
 
         {/* Pessoa */}
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-[34px] h-[34px] rounded-full grid place-items-center text-white font-extrabold text-[12.5px] flex-none bg-slate-600">
+          <div className="w-[34px] h-[34px] rounded-full grid place-items-center text-white font-extrabold text-[12.5px] flex-none bg-[#252c35]">
             {p.iniciais}
           </div>
           <div className="min-w-0">
             <b className="text-[14px] font-extrabold block leading-tight truncate">{p.nome}</b>
-            <span className="text-[11.5px] text-gray-400 font-semibold">
+            <span className="text-[11.5px] text-white/40 font-semibold">
               {p.papel} · {p.isLinha ? "Linha reta" : "Fora da linha"}
             </span>
           </div>
@@ -474,18 +474,18 @@ function PersonRow({
             {p.transmissao.label}
           </div>
           {p.transmissao.sub && (
-            <div className="text-[11.5px] text-gray-400 font-medium mt-0.5">{p.transmissao.sub}</div>
+            <div className="text-[11.5px] text-white/40 font-medium mt-0.5">{p.transmissao.sub}</div>
           )}
         </div>
 
         {/* Documentos (resumo + barra) */}
         <div>
           {p.docsResumo.length === 0 ? (
-            <span className="text-[11.5px] text-gray-300">—</span>
+            <span className="text-[11.5px] text-white/40">—</span>
           ) : (
             p.docsResumo.map((d, i) => (
               <div key={i} className="grid gap-2 text-[11.5px] leading-relaxed" style={{ gridTemplateColumns: "34px auto" }}>
-                <span className="text-gray-500 font-bold">{d.abbr}</span>
+                <span className="text-white/55 font-bold">{d.abbr}</span>
                 <span className={`flex items-center gap-1.5 font-semibold ${docCls(d.statusCls)}`}>
                   <span className={`w-1.5 h-1.5 rounded-full flex-none ${docDot(d.statusCls)}`} />
                   {d.statusLabel.toLowerCase()}
@@ -495,35 +495,35 @@ function PersonRow({
           )}
           {!ocultarValidacao && (
             <div className="flex items-center gap-2 mt-1.5">
-              <span className="text-[11px] font-bold text-gray-500">{p.validados} / {p.total}</span>
-              <div className="w-24 h-1 rounded bg-gray-100 overflow-hidden">
-                <div className="h-full bg-blue-600" style={{ width: `${pctVal}%` }} />
+              <span className="text-[11px] font-bold text-white/55">{p.validados} / {p.total}</span>
+              <div className="w-24 h-1 rounded bg-[#252c35] overflow-hidden">
+                <div className="h-full bg-[#7dd3fc]" style={{ width: `${pctVal}%` }} />
               </div>
             </div>
           )}
         </div>
 
         {/* Responsável */}
-        <div className="text-[12px] font-bold text-gray-500">
+        <div className="text-[12px] font-bold text-white/55">
           {p.responsavel ? (
             <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+              <span className="w-1.5 h-1.5 rounded-full bg-white/25" />
               {p.responsavel.toUpperCase()}
             </div>
           ) : (
-            <span className="text-gray-300 font-medium">—</span>
+            <span className="text-white/40 font-medium">—</span>
           )}
         </div>
 
         {/* Próxima ação */}
-        <div className="text-[13px] font-semibold text-gray-500">
+        <div className="text-[13px] font-semibold text-white/55">
           {p.proximaAcao?.semResp && (
-            <span className="inline-block text-[10.5px] font-extrabold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md mb-1">
+            <span className="inline-block text-[10.5px] font-extrabold bg-[#d2a948]/15 text-[#d2a948] px-2 py-0.5 rounded-md mb-1">
               sem responsável
             </span>
           )}
-          <div className={p.proximaAcao?.cls === "crit" ? "text-red-700 font-bold" : ""}>
-            {p.proximaAcao?.txt || <span className="text-gray-300">—</span>}
+          <div className={p.proximaAcao?.cls === "crit" ? "text-[#f87171] font-bold" : ""}>
+            {p.proximaAcao?.txt || <span className="text-white/40">—</span>}
           </div>
         </div>
 
@@ -531,14 +531,14 @@ function PersonRow({
         <div className="flex items-center justify-end gap-1.5">
           <button
             onClick={() => p.docs.length && (setExp(true))}
-            className="inline-flex items-center gap-1.5 bg-gray-900 text-white text-[12.5px] font-bold px-3.5 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+            className="inline-flex items-center gap-1.5 bg-[#12161c] text-white text-[12.5px] font-bold px-3.5 py-2 rounded-lg hover:bg-[#20262e] transition-colors"
           >
             Abrir <ChevronRight className="w-3 h-3" />
           </button>
           {p.docs.length > 0 && (
             <button
               onClick={() => setExp(!exp)}
-              className="w-7 h-7 grid place-items-center text-gray-400 hover:text-gray-600"
+              className="w-7 h-7 grid place-items-center text-white/40 hover:text-white/68"
             >
               {exp ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             </button>
@@ -553,17 +553,17 @@ function PersonRow({
         return (
           <div key={d.id}>
           <div
-            className="grid items-center gap-3 border-t border-gray-100 py-3 pr-5"
+            className="grid items-center gap-3 border-t border-white/10 py-3 pr-5"
             style={{ gridTemplateColumns: "minmax(200px,2fr) 0.9fr 1fr 0.8fr 1.2fr 124px", paddingLeft: 76 }}
           >
             {/* Nome do doc */}
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-white border border-gray-200 grid place-items-center text-gray-500 flex-none">
+              <div className="w-7 h-7 rounded-lg bg-[#1b2027] border border-white/10 grid place-items-center text-white/55 flex-none">
                 <FileText className="w-3.5 h-3.5" />
               </div>
               <div>
                 <b className="text-[13px] font-bold block leading-tight">{d.tipoLabel}</b>
-                <span className="text-[11px] text-gray-400">{d.subtitulo || "Inteiro teor"}</span>
+                <span className="text-[11px] text-white/40">{d.subtitulo || "Inteiro teor"}</span>
               </div>
             </div>
 
@@ -581,7 +581,7 @@ function PersonRow({
                 value={d.responsavelId ?? ""}
                 onChange={(e) => onDelegar(d.necessidadeId as number, e.target.value ? Number(e.target.value) : null)}
                 onClick={(e) => e.stopPropagation()}
-                className={`text-[12px] rounded-md border px-1.5 py-1 bg-white max-w-[150px] focus:outline-none focus:border-blue-400 ${d.responsavelId ? "text-gray-700 border-gray-200" : "text-gray-400 border-dashed border-gray-300"}`}
+                className={`text-[12px] rounded-md border px-1.5 py-1 bg-[#1b2027] max-w-[150px] focus:outline-none focus:border-blue-400 ${d.responsavelId ? "text-white/80 border-white/10" : "text-white/40 border-dashed border-white/15"}`}
                 title="Delegar responsável"
               >
                 <option value="">Delegar…</option>
@@ -590,18 +590,18 @@ function PersonRow({
                 ))}
               </select>
             ) : (
-              <span className={`text-[12px] ${d.responsavel ? "text-gray-700" : "text-gray-300"}`}>
+              <span className={`text-[12px] ${d.responsavel ? "text-white/80" : "text-white/40"}`}>
                 {d.responsavel || "—"}
               </span>
             )}
 
             {/* SLA */}
-            <span className={`text-[12px] ${d.sla ? "text-gray-700" : "text-gray-300"}`}>
+            <span className={`text-[12px] ${d.sla ? "text-white/80" : "text-white/40"}`}>
               {d.sla || "—"}
             </span>
 
             {/* Próxima ação */}
-            <span className="text-[12px] text-gray-600">{d.proximaAcao || "—"}</span>
+            <span className="text-[12px] text-white/68">{d.proximaAcao || "—"}</span>
 
             {/* Botão — em consulta (readOnly) não há ação de mutação; só o status acima. */}
             <div className="flex justify-end items-center gap-2">
@@ -610,20 +610,20 @@ function PersonRow({
                 <button
                   onClick={() => onNovaOperacao(d.necessidadeId as number, p.pessoaId ?? null, `${d.tipoLabel}${d.subtitulo ? " · " + d.subtitulo : ""} — ${p.nome}`)}
                   title="Nova operação antecipada"
-                  className="text-[11px] font-semibold text-gray-500 hover:text-blue-600 underline decoration-dotted underline-offset-2"
+                  className="text-[11px] font-semibold text-white/55 hover:text-[#7dd3fc] underline decoration-dotted underline-offset-2"
                 >
                   + Operação antecipada
                 </button>
               )}
               {readOnly || !onAbrirOperacao ? (
-                <span className="text-[11px] font-semibold text-gray-400 px-3 py-2">Somente leitura</span>
+                <span className="text-[11px] font-semibold text-white/40 px-3 py-2">Somente leitura</span>
               ) : (
                 <button
                   onClick={() => onAbrirOperacao(d.id, d.necessidadeId)}
                   className={`text-[12px] font-bold px-3 py-2 rounded-lg transition-colors ${
                     d.emissaoConcluida
-                      ? "border border-gray-200 text-gray-700 bg-white hover:bg-gray-50"
-                      : "bg-blue-600 text-white hover:bg-blue-500"
+                      ? "border border-white/10 text-white/80 bg-[#1b2027] hover:bg-[#20262e]"
+                      : "bg-[#7dd3fc] text-white hover:bg-[#7dd3fc]/120"
                   }`}
                 >
                   {d.emissaoConcluida ? "Ver workflow" : "Abrir operação"}
@@ -641,13 +641,13 @@ function PersonRow({
 }
 
 const ST_OP_LABEL: Record<string, { t: string; c: string }> = {
-  CRIADA: { t: "Criada", c: "bg-gray-100 text-gray-600" },
-  EM_EXECUCAO: { t: "Em execução", c: "bg-blue-100 text-blue-700" },
-  AGUARDANDO_RESULTADO: { t: "Aguardando avaliação", c: "bg-amber-100 text-amber-700" },
-  CONCLUIDA: { t: "Concluída", c: "bg-green-100 text-green-700" },
+  CRIADA: { t: "Criada", c: "bg-[#252c35] text-white/68" },
+  EM_EXECUCAO: { t: "Em execução", c: "bg-[#7dd3fc]/15 text-[#7dd3fc]" },
+  AGUARDANDO_RESULTADO: { t: "Aguardando avaliação", c: "bg-[#d2a948]/15 text-[#d2a948]" },
+  CONCLUIDA: { t: "Concluída", c: "bg-[#4ade80]/15 text-[#4ade80]" },
   CONCLUIDA_PARCIAL: { t: "Concluída parcial", c: "bg-teal-100 text-teal-700" },
-  NAO_ATINGIDA: { t: "Não atingida", c: "bg-red-100 text-red-700" },
-  CANCELADA: { t: "Cancelada", c: "bg-gray-100 text-gray-400" },
+  NAO_ATINGIDA: { t: "Não atingida", c: "bg-[#f87171]/15 text-[#f87171]" },
+  CANCELADA: { t: "Cancelada", c: "bg-[#252c35] text-white/40" },
 }
 
 // OPERAÇÕES ANTECIPADAS de UMA necessidade — linha COMPACTA (objetivo · operação vinculada ·
@@ -661,8 +661,8 @@ function OperacoesAntecipadasInline({ ops, readOnly, onAvaliar, onAbrir }: {
   const abertas = ops.filter((o) => !o.encerrada).length
   return (
     <div className="pr-5 pb-2" style={{ paddingLeft: 76 }}>
-      <div className="rounded-lg border border-violet-100 bg-violet-50/50 overflow-hidden">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-violet-100/70 text-[10.5px] font-bold uppercase tracking-wide text-violet-600">
+      <div className="rounded-lg border border-violet-100 bg-[#a78bfa]/12/50 overflow-hidden">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-violet-100/70 text-[10.5px] font-bold uppercase tracking-wide text-[#a78bfa]">
           <ArrowLeftRight className="w-3 h-3" /> Operações antecipadas
           <span className="font-semibold text-violet-400 normal-case tracking-normal">· {ops.length}{abertas > 0 ? ` (${abertas} aberta${abertas > 1 ? "s" : ""})` : ""}</span>
         </div>
@@ -685,7 +685,7 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
   const [avaliando, setAvaliando] = useState(false)
   const [resultado, setResultado] = useState("")
   const [dados, setDados] = useState<Record<string, string>>({})
-  const st = ST_OP_LABEL[o.status] ?? { t: o.status, c: "bg-gray-100 text-gray-600" }
+  const st = ST_OP_LABEL[o.status] ?? { t: o.status, c: "bg-[#252c35] text-white/68" }
   const objetivo = o.objetivo || "Operação antecipada"
   const apoio = !o.vinculavel // documento-alvo diferente do exigido → captura resultado estruturado
   const setD = (k: string, v: string) => setDados((d) => ({ ...d, [k]: v }))
@@ -699,8 +699,8 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex items-baseline gap-1.5 flex-wrap">
           {/* Operação Antecipada é orquestração interna: identificada pelo objetivo/documento/serviço vinculado, sem código público próprio (OPA-n removido). */}
-          <span className="text-[12.5px] font-semibold text-gray-800">{objetivo}</span>
-          <span className="text-[11px] text-gray-400">
+          <span className="text-[12.5px] font-semibold text-white/95">{objetivo}</span>
+          <span className="text-[11px] text-white/40">
             {o.operacao.statusLabel}
             {o.originPhaseCode ? ` · origem ${faseLabel(o.originPhaseCode)}` : ""}
             {apoio && o.targetTipoDocumentoId ? " · documento de apoio" : ""}
@@ -710,7 +710,7 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
         <div className="flex items-center gap-2 flex-none">
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${st.c}`}>{st.t}</span>
           {onAbrir && (
-            <button onClick={() => onAbrir(o)} className="text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-500">Abrir operação</button>
+            <button onClick={() => onAbrir(o)} className="text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-[#7dd3fc] text-white hover:bg-[#7dd3fc]/120">Abrir operação</button>
           )}
         </div>
       </div>
@@ -719,27 +719,27 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
           resultado ESTRUTURADO (é ele que resolve a necessidade de origem, não o doc em si). */}
       {!readOnly && o.aguardandoAvaliacao && onAvaliar && (
         avaliando ? (
-          <div className="mt-2 rounded-md border border-gray-200 bg-white p-2 space-y-2">
+          <div className="mt-2 rounded-md border border-white/10 bg-[#1b2027] p-2 space-y-2">
             {apoio && (
               <div className="grid grid-cols-2 gap-2">
                 {[["cartorio", "Cartório"], ["municipio", "Município"], ["livro", "Livro"], ["folha", "Folha"], ["termo", "Termo"], ["data", "Data"], ["fonte", "Fonte da informação"]].map(([k, label]) => (
-                  <input key={k} value={dados[k] ?? ""} onChange={(e) => setD(k, e.target.value)} placeholder={label} className="text-[12px] rounded-md border border-gray-200 px-2 py-1.5 focus:outline-none focus:border-blue-400" />
+                  <input key={k} value={dados[k] ?? ""} onChange={(e) => setD(k, e.target.value)} placeholder={label} className="text-[12px] rounded-md border border-white/10 px-2 py-1.5 focus:outline-none focus:border-blue-400" />
                 ))}
               </div>
             )}
-            <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder={apoio ? "Observações" : "Resultado obtido"} className="w-full text-[12px] rounded-md border border-gray-200 px-2 py-1.5 focus:outline-none focus:border-blue-400" autoFocus />
+            <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder={apoio ? "Observações" : "Resultado obtido"} className="w-full text-[12px] rounded-md border border-white/10 px-2 py-1.5 focus:outline-none focus:border-blue-400" autoFocus />
             <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={() => enviar("SIM")} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-500"><CheckCircle2 className="w-3.5 h-3.5" /> Objetivo atingido</button>
+              <button onClick={() => enviar("SIM")} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[#4ade80] text-white hover:bg-[#4ade80]/120"><CheckCircle2 className="w-3.5 h-3.5" /> Objetivo atingido</button>
               <button onClick={() => enviar("PARCIAL")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-teal-200 text-teal-700 hover:bg-teal-50">Parcialmente</button>
-              <button onClick={() => enviar("NAO")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50">Não atingido</button>
-              <button onClick={() => enviar("CANCELAR")} className="text-[11.5px] text-gray-400 hover:text-red-600 ml-auto">Cancelar operação</button>
+              <button onClick={() => enviar("NAO")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-white/10 text-white/80 hover:bg-[#20262e]">Não atingido</button>
+              <button onClick={() => enviar("CANCELAR")} className="text-[11.5px] text-white/40 hover:text-[#f87171] ml-auto">Cancelar operação</button>
             </div>
           </div>
         ) : (
-          <button onClick={() => { setAvaliando(true); setResultado("") }} className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-500"><CheckCircle2 className="w-3.5 h-3.5" /> Operação concluída — avaliar objetivo</button>
+          <button onClick={() => { setAvaliando(true); setResultado("") }} className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[#4ade80] text-white hover:bg-[#4ade80]/120"><CheckCircle2 className="w-3.5 h-3.5" /> Operação concluída — avaliar objetivo</button>
         )
       )}
-      {o.resultadoObtido && <div className="text-[11px] text-gray-500 mt-1">Resultado: {o.resultadoObtido}</div>}
+      {o.resultadoObtido && <div className="text-[11px] text-white/55 mt-1">Resultado: {o.resultadoObtido}</div>}
     </div>
   )
 }
@@ -752,12 +752,12 @@ function docCls(cls: string): string {
   switch (cls) {
     case "localizado":
     case "validado":
-    case "recebido": return "text-green-600"
+    case "recebido": return "text-[#4ade80]"
     case "em_busca":
-    case "solicitado": return "text-amber-600"
-    case "bloqueado": return "text-red-700"
-    case "desnecessario": return "text-gray-400"
-    default: return "text-gray-400"
+    case "solicitado": return "text-[#d2a948]"
+    case "bloqueado": return "text-[#f87171]"
+    case "desnecessario": return "text-white/40"
+    default: return "text-white/40"
   }
 }
 
@@ -765,11 +765,11 @@ function docDot(cls: string): string {
   switch (cls) {
     case "localizado":
     case "validado":
-    case "recebido": return "bg-green-500"
+    case "recebido": return "bg-[#4ade80]/120"
     case "em_busca":
-    case "solicitado": return "bg-amber-500"
-    case "bloqueado": return "bg-red-500"
-    default: return "bg-gray-400"
+    case "solicitado": return "bg-[#d2a948]/120"
+    case "bloqueado": return "bg-[#f87171]/120"
+    default: return "bg-white/25"
   }
 }
 
@@ -777,11 +777,11 @@ function pillCls(cls: string): string {
   switch (cls) {
     case "localizado":
     case "validado":
-    case "recebido": return "bg-green-100 text-green-700"
+    case "recebido": return "bg-[#4ade80]/15 text-[#4ade80]"
     case "em_busca":
-    case "solicitado": return "bg-amber-100 text-amber-700"
-    case "bloqueado": return "bg-red-100 text-red-700"
-    case "desnecessario": return "bg-gray-100 text-gray-400"
-    default: return "bg-gray-100 text-gray-500"
+    case "solicitado": return "bg-[#d2a948]/15 text-[#d2a948]"
+    case "bloqueado": return "bg-[#f87171]/15 text-[#f87171]"
+    case "desnecessario": return "bg-[#252c35] text-white/40"
+    default: return "bg-[#252c35] text-white/55"
   }
 }

@@ -652,7 +652,7 @@ export function ProcessoCentralOperacional({
   if (loading && !data) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+        <Loader2 className="w-6 h-6 animate-spin text-white/40" />
       </div>
     )
   }
@@ -661,7 +661,7 @@ export function ProcessoCentralOperacional({
   if (erro && !data) {
     return (
       <div className="h-full overflow-y-auto p-6">
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+        <div className="bg-[#d2a948]/12 border border-[#d2a948]/30 rounded-lg px-4 py-3 text-sm text-[#d2a948]">
           ⚠ {erro}
         </div>
       </div>
@@ -773,7 +773,7 @@ export function ProcessoCentralOperacional({
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50/30">
+    <div className="h-full overflow-y-auto bg-[#15191f]">
       <div className="px-6 py-5">
 
         {/* ===== TOPO: Trilha de fases + Resumo do processo (lado a lado) ===== */}
@@ -806,13 +806,13 @@ export function ProcessoCentralOperacional({
                 da Operação Antecipada — as duas coexistem. */}
             <button
               onClick={() => setNovaTransversalCtx({})}
-              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg border-[1.5px] border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-400 transition-colors"
+              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg border-[1.5px] border-[#d2a948]/30 bg-[#d2a948]/12 text-[#d2a948] hover:border-[#d2a948]/60 transition-colors"
             >
               <ArrowLeftRight className="w-3.5 h-3.5" /> Nova tarefa transversal
             </button>
             <button
               onClick={() => setNovaOperacaoCtx({})}
-              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg border-[1.5px] border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-400 transition-colors"
+              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg border-[1.5px] border-[#a78bfa]/30 bg-[#a78bfa]/12 text-[#a78bfa] hover:border-[#a78bfa]/60 transition-colors"
             >
               <ArrowLeftRight className="w-3.5 h-3.5" /> Nova operação antecipada
             </button>
@@ -822,12 +822,12 @@ export function ProcessoCentralOperacional({
 
         {/* ===== Cabeçalho do MODO CONSULTA (fase passada) — MESMA casca, só leitura ===== */}
         {isView && (
-          <div className="mb-4 flex items-start justify-between gap-4 flex-wrap bg-amber-50/60 border border-amber-200 rounded-xl px-4 py-3">
+          <div className="mb-4 flex items-start justify-between gap-4 flex-wrap bg-[#d2a948]/12 border border-[#d2a948]/30 rounded-xl px-4 py-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-700">
+              <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-3 py-1 rounded-full bg-[#d2a948]/15 text-[#d2a948]">
                 <Eye className="w-3.5 h-3.5" /> Somente leitura
               </span>
-              <span className="text-[13px] font-semibold text-gray-700">
+              <span className="text-[13px] font-semibold text-white/80">
                 {selectedPhaseMeta?.state === "FUTURE" ? "Fase futura · ainda não iniciada"
                   : `Fase concluída${selectedPhaseMeta?.ciclo ? ` · Ciclo ${selectedPhaseMeta.ciclo}` : ""}`}
               </span>
@@ -835,7 +835,7 @@ export function ProcessoCentralOperacional({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setSelectedPhaseKey(null)}
-                className="inline-flex items-center gap-1.5 border-[1.5px] border-gray-200 bg-white text-gray-700 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg hover:border-blue-500 hover:text-blue-600 transition-colors"
+                className="inline-flex items-center gap-1.5 border-[1.5px] border-white/10 bg-[#1b2027] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg hover:border-blue-500 hover:text-[#7dd3fc] transition-colors"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Voltar à fase ativa
               </button>
@@ -864,8 +864,8 @@ export function ProcessoCentralOperacional({
           // Consultando fase passada e os dados ainda NÃO chegaram (loading/erro): mostra
           // spinner/erro — NUNCA o corpo, que cairia nos dados da fase ativa.
           viewErro
-            ? <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">⚠ {viewErro}</div>
-            : <div className="flex items-center justify-center py-16 text-gray-400"><Loader2 className="w-6 h-6 animate-spin" /></div>
+            ? <div className="bg-[#d2a948]/12 border border-[#d2a948]/30 rounded-lg px-4 py-3 text-sm text-[#d2a948]">⚠ {viewErro}</div>
+            : <div className="flex items-center justify-center py-16 text-white/40"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : !isView && ehAnalise ? (
           <ProcessoAnalise processoId={processo.id} onConcluido={() => carregar(true)} />
         ) : !isView && ehTraducao ? (
@@ -884,8 +884,8 @@ export function ProcessoCentralOperacional({
         <>
         {/* ===== Header da Central ===== */}
         <div className="mb-4">
-          <h3 className="text-lg font-bold text-gray-900 tracking-tight">Central Operacional</h3>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <h3 className="text-lg font-bold text-white/95 tracking-tight">Central Operacional</h3>
+          <p className="text-xs text-white/55 mt-0.5">
             Fila de produção documental · todas as tarefas ativas do processo
           </p>
         </div>
@@ -918,17 +918,17 @@ export function ProcessoCentralOperacional({
 
           {abrindoOperacao && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20">
-              <div className="rounded-md bg-white px-4 py-2 text-sm text-gray-700 shadow">Abrindo operação…</div>
+              <div className="rounded-md bg-[#1b2027] px-4 py-2 text-sm text-white/80 shadow">Abrindo operação…</div>
             </div>
           )}
 
           {erroOperacao && (
             <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30" onClick={() => setErroOperacao(null)}>
-              <div className="max-w-sm rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-                <div className="text-sm font-semibold text-gray-900 mb-1">Não foi possível abrir a operação</div>
-                <div className="text-sm text-gray-600 mb-4">{erroOperacao}</div>
+              <div className="max-w-sm rounded-lg bg-[#1b2027] p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <div className="text-sm font-semibold text-white/95 mb-1">Não foi possível abrir a operação</div>
+                <div className="text-sm text-white/68 mb-4">{erroOperacao}</div>
                 <div className="flex justify-end">
-                  <button onClick={() => setErroOperacao(null)} className="px-3 py-1.5 text-sm font-medium rounded-md bg-gray-100 hover:bg-gray-200 text-gray-800">Fechar</button>
+                  <button onClick={() => setErroOperacao(null)} className="px-3 py-1.5 text-sm font-medium rounded-md bg-[#252c35] hover:bg-[#252c35] text-white/95">Fechar</button>
                 </div>
               </div>
             </div>

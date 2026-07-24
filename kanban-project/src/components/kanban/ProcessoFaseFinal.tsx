@@ -19,7 +19,7 @@ interface Props {
   onConcluido?: () => void
 }
 
-const EC = "w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+const EC = "w-full text-sm border border-white/10 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-300"
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("authToken")}` })
 const jsonHeaders = () => ({ "Content-Type": "application/json", ...authHeaders() })
 
@@ -75,10 +75,10 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
+    return <div className="flex items-center justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-white/40" /></div>
   }
   if (!fase || !faseKey) {
-    return <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">Este processo não está numa fase final.</div>
+    return <div className="rounded-xl border border-dashed border-white/15 p-8 text-center text-sm text-white/55">Este processo não está numa fase final.</div>
   }
 
   const cfg = FINAL_CFG[faseKey]
@@ -91,21 +91,21 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Central Operacional · {cfg.phaseName}</h2>
-          <p className="text-sm text-gray-500">Objetivo: {cfg.obj}</p>
+          <h2 className="text-lg font-bold text-white/95">Central Operacional · {cfg.phaseName}</h2>
+          <p className="text-sm text-white/55">Objetivo: {cfg.obj}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-center">
-            <div className="text-lg font-bold text-gray-900">{done} / {cfg.steps.length}</div>
-            <div className="text-[11px] text-gray-500 whitespace-nowrap">Etapas</div>
+          <div className="rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-center">
+            <div className="text-lg font-bold text-white/95">{done} / {cfg.steps.length}</div>
+            <div className="text-[11px] text-white/55 whitespace-nowrap">Etapas</div>
           </div>
-          <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-center">
-            <div className="text-lg font-bold text-gray-900">{progress}%</div>
-            <div className="text-[11px] text-gray-500 whitespace-nowrap">Progresso</div>
+          <div className="rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-center">
+            <div className="text-lg font-bold text-white/95">{progress}%</div>
+            <div className="text-[11px] text-white/55 whitespace-nowrap">Progresso</div>
           </div>
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-            concluida ? "bg-green-50 text-green-700" : "bg-indigo-50 text-indigo-700"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${concluida ? "bg-green-500" : "bg-indigo-500"}`} />
+            concluida ? "bg-[#4ade80]/12 text-[#4ade80]" : "bg-indigo-50 text-indigo-700"}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${concluida ? "bg-[#4ade80]/120" : "bg-indigo-500"}`} />
             {concluida ? "Concluída" : "Em andamento"}
           </span>
         </div>
@@ -114,7 +114,7 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr,300px] gap-4">
         <div className="space-y-4">
           {/* Barra das 3 etapas */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
             <div className="flex items-start">
               {fase.workflow.map((s, i) => {
                 const isDone = s.status === "concluida"
@@ -124,21 +124,21 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
                     <button type="button" disabled={!active} onClick={() => active && setModalStep(s.id)}
                       className={`flex flex-col items-center text-center w-[120px] shrink-0 ${active ? "cursor-pointer" : "cursor-default"}`}>
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                        isDone ? "bg-green-500 text-white" : active ? "bg-indigo-600 text-white ring-2 ring-indigo-200" : "bg-gray-200 text-gray-500"}`}>
+                        isDone ? "bg-[#4ade80]/120 text-white" : active ? "bg-indigo-600 text-white ring-2 ring-indigo-200" : "bg-[#252c35] text-white/55"}`}>
                         {isDone ? <Check className="w-4 h-4" /> : i + 1}
                       </div>
-                      <div className="mt-1.5 text-[11px] font-medium text-gray-700 leading-tight">{s.title}</div>
-                      <div className={`text-[10px] ${isDone ? "text-green-600" : active ? "text-indigo-600" : "text-gray-400"}`}>
+                      <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{s.title}</div>
+                      <div className={`text-[10px] ${isDone ? "text-[#4ade80]" : active ? "text-indigo-600" : "text-white/40"}`}>
                         {isDone ? "Concluído" : active ? "Em andamento" : "Pendente"}
                       </div>
                     </button>
-                    {i < fase.workflow.length - 1 && <div className={`flex-1 h-0.5 mt-3.5 ${isDone ? "bg-green-400" : "bg-gray-200"}`} />}
+                    {i < fase.workflow.length - 1 && <div className={`flex-1 h-0.5 mt-3.5 ${isDone ? "bg-green-400" : "bg-[#252c35]"}`} />}
                   </div>
                 )
               })}
             </div>
             {!concluida && activeStep && (
-              <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end">
+              <div className="mt-3 pt-3 border-t border-white/10 flex justify-end">
                 <button onClick={() => setModalStep(activeStep.id)}
                   className="px-3 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md inline-flex items-center gap-2">
                   {activeStep.title} <ArrowRight className="w-4 h-4" />
@@ -148,21 +148,21 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
           </div>
 
           {/* Contexto */}
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 flex items-start gap-3">
+          <div className="rounded-xl border border-white/10 bg-[#20262e] p-4 flex items-start gap-3">
             <div className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center text-lg flex-shrink-0">{cfg.icon}</div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-gray-900">{cfg.ctxTitle}</div>
-              <p className="text-xs text-gray-600 mt-0.5">{cfg.ctxText}</p>
+              <div className="text-sm font-semibold text-white/95">{cfg.ctxTitle}</div>
+              <p className="text-xs text-white/68 mt-0.5">{cfg.ctxText}</p>
             </div>
           </div>
 
           {/* Lista de etapas */}
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-gray-100 flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-900">Etapas da fase</span>
-              <span className="text-xs font-semibold text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">{cfg.steps.length}</span>
+          <div className="rounded-xl border border-white/10 overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-white/10 flex items-center gap-2">
+              <span className="text-sm font-semibold text-white/95">Etapas da fase</span>
+              <span className="text-xs font-semibold text-white/55 bg-[#252c35] rounded-full px-2 py-0.5">{cfg.steps.length}</span>
             </div>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-white/10">
               {fase.workflow.map((s, i) => {
                 const isDone = s.status === "concluida"
                 const active = s.status === "pendente" || s.status === "em_andamento"
@@ -170,14 +170,14 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
                 return (
                   <div key={s.id} className="flex items-center gap-3 px-4 py-3">
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
-                      isDone ? "bg-green-100 text-green-700" : active ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 text-gray-400"}`}>{i + 1}</span>
+                      isDone ? "bg-[#4ade80]/15 text-[#4ade80]" : active ? "bg-indigo-100 text-indigo-700" : "bg-[#252c35] text-white/40"}`}>{i + 1}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900">{s.title}</div>
-                      <div className="text-[11px] text-gray-500">{meta}</div>
+                      <div className="text-sm font-medium text-white/95">{s.title}</div>
+                      <div className="text-[11px] text-white/55">{meta}</div>
                     </div>
                     {active && <button onClick={() => setModalStep(s.id)} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 border border-indigo-200 rounded-md px-2.5 py-1.5">Abrir etapa</button>}
                     {isDone && <span className="text-green-500"><Check className="w-4 h-4" /></span>}
-                    {!isDone && !active && <span className="text-gray-300">🔒</span>}
+                    {!isDone && !active && <span className="text-white/40">🔒</span>}
                   </div>
                 )
               })}
@@ -187,15 +187,15 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
 
         {/* Coluna direita */}
         <aside className="space-y-4">
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2.5">Ações rápidas</h3>
+          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+            <h3 className="text-sm font-semibold text-white/95 mb-2.5">Ações rápidas</h3>
             <button onClick={() => activeStep ? setModalStep(activeStep.id) : setAviso("Todas as etapas concluídas.")}
-              className="w-full text-left text-sm text-gray-700 hover:bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 inline-flex items-center gap-2">
-              <ArrowRight className="w-4 h-4 text-gray-400" /> Abrir etapa atual
+              className="w-full text-left text-sm text-white/80 hover:bg-[#20262e] border border-white/10 rounded-lg px-3 py-2 inline-flex items-center gap-2">
+              <ArrowRight className="w-4 h-4 text-white/40" /> Abrir etapa atual
             </button>
           </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2.5">Resumo</h3>
+          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+            <h3 className="text-sm font-semibold text-white/95 mb-2.5">Resumo</h3>
             <div className="space-y-1.5 text-xs">
               <Res k="Progresso" v={`${progress}%`} />
               <Res k="Etapas concluídas" v={`${done} / ${cfg.steps.length}`} />
@@ -209,7 +209,7 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
         </aside>
       </div>
 
-      {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
+      {erro && <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-4 py-3 text-sm text-[#f87171]">{erro}</div>}
       {aviso && <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">{aviso}</div>}
 
       {modalStep && (
@@ -223,7 +223,7 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
 }
 
 function Res({ k, v }: { k: string; v: string }) {
-  return <div className="flex items-center justify-between"><span className="text-gray-500">{k}</span><b className="text-gray-800">{v}</b></div>
+  return <div className="flex items-center justify-between"><span className="text-white/55">{k}</span><b className="text-white/95">{v}</b></div>
 }
 
 // ============================================================
@@ -273,21 +273,21 @@ function EtapaModal({ stepId, faseKey, fase, posting, erro, onClose, onSubmit }:
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl max-h-[85vh] flex flex-col">
-        <div className={`flex items-start justify-between px-5 py-4 border-b ${isLast ? "border-red-100" : "border-gray-100"}`}>
+      <div className="relative w-full max-w-lg bg-[#1b2027] rounded-xl shadow-xl max-h-[85vh] flex flex-col">
+        <div className={`flex items-start justify-between px-5 py-4 border-b ${isLast ? "border-red-100" : "border-white/10"}`}>
           <div>
-            <div className={`text-[11px] font-semibold uppercase tracking-wider ${isLast ? "text-red-600" : "text-indigo-600"}`}>Etapa {n} de {cfg.steps.length} · {cfg.phaseName}</div>
-            <h3 className="text-base font-bold text-gray-900 mt-0.5">{sdef.title}</h3>
-            <p className="text-xs text-gray-500 mt-0.5">{sdef.desc}</p>
+            <div className={`text-[11px] font-semibold uppercase tracking-wider ${isLast ? "text-[#f87171]" : "text-indigo-600"}`}>Etapa {n} de {cfg.steps.length} · {cfg.phaseName}</div>
+            <h3 className="text-base font-bold text-white/95 mt-0.5">{sdef.title}</h3>
+            <p className="text-xs text-white/55 mt-0.5">{sdef.desc}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-white/40 hover:text-white/80 p-1"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-5 space-y-4 overflow-y-auto">
           {stepId === "montar_dossie_final" && (
             <>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs text-gray-600 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-gray-400" /> Reúna todos os documentos apostilados e traduzidos do processo num dossiê único.
+              <div className="rounded-lg border border-white/10 bg-[#20262e] px-3 py-2.5 text-xs text-white/68 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-white/40" /> Reúna todos os documentos apostilados e traduzidos do processo num dossiê único.
               </div>
               <Field label="Observações do dossiê"><textarea className={EC} rows={2} value={fnF1} onChange={(e) => setFnF1(e.target.value)} /></Field>
               <Chk on={chk} onClick={() => setChk((v) => !v)}>Confirmo que o dossiê está completo e legível</Chk>
@@ -333,7 +333,7 @@ function EtapaModal({ stepId, faseKey, fase, posting, erro, onClose, onSubmit }:
                 <Field label="Tipo"><Select value={fnCanal} onChange={setFnCanal} opts={["Contato", "Exigência", "Andamento", "Audiência"]} /></Field>
               </div>
               <Field label="Descrição"><textarea className={EC} rows={2} value={fnF1} onChange={(e) => setFnF1(e.target.value)} placeholder="Ex: órgão solicitou documento adicional." /></Field>
-              <div className="text-[11px] text-gray-500">Conclua quando o acompanhamento estiver em dia e a decisão for aguardada.</div>
+              <div className="text-[11px] text-white/55">Conclua quando o acompanhamento estiver em dia e a decisão for aguardada.</div>
             </>
           )}
 
@@ -345,9 +345,9 @@ function EtapaModal({ stepId, faseKey, fase, posting, erro, onClose, onSubmit }:
                   ["exigencia", "! Exigência", "Órgão pediu complementação · fase não conclui"],
                   ["indeferido", "✕ Indeferido", "Pedido negado · fase não conclui"]] as const).map(([v, l, sub]) => (
                   <button key={v} type="button" onClick={() => setDecision(v)}
-                    className={`w-full text-left border rounded-lg px-3 py-2.5 ${decision === v ? (v === "deferido" ? "border-green-400 bg-green-50" : "border-indigo-500 bg-indigo-50") : "border-gray-200"}`}>
-                    <div className="text-sm font-semibold text-gray-900">{l}</div>
-                    <div className="text-[11px] text-gray-500">{sub}</div>
+                    className={`w-full text-left border rounded-lg px-3 py-2.5 ${decision === v ? (v === "deferido" ? "border-green-400 bg-[#4ade80]/12" : "border-indigo-500 bg-indigo-50") : "border-white/10"}`}>
+                    <div className="text-sm font-semibold text-white/95">{l}</div>
+                    <div className="text-[11px] text-white/55">{sub}</div>
                   </button>
                 ))}
               </div>
@@ -357,7 +357,7 @@ function EtapaModal({ stepId, faseKey, fase, posting, erro, onClose, onSubmit }:
 
           {stepId === "confirmar_deferimento" && (
             <>
-              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-700">🏛️ Reconhecimento deferido. Confirme para prosseguir com a entrega ao cliente.</div>
+              <div className="rounded-lg border border-[#4ade80]/30 bg-[#4ade80]/12 px-3 py-2.5 text-sm text-[#4ade80]">🏛️ Reconhecimento deferido. Confirme para prosseguir com a entrega ao cliente.</div>
               <Field label="Nº / referência do reconhecimento"><input className={EC} value={fnNum} onChange={(e) => setFnNum(e.target.value)} /></Field>
             </>
           )}
@@ -374,17 +374,17 @@ function EtapaModal({ stepId, faseKey, fase, posting, erro, onClose, onSubmit }:
 
           {stepId === "encerrar_processo" && (
             <>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700">📦 Ao encerrar, o processo é arquivado como <b>Finalizado</b> e sai do fluxo operacional.</div>
+              <div className="rounded-lg border border-white/10 bg-[#20262e] px-3 py-2.5 text-sm text-white/80">📦 Ao encerrar, o processo é arquivado como <b>Finalizado</b> e sai do fluxo operacional.</div>
               <Field label="Parecer de encerramento"><textarea className={EC} rows={2} value={fnF1} onChange={(e) => setFnF1(e.target.value)} /></Field>
               <Chk on={chk} onClick={() => setChk((v) => !v)}>Confirmo o encerramento e arquivamento do processo</Chk>
             </>
           )}
 
-          {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{erro}</div>}
+          {erro && <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-3 py-2 text-sm text-[#f87171]">{erro}</div>}
         </div>
 
-        <div className="border-t border-gray-100 px-5 py-3 flex justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md">Cancelar</button>
+        <div className="border-t border-white/10 px-5 py-3 flex justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-2 text-sm text-white/68 hover:bg-[#20262e] rounded-md">Cancelar</button>
           <button onClick={submit} disabled={!podeSalvar || posting}
             className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
             {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : isLast && faseKey === "finalizado" ? <Flag className="w-4 h-4" /> : <Check className="w-4 h-4" />}
@@ -397,13 +397,13 @@ function EtapaModal({ stepId, faseKey, fase, posting, erro, onClose, onSubmit }:
 }
 
 function Sec({ children }: { children: ReactNode }) {
-  return <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{children}</div>
+  return <div className="text-[11px] font-semibold uppercase tracking-wider text-white/55">{children}</div>
 }
 function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
   return (
     <div>
-      <label className="text-xs font-semibold text-gray-700 flex items-center gap-1.5 mb-1">
-        {label}{required && <span className="text-[10px] font-bold text-red-500 bg-red-50 rounded px-1.5 py-0.5">Obrigatório</span>}
+      <label className="text-xs font-semibold text-white/80 flex items-center gap-1.5 mb-1">
+        {label}{required && <span className="text-[10px] font-bold text-[#f87171] bg-[#f87171]/12 rounded px-1.5 py-0.5">Obrigatório</span>}
       </label>
       {children}
     </div>
@@ -420,8 +420,8 @@ function Select({ value, onChange, opts }: { value: string; onChange: (v: string
 function Chk({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button type="button" onClick={onClick}
-      className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-left ${on ? "border-green-300 bg-green-50 text-green-700" : "border-gray-200 text-gray-700"}`}>
-      <span className={`w-4 h-4 rounded flex items-center justify-center ${on ? "bg-green-500 text-white" : "border border-gray-300"}`}>{on && <Check className="w-3 h-3" />}</span>
+      className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-left ${on ? "border-green-300 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/80"}`}>
+      <span className={`w-4 h-4 rounded flex items-center justify-center ${on ? "bg-[#4ade80]/120 text-white" : "border border-white/15"}`}>{on && <Check className="w-3 h-3" />}</span>
       {children}
     </button>
   )
@@ -430,7 +430,7 @@ function FakeUpload({ label }: { label: string }) {
   const [ok, setOk] = useState(false)
   return (
     <button type="button" onClick={() => setOk(true)}
-      className={`w-full inline-flex items-center gap-2 text-sm font-semibold rounded-md border px-3 py-2.5 ${ok ? "border-green-300 bg-green-50 text-green-700" : "border-gray-200 text-gray-700"}`}>
+      className={`w-full inline-flex items-center gap-2 text-sm font-semibold rounded-md border px-3 py-2.5 ${ok ? "border-green-300 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/80"}`}>
       {ok ? <Check className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
       {ok ? "comprovante_protocolo.pdf · anexado" : label}
     </button>

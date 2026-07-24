@@ -213,16 +213,16 @@ export function InitOperationModal({
       label: "Buscar certidão",
       desc: "Pesquisar cartório e dados registrais (livro, folha, termo). Use quando ainda não sabe onde está o registro.",
       icon: <Search className="w-5 h-5" />,
-      iconBg: "bg-amber-100",
-      iconColor: "text-amber-700",
+      iconBg: "bg-[#d2a948]/15",
+      iconColor: "text-[#d2a948]",
     },
     {
       key: "desnecessario",
       label: "Marcar como desnecessário",
       desc: "Cancelar este documento — não será mais cobrado.",
       icon: <Ban className="w-5 h-5" />,
-      iconBg: "bg-red-100",
-      iconColor: "text-red-700",
+      iconBg: "bg-[#f87171]/15",
+      iconColor: "text-[#f87171]",
     },
   ]
 
@@ -242,21 +242,21 @@ export function InitOperationModal({
       {/* MODAL */}
       <div className="fixed inset-0 z-[10011] flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-white rounded-xl shadow-2xl w-full max-w-[640px] max-h-[92vh] flex flex-col pointer-events-auto"
+          className="bg-[#1b2027] rounded-xl shadow-2xl w-full max-w-[640px] max-h-[92vh] flex flex-col pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {/* HEADER */}
-          <div className="px-6 pt-5 pb-4 border-b border-gray-100">
+          <div className="px-6 pt-5 pb-4 border-b border-white/10">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900">Iniciar operação</h2>
+              <h2 className="text-lg font-bold text-white/95">Iniciar operação</h2>
               <button
                 onClick={onClose}
-                className="w-7 h-7 rounded-md hover:bg-gray-100 flex items-center justify-center text-gray-500"
+                className="w-7 h-7 rounded-md hover:bg-[#252c35] flex items-center justify-center text-white/55"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-white/55 mt-1">
               {loading ? "Carregando…" : doc ? `${tipoLabel} · ${pessoaName}` : "—"}
             </div>
           </div>
@@ -265,10 +265,10 @@ export function InitOperationModal({
           <div className="flex-1 overflow-y-auto px-6 py-5">
             {loading ? (
               <div className="flex items-center justify-center py-16">
-                <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                <Loader2 className="w-5 h-5 animate-spin text-white/40" />
               </div>
             ) : erro ? (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+              <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-4 py-3 text-sm text-[#f87171]">
                 ⚠ {erro}
               </div>
             ) : doc ? (
@@ -284,8 +284,8 @@ export function InitOperationModal({
                         onClick={() => setTipoOperacao(op.key)}
                         className={`w-full flex items-start gap-3 px-3 py-3 rounded-lg border-2 transition-all text-left ${
                           selected
-                            ? "border-blue-500 bg-blue-50/60"
-                            : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                            ? "border-blue-500 bg-[#7dd3fc]/12"
+                            : "border-white/10 bg-[#1b2027] hover:border-white/15 hover:bg-[#20262e]"
                         }`}
                       >
                         <div
@@ -294,10 +294,10 @@ export function InitOperationModal({
                           {op.icon}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold text-gray-900">{op.label}</div>
+                          <div className="text-sm font-semibold text-white/95">{op.label}</div>
                           <div
                             className={`text-xs mt-0.5 leading-relaxed ${
-                              op.warning ? "text-amber-700" : "text-gray-600"
+                              op.warning ? "text-[#d2a948]" : "text-white/68"
                             }`}
                           >
                             {op.desc}
@@ -314,13 +314,13 @@ export function InitOperationModal({
                     <SectionTitle num={2}>Atribuição inicial</SectionTitle>
                     <div className="grid grid-cols-2 gap-3 mb-6">
                       <div>
-                        <label className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 mb-1.5">
+                        <label className="block text-[10px] uppercase tracking-wider font-semibold text-white/55 mb-1.5">
                           Responsável inicial
                         </label>
                         <select
                           value={responsavelId}
                           onChange={(e) => setResponsavelId(e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-white"
+                          className="w-full px-3 py-2 text-sm border border-white/10 rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-[#1b2027]"
                         >
                           <option value="auto">Auto (responsável padrão da etapa)</option>
                           {usuarios.map((u) => (
@@ -331,14 +331,14 @@ export function InitOperationModal({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 mb-1.5">
+                        <label className="block text-[10px] uppercase tracking-wider font-semibold text-white/55 mb-1.5">
                           Prazo inicial
                         </label>
                         <input
                           type="date"
                           value={dataPrazoInicial}
                           onChange={(e) => setDataPrazoInicial(e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-white"
+                          className="w-full px-3 py-2 text-sm border border-white/10 rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-[#1b2027]"
                         />
                       </div>
                     </div>
@@ -352,9 +352,9 @@ export function InitOperationModal({
                     <div className="grid grid-cols-3 gap-2 mb-6">
                       {(
                         [
-                          { key: "normal", label: "Normal", bgActive: "bg-slate-900 text-white", bgIdle: "bg-white text-gray-700 border-gray-200" },
-                          { key: "urgente", label: "Urgente", bgActive: "bg-orange-500 text-white", bgIdle: "bg-white text-gray-700 border-gray-200" },
-                          { key: "critica", label: "⚠ Crítica", bgActive: "bg-red-500 text-white", bgIdle: "bg-white text-gray-700 border-gray-200" },
+                          { key: "normal", label: "Normal", bgActive: "bg-[#12161c] text-white", bgIdle: "bg-[#1b2027] text-white/80 border-white/10" },
+                          { key: "urgente", label: "Urgente", bgActive: "bg-orange-500 text-white", bgIdle: "bg-[#1b2027] text-white/80 border-white/10" },
+                          { key: "critica", label: "⚠ Crítica", bgActive: "bg-[#f87171]/120 text-white", bgIdle: "bg-[#1b2027] text-white/80 border-white/10" },
                         ] as Array<{ key: Prioridade; label: string; bgActive: string; bgIdle: string }>
                       ).map((p) => {
                         const selected = prioridade === p.key
@@ -363,7 +363,7 @@ export function InitOperationModal({
                             key={p.key}
                             onClick={() => setPrioridade(p.key)}
                             className={`px-3 py-2 rounded-md text-sm font-semibold border-2 transition-colors ${
-                              selected ? p.bgActive + " border-transparent" : p.bgIdle + " hover:bg-gray-50"
+                              selected ? p.bgActive + " border-transparent" : p.bgIdle + " hover:bg-[#20262e]"
                             }`}
                           >
                             {p.label}
@@ -389,18 +389,18 @@ export function InitOperationModal({
                       ? "Por que este documento não é mais necessário?"
                       : "Contexto, instruções para quem vai iniciar, particularidades do caso…"
                   }
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 resize-none"
+                  className="w-full px-3 py-2 text-sm border border-white/10 rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 resize-none"
                 />
               </>
             ) : null}
           </div>
 
           {/* FOOTER */}
-          <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+          <div className="px-6 py-4 border-t border-white/10 flex items-center justify-end gap-2">
             <button
               onClick={onClose}
               disabled={saving}
-              className="px-4 py-2 text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-md disabled:opacity-50"
+              className="px-4 py-2 text-sm font-semibold text-white/80 bg-[#1b2027] hover:bg-[#20262e] border border-white/10 rounded-md disabled:opacity-50"
             >
               Cancelar
             </button>
@@ -409,8 +409,8 @@ export function InitOperationModal({
               disabled={!tipoOperacao || saving}
               className={`px-4 py-2 text-sm font-semibold text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 ${
                 tipoOperacao === "desnecessario"
-                  ? "bg-red-500 hover:bg-red-600"
-                  : "bg-blue-500 hover:bg-blue-600"
+                  ? "bg-[#f87171]/120 hover:bg-red-600"
+                  : "bg-[#7dd3fc]/120 hover:bg-[#7dd3fc]"
               }`}
             >
               {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
@@ -435,10 +435,10 @@ export function InitOperationModal({
 function SectionTitle({ num, children }: { num: number; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-3 mt-1">
-      <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[11px] font-bold flex items-center justify-center">
+      <span className="w-5 h-5 rounded-full bg-[#12161c] text-white text-[11px] font-bold flex items-center justify-center">
         {num}
       </span>
-      <h3 className="text-[11px] uppercase font-bold tracking-wider text-gray-900">{children}</h3>
+      <h3 className="text-[11px] uppercase font-bold tracking-wider text-white/95">{children}</h3>
     </div>
   )
 }

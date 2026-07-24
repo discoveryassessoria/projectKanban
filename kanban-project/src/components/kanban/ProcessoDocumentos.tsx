@@ -275,7 +275,7 @@ export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
   if (loading && !data) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+        <Loader2 className="w-6 h-6 animate-spin text-white/40" />
       </div>
     )
   }
@@ -283,7 +283,7 @@ export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
   if (erro && !data) {
     return (
       <div className="h-full overflow-y-auto p-6">
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+        <div className="bg-[#d2a948]/12 border border-[#d2a948]/30 rounded-lg px-4 py-3 text-sm text-[#d2a948]">
           ⚠ {erro}
         </div>
       </div>

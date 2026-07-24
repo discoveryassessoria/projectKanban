@@ -47,25 +47,25 @@ export function ProcessoFaseGenerica({ processoId, faseCode, onConcluido }: Prop
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">Central Operacional · {fase.label}</h2>
-        <p className="text-sm text-gray-500">Conclua as etapas abaixo e avance o processo para a próxima fase.</p>
+        <h2 className="text-lg font-bold text-white/95">Central Operacional · {fase.label}</h2>
+        <p className="text-sm text-white/55">Conclua as etapas abaixo e avance o processo para a próxima fase.</p>
       </div>
 
-      {resultado && <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
-      {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
+      {resultado && <div className="bg-[#4ade80]/12 border border-[#4ade80]/30 rounded-lg px-4 py-3 text-sm text-[#4ade80] flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
+      {erro && <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-4 py-3 text-sm text-[#f87171]">{erro}</div>}
 
-      <div className="rounded-xl border border-gray-200 divide-y divide-gray-100 overflow-hidden">
+      <div className="rounded-xl border border-white/10 divide-y divide-white/10 overflow-hidden">
         {steps.map((s, i) => {
           const ok = done.has(s.stepKey)
           return (
             <button key={s.stepKey} onClick={() => toggle(s.stepKey)} disabled={!!resultado}
-              className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 disabled:hover:bg-white">
-              <span className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${ok ? "bg-green-500 text-white" : "border-2 border-gray-300 text-transparent"}`}>
+              className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-[#20262e] disabled:hover:bg-[#1b2027]">
+              <span className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${ok ? "bg-[#4ade80]/120 text-white" : "border-2 border-white/15 text-transparent"}`}>
                 <Check className="w-4 h-4" />
               </span>
               <span>
-                <span className={`block text-sm font-medium ${ok ? "text-gray-400 line-through" : "text-gray-900"}`}>{i + 1}. {s.title}</span>
-                <span className="block text-xs text-gray-500">{s.description}</span>
+                <span className={`block text-sm font-medium ${ok ? "text-white/40 line-through" : "text-white/95"}`}>{i + 1}. {s.title}</span>
+                <span className="block text-xs text-white/55">{s.description}</span>
               </span>
             </button>
           )
@@ -73,15 +73,15 @@ export function ProcessoFaseGenerica({ processoId, faseCode, onConcluido }: Prop
       </div>
 
       {next ? (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 p-4">
-          <div className="text-xs text-gray-600">{todasFeitas ? "Tudo pronto — pode avançar." : `Marque as ${steps.length} etapas para concluir a fase.`}</div>
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 p-4">
+          <div className="text-xs text-white/68">{todasFeitas ? "Tudo pronto — pode avançar." : `Marque as ${steps.length} etapas para concluir a fase.`}</div>
           <button onClick={concluir} disabled={!todasFeitas || salvando || !!resultado}
-            className="px-4 py-2 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            className="px-4 py-2 text-sm font-semibold text-white bg-[#12161c] hover:bg-[#20262e] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
             {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} Concluir fase
           </button>
         </div>
       ) : (
-        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Esta é a última fase do processo.</div>
+        <div className="rounded-xl border border-[#4ade80]/30 bg-[#4ade80]/12 p-4 text-sm text-[#4ade80] flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Esta é a última fase do processo.</div>
       )}
     </div>
   )

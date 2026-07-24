@@ -57,44 +57,44 @@ export function RetornarFaseButton({ processoId, faseKey, faseLabel, onRetornou 
     <>
       <button
         onClick={() => setAberto(true)}
-        className="inline-flex items-center gap-1.5 bg-gray-900 text-white text-[12.5px] font-bold px-3.5 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+        className="inline-flex items-center gap-1.5 bg-[#12161c] text-white text-[12.5px] font-bold px-3.5 py-2 rounded-lg hover:bg-[#20262e] transition-colors"
       >
         <RotateCcw className="w-3.5 h-3.5" /> Retornar processo para esta fase
       </button>
 
       {aberto && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={() => !enviando && setAberto(false)}>
-          <div className="max-w-md w-full rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="max-w-md w-full rounded-2xl bg-[#1b2027] p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-3">
-              <RotateCcw className="w-5 h-5 text-gray-700" />
-              <h3 className="text-[16px] font-extrabold text-gray-900">Retornar processo para esta fase</h3>
+              <RotateCcw className="w-5 h-5 text-white/80" />
+              <h3 className="text-[16px] font-extrabold text-white/95">Retornar processo para esta fase</h3>
             </div>
-            <p className="text-[13px] text-gray-600 leading-relaxed mb-4">
+            <p className="text-[13px] text-white/68 leading-relaxed mb-4">
               O processo retornará para <b>{faseLabel}</b>, que voltará a ser a fase <b>ativa</b> (novo ciclo). As
               fases posteriores deixam de ser o caminho ativo, mas <b>todo o histórico é preservado</b>. Deseja continuar?
             </p>
 
-            <label className="block text-[12px] font-semibold text-gray-600 mb-1">Justificativa</label>
+            <label className="block text-[12px] font-semibold text-white/68 mb-1">Justificativa</label>
             <textarea
               value={justificativa}
               onChange={(e) => setJustificativa(e.target.value)}
               rows={3}
-              className="w-full text-[13px] rounded-lg border border-gray-200 px-3 py-2 mb-3 focus:outline-none focus:border-blue-400"
+              className="w-full text-[13px] rounded-lg border border-white/10 px-3 py-2 mb-3 focus:outline-none focus:border-blue-400"
               placeholder="Por que o processo precisa voltar a esta fase?"
             />
-            <label className="block text-[12px] font-semibold text-gray-600 mb-1">Código de motivo</label>
+            <label className="block text-[12px] font-semibold text-white/68 mb-1">Código de motivo</label>
             <input
               value={motivoCodigo}
               onChange={(e) => setMotivoCodigo(e.target.value)}
-              className="w-full text-[13px] rounded-lg border border-gray-200 px-3 py-2 mb-3 focus:outline-none focus:border-blue-400"
+              className="w-full text-[13px] rounded-lg border border-white/10 px-3 py-2 mb-3 focus:outline-none focus:border-blue-400"
               placeholder="Ex.: DOC_NAO_LOCALIZADO"
             />
 
-            {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-[12.5px] text-red-700 mb-3">{erro}</div>}
+            {erro && <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-3 py-2 text-[12.5px] text-[#f87171] mb-3">{erro}</div>}
 
             <div className="flex justify-end gap-2">
-              <button disabled={enviando} onClick={() => setAberto(false)} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 disabled:opacity-50">Cancelar</button>
-              <button disabled={enviando} onClick={() => void enviar()} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50">
+              <button disabled={enviando} onClick={() => setAberto(false)} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-[#252c35] hover:bg-[#252c35] text-white/95 disabled:opacity-50">Cancelar</button>
+              <button disabled={enviando} onClick={() => void enviar()} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-[#12161c] text-white hover:bg-[#20262e] disabled:opacity-50">
                 {enviando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Confirmar retorno
               </button>
             </div>

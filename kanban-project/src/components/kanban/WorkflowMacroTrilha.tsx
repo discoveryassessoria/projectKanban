@@ -130,23 +130,23 @@ export function WorkflowMacroTrilha({
 
   const decLabel = (() => {
     // "Decisão da Análise Documental"
-    if (needsRectification === true) return { txt: "Precisa retificação", cls: "bg-green-100 text-green-700" }
-    if (needsRectification === false) return { txt: "Sem retificação", cls: "bg-green-100 text-green-700" }
-    return { txt: "Não definida", cls: "bg-slate-100 text-slate-500" }
+    if (needsRectification === true) return { txt: "Precisa retificação", cls: "bg-[#4ade80]/15 text-[#4ade80]" }
+    if (needsRectification === false) return { txt: "Sem retificação", cls: "bg-[#4ade80]/15 text-[#4ade80]" }
+    return { txt: "Não definida", cls: "bg-[#252c35] text-white/55" }
   })()
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl px-5 py-4">
+    <div className="bg-[#1b2027] border border-white/10 rounded-2xl px-5 py-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-3.5">
         <div>
-          <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-1.5">
+          <h3 className="text-base font-extrabold text-white/95 flex items-center gap-1.5">
             Workflow Macro do Processo
-            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-100 text-gray-400 text-[10px] font-bold">i</span>
+            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#252c35] text-white/40 text-[10px] font-bold">i</span>
           </h3>
-          <div className="text-xs text-gray-500 mt-0.5">Visão geral do caminho do processo entre fases.</div>
+          <div className="text-xs text-white/55 mt-0.5">Visão geral do caminho do processo entre fases.</div>
         </div>
-        <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 whitespace-nowrap">
+        <div className="text-xs text-white/55 bg-[#20262e] border border-white/10 rounded-lg px-3 py-2 whitespace-nowrap">
           Decisão da Análise Documental:
           <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-md ml-1.5 ${decLabel.cls}`}>{decLabel.txt}</span>
         </div>
@@ -160,20 +160,20 @@ export function WorkflowMacroTrilha({
           const conditional = RETIF_PHASES.includes(title)
 
           const dotCls =
-            st === "concluida" ? "bg-green-600 text-white"
-            : st === "atual" ? "bg-blue-600 text-white"
-            : st === "pulada" ? "bg-slate-200 text-slate-400"
-            : st === "condicional" ? "bg-violet-100 text-violet-500"
-            : st === "bloqueada" ? "bg-amber-100 text-amber-700"
-            : "border-2 border-gray-200 bg-white text-gray-400"
+            st === "concluida" ? "bg-[#4ade80] text-white"
+            : st === "atual" ? "bg-[#7dd3fc] text-white"
+            : st === "pulada" ? "bg-[#252c35] text-white/40"
+            : st === "condicional" ? "bg-[#a78bfa]/15 text-[#a78bfa]"
+            : st === "bloqueada" ? "bg-[#d2a948]/15 text-[#d2a948]"
+            : "border-2 border-white/10 bg-[#1b2027] text-white/40"
 
           const badgeCls =
-            st === "concluida" ? "bg-green-100 text-green-700"
-            : st === "atual" ? "bg-blue-100 text-blue-700 border border-blue-300"
-            : st === "pulada" ? "bg-slate-100 text-slate-500"
-            : st === "condicional" ? "bg-violet-100 text-violet-600"
-            : st === "bloqueada" ? "bg-amber-100 text-amber-700"
-            : "bg-gray-50 text-gray-400"
+            st === "concluida" ? "bg-[#4ade80]/15 text-[#4ade80]"
+            : st === "atual" ? "bg-[#7dd3fc]/15 text-[#7dd3fc] border border-[#7dd3fc]/40"
+            : st === "pulada" ? "bg-[#252c35] text-white/55"
+            : st === "condicional" ? "bg-[#a78bfa]/15 text-[#a78bfa]"
+            : st === "bloqueada" ? "bg-[#d2a948]/15 text-[#d2a948]"
+            : "bg-[#20262e] text-white/40"
           const badgeTxt =
             st === "concluida" ? "Concluída"
             : st === "atual" ? "Atual"
@@ -189,9 +189,9 @@ export function WorkflowMacroTrilha({
             : st === "pulada" ? "#cbd5e1"
             : "#d1d5db"
           const pctColor =
-            st === "concluida" ? "text-green-600"
-            : st === "atual" ? "text-blue-600"
-            : "text-gray-400"
+            st === "concluida" ? "text-[#4ade80]"
+            : st === "atual" ? "text-[#7dd3fc]"
+            : "text-white/40"
 
           // conector pra próxima fase
           const nextDone = i < PROCESS_PHASES.length - 1
@@ -211,8 +211,8 @@ export function WorkflowMacroTrilha({
                 disabled={!clicavel}
                 title={clicavel ? "Ver esta fase" : undefined}
                 className={`flex flex-col items-center gap-1 w-full bg-transparent border-none py-1.5 px-1 rounded-[10px] transition-colors ${
-                  clicavel ? "cursor-pointer hover:bg-gray-50" : "cursor-default"
-                } ${consultando ? "ring-2 ring-blue-400 bg-blue-50/60" : ""}`}
+                  clicavel ? "cursor-pointer hover:bg-[#20262e]" : "cursor-default"
+                } ${consultando ? "ring-2 ring-[#7dd3fc]/40 bg-[#7dd3fc]/12" : ""}`}
               >
                 {/* dot + conector */}
                 <div className="flex items-center w-full justify-center relative">
@@ -230,7 +230,7 @@ export function WorkflowMacroTrilha({
                 </div>
 
                 {/* nome */}
-                <span className="text-[11px] font-semibold text-gray-900 text-center leading-tight min-h-[26px] flex items-center">
+                <span className="text-[11px] font-semibold text-white/95 text-center leading-tight min-h-[26px] flex items-center">
                   {title}
                 </span>
 
@@ -245,7 +245,7 @@ export function WorkflowMacroTrilha({
                 <span className={`text-[12.5px] font-extrabold ${pctColor}`}>{prog}%</span>
 
                 {/* mini barra */}
-                <div className="w-4/5 h-1 bg-gray-200 rounded-full overflow-hidden">
+                <div className="w-4/5 h-1 bg-[#252c35] rounded-full overflow-hidden">
                   <div className="h-full rounded-full" style={{ width: `${prog}%`, background: barColor }} />
                 </div>
               </button>
@@ -255,12 +255,12 @@ export function WorkflowMacroTrilha({
       </div>
 
       {/* Legenda */}
-      <div className="flex flex-wrap gap-3.5 pt-3 mt-2.5 border-t border-gray-200 text-[11px] text-gray-500">
-        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-green-600 text-white grid place-items-center"><Check className="w-2 h-2" strokeWidth={3} /></span>Concluída</span>
-        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-blue-600" />Atual (fase real)</span>
-        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full border-2 border-gray-200 bg-white" />Futura</span>
-        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-violet-100 text-violet-500 grid place-items-center text-[8px]">?</span>Condicional</span>
-        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-slate-200 text-slate-400 grid place-items-center text-[8px]">⤳</span>Pulada</span>
+      <div className="flex flex-wrap gap-3.5 pt-3 mt-2.5 border-t border-white/10 text-[11px] text-white/55">
+        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#4ade80] text-white grid place-items-center"><Check className="w-2 h-2" strokeWidth={3} /></span>Concluída</span>
+        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#7dd3fc]" />Atual (fase real)</span>
+        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full border-2 border-white/10 bg-[#1b2027]" />Futura</span>
+        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#a78bfa]/15 text-[#a78bfa] grid place-items-center text-[8px]">?</span>Condicional</span>
+        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#252c35] text-white/40 grid place-items-center text-[8px]">⤳</span>Pulada</span>
       </div>
     </div>
   )
@@ -302,16 +302,16 @@ export function ResumoDoProcesso({
   ).length
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-4 h-full flex flex-col">
-      <h3 className="text-[13.5px] font-extrabold text-gray-900 mb-3">Resumo do processo</h3>
+    <div className="bg-[#1b2027] border border-white/10 rounded-2xl p-4 h-full flex flex-col">
+      <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">Resumo do processo</h3>
       <StatRow label="Caminho ativo" value={`${path.length} fases`} />
       <StatRow label="Fases concluídas" value={String(concluidas)} />
       <StatRow label="Fase atual" value={currentPhase} />
       <StatRow label="Fases futuras" value={String(futuras)} />
       <StatRow label="Fases puladas" value={String(puladas)} />
-      <div className="flex justify-between items-center text-[12.5px] pt-2.5 mt-auto border-t-2 border-gray-200">
-        <span className="text-gray-500">Progresso geral</span>
-        <b className="text-blue-600 text-[15px]">{overall}%</b>
+      <div className="flex justify-between items-center text-[12.5px] pt-2.5 mt-auto border-t-2 border-white/10">
+        <span className="text-white/55">Progresso geral</span>
+        <b className="text-[#7dd3fc] text-[15px]">{overall}%</b>
       </div>
     </div>
   )
@@ -355,41 +355,41 @@ export function MacroSidebar({
   return (
     <div className="w-[290px] flex-shrink-0 space-y-3.5">
       {/* Resumo do processo */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-[13.5px] font-extrabold text-gray-900 mb-3">Resumo do processo</h3>
+      <div className="bg-[#1b2027] border border-white/10 rounded-xl p-4">
+        <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">Resumo do processo</h3>
         <StatRow label="Caminho ativo" value={`${path.length} fases`} />
         <StatRow label="Fases concluídas" value={String(concluidas)} />
         <StatRow label="Fase atual" value={currentPhase} />
         <StatRow label="Fases futuras" value={String(futuras)} />
         <StatRow label="Fases puladas" value={String(puladas)} />
-        <div className="flex justify-between items-center text-[12.5px] pt-2.5 mt-1 border-t-2 border-gray-200">
-          <span className="text-gray-500">Progresso geral</span>
-          <b className="text-blue-600 text-[15px]">{overall}%</b>
+        <div className="flex justify-between items-center text-[12.5px] pt-2.5 mt-1 border-t-2 border-white/10">
+          <span className="text-white/55">Progresso geral</span>
+          <b className="text-[#7dd3fc] text-[15px]">{overall}%</b>
         </div>
       </div>
 
       {/* Resumo por fase */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-[13.5px] font-extrabold text-gray-900 mb-3">Resumo por fase</h3>
+      <div className="bg-[#1b2027] border border-white/10 rounded-xl p-4">
+        <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">Resumo por fase</h3>
         <div className="flex flex-col gap-0.5">
           {PROCESS_PHASES.map((title, i) => {
             const st = getPhaseStatus(title, currentPhase, completedPhases, path, needsRectification)
             const prog = progressOf(title)
             const icCls =
-              st === "concluida" ? "bg-green-600 text-white"
-              : st === "atual" ? "bg-blue-600"
-              : st === "pulada" ? "bg-slate-200 text-slate-400"
-              : "border-[1.5px] border-gray-200 bg-white"
+              st === "concluida" ? "bg-[#4ade80] text-white"
+              : st === "atual" ? "bg-[#7dd3fc]"
+              : st === "pulada" ? "bg-[#252c35] text-white/40"
+              : "border-[1.5px] border-white/10 bg-[#1b2027]"
             const pctCls =
-              st === "concluida" ? "text-green-600"
-              : st === "atual" ? "text-blue-600"
-              : "text-gray-400"
+              st === "concluida" ? "text-[#4ade80]"
+              : st === "atual" ? "text-[#7dd3fc]"
+              : "text-white/40"
             return (
               <button
                 key={title}
                 onClick={() => onSelectPhase?.(title)}
                 className={`flex gap-2 items-start w-full text-left p-2 rounded-lg cursor-pointer transition-colors ${
-                  title === sel ? "bg-blue-50" : "hover:bg-gray-50"
+                  title === sel ? "bg-[#7dd3fc]/12" : "hover:bg-[#20262e]"
                 }`}
               >
                 <span className={`w-4 h-4 rounded-full grid place-items-center text-[9px] font-bold flex-none mt-0.5 ${icCls}`}>
@@ -397,10 +397,10 @@ export function MacroSidebar({
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline gap-1.5">
-                    <b className="text-[12px] text-gray-900">{i + 1}. {title}</b>
+                    <b className="text-[12px] text-white/95">{i + 1}. {title}</b>
                     <span className={`text-[12px] font-extrabold flex-none ${pctCls}`}>{prog}%</span>
                   </div>
-                  <span className="text-[10.5px] text-gray-400 block mt-0.5 leading-snug">
+                  <span className="text-[10.5px] text-white/40 block mt-0.5 leading-snug">
                     {phaseSummary(title, st, prog)}
                   </span>
                 </div>
@@ -415,9 +415,9 @@ export function MacroSidebar({
 
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between items-center text-[12.5px] py-1.5 border-b border-gray-100">
-      <span className="text-gray-500">{label}</span>
-      <b className="text-gray-900">{value}</b>
+    <div className="flex justify-between items-center text-[12.5px] py-1.5 border-b border-white/10">
+      <span className="text-white/55">{label}</span>
+      <b className="text-white/95">{value}</b>
     </div>
   )
 }

@@ -59,20 +59,20 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const STATUS_PILL_CLS: Record<string, string> = {
-  PENDENTE: "bg-slate-400/20 text-slate-300",
-  SOLICITADO: "bg-violet-500/20 text-violet-300",
-  EM_BUSCA: "bg-amber-500/20 text-amber-300",
-  SOLICITAR: "bg-violet-500/20 text-violet-300",
+  PENDENTE: "bg-white/25/20 text-white/40",
+  SOLICITADO: "bg-[#a78bfa]/120/20 text-violet-300",
+  EM_BUSCA: "bg-[#d2a948]/120/20 text-amber-300",
+  SOLICITAR: "bg-[#a78bfa]/120/20 text-violet-300",
   RECEBIDO: "bg-emerald-500/20 text-emerald-300",
-  EM_ANALISE: "bg-blue-500/20 text-blue-300",
+  EM_ANALISE: "bg-[#7dd3fc]/120/20 text-blue-300",
   RETIFICANDO: "bg-orange-500/20 text-orange-300",
   EM_TRADUCAO: "bg-cyan-500/20 text-cyan-300",
   TRADUZIDO: "bg-emerald-500/20 text-emerald-300",
   EM_APOSTILAMENTO: "bg-cyan-500/20 text-cyan-300",
   APOSTILADO: "bg-emerald-500/20 text-emerald-300",
   ENTREGUE: "bg-emerald-500/20 text-emerald-300",
-  INVALIDO: "bg-red-500/20 text-red-300",
-  NAO_ENCONTRADO: "bg-slate-500/20 text-slate-400",
+  INVALIDO: "bg-[#f87171]/120/20 text-red-300",
+  NAO_ENCONTRADO: "bg-[#20262e]0/20 text-white/40",
 }
 
 // ============================================================
@@ -381,7 +381,7 @@ export function DocumentoOperationalDrawer({
   if (!isOpen) return null
 
   const sla = doc ? computeSla(doc.dataPrazoOperacao) : { text: "—", cls: "" }
-  const statusCls = doc ? (STATUS_PILL_CLS[doc.status] || "bg-slate-500/20 text-slate-300") : ""
+  const statusCls = doc ? (STATUS_PILL_CLS[doc.status] || "bg-[#20262e]0/20 text-white/40") : ""
   const tipoLabel = doc ? (TIPO_LABELS[doc.tipo] || doc.tipo) : ""
   const statusLabel = doc ? (STATUS_LABELS[doc.status] || doc.status) : ""
 
@@ -414,7 +414,7 @@ export function DocumentoOperationalDrawer({
         />
 
       <div
-        className="fixed top-0 right-0 h-screen z-[10001] flex flex-col text-slate-200 font-sans shadow-[-30px_0_60px_rgba(0,0,0,0.4)] transition-transform duration-300"
+        className="fixed top-0 right-0 h-screen z-[10001] flex flex-col text-white/70 font-sans shadow-[-30px_0_60px_rgba(0,0,0,0.4)] transition-transform duration-300"
         style={{
           width: "45vw", minWidth: "680px", maxWidth: "920px",
           background: "#0f1419", transform: "translateX(0)",
@@ -428,9 +428,9 @@ export function DocumentoOperationalDrawer({
               <Loader2 className="w-4 h-4 animate-spin" />
               <span className="text-[12px]">Carregando operação…</span>
             </div>
-            <div className="h-16 rounded-lg bg-white/5 animate-pulse" />
-            <div className="h-24 rounded-lg bg-white/5 animate-pulse" />
-            <div className="h-40 rounded-lg bg-white/5 animate-pulse" />
+            <div className="h-16 rounded-lg bg-[#1b2027]/5 animate-pulse" />
+            <div className="h-24 rounded-lg bg-[#1b2027]/5 animate-pulse" />
+            <div className="h-40 rounded-lg bg-[#1b2027]/5 animate-pulse" />
           </div>
         )}
 
@@ -441,7 +441,7 @@ export function DocumentoOperationalDrawer({
             <p className="text-sm">{erro || "Não foi possível abrir a operação."}</p>
             <button
               onClick={onClose}
-              className="px-3 py-1.5 text-xs bg-white/10 hover:bg-white/15 rounded-md"
+              className="px-3 py-1.5 text-xs bg-[#1b2027]/10 hover:bg-[#1b2027]/15 rounded-md"
             >
               Fechar
             </button>
@@ -459,7 +459,7 @@ export function DocumentoOperationalDrawer({
                 {onBack ? (
                   <button
                     onClick={onBack}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/70 hover:text-white transition-colors -ml-1 px-1 py-0.5 rounded hover:bg-white/5"
+                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/70 hover:text-white transition-colors -ml-1 px-1 py-0.5 rounded hover:bg-[#1b2027]/5"
                   >
                     <span className="text-[14px] leading-none">←</span>
                     {backLabel || nomeCompleto(doc.pessoa)}
@@ -471,7 +471,7 @@ export function DocumentoOperationalDrawer({
                 )}
                 <button
                   onClick={onClose}
-                  className="w-[30px] h-[30px] rounded-md bg-white/5 hover:bg-white/15 flex items-center justify-center text-white"
+                  className="w-[30px] h-[30px] rounded-md bg-[#1b2027]/5 hover:bg-[#1b2027]/15 flex items-center justify-center text-white"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -485,7 +485,7 @@ export function DocumentoOperationalDrawer({
               </div>
 
               {bannerAntecipada && (
-                <div className="mb-3.5 rounded-lg border border-violet-400/30 bg-violet-500/15 px-3 py-2 text-[12px] text-violet-100 flex items-start gap-2">
+                <div className="mb-3.5 rounded-lg border border-violet-400/30 bg-[#a78bfa]/120/15 px-3 py-2 text-[12px] text-violet-100 flex items-start gap-2">
                   <span className="text-[13px] leading-none mt-0.5">⇄</span>
                   <span>{bannerAntecipada}</span>
                 </div>
@@ -561,7 +561,7 @@ export function DocumentoOperationalDrawer({
                   {t.label}
                   {t.count !== undefined && (
                     <span className={`text-[9.5px] px-1.5 rounded-full font-bold ${
-                      activeTab === t.id ? "bg-blue-500/30 text-blue-200" : "bg-white/10 text-white/70"
+                      activeTab === t.id ? "bg-[#7dd3fc]/120/30 text-blue-200" : "bg-[#1b2027]/10 text-white/70"
                     }`}>
                       {t.count}
                     </span>
@@ -707,7 +707,7 @@ function TabOperation({
   }
 
   const inputDarkCls =
-    "w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30"
+    "w-full bg-[#1b2027]/5 border border-white/10 rounded-md px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30"
 
   return (
     <div className="space-y-5">
@@ -720,7 +720,7 @@ function TabOperation({
           <button
             onClick={onOpenInitModal}
             disabled={salvando}
-            className="w-full mt-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-semibold rounded-md"
+            className="w-full mt-2 px-3 py-2 bg-[#7dd3fc]/120 hover:bg-[#7dd3fc] disabled:opacity-50 text-white text-sm font-semibold rounded-md"
           >
             ▸ Iniciar operação
           </button>
@@ -741,7 +741,7 @@ function TabOperation({
             >
               <option value="">— Não atribuído —</option>
               {usuarios.map((u) => (
-                <option key={u.id} value={u.id} className="bg-slate-800">{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>
+                <option key={u.id} value={u.id} className="bg-[#20262e]">{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>
               ))}
             </select>
           </div>
@@ -779,7 +779,7 @@ function TabOperation({
           <button
             onClick={handleSave}
             disabled={salvando}
-            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-semibold rounded-md flex items-center gap-2"
+            className="px-4 py-2 bg-[#7dd3fc]/120 hover:bg-[#7dd3fc] disabled:opacity-50 text-white text-sm font-semibold rounded-md flex items-center gap-2"
           >
             {salvando ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
             Salvar
@@ -890,7 +890,7 @@ function TabHistory({ doc }: { doc: Documento }) {
       <Section title="Timeline do documento">
         <div className="space-y-2.5">
           {eventos.map((e, i) => (
-            <div key={i} className="flex items-start gap-3 p-2.5 rounded-md bg-white/5 border border-white/5">
+            <div key={i} className="flex items-start gap-3 p-2.5 rounded-md bg-[#1b2027]/5 border border-white/5">
               <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-white">{e.label}</div>
@@ -949,12 +949,12 @@ function GridFields({ fields }: { fields: Array<[string, string | null | undefin
 function Placeholder({ titulo, descricao, pendencia }: { titulo: string; descricao: string; pendencia: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
-      <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-4">
+      <div className="w-12 h-12 rounded-full bg-[#1b2027]/5 border border-white/10 flex items-center justify-center mb-4">
         <AlertTriangle className="w-5 h-5 text-amber-400/70" />
       </div>
       <div className="text-base font-semibold text-white mb-2">{titulo}</div>
       <div className="text-sm text-white/60 leading-relaxed mb-4">{descricao}</div>
-      <div className="text-[11px] text-amber-300/80 bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2 leading-relaxed">
+      <div className="text-[11px] text-amber-300/80 bg-[#d2a948]/120/10 border border-amber-500/20 rounded-md px-3 py-2 leading-relaxed">
         ⚠ {pendencia}
       </div>
     </div>
