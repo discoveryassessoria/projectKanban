@@ -71,6 +71,7 @@ export interface ReceitaDetalhe {
 // REAPROVEITA carregarReceitaDetalhe por obrigação (não duplica câmbio/parcelas).
 export interface ReceitaParticipanteDetalhe {
   obrigacaoId: number
+  pessoaId: number | null
   nome: string
   papel: string
   valorBase: number
@@ -435,6 +436,7 @@ export async function carregarReceitaConsolidada(ref: string): Promise<ReceitaDe
   // Participantes (um por slice) + participacaoPct (soma ~100).
   const participantes: ReceitaParticipanteDetalhe[] = slices.map((s) => ({
     obrigacaoId: s.obrigacaoId,
+    pessoaId: s.responsavelFinanceiro?.requerenteId ?? null,
     nome: s.responsavel?.nome ?? 'Participante não identificado',
     papel: s.responsavel?.papel ?? 'Participante',
     valorBase: s.valorBase,

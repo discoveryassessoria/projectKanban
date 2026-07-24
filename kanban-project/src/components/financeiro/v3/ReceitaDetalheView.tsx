@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import RegistrarPagamentoModal from "@/src/components/financeiro/v3/RegistrarPagamentoModal"
+import RegistrarPagamentoView from "@/src/components/financeiro/v3/RegistrarPagamentoView"
 import { NovaFaturaModal } from "@/src/components/kanban/NovaFaturaModal"
 import { uploadFiles } from "@/src/lib/storage"
 import {
@@ -58,6 +59,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const [tab, setTab] = useState("resumo")
   const [drawerPart, setDrawerPart] = useState<any>(null) // participante aberto no drawer (obrigacaoId + nome)
   const [pagOpen, setPagOpen] = useState(false)
+  const [receberOpen, setReceberOpen] = useState(false)
   const [faturaOpen, setFaturaOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [maisOpen, setMaisOpen] = useState(false)
@@ -276,7 +278,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
               className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#1b2027] px-3.5 py-2 text-sm font-medium text-white/80 hover:border-white/25 disabled:cursor-not-allowed disabled:opacity-40"
             ><Pencil className="h-4 w-4" /> Editar receita</button>
 
-            <button onClick={() => setPagOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957]"><Plus className="h-4 w-4" /> Registrar pagamento</button>
+            <button onClick={() => setReceberOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957]"><Plus className="h-4 w-4" /> Registrar pagamento</button>
 
             <div className="relative">
               <button onClick={() => setMaisOpen((o) => !o)} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-sm text-white/80 hover:border-white/25">Mais ações <ChevronDown className="h-3.5 w-3.5" /></button>
@@ -623,7 +625,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
           <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">Pagamentos</h2><span className="rounded-full bg-[#252c35] px-2 py-0.5 text-xs text-white/70">{d.pagamentos.length}</span></div>
-              <button onClick={() => setPagOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957]"><Plus className="h-4 w-4" /> Registrar pagamento</button>
+              <button onClick={() => setReceberOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957]"><Plus className="h-4 w-4" /> Registrar pagamento</button>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <div className="relative min-w-[180px] flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar pagamentos..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
@@ -737,8 +739,8 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                               <button onClick={() => setTab("pagamentos")} className="whitespace-nowrap rounded-lg border border-white/15 bg-[#1b2027] px-2.5 py-1.5 text-xs text-white/80 hover:border-white/25">Ver recebimento</button>
                             ) : (
                               <div className="flex items-center gap-1.5">
-                                <button onClick={() => setPagOpen(true)} className="whitespace-nowrap rounded-lg bg-[#d2a948] px-2.5 py-1.5 text-xs font-semibold text-[#1b1508] hover:bg-[#e0b957]">Registrar pagamento</button>
-                                <button onClick={() => setPagOpen(true)} title="Registrar pagamento" className="rounded-lg border border-white/10 p-1.5 text-white/40 hover:text-white/70"><MoreVertical className="h-4 w-4" /></button>
+                                <button onClick={() => setReceberOpen(true)} className="whitespace-nowrap rounded-lg bg-[#d2a948] px-2.5 py-1.5 text-xs font-semibold text-[#1b1508] hover:bg-[#e0b957]">Registrar pagamento</button>
+                                <button onClick={() => setReceberOpen(true)} title="Registrar pagamento" className="rounded-lg border border-white/10 p-1.5 text-white/40 hover:text-white/70"><MoreVertical className="h-4 w-4" /></button>
                               </div>
                             )}
                           </td>
@@ -846,6 +848,14 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
           natureza={isCusto ? "CUSTO" : "RECEITA"}
           onClose={() => setPagOpen(false)}
           onDone={() => { setPagOpen(false); carregar() }}
+        />
+      )}
+      {receberOpen && d && (
+        <RegistrarPagamentoView
+          obrigacaoId={d.obrigacaoId}
+          receitaRef={String(d.obrigacaoId)}
+          onClose={() => setReceberOpen(false)}
+          onDone={() => { setReceberOpen(false); carregar() }}
         />
       )}
       {faturaOpen && temProcesso && (
