@@ -247,7 +247,9 @@ function Linha({ r, onAbrir, onDrawer }: { r: any; onAbrir: () => void; onDrawer
             <div className="text-white/85">{fmtMoeda(r.valorBase, r.moedaBase)}</div>
             <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-white/45">
               {r.cotacaoAplicada != null ? <>Câmbio: {brl(r.cotacaoAplicada)}</> : "Câmbio não definido"}
-              <span className={`rounded px-1.5 py-0.5 text-[9.5px] font-semibold ${r.tipoCambio === "NAO_DEFINIDO" ? "bg-[#f87171]/15 text-[#f87171]" : "bg-white/10 text-white/60"}`}>{badge}</span>
+              {(r.tipoCambio === "FIXO" || r.tipoCambio === "NAO_DEFINIDO") && (
+                <span className={`rounded px-1.5 py-0.5 text-[9.5px] font-semibold ${r.tipoCambio === "NAO_DEFINIDO" ? "bg-[#f87171]/15 text-[#f87171]" : "bg-white/10 text-white/60"}`}>{badge}</span>
+              )}
             </div>
             {r.dataCotacao && <div className="text-[10.5px] text-white/30">{dataBR(r.dataCotacao)}</div>}
           </div>
