@@ -33,7 +33,7 @@ export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) 
       {t === "receitas" && <ReceitasTab processoId={processoId} />}
       {t === "custos" && <CustosTab processoId={processoId} fx={fxEur} />}
       {t === "extrato" && <ExtratoTab processoId={processoId} fx={fxEur} />}
-      {t === "timeline" && <Movimentacoes processoId={processoId} modo="timeline" />}
+      {t === "timeline" && <TimelineTab processoId={processoId} fx={fxEur} />}
     </div>
   )
 }
@@ -228,6 +228,142 @@ function ExtKpi({ titulo, valor, sub, icon: Ic, cor }: any) {
       <div className="mt-2 text-2xl font-bold" style={{ color: cor }}>{valor}</div>
       <div className="mt-1 text-[11px] text-white/40">{sub}</div>
       <span className="absolute inset-y-0 left-0 w-0.5" style={{ background: cor }} />
+    </div>
+  )
+}
+
+// Timeline financeira — linha do tempo das movimentações + resumos laterais.
+// Discovery Design System. Fonte: obrigações do motor V3.
+function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
+  const [obrs, setObrs] = useState<any[] | null>(null)
+  useEffect(() => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }, [processoId])
+  const movs = useMemo(() => {
+    const toBRL = (v: number, m: string) => m === "BRL" ? v : v * (fx || 1)
+    const base = (obrs ?? []).filter((o) => o.status !== "CANCELADO").map((o) => ({
+      id: o.obrigacaoId, receita: o.direcao === "A_RECEBER", codigo: o.codigoOperacional ?? `#${o.obrigacaoId}`,
+      descricao: o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`, categoria: o.categoria ?? (o.direcao === "A_RECEBER" ? "Receita" : "Custo"),
+      valorBRL: toBRL(o.valorContratado, o.moeda), vencimento: o.vencimento, quitado: o.recebido >= o.valorContratado - 0.005,
+    }))
+    const asc = [...base].sort((a, b) => a.id - b.id)
+    let acc = 0
+    const comSaldo = asc.map((mv) => { acc += mv.receita ? mv.valorBRL : -mv.valorBRL; return { ...mv, saldoAcum: acc } })
+    return comSaldo.reverse()
+  }, [obrs, fx])
+  if (!obrs) return <div className="py-8 text-sm text-white/40">carregando…</div>
+  const totReceitas = movs.filter((m) => m.receita).reduce((s, m) => s + m.valorBRL, 0)
+  const totCustos = movs.filter((m) => !m.receita).reduce((s, m) => s + m.valorBRL, 0)
+  const saldoFinal = totReceitas - totCustos
+  // resumo por categoria
+  const catMap = new Map<string, number>()
+  movs.forEach((m) => catMap.set(m.categoria, (catMap.get(m.categoria) ?? 0) + m.valorBRL))
+  const totCat = [...catMap.values()].reduce((s, v) => s + v, 0) || 1
+  const CORES = ["#4ade80", "#fbbf24", "#7dd3fc", "#a78bfa", "#f87171"]
+  const categorias = [...catMap.entries()].sort((a, b) => b[1] - a[1]).map(([nome, valor], i) => ({ nome, valor, pct: (valor / totCat) * 100, cor: CORES[i % CORES.length] }))
+  const hojeStr = new Date().toISOString().slice(0, 10)
+  const hojeN = movs.filter((m) => (m.vencimento ?? "").slice(0, 10) === hojeStr).length
+  const recebidas = movs.filter((m) => m.receita && m.quitado).length
+  const pendentes = movs.filter((m) => !m.quitado).length
+
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-3">
+        <div><h2 className="text-lg font-semibold text-white">Timeline financeira</h2><p className="text-sm text-white/45">Linha do tempo completa de todas as movimentações e eventos financeiros do processo.</p></div>
+        <button className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.03] px-3.5 py-2 text-sm text-white/80 hover:bg-white/[0.06]"><Download className="h-4 w-4" /> Exportar</button>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_320px]">
+        {/* Timeline */}
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="mb-3 text-xs text-white/40">Ordenado por: Data (mais recente)</div>
+          {movs.length === 0 ? <div className="py-10 text-center text-sm text-white/40">Sem movimentações financeiras.</div> : (
+            <div className="relative pl-1">
+              {movs.map((mv, i) => (
+                <div key={mv.id} className="flex gap-3">
+                  <div className="flex w-16 shrink-0 flex-col items-end pt-1 text-right"><span className="text-[11px] text-white/60">{mv.vencimento ? dataBR(mv.vencimento) : "—"}</span></div>
+                  <div className="flex flex-col items-center">
+                    <span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: `${mv.receita ? "#4ade80" : "#fbbf24"}22`, color: mv.receita ? "#4ade80" : "#fbbf24" }}>{mv.receita ? <ArrowDownRight className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}</span>
+                    {i < movs.length - 1 && <span className="mt-1 w-px flex-1 bg-white/10" />}
+                  </div>
+                  <div className="min-w-0 flex-1 pb-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium" style={{ color: mv.receita ? "#4ade80" : "#fbbf24" }}>{mv.receita ? "Receita" : "Custo"} <span className="text-white/40">· {mv.codigo}</span></div>
+                        <div className="mt-0.5 truncate text-sm text-white/90">{mv.descricao}</div>
+                        <div className="mt-1 flex flex-wrap gap-1.5"><span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">{mv.categoria}</span></div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="tabular-nums text-sm font-semibold" style={{ color: mv.receita ? "#4ade80" : "#fbbf24" }}>{mv.receita ? "" : "-"}{fmt(mv.valorBRL)}</div>
+                        <div className="text-[11px] text-white/40">Saldo após: {fmt(mv.saldoAcum)}</div>
+                        <div className="mt-1">{mv.quitado ? <span className="rounded bg-[#4ade80]/15 px-2 py-0.5 text-[11px] font-semibold text-[#4ade80]">{mv.receita ? "Recebido" : "Pago"}</span> : <span className="rounded bg-[#fbbf24]/15 px-2 py-0.5 text-[11px] font-semibold text-[#fbbf24]">{mv.receita ? "A receber" : "A pagar"}</span>}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-2 border-t border-white/10 pt-3 text-center text-xs text-white/40">Mostrando {movs.length} de {movs.length} registro{movs.length === 1 ? "" : "s"}</div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-4">
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <div className="mb-3 text-sm font-semibold text-white">Resumo do período</div>
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between"><span className="text-white/55">Saldo inicial</span><span className="tabular-nums text-white/80">{fmt(0)}</span></div>
+              <div className="flex justify-between"><span className="text-white/55">Total receitas</span><span className="tabular-nums text-[#4ade80]">{fmt(totReceitas)}</span></div>
+              <div className="flex justify-between"><span className="text-white/55">Total custos</span><span className="tabular-nums text-[#fbbf24]">{fmt(totCustos)}</span></div>
+              <div className="flex justify-between"><span className="text-white/55">Ajustes</span><span className="tabular-nums text-white/70">{fmt(0)}</span></div>
+              <div className="mt-1 flex justify-between border-t border-white/10 pt-2"><span className="font-medium text-white/80">Saldo final</span><span className="tabular-nums font-semibold text-[#7dd3fc]">{fmt(saldoFinal)}</span></div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <div className="mb-3 text-sm font-semibold text-white">Resumo por categoria</div>
+            <div className="flex items-center gap-4">
+              <MiniDonut itens={categorias} total={totCat === 1 ? 0 : totCat} />
+              <div className="flex-1 space-y-1.5 text-xs">
+                {categorias.length === 0 ? <span className="text-white/40">Sem dados.</span> : categorias.slice(0, 5).map((c, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2"><span className="inline-flex min-w-0 items-center gap-1.5"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: c.cor }} /><span className="truncate text-white/70">{c.nome}</span></span><span className="shrink-0 text-white/50">{c.pct.toFixed(1)}%</span></div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <div className="mb-3 text-sm font-semibold text-white">Atividade recente</div>
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between"><span className="text-white/55">{hojeN} movimentação(ões) hoje</span></div>
+              <div className="flex justify-between"><span className="text-white/55">{pendentes} pendente(s)</span></div>
+              <div className="flex justify-between"><span className="text-white/55">{recebidas} recebida(s)</span><span className="tabular-nums text-[#4ade80]">{fmt(movs.filter((m) => m.receita && m.quitado).reduce((s, m) => s + m.valorBRL, 0))}</span></div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <div className="mb-2 text-sm font-semibold text-white">Legenda de tipos</div>
+            <div className="grid grid-cols-2 gap-y-1.5 text-xs text-white/60">
+              <span className="inline-flex items-center gap-1.5"><ArrowDownRight className="h-3.5 w-3.5 text-[#4ade80]" /> Receita</span>
+              <span className="inline-flex items-center gap-1.5"><ArrowUpRight className="h-3.5 w-3.5 text-[#fbbf24]" /> Custo</span>
+              <span className="inline-flex items-center gap-1.5"><RefreshCw className="h-3.5 w-3.5 text-[#7dd3fc]" /> Transferência</span>
+              <span className="inline-flex items-center gap-1.5"><Settings className="h-3.5 w-3.5 text-[#a78bfa]" /> Ajuste</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+function MiniDonut({ itens, total }: { itens: { valor: number; cor: string }[]; total: number }) {
+  const size = 108, thick = 15, r = (size - thick) / 2, c = size / 2, circ = 2 * Math.PI * r
+  const soma = itens.reduce((s, x) => s + x.valor, 0)
+  let acc = 0
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={c} cy={c} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={thick} />
+        {soma > 0 && itens.filter((x) => x.valor > 0).map((x, i) => { const frac = x.valor / soma; const dash = frac * circ; const off = acc * circ; acc += frac; return <circle key={i} cx={c} cy={c} r={r} fill="none" stroke={x.cor} strokeWidth={thick} strokeDasharray={`${dash} ${circ - dash}`} strokeDashoffset={-off} /> })}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[10px] text-white/40">Total</span><span className="text-xs font-bold text-white">{fmt(total)}</span></div>
     </div>
   )
 }
