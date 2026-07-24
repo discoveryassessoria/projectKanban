@@ -186,10 +186,13 @@ function Kpi({ icon, label, value, sub, valueColor = "text-white" }: {
   icon: React.ReactNode; label: string; value: string; sub?: string; valueColor?: string
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-4">
-      <div className="flex items-center gap-1.5 text-white/50 text-xs font-medium"><span className="text-white/60">{icon}</span>{label}</div>
-      <div className={`font-bold mt-1.5 text-xl ${valueColor}`}>{value}</div>
-      {sub && <div className="text-[11px] text-white/40 mt-1">{sub}</div>}
+    <div className="rounded-[var(--radius-md)] border p-4" style={{ background: "var(--surface-primary)", borderColor: "var(--border-default)", boxShadow: "var(--shadow-surface)" }}>
+      <div className="flex items-center gap-2">
+        <span className="h-8 w-8 shrink-0 grid place-items-center rounded-[var(--radius-sm)] border" style={{ background: "var(--surface-secondary)", borderColor: "var(--border-default)", color: "var(--text-secondary)" }}>{icon}</span>
+        <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{label}</span>
+      </div>
+      <div className={`font-bold mt-2 text-2xl tabular-nums ${valueColor}`}>{value}</div>
+      {sub && <div className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>{sub}</div>}
     </div>
   )
 }

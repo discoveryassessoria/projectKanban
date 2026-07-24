@@ -80,6 +80,66 @@
   --sidebar-ring: oklch(0.55 0.15 250);
 }
 
+/* ============================================================
+   LINGUAGEM VISUAL — FINANCEIRO GERAL (tokens semânticos únicos)
+   ------------------------------------------------------------
+   Fonte única do dark glass corporativo (Golden Master = Página
+   Inicial). Toda tela do Financeiro consome ESTES tokens; nenhuma
+   página define hex/rgba/sombra/raio/spacing próprios. Aditivo:
+   não altera nenhum token pré-existente acima.
+   ============================================================ */
+:root {
+  /* Fundo e camadas do shell */
+  --app-background: #0a0a0b;
+  --app-overlay: rgba(0, 0, 0, 0.85);
+  --sidebar-background: rgba(0, 0, 0, 0.55);
+  --header-background: rgba(0, 0, 0, 0.55);
+
+  /* Superfícies (cards, painéis, linhas) */
+  --surface-primary: rgba(255, 255, 255, 0.05);
+  --surface-secondary: rgba(255, 255, 255, 0.04);
+  --surface-hover: rgba(255, 255, 255, 0.08);
+  --surface-active: rgba(255, 255, 255, 0.12);
+
+  /* Bordas */
+  --border-default: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.20);
+
+  /* Texto */
+  --text-primary: rgba(255, 255, 255, 0.95);
+  --text-secondary: rgba(255, 255, 255, 0.55);
+  --text-muted: rgba(255, 255, 255, 0.40);
+
+  /* Acento institucional (dourado) — ação/navegação ativa apenas */
+  --accent-primary: #d2a948;
+  --accent-hover: #e0b957;
+  --accent-ink: #1b1508; /* texto sobre dourado */
+
+  /* Semânticas — usar SÓ quando houver significado real */
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #7dd3fc;
+
+  /* Raio */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* Sombra de superfície */
+  --shadow-surface: 0 1px 2px rgba(0, 0, 0, 0.30);
+
+  /* Espaçamento (escala 4px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+}
+
 /* Base layer - apenas uma vez */
 @layer base {
   * {

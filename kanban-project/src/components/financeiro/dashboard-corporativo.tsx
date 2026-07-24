@@ -374,8 +374,11 @@ function StripCard({ topColor, icon, label, value, valueColor = "text-white", su
   topColor: string; icon: React.ReactNode; label: string; value: string; valueColor?: string
   sub: React.ReactNode; action: { label: string; onClick: () => void }; mock?: boolean
 }) {
+  // Neutralização: sem borda superior colorida (decorativa). Valor mantém cor
+  // semântica só quando fizer sentido (valueColor).
+  void topColor
   return (
-    <div className={`${CARD} p-4 relative`} style={{ borderTop: `2px solid ${topColor}` }}>
+    <div className={`${CARD} p-4 relative`}>
       {mock && <span className="absolute top-2 right-2 text-[9px] text-white/30 bg-white/5 px-1.5 py-0.5 rounded">prévia</span>}
       <div className="flex items-center gap-1.5 text-white/50 text-xs font-medium">{icon}{label}</div>
       <div className={`text-[22px] font-bold mt-1 ${valueColor}`}>{value}</div>
@@ -389,14 +392,18 @@ function Kpi({ icon, label, value, sub, valueColor = "text-white", compact, mock
   icon: React.ReactNode; label: string; value: string; sub?: string; valueColor?: string
   compact?: boolean; mock?: boolean; accent: string
 }) {
+  // Neutralização (Golden Master): ícone neutro, SEM linha colorida inferior,
+  // SEM borda colorida. `accent` fica sem efeito visual — cor só permanece no
+  // VALOR (valueColor) quando tiver significado semântico real.
+  void accent
   return (
     <div className={`${CARD} relative overflow-hidden`}>
       {mock && <span className="absolute top-2 right-2 text-[9px] text-white/30 bg-white/5 px-1.5 py-0.5 rounded">prévia</span>}
       <div className={compact ? "p-3" : "p-4"}>
         <div className="flex items-center gap-2.5">
           <span
-            className={`${compact ? "h-8 w-8" : "h-10 w-10"} shrink-0 rounded-full grid place-items-center`}
-            style={{ background: `${accent}1f`, border: `1px solid ${accent}40`, color: accent }}
+            className={`${compact ? "h-8 w-8" : "h-9 w-9"} shrink-0 rounded-[var(--radius-sm)] grid place-items-center border`}
+            style={{ background: "var(--surface-secondary)", borderColor: "var(--border-default)", color: "var(--text-secondary)" }}
           >
             {icon}
           </span>
@@ -405,7 +412,6 @@ function Kpi({ icon, label, value, sub, valueColor = "text-white", compact, mock
         <div className={`font-bold mt-2 ${compact ? "text-lg" : "text-2xl"} ${valueColor}`}>{value}</div>
         {sub && <div className="text-[11px] text-white/40 mt-1">{sub}</div>}
       </div>
-      <div className="h-[3px] w-full" style={{ background: accent }} />
     </div>
   )
 }

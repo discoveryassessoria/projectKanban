@@ -112,13 +112,18 @@ export default function PagarTab() {
           <GlassBtn icon={<RefreshCw className="h-3.5 w-3.5" />}>Recorrentes</GlassBtn>
           <GlassBtn icon={<Landmark className="h-3.5 w-3.5" />}>Por fornecedor</GlassBtn>
           <GlassBtn icon={<Upload className="h-3.5 w-3.5" />}>Exportar</GlassBtn>
-          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white"><Plus className="h-3.5 w-3.5" /> Nova despesa</button>
+          <button
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold rounded-[var(--radius-sm)] transition-colors"
+            style={{ background: "var(--accent-primary)", color: "var(--accent-ink)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--accent-hover)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "var(--accent-primary)")}
+          ><Plus className="h-3.5 w-3.5" /> Nova despesa</button>
         </div>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi icon={<FileText className="h-3.5 w-3.5" />} label="Total a Pagar" value={fmtBRL(k.aPagar)} valueColor="text-amber-400" sub={`${k.qtdAbertos} pagamentos`} />
+        <Kpi icon={<FileText className="h-3.5 w-3.5" />} label="Total a Pagar" value={fmtBRL(k.aPagar)} sub={`${k.qtdAbertos} pagamentos`} />
         <Kpi icon={<AlertTriangle className="h-3.5 w-3.5" />} label="Vencidos" value={fmtBRL(k.vencidosTotal)} valueColor={k.vencidosTotal > 0 ? "text-red-400" : "text-green-400"} sub={k.qtdVencidos > 0 ? `${k.qtdVencidos} atrasados` : "✓ Em dia"} />
         <Kpi icon={<Clock className="h-3.5 w-3.5" />} label="Agendados" value={fmtBRL(k.agendadosTotal)} sub={`${k.qtdAgendados} prontos p/ pagar`} />
         <Kpi icon={<CheckCircle className="h-3.5 w-3.5" />} label="Pago no mês" value={fmtBRL(k.pagosMes)} valueColor="text-green-400" sub={`${k.qtdPagosMes} pagamentos efetuados`} />
@@ -131,10 +136,10 @@ export default function PagarTab() {
           <span className="text-[11px] text-white/40">{d.contagem.todos} no funil</span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <PipelineCard color="#f59e0b" label="Pendente" qtd={d.pipeline.pendente.qtd} total={d.pipeline.pendente.total} hint="Aguardando" />
-          <PipelineCard color="#0ea5e9" label="Agendado" qtd={d.pipeline.agendado.qtd} total={d.pipeline.agendado.total} hint="Pronto p/ pagar" />
-          <PipelineCard color="#22c55e" label="Pago" qtd={d.pipeline.pago.qtd} total={d.pipeline.pago.total} hint="Concluído" />
-          <PipelineCard color="#94a3b8" label="Cancelado" qtd={d.pipeline.cancelado.qtd} total={d.pipeline.cancelado.total} hint="Encerrado" />
+          <PipelineCard color="var(--warning)" label="Pendente" qtd={d.pipeline.pendente.qtd} total={d.pipeline.pendente.total} hint="Aguardando" />
+          <PipelineCard color="var(--info)" label="Agendado" qtd={d.pipeline.agendado.qtd} total={d.pipeline.agendado.total} hint="Pronto p/ pagar" />
+          <PipelineCard color="var(--success)" label="Pago" qtd={d.pipeline.pago.qtd} total={d.pipeline.pago.total} hint="Concluído" />
+          <PipelineCard color="var(--text-muted)" label="Cancelado" qtd={d.pipeline.cancelado.qtd} total={d.pipeline.cancelado.total} hint="Encerrado" />
         </div>
       </div>
 
@@ -268,22 +273,27 @@ function Kpi({ icon, label, value, sub, valueColor = "text-white" }: {
   icon: React.ReactNode; label: string; value: string; sub?: string; valueColor?: string
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-4">
-      <div className="flex items-center gap-1.5 text-white/50 text-xs font-medium"><span className="text-white/60">{icon}</span>{label}</div>
-      <div className={`font-bold mt-1.5 text-xl ${valueColor}`}>{value}</div>
-      {sub && <div className="text-[11px] text-white/40 mt-1">{sub}</div>}
+    <div className="rounded-[var(--radius-md)] border p-4" style={{ background: "var(--surface-primary)", borderColor: "var(--border-default)", boxShadow: "var(--shadow-surface)" }}>
+      <div className="flex items-center gap-2">
+        <span className="h-8 w-8 shrink-0 grid place-items-center rounded-[var(--radius-sm)] border" style={{ background: "var(--surface-secondary)", borderColor: "var(--border-default)", color: "var(--text-secondary)" }}>{icon}</span>
+        <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{label}</span>
+      </div>
+      <div className={`font-bold mt-2 text-2xl tabular-nums ${valueColor}`}>{value}</div>
+      {sub && <div className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>{sub}</div>}
     </div>
   )
 }
 
+// Pipeline: superfície neutra, SEM borda superior colorida. O ponto de estado
+// mantém cor semântica (pendente/agendado/pago/cancelado) — significado real.
 function PipelineCard({ color, label, qtd, total, hint }: { color: string; label: string; qtd: number; total: number; hint: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-3" style={{ borderTop: `2px solid ${color}` }}>
-      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-white/50">
+    <div className="rounded-[var(--radius-sm)] border p-3" style={{ background: "var(--surface-secondary)", borderColor: "var(--border-default)" }}>
+      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
         <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />{label}
       </div>
-      <div className="text-xl font-bold text-white mt-1">{qtd}</div>
-      <div className="text-[11px] text-white/40">{fmtBRLshort(total)} · {hint}</div>
+      <div className="text-xl font-bold mt-1" style={{ color: "var(--text-primary)" }}>{qtd}</div>
+      <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>{fmtBRLshort(total)} · {hint}</div>
     </div>
   )
 }
