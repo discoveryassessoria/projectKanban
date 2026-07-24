@@ -121,6 +121,13 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
       })
     : []
   const recPor = new Map(receitas.map((r) => [r.id, r]))
+  // Requerente REAL da receita legada (nome em texto) — fonte confiável do vínculo,
+  // preferida sobre a participação da distribuição (que pode não resolver a Pessoa).
+  const reqLegado = recIds.length
+    ? await prisma.receitaRequerente.findMany({ where: { receitaId: { in: recIds } }, orderBy: { idx: 'asc' }, select: { receitaId: true, nome: true } }).catch(() => [])
+    : []
+  const reqNomePor = new Map<number, string>()
+  for (const r of reqLegado) { if (r.receitaId != null && !reqNomePor.has(r.receitaId) && r.nome?.trim()) reqNomePor.set(r.receitaId, r.nome.trim()) }
 
   // Parcelas legadas (fonte REAL do aging a-vencer/vencido) — por receita.
   const parcelas = recIds.length
@@ -253,7 +260,9 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
       receitaId: o.origemTipo === 'Receita' ? (o.origemId ?? null) : null,
       codigo: o.codigoOperacional,
       descricao: itemMestre?.name ?? rec?.descricao ?? o.observacoes ?? null,
-      requerente: primeiro ? { nome: nomePessoa(primeiro.pessoaId), papel: 'Principal' } : null,
+      requerente: (rec && reqNomePor.get(rec.id))
+        ? { nome: reqNomePor.get(rec.id)!, papel: 'Principal' }
+        : (primeiro ? { nome: nomePessoa(primeiro.pessoaId), papel: 'Principal' } : null),
       servico,
       formaCobranca: 'À vista',
       moeda: moedaBase, moedaBase, valorBase: cent(valorBase), valorContratado: cent(valorBase), recebido: cent(recebido), saldo: cent(saldo),

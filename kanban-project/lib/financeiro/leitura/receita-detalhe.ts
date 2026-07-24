@@ -91,6 +91,11 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     ? await prisma.receita.findUnique({ where: { id: obr.origemId }, select: { codigo: true, descricao: true, categoria: true, data1: true, createdAt: true, processoId: true, tipoServicoId: true, moeda: true, valor: true, fxEstimado: true, fxRule: true, fxFixo: true, fxData: true, valorBrlFixo: true } }).catch(() => null)
     : null
   const tipoServico = receita?.tipoServicoId ? await prisma.tipoServico.findUnique({ where: { id: receita.tipoServicoId }, select: { nome: true } }).catch(() => null) : null
+  // Requerente REAL (nome em texto) da Receita legada — fonte confiável do vínculo.
+  const reqLeg = (obr.origemTipo === 'Receita' && obr.origemId)
+    ? await prisma.receitaRequerente.findMany({ where: { receitaId: obr.origemId }, orderBy: { idx: 'asc' }, select: { nome: true } }).catch(() => [])
+    : []
+  const reqNomeLegado = reqLeg.find((r) => r.nome?.trim())?.nome?.trim() || null
   // Item do Cadastro Mestre (fonte do lançamento manual) — preferido sobre o legado.
   const itemMestre = obr.itemCatalogoId ? await prisma.itemCatalogo.findUnique({ where: { id: obr.itemCatalogoId }, select: { name: true } }).catch(() => null) : null
   const processo = obr.processoId ? await prisma.processo.findUnique({ where: { id: obr.processoId }, select: { id: true, codigo: true, nome: true } }) : null
@@ -144,7 +149,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   // ── Parcelas (aba Cobranças) — detalhe por parcela + resumo ──
   const agoraP = Date.now()
   const cotP = ca.cotacaoAplicada
-  const reqNomeP = parts[0] ? nome(parts[0].pessoaId) : 'Requerente não identificado'
+  const reqNomeP = reqNomeLegado || (parts[0] ? nome(parts[0].pessoaId) : 'Requerente não identificado')
   const FORMA_P: Record<string, string> = { PIX: 'PIX', CARTAO_CREDITO: 'Cartão de crédito', CARTAO_DEBITO: 'Cartão de débito', BOLETO: 'Boleto', TRANSFERENCIA: 'Transferência', DINHEIRO: 'Dinheiro', CHEQUE: 'Cheque', WISE: 'Wise' }
   const parcelasDetalhe = parcelasAll.map((p) => {
     const vBrl = p.valorBrl != null ? Number(p.valorBrl) : (p.cambioAplicado ? Number(p.valor) * Number(p.cambioAplicado) : (cotP ? Number(p.valor) * cotP : Number(p.valor)))
@@ -204,7 +209,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     natureza: obr.direcao === 'A_PAGAR' ? 'CUSTO' : 'RECEITA',
     codigo: obr.codigoOperacional, descricao: itemMestre?.name ?? receita?.descricao ?? obr.observacoes ?? null, statusLabel,
     processo: { id: processo?.id ?? null, codigo: processo?.codigo ?? null, nome: processo?.nome ?? null },
-    responsavel: primeiro ? { nome: nome(primeiro.pessoaId), papel: 'Principal' } : null,
+    responsavel: reqNomeLegado ? { nome: reqNomeLegado, papel: 'Principal' } : (primeiro ? { nome: nome(primeiro.pessoaId), papel: 'Principal' } : null),
     servico: itemMestre?.name ?? tipoServico?.nome ?? labelServico(receita?.categoria ? String(receita.categoria) : null),
     formaCobranca: 'À vista',
     moeda,
