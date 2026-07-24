@@ -99,21 +99,21 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 const STATUS_PILL_CLS: Record<string, string> = {
-  PENDENTE:           "bg-gray-100 text-gray-700",
-  SOLICITADO:         "bg-blue-100 text-blue-800",
-  EM_BUSCA:           "bg-amber-100 text-amber-800",
-  SOLICITAR:          "bg-purple-100 text-purple-800",
-  RECEBIDO:           "bg-emerald-100 text-emerald-800",
-  EM_ANALISE:         "bg-sky-100 text-sky-800",
-  RETIFICANDO:        "bg-orange-100 text-orange-800",
-  EM_TRADUCAO:        "bg-indigo-100 text-indigo-800",
-  TRADUZIDO:          "bg-indigo-100 text-indigo-800",
-  EM_APOSTILAMENTO:   "bg-violet-100 text-violet-800",
-  APOSTILADO:         "bg-violet-100 text-violet-800",
-  ENTREGUE:           "bg-emerald-100 text-emerald-800",
-  INVALIDO:           "bg-red-100 text-red-800",
-  NAO_ENCONTRADO:     "bg-red-100 text-red-800",
-  CANCELADO:          "bg-gray-200 text-gray-700",
+  PENDENTE:           "bg-[#252c35] text-white/80",
+  SOLICITADO:         "bg-[#7dd3fc]/15 text-[#7dd3fc]",
+  EM_BUSCA:           "bg-[#d2a948]/15 text-[#d2a948]",
+  SOLICITAR:          "bg-[#a78bfa]/15 text-[#a78bfa]",
+  RECEBIDO:           "bg-[#4ade80]/15 text-[#4ade80]",
+  EM_ANALISE:         "bg-[#7dd3fc]/15 text-[#7dd3fc]",
+  RETIFICANDO:        "bg-[#fbbf24]/15 text-[#fbbf24]",
+  EM_TRADUCAO:        "bg-[#7dd3fc]/15 text-[#7dd3fc]",
+  TRADUZIDO:          "bg-[#7dd3fc]/15 text-[#7dd3fc]",
+  EM_APOSTILAMENTO:   "bg-[#a78bfa]/15 text-[#a78bfa]",
+  APOSTILADO:         "bg-[#a78bfa]/15 text-[#a78bfa]",
+  ENTREGUE:           "bg-[#4ade80]/15 text-[#4ade80]",
+  INVALIDO:           "bg-[#f87171]/15 text-[#f87171]",
+  NAO_ENCONTRADO:     "bg-[#f87171]/15 text-[#f87171]",
+  CANCELADO:          "bg-[#252c35] text-white/80",
 }
 
 const OWNER_LABEL: Record<string, string> = {
@@ -124,9 +124,9 @@ const OWNER_LABEL: Record<string, string> = {
 }
 
 const PRIO_PILL: Record<string, { label: string; cls: string }> = {
-  critica:  { label: "CRÍTICA",  cls: "bg-red-600 text-white" },
-  urgente:  { label: "ALTA",     cls: "bg-orange-500 text-white" },
-  normal:   { label: "NORMAL",   cls: "bg-gray-100 text-gray-700 border border-gray-200" },
+  critica:  { label: "CRÍTICA",  cls: "bg-[#f87171]/15 text-white" },
+  urgente:  { label: "ALTA",     cls: "bg-[#fbbf24]/15 text-white" },
+  normal:   { label: "NORMAL",   cls: "bg-[#252c35] text-white/80 border border-white/10" },
 }
 
 // ============================================================
@@ -153,12 +153,12 @@ function relativeAging(startedAt: string | Date | null | undefined): string {
 }
 
 function slaInfo(dueAt: string | Date | null | undefined): { text: string; cls: string } {
-  if (!dueAt) return { text: "sem prazo", cls: "text-gray-500" }
+  if (!dueAt) return { text: "sem prazo", cls: "text-white/55" }
   const due = typeof dueAt === "string" ? new Date(dueAt) : dueAt
   const diffDays = Math.round((due.getTime() - Date.now()) / 86400000)
-  if (diffDays < 0) return { text: `${Math.abs(diffDays)} dia(s) vencido`, cls: "text-red-700 font-bold" }
-  if (diffDays === 0) return { text: "vence hoje", cls: "text-amber-700 font-bold" }
-  return { text: `${diffDays} dia(s) restantes`, cls: "text-emerald-700 font-semibold" }
+  if (diffDays < 0) return { text: `${Math.abs(diffDays)} dia(s) vencido`, cls: "text-[#f87171] font-bold" }
+  if (diffDays === 0) return { text: "vence hoje", cls: "text-[#d2a948] font-bold" }
+  return { text: `${diffDays} dia(s) restantes`, cls: "text-[#4ade80] font-semibold" }
 }
 
 // ============================================================
@@ -194,7 +194,7 @@ export function TabOperationCockpit({
   if (!workflow) {
     return (
       <div className="p-5 space-y-4">
-        <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-center">
+        <div className="bg-[#1b2027]/5 border border-white/10 rounded-xl p-6 text-center">
           <Play className="w-8 h-8 text-white/30 mx-auto mb-3" />
           <h4 className="text-sm font-bold text-white mb-1">
             {canStart ? "Operação não iniciada" : "Sem operação nesta fase"}
@@ -207,7 +207,7 @@ export function TabOperationCockpit({
           {canStart && (
             <button
               onClick={onAbrirIniciar}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-md transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#7dd3fc] hover:bg-[#7dd3fc] rounded-md transition-colors"
             >
               <Play className="w-4 h-4" />
               {nextActionLabel ? `Iniciar: ${nextActionLabel}` : "Iniciar operação"}
@@ -232,9 +232,9 @@ export function TabOperationCockpit({
   if (allDone) {
     return (
       <div className="p-5 space-y-4">
-        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-6 text-center">
-          <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-3" />
-          <h4 className="text-sm font-bold text-emerald-300 mb-1">✓ Operação concluída</h4>
+        <div className="bg-[#4ade80]/10 border border-[#4ade80]/30 rounded-xl p-6 text-center">
+          <CheckCircle2 className="w-8 h-8 text-[#4ade80] mx-auto mb-3" />
+          <h4 className="text-sm font-bold text-[#4ade80] mb-1">✓ Operação concluída</h4>
           <p className="text-[12px] text-white/60">
             Todas as 6 etapas foram finalizadas. Documento marcado como Recebido.
           </p>
@@ -252,7 +252,7 @@ export function TabOperationCockpit({
     // Workflow existe mas nenhuma etapa ativa: provavelmente está pausado/cancelado
     return (
       <div className="p-5 space-y-4">
-        <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-center">
+        <div className="bg-[#1b2027]/5 border border-white/10 rounded-xl p-6 text-center">
           <p className="text-[12px] text-white/50">
             Workflow {workflow.status}. Use os controles no topo da sidebar para retomar.
           </p>
@@ -267,7 +267,7 @@ export function TabOperationCockpit({
   const aging = relativeAging(activeStep.startedAt)
   const ownerLabel = activeStep.assignee?.nome || OWNER_LABEL[activeStep.ownerKey] || activeStep.ownerKey
   const statusLabel = STATUS_LABEL[doc.status] || doc.status
-  const statusPill = STATUS_PILL_CLS[doc.status] || "bg-gray-100 text-gray-700"
+  const statusPill = STATUS_PILL_CLS[doc.status] || "bg-[#252c35] text-white/80"
 
   const prio = PRIO_PILL[workflow.prioridade || "normal"] || PRIO_PILL.normal
 
@@ -290,10 +290,10 @@ export function TabOperationCockpit({
       {/* ============== BLOCO 1: ESTADO OPERACIONAL ============== */}
       <div className={`rounded-xl border p-4 ${
         isOverdue
-          ? "bg-red-500/10 border-red-500/30"
+          ? "bg-[#f87171]/10 border-[#f87171]/30"
           : activeStep.status === "bloqueada"
-          ? "bg-amber-500/10 border-amber-500/30"
-          : "bg-white/5 border-white/10"
+          ? "bg-[#d2a948]/10 border-[#d2a948]/30"
+          : "bg-[#1b2027]/5 border-white/10"
       }`}>
         <div className="grid grid-cols-3 gap-4 mb-4 max-md:grid-cols-2">
           <Cell label="Status documental">
@@ -309,12 +309,12 @@ export function TabOperationCockpit({
               <select
                 value={activeStep.assignee?.id ?? ""}
                 onChange={(e) => onAtribuir(activeStep.id, e.target.value ? Number(e.target.value) : null)}
-                className="w-full bg-white/5 border border-white/10 rounded px-1.5 py-1 text-[12.5px] text-white focus:outline-none focus:border-blue-500/50"
+                className="w-full bg-[#1b2027]/5 border border-white/10 rounded px-1.5 py-1 text-[12.5px] text-white focus:outline-none focus:border-[#7dd3fc]/50"
                 title="Delegar responsável"
               >
-                <option value="" className="bg-slate-800">Delegar…</option>
+                <option value="" className="bg-[#20262e]">Delegar…</option>
                 {usuarios.map((u) => (
-                  <option key={u.id} value={u.id} className="bg-slate-800">{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>
+                  <option key={u.id} value={u.id} className="bg-[#20262e]">{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>
                 ))}
               </select>
             ) : (
@@ -336,7 +336,7 @@ export function TabOperationCockpit({
 
         <button
           onClick={() => { onTrocarAba("workflow"); onAbrirCentralDaEtapa(activeStep.id) }}
-          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-[12px] font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-md transition-colors"
+          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-[12px] font-semibold text-white bg-[#7dd3fc] hover:bg-[#7dd3fc] rounded-md transition-colors"
         >
           Painel completo da etapa
           <ChevronRight className="w-3.5 h-3.5" />
@@ -345,7 +345,7 @@ export function TabOperationCockpit({
 
       {/* ============== BLOCO 2: IMPEDITIVOS ============== */}
       {blockers.length > 0 ? (
-        <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+        <div className="bg-[#1b2027]/5 border border-white/10 rounded-xl p-4">
           <div className="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-2 flex items-center gap-1.5">
             <AlertTriangle className="w-3 h-3" />
             Impeditivos ativos ({blockers.length})
@@ -353,15 +353,15 @@ export function TabOperationCockpit({
           <div className="space-y-1.5">
             {blockers.map((b, i) => (
               <div key={i} className="flex items-center gap-2 text-[12px]">
-                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${b.sev === "crit" ? "bg-red-500" : "bg-amber-500"}`} />
-                <span className={b.sev === "crit" ? "text-red-300" : "text-amber-300"}>{b.label}</span>
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${b.sev === "crit" ? "bg-[#f87171]" : "bg-[#d2a948]"}`} />
+                <span className={b.sev === "crit" ? "text-[#f87171]" : "text-[#d2a948]"}>{b.label}</span>
               </div>
             ))}
           </div>
         </div>
       ) : (
-        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3">
-          <div className="text-[12px] text-emerald-300 flex items-center gap-2">
+        <div className="bg-[#4ade80]/10 border border-[#4ade80]/20 rounded-xl px-4 py-3">
+          <div className="text-[12px] text-[#4ade80] flex items-center gap-2">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <strong>Sem impeditivos</strong> — etapa pode ser concluída
           </div>
@@ -490,16 +490,16 @@ function ShortcutsBlock({
 type Sev = "ok" | "warn" | "crit" | "pending"
 
 const SEV_BORDER: Record<Sev, string> = {
-  ok:      "border-emerald-500/30 hover:border-emerald-500/50",
-  warn:    "border-amber-500/30 hover:border-amber-500/50",
-  crit:    "border-red-500/30 hover:border-red-500/50",
+  ok:      "border-[#4ade80]/30 hover:border-[#4ade80]/50",
+  warn:    "border-[#d2a948]/30 hover:border-[#d2a948]/50",
+  crit:    "border-[#f87171]/30 hover:border-[#f87171]/50",
   pending: "border-white/10 hover:border-white/20",
 }
 const SEV_DOT: Record<Sev, string> = {
-  ok: "bg-emerald-400", warn: "bg-amber-400", crit: "bg-red-400", pending: "bg-white/30",
+  ok: "bg-[#4ade80]/15", warn: "bg-[#d2a948]/15", crit: "bg-[#f87171]/15", pending: "bg-[#1b2027]/30",
 }
 const SEV_VAL: Record<Sev, string> = {
-  ok: "text-emerald-300", warn: "text-amber-300", crit: "text-red-300", pending: "text-white/50",
+  ok: "text-[#4ade80]", warn: "text-[#d2a948]", crit: "text-[#f87171]", pending: "text-white/50",
 }
 
 function ShortcutCard({
@@ -521,7 +521,7 @@ function ShortcutCard({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex items-center justify-between gap-2 px-3 py-2.5 bg-white/5 border rounded-lg text-left transition-colors ${SEV_BORDER[sev]} ${
+      className={`flex items-center justify-between gap-2 px-3 py-2.5 bg-[#1b2027]/5 border rounded-lg text-left transition-colors ${SEV_BORDER[sev]} ${
         disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
       }`}
     >

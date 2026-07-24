@@ -167,7 +167,7 @@ function EditorShell({
               </div>
               <button
                 onClick={onClose}
-                className="w-8 h-8 rounded-md bg-white/5 hover:bg-white/15 flex items-center justify-center text-white flex-shrink-0"
+                className="w-8 h-8 rounded-md bg-[#1b2027]/5 hover:bg-[#1b2027]/15 flex items-center justify-center text-white flex-shrink-0"
                 aria-label="Fechar"
               >
                 <X className="w-4 h-4" />
@@ -176,7 +176,7 @@ function EditorShell({
           </div>
 
           {/* Body */}
-          <div className="flex-1 overflow-y-auto px-6 py-5 text-slate-200">{children}</div>
+          <div className="flex-1 overflow-y-auto px-6 py-5 text-white/70">{children}</div>
 
           {/* Footer */}
           <div className="flex-shrink-0 px-6 py-4 border-t border-white/10 bg-[#11151b]">
@@ -205,22 +205,22 @@ function Label({
   return (
     <label className="block text-[10px] uppercase font-semibold tracking-wider text-white/55 mb-1.5">
       {children}
-      {required && <span className="text-amber-300 ml-1">*</span>}
+      {required && <span className="text-[#d2a948] ml-1">*</span>}
     </label>
   )
 }
 
 const inputCls =
-  "w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30"
+  "w-full px-3 py-2 bg-[#1b2027]/5 border border-white/10 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/30"
 
 const inputClsInvalid =
-  "w-full px-3 py-2 bg-white/5 border border-amber-500/40 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/30"
+  "w-full px-3 py-2 bg-[#1b2027]/5 border border-[#d2a948]/40 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#d2a948]/60 focus:ring-1 focus:ring-[#d2a948]/30"
 
 function ReadOnlyBanner({ stepStatus }: { stepStatus: string }) {
   if (stepStatus !== "concluida") return null
   return (
-    <div className="mb-5 p-3 rounded-lg border border-blue-500/30 bg-blue-500/10">
-      <div className="text-[12px] font-semibold text-blue-300 mb-0.5 flex items-center gap-1.5">
+    <div className="mb-5 p-3 rounded-lg border border-[#7dd3fc]/30 bg-[#7dd3fc]/10">
+      <div className="text-[12px] font-semibold text-[#7dd3fc] mb-0.5 flex items-center gap-1.5">
         <AlertCircle className="w-3.5 h-3.5" />
         Etapa já concluída
       </div>
@@ -669,14 +669,14 @@ export function EditorSolicitarCertidao({
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-white hover:bg-white/5 rounded-md disabled:opacity-50"
+            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-white hover:bg-[#1b2027]/5 rounded-md disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             onClick={handleSalvar}
             disabled={saving || readOnly || !podeConcluir}
-            className="px-5 py-2 text-[12.5px] font-semibold bg-red-500 hover:bg-red-600 disabled:bg-red-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2"
+            className="px-5 py-2 text-[12.5px] font-semibold bg-[#f87171] hover:bg-[#f87171]/15 disabled:bg-[#f87171]/15 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2"
             title={!podeConcluir ? "Falta: " + errosValidacao.join(", ") : ""}
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
@@ -696,10 +696,10 @@ export function EditorSolicitarCertidao({
           {/* ========================================================== */}
           {/* RESUMO DO PEDIDO                                            */}
           {/* ========================================================== */}
-          <div className="mb-5 rounded-xl border border-indigo-500/25 bg-indigo-500/5 overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-indigo-500/20 bg-indigo-500/10 flex items-center gap-2">
+          <div className="mb-5 rounded-xl border border-[#7dd3fc]/25 bg-[#7dd3fc]/5 overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-[#7dd3fc]/20 bg-[#7dd3fc]/10 flex items-center gap-2">
               <span className="text-[16px]">📋</span>
-              <span className="text-[12px] uppercase font-bold tracking-wider text-indigo-200">
+              <span className="text-[12px] uppercase font-bold tracking-wider text-[#7dd3fc]">
                 Resumo do pedido
               </span>
             </div>
@@ -754,7 +754,7 @@ export function EditorSolicitarCertidao({
                     )}
                   </>
                 ) : (
-                  <div className="text-[12px] text-amber-300/85 italic">
+                  <div className="text-[12px] text-[#d2a948]/85 italic">
                     Não localizados na etapa anterior
                   </div>
                 )}
@@ -772,10 +772,10 @@ export function EditorSolicitarCertidao({
             {/* Recomendação */}
             {recomendacao && (
               <div className="px-4 pb-4">
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 flex items-start gap-3">
+                <div className="rounded-lg border border-[#d2a948]/30 bg-[#d2a948]/10 p-3 flex items-start gap-3">
                   <span className="text-[18px] mt-0.5">💡</span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[12px] font-semibold text-amber-200 mb-0.5">
+                    <div className="text-[12px] font-semibold text-[#d2a948] mb-0.5">
                       Recomendação: canal{" "}
                       <strong className="text-white">
                         {CANAIS.find((c) => c.id === recomendacao.canal)?.label}
@@ -788,7 +788,7 @@ export function EditorSolicitarCertidao({
                   {!readOnly && form.canal !== recomendacao.canal && (
                     <button
                       onClick={() => setForm({ ...form, canal: recomendacao.canal })}
-                      className="text-[10.5px] font-semibold px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 rounded border border-amber-500/30 whitespace-nowrap"
+                      className="text-[10.5px] font-semibold px-2 py-1 bg-[#d2a948]/20 hover:bg-[#d2a948]/30 text-[#d2a948] rounded border border-[#d2a948]/30 whitespace-nowrap"
                     >
                       Usar este
                     </button>
@@ -819,16 +819,16 @@ export function EditorSolicitarCertidao({
                   disabled={readOnly}
                   className={`px-3 py-2.5 rounded-md border text-left transition-all disabled:cursor-not-allowed ${
                     isSelected
-                      ? "border-blue-500/60 bg-blue-500/15 ring-1 ring-blue-500/40"
-                      : "border-white/10 bg-white/5 hover:bg-white/10"
+                      ? "border-[#7dd3fc]/60 bg-[#7dd3fc]/15 ring-1 ring-[#7dd3fc]/40"
+                      : "border-white/10 bg-[#1b2027]/5 hover:bg-[#1b2027]/10"
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-0.5">
-                    <Icon className={`w-3.5 h-3.5 ${isSelected ? "text-blue-300" : "text-white/60"}`} />
+                    <Icon className={`w-3.5 h-3.5 ${isSelected ? "text-[#7dd3fc]" : "text-white/60"}`} />
                     <span className={`text-[12px] font-semibold ${isSelected ? "text-white" : "text-white/80"}`}>
                       {canal.label}
                     </span>
-                    {isSelected && <Check className="w-3 h-3 text-blue-300 ml-auto" />}
+                    {isSelected && <Check className="w-3 h-3 text-[#7dd3fc] ml-auto" />}
                   </div>
                   <div className="text-[10px] text-white/55 leading-snug">{canal.desc}</div>
                 </button>
@@ -866,7 +866,7 @@ export function EditorSolicitarCertidao({
                       <label className="text-[10px] uppercase font-semibold tracking-wider text-white/55">
                         🏷 Número do protocolo
                       </label>
-                      <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40">
                         obrigatório
                       </span>
                     </div>
@@ -888,7 +888,7 @@ export function EditorSolicitarCertidao({
                       <label className="text-[10px] uppercase font-semibold tracking-wider text-white/55">
                         📦 Código de rastreio
                       </label>
-                      <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40">
                         obrigatório
                       </span>
                     </div>
@@ -910,7 +910,7 @@ export function EditorSolicitarCertidao({
                       📝 Observação
                     </label>
                     {canalConfig.requires.observation ? (
-                      <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40">
                         obrigatória
                       </span>
                     ) : (
@@ -964,7 +964,7 @@ export function EditorSolicitarCertidao({
                     type="text"
                     value="~30 dias úteis"
                     disabled
-                    className="w-full px-3 py-2 bg-white/3 border border-white/10 rounded-md text-sm text-white/50 cursor-not-allowed"
+                    className="w-full px-3 py-2 bg-[#1b2027]/3 border border-white/10 rounded-md text-sm text-white/50 cursor-not-allowed"
                   />
                 </div>
 
@@ -988,11 +988,11 @@ export function EditorSolicitarCertidao({
                     disabled={readOnly}
                     className={inputCls}
                   >
-                    <option value="" className="bg-slate-800">
+                    <option value="" className="bg-[#20262e]">
                       — Selecione —
                     </option>
                     {FORMAS_PAGAMENTO.map((fp) => (
-                      <option key={fp.id} value={fp.id} className="bg-slate-800">
+                      <option key={fp.id} value={fp.id} className="bg-[#20262e]">
                         {fp.label}
                       </option>
                     ))}
@@ -1020,7 +1020,7 @@ function ResumoCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+    <div className="rounded-lg border border-white/10 bg-[#1b2027]/5 p-3">
       <div className="text-[9.5px] uppercase font-bold tracking-wider text-white/45 mb-1.5">
         {label}
       </div>
@@ -1066,12 +1066,12 @@ const FOLLOWUP_KINDS: {
   icon: string
   pillClass: string
 }[] = [
-  { value: "LIGACAO", label: "Ligação", icon: "📞", pillClass: "bg-indigo-500/20 text-indigo-200 border-indigo-500/30" },
-  { value: "EMAIL", label: "E-mail", icon: "📧", pillClass: "bg-blue-500/20 text-blue-200 border-blue-500/30" },
-  { value: "WHATSAPP", label: "WhatsApp", icon: "💬", pillClass: "bg-emerald-500/20 text-emerald-200 border-emerald-500/30" },
-  { value: "CARTORIO", label: "Cartório presencial", icon: "🏛", pillClass: "bg-amber-500/20 text-amber-200 border-amber-500/30" },
+  { value: "LIGACAO", label: "Ligação", icon: "📞", pillClass: "bg-[#7dd3fc]/20 text-[#7dd3fc] border-[#7dd3fc]/30" },
+  { value: "EMAIL", label: "E-mail", icon: "📧", pillClass: "bg-[#7dd3fc]/20 text-[#7dd3fc] border-[#7dd3fc]/30" },
+  { value: "WHATSAPP", label: "WhatsApp", icon: "💬", pillClass: "bg-[#4ade80]/20 text-[#4ade80] border-[#4ade80]/30" },
+  { value: "CARTORIO", label: "Cartório presencial", icon: "🏛", pillClass: "bg-[#d2a948]/20 text-[#d2a948] border-[#d2a948]/30" },
   { value: "CORREIOS", label: "Correios", icon: "📬", pillClass: "bg-rose-500/20 text-rose-200 border-rose-500/30" },
-  { value: "OUTRO", label: "Outro", icon: "🔔", pillClass: "bg-white/10 text-white/80 border-white/20" },
+  { value: "OUTRO", label: "Outro", icon: "🔔", pillClass: "bg-[#1b2027]/10 text-white/80 border-white/20" },
 ]
 
 function getFollowupMeta(kind: FollowupKind) {
@@ -1320,21 +1320,21 @@ export function EditorAguardarRetorno({
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-white hover:bg-white/5 rounded-md disabled:opacity-50"
+            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-white hover:bg-[#1b2027]/5 rounded-md disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             onClick={() => handleSalvar(false)}
             disabled={saving || readOnly}
-            className="px-4 py-2 text-[12.5px] font-semibold bg-white/10 hover:bg-white/15 disabled:opacity-50 text-white rounded-md"
+            className="px-4 py-2 text-[12.5px] font-semibold bg-[#1b2027]/10 hover:bg-[#1b2027]/15 disabled:opacity-50 text-white rounded-md"
           >
             Salvar (sem concluir)
           </button>
           <button
             onClick={() => handleSalvar(true)}
             disabled={saving || readOnly}
-            className="px-5 py-2 text-[12.5px] font-semibold bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2"
+            className="px-5 py-2 text-[12.5px] font-semibold bg-[#4ade80]/15 hover:bg-[#4ade80]/15 disabled:bg-[#4ade80]/15 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
             Confirmar retorno · concluir etapa
@@ -1354,10 +1354,10 @@ export function EditorAguardarRetorno({
               1. RESUMO DA SOLICITAÇÃO (read-only, vem da Etapa 2)
              ═══════════════════════════════════════════════════════ */}
           {solicit && (
-            <div className="rounded-lg border border-indigo-500/30 bg-gradient-to-br from-indigo-500/10 to-blue-500/5 overflow-hidden">
-              <div className="px-3.5 py-2 bg-indigo-500/15 border-b border-indigo-500/20 flex items-center gap-2">
-                <Send className="w-3.5 h-3.5 text-indigo-200" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-100">
+            <div className="rounded-lg border border-[#7dd3fc]/30 bg-gradient-to-br from-[#7dd3fc]/10 to-[#7dd3fc]/5 overflow-hidden">
+              <div className="px-3.5 py-2 bg-[#7dd3fc]/15 border-b border-[#7dd3fc]/20 flex items-center gap-2">
+                <Send className="w-3.5 h-3.5 text-[#7dd3fc]" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#7dd3fc]">
                   Resumo da solicitação
                 </span>
               </div>
@@ -1395,7 +1395,7 @@ export function EditorAguardarRetorno({
                       href={solicit.link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[12px] text-blue-300 hover:text-blue-200 hover:underline inline-flex items-center gap-1 break-all"
+                      className="text-[12px] text-[#7dd3fc] hover:text-[#7dd3fc] hover:underline inline-flex items-center gap-1 break-all"
                     >
                       {solicit.link}
                       <ExternalLink className="w-3 h-3 flex-shrink-0" />
@@ -1414,7 +1414,7 @@ export function EditorAguardarRetorno({
                 )}
               </div>
               {!solicit.canal && !solicit.protocolo && !solicit.atendente && (
-                <div className="px-3.5 py-2 border-t border-indigo-500/20 text-[11px] text-amber-200 bg-amber-500/5 flex items-center gap-1.5">
+                <div className="px-3.5 py-2 border-t border-[#7dd3fc]/20 text-[11px] text-[#d2a948] bg-[#d2a948]/5 flex items-center gap-1.5">
                   <AlertTriangle className="w-3 h-3 flex-shrink-0" />
                   Solicitação ainda não preenchida na Etapa 2. Reabra a etapa anterior para preencher.
                 </div>
@@ -1431,7 +1431,7 @@ export function EditorAguardarRetorno({
                 <MessageCircle className="w-3.5 h-3.5" />
                 Histórico de contatos
                 {followups.length > 0 && (
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-white/10 text-white/70">
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#1b2027]/10 text-white/70">
                     {followups.length}
                   </span>
                 )}
@@ -1439,7 +1439,7 @@ export function EditorAguardarRetorno({
             </div>
 
             {followups.length === 0 ? (
-              <div className="px-3 py-4 rounded-md bg-white/5 border border-dashed border-white/15 text-center">
+              <div className="px-3 py-4 rounded-md bg-[#1b2027]/5 border border-dashed border-white/15 text-center">
                 <div className="text-[11.5px] text-white/55 italic">
                   Nenhum contato registrado ainda.
                 </div>
@@ -1454,7 +1454,7 @@ export function EditorAguardarRetorno({
                   return (
                     <div
                       key={`${f.iso}-${i}`}
-                      className="rounded-md border border-white/10 bg-white/5 p-2.5"
+                      className="rounded-md border border-white/10 bg-[#1b2027]/5 p-2.5"
                     >
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span
@@ -1484,8 +1484,8 @@ export function EditorAguardarRetorno({
               3. ADICIONAR NOVO CONTATO
              ═══════════════════════════════════════════════════════ */}
           {!readOnly && (
-            <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3.5">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-200 mb-2.5 flex items-center gap-1.5">
+            <div className="rounded-lg border border-[#4ade80]/25 bg-[#4ade80]/5 p-3.5">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[#4ade80] mb-2.5 flex items-center gap-1.5">
                 <span>+</span>
                 <span>Adicionar contato</span>
               </div>
@@ -1532,7 +1532,7 @@ export function EditorAguardarRetorno({
                 <button
                   onClick={handleAddFollowup}
                   disabled={addingFollowup || !newDesc.trim()}
-                  className="px-3.5 py-1.5 text-[11.5px] font-semibold bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-1.5"
+                  className="px-3.5 py-1.5 text-[11.5px] font-semibold bg-[#4ade80]/15 hover:bg-[#4ade80]/15 disabled:bg-[#4ade80]/15 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-1.5"
                 >
                   {addingFollowup ? (
                     <Loader2 className="w-3 h-3 animate-spin" />
@@ -1754,14 +1754,14 @@ export function EditorReceberCertidao({
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-white hover:bg-white/5 rounded-md disabled:opacity-50"
+            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-white hover:bg-[#1b2027]/5 rounded-md disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             onClick={handleSalvar}
             disabled={saving || readOnly || !podeConcluir}
-            className="px-5 py-2 text-[12.5px] font-semibold bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2"
+            className="px-5 py-2 text-[12.5px] font-semibold bg-[#4ade80]/15 hover:bg-[#4ade80]/15 disabled:bg-[#4ade80]/15 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
             Confirmar recebimento · concluir etapa
@@ -1814,7 +1814,7 @@ export function EditorReceberCertidao({
               <div className="text-[10px] uppercase font-bold tracking-wider text-white/45">
                 2. Tipo de mídia
               </div>
-              <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40">
                 obrigatório
               </span>
             </div>
@@ -1832,26 +1832,26 @@ export function EditorReceberCertidao({
                     disabled={readOnly}
                     className={`text-left px-3.5 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
                       ativo
-                        ? "border-emerald-500/60 bg-emerald-500/10 ring-1 ring-emerald-500/30"
-                        : "border-white/10 bg-white/5 hover:bg-white/10"
+                        ? "border-[#4ade80]/60 bg-[#4ade80]/10 ring-1 ring-[#4ade80]/30"
+                        : "border-white/10 bg-[#1b2027]/5 hover:bg-[#1b2027]/10"
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <div
                         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                           ativo
-                            ? "border-emerald-400 bg-emerald-500"
+                            ? "border-[#4ade80]/30 bg-[#4ade80]/15"
                             : "border-white/30 bg-transparent"
                         }`}
                       >
                         {ativo && (
-                          <div className="w-2 h-2 rounded-full bg-white" />
+                          <div className="w-2 h-2 rounded-full bg-[#1b2027]" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div
                           className={`text-[12.5px] font-semibold flex items-center gap-1.5 ${
-                            ativo ? "text-emerald-100" : "text-white/85"
+                            ativo ? "text-[#4ade80]" : "text-white/85"
                           }`}
                         >
                           <span>{opt.icon}</span>
@@ -1872,7 +1872,7 @@ export function EditorReceberCertidao({
               3. LOCALIZAÇÃO FÍSICA (condicional)
              ═══════════════════════════════════════════════════════ */}
           {showPhysicalLocation && (
-            <div className="p-3 rounded-lg border border-amber-500/25 bg-amber-500/5">
+            <div className="p-3 rounded-lg border border-[#d2a948]/25 bg-[#d2a948]/5">
               <Label>📍 Localização física do papel</Label>
               <input
                 type="text"
@@ -2166,7 +2166,7 @@ export function EditorConferirCertidao({
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-white hover:bg-white/5 rounded-md disabled:opacity-50"
+            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-white hover:bg-[#1b2027]/5 rounded-md disabled:opacity-50"
           >
             Cancelar
           </button>
@@ -2175,12 +2175,12 @@ export function EditorConferirCertidao({
             disabled={saving || readOnly || !podeConcluir}
             className={`px-5 py-2 text-[12.5px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2 ${
               resultado === "aprovado"
-                ? "bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-900"
+                ? "bg-[#4ade80]/15 hover:bg-[#4ade80]/15 disabled:bg-[#4ade80]/15"
                 : resultado === "divergente"
-                ? "bg-amber-500 hover:bg-amber-600 disabled:bg-amber-900"
+                ? "bg-[#d2a948] hover:bg-[#d2a948]/15 disabled:bg-[#d2a948]/15"
                 : resultado === "nova_via"
                 ? "bg-rose-500 hover:bg-rose-600 disabled:bg-rose-900"
-                : "bg-slate-500 disabled:bg-slate-700"
+                : "bg-[#20262e]0 disabled:bg-[#20262e]"
             }`}
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileCheck className="w-3.5 h-3.5" />}
@@ -2199,15 +2199,15 @@ export function EditorConferirCertidao({
         <div className="space-y-5">
           {/* Anexo da certidão (link) */}
           {arquivoUrl && (
-            <div className="px-3 py-2 rounded-md border border-blue-500/25 bg-blue-500/5 flex items-center gap-2">
-              <FileCheck className="w-3.5 h-3.5 text-blue-300 flex-shrink-0" />
+            <div className="px-3 py-2 rounded-md border border-[#7dd3fc]/25 bg-[#7dd3fc]/5 flex items-center gap-2">
+              <FileCheck className="w-3.5 h-3.5 text-[#7dd3fc] flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-[11px] text-white/70">Anexo recebido</div>
                 <a
                   href={arquivoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[12px] text-blue-300 hover:text-blue-200 hover:underline inline-flex items-center gap-1"
+                  className="text-[12px] text-[#7dd3fc] hover:text-[#7dd3fc] hover:underline inline-flex items-center gap-1"
                 >
                   {arquivoNome || "Abrir arquivo"}
                   <ExternalLink className="w-2.5 h-2.5" />
@@ -2230,8 +2230,8 @@ export function EditorConferirCertidao({
 
             {/* Hint árvore */}
             {treeRef && (
-              <div className="px-3 py-2 rounded-md bg-indigo-500/8 border border-indigo-500/20 mb-3">
-                <div className="text-[10px] uppercase font-semibold tracking-wider text-indigo-300 mb-1">
+              <div className="px-3 py-2 rounded-md bg-[#7dd3fc]/8 border border-[#7dd3fc]/20 mb-3">
+                <div className="text-[10px] uppercase font-semibold tracking-wider text-[#7dd3fc] mb-1">
                   Nomes na árvore (referência)
                 </div>
                 <div className="text-[11.5px] text-white/75 leading-snug">{treeRef}</div>
@@ -2336,15 +2336,15 @@ export function EditorConferirCertidao({
                     disabled={readOnly}
                     className={`w-full text-left px-3 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
                       isChecked
-                        ? "border-emerald-500/40 bg-emerald-500/10"
-                        : "border-white/10 bg-white/5 hover:bg-white/10"
+                        ? "border-[#4ade80]/40 bg-[#4ade80]/10"
+                        : "border-white/10 bg-[#1b2027]/5 hover:bg-[#1b2027]/10"
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <div
                         className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                           isChecked
-                            ? "border-emerald-400 bg-emerald-500"
+                            ? "border-[#4ade80]/30 bg-[#4ade80]/15"
                             : "border-white/30 bg-transparent"
                         }`}
                       >
@@ -2355,7 +2355,7 @@ export function EditorConferirCertidao({
                       <div className="flex-1 min-w-0">
                         <div
                           className={`text-[12.5px] font-semibold ${
-                            isChecked ? "text-emerald-100" : "text-white/85"
+                            isChecked ? "text-[#4ade80]" : "text-white/85"
                           }`}
                         >
                           {item.label}
@@ -2447,16 +2447,16 @@ function ResultadoBtn({
 }) {
   const colorMap = {
     emerald: {
-      ativo: "border-emerald-500/60 bg-emerald-500/15 text-emerald-200",
-      icon: "text-emerald-300",
+      ativo: "border-[#4ade80]/60 bg-[#4ade80]/15 text-[#4ade80]",
+      icon: "text-[#4ade80]",
     },
     amber: {
-      ativo: "border-amber-500/60 bg-amber-500/15 text-amber-200",
-      icon: "text-amber-300",
+      ativo: "border-[#d2a948]/60 bg-[#d2a948]/15 text-[#d2a948]",
+      icon: "text-[#d2a948]",
     },
     red: {
-      ativo: "border-red-500/60 bg-red-500/15 text-red-200",
-      icon: "text-red-300",
+      ativo: "border-[#f87171]/60 bg-[#f87171]/15 text-[#f87171]",
+      icon: "text-[#f87171]",
     },
   }
   const cls = colorMap[cor]
@@ -2465,7 +2465,7 @@ function ResultadoBtn({
     <button
       onClick={onClick}
       className={`px-3 py-3 rounded-md border text-center transition-all ${
-        ativo ? cls.ativo + " ring-1 ring-current/40" : "border-white/10 bg-white/5 hover:bg-white/10 text-white/80"
+        ativo ? cls.ativo + " ring-1 ring-current/40" : "border-white/10 bg-[#1b2027]/5 hover:bg-[#1b2027]/10 text-white/80"
       }`}
     >
       <div className={`flex justify-center mb-1.5 ${ativo ? cls.icon : "text-white/60"}`}>{icon}</div>
@@ -2705,7 +2705,7 @@ export function EditorValidarCertidao({
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-white hover:bg-white/5 rounded-md disabled:opacity-50"
+            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-white hover:bg-[#1b2027]/5 rounded-md disabled:opacity-50"
           >
             Cancelar
           </button>
@@ -2714,14 +2714,14 @@ export function EditorValidarCertidao({
             disabled={saving || readOnly || !podeConcluir}
             className={`px-5 py-2 text-[12.5px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2 ${
               decisao === "aprovado"
-                ? "bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-900"
+                ? "bg-[#4ade80]/15 hover:bg-[#4ade80]/15 disabled:bg-[#4ade80]/15"
                 : decisao === "aprovado_ressalvas"
-                ? "bg-blue-500 hover:bg-blue-600 disabled:bg-blue-900"
+                ? "bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:bg-[#7dd3fc]/15"
                 : decisao === "nova_via"
-                ? "bg-amber-500 hover:bg-amber-600 disabled:bg-amber-900"
+                ? "bg-[#d2a948] hover:bg-[#d2a948]/15 disabled:bg-[#d2a948]/15"
                 : decisao === "rejeitado"
-                ? "bg-red-500 hover:bg-red-600 disabled:bg-red-900"
-                : "bg-slate-500 disabled:bg-slate-700"
+                ? "bg-[#f87171] hover:bg-[#f87171]/15 disabled:bg-[#f87171]/15"
+                : "bg-[#20262e]0 disabled:bg-[#20262e]"
             }`}
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Scale className="w-3.5 h-3.5" />}
@@ -2741,10 +2741,10 @@ export function EditorValidarCertidao({
           {/* ═══════════════════════════════════════════════════════
               1. CONTEXTO DA DECISÃO (read-only)
              ═══════════════════════════════════════════════════════ */}
-          <div className="rounded-lg border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-orange-500/5 overflow-hidden">
-            <div className="px-3.5 py-2 bg-amber-500/15 border-b border-amber-500/20 flex items-center gap-2">
-              <Scale className="w-3.5 h-3.5 text-amber-200" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-100">
+          <div className="rounded-lg border border-[#d2a948]/30 bg-gradient-to-br from-[#d2a948]/10 to-[#fbbf24]/5 overflow-hidden">
+            <div className="px-3.5 py-2 bg-[#d2a948]/15 border-b border-[#d2a948]/20 flex items-center gap-2">
+              <Scale className="w-3.5 h-3.5 text-[#d2a948]" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#d2a948]">
                 Contexto da decisão
               </span>
             </div>
@@ -2769,7 +2769,7 @@ export function EditorValidarCertidao({
                     href={arquivoUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[12px] text-blue-300 hover:text-blue-200 hover:underline inline-flex items-center gap-1 truncate"
+                    className="text-[12px] text-[#7dd3fc] hover:text-[#7dd3fc] hover:underline inline-flex items-center gap-1 truncate"
                   >
                     📎 {arquivoNome || "Abrir"}
                     <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
@@ -2813,22 +2813,22 @@ export function EditorValidarCertidao({
               {DECISAO_OPTIONS.map((opt) => {
                 const ativo = decisao === opt.value
                 const colorMap = {
-                  emerald: ativo ? "border-emerald-500/60 bg-emerald-500/10 ring-1 ring-emerald-500/30" : "",
-                  blue: ativo ? "border-blue-500/60 bg-blue-500/10 ring-1 ring-blue-500/30" : "",
-                  amber: ativo ? "border-amber-500/60 bg-amber-500/10 ring-1 ring-amber-500/30" : "",
-                  red: ativo ? "border-red-500/60 bg-red-500/10 ring-1 ring-red-500/30" : "",
+                  emerald: ativo ? "border-[#4ade80]/60 bg-[#4ade80]/10 ring-1 ring-[#4ade80]/30" : "",
+                  blue: ativo ? "border-[#7dd3fc]/60 bg-[#7dd3fc]/10 ring-1 ring-[#7dd3fc]/30" : "",
+                  amber: ativo ? "border-[#d2a948]/60 bg-[#d2a948]/10 ring-1 ring-[#d2a948]/30" : "",
+                  red: ativo ? "border-[#f87171]/60 bg-[#f87171]/10 ring-1 ring-[#f87171]/30" : "",
                 }
                 const iconColorMap = {
-                  emerald: ativo ? "text-emerald-300" : "text-white/60",
-                  blue: ativo ? "text-blue-300" : "text-white/60",
-                  amber: ativo ? "text-amber-300" : "text-white/60",
-                  red: ativo ? "text-red-300" : "text-white/60",
+                  emerald: ativo ? "text-[#4ade80]" : "text-white/60",
+                  blue: ativo ? "text-[#7dd3fc]" : "text-white/60",
+                  amber: ativo ? "text-[#d2a948]" : "text-white/60",
+                  red: ativo ? "text-[#f87171]" : "text-white/60",
                 }
                 const textColorMap = {
-                  emerald: ativo ? "text-emerald-100" : "text-white/85",
-                  blue: ativo ? "text-blue-100" : "text-white/85",
-                  amber: ativo ? "text-amber-100" : "text-white/85",
-                  red: ativo ? "text-red-100" : "text-white/85",
+                  emerald: ativo ? "text-[#4ade80]" : "text-white/85",
+                  blue: ativo ? "text-[#7dd3fc]" : "text-white/85",
+                  amber: ativo ? "text-[#d2a948]" : "text-white/85",
+                  red: ativo ? "text-[#f87171]" : "text-white/85",
                 }
                 return (
                   <button
@@ -2839,7 +2839,7 @@ export function EditorValidarCertidao({
                     className={`w-full text-left px-3.5 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
                       ativo
                         ? colorMap[opt.cor]
-                        : "border-white/10 bg-white/5 hover:bg-white/10"
+                        : "border-white/10 bg-[#1b2027]/5 hover:bg-[#1b2027]/10"
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -2850,7 +2850,7 @@ export function EditorValidarCertidao({
                             : "border-white/30 bg-transparent"
                         }`}
                       >
-                        {ativo && <div className="w-2 h-2 rounded-full bg-white" />}
+                        {ativo && <div className="w-2 h-2 rounded-full bg-[#1b2027]" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className={`text-[12.5px] font-semibold flex items-center gap-1.5 ${textColorMap[opt.cor]}`}>
@@ -2877,7 +2877,7 @@ export function EditorValidarCertidao({
                 Parecer jurídico
               </Label>
               {precisaParecer && (
-                <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40">
                   obrigatório
                 </span>
               )}
@@ -2906,7 +2906,7 @@ export function EditorValidarCertidao({
               } resize-none`}
             />
             {precisaParecer && parecer.trim().length > 0 && parecer.trim().length < 5 && (
-              <div className="text-[10.5px] text-amber-200 mt-1 italic">
+              <div className="text-[10.5px] text-[#d2a948] mt-1 italic">
                 Parecer muito curto. Mínimo 5 caracteres.
               </div>
             )}
@@ -3047,7 +3047,7 @@ function FileUploadField({
           {label}
         </label>
         {required && (
-          <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+          <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40">
             obrigatório
           </span>
         )}
@@ -3066,9 +3066,9 @@ function FileUploadField({
       {/* Estados */}
       {uploading ? (
         // 1. SUBINDO
-        <div className="px-3 py-2.5 bg-white/5 border border-blue-500/40 rounded-md">
+        <div className="px-3 py-2.5 bg-[#1b2027]/5 border border-[#7dd3fc]/40 rounded-md">
           <div className="flex items-center gap-2.5 mb-2">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-300 flex-shrink-0" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#7dd3fc] flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-[12px] text-white truncate">{fileName}</div>
               <div className="text-[10px] text-white/55">
@@ -3076,18 +3076,18 @@ function FileUploadField({
               </div>
             </div>
           </div>
-          <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+          <div className="h-1 bg-[#1b2027]/10 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all"
+              className="h-full bg-gradient-to-r from-[#7dd3fc] to-[#4ade80] transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
       ) : value ? (
         // 2. ARQUIVO CARREGADO
-        <div className="px-3 py-2.5 bg-emerald-500/5 border border-emerald-500/30 rounded-md">
+        <div className="px-3 py-2.5 bg-[#4ade80]/5 border border-[#4ade80]/30 rounded-md">
           <div className="flex items-center gap-2.5">
-            <FileCheck className="w-4 h-4 text-emerald-300 flex-shrink-0" />
+            <FileCheck className="w-4 h-4 text-[#4ade80] flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-[12px] text-white truncate font-medium">
                 {displayName || "Arquivo enviado"}
@@ -3098,7 +3098,7 @@ function FileUploadField({
                   href={value}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-300 hover:text-blue-200 hover:underline inline-flex items-center gap-0.5"
+                  className="text-[#7dd3fc] hover:text-[#7dd3fc] hover:underline inline-flex items-center gap-0.5"
                 >
                   Abrir <ExternalLink className="w-2.5 h-2.5" />
                 </a>
@@ -3109,14 +3109,14 @@ function FileUploadField({
                 <button
                   type="button"
                   onClick={openPicker}
-                  className="text-[10.5px] font-semibold px-2 py-1 bg-white/10 hover:bg-white/15 rounded text-white"
+                  className="text-[10.5px] font-semibold px-2 py-1 bg-[#1b2027]/10 hover:bg-[#1b2027]/15 rounded text-white"
                 >
                   Trocar
                 </button>
                 <button
                   type="button"
                   onClick={handleRemove}
-                  className="text-[10.5px] font-semibold px-2 py-1 bg-red-500/15 hover:bg-red-500/25 rounded text-red-200 inline-flex items-center gap-1"
+                  className="text-[10.5px] font-semibold px-2 py-1 bg-[#f87171]/15 hover:bg-[#f87171]/25 rounded text-[#f87171] inline-flex items-center gap-1"
                   title="Remover anexo"
                 >
                   <Trash2 className="w-3 h-3" />
@@ -3131,12 +3131,12 @@ function FileUploadField({
           type="button"
           onClick={openPicker}
           disabled={disabled}
-          className={`w-full px-3 py-3.5 bg-white/5 border border-dashed rounded-md text-left hover:bg-white/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-            invalid ? "border-amber-500/40" : "border-white/15"
+          className={`w-full px-3 py-3.5 bg-[#1b2027]/5 border border-dashed rounded-md text-left hover:bg-[#1b2027]/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+            invalid ? "border-[#d2a948]/40" : "border-white/15"
           }`}
         >
           <div className="flex items-center gap-2.5">
-            <Upload className={`w-4 h-4 ${invalid ? "text-amber-300" : "text-white/60"}`} />
+            <Upload className={`w-4 h-4 ${invalid ? "text-[#d2a948]" : "text-white/60"}`} />
             <div className="flex-1">
               <div className="text-[12px] text-white/85 font-medium">
                 Selecionar arquivo
@@ -3171,7 +3171,7 @@ function EditorPlaceholder({
         <div className="flex items-center justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-[12.5px] font-semibold bg-white/10 hover:bg-white/15 text-white rounded-md"
+            className="px-4 py-2 text-[12.5px] font-semibold bg-[#1b2027]/10 hover:bg-[#1b2027]/15 text-white rounded-md"
           >
             Fechar
           </button>
@@ -3179,7 +3179,7 @@ function EditorPlaceholder({
       }
     >
       <div className="py-8 text-center text-white/55">
-        <AlertCircle className="w-10 h-10 text-amber-400/60 mx-auto mb-3" />
+        <AlertCircle className="w-10 h-10 text-[#d2a948]/60 mx-auto mb-3" />
         <p className="text-sm">
           Use o botão <strong>⚡ Forçar</strong> no header se quiser concluir esta etapa sem editor.
         </p>

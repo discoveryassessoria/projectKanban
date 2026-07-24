@@ -141,13 +141,13 @@ const STATUS_LABEL: Record<StatusStep, string> = {
 }
 
 const STATUS_PILL_CLS: Record<StatusStep, string> = {
-  nao_iniciada: "bg-slate-500/20 text-slate-300 border-slate-700/50",
-  bloqueada: "bg-red-500/20 text-red-300 border-red-700/50",
-  em_andamento: "bg-blue-500/20 text-blue-300 border-blue-700/50",
-  aguardando_terceiro: "bg-amber-500/20 text-amber-300 border-amber-700/50",
-  atrasada: "bg-orange-500/20 text-orange-300 border-orange-700/50",
-  concluida: "bg-emerald-500/20 text-emerald-300 border-emerald-700/50",
-  cancelada: "bg-slate-500/20 text-slate-400 border-slate-700/50",
+  nao_iniciada: "bg-[#20262e]0/20 text-white/40 border-white/10",
+  bloqueada: "bg-[#f87171]/20 text-[#f87171] border-[#f87171]/50",
+  em_andamento: "bg-[#7dd3fc]/20 text-[#7dd3fc] border-[#7dd3fc]/50",
+  aguardando_terceiro: "bg-[#d2a948]/20 text-[#d2a948] border-[#d2a948]/50",
+  atrasada: "bg-[#fbbf24]/20 text-[#fbbf24] border-[#fbbf24]/50",
+  concluida: "bg-[#4ade80]/20 text-[#4ade80] border-[#4ade80]/50",
+  cancelada: "bg-[#20262e]0/20 text-white/40 border-white/10",
 }
 
 const fmtDateTime = (iso: string | null): string => {
@@ -176,14 +176,14 @@ const fmtDate = (iso: string | null): string => {
 const fmtSla = (
   dueAt: string | null,
 ): { label: string; cls: string } => {
-  if (!dueAt) return { label: "sem prazo", cls: "text-slate-400" }
+  if (!dueAt) return { label: "sem prazo", cls: "text-white/40" }
   const diff = (new Date(dueAt).getTime() - Date.now()) / 86400000
   if (diff < -5)
-    return { label: `${Math.abs(Math.floor(diff))}d crítico`, cls: "text-red-300" }
+    return { label: `${Math.abs(Math.floor(diff))}d crítico`, cls: "text-[#f87171]" }
   if (diff < 0)
-    return { label: `${Math.abs(Math.floor(diff))}d atrasado`, cls: "text-orange-300" }
-  if (diff < 1) return { label: "vence hoje", cls: "text-amber-300" }
-  return { label: `${Math.ceil(diff)} dia(s) restantes`, cls: "text-emerald-300" }
+    return { label: `${Math.abs(Math.floor(diff))}d atrasado`, cls: "text-[#fbbf24]" }
+  if (diff < 1) return { label: "vence hoje", cls: "text-[#d2a948]" }
+  return { label: `${Math.ceil(diff)} dia(s) restantes`, cls: "text-[#4ade80]" }
 }
 
 // ============================================================
@@ -407,7 +407,7 @@ export function CentralDaEtapaDrawer({
       />
 
       <div
-        className="fixed top-0 right-0 h-screen z-[10003] flex flex-col text-slate-200 font-sans shadow-[-30px_0_60px_rgba(0,0,0,0.5)]"
+        className="fixed top-0 right-0 h-screen z-[10003] flex flex-col text-white/70 font-sans shadow-[-30px_0_60px_rgba(0,0,0,0.5)]"
         style={{
           width: "45vw",
           minWidth: "640px",
@@ -423,11 +423,11 @@ export function CentralDaEtapaDrawer({
 
         {erro && !step && (
           <div className="flex-1 flex flex-col items-center justify-center text-white/60 gap-3 p-6">
-            <AlertTriangle className="w-8 h-8 text-amber-400" />
+            <AlertTriangle className="w-8 h-8 text-[#d2a948]" />
             <p className="text-sm">{erro}</p>
             <button
               onClick={onClose}
-              className="px-3 py-1.5 text-xs bg-white/10 hover:bg-white/15 rounded-md"
+              className="px-3 py-1.5 text-xs bg-[#1b2027]/10 hover:bg-[#1b2027]/15 rounded-md"
             >
               Fechar
             </button>
@@ -447,7 +447,7 @@ export function CentralDaEtapaDrawer({
                 </div>
                 <button
                   onClick={onClose}
-                  className="w-[30px] h-[30px] rounded-md bg-white/5 hover:bg-white/15 flex items-center justify-center text-white"
+                  className="w-[30px] h-[30px] rounded-md bg-[#1b2027]/5 hover:bg-[#1b2027]/15 flex items-center justify-center text-white"
                   aria-label="Fechar"
                 >
                   <X className="w-4 h-4" />
@@ -472,13 +472,13 @@ export function CentralDaEtapaDrawer({
                   {STATUS_LABEL[step.status]}
                 </span>
 
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] text-white/80">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#1b2027]/5 border border-white/10 text-[11px] text-white/80">
                   <UserIcon className="w-3 h-3" />
                   {step.assignee?.nome || ownerName(step.ownerKey)}
                 </span>
 
                 {step.dueAt && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] text-white/80 font-mono">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#1b2027]/5 border border-white/10 text-[11px] text-white/80 font-mono">
                     <Clock className="w-3 h-3" />
                     {fmtDateTime(step.dueAt)}
                   </span>
@@ -491,24 +491,24 @@ export function CentralDaEtapaDrawer({
                   <button
                     onClick={handleReabrir}
                     disabled={!!saving}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-white/10 hover:bg-white/15 disabled:opacity-50 text-white rounded-md transition-colors border border-white/15"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#1b2027]/10 hover:bg-[#1b2027]/15 disabled:opacity-50 text-white rounded-md transition-colors border border-white/15"
                   >
                     {saving === "reabrindo" ? "Reabrindo…" : "↻ Reabrir etapa"}
                   </button>
                   <button
                     onClick={onClose}
                     disabled={!!saving}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-red-500/15 hover:bg-red-500/25 disabled:opacity-50 text-red-200 border border-red-500/30 rounded-md transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#f87171]/15 hover:bg-[#f87171]/25 disabled:opacity-50 text-[#f87171] border border-[#f87171]/30 rounded-md transition-colors"
                   >
                     Fechar
                   </button>
-                  <div className="ml-auto text-[11px] text-emerald-300/80">
+                  <div className="ml-auto text-[11px] text-[#4ade80]/80">
                     Concluída por <strong>{step.completedBy?.nome || "—"}</strong> em{" "}
                     {fmtDateTime(step.completedAt)}
                   </div>
                 </div>
               ) : step.status === "cancelada" ? (
-                <div className="text-[11px] text-slate-400/80">
+                <div className="text-[11px] text-white/40/80">
                   Etapa cancelada.
                 </div>
               ) : (
@@ -517,7 +517,7 @@ export function CentralDaEtapaDrawer({
                   <button
                     onClick={handleConcluir}
                     disabled={!!saving || step.status === "bloqueada"}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#4ade80]/15 hover:bg-[#4ade80]/15 disabled:bg-[#4ade80]/15 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md transition-colors"
                   >
                     <Check className="w-3.5 h-3.5" />
                     Concluir etapa
@@ -528,7 +528,7 @@ export function CentralDaEtapaDrawer({
                     <button
                       onClick={handleDesbloquear}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-md transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:opacity-50 text-white rounded-md transition-colors"
                     >
                       {saving === "desbloqueando" ? "Desbloqueando…" : "Desbloquear"}
                     </button>
@@ -539,7 +539,7 @@ export function CentralDaEtapaDrawer({
                         setShowTransferForm(false)
                       }}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-white/10 hover:bg-white/15 disabled:opacity-50 text-white rounded-md transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#1b2027]/10 hover:bg-[#1b2027]/15 disabled:opacity-50 text-white rounded-md transition-colors"
                     >
                       <Lock className="w-3.5 h-3.5" />
                       Bloquear
@@ -553,7 +553,7 @@ export function CentralDaEtapaDrawer({
                       setShowBlockForm(false)
                     }}
                     disabled={!!saving}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-white/10 hover:bg-white/15 disabled:opacity-50 text-white rounded-md transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#1b2027]/10 hover:bg-[#1b2027]/15 disabled:opacity-50 text-white rounded-md transition-colors"
                   >
                     <ArrowLeftRight className="w-3.5 h-3.5" />
                     Transferir
@@ -563,7 +563,7 @@ export function CentralDaEtapaDrawer({
                   <button
                     onClick={handleForcar}
                     disabled={!!saving}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-amber-500/20 hover:bg-amber-500/30 disabled:opacity-50 text-amber-300 border border-amber-500/30 rounded-md transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#d2a948]/20 hover:bg-[#d2a948]/30 disabled:opacity-50 text-[#d2a948] border border-[#d2a948]/30 rounded-md transition-colors"
                     title="Pula validações e marca como concluída (admin)"
                   >
                     <Zap className="w-3.5 h-3.5" />
@@ -574,7 +574,7 @@ export function CentralDaEtapaDrawer({
                   <button
                     onClick={onClose}
                     disabled={!!saving}
-                    className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-white/70 hover:text-white hover:bg-white/5 rounded-md transition-colors"
+                    className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-white/70 hover:text-white hover:bg-[#1b2027]/5 rounded-md transition-colors"
                   >
                     Fechar
                   </button>
@@ -583,8 +583,8 @@ export function CentralDaEtapaDrawer({
 
               {/* Form inline: Bloquear */}
               {showBlockForm && (
-                <div className="mt-3 p-3 rounded-md border border-red-500/30 bg-red-500/10">
-                  <label className="block text-[10px] uppercase font-semibold tracking-wider text-red-300/80 mb-1.5">
+                <div className="mt-3 p-3 rounded-md border border-[#f87171]/30 bg-[#f87171]/10">
+                  <label className="block text-[10px] uppercase font-semibold tracking-wider text-[#f87171]/80 mb-1.5">
                     Motivo do bloqueio
                   </label>
                   <input
@@ -592,14 +592,14 @@ export function CentralDaEtapaDrawer({
                     value={blockReason}
                     onChange={(e) => setBlockReason(e.target.value)}
                     placeholder="ex: aguardando cliente confirmar dados"
-                    className="w-full px-2.5 py-1.5 bg-white/5 border border-white/10 rounded text-[12px] text-white placeholder-white/30 focus:outline-none focus:border-red-500/50"
+                    className="w-full px-2.5 py-1.5 bg-[#1b2027]/5 border border-white/10 rounded text-[12px] text-white placeholder-white/30 focus:outline-none focus:border-[#f87171]/50"
                     autoFocus
                   />
                   <div className="flex gap-2 mt-2">
                     <button
                       onClick={handleBloquear}
                       disabled={!!saving || !blockReason.trim()}
-                      className="px-3 py-1.5 text-[11px] font-semibold bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded"
+                      className="px-3 py-1.5 text-[11px] font-semibold bg-[#f87171] hover:bg-[#f87171]/15 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded"
                     >
                       {saving === "bloqueando" ? "Bloqueando…" : "Confirmar bloqueio"}
                     </button>
@@ -618,8 +618,8 @@ export function CentralDaEtapaDrawer({
 
               {/* Form inline: Transferir */}
               {showTransferForm && (
-                <div className="mt-3 p-3 rounded-md border border-blue-500/30 bg-blue-500/10">
-                  <label className="block text-[10px] uppercase font-semibold tracking-wider text-blue-300/80 mb-1.5">
+                <div className="mt-3 p-3 rounded-md border border-[#7dd3fc]/30 bg-[#7dd3fc]/10">
+                  <label className="block text-[10px] uppercase font-semibold tracking-wider text-[#7dd3fc]/80 mb-1.5">
                     Transferir para
                   </label>
                   <select
@@ -627,13 +627,13 @@ export function CentralDaEtapaDrawer({
                     onChange={(e) =>
                       setTransferUserId(e.target.value ? Number(e.target.value) : null)
                     }
-                    className="w-full px-2.5 py-1.5 bg-white/5 border border-white/10 rounded text-[12px] text-white focus:outline-none focus:border-blue-500/50"
+                    className="w-full px-2.5 py-1.5 bg-[#1b2027]/5 border border-white/10 rounded text-[12px] text-white focus:outline-none focus:border-[#7dd3fc]/50"
                   >
-                    <option value="" className="bg-slate-800">
+                    <option value="" className="bg-[#20262e]">
                       — Selecione um responsável —
                     </option>
                     {usuarios.map((u) => (
-                      <option key={u.id} value={u.id} className="bg-slate-800">
+                      <option key={u.id} value={u.id} className="bg-[#20262e]">
                         {u.nome}
                       </option>
                     ))}
@@ -642,7 +642,7 @@ export function CentralDaEtapaDrawer({
                     <button
                       onClick={handleTransferir}
                       disabled={!!saving || !transferUserId}
-                      className="px-3 py-1.5 text-[11px] font-semibold bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded"
+                      className="px-3 py-1.5 text-[11px] font-semibold bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded"
                     >
                       {saving === "transferindo" ? "Transferindo…" : "Confirmar"}
                     </button>
@@ -661,7 +661,7 @@ export function CentralDaEtapaDrawer({
 
               {/* Banner motivoBloqueio */}
               {step.status === "bloqueada" && step.motivoBloqueio && (
-                <div className="mt-3 p-2.5 rounded-md border border-red-500/30 bg-red-500/10 text-[12px] text-red-200">
+                <div className="mt-3 p-2.5 rounded-md border border-[#f87171]/30 bg-[#f87171]/10 text-[12px] text-[#f87171]">
                   <strong className="font-semibold">Bloqueado:</strong> {step.motivoBloqueio}
                 </div>
               )}
@@ -688,7 +688,7 @@ export function CentralDaEtapaDrawer({
                   onClick={() => setActiveTab(t.id)}
                   className={`flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 text-[11.5px] font-semibold border-b-2 transition-colors -mb-px ${
                     activeTab === t.id
-                      ? "text-white border-blue-500"
+                      ? "text-white border-[#7dd3fc]"
                       : "text-white/55 hover:text-white border-transparent"
                   }`}
                 >
@@ -697,8 +697,8 @@ export function CentralDaEtapaDrawer({
                     <span
                       className={`text-[9.5px] px-1.5 rounded-full font-bold ${
                         activeTab === t.id
-                          ? "bg-blue-500/30 text-blue-200"
-                          : "bg-white/10 text-white/70"
+                          ? "bg-[#7dd3fc]/30 text-[#7dd3fc]"
+                          : "bg-[#1b2027]/10 text-white/70"
                       }`}
                     >
                       {t.count}
@@ -847,15 +847,15 @@ function TabCampos({
 
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center max-w-lg mx-auto">
-      <div className="w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mb-4">
-        <FileText className="w-6 h-6 text-blue-400" />
+      <div className="w-14 h-14 rounded-full bg-[#7dd3fc]/10 border border-[#7dd3fc]/30 flex items-center justify-center mb-4">
+        <FileText className="w-6 h-6 text-[#7dd3fc]" />
       </div>
       <div className="text-base font-semibold text-white mb-2">{config.titulo}</div>
       <div className="text-sm text-white/65 leading-relaxed mb-5">{config.descricao}</div>
 
       <button
         onClick={onOpenEditor}
-        className="inline-flex items-center gap-1.5 px-4 py-2 text-[12.5px] font-semibold bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors"
+        className="inline-flex items-center gap-1.5 px-4 py-2 text-[12.5px] font-semibold bg-[#7dd3fc] hover:bg-[#252c35] text-white/95 border border-white/10 rounded-md transition-colors"
       >
         {isConcluida ? "Ver campos preenchidos" : "Abrir editor"}
         <ChevronRight className="w-3.5 h-3.5" />
@@ -900,7 +900,7 @@ function TabSla({
   }
 
   const inputCls =
-    "w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30"
+    "w-full px-3 py-2 bg-[#1b2027]/5 border border-white/10 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/30"
 
   return (
     <div className="space-y-5 max-w-2xl">
@@ -924,7 +924,7 @@ function TabSla({
             <label className="block text-[10px] uppercase font-semibold tracking-wider text-white/50 mb-1.5">
               Status do SLA
             </label>
-            <div className={`px-3 py-2 bg-white/5 border border-white/10 rounded-md text-sm font-semibold ${sla.cls}`}>
+            <div className={`px-3 py-2 bg-[#1b2027]/5 border border-white/10 rounded-md text-sm font-semibold ${sla.cls}`}>
               {sla.label}
             </div>
           </div>
@@ -954,7 +954,7 @@ function TabSla({
         <button
           onClick={salvar}
           disabled={!!saving}
-          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-semibold rounded-md inline-flex items-center gap-2"
+          className="px-4 py-2 bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:opacity-50 text-white text-sm font-semibold rounded-md inline-flex items-center gap-2"
         >
           {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
           Salvar
@@ -1003,9 +1003,9 @@ function TabTimeline({ step }: { step: WorkflowStep }) {
         {eventos.map((e, i) => (
           <div
             key={i}
-            className="flex items-start gap-3 p-3 rounded-md bg-white/5 border border-white/10"
+            className="flex items-start gap-3 p-3 rounded-md bg-[#1b2027]/5 border border-white/10"
           >
-            <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />
+            <div className="w-2 h-2 rounded-full bg-[#7dd3fc]/15 mt-1.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-sm text-white">{e.label}</div>
               {e.sublabel && (
@@ -1055,12 +1055,12 @@ function Placeholder({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
-      <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-4">
-        <AlertTriangle className="w-5 h-5 text-amber-400/70" />
+      <div className="w-12 h-12 rounded-full bg-[#1b2027]/5 border border-white/10 flex items-center justify-center mb-4">
+        <AlertTriangle className="w-5 h-5 text-[#d2a948]/70" />
       </div>
       <div className="text-base font-semibold text-white mb-2">{titulo}</div>
       <div className="text-sm text-white/60 leading-relaxed mb-4">{descricao}</div>
-      <div className="text-[11px] text-amber-300/80 bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2 leading-relaxed">
+      <div className="text-[11px] text-[#d2a948]/80 bg-[#d2a948]/10 border border-[#d2a948]/20 rounded-md px-3 py-2 leading-relaxed">
         ⚠ {pendencia}
       </div>
     </div>

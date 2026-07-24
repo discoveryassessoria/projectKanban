@@ -416,11 +416,11 @@ export function EditorRegistralModal({
 
           {erro && !doc && (
             <div className="flex-1 flex flex-col items-center justify-center text-white/60 gap-3 p-8">
-              <AlertTriangle className="w-8 h-8 text-amber-400" />
+              <AlertTriangle className="w-8 h-8 text-[#d2a948]" />
               <p className="text-sm">{erro}</p>
               <button
                 onClick={onClose}
-                className="px-3 py-1.5 text-xs bg-white/10 hover:bg-white/15 rounded-md text-white"
+                className="px-3 py-1.5 text-xs bg-[#1b2027]/10 hover:bg-[#1b2027]/15 rounded-md text-white"
               >
                 Fechar
               </button>
@@ -448,7 +448,7 @@ export function EditorRegistralModal({
                   </div>
                   <button
                     onClick={onClose}
-                    className="w-8 h-8 rounded-md bg-white/5 hover:bg-white/15 flex items-center justify-center text-white flex-shrink-0"
+                    className="w-8 h-8 rounded-md bg-[#1b2027]/5 hover:bg-[#1b2027]/15 flex items-center justify-center text-white flex-shrink-0"
                     aria-label="Fechar"
                   >
                     <X className="w-4 h-4" />
@@ -457,9 +457,9 @@ export function EditorRegistralModal({
               </div>
 
               {/* ============== BODY (scroll) ============== */}
-              <div className="flex-1 overflow-y-auto px-6 py-5 text-slate-200">
+              <div className="flex-1 overflow-y-auto px-6 py-5 text-white/70">
                 {/* Nome base (não muda) */}
-                <div className="mb-5 p-3 rounded-lg bg-white/5 border border-white/10">
+                <div className="mb-5 p-3 rounded-lg bg-[#1b2027]/5 border border-white/10">
                   <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-1">
                     Nome base na árvore (não muda aqui)
                   </div>
@@ -471,13 +471,13 @@ export function EditorRegistralModal({
                   <div
                     className={`mb-5 p-3.5 rounded-lg border ${
                       podeConcluirEtapa
-                        ? "border-emerald-500/30 bg-emerald-500/10"
-                        : "border-amber-500/30 bg-amber-500/10"
+                        ? "border-[#4ade80]/30 bg-[#4ade80]/10"
+                        : "border-[#d2a948]/30 bg-[#d2a948]/10"
                     }`}
                   >
                     <div
                       className={`text-[12px] font-semibold mb-1 flex items-center gap-1.5 ${
-                        podeConcluirEtapa ? "text-emerald-300" : "text-amber-300"
+                        podeConcluirEtapa ? "text-[#4ade80]" : "text-[#d2a948]"
                       }`}
                     >
                       <AlertTriangle className="w-3.5 h-3.5" />
@@ -487,11 +487,11 @@ export function EditorRegistralModal({
                     </div>
                     <div className="text-[11.5px] text-white/75 leading-relaxed">
                       preencha{" "}
-                      <strong className={cartorioOk ? "text-emerald-300" : "text-amber-200"}>
+                      <strong className={cartorioOk ? "text-[#4ade80]" : "text-[#d2a948]"}>
                         Cartório
                       </strong>{" "}
                       + pelo menos um de{" "}
-                      <strong className={referenciaOk ? "text-emerald-300" : "text-amber-200"}>
+                      <strong className={referenciaOk ? "text-[#4ade80]" : "text-[#d2a948]"}>
                         Livro / Folha / Termo
                       </strong>
                       . Os demais campos são opcionais aqui.
@@ -716,7 +716,7 @@ export function EditorRegistralModal({
                       value={form.observacoes}
                       onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
                       placeholder="Observações registrais…"
-                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 resize-none"
+                      className="w-full px-3 py-2 bg-[#1b2027]/5 border border-white/10 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/30 resize-none"
                     />
                   </Section>
                 )}
@@ -727,7 +727,7 @@ export function EditorRegistralModal({
                 <button
                   onClick={onClose}
                   disabled={saving}
-                  className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-white hover:bg-white/5 rounded-md transition-colors disabled:opacity-50"
+                  className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-white hover:bg-[#1b2027]/5 rounded-md transition-colors disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -736,7 +736,7 @@ export function EditorRegistralModal({
                   <button
                     onClick={handleSalvar}
                     disabled={saving || !podeConcluirEtapa}
-                    className="px-5 py-2 text-[12.5px] font-semibold bg-red-500 hover:bg-red-600 disabled:bg-red-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2 transition-colors"
+                    className="px-5 py-2 text-[12.5px] font-semibold bg-[#f87171] hover:bg-[#f87171]/15 disabled:bg-[#f87171]/15 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2 transition-colors"
                   >
                     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     Salvar e iniciar solicitação
@@ -745,7 +745,7 @@ export function EditorRegistralModal({
                   <button
                     onClick={handleSalvar}
                     disabled={saving}
-                    className="px-5 py-2 text-[12.5px] font-semibold bg-blue-500 hover:bg-blue-600 disabled:bg-blue-900 disabled:opacity-50 text-white rounded-md inline-flex items-center gap-2 transition-colors"
+                    className="px-5 py-2 text-[12.5px] font-semibold bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:bg-[#7dd3fc]/15 disabled:opacity-50 text-white rounded-md inline-flex items-center gap-2 transition-colors"
                   >
                     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     Salvar
@@ -846,8 +846,8 @@ function Field({
           <span
             className={`text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
               isEmpty
-                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                ? "bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40"
+                : "bg-[#4ade80]/20 text-[#4ade80] border border-[#4ade80]/40"
             }`}
           >
             obrigatório p/ concluir
@@ -857,15 +857,15 @@ function Field({
           <span
             className={`text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
               isEmpty
-                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                ? "bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40"
+                : "bg-[#4ade80]/20 text-[#4ade80] border border-[#4ade80]/40"
             }`}
           >
             obrigatório*
           </span>
         )}
         {critical && !requiredToComplete && !requiredAlt && (
-          <span className="text-[8.5px] font-semibold uppercase tracking-wider text-blue-300/70">
+          <span className="text-[8.5px] font-semibold uppercase tracking-wider text-[#7dd3fc]/70">
             crítico
           </span>
         )}
@@ -874,10 +874,10 @@ function Field({
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full px-3 py-2 bg-white/5 border rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:ring-1 ${
+        className={`w-full px-3 py-2 bg-[#1b2027]/5 border rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:ring-1 ${
           requiredEmpty || requiredAltEmpty
-            ? "border-amber-500/40 focus:border-amber-500/60 focus:ring-amber-500/30"
-            : "border-white/10 focus:border-blue-500/50 focus:ring-blue-500/30"
+            ? "border-[#d2a948]/40 focus:border-[#d2a948]/60 focus:ring-[#d2a948]/30"
+            : "border-white/10 focus:border-[#7dd3fc]/50 focus:ring-[#7dd3fc]/30"
         }`}
       />
     </div>
