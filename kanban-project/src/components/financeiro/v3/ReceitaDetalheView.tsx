@@ -386,43 +386,47 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
               <div className="flex items-center justify-between"><span className="text-sm text-white/70">Total</span><span className="text-sm text-white/80">{rp.total} parcelas</span></div>
             </Painel>
 
-            {!semBase && (
-            <Painel titulo="Regra de câmbio" aberto>
-              <Linha k="Moeda base" v={d.moedaBase === "EUR" ? `${d.moedaBase} - Euro (€)` : d.moedaBase} />
-              <Linha k={`Valor base (${d.moedaBase})`} v={fmtEUR(d.valorBase)} />
-              <Linha k="Câmbio aplicado" v={d.cotacaoAplicada != null ? brl(d.cotacaoAplicada) : "—"} />
-              <Linha k="Tipo de câmbio" v={d.tipoCambio === "FIXO" ? "Fixo" : (d.tipoCambio === "NAO_DEFINIDO" ? "—" : "Variável")} cor={d.tipoCambio === "FIXO" ? "text-[#4ade80]" : undefined} />
-              <Linha k="Data da fixação" v={dataBR(d.dataCotacao)} />
-              <div className="my-2 border-t border-white/10" />
-              <button onClick={() => router.push("/cambio")} className="inline-flex items-center gap-1 text-sm text-[#7dd3fc] hover:underline">Ver detalhes do câmbio <ExternalLink className="h-3.5 w-3.5" /></button>
-            </Painel>
-            )}
-
-            {d.distribuicao?.length > 0 && (
-            <Painel titulo="Distribuição econômica" aberto>
-              {d.distribuicao.map((x: any, i: number) => (
-                <div key={i} className="py-1.5"><div className="flex items-center justify-between"><span className="text-sm text-white/80">{x.nome}</span><span className="text-sm text-white/70">{x.percentual.toFixed(2)}%</span></div><div className="text-right text-xs text-white/40">{fmt(x.valor, d.moeda)}</div></div>
-              ))}
-              <div className="my-2 border-t border-white/10" />
-              <div className="flex items-center justify-between"><span className="text-sm text-white/70">Total</span><span className="text-sm text-white/70">{Math.round(d.distribuicaoTotal.percentual)}%</span></div>
-              <div className="text-right text-base font-semibold text-white">{fmt(d.distribuicaoTotal.valor, d.moeda)}</div>
-            </Painel>
-            )}
-
-            <Painel titulo={`Responsáveis (${d.responsaveis?.length ?? 0})`}>
-              {(d.responsaveis ?? []).length === 0 ? <div className="text-sm text-white/40">—</div> : (d.responsaveis ?? []).map((r: any, i: number) => (
-                <div key={i} className="py-1.5 text-sm text-white/80">{r.nome}</div>
-              ))}
-            </Painel>
-
-            <Painel titulo={`Pagadores (${d.pagadores?.length ?? 0})`}>
-              {(d.pagadores ?? []).length === 0 ? <div className="text-sm text-white/40">—</div> : (d.pagadores ?? []).map((p: any, i: number) => (
-                <div key={i} className="flex items-center justify-between py-1.5 text-sm"><span className="text-white/80">{p.nome}</span><span className="text-white/70">{brl(p.valor)}</span></div>
-              ))}
-            </Painel>
-
-            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4"><div className="text-sm font-medium text-white/70">Observação</div><div className="mt-1 text-sm text-white/40">{d.observacao ?? "—"}</div></div>
           </div>
+        </div>
+
+        {/* ── Cards complementares (grade horizontal abaixo do conteúdo) ── */}
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {!semBase && (
+          <Painel titulo="Regra de câmbio" aberto>
+            <Linha k="Moeda base" v={d.moedaBase === "EUR" ? `${d.moedaBase} - Euro (€)` : d.moedaBase} />
+            <Linha k={`Valor base (${d.moedaBase})`} v={fmtEUR(d.valorBase)} />
+            <Linha k="Câmbio aplicado" v={d.cotacaoAplicada != null ? brl(d.cotacaoAplicada) : "—"} />
+            <Linha k="Tipo de câmbio" v={d.tipoCambio === "FIXO" ? "Fixo" : (d.tipoCambio === "NAO_DEFINIDO" ? "—" : "Variável")} cor={d.tipoCambio === "FIXO" ? "text-[#4ade80]" : undefined} />
+            <Linha k="Data da fixação" v={dataBR(d.dataCotacao)} />
+            <div className="my-2 border-t border-white/10" />
+            <button onClick={() => router.push("/cambio")} className="inline-flex items-center gap-1 text-sm text-[#7dd3fc] hover:underline">Ver detalhes do câmbio <ExternalLink className="h-3.5 w-3.5" /></button>
+          </Painel>
+          )}
+
+          {d.distribuicao?.length > 0 && (
+          <Painel titulo="Distribuição econômica" aberto>
+            {d.distribuicao.map((x: any, i: number) => (
+              <div key={i} className="py-1.5"><div className="flex items-center justify-between"><span className="text-sm text-white/80">{x.nome}</span><span className="text-sm text-white/70">{x.percentual.toFixed(2)}%</span></div><div className="text-right text-xs text-white/40">{fmt(x.valor, d.moeda)}</div></div>
+            ))}
+            <div className="my-2 border-t border-white/10" />
+            <div className="flex items-center justify-between"><span className="text-sm text-white/70">Total</span><span className="text-sm text-white/70">{Math.round(d.distribuicaoTotal.percentual)}%</span></div>
+            <div className="text-right text-base font-semibold text-white">{fmt(d.distribuicaoTotal.valor, d.moeda)}</div>
+          </Painel>
+          )}
+
+          <Painel titulo={`Responsáveis (${d.responsaveis?.length ?? 0})`}>
+            {(d.responsaveis ?? []).length === 0 ? <div className="text-sm text-white/40">—</div> : (d.responsaveis ?? []).map((r: any, i: number) => (
+              <div key={i} className="py-1.5 text-sm text-white/80">{r.nome}</div>
+            ))}
+          </Painel>
+
+          <Painel titulo={`Pagadores (${d.pagadores?.length ?? 0})`}>
+            {(d.pagadores ?? []).length === 0 ? <div className="text-sm text-white/40">—</div> : (d.pagadores ?? []).map((p: any, i: number) => (
+              <div key={i} className="flex items-center justify-between py-1.5 text-sm"><span className="text-white/80">{p.nome}</span><span className="text-white/70">{brl(p.valor)}</span></div>
+            ))}
+          </Painel>
+
+          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4"><div className="text-sm font-medium text-white/70">Observação</div><div className="mt-1 text-sm text-white/40">{d.observacao ?? "—"}</div></div>
         </div>
       </div>
       {pagOpen && d && (
