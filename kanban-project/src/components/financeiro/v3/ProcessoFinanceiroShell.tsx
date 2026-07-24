@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ReceitasTab } from "./ReceitasTab"
+import { ReceitaDetalheView } from "./ReceitaDetalheView"
 import { LancamentoManualModal } from "./LancamentoManualModal"
 import RegistrarPagamentoModal from "./RegistrarPagamentoModal"
 import { VisaoGeral } from "@/src/components/financeiro/subabas/VisaoGeral"
@@ -33,7 +34,12 @@ function baixarCSV(nome: string, rows: Record<string, any>[]) {
 export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) {
   const [t, setT] = useState("visao")
   const [fxEur, setFxEur] = useState(5.5)
+  const [detalheRef, setDetalheRef] = useState<string | null>(null)
   useEffect(() => { fetch("/api/cambio").then((r) => r.json()).then((d) => setFxEur(Number(d?.eur) || 5.5)).catch(() => {}) }, [])
+  if (detalheRef) return (
+    <div className="text-white/80"><ReceitaDetalheView refParam={detalheRef} onVoltar={() => setDetalheRef(null)} /></div>
+  )
+  const abrirDetalhe = (id: number) => setDetalheRef(String(id))
   return (
     <div className="text-white/80">
       <div className="mb-5 flex flex-wrap gap-6 border-b border-white/10">
@@ -42,10 +48,10 @@ export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) 
         ))}
       </div>
       {t === "visao" && <VisaoGeral processoId={processoId} fxHoje={fxEur} onIrPara={(a) => setT(a)} />}
-      {t === "receitas" && <ReceitasTab processoId={processoId} />}
+      {t === "receitas" && <ReceitasTab processoId={processoId} onAbrirDetalhe={abrirDetalhe} />}
       {t === "custos" && <CustosTab processoId={processoId} fx={fxEur} />}
-      {t === "extrato" && <ExtratoTab processoId={processoId} fx={fxEur} />}
-      {t === "timeline" && <TimelineTab processoId={processoId} fx={fxEur} />}
+      {t === "extrato" && <ExtratoTab processoId={processoId} fx={fxEur} onAbrirDetalhe={abrirDetalhe} />}
+      {t === "timeline" && <TimelineTab processoId={processoId} fx={fxEur} onAbrirDetalhe={abrirDetalhe} />}
     </div>
   )
 }
@@ -149,7 +155,7 @@ function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
 
 // Extrato financeiro — movimentações do processo (Receitas/Custos) com saldo
 // acumulado. Discovery Design System. Fonte: obrigações do motor V3.
-function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
+function ExtratoTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx: number; onAbrirDetalhe?: (id: number) => void }) {
   const router = useRouter()
   const [obrs, setObrs] = useState<any[] | null>(null)
   const [tipo, setTipo] = useState<"todos" | "receitas" | "custos">("todos")
@@ -237,7 +243,7 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
               <td className="px-4 tabular-nums text-[#fbbf24]">{mv.receita ? "—" : fmt(mv.valorBRL)}</td>
               <td className="px-4 tabular-nums text-[#7dd3fc]">{fmt(mv.saldoAcum)}</td>
               <td className="px-4">{mv.quitado ? <span className="rounded bg-[#4ade80]/15 px-2 py-0.5 text-[11px] font-semibold text-[#4ade80]">{mv.receita ? "Recebido" : "Pago"}</span> : <span className="rounded bg-[#fbbf24]/15 px-2 py-0.5 text-[11px] font-semibold text-[#fbbf24]">{mv.receita ? "A receber" : "A pagar"}</span>}</td>
-              <td className="px-4"><button onClick={() => router.push(`/financeiro/v3/receita/${mv.id}`)} title="Abrir movimentação" className="grid h-7 w-7 place-items-center rounded-md text-white/40 hover:bg-white/10 hover:text-white/70"><Eye className="h-4 w-4" /></button></td>
+              <td className="px-4"><button onClick={() => onAbrirDetalhe ? onAbrirDetalhe(mv.id) : router.push(`/financeiro/v3/receita/${mv.id}`)} title="Abrir movimentação" className="grid h-7 w-7 place-items-center rounded-md text-white/40 hover:bg-white/10 hover:text-white/70"><Eye className="h-4 w-4" /></button></td>
             </tr>
           ))}{lista.length === 0 && <tr><td colSpan={10} className="px-4 py-8 text-center text-white/40">Sem movimentações.</td></tr>}</tbody>
         </table>
@@ -282,7 +288,7 @@ function ExtKpi({ titulo, valor, sub, icon: Ic, cor }: any) {
 
 // Timeline financeira — linha do tempo das movimentações + resumos laterais.
 // Discovery Design System. Fonte: obrigações do motor V3.
-function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
+function TimelineTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx: number; onAbrirDetalhe?: (id: number) => void }) {
   const router = useRouter()
   const [obrs, setObrs] = useState<any[] | null>(null)
   const [fCat, setFCat] = useState("Todas")
@@ -374,7 +380,7 @@ function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
                           </div>
                           {mv.responsavel && <div className="mt-1.5 flex items-center justify-end gap-1.5"><span className="grid h-5 w-5 place-items-center rounded-full bg-white/10 text-[9px] font-semibold text-white/70">{iniciais(mv.responsavel)}</span><span className="text-[11px] text-white/50">{mv.responsavel}</span></div>}
                         </div>
-                        <button onClick={() => router.push(`/financeiro/v3/receita/${mv.id}`)} title="Abrir movimentação" className="mt-0.5 grid h-7 w-7 place-items-center rounded-md text-white/40 hover:bg-white/10 hover:text-white/70"><span className="text-lg leading-none">⋮</span></button>
+                        <button onClick={() => onAbrirDetalhe ? onAbrirDetalhe(mv.id) : router.push(`/financeiro/v3/receita/${mv.id}`)} title="Abrir movimentação" className="mt-0.5 grid h-7 w-7 place-items-center rounded-md text-white/40 hover:bg-white/10 hover:text-white/70"><span className="text-lg leading-none">⋮</span></button>
                       </div>
                     </div>
                   </div>

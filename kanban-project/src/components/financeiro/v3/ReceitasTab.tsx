@@ -35,7 +35,7 @@ const CAMBIO_BADGE: Record<string, string> = { FIXO: "Fixo", VARIAVEL: "Variáve
 const AGRUPAR: [string, string][] = [["receita", "Receita"], ["requerente", "Requerente"], ["forma", "Forma de cobrança"], ["fase", "Fase"]]
 const PAGE = 10
 
-export function ReceitasTab({ processoId }: { processoId?: number }) {
+export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: number; onAbrirDetalhe?: (obrigacaoId: number) => void }) {
   const router = useRouter()
   const [d, setD] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -168,10 +168,10 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
                     <button onClick={() => setNovo(true)} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1d4ed8]"><Plus className="h-4 w-4" /> Nova Receita</button>
                   </td></tr>
                 ) : agrupar === "receita" ? (
-                  filtradas.slice((page - 1) * PAGE, page * PAGE).map((r) => <Linha key={r.obrigacaoId} r={r} onAbrir={() => router.push(`/financeiro/v3/receita/${r.obrigacaoId}`)} onDrawer={() => setSel(r)} />)
+                  filtradas.slice((page - 1) * PAGE, page * PAGE).map((r) => <Linha key={r.obrigacaoId} r={r} onAbrir={() => onAbrirDetalhe ? onAbrirDetalhe(r.obrigacaoId) : router.push(`/financeiro/v3/receita/${r.obrigacaoId}`)} onDrawer={() => setSel(r)} />)
                 ) : (
                   Object.entries(agruparPor(filtradas, grupoDe)).map(([grupo, rows]) => (
-                    <FragmentGroup key={grupo} grupo={grupo} rows={rows} onAbrir={(r) => router.push(`/financeiro/v3/receita/${r.obrigacaoId}`)} onDrawer={(r) => setSel(r)} />
+                    <FragmentGroup key={grupo} grupo={grupo} rows={rows} onAbrir={(r) => onAbrirDetalhe ? onAbrirDetalhe(r.obrigacaoId) : router.push(`/financeiro/v3/receita/${r.obrigacaoId}`)} onDrawer={(r) => setSel(r)} />
                   ))
                 )}
               </tbody>

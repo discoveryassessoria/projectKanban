@@ -41,11 +41,14 @@ export interface ReceitaDetalhe {
   parcelasAVencer: number
   parcelasVencidas: number
   proximoVencimento: string | null
+  parcelasDetalhe: { numero: number; totalParcelas: number; vencimento: string; valorBase: number; moedaBase: string; cotacao: number | null; tipoCambio: string; valorBrl: number; recebidoBrl: number; saldoBrl: number; status: string; forma: string | null; responsavel: string; diasAtraso: number }[]
+  resumoParcelas: { pagas: { qtd: number; valor: number }; aVencer: { qtd: number; valor: number }; vencidas: { qtd: number; valor: number }; canceladas: { qtd: number; valor: number }; total: number }
+  inadimplenciaPct: number
   criadoEm: string | null
   criadoPor: string | null
   pagamentos: { id: number; data: string; valor: number; formaLabel: string | null; banco: string | null; agencia: string | null; conta: string | null; referencia: string | null; status: string }[]
   historico: { id: number; data: string; tipo: string; titulo: string; descricao: string; ator: string }[]
-  resumo: { contratado: number; recebido: number; saldo: number; descontos: number; ajustes: number; liquido: number; contratadoBrl: number; recebidoBrl: number; saldoBrl: number; descontosBrl: number; ajustesBrl: number; liquidoBrl: number }
+  resumo: { contratado: number; recebido: number; saldo: number; descontos: number; ajustes: number; liquido: number; contratadoBrl: number; recebidoBrl: number; saldoBrl: number; descontosBrl: number; ajustesBrl: number; liquidoBrl: number; jurosBrl: number; multaBrl: number }
   distribuicao: { nome: string; percentual: number; valor: number }[]
   distribuicaoTotal: { percentual: number; valor: number }
   responsaveis: { id: number; nome: string }[]
@@ -119,9 +122,10 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   const moeda = String(obr.moedaContratual)
 
   // câmbio + aging + BRL — MESMO núcleo da lista de receitas (números idênticos)
-  const parcelasRec = obr.origemTipo === 'Receita' && obr.origemId
-    ? await prisma.parcelaFinanceira.findMany({ where: { receitaId: obr.origemId, status: { not: 'CANCELADA' } }, select: { vencimento: true, valor: true, status: true, cambioAplicado: true, valorBrl: true } }).catch(() => [])
+  const parcelasAll = obr.origemTipo === 'Receita' && obr.origemId
+    ? await prisma.parcelaFinanceira.findMany({ where: { receitaId: obr.origemId }, orderBy: { numero: 'asc' }, select: { numero: true, vencimento: true, valor: true, status: true, cambioAplicado: true, valorBrl: true, formaPagamento: true } }).catch(() => [])
     : []
+  const parcelasRec = parcelasAll.filter((p) => p.status !== 'CANCELADA')
   const live = await cotacoesVivas()
   const ca = computeCambioAging({
     moedaBase: moeda, valorBase: contratado, saldoLedger: saldo, recebidoLedger: recebido,
@@ -131,7 +135,42 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   })
   const descontosBrl = moeda === 'BRL' ? descontos : cent(descontos * (ca.cotacaoAplicada ?? 1))
   const ajustesBrl = moeda === 'BRL' ? ajustes : cent(ajustes * (ca.cotacaoAplicada ?? 1))
+  const juros = cent(obr.ocorrencias.filter((o) => o.tipo === 'JUROS').reduce((s, o) => s + Number(o.valor), 0))
+  const multa = cent(obr.ocorrencias.filter((o) => o.tipo === 'MULTA').reduce((s, o) => s + Number(o.valor), 0))
+  const jurosBrl = moeda === 'BRL' ? juros : cent(juros * (ca.cotacaoAplicada ?? 1))
+  const multaBrl = moeda === 'BRL' ? multa : cent(multa * (ca.cotacaoAplicada ?? 1))
   const liquidoBrl = cent(ca.valorContratadoBrl - descontosBrl + ajustesBrl)
+
+  // ── Parcelas (aba Cobranças) — detalhe por parcela + resumo ──
+  const agoraP = Date.now()
+  const cotP = ca.cotacaoAplicada
+  const reqNomeP = parts[0] ? nome(parts[0].pessoaId) : 'Requerente não identificado'
+  const FORMA_P: Record<string, string> = { PIX: 'PIX', CARTAO_CREDITO: 'Cartão de crédito', CARTAO_DEBITO: 'Cartão de débito', BOLETO: 'Boleto', TRANSFERENCIA: 'Transferência', DINHEIRO: 'Dinheiro', CHEQUE: 'Cheque', WISE: 'Wise' }
+  const parcelasDetalhe = parcelasAll.map((p) => {
+    const vBrl = p.valorBrl != null ? Number(p.valorBrl) : (p.cambioAplicado ? Number(p.valor) * Number(p.cambioAplicado) : (cotP ? Number(p.valor) * cotP : Number(p.valor)))
+    const pago = p.status === 'RECEBIDA' || p.status === 'PAGA'
+    const cancel = p.status === 'CANCELADA'
+    const overdue = !pago && !cancel && new Date(p.vencimento).getTime() < agoraP
+    const status = cancel ? 'CANCELADA' : pago ? 'PAGA' : overdue ? 'VENCIDA' : 'A_VENCER'
+    const recebidoBrlP = pago ? cent(vBrl) : 0
+    return {
+      numero: p.numero, totalParcelas: parcelasAll.length, vencimento: new Date(p.vencimento).toISOString(),
+      valorBase: cent(Number(p.valor)), moedaBase: moeda, cotacao: cotP, tipoCambio: ca.tipoCambio,
+      valorBrl: cent(vBrl), recebidoBrl: recebidoBrlP, saldoBrl: cancel ? 0 : cent(vBrl - recebidoBrlP),
+      status, forma: p.formaPagamento ? (FORMA_P[p.formaPagamento] ?? String(p.formaPagamento)) : null,
+      responsavel: reqNomeP, diasAtraso: overdue ? Math.floor((agoraP - new Date(p.vencimento).getTime()) / 86400000) : 0,
+    }
+  })
+  const grpP = (st: string) => parcelasDetalhe.filter((p) => p.status === st)
+  const resumoParcelas = {
+    pagas: { qtd: grpP('PAGA').length, valor: cent(grpP('PAGA').reduce((s, p) => s + p.valorBrl, 0)) },
+    aVencer: { qtd: grpP('A_VENCER').length, valor: cent(grpP('A_VENCER').reduce((s, p) => s + p.saldoBrl, 0)) },
+    vencidas: { qtd: grpP('VENCIDA').length, valor: cent(grpP('VENCIDA').reduce((s, p) => s + p.saldoBrl, 0)) },
+    canceladas: { qtd: grpP('CANCELADA').length, valor: 0 },
+    total: parcelasAll.length,
+  }
+  const baseInad = parcelasAll.length - resumoParcelas.canceladas.qtd
+  const inadimplenciaPct = baseInad > 0 ? Math.round((resumoParcelas.vencidas.qtd / baseInad) * 100) : 0
 
   const historico = obr.ocorrencias.map((o) => {
     const pg = o.pagadorId != null ? pagadores.find((p) => p.id === o.pagadorId) : undefined
@@ -174,9 +213,10 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     moedaBase: ca.moedaBase, valorBase: ca.valorBase, cotacaoAplicada: ca.cotacaoAplicada, tipoCambio: ca.tipoCambio, dataCotacao: ca.dataCotacao,
     valorContratadoBrl: ca.valorContratadoBrl, recebidoBrl: ca.recebidoBrl, saldoBrl: ca.saldoBrl, aVencerBrl: ca.aVencerBrl, vencidoBrl: ca.vencidoBrl,
     parcelas: ca.parcelas, parcelasRecebidas: ca.parcelasRecebidas, parcelasAVencer: ca.parcelasAVencer, parcelasVencidas: ca.parcelasVencidas, proximoVencimento: ca.proximoVencimento,
+    parcelasDetalhe, resumoParcelas, inadimplenciaPct,
     criadoEm: obr.criadoEm.toISOString(), criadoPor: criador?.nome ?? 'Usuário',
     pagamentos, historico,
-    resumo: { contratado, recebido, saldo, descontos, ajustes, liquido: cent(contratado - descontos + ajustes), contratadoBrl: ca.valorContratadoBrl, recebidoBrl: ca.recebidoBrl, saldoBrl: ca.saldoBrl, descontosBrl, ajustesBrl, liquidoBrl },
+    resumo: { contratado, recebido, saldo, descontos, ajustes, liquido: cent(contratado - descontos + ajustes), contratadoBrl: ca.valorContratadoBrl, recebidoBrl: ca.recebidoBrl, saldoBrl: ca.saldoBrl, descontosBrl, ajustesBrl, liquidoBrl, jurosBrl, multaBrl },
     distribuicao, distribuicaoTotal: { percentual: cent(distribuicao.reduce((s, d) => s + d.percentual, 0)), valor: cent(distribuicao.reduce((s, d) => s + d.valor, 0)) },
     responsaveis: responsaveisSet, pagadores: [...pagadoresAgg.entries()].map(([nome, valor]) => ({ nome, valor })),
     observacao: obr.observacoes ?? null,
