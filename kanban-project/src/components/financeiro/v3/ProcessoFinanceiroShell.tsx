@@ -9,8 +9,9 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { ReceitasTab } from "./ReceitasTab"
+import { LancamentoManualModal } from "./LancamentoManualModal"
 import { VisaoGeral } from "@/src/components/financeiro/subabas/VisaoGeral"
-import { FileText, X } from "lucide-react"
+import { FileText } from "lucide-react"
 
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
 const dataBR = (s?: string | null) => s ? new Date(s).toLocaleDateString("pt-BR") : "—"
@@ -61,80 +62,7 @@ function CustosTab({ processoId }: { processoId: number }) {
           ))}{obrs.length === 0 && <tr><td colSpan={7} className="px-5 py-8 text-center text-neutral-500">Nenhum custo neste processo.</td></tr>}</tbody>
         </table>
       </div>
-      {novo && <NovoCustoModal processoId={processoId} onClose={() => setNovo(false)} onCriado={() => { setNovo(false); carregar() }} />}
-    </div>
-  )
-}
-
-// Modal de lançamento manual de Custo — item vem do Catálogo Mestre (Gerenciamento).
-function NovoCustoModal({ processoId, onClose, onCriado }: { processoId: number; onClose: () => void; onCriado: () => void }) {
-  const [itens, setItens] = useState<any[] | null>(null)
-  const [itemId, setItemId] = useState<string>("")
-  const [descricao, setDescricao] = useState("")
-  const [valor, setValor] = useState("")
-  const [moeda, setMoeda] = useState("BRL")
-  const [vencimento, setVencimento] = useState("")
-  const [salvando, setSalvando] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
-
-  useEffect(() => { fetch(`/api/financeiro/v3/itens-catalogo`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setItens(j.itens ?? [])).catch(() => setItens([])) }, [])
-
-  async function salvar() {
-    setErro(null)
-    const v = Number(String(valor).replace(",", "."))
-    if (!itemId) { setErro("Selecione um item do Catálogo Mestre."); return }
-    if (!isFinite(v) || v <= 0) { setErro("Informe um valor maior que zero."); return }
-    setSalvando(true)
-    try {
-      const res = await fetch(`/api/financeiro/v3/custos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ processoId, itemCatalogoId: Number(itemId), descricao: descricao.trim() || undefined, valor: v, moeda, vencimento: vencimento || undefined }),
-      })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok || !j.ok) { setErro(j?.erro || j?.motivo || `Falha ao salvar (HTTP ${res.status}).`); return }
-      onCriado()
-    } catch {
-      setErro("Erro de conexão ao salvar.")
-    } finally {
-      setSalvando(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl border border-neutral-800 bg-[#0f1114] p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between"><h3 className="text-base font-semibold text-white">Novo Custo</h3><button onClick={onClose} className="text-neutral-500 hover:text-neutral-300"><X className="h-4 w-4" /></button></div>
-        <div className="mt-4 space-y-3">
-          <label className="block text-xs text-neutral-400">Item (Catálogo Mestre)
-            <select value={itemId} onChange={(e) => setItemId(e.target.value)} className="mt-1 w-full rounded-lg border border-neutral-800 bg-[#0a0b0d] px-3 py-2 text-sm text-neutral-100 outline-none">
-              <option value="">{itens == null ? "carregando…" : "Selecione um item…"}</option>
-              {(itens ?? []).map((i) => <option key={i.id} value={i.id}>{i.name}{i.categoria ? ` · ${i.categoria}` : ""}</option>)}
-            </select>
-          </label>
-          <label className="block text-xs text-neutral-400">Descrição (opcional)
-            <input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Padrão: nome do item" className="mt-1 w-full rounded-lg border border-neutral-800 bg-[#0a0b0d] px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-600" />
-          </label>
-          <div className="flex gap-3">
-            <label className="block flex-1 text-xs text-neutral-400">Valor
-              <input value={valor} onChange={(e) => setValor(e.target.value)} inputMode="decimal" placeholder="0,00" className="mt-1 w-full rounded-lg border border-neutral-800 bg-[#0a0b0d] px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-600" />
-            </label>
-            <label className="block w-28 text-xs text-neutral-400">Moeda
-              <select value={moeda} onChange={(e) => setMoeda(e.target.value)} className="mt-1 w-full rounded-lg border border-neutral-800 bg-[#0a0b0d] px-3 py-2 text-sm text-neutral-100 outline-none">
-                {["BRL", "EUR", "USD"].map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </label>
-          </div>
-          <label className="block text-xs text-neutral-400">Vencimento (opcional)
-            <input type="date" value={vencimento} onChange={(e) => setVencimento(e.target.value)} className="mt-1 w-full rounded-lg border border-neutral-800 bg-[#0a0b0d] px-3 py-2 text-sm text-neutral-100 outline-none" />
-          </label>
-          {erro && <div className="rounded-lg border border-red-800/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">{erro}</div>}
-        </div>
-        <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-neutral-700 bg-neutral-900 px-3.5 py-2 text-sm text-neutral-300 hover:border-neutral-600">Cancelar</button>
-          <button onClick={salvar} disabled={salvando} className="rounded-lg bg-amber-500/90 px-3.5 py-2 text-sm font-medium text-neutral-950 hover:bg-amber-400 disabled:opacity-50">{salvando ? "Salvando…" : "Lançar custo"}</button>
-        </div>
-      </div>
+      {novo && <LancamentoManualModal natureza="CUSTO" processoId={processoId} onClose={() => setNovo(false)} onCriado={() => { setNovo(false); carregar() }} />}
     </div>
   )
 }

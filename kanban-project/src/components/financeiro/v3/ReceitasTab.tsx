@@ -9,6 +9,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { LancamentoManualModal } from "./LancamentoManualModal"
 import {
   DollarSign, CheckSquare, Clock, CalendarDays, Search, RotateCcw, Plus, X,
   ExternalLink, FileText, ChevronDown, ChevronLeft, ChevronRight, Receipt,
@@ -24,8 +25,10 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
   const [busca, setBusca] = useState("")
   const [sel, setSel] = useState<any>(null)
   const [subtab, setSubtab] = useState("receitas")
+  const [novo, setNovo] = useState(false)
 
-  useEffect(() => { fetch(`/api/financeiro/v3/receitas${processoId ? `?processoId=${processoId}` : ""}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setD(j)).catch(() => setD({ kpis: {}, receitas: [] })) }, [processoId])
+  const carregar = () => { fetch(`/api/financeiro/v3/receitas${processoId ? `?processoId=${processoId}` : ""}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setD(j)).catch(() => setD({ kpis: {}, receitas: [] })) }
+  useEffect(() => { carregar() }, [processoId])
   const linhas = useMemo(() => (d?.receitas ?? []).filter((r: any) => !busca || `${r.descricao} ${r.requerente?.nome} ${r.servico} ${r.codigo}`.toLowerCase().includes(busca.toLowerCase())), [d, busca])
   if (!d) return <div className="py-10 text-sm text-neutral-500">carregando…</div>
   const k = d.kpis ?? {}
@@ -63,7 +66,7 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
                 <button key={id} onClick={() => setSubtab(id)} className={`-mb-px border-b-2 pb-3 text-sm ${subtab === id ? "border-amber-400 font-medium text-amber-400" : "border-transparent text-neutral-400 hover:text-neutral-200"}`}>{label}</button>
               ))}
             </div>
-            <button className="mb-2 inline-flex items-center gap-2 rounded-lg bg-amber-500/90 px-3.5 py-2 text-sm font-medium text-neutral-950 hover:bg-amber-400"><Plus className="h-4 w-4" /> Nova Receita</button>
+            <button onClick={() => setNovo(true)} className="mb-2 inline-flex items-center gap-2 rounded-lg bg-amber-500/90 px-3.5 py-2 text-sm font-medium text-neutral-950 hover:bg-amber-400"><Plus className="h-4 w-4" /> Nova Receita</button>
           </div>
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs text-neutral-500">
@@ -92,6 +95,9 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
 
       {/* Drawer lateral */}
       {sel && <Drawer r={sel} onClose={() => setSel(null)} onRegistrar={() => router.push(`/financeiro/v3/receita/${sel.obrigacaoId}`)} />}
+
+      {/* Modal Nova Receita (lançamento manual) */}
+      {novo && processoId != null && <LancamentoManualModal natureza="RECEITA" processoId={processoId} onClose={() => setNovo(false)} onCriado={() => { setNovo(false); carregar() }} />}
     </div>
   )
 }

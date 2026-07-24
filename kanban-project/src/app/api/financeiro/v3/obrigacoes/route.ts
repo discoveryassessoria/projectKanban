@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
     processoId: sp.get('processoId') ? Number(sp.get('processoId')) : undefined,
     status: sp.get('status') ?? undefined,
     natureza: sp.get('natureza') ?? undefined,
+    origemTipo: sp.get('origemTipo') ?? undefined,
   })
   return NextResponse.json({ disponivel: true, obrigacoes })
 }

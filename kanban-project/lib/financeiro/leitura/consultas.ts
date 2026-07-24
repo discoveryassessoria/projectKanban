@@ -20,16 +20,19 @@ export interface ObrigacaoLista {
   valorContratado: number
   saldo: number
   recebido: number
+  vencimento: string | null
+  origemTipo: string | null
   temAbertura: boolean
 }
 
 /** Lista obrigações com saldo (projeção). Filtros opcionais. */
-export async function listarObrigacoes(f?: { processoId?: number; status?: string; natureza?: string }): Promise<ObrigacaoLista[]> {
+export async function listarObrigacoes(f?: { processoId?: number; status?: string; natureza?: string; origemTipo?: string }): Promise<ObrigacaoLista[]> {
   const obrs = await prisma.obrigacaoEconomica.findMany({
     where: {
       ...(f?.processoId ? { processoId: f.processoId } : {}),
       ...(f?.status ? { status: f.status } : {}),
       ...(f?.natureza ? { natureza: f.natureza } : {}),
+      ...(f?.origemTipo ? { origemTipo: f.origemTipo } : {}),
     },
     orderBy: { id: 'desc' },
     take: 500,
@@ -45,7 +48,9 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
       obrigacaoId: o.id, codigoOperacional: o.codigoOperacional, descricao: o.observacoes ?? null, natureza: o.natureza, direcao: o.direcao,
       status: o.status, processoId: o.processoId, moeda: String(o.moedaContratual),
       valorContratado: Number(o.valorContratado), saldo: p ? Number(p.saldo) : Number(o.valorContratado),
-      recebido: p ? Number(p.recebidoBruto) : 0, temAbertura: comAbertura.has(o.id),
+      recebido: p ? Number(p.recebidoBruto) : 0,
+      vencimento: o.vencimento ? o.vencimento.toISOString() : null, origemTipo: o.origemTipo ?? null,
+      temAbertura: comAbertura.has(o.id),
     }
   })
 }

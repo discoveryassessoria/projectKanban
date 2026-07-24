@@ -1,13 +1,16 @@
 // /api/financeiro/v3/custos — lançamento MANUAL de Custo (Motor Financeiro V3).
-//   POST { processoId, itemCatalogoId, descricao?, valor, moeda?, vencimento? }
-// Cria uma ObrigacaoEconomica de natureza CUSTO (A_PAGAR) com Ledger próprio,
-// a partir de um item já cadastrado no Catálogo Mestre (Gerenciamento). Gated
-// pela mesma flag de leitura (posicaoRead) que já alimenta a lista de Custos.
+//   POST { processoId, itemCatalogoId, descricao?, quantidade?, valorUnitario,
+//          moeda?, desconto?, acrescimo?, vencimento?, formaCobranca?,
+//          fornecedorId?, faseLabel?, rateio?, registrarPagamento? }
+// Cria uma ObrigacaoEconomica de natureza CUSTO (A_PAGAR) a partir de um item já
+// cadastrado no Catálogo Mestre (Gerenciamento). Reusa o motor V3
+// (criarLancamentoManual → criarLancamentoExtra). Gated pela mesma flag de
+// leitura (posicaoRead) que já alimenta a lista de Custos. Auditoria registrada.
 import { NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { flagAtiva } from '@/lib/financeiro/flags'
-import { criarObrigacaoEconomicaComLedger } from '@/lib/financeiro/ledger/ledger-service'
-import { prisma } from '@/lib/prisma'
+import { criarLancamentoManual } from '@/lib/financeiro/extras/lancamento-manual'
+import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { usuarioFlag } from '../_flags'
 
 const MOEDAS = new Set(['BRL', 'EUR', 'USD'])
@@ -21,32 +24,33 @@ export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => ({}))
   const processoId = b?.processoId != null ? Number(b.processoId) : null
   const itemCatalogoId = b?.itemCatalogoId != null ? Number(b.itemCatalogoId) : null
-  const valor = Number(b?.valor)
+  // Retrocompat: aceita `valor` (versão antiga do modal) como valorUnitário.
+  const valorUnitario = Number(b?.valorUnitario ?? b?.valor)
   const moeda = MOEDAS.has(b?.moeda) ? b.moeda : 'BRL'
 
   if (!processoId) return NextResponse.json({ ok: false, erro: 'processoId é obrigatório.' }, { status: 400 })
   if (!itemCatalogoId) return NextResponse.json({ ok: false, erro: 'Selecione um item do Catálogo Mestre.' }, { status: 400 })
-  if (!isFinite(valor) || valor <= 0) return NextResponse.json({ ok: false, erro: 'Informe um valor maior que zero.' }, { status: 400 })
-
-  // O item é a FONTE do custo: nome vira a descrição (fallback à descrição livre).
-  const item = await prisma.itemCatalogo.findUnique({ where: { id: itemCatalogoId }, select: { id: true, name: true, ativo: true } })
-  if (!item || !item.ativo) return NextResponse.json({ ok: false, erro: 'Item do Catálogo Mestre inválido ou inativo.' }, { status: 400 })
-
-  const descricao = (typeof b?.descricao === 'string' && b.descricao.trim()) ? b.descricao.trim() : item.name
+  if (!isFinite(valorUnitario) || valorUnitario <= 0) return NextResponse.json({ ok: false, erro: 'Informe um valor maior que zero.' }, { status: 400 })
 
   const actor = await extrairUsuarioComPermissoes(req)
   try {
-    const r = await criarObrigacaoEconomicaComLedger({
+    const r = await criarLancamentoManual({
       natureza: 'CUSTO',
-      valorContratado: valor,
-      moedaContratual: moeda,
-      processoId,
+      processoId, itemCatalogoId,
+      descricao: b?.descricao ?? null,
+      quantidade: b?.quantidade != null ? Number(b.quantidade) : 1,
+      valorUnitario, moeda,
+      desconto: b?.desconto != null ? Number(b.desconto) : 0,
+      acrescimo: b?.acrescimo != null ? Number(b.acrescimo) : 0,
       vencimento: b?.vencimento ? new Date(b.vencimento) : null,
-      observacoes: descricao,
-      origemTipo: 'nativo',
-      origemId: null,
+      formaCobranca: b?.formaCobranca ?? null,
+      fornecedorId: b?.fornecedorId != null ? Number(b.fornecedorId) : null,
+      faseLabel: b?.faseLabel ?? null,
+      rateio: b?.rateio ?? null,
+      pagamento: b?.registrarPagamento ? { observacao: 'Pagamento no lançamento manual de custo' } : null,
       criadoPorId: actor?.userId ?? null,
     })
+    await registrarAuditoria(req, { acao: 'CRIAR', entidade: 'CustoManual', entidadeId: r.obrigacaoId, descricao: `Custo manual lançado (${r.moeda} ${r.total})`, detalhes: { processoId, itemCatalogoId, total: r.total, moeda: r.moeda } })
     return NextResponse.json({ ok: true, ...r })
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e instanceof Error ? e.message : 'Falha ao criar o custo.' }, { status: 422 })
