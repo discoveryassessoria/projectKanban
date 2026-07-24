@@ -41,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ref
       criadoPorId: actor?.userId ?? null,
     })
     if (!r.ok) return NextResponse.json({ ok: false, erro: r.erros[0] ?? 'Falha na validação.', erros: r.erros }, { status: 422 })
-    return NextResponse.json({ ok: true, ...r })
+    return NextResponse.json({ ...r, ok: true })
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e instanceof Error ? e.message : 'Falha ao registrar pagamento.' }, { status: 422 })
   }

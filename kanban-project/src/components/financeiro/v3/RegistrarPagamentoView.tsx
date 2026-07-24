@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  X, Plus, Trash2, Upload, Loader2, Info as InfoIcon, AlertTriangle, CheckCircle2,
+  Plus, Trash2, Upload, Loader2, Info as InfoIcon, AlertTriangle, CheckCircle2,
   Landmark, CreditCard, Users, FileText, Eye, Building2, User as UserIcon, UsersRound,
 } from "lucide-react"
 import { uploadFiles } from "@/src/lib/storage"
@@ -107,7 +107,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
   const saldoRestante = Math.max(0, liquidoAReceber - recebido)
   const excedente = Math.max(0, recebido - liquidoAReceber)
   const situacao = saldoRestante <= 0.005 ? (excedente > 0.005 ? "EXCEDENTE" : "QUITADA") : "PARCIAL"
-  const creditoGerado = excedenteTrat === "CREDITO" ? excedente : excedente
+  const creditoGerado = excedente
 
   const contaPrincipal = useMemo(() => contasOpts.find((c) => c.key === linhas[0]?.contaKey) ?? null, [contasOpts, linhas])
   const pagadorNome = pagadorTipo === "EXTERNO" ? (ext.nome || "Externo") : (participantes.find((p) => p.pessoaId === pagadorPessoaId)?.nome ?? (pagadorTipo === "EMPRESA" ? "Empresa" : pagadorTipo === "TERCEIRO" ? "Terceiro" : "—"))
