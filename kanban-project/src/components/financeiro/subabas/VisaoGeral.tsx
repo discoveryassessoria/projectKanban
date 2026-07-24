@@ -145,7 +145,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
     const mp = new Map<string, number>()
     for (const r of receitas.filter(ativo)) { const tot = r.parcelas.reduce((s, p) => s + parcToBrl(r, p, fxHoje), 0); mp.set(r.moeda, (mp.get(r.moeda) || 0) + tot) }
     const total = [...mp.values()].reduce((s, v) => s + v, 0) || 1
-    const cores: Record<string, string> = { BRL: '#34d399', EUR: '#f59e0b', USD: '#38bdf8' }
+    const cores: Record<string, string> = { BRL: '#4ade80', EUR: '#fbbf24', USD: '#7dd3fc' }
     const nomes: Record<string, string> = { BRL: 'Real Brasileiro', EUR: 'Euro', USD: 'Dólar Americano' }
     return { total, itens: ['BRL', 'EUR', 'USD'].map((c) => ({ code: c, nome: nomes[c], cor: cores[c], valor: mp.get(c) || 0, pct: ((mp.get(c) || 0) / total) * 100 })) }
   }, [receitas, fxHoje])
@@ -171,11 +171,11 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
     <div className="space-y-4 text-white">
       {/* 1 · cinco cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Card titulo="A Receber" valor={brl(m.recP)} sub={`${pct(m.pctReceber)} do previsto`} icon={DollarSign} cor="#34d399" />
-        <Card titulo="Recebido" valor={brl(m.recR)} sub={`${pct(m.pctReceb)} do total`} icon={CreditCard} cor="#38bdf8" />
-        <Card titulo="Custos" valor={brl(m.cusT)} sub={`${pct(m.pctCustos)} do total`} icon={Database} cor="#fb923c" />
+        <Card titulo="A Receber" valor={brl(m.recP)} sub={`${pct(m.pctReceber)} do previsto`} icon={DollarSign} cor="#4ade80" />
+        <Card titulo="Recebido" valor={brl(m.recR)} sub={`${pct(m.pctReceb)} do total`} icon={CreditCard} cor="#7dd3fc" />
+        <Card titulo="Custos" valor={brl(m.cusT)} sub={`${pct(m.pctCustos)} do total`} icon={Database} cor="#fbbf24" />
         <Card titulo="Lucro" valor={brl(m.lucro)} sub={`${pct(m.pctLucro)} do previsto`} icon={BarChart3} cor="#a78bfa" />
-        <Card titulo="Situação Financeira" valor={emDia ? 'Tudo em dia' : `${m.inadCount} parcela(s) vencida(s)`} valorCor={emDia ? 'text-emerald-400' : 'text-red-400'} sub={emDia ? 'Nenhuma pendência' : brl(m.inadBrl)} icon={emDia ? CheckCircle2 : AlertTriangle} cor={emDia ? '#34d399' : '#f87171'} />
+        <Card titulo="Situação Financeira" valor={emDia ? 'Tudo em dia' : `${m.inadCount} parcela(s) vencida(s)`} valorCor={emDia ? 'text-[#4ade80]' : 'text-red-400'} sub={emDia ? 'Nenhuma pendência' : brl(m.inadBrl)} icon={emDia ? CheckCircle2 : AlertTriangle} cor={emDia ? '#4ade80' : '#f87171'} />
       </div>
 
       {/* 2 · eventos + ações */}
@@ -191,7 +191,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
                   {eventos.slice(0, 6).map((e, i) => (
                     <tr key={i} className="border-t border-white/5">
                       <td className="px-3 py-2.5 text-white/70"><div>{diaMes(e.date)}</div><div className="text-[10px] text-white/35">{diaSemana(e.date)}</div></td>
-                      <td className="px-3 py-2.5"><span className="inline-flex items-center gap-1.5" style={{ color: e.tipo === 'Receita' ? '#34d399' : '#38bdf8' }}>{e.tipo === 'Receita' ? <Receipt className="h-3.5 w-3.5" /> : <Wallet className="h-3.5 w-3.5" />}{e.tipo}</span></td>
+                      <td className="px-3 py-2.5"><span className="inline-flex items-center gap-1.5" style={{ color: e.tipo === 'Receita' ? '#4ade80' : '#7dd3fc' }}>{e.tipo === 'Receita' ? <Receipt className="h-3.5 w-3.5" /> : <Wallet className="h-3.5 w-3.5" />}{e.tipo}</span></td>
                       <td className="px-3 py-2.5 text-white/80">{e.requerente}</td>
                       <td className="px-3 py-2.5 text-white/60">{e.descricao}</td>
                       <td className="px-3 py-2.5 tabular-nums font-medium text-white/90">{brl(e.valorBrl)}</td>
@@ -208,10 +208,10 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
 
         <Painel titulo="Ações rápidas">
           <div className="space-y-2">
-            <Acao icon={DollarSign} cor="#34d399" titulo="Abrir Receitas" sub="Visualizar todas as receitas do processo" onClick={() => onIrPara?.('receitas')} />
-            <Acao icon={Database} cor="#fb923c" titulo="Abrir Custos" sub="Visualizar todos os custos do processo" onClick={() => onIrPara?.('custos')} />
+            <Acao icon={DollarSign} cor="#4ade80" titulo="Abrir Receitas" sub="Visualizar todas as receitas do processo" onClick={() => onIrPara?.('receitas')} />
+            <Acao icon={Database} cor="#fbbf24" titulo="Abrir Custos" sub="Visualizar todos os custos do processo" onClick={() => onIrPara?.('custos')} />
             <Acao icon={Receipt} cor="#D2A948" titulo="Gerar Cobrança" sub="Gerar nova cobrança para o processo" onClick={() => onIrPara?.('receitas')} />
-            <Acao icon={CreditCard} cor="#38bdf8" titulo="Registrar Pagamento" sub="Registrar pagamento recebido" onClick={() => onIrPara?.('receitas')} />
+            <Acao icon={CreditCard} cor="#7dd3fc" titulo="Registrar Pagamento" sub="Registrar pagamento recebido" onClick={() => onIrPara?.('receitas')} />
             <Acao icon={FileDown} cor="#a78bfa" titulo="Exportar Financeiro" sub="Exportar relatório financeiro" onClick={() => window.print()} />
           </div>
         </Painel>
@@ -225,9 +225,9 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
               {fluxo.map((e, i) => (
                 <div key={i} className="flex items-center gap-3">
                   <div className="w-9 shrink-0 text-center"><div className="text-sm font-bold text-white">{diaMes(e.date).slice(0, 2)}</div><div className="text-[9px] uppercase text-white/40">{new Date(e.date).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}</div></div>
-                  <div className="relative flex flex-col items-center self-stretch"><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />{i < fluxo.length - 1 && <span className="w-px flex-1 bg-white/15" />}</div>
+                  <div className="relative flex flex-col items-center self-stretch"><span className="h-2.5 w-2.5 rounded-full bg-[#4ade80]" />{i < fluxo.length - 1 && <span className="w-px flex-1 bg-white/15" />}</div>
                   <div className="min-w-0 flex-1"><p className="text-sm text-white/80">Recebimento previsto</p><p className="truncate text-[11px] text-white/45">{e.descricao}</p></div>
-                  <span className="tabular-nums text-sm font-medium text-emerald-300">{brl(e.valorBrl)}</span>
+                  <span className="tabular-nums text-sm font-medium text-[#4ade80]">{brl(e.valorBrl)}</span>
                 </div>
               ))}
             </div>
@@ -255,7 +255,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
               {porRequerente.linhas.map((x, i) => (
                 <div key={i}>
                   <div className="flex items-center justify-between text-sm"><span className="truncate text-white/80">{x.nome}</span><span className="ml-2 shrink-0 tabular-nums text-white/70">{brl(x.valor)} <span className="text-white/40">{x.pct.toFixed(1)}%</span></span></div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-emerald-400" style={{ width: `${Math.max(2, x.pct)}%` }} /></div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[#4ade80]" style={{ width: `${Math.max(2, x.pct)}%` }} /></div>
                 </div>
               ))}
               <div className="flex items-center justify-between border-t border-white/10 pt-2 text-sm"><span className="text-white/45">Total</span><span className="tabular-nums font-semibold">{brl(porRequerente.total === 1 ? 0 : porRequerente.total)}</span></div>
@@ -300,7 +300,7 @@ function Acao({ icon: Ic, cor, titulo, sub, onClick }: { icon: any; cor: string;
   )
 }
 function Tag({ cor, children }: { cor: string; children: React.ReactNode }) {
-  const map: Record<string, string> = { amber: 'bg-amber-500/15 text-amber-300 border-amber-500/30', red: 'bg-red-500/15 text-red-300 border-red-500/30', sky: 'bg-sky-500/15 text-sky-300 border-sky-500/30', emerald: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' }
+  const map: Record<string, string> = { amber: 'bg-amber-500/15 text-amber-300 border-amber-500/30', red: 'bg-red-500/15 text-red-300 border-red-500/30', sky: 'bg-sky-500/15 text-sky-300 border-sky-500/30', emerald: 'bg-emerald-500/15 text-[#4ade80] border-emerald-500/30' }
   return <span className={`inline-block rounded-md border px-2 py-0.5 text-[11px] font-medium ${map[cor] ?? map.sky}`}>{children}</span>
 }
 function Donut({ itens }: { itens: { cor: string; valor: number; pct: number; code: string }[] }) {
