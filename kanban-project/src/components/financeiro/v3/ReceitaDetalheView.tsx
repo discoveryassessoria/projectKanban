@@ -2,27 +2,31 @@
 // ============================================================================
 // DETALHE DA RECEITA (Financeiro V3) — componente reutilizável, embutido no
 // modal do processo (ProcessoFinanceiroShell) ou na rota de página dedicada.
-// Reprodução fiel do mockup aprovado, SEM o cabeçalho falso (sino/usuário) e
-// SEM o wrapper full-screen: o container hospedeiro provê padding/scroll.
+// Layout rico aprovado (#80): SEM cabeçalho/sidebar da app — só o conteúdo do
+// detalhe; o container hospedeiro provê padding/scroll.
 // Dados EXCLUSIVAMENTE do Motor V3 (Ledger/projeções) via /api/financeiro/v3/receita.
 // Valores operacionais em BRL; moeda-base contratual (EUR) apresentada como câmbio.
 // ============================================================================
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import RegistrarPagamentoModal from "@/src/components/financeiro/v3/RegistrarPagamentoModal"
+import { NovaFaturaModal } from "@/src/components/kanban/NovaFaturaModal"
 import {
   ArrowLeft, ExternalLink, MoreVertical, Copy, ChevronDown, ChevronUp,
   Receipt, CreditCard, Wallet, FileCheck, Clock, Search, SlidersHorizontal, Calendar,
   Plus, Pencil, ChevronLeft, ChevronRight, UserPlus, ArrowDownCircle, CheckCircle2,
-  Info as InfoIcon, Plus as PlusIcon,
+  Info as InfoIcon, X, AlertTriangle, Send, FileText, Loader2, ChevronRight as ChevronRightSm,
 } from "lucide-react"
 
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
 const brl = (v: number) => fmt(v, "BRL")
 const dataBR = (s?: string | null) => s ? new Date(s).toLocaleDateString("pt-BR") : "—"
+const horaBR = (s?: string | null) => s ? new Date(s).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""
 const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
+const iniciais = (n?: string | null) => (n ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?"
 
 // classe do badge de status (amber A VENCER · red VENCIDO · blue PARCIAL · green QUITADO)
 const statusCls = (s?: string | null) => {
@@ -48,8 +52,12 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const router = useRouter()
   const [d, setD] = useState<any>(null)
   const [erro, setErro] = useState<string | null>(null)
-  const [tab, setTab] = useState("resumo")
+  const [tab, setTab] = useState("cobrancas")
   const [pagOpen, setPagOpen] = useState(false)
+  const [faturaOpen, setFaturaOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [maisOpen, setMaisOpen] = useState(false)
+  const [verMais, setVerMais] = useState(false)
   const [busca, setBusca] = useState("")
   const [copiado, setCopiado] = useState(false)
   const [pStatus, setPStatus] = useState("TODAS")
@@ -86,8 +94,9 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const semBase = d.moedaBase === "BRL"
   const fmtEUR = (v: number) => fmt(v, d.moedaBase)
   const moedaBaseLabel = d.moedaBase === "EUR" ? "Euro (EUR)" : d.moedaBase
-  const movLink = `/financeiro/v3/processo-preview?processoId=${d.processo.id ?? ""}`
   const pct = d.valorContratadoBrl ? Math.round((d.recebidoBrl / d.valorContratadoBrl) * 100) : 0
+  const podeEditar = d.receitaId != null
+  const temProcesso = d.processo?.id != null
 
   const pagamentosFiltrados = (d.pagamentos ?? []).filter((p: any) => {
     if (!busca.trim()) return true
@@ -123,14 +132,49 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const ehHoje = (iso?: string | null) => !!iso && new Date(iso).toDateString() === hojeStr
   const selCls = "rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70 outline-none"
 
+  // ── Distribuição entre requerentes ──
+  const dist: any[] = d.distribuicaoRequerentes ?? []
+  const divisaoIgual = dist.length > 1 && new Set(dist.map((r) => Math.round(Number(r.percentual)))).size === 1
+  const historico: any[] = d.historico ?? []
+
+  // botão de ação para "Próximas ações"
+  const acaoBotao = (acao: string) => {
+    switch (acao) {
+      case "COBRAR_VENCIDA": return { label: "Ver cobranças", onClick: () => setTab("cobrancas"), disabled: false, title: "" }
+      case "REGISTRAR_PAGAMENTO": return { label: "Registrar", onClick: () => setPagOpen(true), disabled: false, title: "" }
+      case "EMITIR_FATURA": return temProcesso ? { label: "Emitir fatura", onClick: () => setFaturaOpen(true), disabled: false, title: "" } : { label: "Emitir fatura", onClick: () => {}, disabled: true, title: "Processo não vinculado" }
+      case "ENVIAR_COBRANCA": return { label: "Enviar", onClick: () => {}, disabled: true, title: "Envio de cobrança em breve" }
+      default: return { label: "Abrir", onClick: () => {}, disabled: true, title: "" }
+    }
+  }
+  const acaoIcone = (acao: string, severidade?: string) => {
+    if (acao === "COBRAR_VENCIDA") return { Icon: AlertTriangle, cls: "bg-[#f87171]/15 text-[#f87171]" }
+    if (acao === "REGISTRAR_PAGAMENTO") return { Icon: Wallet, cls: "bg-[#4ade80]/15 text-[#4ade80]" }
+    if (acao === "EMITIR_FATURA") return { Icon: FileText, cls: "bg-[#7dd3fc]/15 text-[#7dd3fc]" }
+    if (acao === "ENVIAR_COBRANCA") return { Icon: Send, cls: "bg-[#d2a948]/15 text-[#d2a948]" }
+    return { Icon: InfoIcon, cls: "bg-white/10 text-white/60" }
+  }
+  const alertaIcone = (sev: string) => {
+    if (sev === "crit") return "text-[#f87171]"
+    if (sev === "warn") return "text-[#d2a948]"
+    return "text-[#7dd3fc]"
+  }
+
+  const tabs: [string, string, any, number][] = [
+    ["cobrancas", "Cobranças", CreditCard, rp.total],
+    ["pagamentos", "Pagamentos", Wallet, (d.pagamentos ?? []).length],
+    ["documentos", "Documentos", FileCheck, 0],
+    ["timeline", "Timeline", Clock, historico.length],
+  ]
+
   return (
     <div className="text-white/80">
       <div className="mx-auto max-w-[1400px] px-1 py-1">
-        {/* ── Top bar ── */}
-        <div className="flex items-start justify-between">
-          <div>
+        {/* ── HEADER ── */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
             <button onClick={onVoltar} className="mb-3 flex items-center gap-2 text-sm text-white/68 hover:text-white/80"><ArrowLeft className="h-4 w-4" /> Voltar para {isCusto ? "Custos" : "Receitas"}</button>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-[28px] font-bold leading-tight text-white">{d.descricao ?? d.codigo}</h1>
               <span className={`rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide ${statusCls(d.statusLabel)}`}>{d.statusLabel}</span>
             </div>
@@ -139,82 +183,226 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
               <span className="text-white/68">{d.codigo}</span>
             </div>
           </div>
-        </div>
 
-        {/* ── Info card ── */}
-        <div className="mt-5 rounded-xl border border-white/10 bg-[#1b2027] p-5">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3 lg:grid-cols-6">
-            <Info rotulo={isCusto ? "Custo" : "Receita"}><span className="inline-flex items-center gap-1.5 font-medium text-white/95">{d.codigo}<button onClick={copiarCodigo} title="Copiar código" className="text-white/40 hover:text-white/80">{copiado ? <CheckCircle2 className="h-3.5 w-3.5 text-[#4ade80]" /> : <Copy className="h-3.5 w-3.5" />}</button></span></Info>
-            <Info rotulo="Descrição"><span className="text-white/80">{d.descricao ?? "—"}</span></Info>
-            <Info rotulo="Processo"><div className="text-white/80">{d.processo.codigo ?? "—"}{d.processo.nome ? ` – ${d.processo.nome}` : ""}</div>{d.processo.id && <a href={movLink} className="inline-flex items-center gap-1 text-xs text-[#7dd3fc] hover:underline">Abrir processo <ExternalLink className="h-3 w-3" /></a>}</Info>
-            <Info rotulo="Responsável">{d.responsavel ? <span className="inline-flex items-center gap-2 text-white/80">{d.responsavel.nome}<span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[11px] text-violet-300">{d.responsavel.papel}</span></span> : "—"}</Info>
-            <Info rotulo="Serviço"><span className="text-white/80">{d.servico ?? "—"}</span></Info>
-            <Info rotulo="Forma de cobrança"><span className="text-white/80">{d.formaCobranca ?? "—"}</span></Info>
-          </div>
-          <div className="my-4 border-t border-white/10" />
-          <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-            <Cell rotulo={`Valor base (${d.moedaBase})`} sub={semBase ? "—" : `Contrato em ${d.moedaBase}`}><span className="font-medium text-white/95">{fmtEUR(d.valorBase)}</span></Cell>
-            <Cell rotulo="Câmbio aplicado" sub={dataBR(d.dataCotacao)}>
-              <span className="inline-flex items-center gap-2 font-medium text-white/95">{d.cotacaoAplicada != null ? brl(d.cotacaoAplicada) : "—"}
-                {d.tipoCambio === "FIXO" && <span className="rounded bg-[#4ade80]/15 px-1.5 py-0.5 text-[10px] font-semibold text-[#4ade80]">Fixo</span>}
-                {d.tipoCambio === "NAO_DEFINIDO" && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold text-white/60">Não definido</span>}
-              </span>
-            </Cell>
-            <Cell rotulo="Valor contratado (BRL)"><span className="font-semibold text-white/95">{brl(d.valorContratadoBrl)}</span></Cell>
-            <Cell rotulo={isCusto ? "Pago (BRL)" : "Recebido (BRL)"} sub={`${d.parcelasRecebidas} parcelas`}><span className="font-semibold text-[#4ade80]">{brl(d.recebidoBrl)}</span></Cell>
-            <Cell rotulo="Saldo (BRL)" sub={`${d.parcelas} parcelas`}><span className="font-semibold text-[#7dd3fc]">{brl(d.saldoBrl)}</span></Cell>
-            <Cell rotulo="Vencimento"><span className="text-white/80">{dataBR(d.vencimento)}</span></Cell>
-            <Cell rotulo="Status" sub={d.proximoVencimento ? `Próxima parcela em ${dataBR(d.proximoVencimento)}` : undefined}><span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${statusCls(d.statusLabel)}`}>{d.statusLabel}</span></Cell>
-            <Cell rotulo="Criado em" sub={`por ${d.criadoPor}`}><span className="text-white/70">{dataBR(d.criadoEm)} às {d.criadoEm ? new Date(d.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""}</span></Cell>
+          {/* Ações do topo */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => podeEditar && setEditOpen(true)}
+              disabled={!podeEditar}
+              title={podeEditar ? "Editar metadados da receita" : "Edição disponível apenas para receitas de origem"}
+              className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#1b2027] px-3.5 py-2 text-sm font-medium text-white/80 hover:border-white/25 disabled:cursor-not-allowed disabled:opacity-40"
+            ><Pencil className="h-4 w-4" /> Editar receita</button>
+
+            <button onClick={() => setPagOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957]"><Plus className="h-4 w-4" /> Registrar pagamento</button>
+
+            <div className="relative">
+              <button onClick={() => setMaisOpen((o) => !o)} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-sm text-white/80 hover:border-white/25">Mais ações <ChevronDown className="h-3.5 w-3.5" /></button>
+              {maisOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setMaisOpen(false)} />
+                  <div className="absolute right-0 z-50 mt-1 w-52 overflow-hidden rounded-lg border border-white/10 bg-[#1b2027] py-1 shadow-xl shadow-black/40">
+                    <button onClick={() => { setMaisOpen(false); setTab("timeline") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><Clock className="h-4 w-4 text-white/45" /> Ver movimentações</button>
+                    <button onClick={() => { setMaisOpen(false); copiarCodigo() }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5">{copiado ? <CheckCircle2 className="h-4 w-4 text-[#4ade80]" /> : <Copy className="h-4 w-4 text-white/45" />} Copiar código</button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* ── Abas ── */}
-        <div className="mt-5 flex items-center gap-7 border-b border-white/10">
-          {[["resumo", "Resumo", Receipt, 0], ["cobrancas", "Cobranças", CreditCard, rp.total], ["pagamentos", "Pagamentos", Wallet, 0], ["documentos", "Documentos", FileCheck, 1], ["timeline", "Timeline", Clock, 0]].map(([id, label, Icon, badge]: any) => (
-            <button key={id} onClick={() => setTab(id)} className={`-mb-px flex items-center gap-2 border-b-2 px-1 pb-3 pt-2 text-sm ${tab === id ? "border-[#d2a948] font-medium text-[#d2a948]" : "border-transparent text-white/68 hover:text-white/80"}`}>
+        {/* ── TOP: (info + situação + ações)  |  sidebar ── */}
+        <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_340px]">
+          {/* ─── COLUNA PRINCIPAL ─── */}
+          <div className="min-w-0 space-y-5">
+            {/* INFO CARD */}
+            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
+                <Info rotulo={isCusto ? "Custo" : "Receita"}><span className="inline-flex items-center gap-1.5 font-medium text-white/95">{d.codigo}<button onClick={copiarCodigo} title="Copiar código" className="text-white/40 hover:text-white/80">{copiado ? <CheckCircle2 className="h-3.5 w-3.5 text-[#4ade80]" /> : <Copy className="h-3.5 w-3.5" />}</button></span></Info>
+                <Info rotulo={`Moeda-base (Contrato)`}><span className="font-medium text-white/95">{fmtEUR(d.valorBase)}</span><div className="mt-0.5 text-[11px] text-white/40">{moedaBaseLabel}</div></Info>
+                <Info rotulo="Câmbio aplicado">
+                  <span className="inline-flex items-center gap-2 font-medium text-white/95">{d.cotacaoAplicada != null ? brl(d.cotacaoAplicada) : "—"}
+                    {d.tipoCambio === "FIXO" && <span className="rounded bg-[#4ade80]/15 px-1.5 py-0.5 text-[10px] font-semibold text-[#4ade80]">Fixo</span>}
+                  </span>
+                  <div className="mt-0.5 text-[11px] text-white/40">{d.tipoCambio === "FIXO" ? `Fixo desde ${dataBR(d.dataCotacao)}` : dataBR(d.dataCotacao)}</div>
+                </Info>
+                <Info rotulo="Valor contratado (BRL)"><span className="font-semibold text-white/95">{brl(d.valorContratadoBrl)}</span></Info>
+              </div>
+
+              {verMais && (
+                <>
+                  <div className="my-4 border-t border-white/10" />
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
+                    <Info rotulo="Status">
+                      <span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${statusCls(d.statusLabel)}`}>{d.statusLabel}</span>
+                      {d.proximoVencimento && <div className="mt-1 text-[11px] text-white/40">Próxima parcela em {dataBR(d.proximoVencimento)}</div>}
+                    </Info>
+                    <Info rotulo="Descrição"><span className="text-white/80">{d.descricao ?? "—"}</span></Info>
+                    <Info rotulo="Forma de cobrança"><span className="text-white/80">{d.formaCobranca ?? "—"}</span></Info>
+                    <Info rotulo="Responsável">{d.responsavel ? <span className="inline-flex items-center gap-2 text-white/80">{d.responsavel.nome}<span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[11px] text-violet-300">Principal</span></span> : "—"}</Info>
+                    <Info rotulo="Criado em"><span className="text-white/70">{dataBR(d.criadoEm)} às {horaBR(d.criadoEm)}</span><div className="mt-0.5 text-[11px] text-white/40">por {d.criadoPor}</div></Info>
+                    <Info rotulo="Vencimento final"><span className="text-white/80">{dataBR(d.vencimento)}</span></Info>
+                    <Info rotulo="Processo">
+                      <div className="text-white/80">{d.processo.codigo ?? "—"}{d.processo.nome ? ` – ${d.processo.nome}` : ""}</div>
+                      {temProcesso && <a href={`/financeiro/v3/processo-preview?processoId=${d.processo.id}`} className="inline-flex items-center gap-1 text-xs text-[#7dd3fc] hover:underline">Abrir processo <ExternalLink className="h-3 w-3" /></a>}
+                    </Info>
+                    <Info rotulo="Câmbio">
+                      <button onClick={() => router.push("/cambio")} className="inline-flex items-center gap-1 text-sm text-[#7dd3fc] hover:underline">Entenda o câmbio aplicado <ExternalLink className="h-3.5 w-3.5" /></button>
+                    </Info>
+                  </div>
+                </>
+              )}
+
+              <button onClick={() => setVerMais((v) => !v)} className="mt-4 inline-flex items-center gap-1.5 text-sm text-[#7dd3fc] hover:underline">
+                {verMais ? "Ocultar detalhes da receita" : "Ver mais detalhes da receita"} {verMais ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+
+            {/* SITUAÇÃO FINANCEIRA */}
+            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+              <h2 className="text-lg font-semibold text-white">Situação financeira</h2>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <SubCard rotulo="Valor contratado" valor={brl(d.valorContratadoBrl)} linhas={!semBase ? [`Base contratual: ${fmtEUR(d.valorBase)}`] : []} />
+                <SubCard rotulo={isCusto ? "Pago" : "Recebido"} valor={brl(d.recebidoBrl)} cor="text-[#4ade80]" linhas={[`${pct}% do total`, `${d.parcelasRecebidas} parcela(s) recebida(s)`]} />
+                <SubCard rotulo="A vencer" valor={brl(d.aVencerBrl)} cor="text-[#d2a948]" linhas={[`${d.parcelasAVencer} parcela(s)`, `Próximo: ${dataBR(d.proximoVencimento)}`]} />
+                <SubCard rotulo="Vencido" valor={brl(d.vencidoBrl)} cor="text-[#f87171]" linhas={[`${d.parcelasVencidas} parcela(s)`, ...(d.parcelasVencidas ? [`Desde ${dataBR(d.proximoVencimento)}`] : [])]} />
+                <SubCard rotulo="Saldo a receber" valor={brl(d.saldoBrl)} cor="text-[#7dd3fc]" linhas={[`${d.parcelas} parcela(s) em aberto`]} />
+              </div>
+            </div>
+
+            {/* PRÓXIMAS AÇÕES + ÚLTIMA MOVIMENTAÇÃO */}
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              {/* Próximas ações */}
+              <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+                <h2 className="text-base font-semibold text-white">Próximas ações</h2>
+                <div className="mt-4 space-y-2.5">
+                  {(d.proximasAcoes ?? []).length === 0 ? (
+                    <div className="text-sm text-white/40">Nenhuma ação pendente.</div>
+                  ) : (d.proximasAcoes ?? []).map((a: any, i: number) => {
+                    const { Icon, cls } = acaoIcone(a.acao)
+                    const btn = acaoBotao(a.acao)
+                    return (
+                      <div key={i} className="flex items-start gap-3 rounded-lg border border-white/10 bg-[#161b21] px-3.5 py-3">
+                        <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${cls}`}><Icon className="h-4 w-4" /></div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-white/90">{a.label}</div>
+                          <div className="mt-0.5 text-xs text-white/45">{a.descricao}</div>
+                        </div>
+                        <button onClick={btn.onClick} disabled={btn.disabled} title={btn.title} className="shrink-0 whitespace-nowrap rounded-lg border border-white/15 bg-[#1b2027] px-3 py-1.5 text-xs font-medium text-white/80 hover:border-white/30 disabled:cursor-not-allowed disabled:opacity-40">{btn.label}</button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Última movimentação */}
+              <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+                <h2 className="text-base font-semibold text-white">Última movimentação</h2>
+                <div className="mt-4 space-y-4">
+                  {historico.length === 0 ? (
+                    <div className="text-sm text-white/40">Sem movimentações registradas.</div>
+                  ) : historico.slice(0, 3).map((h: any, i: number) => (
+                    <div key={h.id ?? i} className="flex gap-3">
+                      <div className="mt-1 flex flex-col items-center">
+                        <span className="h-2 w-2 rounded-full bg-[#7dd3fc]" />
+                        {i < Math.min(historico.length, 3) - 1 && <span className="mt-1 w-px flex-1 bg-white/10" />}
+                      </div>
+                      <div className="min-w-0 flex-1 pb-1">
+                        <div className="text-sm font-medium text-white/90">{h.titulo}</div>
+                        <div className="mt-0.5 flex items-center gap-2 text-xs text-white/40"><span>{dataBR(h.data)} · {horaBR(h.data)}</span><span className="text-[#7dd3fc]">{h.ator}</span></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => setTab("timeline")} className="mt-3 inline-flex items-center gap-1 text-sm text-[#7dd3fc] hover:underline">Ver timeline completa <ChevronRightSm className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
+          </div>
+
+          {/* ─── SIDEBAR ─── */}
+          <aside className="space-y-4">
+            {/* Distribuição entre requerentes */}
+            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-white/85">Distribuição entre requerentes</span>
+                {divisaoIgual && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-300">Divisão igual</span>}
+              </div>
+              <div className="mt-1 text-xs text-white/40">{dist.length} requerente(s)</div>
+              <div className="mt-3 space-y-2.5">
+                {dist.length === 0 ? <div className="text-sm text-white/40">—</div> : dist.map((r: any, i: number) => (
+                  <div key={i} className="flex items-center gap-2.5">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-[11px] font-semibold text-violet-300">{iniciais(r.nome)}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm text-white/85">{r.nome}</div>
+                      <div className="text-[11px] text-white/40">{brl(r.valor)}</div>
+                    </div>
+                    <span className="shrink-0 text-sm font-medium text-white/80">{Number(r.percentual).toFixed(0)}%</span>
+                  </div>
+                ))}
+              </div>
+              <div className="my-3 border-t border-white/10" />
+              <div className="flex items-center justify-between"><span className="text-sm text-white/60">Total do contrato</span><span className="text-sm font-semibold text-white/90">{brl(d.valorContratadoBrl)}</span></div>
+            </div>
+
+            {/* Pagador */}
+            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+              <span className="text-sm font-semibold text-white/85">Pagador</span>
+              <div className="mt-3 flex items-center gap-2.5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#7dd3fc]/15 text-[11px] font-semibold text-[#7dd3fc]">{iniciais(d.responsavelFinanceiro?.nome)}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm text-white/85">{d.responsavelFinanceiro?.nome ?? "—"}</div>
+                  <span className="mt-1 inline-block rounded bg-[#7dd3fc]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#7dd3fc]">Responsável financeiro</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Documentos principais (placeholder — relação vem em fase posterior) */}
+            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+              <span className="text-sm font-semibold text-white/85">Documentos principais</span>
+              <div className="mt-3 rounded-lg border border-dashed border-white/10 bg-[#161b21] px-3 py-6 text-center text-xs text-white/40">Nenhum documento vinculado ainda</div>
+              <button disabled title="em breve" className="mt-3 w-full cursor-not-allowed rounded-lg border border-white/10 py-2 text-xs text-white/40 opacity-60">Ver todos os documentos</button>
+            </div>
+
+            {/* Alertas */}
+            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+              <span className="text-sm font-semibold text-white/85">Alertas</span>
+              <div className="mt-3 space-y-2">
+                {(d.alertas ?? []).length === 0 ? <div className="text-sm text-white/40">Sem alertas.</div> : (d.alertas ?? []).map((a: any, i: number) => (
+                  <div key={i} className="flex items-center gap-2.5 rounded-lg border border-white/10 bg-[#161b21] px-3 py-2.5">
+                    <AlertTriangle className={`h-4 w-4 shrink-0 ${alertaIcone(a.severidade)}`} />
+                    <span className="min-w-0 flex-1 truncate text-sm text-white/80">{a.label}</span>
+                    <span className="shrink-0 text-sm font-medium text-white/70">{a.valor != null ? brl(a.valor) : <ChevronRightSm className="h-4 w-4 text-white/40" />}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        {/* ── ABAS ── */}
+        <div className="mt-6 flex items-center gap-7 overflow-x-auto border-b border-white/10">
+          {tabs.map(([id, label, Icon, badge]) => (
+            <button key={id} onClick={() => setTab(id)} className={`-mb-px flex shrink-0 items-center gap-2 border-b-2 px-1 pb-3 pt-2 text-sm ${tab === id ? "border-[#d2a948] font-medium text-[#d2a948]" : "border-transparent text-white/68 hover:text-white/80"}`}>
               <Icon className="h-4 w-4" /> {label}{badge ? <span className="ml-1 rounded-full bg-[#252c35] px-1.5 text-[11px] text-white/70">{badge}</span> : null}
             </button>
           ))}
         </div>
 
-        {/* ── Conteúdo (main + right) ── */}
+        {/* ── CONTEÚDO DAS ABAS ── */}
         <div className="mt-5">
-          <div className="space-y-5">
-            {/* Resumo financeiro (5 sub-cards + bloco de câmbio) */}
-            {tab === "resumo" && (
-            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-              <h2 className="text-lg font-semibold text-white">Resumo financeiro</h2>
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <SubCard rotulo="Valor contratado" valor={brl(d.valorContratadoBrl)} linhas={!semBase ? [`Base contratual: ${fmtEUR(d.valorBase)}`] : []} />
-                <SubCard rotulo={isCusto ? "Pago" : "Recebido"} valor={brl(d.recebidoBrl)} cor="text-[#4ade80]" linhas={[`${pct}% do total`, `${d.parcelasRecebidas} parcelas recebidas`]} />
-                <SubCard rotulo="A vencer" valor={brl(d.aVencerBrl)} cor="text-[#d2a948]" linhas={[`${d.parcelasAVencer} parcelas`, `Próximo: ${dataBR(d.proximoVencimento)}`]} />
-                <SubCard rotulo="Vencido" valor={brl(d.vencidoBrl)} cor="text-[#f87171]" linhas={[`${d.parcelasVencidas} parcela(s)`, ...(d.parcelasVencidas ? [`Desde ${dataBR(d.proximoVencimento)}`] : [])]} />
-                <SubCard rotulo="Saldo a receber" valor={brl(d.saldoBrl)} cor="text-[#7dd3fc]" linhas={[`${d.parcelas} parcelas em aberto`]} />
-              </div>
-              <div className="mt-4 flex items-start justify-between gap-4 rounded-lg border border-white/10 bg-[#161b21] px-4 py-3">
-                <div className="flex items-start gap-2.5 text-sm text-white/68">
-                  <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#7dd3fc]" />
-                  <span>Os valores operacionais são apresentados em Reais (BRL). A moeda-base contratual desta receita é {moedaBaseLabel}.</span>
-                </div>
-                <button onClick={() => router.push("/cambio")} className="inline-flex shrink-0 items-center gap-1 text-sm text-[#7dd3fc] hover:underline">Entenda o câmbio aplicado <ExternalLink className="h-3.5 w-3.5" /></button>
-              </div>
+          {/* Pagamentos */}
+          {tab === "pagamentos" && (
+          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">Pagamentos</h2><span className="rounded-full bg-[#252c35] px-2 py-0.5 text-xs text-white/70">{d.pagamentos.length}</span></div>
+              <button onClick={() => setPagOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957]"><Plus className="h-4 w-4" /> Registrar pagamento</button>
             </div>
-            )}
-
-            {/* Pagamentos */}
-            {tab === "pagamentos" && (
-            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">Pagamentos</h2><span className="rounded-full bg-[#252c35] px-2 py-0.5 text-xs text-white/70">{d.pagamentos.length}</span></div>
-                <button onClick={() => setPagOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957]"><PlusIcon className="h-4 w-4" /> Registrar pagamento</button>
-              </div>
-              <div className="mt-4 flex items-center gap-3">
-                <div className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar pagamentos..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
-                <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><SlidersHorizontal className="h-4 w-4" /> Filtros</button>
-                <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><Calendar className="h-4 w-4" /> Período <ChevronDown className="h-3.5 w-3.5" /></button>
-              </div>
-              <table className="mt-4 w-full text-sm">
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className="relative min-w-[180px] flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar pagamentos..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
+              <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><SlidersHorizontal className="h-4 w-4" /> Filtros</button>
+              <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><Calendar className="h-4 w-4" /> Período <ChevronDown className="h-3.5 w-3.5" /></button>
+            </div>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-sm">
                 <thead><tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/40">
                   <th className="pb-2 font-medium">Data</th><th className="pb-2 font-medium">Valor</th><th className="pb-2 font-medium">Forma</th><th className="pb-2 font-medium">Conta recebida</th><th className="pb-2 font-medium">Referência</th><th className="pb-2 font-medium">Status</th><th className="pb-2 font-medium">Ações</th>
                 </tr></thead>
@@ -230,201 +418,151 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                   </tr>
                 ))}</tbody>
               </table>
-              <div className="mt-4 flex items-center justify-between text-sm text-white/40">
-                <span>Mostrando {pagamentosFiltrados.length} de {d.pagamentos.length} pagamentos</span>
-                <div className="flex items-center gap-1"><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded border border-white/15 bg-[#252c35] px-2.5 py-1 text-xs text-white/80">1</span><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronRight className="h-4 w-4" /></button></div>
-              </div>
             </div>
-            )}
-
-            {/* Cobranças (parcelas) */}
-            {tab === "cobrancas" && (
-              <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-                <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">Cobranças</h2><span className="rounded-full bg-[#252c35] px-2 py-0.5 text-xs text-white/70">{rp.total}</span></div>
-
-                {/* KPIs */}
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                  <SubCard rotulo="Total das cobranças" valor={brl(d.valorContratadoBrl)} linhas={[`${rp.total} parcelas`]} />
-                  <SubCard rotulo={isCusto ? "Pago" : "Recebido"} valor={brl(d.resumo.recebidoBrl)} cor="text-[#4ade80]" linhas={[`${rp.pagas.qtd} parcelas pagas`]} />
-                  <SubCard rotulo="A vencer" valor={brl(d.aVencerBrl)} cor="text-[#d2a948]" linhas={[`${rp.aVencer.qtd} parcelas`]} />
-                  <SubCard rotulo="Vencido" valor={brl(d.vencidoBrl)} cor="text-[#f87171]" linhas={[`${rp.vencidas.qtd} parcela(s)`]} />
-                  <SubCard rotulo="Inadimplência" valor={`${d.inadimplenciaPct ?? 0}%`} cor="text-[#f87171]" linhas={[`${rp.vencidas.qtd} parcela vencida`]} />
-                </div>
-
-                {/* Filtros */}
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <select value={pStatus} onChange={(e) => { setPStatus(e.target.value); setPPage(1) }} className={selCls}>
-                    <option value="TODAS">Todas</option>
-                    {statusDistintos.map((s) => <option key={s} value={s}>{parcelaStatusLabel(s)}</option>)}
-                  </select>
-                  <select value={pForma} onChange={(e) => { setPForma(e.target.value); setPPage(1) }} className={selCls}>
-                    <option value="TODAS">Forma de pagamento</option>
-                    {formasDistintas.map((f) => <option key={f} value={f}>{f}</option>)}
-                  </select>
-                  <select value={pResp} onChange={(e) => { setPResp(e.target.value); setPPage(1) }} className={selCls}>
-                    <option value="TODAS">Responsável</option>
-                    {respsDistintos.map((r) => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                  <div className="relative min-w-[180px] flex-1">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
-                    <input value={pBusca} onChange={(e) => { setPBusca(e.target.value); setPPage(1) }} placeholder="Buscar parcela..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" />
-                  </div>
-                  <button onClick={limparFiltros} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70 hover:border-white/25">Limpar filtros</button>
-                </div>
-
-                {/* Tabela de parcelas */}
-                {parcelas.length === 0 ? (
-                  <div className="mt-6 rounded-lg border border-dashed border-white/10 bg-[#12161c] px-4 py-8 text-center text-sm text-white/40">Nenhuma cobrança/parcela para esta receita.</div>
-                ) : (
-                  <>
-                    <div className="mt-4 overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead><tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/40">
-                          <th className="pb-2 font-medium">Parcela</th>
-                          <th className="pb-2 font-medium">Responsável</th>
-                          <th className="pb-2 font-medium">Vencimento</th>
-                          <th className="pb-2 font-medium">Valor</th>
-                          <th className="pb-2 font-medium">Valor base</th>
-                          <th className="pb-2 font-medium">Recebido</th>
-                          <th className="pb-2 font-medium">Saldo</th>
-                          <th className="pb-2 font-medium">Status</th>
-                          <th className="pb-2 font-medium">Forma</th>
-                          <th className="pb-2 font-medium">Ações</th>
-                        </tr></thead>
-                        <tbody>{parcelasPagina.map((p: any, i: number) => (
-                          <tr key={i} className="border-b border-white/10 align-top">
-                            <td className="whitespace-nowrap py-3.5 font-medium text-white/95">{p.numero}/{p.totalParcelas}</td>
-                            <td className="py-3.5">
-                              <span className="inline-flex items-center gap-1.5 text-white/80">{p.responsavel}
-                                {d.responsavel?.nome && p.responsavel === d.responsavel.nome && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-300">Principal</span>}
-                              </span>
-                            </td>
-                            <td className="whitespace-nowrap py-3.5 text-white/70">{dataBR(p.vencimento)}
-                              {p.status === "VENCIDA" ? <div className="text-xs text-[#f87171]">{p.diasAtraso} dias de atraso</div> : ehHoje(p.vencimento) ? <div className="text-xs text-[#d2a948]">Hoje</div> : null}
-                            </td>
-                            <td className="whitespace-nowrap py-3.5 font-medium text-white/95">{brl(p.valorBrl)}</td>
-                            <td className="whitespace-nowrap py-3.5">
-                              <div className="text-white/80">{fmtEUR(p.valorBase)}</div>
-                              <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-white/40">Câmbio: {p.cotacao != null ? brl(p.cotacao) : "—"}
-                                {p.tipoCambio === "FIXO" && <span className="rounded bg-[#4ade80]/15 px-1 py-0.5 text-[9px] font-semibold text-[#4ade80]">Fixo</span>}
-                                {p.tipoCambio === "NAO_DEFINIDO" && <span className="rounded bg-white/10 px-1 py-0.5 text-[9px] font-semibold text-white/50">—</span>}
-                              </div>
-                            </td>
-                            <td className={`whitespace-nowrap py-3.5 ${p.recebidoBrl > 0 ? "font-medium text-[#4ade80]" : "text-white/70"}`}>{brl(p.recebidoBrl)}</td>
-                            <td className="whitespace-nowrap py-3.5 font-medium text-[#7dd3fc]">{brl(p.saldoBrl)}</td>
-                            <td className="py-3.5"><span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${parcelaStatusCls(p.status)}`}>{parcelaStatusLabel(p.status)}</span></td>
-                            <td className="whitespace-nowrap py-3.5 text-white/70">{p.forma ?? "—"}</td>
-                            <td className="py-3.5">
-                              {p.status === "PAGA" ? (
-                                <button onClick={() => setTab("pagamentos")} className="whitespace-nowrap rounded-lg border border-white/15 bg-[#1b2027] px-2.5 py-1.5 text-xs text-white/80 hover:border-white/25">Ver recebimento</button>
-                              ) : (
-                                <div className="flex items-center gap-1.5">
-                                  <button onClick={() => setPagOpen(true)} className="whitespace-nowrap rounded-lg bg-[#d2a948] px-2.5 py-1.5 text-xs font-semibold text-[#1b1508] hover:bg-[#e0b957]">Registrar pagamento</button>
-                                  <button onClick={() => setPagOpen(true)} title="Registrar pagamento" className="rounded-lg border border-white/10 p-1.5 text-white/40 hover:text-white/70"><MoreVertical className="h-4 w-4" /></button>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        ))}</tbody>
-                      </table>
-                    </div>
-                    <div className="mt-4 flex items-center justify-between text-sm text-white/40">
-                      <span>Mostrando {parcDe}–{parcAte} de {parcelasFiltradas.length} parcelas</span>
-                      <div className="flex items-center gap-1">
-                        <button disabled={paginaAtual <= 1} onClick={() => setPPage((p) => Math.max(1, p - 1))} className="rounded border border-white/10 p-1.5 text-white/40 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>
-                        <span className="rounded border border-white/15 bg-[#252c35] px-2.5 py-1 text-xs text-white/80">{paginaAtual}</span>
-                        <button disabled={paginaAtual >= totalPaginas} onClick={() => setPPage((p) => Math.min(totalPaginas, p + 1))} className="rounded border border-white/10 p-1.5 text-white/40 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Documentos */}
-            {tab === "documentos" && (
-              <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-                <h2 className="text-lg font-semibold text-white">Documentos</h2>
-                <div className="mt-6 rounded-lg border border-dashed border-white/10 bg-[#12161c] px-4 py-8 text-center text-sm text-white/40">Nenhum documento vinculado a esta receita.</div>
-              </div>
-            )}
-
-            {/* Histórico de movimentações */}
-            {tab === "timeline" && (
-            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white">Histórico de movimentações</h2>
-                <button onClick={() => setTab("timeline")} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/70 hover:border-white/25">Ver timeline completa <ExternalLink className="h-3 w-3" /></button>
-              </div>
-              <div className="mt-4">{d.historico.map((h: any, i: number) => {
-                const Icon = h.tipo === "OBRIGACAO_CRIADA" ? UserPlus : (h.tipo.startsWith("PAGAMENTO") ? ArrowDownCircle : Receipt)
-                const cor = h.tipo === "OBRIGACAO_CRIADA" ? "text-violet-400" : (h.tipo.startsWith("PAGAMENTO") ? "text-[#4ade80]" : "text-white/68")
-                const ultimo = i === d.historico.length - 1
-                return (
-                  <div key={h.id} className="flex gap-4">
-                    <div className="w-16 shrink-0 pt-0.5 text-right text-[11px] leading-tight text-white/40">{dataBR(h.data)}<br />{new Date(h.data).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</div>
-                    <div className="flex flex-col items-center"><div className={`flex h-8 w-8 items-center justify-center rounded-full bg-[#252c35] ${cor}`}><Icon className="h-4 w-4" /></div>{!ultimo && <div className="w-px flex-1 bg-[#252c35]" />}</div>
-                    <div className={`flex-1 ${ultimo ? "" : "pb-6"}`}>
-                      <div className="flex items-start justify-between"><div className="font-medium text-white/95">{h.titulo}</div><span className="text-xs text-[#7dd3fc]">{h.ator}</span></div>
-                      <div className="mt-0.5 text-sm text-white/68">{h.descricao}</div>
-                    </div>
-                  </div>
-                )
-              })}</div>
+            <div className="mt-4 flex items-center justify-between text-sm text-white/40">
+              <span>Mostrando {pagamentosFiltrados.length} de {d.pagamentos.length} pagamentos</span>
+              <div className="flex items-center gap-1"><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded border border-white/15 bg-[#252c35] px-2.5 py-1 text-xs text-white/80">1</span><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronRight className="h-4 w-4" /></button></div>
             </div>
-            )}
           </div>
-
-        </div>
-
-        {/* ── Cards complementares (grade horizontal abaixo do conteúdo) ── */}
-        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <Painel titulo="Resumo das parcelas" aberto>
-            <DotLinha cor="bg-[#4ade80]" k={`${rp.pagas.qtd} pagas`} v={brl(rp.pagas.valor)} />
-            <DotLinha cor="bg-[#d2a948]" k={`${rp.aVencer.qtd} a vencer`} v={brl(rp.aVencer.valor)} />
-            <DotLinha cor="bg-[#f87171]" k={`${rp.vencidas.qtd} vencida`} v={brl(rp.vencidas.valor)} />
-            <DotLinha cor="bg-white/40" k={`${rp.canceladas.qtd} canceladas`} v={brl(rp.canceladas.valor)} />
-            <div className="my-2 border-t border-white/10" />
-            <div className="flex items-center justify-between"><span className="text-sm text-white/70">Total</span><span className="text-sm text-white/80">{rp.total} parcelas</span></div>
-          </Painel>
-          {!semBase && (
-          <Painel titulo="Regra de câmbio" aberto>
-            <Linha k="Moeda base" v={d.moedaBase === "EUR" ? `${d.moedaBase} - Euro (€)` : d.moedaBase} />
-            <Linha k={`Valor base (${d.moedaBase})`} v={fmtEUR(d.valorBase)} />
-            <Linha k="Câmbio aplicado" v={d.cotacaoAplicada != null ? brl(d.cotacaoAplicada) : "—"} />
-            <Linha k="Tipo de câmbio" v={d.tipoCambio === "FIXO" ? "Fixo" : (d.tipoCambio === "NAO_DEFINIDO" ? "—" : "Variável")} cor={d.tipoCambio === "FIXO" ? "text-[#4ade80]" : undefined} />
-            <Linha k="Data da fixação" v={dataBR(d.dataCotacao)} />
-            <div className="my-2 border-t border-white/10" />
-            <button onClick={() => router.push("/cambio")} className="inline-flex items-center gap-1 text-sm text-[#7dd3fc] hover:underline">Ver detalhes do câmbio <ExternalLink className="h-3.5 w-3.5" /></button>
-          </Painel>
           )}
 
-          {d.distribuicao?.length > 0 && (
-          <Painel titulo="Distribuição econômica" aberto>
-            {d.distribuicao.map((x: any, i: number) => (
-              <div key={i} className="py-1.5"><div className="flex items-center justify-between"><span className="text-sm text-white/80">{x.nome}</span><span className="text-sm text-white/70">{x.percentual.toFixed(2)}%</span></div><div className="text-right text-xs text-white/40">{fmt(x.valor, d.moeda)}</div></div>
-            ))}
-            <div className="my-2 border-t border-white/10" />
-            <div className="flex items-center justify-between"><span className="text-sm text-white/70">Total</span><span className="text-sm text-white/70">{Math.round(d.distribuicaoTotal.percentual)}%</span></div>
-            <div className="text-right text-base font-semibold text-white">{fmt(d.distribuicaoTotal.valor, d.moeda)}</div>
-          </Painel>
+          {/* Cobranças (parcelas) */}
+          {tab === "cobrancas" && (
+            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+              <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">Cobranças</h2><span className="rounded-full bg-[#252c35] px-2 py-0.5 text-xs text-white/70">{rp.total}</span></div>
+
+              {/* KPIs */}
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <SubCard rotulo="Total das cobranças" valor={brl(d.valorContratadoBrl)} linhas={[`${rp.total} parcelas`]} />
+                <SubCard rotulo={isCusto ? "Pago" : "Recebido"} valor={brl(d.resumo.recebidoBrl)} cor="text-[#4ade80]" linhas={[`${rp.pagas.qtd} parcelas pagas`]} />
+                <SubCard rotulo="A vencer" valor={brl(d.aVencerBrl)} cor="text-[#d2a948]" linhas={[`${rp.aVencer.qtd} parcelas`]} />
+                <SubCard rotulo="Vencido" valor={brl(d.vencidoBrl)} cor="text-[#f87171]" linhas={[`${rp.vencidas.qtd} parcela(s)`]} />
+                <SubCard rotulo="Inadimplência" valor={`${d.inadimplenciaPct ?? 0}%`} cor="text-[#f87171]" linhas={[`${rp.vencidas.qtd} parcela vencida`]} />
+              </div>
+
+              {/* Filtros */}
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <select value={pStatus} onChange={(e) => { setPStatus(e.target.value); setPPage(1) }} className={selCls}>
+                  <option value="TODAS">Todas</option>
+                  {statusDistintos.map((s) => <option key={s} value={s}>{parcelaStatusLabel(s)}</option>)}
+                </select>
+                <select value={pForma} onChange={(e) => { setPForma(e.target.value); setPPage(1) }} className={selCls}>
+                  <option value="TODAS">Forma de pagamento</option>
+                  {formasDistintas.map((f) => <option key={f} value={f}>{f}</option>)}
+                </select>
+                <select value={pResp} onChange={(e) => { setPResp(e.target.value); setPPage(1) }} className={selCls}>
+                  <option value="TODAS">Responsável</option>
+                  {respsDistintos.map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <div className="relative min-w-[180px] flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+                  <input value={pBusca} onChange={(e) => { setPBusca(e.target.value); setPPage(1) }} placeholder="Buscar parcela..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" />
+                </div>
+                <button onClick={limparFiltros} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70 hover:border-white/25">Limpar filtros</button>
+              </div>
+
+              {/* Tabela de parcelas */}
+              {parcelas.length === 0 ? (
+                <div className="mt-6 rounded-lg border border-dashed border-white/10 bg-[#12161c] px-4 py-8 text-center text-sm text-white/40">Nenhuma cobrança/parcela para esta receita.</div>
+              ) : (
+                <>
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead><tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/40">
+                        <th className="pb-2 font-medium">Parcela</th>
+                        <th className="pb-2 font-medium">Responsável</th>
+                        <th className="pb-2 font-medium">Vencimento</th>
+                        <th className="pb-2 font-medium">Valor</th>
+                        <th className="pb-2 font-medium">Valor base</th>
+                        <th className="pb-2 font-medium">Recebido</th>
+                        <th className="pb-2 font-medium">Restante (BRL)</th>
+                        <th className="pb-2 font-medium">Status</th>
+                        <th className="pb-2 font-medium">Forma</th>
+                        <th className="pb-2 font-medium">Ações</th>
+                      </tr></thead>
+                      <tbody>{parcelasPagina.map((p: any, i: number) => (
+                        <tr key={i} className="border-b border-white/10 align-top">
+                          <td className="whitespace-nowrap py-3.5 font-medium text-white/95">{p.numero}/{p.totalParcelas}</td>
+                          <td className="py-3.5">
+                            <span className="inline-flex items-center gap-1.5 text-white/80">{p.responsavel}
+                              {d.responsavel?.nome && p.responsavel === d.responsavel.nome && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-300">Principal</span>}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap py-3.5 text-white/70">{dataBR(p.vencimento)}
+                            {p.status === "VENCIDA" ? <div className="text-xs text-[#f87171]">{p.diasAtraso} dias de atraso</div> : ehHoje(p.vencimento) ? <div className="text-xs text-[#d2a948]">Hoje</div> : null}
+                          </td>
+                          <td className="whitespace-nowrap py-3.5 font-medium text-white/95">{brl(p.valorBrl)}</td>
+                          <td className="whitespace-nowrap py-3.5">
+                            <div className="text-white/80">{fmtEUR(p.valorBase)}</div>
+                            <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-white/40">Câmbio: {p.cotacao != null ? brl(p.cotacao) : "—"}
+                              {p.tipoCambio === "FIXO" && <span className="rounded bg-[#4ade80]/15 px-1 py-0.5 text-[9px] font-semibold text-[#4ade80]">Fixo</span>}
+                              {p.tipoCambio === "NAO_DEFINIDO" && <span className="rounded bg-white/10 px-1 py-0.5 text-[9px] font-semibold text-white/50">—</span>}
+                            </div>
+                          </td>
+                          <td className={`whitespace-nowrap py-3.5 ${p.recebidoBrl > 0 ? "font-medium text-[#4ade80]" : "text-white/70"}`}>{brl(p.recebidoBrl)}</td>
+                          <td className="whitespace-nowrap py-3.5 font-medium text-[#7dd3fc]">{brl(p.saldoBrl)}</td>
+                          <td className="py-3.5"><span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${parcelaStatusCls(p.status)}`}>{parcelaStatusLabel(p.status)}</span></td>
+                          <td className="whitespace-nowrap py-3.5 text-white/70">{p.forma ?? "—"}</td>
+                          <td className="py-3.5">
+                            {p.status === "PAGA" ? (
+                              <button onClick={() => setTab("pagamentos")} className="whitespace-nowrap rounded-lg border border-white/15 bg-[#1b2027] px-2.5 py-1.5 text-xs text-white/80 hover:border-white/25">Ver recebimento</button>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <button onClick={() => setPagOpen(true)} className="whitespace-nowrap rounded-lg bg-[#d2a948] px-2.5 py-1.5 text-xs font-semibold text-[#1b1508] hover:bg-[#e0b957]">Registrar pagamento</button>
+                                <button onClick={() => setPagOpen(true)} title="Registrar pagamento" className="rounded-lg border border-white/10 p-1.5 text-white/40 hover:text-white/70"><MoreVertical className="h-4 w-4" /></button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                  <div className="mt-4 flex items-center justify-between text-sm text-white/40">
+                    <span>Mostrando {parcDe}–{parcAte} de {parcelasFiltradas.length} parcelas</span>
+                    <div className="flex items-center gap-1">
+                      <button disabled={paginaAtual <= 1} onClick={() => setPPage((p) => Math.max(1, p - 1))} className="rounded border border-white/10 p-1.5 text-white/40 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>
+                      <span className="rounded border border-white/15 bg-[#252c35] px-2.5 py-1 text-xs text-white/80">{paginaAtual}</span>
+                      <button disabled={paginaAtual >= totalPaginas} onClick={() => setPPage((p) => Math.min(totalPaginas, p + 1))} className="rounded border border-white/10 p-1.5 text-white/40 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
-          <Painel titulo={`Responsáveis (${d.responsaveis?.length ?? 0})`}>
-            {(d.responsaveis ?? []).length === 0 ? <div className="text-sm text-white/40">—</div> : (d.responsaveis ?? []).map((r: any, i: number) => (
-              <div key={i} className="py-1.5 text-sm text-white/80">{r.nome}</div>
-            ))}
-          </Painel>
+          {/* Documentos */}
+          {tab === "documentos" && (
+            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+              <h2 className="text-lg font-semibold text-white">Documentos</h2>
+              <div className="mt-6 rounded-lg border border-dashed border-white/10 bg-[#12161c] px-4 py-8 text-center text-sm text-white/40">Nenhum documento vinculado a esta receita.</div>
+            </div>
+          )}
 
-          <Painel titulo={`Pagadores (${d.pagadores?.length ?? 0})`}>
-            {(d.pagadores ?? []).length === 0 ? <div className="text-sm text-white/40">—</div> : (d.pagadores ?? []).map((p: any, i: number) => (
-              <div key={i} className="flex items-center justify-between py-1.5 text-sm"><span className="text-white/80">{p.nome}</span><span className="text-white/70">{brl(p.valor)}</span></div>
-            ))}
-          </Painel>
-
-          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4"><div className="text-sm font-medium text-white/70">Observação</div><div className="mt-1 text-sm text-white/40">{d.observacao ?? "—"}</div></div>
+          {/* Timeline / Histórico de movimentações */}
+          {tab === "timeline" && (
+          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+            <h2 className="text-lg font-semibold text-white">Histórico de movimentações</h2>
+            <div className="mt-4">{historico.map((h: any, i: number) => {
+              const Icon = h.tipo === "OBRIGACAO_CRIADA" ? UserPlus : (String(h.tipo).startsWith("PAGAMENTO") ? ArrowDownCircle : Receipt)
+              const cor = h.tipo === "OBRIGACAO_CRIADA" ? "text-violet-400" : (String(h.tipo).startsWith("PAGAMENTO") ? "text-[#4ade80]" : "text-white/68")
+              const ultimo = i === historico.length - 1
+              return (
+                <div key={h.id ?? i} className="flex gap-4">
+                  <div className="w-16 shrink-0 pt-0.5 text-right text-[11px] leading-tight text-white/40">{dataBR(h.data)}<br />{horaBR(h.data)}</div>
+                  <div className="flex flex-col items-center"><div className={`flex h-8 w-8 items-center justify-center rounded-full bg-[#252c35] ${cor}`}><Icon className="h-4 w-4" /></div>{!ultimo && <div className="w-px flex-1 bg-[#252c35]" />}</div>
+                  <div className={`flex-1 ${ultimo ? "" : "pb-6"}`}>
+                    <div className="flex items-start justify-between"><div className="font-medium text-white/95">{h.titulo}</div><span className="text-xs text-[#7dd3fc]">{h.ator}</span></div>
+                    <div className="mt-0.5 text-sm text-white/68">{h.descricao}</div>
+                  </div>
+                </div>
+              )
+            })}</div>
+          </div>
+          )}
         </div>
       </div>
+
+      {/* ── MODAIS ── */}
       {pagOpen && d && (
         <RegistrarPagamentoModal
           obrigacaoId={d.obrigacaoId}
@@ -435,15 +573,91 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
           onDone={() => { setPagOpen(false); carregar() }}
         />
       )}
+      {faturaOpen && temProcesso && (
+        <NovaFaturaModal
+          processoId={d.processo.id}
+          onClose={() => setFaturaOpen(false)}
+          onSuccess={() => { setFaturaOpen(false); carregar() }}
+        />
+      )}
+      {editOpen && podeEditar && (
+        <EditarReceitaModal
+          receitaId={d.receitaId}
+          descricaoInicial={d.descricao ?? ""}
+          observacaoInicial={d.observacao ?? ""}
+          onClose={() => setEditOpen(false)}
+          onDone={() => { setEditOpen(false); carregar() }}
+        />
+      )}
     </div>
   )
 }
 
-function Info({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
-  return <div className="py-1"><div className="mb-1 text-xs text-white/40">{rotulo}</div><div className="text-sm">{children}</div></div>
+// ── Modal de edição de metadados seguros (descrição + observações) ──
+function EditarReceitaModal({ receitaId, descricaoInicial, observacaoInicial, onClose, onDone }: { receitaId: number; descricaoInicial: string; observacaoInicial: string; onClose: () => void; onDone: () => void }) {
+  const [descricao, setDescricao] = useState(descricaoInicial)
+  const [observacoes, setObservacoes] = useState(observacaoInicial)
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+
+  useEffect(() => {
+    const orig = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape" && !salvando) onClose() }
+    document.addEventListener("keydown", onEsc)
+    return () => { document.body.style.overflow = orig; document.removeEventListener("keydown", onEsc) }
+  }, [onClose, salvando])
+
+  const salvar = async () => {
+    if (!descricao.trim()) { setErro("A descrição é obrigatória."); return }
+    setSalvando(true); setErro(null)
+    try {
+      const res = await fetch(`/api/financeiro/receitas/${receitaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ descricao: descricao.trim(), observacoes: observacoes.trim() || null }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) { setErro(j?.error || `Falha ao salvar (HTTP ${res.status}).`); setSalvando(false); return }
+      onDone()
+    } catch { setErro("Falha de rede ao salvar."); setSalvando(false) }
+  }
+
+  const inp = "mt-1 w-full rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/90 outline-none placeholder:text-white/30 focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25"
+  const lbl = "block text-[11px] font-medium uppercase tracking-wider text-white/45"
+
+  if (typeof document === "undefined") return null
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => !salvando && onClose()}>
+      <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#1b2027] shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <h3 className="text-base font-semibold text-white">Editar receita</h3>
+          <button onClick={() => !salvando && onClose()} className="text-white/40 hover:text-white/80"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="space-y-4 px-5 py-5">
+          <div>
+            <label className={lbl}>Descrição</label>
+            <input value={descricao} onChange={(e) => setDescricao(e.target.value)} maxLength={300} className={inp} placeholder="Descrição da receita" />
+          </div>
+          <div>
+            <label className={lbl}>Observações</label>
+            <textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value)} rows={4} className={`${inp} resize-none`} placeholder="Observações internas (opcional)" />
+          </div>
+          <p className="text-xs text-white/40">Apenas metadados são editáveis. Valores, câmbio e parcelas são governados pelo Ledger e não mudam por aqui.</p>
+          {erro && <div className="rounded-lg border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-sm text-[#f87171]">{erro}</div>}
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-white/10 px-5 py-4">
+          <button onClick={() => !salvando && onClose()} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/70 hover:border-white/25">Cancelar</button>
+          <button onClick={salvar} disabled={salvando} className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-4 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957] disabled:opacity-60">{salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Salvar</button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
 }
-function Cell({ rotulo, children, sub }: { rotulo: string; children: React.ReactNode; sub?: string }) {
-  return <div className="py-1"><div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-white/40">{rotulo}</div><div className="text-sm">{children}</div>{sub && <div className="mt-0.5 text-[11px] text-white/40">{sub}</div>}</div>
+
+function Info({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+  return <div><div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-white/40">{rotulo}</div><div className="text-sm">{children}</div></div>
 }
 function SubCard({ rotulo, valor, cor, linhas }: { rotulo: string; valor: string; cor?: string; linhas?: string[] }) {
   return (
@@ -451,21 +665,6 @@ function SubCard({ rotulo, valor, cor, linhas }: { rotulo: string; valor: string
       <div className="text-[11px] uppercase tracking-wider text-white/40">{rotulo}</div>
       <div className={`mt-1.5 text-xl font-semibold ${cor ?? "text-white/95"}`}>{valor}</div>
       {linhas?.map((l, i) => <div key={i} className="mt-1 text-xs text-white/45">{l}</div>)}
-    </div>
-  )
-}
-function Linha({ k, v, cor }: { k: string; v: string; cor?: string }) {
-  return <div className="flex items-center justify-between py-1.5 text-sm"><span className="text-white/68">{k}</span><span className={cor ?? "text-white/80"}>{v}</span></div>
-}
-function DotLinha({ cor, k, v }: { cor: string; k: string; v: string }) {
-  return <div className="flex items-center justify-between py-1.5 text-sm"><span className="inline-flex items-center gap-2 text-white/68"><span className={`h-2 w-2 rounded-full ${cor}`} />{k}</span><span className="text-white/80">{v}</span></div>
-}
-function Painel({ titulo, children, aberto }: { titulo: string; children?: React.ReactNode; aberto?: boolean }) {
-  const [open, setOpen] = useState(!!aberto)
-  return (
-    <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
-      <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between"><span className="text-sm font-semibold text-white/80">{titulo}</span>{open ? <ChevronUp className="h-4 w-4 text-white/40" /> : <ChevronDown className="h-4 w-4 text-white/40" />}</button>
-      {open && children && <div className="mt-3">{children}</div>}
     </div>
   )
 }

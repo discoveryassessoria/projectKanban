@@ -44,6 +44,11 @@ export interface ReceitaDetalhe {
   parcelasDetalhe: { numero: number; totalParcelas: number; vencimento: string; valorBase: number; moedaBase: string; cotacao: number | null; tipoCambio: string; valorBrl: number; recebidoBrl: number; saldoBrl: number; status: string; forma: string | null; responsavel: string; diasAtraso: number }[]
   resumoParcelas: { pagas: { qtd: number; valor: number }; aVencer: { qtd: number; valor: number }; vencidas: { qtd: number; valor: number }; canceladas: { qtd: number; valor: number }; total: number }
   inadimplenciaPct: number
+  distribuicaoRequerentes: { nome: string; requerenteId: number | null; percentual: number; valor: number }[]
+  responsavelFinanceiro: { nome: string; requerenteId: number | null } | null
+  ultimaMovimentacao: { data: string; titulo: string; ator: string } | null
+  alertas: { tipo: string; severidade: string; label: string; valor: number | null }[]
+  proximasAcoes: { acao: string; label: string; descricao: string; disponivel: boolean }[]
   criadoEm: string | null
   criadoPor: string | null
   pagamentos: { id: number; data: string; valor: number; formaLabel: string | null; banco: string | null; agencia: string | null; conta: string | null; referencia: string | null; status: string }[]
@@ -93,7 +98,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   const tipoServico = receita?.tipoServicoId ? await prisma.tipoServico.findUnique({ where: { id: receita.tipoServicoId }, select: { nome: true } }).catch(() => null) : null
   // Requerente REAL (nome em texto) da Receita legada — fonte confiável do vínculo.
   const reqLeg = (obr.origemTipo === 'Receita' && obr.origemId)
-    ? await prisma.receitaRequerente.findMany({ where: { receitaId: obr.origemId }, orderBy: { idx: 'asc' }, select: { nome: true } }).catch(() => [])
+    ? await prisma.receitaRequerente.findMany({ where: { receitaId: obr.origemId }, orderBy: { idx: 'asc' }, select: { nome: true, percentual: true, requerenteId: true } }).catch(() => [])
     : []
   const reqNomeLegado = reqLeg.find((r) => r.nome?.trim())?.nome?.trim() || null
   // Item do Cadastro Mestre (fonte do lançamento manual) — preferido sobre o legado.
@@ -204,6 +209,22 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   const statusLabel = ca.statusLabel
   const primeiro = parts[0]
 
+  // ── blocos do detalhe rico (#80), DERIVADOS (sem migration) ──
+  const ultimaMovimentacao = historico[0] ? { data: historico[0].data, titulo: historico[0].titulo, ator: historico[0].ator } : null
+  const distribuicaoRequerentes = reqLeg.map((r) => ({ nome: r.nome, requerenteId: r.requerenteId ?? null, percentual: Number(r.percentual ?? 0), valor: cent((Number(r.percentual ?? 0) / 100) * ca.valorContratadoBrl) }))
+  const responsavelFinanceiro = reqLeg[0] ? { nome: reqLeg[0].nome, requerenteId: reqLeg[0].requerenteId ?? null } : (primeiro ? { nome: nome(primeiro.pessoaId), requerenteId: null } : null)
+  const semPagamento = pagamentos.length === 0
+  const alertas: { tipo: string; severidade: 'crit' | 'warn' | 'info'; label: string; valor: number | null }[] = []
+  if (resumoParcelas.vencidas.qtd > 0) alertas.push({ tipo: 'PARCELA_VENCIDA', severidade: 'crit', label: `${resumoParcelas.vencidas.qtd} parcela(s) vencida(s)`, valor: resumoParcelas.vencidas.valor })
+  alertas.push({ tipo: 'FATURA_NAO_EMITIDA', severidade: 'warn', label: 'Fatura não emitida', valor: null })
+  if (semPagamento) alertas.push({ tipo: 'SEM_PAGAMENTO', severidade: 'info', label: 'Nenhum pagamento registrado', valor: null })
+  const proximasAcoes = [
+    ...(resumoParcelas.vencidas.qtd > 0 ? [{ acao: 'COBRAR_VENCIDA', label: `Existe ${resumoParcelas.vencidas.qtd} parcela vencida`, descricao: `Parcela de ${fmtMoeda(resumoParcelas.vencidas.valor, 'BRL')} vencida.`, disponivel: true }] : []),
+    { acao: 'REGISTRAR_PAGAMENTO', label: 'Registrar pagamento', descricao: semPagamento ? 'Nenhum pagamento registrado ainda.' : 'Registrar novo pagamento recebido.', disponivel: true },
+    { acao: 'EMITIR_FATURA', label: 'Emitir fatura', descricao: 'Fatura ainda não emitida para esta receita.', disponivel: true },
+    { acao: 'ENVIAR_COBRANCA', label: 'Enviar cobrança', descricao: 'Cobrança ainda não enviada ao cliente.', disponivel: true },
+  ]
+
   return {
     obrigacaoId: id, receitaId: obr.origemTipo === 'Receita' ? (obr.origemId ?? null) : null,
     natureza: obr.direcao === 'A_PAGAR' ? 'CUSTO' : 'RECEITA',
@@ -219,6 +240,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     valorContratadoBrl: ca.valorContratadoBrl, recebidoBrl: ca.recebidoBrl, saldoBrl: ca.saldoBrl, aVencerBrl: ca.aVencerBrl, vencidoBrl: ca.vencidoBrl,
     parcelas: ca.parcelas, parcelasRecebidas: ca.parcelasRecebidas, parcelasAVencer: ca.parcelasAVencer, parcelasVencidas: ca.parcelasVencidas, proximoVencimento: ca.proximoVencimento,
     parcelasDetalhe, resumoParcelas, inadimplenciaPct,
+    distribuicaoRequerentes, responsavelFinanceiro, ultimaMovimentacao, alertas, proximasAcoes,
     criadoEm: obr.criadoEm.toISOString(), criadoPor: criador?.nome ?? 'Usuário',
     pagamentos, historico,
     resumo: { contratado, recebido, saldo, descontos, ajustes, liquido: cent(contratado - descontos + ajustes), contratadoBrl: ca.valorContratadoBrl, recebidoBrl: ca.recebidoBrl, saldoBrl: ca.saldoBrl, descontosBrl, ajustesBrl, liquidoBrl, jurosBrl, multaBrl },
