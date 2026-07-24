@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
       vencimento: b?.vencimento ? new Date(b.vencimento) : null,
       formaCobranca: b?.formaCobranca ?? null,
       fornecedorId: b?.fornecedorId != null ? Number(b.fornecedorId) : null,
+      centroCustoId: b?.centroCustoId != null ? Number(b.centroCustoId) : null,
       faseLabel: b?.faseLabel ?? null,
       rateio: b?.rateio ?? null,
       pagamento: b?.registrarPagamento ? { observacao: 'Pagamento no lançamento manual de custo' } : null,

@@ -8,7 +8,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { registrarLancamento } from '../ledger/ledger-service'
-import { lancPagamento, lancDesconto, lancEncargo, lancEstorno, type Perna, type Direcao } from '../ledger/lancamentos'
+import { lancPagamento, lancPagamentoPagavel, lancDesconto, lancEncargo, lancEstorno, type Perna, type Direcao } from '../ledger/lancamentos'
 import { aplicar, type PoliticaAplicacao } from '../dominio/aplicacao'
 import { chaveEvento } from '../dominio/eventos'
 
@@ -100,7 +100,10 @@ export async function registrarOcorrencia(e: EntradaOcorrencia) {
         await tx.creditoFinanceiro.create({ data: { obrigacaoId: obr.id, origemOcorrenciaId: oc.id, valor: excedente, moeda, destino: e.excedenteDestino ?? 'CREDITO', status: 'ABERTO' } })
       }
       const quitado = res.totalAplicado > 0 ? res.totalAplicado : cent(e.valor - excedente)
-      lancPernas = lancPagamento({ valorQuitado: quitado, tarifa: cent(e.tarifa ?? 0), diferencaCambial: cent(e.diferencaCambial ?? 0) })
+      // Roteia por DIREÇÃO: recebimento (A_RECEBER) vs desembolso/baixa (A_PAGAR).
+      lancPernas = obr.direcao === 'A_PAGAR'
+        ? lancPagamentoPagavel({ valorQuitado: quitado, tarifa: cent(e.tarifa ?? 0) })
+        : lancPagamento({ valorQuitado: quitado, tarifa: cent(e.tarifa ?? 0), diferencaCambial: cent(e.diferencaCambial ?? 0) })
     } else if (e.tipo === 'DESCONTO') {
       lancPernas = lancDesconto(e.valor)
     } else if (e.tipo === 'JUROS' || e.tipo === 'MULTA') {

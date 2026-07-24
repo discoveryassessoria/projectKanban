@@ -48,10 +48,12 @@ export async function carregarPosicaoProcesso(processoId: number): Promise<Posic
   const nomesPessoas: Record<number, string> = {}
   for (const p of pessoas) nomesPessoas[p.id] = [p.nome, p.sobrenome].filter(Boolean).join(' ')
 
+  // "Recebido" é métrica de RECEBÍVEL — não mistura com a baixa de custos (A_PAGAR).
+  const receb = posicoes.filter((p) => p.direcao !== 'A_PAGAR')
   const totais = {
     contratado: cent(posicoes.reduce((s, p) => s + p.valorContratado, 0)),
     saldo: cent(posicoes.reduce((s, p) => s + p.saldo, 0)),
-    recebido: cent(posicoes.reduce((s, p) => s + p.recebidoBruto, 0)),
+    recebido: cent(receb.reduce((s, p) => s + p.recebidoBruto, 0)),
     obrigacoes: posicoes.length,
   }
 

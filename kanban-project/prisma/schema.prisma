@@ -3973,6 +3973,7 @@ model ObrigacaoEconomica {
   politicaDivisao   String?  @db.VarChar(20) // SEM_DIVISAO|IGUAL|PERCENTUAL|VALOR|GRUPO|PERSONALIZADA
   contaContabilId   Int?
   centroCustoId     Int?
+  fornecedorId      Int? // custo manual: fornecedor vinculado (aditivo; sem FK forte, igual faseId/centroCustoId)
   status            String   @default("RASCUNHO") @db.VarChar(20) // RASCUNHO|ATIVO|SUSPENSO|LIQUIDADO|CANCELADO
   vencimento        DateTime? // Fase 2 — vencimento da obrigação (ex.: lançamento extra em cobrança futura)
   versao            Int      @default(1)

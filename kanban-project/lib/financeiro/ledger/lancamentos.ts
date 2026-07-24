@@ -107,6 +107,19 @@ export function lancPagamento(input: {
   return montarLancamento('PAGAMENTO', pernas)
 }
 
+/**
+ * Baixa (desembolso) de uma obrigação A_PAGAR (custo/reembolso): reduz o passivo
+ * "Fornecedores/Custos a Pagar" contra a saída de Caixa. Espelho do lancPagamento
+ * receivable — orientado a PAGÁVEL. Sempre 2 pernas balanceadas.
+ */
+export function lancPagamentoPagavel(input: { valorQuitado: number; tarifa?: number }): Lancamento {
+  const quitado = cent(input.valorQuitado)
+  const tarifa = cent(input.tarifa ?? 0)
+  const pernas: Perna[] = [D(CONTA.FORNECEDORES_A_PAGAR, quitado), C(CONTA.CAIXA_BANCO, cent(quitado + tarifa))]
+  if (tarifa > 0) pernas.push(D(CONTA.TAXAS, tarifa))
+  return montarLancamento('PAGAMENTO', pernas)
+}
+
 /** Desconto concedido: reduz o a receber contra a conta de descontos. */
 export function lancDesconto(valor: number): Lancamento {
   return montarLancamento('DESCONTO', [D(CONTA.DESCONTOS, valor), C(CONTA.CLIENTES_A_RECEBER, valor)])

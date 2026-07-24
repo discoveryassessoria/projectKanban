@@ -20,6 +20,7 @@ export interface TimelineItem {
   aplicado: number
   comprovanteUrl?: string | null
   observacao?: string | null
+  manual: boolean // lançamento manual (origemTipo='nativo')
 }
 
 export interface PosicaoFinanceira {
@@ -95,7 +96,7 @@ export async function carregarPosicao(ref: { obrigacaoId?: number; codigo?: stri
       if (pg.pessoaId != null) pagamentosInternos.push({ pessoaId: pg.pessoaId, valor: Number(o.valor) })
       else if (externoNome) externosMap.set(externoNome, (externosMap.get(externoNome) ?? 0) + Number(o.valor))
     }
-    return { ocorrenciaId: o.id, tipo: o.tipo, valor: Number(o.valor), moeda: String(o.moeda), data: o.data.toISOString(), status: o.status, pagador: pg ? { tipo: pg.tipo, pessoaId: pg.pessoaId, externoNome } : null, aplicado, comprovanteUrl: o.comprovanteUrl, observacao: o.observacao }
+    return { ocorrenciaId: o.id, tipo: o.tipo, valor: Number(o.valor), moeda: String(o.moeda), data: o.data.toISOString(), status: o.status, pagador: pg ? { tipo: pg.tipo, pessoaId: pg.pessoaId, externoNome } : null, aplicado, comprovanteUrl: o.comprovanteUrl, observacao: o.observacao, manual: obr.origemTipo === 'nativo' }
   })
 
   const dist = obr.distribuicoes[0]

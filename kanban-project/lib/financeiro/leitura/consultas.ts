@@ -30,7 +30,8 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
   const obrs = await prisma.obrigacaoEconomica.findMany({
     where: {
       ...(f?.processoId ? { processoId: f.processoId } : {}),
-      ...(f?.status ? { status: f.status } : {}),
+      // Sem status explícito, exclui CANCELADO (segue no Extrato/Timeline p/ histórico).
+      ...(f?.status ? { status: f.status } : { status: { not: 'CANCELADO' } }),
       ...(f?.natureza ? { natureza: f.natureza } : {}),
       ...(f?.origemTipo ? { origemTipo: f.origemTipo } : {}),
     },

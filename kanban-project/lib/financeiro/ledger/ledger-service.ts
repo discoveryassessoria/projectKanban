@@ -78,6 +78,8 @@ export async function criarObrigacaoEconomicaComLedger(input: {
   processoId?: number | null
   faseId?: number | null
   clienteId?: number | null
+  fornecedorId?: number | null
+  centroCustoId?: number | null
   regraFinanceiraId?: number | null
   vencimento?: Date | null
   observacoes?: string | null
@@ -101,6 +103,7 @@ export async function criarObrigacaoEconomicaComLedger(input: {
       codigoOperacional: input.codigoOperacional ?? null,
       natureza: input.natureza, direcao: dir,
       processoId: input.processoId ?? null, faseId: input.faseId ?? null, clienteId: input.clienteId ?? null,
+      fornecedorId: input.fornecedorId ?? null, centroCustoId: input.centroCustoId ?? null,
       regraFinanceiraId: input.regraFinanceiraId ?? null,
       moedaContratual: moeda, moedaContabil: moeda,
       valorContratado: input.valorContratado,

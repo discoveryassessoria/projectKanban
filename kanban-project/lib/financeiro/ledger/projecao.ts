@@ -38,14 +38,30 @@ function debitos(entries: EntryProjecao[], conta: string): number {
   return cent(entries.filter((e) => e.conta === conta && e.direcao === 'DEBITO').reduce((s, e) => s + e.valor, 0))
 }
 
+/** Total lançado a crédito numa conta. */
+function creditos(entries: EntryProjecao[], conta: string): number {
+  return cent(entries.filter((e) => e.conta === conta && e.direcao === 'CREDITO').reduce((s, e) => s + e.valor, 0))
+}
+
 /**
  * Reconstrói a projeção a partir de TODOS os entries da obrigação (incluindo o
  * lançamento de abertura, quando houver). Determinístico e idempotente.
  */
 export function projetar(entries: EntryProjecao[]): Projecao {
-  const saldo = saldoConta(entries, CONTA.CLIENTES_A_RECEBER)
+  // Recebível (obrigações A_RECEBER): saldo = Clientes a Receber; recebido = Caixa (+ tarifas).
+  const recebivelSaldo = saldoConta(entries, CONTA.CLIENTES_A_RECEBER)
   const recebidoLiquido = saldoConta(entries, CONTA.CAIXA_BANCO)
-  const recebidoBruto = cent(recebidoLiquido + debitos(entries, CONTA.TAXAS))
+  const recebidoReceb = cent(recebidoLiquido + debitos(entries, CONTA.TAXAS))
+
+  // Pagável (obrigações A_PAGAR): a obrigação credita "Fornecedores/Custos a Pagar"
+  // ao nascer (contratado) e o débito nesse passivo = valor JÁ PAGO (baixa).
+  // Como uma obrigação é sempre de UMA direção, o par oposto fica zerado.
+  const pagavelDebito = debitos(entries, CONTA.FORNECEDORES_A_PAGAR) // total pago (custo)
+  const pagavelCredito = creditos(entries, CONTA.FORNECEDORES_A_PAGAR) // contratado (custo)
+  const ehPagavel = pagavelCredito > 0.004
+
+  const saldo = ehPagavel ? cent(pagavelCredito - pagavelDebito) : recebivelSaldo
+  const recebidoBruto = ehPagavel ? pagavelDebito : recebidoReceb
   const ultimaSequenciaAplicada = entries.reduce((m, e) => Math.max(m, e.sequencia ?? 0), 0)
   return { saldo, recebidoBruto, recebidoLiquido, ultimaSequenciaAplicada }
 }

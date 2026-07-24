@@ -27,6 +27,7 @@ export interface EntradaLancamentoManual {
   vencimento?: Date | null
   formaCobranca?: string | null
   fornecedorId?: number | null // custo
+  centroCustoId?: number | null // custo
   faseLabel?: string | null
   rateio?: { modo: ModoDistribuicao; participantes: ParticipanteRateio[] } | null
   pagamento?: { observacao?: string | null; comprovanteUrl?: string | null } | null
@@ -37,11 +38,6 @@ export interface ResultadoLancamentoManual { obrigacaoId: number; total: number;
 
 /** Valida e cria o lançamento manual. Lança Error com mensagem clara em falha. */
 export async function criarLancamentoManual(e: EntradaLancamentoManual): Promise<ResultadoLancamentoManual> {
-  // O motor V3 modela pagamento apenas de RECEITA (projeção orientada a
-  // recebível). Desembolso de CUSTO (pagável) ainda não é suportado pela
-  // projeção — não gravamos lançamento contábil incorreto.
-  if (e.natureza === 'CUSTO' && e.pagamento) throw new Error('Registro de pagamento de custo ainda não disponível — salve o custo e registre o pagamento pela baixa quando disponível.')
-
   const qtd = e.quantidade && e.quantidade > 0 ? e.quantidade : 1
   const unit = Number(e.valorUnitario)
   if (!isFinite(unit) || unit <= 0) throw new Error('Informe um valor unitário maior que zero.')
@@ -95,6 +91,8 @@ export async function criarLancamentoManual(e: EntradaLancamentoManual): Promise
     valor: total,
     moeda,
     processoId: e.processoId,
+    fornecedorId: e.natureza === 'CUSTO' ? (e.fornecedorId ?? null) : null,
+    centroCustoId: e.natureza === 'CUSTO' ? (e.centroCustoId ?? null) : null,
     vencimento: e.vencimento ?? null,
     distribuicao,
     pagamento: e.pagamento ? { observacao: e.pagamento.observacao ?? 'Pagamento no lançamento manual', comprovanteUrl: e.pagamento.comprovanteUrl ?? null } : null,

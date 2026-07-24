@@ -29,7 +29,7 @@ export interface ReceitasLista {
 
 export async function listarReceitas(processoId?: number): Promise<ReceitasLista> {
   const obrs = await prisma.obrigacaoEconomica.findMany({
-    where: { natureza: 'RECEITA', direcao: 'A_RECEBER', ...(processoId ? { processoId } : {}) },
+    where: { natureza: 'RECEITA', direcao: 'A_RECEBER', status: { not: 'CANCELADO' }, ...(processoId ? { processoId } : {}) },
     include: { distribuicoes: { orderBy: { versao: 'desc' }, include: { participacoes: true } } },
     orderBy: { id: 'desc' }, take: 500,
   })

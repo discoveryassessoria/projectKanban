@@ -9,6 +9,7 @@ import { listarReceitas } from '@/lib/financeiro/leitura/receitas-lista'
 import { listarObrigacoes } from '@/lib/financeiro/leitura/consultas'
 import { carregarPosicaoProcesso } from '@/lib/financeiro/leitura/posicao-processo'
 import { resolverPrecoPorConfigDB } from '@/src/lib/motor/resolver-preco-financeiro.prisma'
+import { cancelarObrigacao } from '@/lib/financeiro/extras/cancelar-lancamento'
 
 let passou = 0, falhou = 0
 const ok = (n: string, c: boolean, extra = '') => { if (c) { passou++; console.log(`  ✓ ${n}`) } else { falhou++; console.log(`  ✗ ${n} ${extra}`) } }
@@ -119,12 +120,15 @@ async function main() {
   ok('C4 criado (fornecedor + acréscimo, total 320)', c4.total === 320)
   const c4obr = await prisma.obrigacaoEconomica.findUnique({ where: { id: c4.obrigacaoId } })
   ok('C4 observação registra fornecedor (auditoria/manual)', !!c4obr?.observacoes?.includes('Cartório XYZ') && c4obr!.observacoes!.includes('manual'))
-  // 5) custo simples (5º custo) — pagamento de custo é rejeitado (motor não desembolsa pagável)
-  const c5 = await criarLancamentoManual({ natureza: 'CUSTO', processoId: proc.id, itemCatalogoId: taxa.it.id, valorUnitario: 250, moeda: 'BRL' })
-  ok('C5 criado (5º custo)', c5.total === 250)
-  let custoPagRejeitado = false
-  try { await criarLancamentoManual({ natureza: 'CUSTO', processoId: proc.id, itemCatalogoId: taxa.it.id, valorUnitario: 250, moeda: 'BRL', pagamento: { observacao: 'x' } }) } catch { custoPagRejeitado = true }
-  ok('pagamento imediato de CUSTO é rejeitado com mensagem clara (não corrompe ledger)', custoPagRejeitado)
+  ok('C4 fornecedor vinculado ESTRUTURALMENTE (fornecedorId)', c4obr?.fornecedorId === forn.id, `fornecedorId=${c4obr?.fornecedorId}`)
+  // 5) custo + registrar pagamento (BAIXA de pagável) → saldo 0 / pago = total
+  const c5 = await criarLancamentoManual({ natureza: 'CUSTO', processoId: proc.id, itemCatalogoId: taxa.it.id, valorUnitario: 250, moeda: 'BRL', pagamento: { observacao: 'pago' } })
+  const projC5 = await prisma.saldoProjecao.findUnique({ where: { obrigacaoId: c5.obrigacaoId } })
+  ok('C5 custo COM baixa → saldo 0 / pago 250', !!projC5 && round2(Number(projC5.saldo)) === 0 && round2(Number(projC5.recebidoBruto)) === 250, JSON.stringify(projC5))
+  // custo SEM pagamento mantém saldo a pagar = contratado (projeção pagável correta)
+  const c6 = await criarLancamentoManual({ natureza: 'CUSTO', processoId: proc.id, itemCatalogoId: servico.it.id, valorUnitario: 500, moeda: 'BRL' })
+  const projC6 = await prisma.saldoProjecao.findUnique({ where: { obrigacaoId: c6.obrigacaoId } })
+  ok('C6 custo SEM baixa → saldo a pagar 500 / pago 0', !!projC6 && round2(Number(projC6.saldo)) === 500 && round2(Number(projC6.recebidoBruto)) === 0, JSON.stringify(projC6))
 
   // Receita COM pagamento imediato → saldo 0 / recebido = total (recebível funciona)
   const rp = await criarLancamentoManual({ natureza: 'RECEITA', processoId: proc.id, itemCatalogoId: taxa.it.id, valorUnitario: 200, moeda: 'BRL', pagamento: { observacao: 'recebido' } })
@@ -136,21 +140,48 @@ async function main() {
   const receitasAba = await listarReceitas(proc.id)
   ok('Aba Receitas mostra as 5 receitas', receitasAba.receitas.length === 5, `n=${receitasAba.receitas.length}`)
   const custosAba = await listarObrigacoes({ processoId: proc.id, natureza: 'CUSTO' })
-  ok('Aba Custos mostra os 5 custos', custosAba.length === 5, `n=${custosAba.length}`)
+  ok('Aba Custos mostra os 6 custos', custosAba.length === 6, `n=${custosAba.length}`)
   const pos = await carregarPosicaoProcesso(proc.id)
   const totalTimeline = (pos?.obrigacoes ?? []).reduce((s: number, o: any) => s + (o.timeline?.length ?? 0), 0)
-  ok('Extrato/Timeline tem eventos de todas as 10 obrigações', (pos?.obrigacoes?.length ?? 0) === 10 && totalTimeline >= 10, `obrs=${pos?.obrigacoes?.length} eventos=${totalTimeline}`)
+  ok('Extrato/Timeline tem eventos de todas as 11 obrigações', (pos?.obrigacoes?.length ?? 0) === 11 && totalTimeline >= 11, `obrs=${pos?.obrigacoes?.length} eventos=${totalTimeline}`)
+  ok('Visão Geral "Recebido" NÃO mistura baixa de custo (só recebível)', round2(pos.totais.recebido) === 200, `recebido=${pos.totais.recebido}`)
   const nativosReceita = await listarObrigacoes({ processoId: proc.id, natureza: 'RECEITA', origemTipo: 'nativo' })
   const nativosCusto = await listarObrigacoes({ processoId: proc.id, natureza: 'CUSTO', origemTipo: 'nativo' })
-  ok('Merge Visão Geral: 5 receitas + 5 custos nativos', nativosReceita.length === 5 && nativosCusto.length === 5, `${nativosReceita.length}/${nativosCusto.length}`)
+  ok('Merge Visão Geral: 5 receitas + 6 custos nativos', nativosReceita.length === 5 && nativosCusto.length === 6, `${nativosReceita.length}/${nativosCusto.length}`)
 
   // ================= NÃO DUPLICA EM RELEITURA =================
   console.log('\nIdempotência de leitura (reload)')
   const releitura1 = await listarObrigacoes({ processoId: proc.id })
   const releitura2 = await listarObrigacoes({ processoId: proc.id })
-  ok('reload não duplica (10 obrigações estáveis)', releitura1.length === 10 && releitura2.length === 10, `${releitura1.length}/${releitura2.length}`)
+  ok('reload não duplica (11 obrigações estáveis)', releitura1.length === 11 && releitura2.length === 11, `${releitura1.length}/${releitura2.length}`)
   const totalObrDB = await prisma.obrigacaoEconomica.count({ where: { processoId: proc.id } })
-  ok('total no banco = 10 (nenhuma duplicata)', totalObrDB === 10, `db=${totalObrDB}`)
+  ok('total no banco = 11 (nenhuma duplicata)', totalObrDB === 11, `db=${totalObrDB}`)
+
+  // ================= CANCELAMENTO AUDITÁVEL =================
+  console.log('\nCancelamento (estorno auditável, sem apagar histórico)')
+  await cancelarObrigacao({ obrigacaoId: r1.obrigacaoId, motivo: 'teste' })
+  await cancelarObrigacao({ obrigacaoId: c1.obrigacaoId, motivo: 'teste' })
+  const r1cancel = await prisma.obrigacaoEconomica.findUnique({ where: { id: r1.obrigacaoId } })
+  const projR1c = await prisma.saldoProjecao.findUnique({ where: { obrigacaoId: r1.obrigacaoId } })
+  ok('receita cancelada → status CANCELADO + saldo 0', r1cancel?.status === 'CANCELADO' && round2(Number(projR1c?.saldo)) === 0, `status=${r1cancel?.status} saldo=${projR1c?.saldo}`)
+  const recAposCancel = await listarReceitas(proc.id)
+  ok('receita cancelada some da aba Receitas (4 restantes)', recAposCancel.receitas.length === 4, `n=${recAposCancel.receitas.length}`)
+  const custAposCancel = await listarObrigacoes({ processoId: proc.id, natureza: 'CUSTO' })
+  ok('custo cancelado some da aba Custos (5 restantes)', custAposCancel.length === 5, `n=${custAposCancel.length}`)
+  const histPreservado = await prisma.obrigacaoEconomica.count({ where: { processoId: proc.id } })
+  ok('histórico preservado no banco (11 obrigações, nada apagado)', histPreservado === 11, `db=${histPreservado}`)
+  const posComCancel = await carregarPosicaoProcesso(proc.id)
+  ok('cancelados continuam no Extrato/Timeline (11 obrigações)', (posComCancel?.obrigacoes?.length ?? 0) === 11)
+  let idempotente = false
+  const rc2 = await cancelarObrigacao({ obrigacaoId: r1.obrigacaoId, motivo: 'de novo' })
+  idempotente = rc2.jaCancelada === true
+  ok('cancelar de novo é idempotente (jaCancelada=true)', idempotente)
+
+  // ================= TIMELINE MARCA MANUAL =================
+  const posFinal = await carregarPosicaoProcesso(proc.id)
+  const algumManual = (posFinal?.obrigacoes ?? []).some((o: any) => (o.timeline ?? []).some((t: any) => t.manual === true))
+  const todosManuais = (posFinal?.obrigacoes ?? []).every((o: any) => (o.timeline ?? []).every((t: any) => t.manual === true))
+  ok('Timeline marca lançamento como manual (origemTipo=nativo)', algumManual && todosManuais)
 
   console.log(`\n=== RESULTADO: ${passou} passou, ${falhou} falhou ===\n`)
   await prisma.$disconnect()

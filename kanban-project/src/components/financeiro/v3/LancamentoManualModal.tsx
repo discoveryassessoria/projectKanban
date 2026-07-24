@@ -31,6 +31,8 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
   const [requerentes, setRequerentes] = useState<Requerente[]>([])
   const [fases, setFases] = useState<Fase[]>([])
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
+  const [centros, setCentros] = useState<{ id: number; nome: string }[]>([])
+  const [centroCustoId, setCentroCustoId] = useState<string>("")
 
   // campos
   const [tipo, setTipo] = useState<string>("")           // filtra itens por natureza
@@ -64,7 +66,10 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
       setRequerentes(reqs)
     }).catch(() => setRequerentes([]))
     fetch(`/api/processos/${processoId}/phases`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setFases((j?.phases ?? []).map((p: any) => ({ phaseKey: p.phaseKey, label: p.label })))).catch(() => setFases([]))
-    if (!receita) fetch(`/api/fornecedores?ativo=true`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setFornecedores((Array.isArray(j) ? j : j?.fornecedores ?? []).map((f: any) => ({ id: f.id, nome: f.nome })))).catch(() => setFornecedores([]))
+    if (!receita) {
+      fetch(`/api/fornecedores?ativo=true`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setFornecedores((Array.isArray(j) ? j : j?.fornecedores ?? []).map((f: any) => ({ id: f.id, nome: f.nome })))).catch(() => setFornecedores([]))
+      fetch(`/api/financeiro/v3/centros-custo`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setCentros(j?.centros ?? [])).catch(() => setCentros([]))
+    }
   }, [processoId, receita])
 
   const tipos = useMemo(() => Array.from(new Set((itens ?? []).map((i) => i.natureza))), [itens])
@@ -137,7 +142,7 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
         formaCobranca: formaCobranca || undefined, faseLabel: faseLabel || undefined,
         rateio, registrarPagamento: comPagamento || undefined,
       }
-      if (!receita) { body.acrescimo = acr || undefined; body.fornecedorId = fornecedorId ? Number(fornecedorId) : undefined }
+      if (!receita) { body.acrescimo = acr || undefined; body.fornecedorId = fornecedorId ? Number(fornecedorId) : undefined; body.centroCustoId = centroCustoId ? Number(centroCustoId) : undefined }
       const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(body) })
       const j = await res.json().catch(() => ({}))
       if (!res.ok || !j.ok) { setErro(j?.erro || j?.motivo || `Falha ao salvar (HTTP ${res.status}).`); return }
@@ -205,6 +210,14 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
               <select value={fornecedorId} onChange={(e) => setFornecedorId(e.target.value)} className={inputCls}>
                 <option value="">—</option>
                 {fornecedores.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+              </select>
+            </label>
+          )}
+          {!receita && (
+            <label className={labelCls}>Centro de custo <span className="text-neutral-600">(opcional)</span>
+              <select value={centroCustoId} onChange={(e) => setCentroCustoId(e.target.value)} className={inputCls}>
+                <option value="">—</option>
+                {centros.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </select>
             </label>
           )}
@@ -289,7 +302,7 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
 
         <div className="mt-5 flex justify-end gap-2">
           <button onClick={onClose} className="rounded-lg border border-neutral-700 bg-neutral-900 px-3.5 py-2 text-sm text-neutral-300 hover:border-neutral-600">Cancelar</button>
-          {receita && <button onClick={() => salvar(true)} disabled={!!salvando} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-700/50 bg-emerald-600/15 px-3.5 py-2 text-sm font-medium text-emerald-300 hover:bg-emerald-600/25 disabled:opacity-50"><Plus className="h-4 w-4" /> {salvando === "pagamento" ? "Salvando…" : "Salvar e registrar pagamento"}</button>}
+          <button onClick={() => salvar(true)} disabled={!!salvando} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-700/50 bg-emerald-600/15 px-3.5 py-2 text-sm font-medium text-emerald-300 hover:bg-emerald-600/25 disabled:opacity-50"><Plus className="h-4 w-4" /> {salvando === "pagamento" ? "Salvando…" : "Salvar e registrar pagamento"}</button>
           <button onClick={() => salvar(false)} disabled={!!salvando} className="rounded-lg bg-amber-500/90 px-3.5 py-2 text-sm font-medium text-neutral-950 hover:bg-amber-400 disabled:opacity-50">{salvando === "salvar" ? "Salvando…" : receita ? "Salvar receita" : "Salvar custo"}</button>
         </div>
       </div>

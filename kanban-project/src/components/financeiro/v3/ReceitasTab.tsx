@@ -94,7 +94,13 @@ export function ReceitasTab({ processoId }: { processoId?: number }) {
       </div>
 
       {/* Drawer lateral */}
-      {sel && <Drawer r={sel} onClose={() => setSel(null)} onRegistrar={() => router.push(`/financeiro/v3/receita/${sel.obrigacaoId}`)} />}
+      {sel && <Drawer r={sel} onClose={() => setSel(null)} onRegistrar={() => router.push(`/financeiro/v3/receita/${sel.obrigacaoId}`)} onCancelar={async () => {
+        if (!window.confirm("Cancelar esta receita? O histórico é preservado (estorno auditável).")) return
+        const res = await fetch(`/api/financeiro/v3/obrigacoes/${sel.obrigacaoId}/cancelar`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: "{}" })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok || !j.ok) alert(j?.erro || `Falha ao cancelar (HTTP ${res.status}).`)
+        else { setSel(null); carregar() }
+      }} />}
 
       {/* Modal Nova Receita (lançamento manual) */}
       {novo && processoId != null && <LancamentoManualModal natureza="RECEITA" processoId={processoId} onClose={() => setNovo(false)} onCriado={() => { setNovo(false); carregar() }} />}
@@ -118,7 +124,7 @@ function Filtro({ rotulo, valor }: { rotulo: string; valor: string }) {
     </label>
   )
 }
-function Drawer({ r, onClose, onRegistrar }: { r: any; onClose: () => void; onRegistrar: () => void }) {
+function Drawer({ r, onClose, onRegistrar, onCancelar }: { r: any; onClose: () => void; onRegistrar: () => void; onCancelar: () => void }) {
   return (
     <div className="w-[320px] shrink-0 self-start rounded-xl border border-neutral-800 bg-[#0f1114] p-4">
       <div className="flex items-center justify-between"><h3 className="text-sm font-semibold text-neutral-200">Detalhes da receita</h3><button onClick={onClose} className="text-neutral-500 hover:text-neutral-300"><X className="h-4 w-4" /></button></div>
@@ -142,7 +148,7 @@ function Drawer({ r, onClose, onRegistrar }: { r: any; onClose: () => void; onRe
         <button onClick={onRegistrar} className="flex w-full items-center gap-2 rounded-lg border border-emerald-700/40 bg-emerald-600/10 px-3 py-2 text-sm text-emerald-400 hover:bg-emerald-600/20"><FileText className="h-4 w-4" /> Registrar pagamento</button>
         <button className="flex w-full items-center gap-2 rounded-lg border border-amber-700/40 bg-amber-600/10 px-3 py-2 text-sm text-amber-400 hover:bg-amber-600/20"><FileText className="h-4 w-4" /> Emitir cobrança</button>
         <button className="flex w-full items-center gap-2 rounded-lg border border-sky-700/40 bg-sky-600/10 px-3 py-2 text-sm text-sky-400 hover:bg-sky-600/20"><FileText className="h-4 w-4" /> Emitir nota fiscal</button>
-        <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-300"><Receipt className="hidden" />Mais ações <ChevronDown className="h-4 w-4" /></button>
+        <button onClick={onCancelar} className="flex w-full items-center gap-2 rounded-lg border border-red-800/40 bg-red-950/20 px-3 py-2 text-sm text-red-300 hover:bg-red-950/40"><Receipt className="hidden" />Cancelar lançamento</button>
       </div>
     </div>
   )

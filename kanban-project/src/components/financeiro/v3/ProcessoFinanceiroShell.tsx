@@ -42,7 +42,18 @@ export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) 
 function CustosTab({ processoId }: { processoId: number }) {
   const [obrs, setObrs] = useState<any[] | null>(null)
   const [novo, setNovo] = useState(false)
+  const [cancelando, setCancelando] = useState<number | null>(null)
   const carregar = () => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}&natureza=CUSTO`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }
+  async function cancelar(id: number) {
+    if (!window.confirm("Cancelar este custo? O histórico é preservado (estorno auditável).")) return
+    setCancelando(id)
+    try {
+      const res = await fetch(`/api/financeiro/v3/obrigacoes/${id}/cancelar`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: "{}" })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || !j.ok) alert(j?.erro || `Falha ao cancelar (HTTP ${res.status}).`)
+      else carregar()
+    } finally { setCancelando(null) }
+  }
   useEffect(() => { carregar() }, [processoId])
   if (!obrs) return <div className="py-8 text-sm text-neutral-500">carregando…</div>
   const totais = { contratado: obrs.reduce((s, o) => s + o.valorContratado, 0), saldo: obrs.reduce((s, o) => s + o.saldo, 0), pago: obrs.reduce((s, o) => s + o.recebido, 0) }
@@ -58,7 +69,7 @@ function CustosTab({ processoId }: { processoId: number }) {
         <table className="w-full text-sm">
           <thead><tr className="text-left text-xs text-neutral-500">{["Custo", "Valor contratado", "Pago", "Saldo", "Vencimento", "Status", "Ações"].map((h) => <th key={h} className="px-5 py-3 font-medium">{h}</th>)}</tr></thead>
           <tbody>{obrs.map((o) => (
-            <tr key={o.obrigacaoId} className="border-t border-neutral-800/60"><td className="px-5 py-4 text-neutral-100"><div>{o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`}</div>{o.codigoOperacional && <div className="text-xs text-neutral-500">{o.codigoOperacional}</div>}</td><td className="px-5">{fmt(o.valorContratado, o.moeda)}</td><td className="px-5 text-emerald-400">{fmt(o.recebido, o.moeda)}</td><td className="px-5 text-sky-400">{fmt(o.saldo, o.moeda)}</td><td className="px-5 text-neutral-300">—</td><td className="px-5"><span className="rounded bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-400">{o.status}</span></td><td className="px-5 text-neutral-500">⋮</td></tr>
+            <tr key={o.obrigacaoId} className="border-t border-neutral-800/60"><td className="px-5 py-4 text-neutral-100"><div>{o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`}</div>{o.codigoOperacional && <div className="text-xs text-neutral-500">{o.codigoOperacional}</div>}</td><td className="px-5">{fmt(o.valorContratado, o.moeda)}</td><td className="px-5 text-emerald-400">{fmt(o.recebido, o.moeda)}</td><td className="px-5 text-sky-400">{fmt(o.saldo, o.moeda)}</td><td className="px-5 text-neutral-300">—</td><td className="px-5"><span className="rounded bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-400">{o.status}</span></td><td className="px-5"><button onClick={() => cancelar(o.obrigacaoId)} disabled={cancelando === o.obrigacaoId} className="rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:border-red-700/50 hover:text-red-300 disabled:opacity-50">{cancelando === o.obrigacaoId ? "…" : "Cancelar"}</button></td></tr>
           ))}{obrs.length === 0 && <tr><td colSpan={7} className="px-5 py-8 text-center text-neutral-500">Nenhum custo neste processo.</td></tr>}</tbody>
         </table>
       </div>
@@ -85,7 +96,7 @@ function Movimentacoes({ processoId, modo }: { processoId: number; modo: "extrat
         <table className="w-full text-sm">
           <thead><tr className="text-left text-xs text-neutral-500">{["Data", "Descrição", "Origem", "Valor", "Status", ""].map((h) => <th key={h} className="py-2 font-medium">{h}</th>)}</tr></thead>
           <tbody>{eventos.map((e, i) => (
-            <tr key={i} className="border-t border-neutral-800/60"><td className="py-2.5 text-neutral-300">{dataBR(e.data)}</td><td className="text-neutral-200">{e.tipo}</td><td className="text-neutral-400">{e.obrigacao ?? "—"}</td><td className={ENTRADA.has(e.tipo) ? "text-emerald-400" : "text-neutral-200"}>{ENTRADA.has(e.tipo) ? "+" : ""}{fmt(e.valor, e.moeda)}</td><td className="text-neutral-400">{e.status}</td><td>{e.comprovanteUrl && <a href={e.comprovanteUrl} target="_blank" rel="noreferrer" className="text-xs text-sky-400">comprovante</a>}</td></tr>
+            <tr key={i} className="border-t border-neutral-800/60"><td className="py-2.5 text-neutral-300">{dataBR(e.data)}</td><td className="text-neutral-200">{e.tipo}{e.manual && <span className="ml-2 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-medium text-sky-300">manual</span>}</td><td className="text-neutral-400">{e.obrigacao ?? "—"}</td><td className={ENTRADA.has(e.tipo) ? "text-emerald-400" : "text-neutral-200"}>{ENTRADA.has(e.tipo) ? "+" : ""}{fmt(e.valor, e.moeda)}</td><td className="text-neutral-400">{e.status}</td><td>{e.comprovanteUrl && <a href={e.comprovanteUrl} target="_blank" rel="noreferrer" className="text-xs text-sky-400">comprovante</a>}</td></tr>
           ))}</tbody>
         </table>
       ) : (
