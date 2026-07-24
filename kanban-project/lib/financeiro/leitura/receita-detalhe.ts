@@ -5,6 +5,7 @@
 // Processo de origem (metadados). Espelha 1:1 o que a tela renderiza.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import { cotacoesVivas, computeCambioAging, labelServico } from './cambio-aging'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
@@ -24,11 +25,27 @@ export interface ReceitaDetalhe {
   recebido: number
   saldo: number
   vencimento: string | null
+  // câmbio + BRL + aging (mesmo núcleo/matemática da lista de receitas)
+  moedaBase: string
+  valorBase: number
+  cotacaoAplicada: number | null
+  tipoCambio: string
+  dataCotacao: string | null
+  valorContratadoBrl: number
+  recebidoBrl: number
+  saldoBrl: number
+  aVencerBrl: number
+  vencidoBrl: number
+  parcelas: number
+  parcelasRecebidas: number
+  parcelasAVencer: number
+  parcelasVencidas: number
+  proximoVencimento: string | null
   criadoEm: string | null
   criadoPor: string | null
   pagamentos: { id: number; data: string; valor: number; formaLabel: string | null; banco: string | null; agencia: string | null; conta: string | null; referencia: string | null; status: string }[]
   historico: { id: number; data: string; tipo: string; titulo: string; descricao: string; ator: string }[]
-  resumo: { contratado: number; recebido: number; saldo: number; descontos: number; ajustes: number; liquido: number }
+  resumo: { contratado: number; recebido: number; saldo: number; descontos: number; ajustes: number; liquido: number; contratadoBrl: number; recebidoBrl: number; saldoBrl: number; descontosBrl: number; ajustesBrl: number; liquidoBrl: number }
   distribuicao: { nome: string; percentual: number; valor: number }[]
   distribuicaoTotal: { percentual: number; valor: number }
   responsaveis: { id: number; nome: string }[]
@@ -68,7 +85,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
 
   // Receita/Processo de origem (metadados) + criador
   const receita = obr.origemTipo === 'Receita' && obr.origemId
-    ? await prisma.receita.findUnique({ where: { id: obr.origemId }, select: { codigo: true, descricao: true, categoria: true, data1: true, createdAt: true, processoId: true, tipoServicoId: true } }).catch(() => null)
+    ? await prisma.receita.findUnique({ where: { id: obr.origemId }, select: { codigo: true, descricao: true, categoria: true, data1: true, createdAt: true, processoId: true, tipoServicoId: true, moeda: true, valor: true, fxEstimado: true, fxRule: true, fxFixo: true, fxData: true, valorBrlFixo: true } }).catch(() => null)
     : null
   const tipoServico = receita?.tipoServicoId ? await prisma.tipoServico.findUnique({ where: { id: receita.tipoServicoId }, select: { nome: true } }).catch(() => null) : null
   // Item do Cadastro Mestre (fonte do lançamento manual) — preferido sobre o legado.
@@ -86,7 +103,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   const parteIds = pagadores.map((p) => p.parteExternaId).filter((v): v is number => v != null)
   const partes = parteIds.length ? await prisma.parteExterna.findMany({ where: { id: { in: parteIds } } }) : []
   const pessoas = pessoaIds.size ? await prisma.pessoa.findMany({ where: { id: { in: [...pessoaIds] } }, select: { id: true, nome: true, sobrenome: true } }) : []
-  const nome = (pid: number | null) => { const p = pessoas.find((x) => x.id === pid); return p ? [p.nome, p.sobrenome].filter(Boolean).join(' ') : (pid != null ? `Pessoa #${pid}` : '—') }
+  const nome = (pid: number | null) => { const p = pessoas.find((x) => x.id === pid); const n = p ? [p.nome, p.sobrenome].filter(Boolean).join(' ').trim() : ''; return n || 'Não identificado' }
 
   const contratado = Number(obr.valorContratado)
   const recebido = proj ? Number(proj.recebidoBruto) : 0
@@ -100,13 +117,31 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   }))
 
   const moeda = String(obr.moedaContratual)
+
+  // câmbio + aging + BRL — MESMO núcleo da lista de receitas (números idênticos)
+  const parcelasRec = obr.origemTipo === 'Receita' && obr.origemId
+    ? await prisma.parcelaFinanceira.findMany({ where: { receitaId: obr.origemId, status: { not: 'CANCELADA' } }, select: { vencimento: true, valor: true, status: true, cambioAplicado: true, valorBrl: true } }).catch(() => [])
+    : []
+  const live = await cotacoesVivas()
+  const ca = computeCambioAging({
+    moedaBase: moeda, valorBase: contratado, saldoLedger: saldo, recebidoLedger: recebido,
+    vencimento: obr.vencimento ?? receita?.data1 ?? null,
+    receita: receita ? { fxRule: receita.fxRule, fxEstimado: receita.fxEstimado, fxFixo: receita.fxFixo, fxData: receita.fxData, valorBrlFixo: receita.valorBrlFixo } : null,
+    parcelas: parcelasRec, live,
+  })
+  const descontosBrl = moeda === 'BRL' ? descontos : cent(descontos * (ca.cotacaoAplicada ?? 1))
+  const ajustesBrl = moeda === 'BRL' ? ajustes : cent(ajustes * (ca.cotacaoAplicada ?? 1))
+  const liquidoBrl = cent(ca.valorContratadoBrl - descontosBrl + ajustesBrl)
+
   const historico = obr.ocorrencias.map((o) => {
     const pg = o.pagadorId != null ? pagadores.find((p) => p.id === o.pagadorId) : undefined
     const quem = pg?.parteExternaId != null ? (partes.find((x) => x.id === pg.parteExternaId)?.nome ?? 'Externo') : (pg?.pessoaId != null ? nome(pg.pessoaId) : (criador?.nome ?? 'Usuário'))
+    // valor na moeda-base + BRL entre parênteses (ex.: "€ 2.800,00 (R$ 16.800,00)")
+    const comBrl = (v: number) => `${fmtMoeda(v, moeda)}${moeda !== 'BRL' && ca.cotacaoAplicada ? ` (${fmtMoeda(cent(v * ca.cotacaoAplicada), 'BRL')})` : ''}`
     let descricao = ''
-    if (o.tipo === 'OBRIGACAO_CRIADA') descricao = `Receita criada no valor de ${fmtMoeda(Number(o.valor), moeda)}.`
-    else if (o.tipo === 'PAGAMENTO' || o.tipo === 'PAGAMENTO_PARCIAL') descricao = `Pagamento via ${o.formaLabel ?? 'recurso'} no valor de ${fmtMoeda(Number(o.valor), moeda)}.`
-    else descricao = `${TITULO[o.tipo] ?? o.tipo} — ${fmtMoeda(Number(o.valor), moeda)}.`
+    if (o.tipo === 'OBRIGACAO_CRIADA') descricao = `Receita criada no valor de ${comBrl(Number(o.valor))}.`
+    else if (o.tipo === 'PAGAMENTO' || o.tipo === 'PAGAMENTO_PARCIAL') descricao = `Pagamento via ${o.formaLabel ?? 'recurso'} no valor de ${comBrl(Number(o.valor))}.`
+    else descricao = `${TITULO[o.tipo] ?? o.tipo} — ${comBrl(Number(o.valor))}.`
     return { id: o.id, data: o.data.toISOString(), tipo: o.tipo, titulo: TITULO[o.tipo] ?? o.tipo, descricao, ator: quem }
   })
 
@@ -122,7 +157,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     pagadoresAgg.set(quem, cent((pagadoresAgg.get(quem) ?? 0) + Number(o.valor)))
   }
 
-  const statusLabel = saldo <= 0.005 ? 'QUITADO' : 'A VENCER'
+  const statusLabel = ca.statusLabel
   const primeiro = parts[0]
 
   return {
@@ -131,14 +166,17 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     codigo: obr.codigoOperacional, descricao: itemMestre?.name ?? receita?.descricao ?? obr.observacoes ?? null, statusLabel,
     processo: { id: processo?.id ?? null, codigo: processo?.codigo ?? null, nome: processo?.nome ?? null },
     responsavel: primeiro ? { nome: nome(primeiro.pessoaId), papel: 'Principal' } : null,
-    servico: itemMestre?.name ?? tipoServico?.nome ?? (receita?.categoria ? String(receita.categoria) : null),
+    servico: itemMestre?.name ?? tipoServico?.nome ?? labelServico(receita?.categoria ? String(receita.categoria) : null),
     formaCobranca: 'À vista',
     moeda,
     valorContratado: contratado, recebido, saldo,
     vencimento: (obr.vencimento ?? receita?.data1)?.toISOString() ?? null,
+    moedaBase: ca.moedaBase, valorBase: ca.valorBase, cotacaoAplicada: ca.cotacaoAplicada, tipoCambio: ca.tipoCambio, dataCotacao: ca.dataCotacao,
+    valorContratadoBrl: ca.valorContratadoBrl, recebidoBrl: ca.recebidoBrl, saldoBrl: ca.saldoBrl, aVencerBrl: ca.aVencerBrl, vencidoBrl: ca.vencidoBrl,
+    parcelas: ca.parcelas, parcelasRecebidas: ca.parcelasRecebidas, parcelasAVencer: ca.parcelasAVencer, parcelasVencidas: ca.parcelasVencidas, proximoVencimento: ca.proximoVencimento,
     criadoEm: obr.criadoEm.toISOString(), criadoPor: criador?.nome ?? 'Usuário',
     pagamentos, historico,
-    resumo: { contratado, recebido, saldo, descontos, ajustes, liquido: cent(contratado - descontos + ajustes) },
+    resumo: { contratado, recebido, saldo, descontos, ajustes, liquido: cent(contratado - descontos + ajustes), contratadoBrl: ca.valorContratadoBrl, recebidoBrl: ca.recebidoBrl, saldoBrl: ca.saldoBrl, descontosBrl, ajustesBrl, liquidoBrl },
     distribuicao, distribuicaoTotal: { percentual: cent(distribuicao.reduce((s, d) => s + d.percentual, 0)), valor: cent(distribuicao.reduce((s, d) => s + d.valor, 0)) },
     responsaveis: responsaveisSet, pagadores: [...pagadoresAgg.entries()].map(([nome, valor]) => ({ nome, valor })),
     observacao: obr.observacoes ?? null,
