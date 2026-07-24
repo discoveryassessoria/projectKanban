@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from "react"
 import { ReceitasTab } from "./ReceitasTab"
 import { LancamentoManualModal } from "./LancamentoManualModal"
 import { VisaoGeral } from "@/src/components/financeiro/subabas/VisaoGeral"
-import { FileText } from "lucide-react"
+import { FileText, FileMinus, CheckSquare, CalendarDays, AlertTriangle, Plus, Eye, Layers, ChevronLeft, ChevronRight, ArrowDownRight, ArrowUpRight, RefreshCw, SlidersHorizontal } from "lucide-react"
 
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
 const dataBR = (s?: string | null) => s ? new Date(s).toLocaleDateString("pt-BR") : "—"
@@ -31,18 +31,19 @@ export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) 
       </div>
       {t === "visao" && <VisaoGeral processoId={processoId} fxHoje={fxEur} onIrPara={(a) => setT(a)} />}
       {t === "receitas" && <ReceitasTab processoId={processoId} />}
-      {t === "custos" && <CustosTab processoId={processoId} />}
+      {t === "custos" && <CustosTab processoId={processoId} fx={fxEur} />}
       {t === "extrato" && <Movimentacoes processoId={processoId} modo="extrato" />}
       {t === "timeline" && <Movimentacoes processoId={processoId} modo="timeline" />}
     </div>
   )
 }
 
-// Custos — lista do processo (obrigações de natureza CUSTO).
-function CustosTab({ processoId }: { processoId: number }) {
+// Custos — lista do processo (obrigações de natureza CUSTO). Discovery Design System.
+function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
   const [obrs, setObrs] = useState<any[] | null>(null)
   const [novo, setNovo] = useState(false)
   const [cancelando, setCancelando] = useState<number | null>(null)
+  const [sub, setSub] = useState<"todos" | "pagos" | "apagar">("todos")
   const carregar = () => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}&natureza=CUSTO`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }
   async function cancelar(id: number) {
     if (!window.confirm("Cancelar este custo? O histórico é preservado (estorno auditável).")) return
@@ -55,23 +56,77 @@ function CustosTab({ processoId }: { processoId: number }) {
     } finally { setCancelando(null) }
   }
   useEffect(() => { carregar() }, [processoId])
-  if (!obrs) return <div className="py-8 text-sm text-neutral-500">carregando…</div>
-  const totais = { contratado: obrs.reduce((s, o) => s + o.valorContratado, 0), saldo: obrs.reduce((s, o) => s + o.saldo, 0), pago: obrs.reduce((s, o) => s + o.recebido, 0) }
+  if (!obrs) return <div className="py-8 text-sm text-white/40">carregando…</div>
+
+  const toBRL = (v: number, m: string) => m === "BRL" ? v : v * (fx || 1)
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+  const quitado = (o: any) => o.recebido >= o.valorContratado - 0.005
+  const emAtraso = obrs.filter((o) => o.vencimento && new Date(o.vencimento) < hoje && o.saldo > 0.005)
+  const totais = {
+    total: obrs.reduce((s, o) => s + toBRL(o.valorContratado, o.moeda), 0),
+    pago: obrs.reduce((s, o) => s + toBRL(o.recebido, o.moeda), 0),
+    apagar: obrs.reduce((s, o) => s + toBRL(o.saldo, o.moeda), 0),
+    atraso: emAtraso.length,
+  }
+  const lista = obrs.filter((o) => sub === "pagos" ? quitado(o) : sub === "apagar" ? !quitado(o) : true)
+
+  const KpiC = ({ titulo, valor, sub: s, icon: Ic, cor }: any) => (
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+      <div className="flex items-start justify-between gap-2"><span className="text-[11px] font-medium uppercase tracking-wide text-white/45">{titulo}</span>{Ic && <span className="grid h-8 w-8 place-items-center rounded-lg" style={{ background: `${cor}22`, color: cor }}><Ic className="h-4 w-4" /></span>}</div>
+      <div className="mt-2 text-2xl font-bold text-white">{valor}</div>
+      <div className="mt-1 text-[11px] text-white/40">{s}</div>
+    </div>
+  )
+
   return (
     <div>
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {[["Total contratado", fmt(totais.contratado)], ["Pago", fmt(totais.pago)], ["Saldo a pagar", fmt(totais.saldo)], ["Custos", String(obrs.length)]].map(([k, v]) => (
-          <div key={k} className="rounded-xl border border-neutral-800 bg-[#0f1114] p-4"><div className="text-xs text-neutral-400">{k}</div><div className="mt-1 text-xl font-bold text-white">{v}</div></div>
-        ))}
+      {/* Cabeçalho */}
+      <div className="flex items-start justify-between gap-3">
+        <div><h2 className="text-lg font-semibold text-white">Custos</h2><p className="text-sm text-white/45">Despesas e custos do processo</p></div>
+        <div className="flex items-center gap-2">
+          <button className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.03] px-3.5 py-2 text-sm text-white/80 hover:bg-white/[0.06]"><Layers className="h-4 w-4" /> Fases aplicadas</button>
+          <button onClick={() => setNovo(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-medium text-[#1b1508] hover:bg-[#e0b957]"><Plus className="h-4 w-4" /> Novo Custo</button>
+        </div>
       </div>
-      <div className="mt-5 rounded-xl border border-neutral-800 bg-[#0f1114]">
-        <div className="flex items-center justify-between border-b border-neutral-800 px-5 py-3"><span className="text-sm font-medium text-amber-400">Custos ({obrs.length})</span><button onClick={() => setNovo(true)} className="rounded-lg bg-amber-500/90 px-3.5 py-2 text-sm font-medium text-neutral-950 hover:bg-amber-400">+ Novo Custo</button></div>
-        <table className="w-full text-sm">
-          <thead><tr className="text-left text-xs text-neutral-500">{["Custo", "Valor contratado", "Pago", "Saldo", "Vencimento", "Status", "Ações"].map((h) => <th key={h} className="px-5 py-3 font-medium">{h}</th>)}</tr></thead>
-          <tbody>{obrs.map((o) => (
-            <tr key={o.obrigacaoId} className="border-t border-neutral-800/60"><td className="px-5 py-4 text-neutral-100"><div>{o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`}</div>{o.codigoOperacional && <div className="text-xs text-neutral-500">{o.codigoOperacional}</div>}</td><td className="px-5">{fmt(o.valorContratado, o.moeda)}</td><td className="px-5 text-emerald-400">{fmt(o.recebido, o.moeda)}</td><td className="px-5 text-sky-400">{fmt(o.saldo, o.moeda)}</td><td className="px-5 text-neutral-300">—</td><td className="px-5"><span className="rounded bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-400">{o.status}</span></td><td className="px-5"><button onClick={() => cancelar(o.obrigacaoId)} disabled={cancelando === o.obrigacaoId} className="rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:border-red-700/50 hover:text-red-300 disabled:opacity-50">{cancelando === o.obrigacaoId ? "…" : "Cancelar"}</button></td></tr>
-          ))}{obrs.length === 0 && <tr><td colSpan={7} className="px-5 py-8 text-center text-neutral-500">Nenhum custo neste processo.</td></tr>}</tbody>
-        </table>
+
+      {/* KPIs */}
+      <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+        <KpiC titulo="Total" valor={fmt(totais.total)} sub={`${obrs.length} custo(s)`} icon={FileMinus} cor="#7dd3fc" />
+        <KpiC titulo="Pago" valor={fmt(totais.pago)} sub="pago em caixa" icon={CheckSquare} cor="#4ade80" />
+        <KpiC titulo="A pagar" valor={fmt(totais.apagar)} sub="a pagar" icon={CalendarDays} cor="#fbbf24" />
+        <KpiC titulo="Em atraso" valor={`${totais.atraso} parc.`} sub={`${totais.atraso} parcelas`} icon={AlertTriangle} cor="#f87171" />
+      </div>
+
+      {/* Tabela */}
+      <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.04]">
+        <div className="flex items-center gap-6 border-b border-white/10 px-5 pt-4">
+          {([["todos", "Todos"], ["pagos", "Pagos"], ["apagar", "A Pagar"]] as const).map(([id, label]) => (
+            <button key={id} onClick={() => setSub(id)} className={`-mb-px border-b-2 pb-3 text-sm ${sub === id ? "border-[#d2a948] font-medium text-[#d2a948]" : "border-transparent text-white/55 hover:text-white/80"}`}>{label}</button>
+          ))}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="text-left text-[11px] uppercase tracking-wide text-white/40">{["Descrição", "Categoria", "Total", "Total (BRL)", "Câmbio", "Vencimento", "Progresso", "Status", "Ações"].map((h) => <th key={h} className="px-5 py-3 font-medium">{h}</th>)}</tr></thead>
+            <tbody>{lista.map((o) => {
+              const prog = o.valorContratado > 0 ? Math.min(100, Math.round((o.recebido / o.valorContratado) * 100)) : 0
+              const quit = quitado(o)
+              return (
+                <tr key={o.obrigacaoId} className="border-t border-white/10 hover:bg-white/[0.03]">
+                  <td className="px-5 py-4"><div className="max-w-[220px] text-white/95">{o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`}</div>{o.codigoOperacional && <div className="text-xs text-white/40">{o.codigoOperacional}</div>}</td>
+                  <td className="px-5 text-white/70">{o.categoria ?? "—"}</td>
+                  <td className="px-5 text-white/95">{fmt(o.valorContratado, o.moeda)}</td>
+                  <td className="px-5 text-white/70">{fmt(toBRL(o.valorContratado, o.moeda))}</td>
+                  <td className="px-5"><span className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] text-white/70">{o.moeda}</span></td>
+                  <td className="px-5 text-white/70">{o.vencimento ? dataBR(o.vencimento) : "—"}</td>
+                  <td className="px-5"><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[#4ade80]" style={{ width: `${prog}%` }} /></div><span className="text-[11px] text-white/50">{prog}%</span></div></td>
+                  <td className="px-5">{quit ? <span className="rounded bg-[#4ade80]/15 px-2 py-0.5 text-[11px] font-semibold text-[#4ade80]">Pago</span> : <span className="rounded bg-[#fbbf24]/15 px-2 py-0.5 text-[11px] font-semibold text-[#fbbf24]">A pagar</span>}</td>
+                  <td className="px-5"><button onClick={() => cancelar(o.obrigacaoId)} disabled={cancelando === o.obrigacaoId} className="rounded-lg border border-white/15 px-2.5 py-1 text-xs text-white/70 hover:border-[#f87171]/50 hover:text-[#f87171] disabled:opacity-50">{cancelando === o.obrigacaoId ? "…" : "Cancelar"}</button></td>
+                </tr>
+              )
+            })}{lista.length === 0 && <tr><td colSpan={9} className="px-5 py-8 text-center text-white/40">Nenhum custo neste processo.</td></tr>}</tbody>
+          </table>
+        </div>
+        <div className="flex items-center justify-between px-5 py-4 text-sm text-white/40"><span>Mostrando {lista.length} de {lista.length} registro{lista.length === 1 ? "" : "s"}</span><div className="flex items-center gap-1"><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded border border-[#d2a948]/40 bg-[#d2a948]/12 px-2.5 py-1 text-xs text-[#d2a948]">1</span><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronRight className="h-4 w-4" /></button></div></div>
       </div>
       {novo && <LancamentoManualModal natureza="CUSTO" processoId={processoId} onClose={() => setNovo(false)} onCriado={() => { setNovo(false); carregar() }} />}
     </div>
