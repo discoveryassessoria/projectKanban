@@ -8,6 +8,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { ReceitasTab } from "./ReceitasTab"
 import { LancamentoManualModal } from "./LancamentoManualModal"
 import RegistrarPagamentoModal from "./RegistrarPagamentoModal"
@@ -18,6 +19,16 @@ const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "c
 const dataBR = (s?: string | null) => s ? new Date(s).toLocaleDateString("pt-BR") : "—"
 const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 const SUBTABS: [string, string][] = [["visao", "Visão Geral"], ["receitas", "Receitas"], ["custos", "Custos"], ["extrato", "Extrato"], ["timeline", "Timeline"]]
+// Exporta linhas já carregadas como CSV (client-side, sem endpoint dedicado).
+function baixarCSV(nome: string, rows: Record<string, any>[]) {
+  if (!rows.length) { alert("Nada para exportar."); return }
+  const cols = Object.keys(rows[0])
+  const esc = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`
+  const csv = [cols.join(";"), ...rows.map((r) => cols.map((c) => esc(r[c])).join(";"))].join("\n")
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a"); a.href = url; a.download = `${nome}.csv`; a.click(); URL.revokeObjectURL(url)
+}
 
 export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) {
   const [t, setT] = useState("visao")
@@ -139,8 +150,11 @@ function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
 // Extrato financeiro — movimentações do processo (Receitas/Custos) com saldo
 // acumulado. Discovery Design System. Fonte: obrigações do motor V3.
 function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
+  const router = useRouter()
   const [obrs, setObrs] = useState<any[] | null>(null)
   const [tipo, setTipo] = useState<"todos" | "receitas" | "custos">("todos")
+  const [fCat, setFCat] = useState("Todas")
+  const [fStatus, setFStatus] = useState("Todos")
   const [busca, setBusca] = useState("")
   useEffect(() => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }, [processoId])
   const movs = useMemo(() => {
@@ -157,7 +171,8 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
     const comSaldo = asc.map((mv) => { acc += mv.receita ? mv.valorBRL : -mv.valorBRL; return { ...mv, saldoAcum: acc } })
     return comSaldo.reverse()
   }, [obrs, fx])
-  const lista = useMemo(() => movs.filter((mv) => (tipo === "receitas" ? mv.receita : tipo === "custos" ? !mv.receita : true) && (!busca || `${mv.descricao} ${mv.codigo} ${mv.categoria}`.toLowerCase().includes(busca.toLowerCase()))), [movs, tipo, busca])
+  const cats = useMemo(() => ["Todas", ...Array.from(new Set(movs.map((mv) => mv.categoria)))], [movs])
+  const lista = useMemo(() => movs.filter((mv) => (tipo === "receitas" ? mv.receita : tipo === "custos" ? !mv.receita : true) && (fCat === "Todas" || mv.categoria === fCat) && (fStatus === "Todos" || (fStatus === "Quitado" ? mv.quitado : !mv.quitado)) && (!busca || `${mv.descricao} ${mv.codigo} ${mv.categoria}`.toLowerCase().includes(busca.toLowerCase()))), [movs, tipo, fCat, fStatus, busca])
   if (!obrs) return <div className="py-8 text-sm text-white/40">carregando…</div>
   const totReceitas = movs.filter((m) => m.receita).reduce((s, m) => s + m.valorBRL, 0)
   const totCustos = movs.filter((m) => !m.receita).reduce((s, m) => s + m.valorBRL, 0)
@@ -168,22 +183,22 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
     <div>
       <div className="flex items-start justify-between gap-3">
         <div><h2 className="text-lg font-semibold text-white">Extrato financeiro</h2><p className="text-sm text-white/45">Histórico completo de receitas, custos e movimentações financeiras do processo.</p></div>
-        <button className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#1b2027] px-3.5 py-2 text-sm text-white/80 hover:bg-[#252c35]"><Download className="h-4 w-4" /> Exportar</button>
+        <button onClick={() => baixarCSV("extrato-financeiro", lista.map((mv) => ({ Data: mv.vencimento ? dataBR(mv.vencimento) : "", Tipo: mv.receita ? "Receita" : "Custo", Categoria: mv.categoria, Descricao: mv.descricao, Documento: mv.codigo, Valor: mv.valorBRL, SaldoAcumulado: mv.saldoAcum, Status: mv.quitado ? (mv.receita ? "Recebido" : "Pago") : (mv.receita ? "A receber" : "A pagar") })))} className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#1b2027] px-3.5 py-2 text-sm text-white/80 hover:bg-[#252c35]"><Download className="h-4 w-4" /> Exportar</button>
       </div>
 
       {/* Filtros */}
       <div className="mt-4 rounded-xl border border-white/10 bg-[#1b2027] p-4">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           <label className="text-xs text-white/40">Período<div className={`mt-1 flex items-center justify-between ${selCls}`}><span className="text-white/70">01/06/2026 - 24/07/2026</span><CalendarDays className="h-3.5 w-3.5 text-white/40" /></div></label>
-          <FiltroBox label="Tipo" valor="Todos" />
-          <FiltroBox label="Categoria" valor="Todas" />
+          <FiltroBox label="Tipo" valor={tipo === "receitas" ? "Receitas" : tipo === "custos" ? "Custos" : "Todos"} options={["Todos", "Receitas", "Custos"]} onChange={(v) => setTipo(v === "Receitas" ? "receitas" : v === "Custos" ? "custos" : "todos")} />
+          <FiltroBox label="Categoria" valor={fCat} options={cats} onChange={setFCat} />
           <FiltroBox label="Pessoa / Requerente" valor="Todos" />
           <FiltroBox label="Documento" valor="Todos" />
         </div>
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <FiltroBox label="Fase" valor="Todas" className="w-[150px]" />
           <FiltroBox label="Responsável" valor="Todos" className="w-[150px]" />
-          <FiltroBox label="Status" valor="Todos" className="w-[150px]" />
+          <FiltroBox label="Status" valor={fStatus} options={["Todos", "Quitado", "Pendente"]} onChange={setFStatus} className="w-[150px]" />
           <div className="relative min-w-[240px] flex-1"><div className="mb-1 text-xs text-white/40">Buscar</div><Search className="pointer-events-none absolute left-3 top-[30px] h-4 w-4 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar descrição, documento, origem..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
           <button onClick={() => setBusca("")} className="mb-[1px] inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
         </div>
@@ -217,7 +232,7 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
               <td className="px-4 tabular-nums text-[#fbbf24]">{mv.receita ? "—" : fmt(mv.valorBRL)}</td>
               <td className="px-4 tabular-nums text-[#7dd3fc]">{fmt(mv.saldoAcum)}</td>
               <td className="px-4">{mv.quitado ? <span className="rounded bg-[#4ade80]/15 px-2 py-0.5 text-[11px] font-semibold text-[#4ade80]">{mv.receita ? "Recebido" : "Pago"}</span> : <span className="rounded bg-[#fbbf24]/15 px-2 py-0.5 text-[11px] font-semibold text-[#fbbf24]">{mv.receita ? "A receber" : "A pagar"}</span>}</td>
-              <td className="px-4"><span className="grid h-7 w-7 place-items-center rounded-md text-white/40 hover:bg-white/10 hover:text-white/70"><Eye className="h-4 w-4" /></span></td>
+              <td className="px-4"><button onClick={() => router.push(`/financeiro/v3/receita/${mv.id}`)} title="Abrir movimentação" className="grid h-7 w-7 place-items-center rounded-md text-white/40 hover:bg-white/10 hover:text-white/70"><Eye className="h-4 w-4" /></button></td>
             </tr>
           ))}{lista.length === 0 && <tr><td colSpan={10} className="px-4 py-8 text-center text-white/40">Sem movimentações.</td></tr>}</tbody>
         </table>
@@ -231,7 +246,19 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
     </div>
   )
 }
-function FiltroBox({ label, valor, className = "" }: { label: string; valor: string; className?: string }) {
+function FiltroBox({ label, valor, className = "", options, onChange }: { label: string; valor: string; className?: string; options?: string[]; onChange?: (v: string) => void }) {
+  if (options && onChange) {
+    return (
+      <label className={`text-xs text-white/40 ${className}`}>{label}
+        <div className="relative mt-1">
+          <select value={valor} onChange={(e) => onChange(e.target.value)} className="w-full appearance-none rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 pr-8 text-sm text-white/80 outline-none focus:border-[#7dd3fc]/50">
+            {options.map((o) => <option key={o} value={o} className="bg-[#20262e]">{o}</option>)}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
+        </div>
+      </label>
+    )
+  }
   return (
     <label className={`text-xs text-white/40 ${className}`}>{label}
       <div className="mt-1 flex items-center justify-between rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm"><span className="text-white/70">{valor}</span><ChevronDown className="h-3.5 w-3.5 text-white/40" /></div>
@@ -251,7 +278,9 @@ function ExtKpi({ titulo, valor, sub, icon: Ic, cor }: any) {
 // Timeline financeira — linha do tempo das movimentações + resumos laterais.
 // Discovery Design System. Fonte: obrigações do motor V3.
 function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
+  const router = useRouter()
   const [obrs, setObrs] = useState<any[] | null>(null)
+  const [fCat, setFCat] = useState("Todas")
   const [busca, setBusca] = useState("")
   useEffect(() => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }, [processoId])
   const movsAll = useMemo(() => {
@@ -266,7 +295,8 @@ function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
     const comSaldo = asc.map((mv) => { acc += mv.receita ? mv.valorBRL : -mv.valorBRL; return { ...mv, saldoAcum: acc } })
     return comSaldo.reverse()
   }, [obrs, fx])
-  const movs = useMemo(() => movsAll.filter((mv) => !busca || `${mv.descricao} ${mv.codigo} ${mv.categoria} ${mv.responsavel ?? ""}`.toLowerCase().includes(busca.toLowerCase())), [movsAll, busca])
+  const cats = useMemo(() => ["Todas", ...Array.from(new Set(movsAll.map((mv) => mv.categoria)))], [movsAll])
+  const movs = useMemo(() => movsAll.filter((mv) => (fCat === "Todas" || mv.categoria === fCat) && (!busca || `${mv.descricao} ${mv.codigo} ${mv.categoria} ${mv.responsavel ?? ""}`.toLowerCase().includes(busca.toLowerCase()))), [movsAll, fCat, busca])
   const iniciais = (nome: string | null) => (nome ?? "").split(" ").filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join("") || "—"
   const horaBR = (iso?: string | null) => iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""
   if (!obrs) return <div className="py-8 text-sm text-white/40">carregando…</div>
@@ -288,7 +318,7 @@ function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
     <div>
       <div className="flex items-start justify-between gap-3">
         <div><h2 className="text-lg font-semibold text-white">Timeline financeira</h2><p className="text-sm text-white/45">Linha do tempo completa de todas as movimentações e eventos financeiros do processo.</p></div>
-        <button className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#1b2027] px-3.5 py-2 text-sm text-white/80 hover:bg-[#252c35]"><Download className="h-4 w-4" /> Exportar</button>
+        <button onClick={() => baixarCSV("timeline-financeira", movs.map((mv) => ({ Data: mv.data ? dataBR(mv.data) : "", Tipo: mv.receita ? "Receita" : "Custo", Categoria: mv.categoria, Descricao: mv.descricao, Documento: mv.codigo, Valor: mv.valorBRL, SaldoApos: mv.saldoAcum, Responsavel: mv.responsavel ?? "", Status: mv.quitado ? (mv.receita ? "Recebido" : "Pago") : (mv.receita ? "A receber" : "A pagar") })))} className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#1b2027] px-3.5 py-2 text-sm text-white/80 hover:bg-[#252c35]"><Download className="h-4 w-4" /> Exportar</button>
       </div>
 
       {/* Filtros */}
@@ -296,7 +326,7 @@ function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           <label className="text-xs text-white/40">Período<div className="mt-1 flex items-center justify-between rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm"><span className="text-white/70">01/06/2026 - 24/07/2026</span><CalendarDays className="h-3.5 w-3.5 text-white/40" /></div></label>
           <FiltroBox label="Tipo" valor="Todos" />
-          <FiltroBox label="Categoria" valor="Todas" />
+          <FiltroBox label="Categoria" valor={fCat} options={cats} onChange={setFCat} />
           <FiltroBox label="Fase" valor="Todas" />
           <FiltroBox label="Responsável" valor="Todos" />
         </div>
@@ -336,7 +366,7 @@ function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
                           </div>
                           {mv.responsavel && <div className="mt-1.5 flex items-center justify-end gap-1.5"><span className="grid h-5 w-5 place-items-center rounded-full bg-white/10 text-[9px] font-semibold text-white/70">{iniciais(mv.responsavel)}</span><span className="text-[11px] text-white/50">{mv.responsavel}</span></div>}
                         </div>
-                        <button className="mt-0.5 grid h-7 w-7 place-items-center rounded-md text-white/40 hover:bg-white/10 hover:text-white/70"><SlidersHorizontal className="hidden" /><span className="text-lg leading-none">⋮</span></button>
+                        <button onClick={() => router.push(`/financeiro/v3/receita/${mv.id}`)} title="Abrir movimentação" className="mt-0.5 grid h-7 w-7 place-items-center rounded-md text-white/40 hover:bg-white/10 hover:text-white/70"><span className="text-lg leading-none">⋮</span></button>
                       </div>
                     </div>
                   </div>
