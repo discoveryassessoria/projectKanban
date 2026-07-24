@@ -91,6 +91,7 @@ export async function criarLancamentoManual(e: EntradaLancamentoManual): Promise
     valor: total,
     moeda,
     processoId: e.processoId,
+    itemCatalogoId: e.itemCatalogoId, // FONTE do lançamento (Cadastro Mestre) — estrutural
     fornecedorId: e.natureza === 'CUSTO' ? (e.fornecedorId ?? null) : null,
     centroCustoId: e.natureza === 'CUSTO' ? (e.centroCustoId ?? null) : null,
     vencimento: e.vencimento ?? null,

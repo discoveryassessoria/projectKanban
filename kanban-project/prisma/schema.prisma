@@ -3974,6 +3974,7 @@ model ObrigacaoEconomica {
   contaContabilId   Int?
   centroCustoId     Int?
   fornecedorId      Int? // custo manual: fornecedor vinculado (aditivo; sem FK forte, igual faseId/centroCustoId)
+  itemCatalogoId    Int? // FONTE do lançamento manual: item do Cadastro Mestre (Gerenciamento). Aditivo, sem FK forte.
   status            String   @default("RASCUNHO") @db.VarChar(20) // RASCUNHO|ATIVO|SUSPENSO|LIQUIDADO|CANCELADO
   vencimento        DateTime? // Fase 2 — vencimento da obrigação (ex.: lançamento extra em cobrança futura)
   versao            Int      @default(1)

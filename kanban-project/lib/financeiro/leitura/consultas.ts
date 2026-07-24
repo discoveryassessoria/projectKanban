@@ -41,12 +41,16 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
   const ids = obrs.map((o) => o.id)
   const projs = ids.length ? await prisma.saldoProjecao.findMany({ where: { obrigacaoId: { in: ids } } }) : []
   const projPor = new Map(projs.map((p) => [p.obrigacaoId, p]))
+  // Rótulo vindo do Cadastro Mestre (Gerenciamento), não da observação/legado.
+  const itemIds = obrs.map((o) => o.itemCatalogoId).filter((v): v is number => v != null)
+  const itens = itemIds.length ? await prisma.itemCatalogo.findMany({ where: { id: { in: itemIds } }, select: { id: true, name: true } }).catch(() => []) : []
+  const itemPor = new Map(itens.map((i) => [i.id, i.name]))
   const aberturas = ids.length ? await prisma.ledgerOpeningBalance.findMany({ where: { obrigacaoId: { in: ids }, revertidoEm: null }, select: { obrigacaoId: true } }) : []
   const comAbertura = new Set(aberturas.map((a) => a.obrigacaoId))
   return obrs.map((o) => {
     const p = projPor.get(o.id)
     return {
-      obrigacaoId: o.id, codigoOperacional: o.codigoOperacional, descricao: o.observacoes ?? null, natureza: o.natureza, direcao: o.direcao,
+      obrigacaoId: o.id, codigoOperacional: o.codigoOperacional, descricao: (o.itemCatalogoId ? itemPor.get(o.itemCatalogoId) : null) ?? o.observacoes ?? null, natureza: o.natureza, direcao: o.direcao,
       status: o.status, processoId: o.processoId, moeda: String(o.moedaContratual),
       valorContratado: Number(o.valorContratado), saldo: p ? Number(p.saldo) : Number(o.valorContratado),
       recebido: p ? Number(p.recebidoBruto) : 0,

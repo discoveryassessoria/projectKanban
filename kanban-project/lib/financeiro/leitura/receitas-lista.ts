@@ -42,6 +42,11 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
   const tipoIds = receitas.map((r) => r.tipoServicoId).filter((v): v is number => v != null)
   const tipos = tipoIds.length ? await prisma.tipoServico.findMany({ where: { id: { in: tipoIds } }, select: { id: true, nome: true } }).catch(() => []) : []
   const tipoPor = new Map(tipos.map((t) => [t.id, t.nome]))
+  // FONTE do lançamento manual = item do Cadastro Mestre (Gerenciamento). Preferido
+  // sobre o legado ao rotular serviço/descrição (é o "espelho do Mestre").
+  const itemIds = obrs.map((o) => o.itemCatalogoId).filter((v): v is number => v != null)
+  const itensMestre = itemIds.length ? await prisma.itemCatalogo.findMany({ where: { id: { in: itemIds } }, select: { id: true, name: true, categoria: true } }).catch(() => []) : []
+  const itemPor = new Map(itensMestre.map((i) => [i.id, i]))
 
   const pessoaIds = new Set<number>()
   for (const o of obrs) (o.distribuicoes[0]?.participacoes ?? []).forEach((p) => { if (p.incluido) pessoaIds.add(p.pessoaId) })
@@ -52,15 +57,16 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
   const linhas: ReceitaLinha[] = obrs.map((o) => {
     const proj = projPor.get(o.id)
     const rec = o.origemId ? recPor.get(o.origemId) : undefined
+    const itemMestre = o.itemCatalogoId ? itemPor.get(o.itemCatalogoId) : undefined
     const saldo = proj ? Number(proj.saldo) : Number(o.valorContratado)
     const recebido = proj ? Number(proj.recebidoBruto) : 0
     const venc = o.vencimento ?? rec?.data1 ?? null
     const primeiro = (o.distribuicoes[0]?.participacoes ?? []).filter((p) => p.incluido)[0]
     const statusLabel = saldo <= 0.005 ? 'QUITADO' : (venc && new Date(venc).getTime() < agora ? 'VENCIDO' : 'A VENCER')
     return {
-      obrigacaoId: o.id, codigo: o.codigoOperacional, descricao: rec?.descricao ?? o.observacoes ?? null,
+      obrigacaoId: o.id, codigo: o.codigoOperacional, descricao: itemMestre?.name ?? rec?.descricao ?? o.observacoes ?? null,
       requerente: primeiro ? { nome: nome(primeiro.pessoaId), papel: 'Principal' } : null,
-      servico: (rec?.tipoServicoId ? tipoPor.get(rec.tipoServicoId) : null) ?? (rec?.categoria ? String(rec.categoria) : null),
+      servico: itemMestre?.name ?? (rec?.tipoServicoId ? tipoPor.get(rec.tipoServicoId) : null) ?? (rec?.categoria ? String(rec.categoria) : null) ?? (itemMestre?.categoria ?? null),
       formaCobranca: 'À vista',
       valorContratado: Number(o.valorContratado), recebido, saldo,
       vencimento: venc ? new Date(venc).toISOString() : null, statusLabel, moeda: String(o.moedaContratual),

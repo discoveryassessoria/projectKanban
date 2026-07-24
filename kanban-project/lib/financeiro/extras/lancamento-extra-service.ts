@@ -21,6 +21,7 @@ export interface EntradaLancamentoExtra {
   clienteId?: number | null
   fornecedorId?: number | null
   centroCustoId?: number | null
+  itemCatalogoId?: number | null
   vencimento?: Date | null // cobrança futura
   distribuicao?: { modo: ModoDistribuicao; participantes: { pessoaId: number; percentual?: number; valor?: number; incluido?: boolean }[] } | null
   // Presente ⇒ pagamento IMEDIATO; ausente ⇒ cobrança futura (fica em aberto).
@@ -44,6 +45,7 @@ export async function criarLancamentoExtra(e: EntradaLancamentoExtra) {
     clienteId: e.clienteId ?? null,
     fornecedorId: e.fornecedorId ?? null,
     centroCustoId: e.centroCustoId ?? null,
+    itemCatalogoId: e.itemCatalogoId ?? null,
     vencimento: e.vencimento ?? null,
     observacoes: e.descricao ?? null,
     origemTipo: 'nativo',
