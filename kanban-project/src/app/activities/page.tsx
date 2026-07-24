@@ -188,13 +188,14 @@ function ActivitiesPageInner() {
 
   return (
     <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
-      {/* BACKGROUND FIXO */}
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
+      {/* BACKGROUND FIXO — mesma densidade escura das telas financeiras */}
+      <div className="pointer-events-none fixed inset-0 -z-10 scale-105 blur-[6px] bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-black/85" />
 
       {/* HEADER - Componente reutilizável */}
       <HeaderBar
-        title="Tarefas"
-        subtitle="Gerencie suas tarefas"
+        title="Tarefas e Projetos"
+        subtitle="Gerencie suas tarefas e acompanhe o progresso dos projetos"
         userName={user.nome}
         userRole={user.tipo === 'admin' ? 'Administrador' : user.tipo || 'Usuário'}
         userEmail={user.email || ''}
@@ -207,7 +208,7 @@ function ActivitiesPageInner() {
       {/* CONTEÚDO COM OVERLAY ESCURO IGUAL DASHBOARD */}
       <div className="min-h-screen relative">
         {/* Overlay apenas na área do conteúdo */}
-        <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+        <div className="absolute inset-0 bg-black/25 pointer-events-none" />
         <main className="relative px-4 py-4 max-w-full">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -218,10 +219,10 @@ function ActivitiesPageInner() {
         {/* Tabs de visualização */}
         <Tabs value={tabValue} onValueChange={setTabValue} className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <TabsList className="bg-transparent border border-white/30">
-              <TabsTrigger value="list" className="data-[state=active]:bg-white/20 text-white">Lista</TabsTrigger>
-              <TabsTrigger value="deadline" className="data-[state=active]:bg-white/20 text-white">Prazo</TabsTrigger>
-              <TabsTrigger value="calendar" className="data-[state=active]:bg-white/20 text-white">Calendário</TabsTrigger>
+            <TabsList className="bg-transparent border border-white/15">
+              <TabsTrigger value="list" className="text-white/60 data-[state=active]:bg-[#d2a948]/15 data-[state=active]:text-[#d2a948]">Lista</TabsTrigger>
+              <TabsTrigger value="deadline" className="text-white/60 data-[state=active]:bg-[#d2a948]/15 data-[state=active]:text-[#d2a948]">Prazo</TabsTrigger>
+              <TabsTrigger value="calendar" className="text-white/60 data-[state=active]:bg-[#d2a948]/15 data-[state=active]:text-[#d2a948]">Calendário</TabsTrigger>
             </TabsList>
             
             {/* Filters and Actions */}
@@ -586,7 +587,7 @@ function CreateActivityModal() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center justify-center gap-1.5 h-9">
+        <Button className="text-[#1b1508] hover:opacity-90 inline-flex items-center justify-center gap-1.5 h-9 font-semibold" style={{ background: "var(--accent-primary)" }}>
           <span className="-mt-[2px]">+</span>
           <span>Nova Atividade</span>
         </Button>

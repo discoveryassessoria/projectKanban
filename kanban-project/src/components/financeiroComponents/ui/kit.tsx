@@ -355,19 +355,19 @@ export function EmptyState({
 // FILTRO EM PÍLULA (chip)
 // ============================================================================
 export function FilterChip({
-  active, onClick, children, count,
-}: { active: boolean; onClick: () => void; children: React.ReactNode; count?: number }) {
+  active, onClick, children, count, gold, dot,
+}: { active: boolean; onClick: () => void; children: React.ReactNode; count?: number; gold?: boolean; dot?: string }) {
+  const activeStyle = gold
+    ? { background: "color-mix(in srgb, var(--accent-primary) 14%, transparent)", borderColor: "color-mix(in srgb, var(--accent-primary) 45%, transparent)", color: "var(--accent-primary)" }
+    : { background: S.surfaceActive, borderColor: S.borderStrong, color: S.textPrimary }
   return (
     <button
       type="button"
       onClick={onClick}
       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-[var(--radius-sm)] border transition-colors"
-      style={{
-        background: active ? S.surfaceActive : S.surface,
-        borderColor: active ? S.borderStrong : S.border,
-        color: active ? S.textPrimary : S.textSecondary,
-      }}
+      style={active ? activeStyle : { background: S.surface, borderColor: S.border, color: S.textSecondary }}
     >
+      {dot && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: dot }} />}
       {children}
       {count != null && (
         <span className="text-[10px] px-1.5 rounded-full" style={{ background: S.surfaceActive, color: S.textSecondary }}>

@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useActivities, useStatuses, useContratantes, useRequerentes, invalidateActivities } from "@/src/hooks/useActivitiesData"
@@ -11,6 +10,11 @@ import type { Atividade, Status, Usuario } from "@/src/hooks/useActivitiesData"
 import { TarefaDetailModal } from "@/src/components/kanban/TarefaDetailModal"
 import { useUsers } from "@/src/hooks/useActivitiesData"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { BandeiraPais } from "@/src/components/ui/bandeira-pais"
+import { FileText, ListTodo, Play, Clock, CheckCircle2 } from "lucide-react"
+import {
+  KpiCard, StatusBadge, FilterChip, ActionMenu, type Tone,
+} from "@/src/components/financeiroComponents/ui/kit"
 
 // Mapeamento de países para exibição
 const PAIS_LABELS: Record<string, string> = {
@@ -18,6 +22,17 @@ const PAIS_LABELS: Record<string, string> = {
   ESPANHA: 'Espanha',
   ALEMANHA: 'Alemanha',
   ITALIA: 'Itália'
+}
+
+// Status derivado (fiel ao oficial): 4 estados a partir de concluida + datas.
+function statusDerivado(a: Atividade): { label: string; tone: Tone } {
+  if (a.concluida) return { label: "Concluída", tone: "success" }
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+  const prazo = a.data_termino ? new Date(a.data_termino) : null
+  const inicio = a.data_inicio ? new Date(a.data_inicio) : null
+  if (prazo && prazo < hoje) return { label: "Atrasada", tone: "danger" }
+  if (inicio && inicio <= hoje) return { label: "Em andamento", tone: "warning" }
+  return { label: "Pendente", tone: "neutral" }
 }
 
 interface UserAtv {
@@ -59,6 +74,13 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
     { id: -2, nome: 'Pendente' },
     { id: -1, nome: 'Concluída' }
   ]
+
+  // Cards-resumo inferiores (fiel ao oficial) — contagem por status derivado.
+  const resumoCards = useMemo(() => {
+    const c = (label: string) => atividadesTodas.filter((a: Atividade) => statusDerivado(a).label === label).length
+    return { total: atividadesTodas.length, emAndamento: c("Em andamento"), pendentes: c("Pendente"), concluidas: c("Concluída") }
+  }, [atividadesTodas])
+  const pct = (n: number) => (resumoCards.total ? Math.round((n / resumoCards.total) * 100) : 0)
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Sem prazo'
@@ -346,19 +368,13 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
       <div className="px-4 pt-3 flex items-center gap-2">
         <span className="text-[11px] font-semibold text-white/50 uppercase tracking-wide">Tipo:</span>
         {([["TODAS", "Todas"], ["NORMAL", "Normais"], ["TRANSVERSAL", "Transversais"]] as const).map(([val, label]) => (
-          <button
-            key={val}
-            onClick={() => setFiltroTipo(val)}
-            className={`text-[12px] font-semibold px-3 py-1 rounded-full transition-colors ${filtroTipo === val ? "bg-violet-500/30 text-violet-200 border border-violet-400/40" : "bg-white/5 text-white/60 border border-white/10 hover:text-white"}`}
-          >
-            {label}
-          </button>
+          <FilterChip key={val} gold active={filtroTipo === val} onClick={() => setFiltroTipo(val)}>{label}</FilterChip>
         ))}
         {filtroTipo === "TRANSVERSAL" && <span className="text-[11px] text-white/40 ml-1">{atividades.length} transversal(is)</span>}
       </div>
       {/* Table Header */}
       <div className="px-4 py-3 border-b border-white/10">
-        <div className="grid gap-4 items-center text-sm font-medium text-white/80" style={{ gridTemplateColumns: '28px 2.5fr 0.8fr 1.2fr 0.7fr 0.7fr 0.6fr 0.4fr 0.6fr' }}>
+        <div className="grid gap-4 items-center text-sm font-medium text-white/60" style={{ gridTemplateColumns: '28px 2.5fr 0.8fr 1.2fr 0.7fr 0.7fr 0.7fr 0.5fr 0.7fr 0.4fr' }}>
           <div className="">
             {(pode('tarefas.excluir') || pode('tarefas.editar')) && (
               <input
@@ -377,6 +393,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
           <div className="">Status</div>
           <div className="">Responsável</div>
           <div className="">País</div>
+          <div className="text-right">Ações</div>
         </div>
       </div>
 
@@ -393,13 +410,16 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
             <p className="text-sm text-white/50">Crie uma nova atividade clicando no botão acima</p>
           </div>
         ) : (
-          atividades.map((atividade: Atividade) => (
+          atividades.map((atividade: Atividade) => {
+            const st = statusDerivado(atividade)
+            const iconColor = st.tone === "success" ? "var(--success)" : st.tone === "danger" ? "var(--danger)" : st.tone === "warning" ? "var(--warning)" : "var(--text-muted)"
+            return (
             <div
               key={atividade.id}
               className="px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer"
               onClick={() => handleAtividadeClick(atividade)}
             >
-              <div className="grid gap-4 items-center text-white/80" style={{ gridTemplateColumns: '28px 2.5fr 0.8fr 1.2fr 0.7fr 0.7fr 0.6fr 0.4fr 0.6fr' }}>
+              <div className="grid gap-4 items-center text-white/80" style={{ gridTemplateColumns: '28px 2.5fr 0.8fr 1.2fr 0.7fr 0.7fr 0.7fr 0.5fr 0.7fr 0.4fr' }}>
                 <div className="">
                   {(pode('tarefas.excluir') || pode('tarefas.editar')) && (
                     <input
@@ -411,13 +431,16 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                     />
                   )}
                 </div>
-                
-                <div className="">
-                  <div className="space-y-1">
+
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="grid place-items-center h-8 w-8 rounded-md border shrink-0" style={{ background: "var(--surface-secondary)", borderColor: "var(--border-default)", color: iconColor }}>
+                    <FileText className="h-4 w-4" />
+                  </span>
+                  <div className="space-y-0.5 min-w-0">
                     <div className="font-medium text-sm text-white flex items-center gap-2">
                       {atividade.nome || 'Sem título'}
                       {atividade.tipo === "TRANSVERSAL" && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 whitespace-nowrap" title={`Ação antecipada de ${atividade.faseReferenciaCode ?? "outra fase"}`}>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap" style={{ background: "color-mix(in srgb, var(--info) 18%, transparent)", color: "var(--info)" }} title={`Ação antecipada de ${atividade.faseReferenciaCode ?? "outra fase"}`}>
                           ⇄ Transversal{atividade.faseReferenciaCode ? ` · ${atividade.faseReferenciaCode}` : ""}
                         </span>
                       )}
@@ -439,25 +462,23 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                     {atividade.tarefaPai?.titulo || '-'}
                   </div>
                 </div>
-                
+
                 <div className="">
                   <div className="text-sm text-white/70">
                     {atividade.data_inicio ? formatDateOnly(atividade.data_inicio) : '-'}
                   </div>
                 </div>
-                
+
                 <div className="">
                   <div className="text-sm text-white/70">
                     {atividade.data_termino ? formatDateOnly(atividade.data_termino) : 'Sem prazo'}
                   </div>
                 </div>
-                
+
                 <div className="">
-                  <Badge className={getStatusBadgeClass(atividade.status?.nome)}>
-                    {atividade.status?.nome || 'Sem status'}
-                  </Badge>
+                  <StatusBadge tone={st.tone}>{st.label}</StatusBadge>
                 </div>
-                
+
                 <div className="">
                   <div className="flex items-center">
                     <Avatar className="h-6 w-6 border border-white/20">
@@ -467,15 +488,19 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
                     </Avatar>
                   </div>
                 </div>
-                
+
                 <div className="">
-                  <div className="text-sm font-medium text-white/70">
-                    {PAIS_LABELS[atividade.pais || ''] || atividade.pais || '-'}
-                  </div>
+                  {atividade.pais
+                    ? <span className="inline-flex items-center gap-1.5 text-sm text-white/70"><BandeiraPais pais={atividade.pais as any} size="sm" /> {PAIS_LABELS[atividade.pais] || atividade.pais}</span>
+                    : <span className="text-sm text-white/40">-</span>}
+                </div>
+
+                <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+                  <ActionMenu onClick={() => handleAtividadeClick(atividade)} />
                 </div>
               </div>
             </div>
-          ))
+          )})
         )}
       </div>
 
@@ -524,12 +549,20 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
               </div>
             )}
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-3">
             <span>Páginas: 1</span>
-            <span>Registros: {atividades.length}</span>
+            <span className="inline-flex items-center gap-1 rounded-md border border-white/15 px-3 py-1.5 text-white/60">20 por página <span className="text-white/40">▾</span></span>
           </div>
         </div>
       </div>
+    </div>
+
+    {/* CARDS INFERIORES (fiel ao oficial) — valor branco, cor só no ícone */}
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+      <KpiCard iconVariant="subtle" icon={<ListTodo className="h-4 w-4" />} label="Total de atividades" value={resumoCards.total} sub="atividades cadastradas" />
+      <KpiCard iconVariant="subtle" iconTone="info" icon={<Play className="h-4 w-4" />} label="Em andamento" value={resumoCards.emAndamento} sub={`${pct(resumoCards.emAndamento)}% do total`} />
+      <KpiCard iconVariant="subtle" iconTone="warning" icon={<Clock className="h-4 w-4" />} label="Pendentes" value={resumoCards.pendentes} sub={`${pct(resumoCards.pendentes)}% do total`} />
+      <KpiCard iconVariant="subtle" iconTone="success" icon={<CheckCircle2 className="h-4 w-4" />} label="Concluídas" value={resumoCards.concluidas} sub={`${pct(resumoCards.concluidas)}% do total`} />
     </div>
 
       {/* ✅ NOVO: Modal específico para tarefas */}
