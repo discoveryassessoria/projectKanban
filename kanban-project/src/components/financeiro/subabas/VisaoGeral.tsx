@@ -81,6 +81,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
   const [custos, setCustos] = useState<ItemAPI[]>([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [mesesFluxo, setMesesFluxo] = useState(6)
 
   useEffect(() => {
     let cancelado = false
@@ -139,7 +140,6 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
     return evs.sort((a, b) => (a.date || '').localeCompare(b.date || ''))
   }, [receitas, custos, fxHoje])
 
-  const fluxo = useMemo(() => eventos.filter((e) => e.tipo === 'Receita').slice(0, 4), [eventos])
 
   const porMoeda = useMemo(() => {
     const mp = new Map<string, number>()
@@ -161,6 +161,24 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
     if (restoVal > 0) linhas.push({ nome: 'Demais requerentes', valor: restoVal, pct: (restoVal / total) * 100 })
     return { total, linhas }
   }, [receitas, fxHoje])
+
+  // Fluxo de Caixa Previsto — buckets mensais (Entradas = receitas, Saídas =
+  // custos) a partir dos vencimentos das parcelas; Saldo = acumulado.
+  const fluxoCaixa = useMemo(() => {
+    const base = new Date(); base.setDate(1); base.setHours(0, 0, 0, 0)
+    const meses = Array.from({ length: mesesFluxo }, (_, i) => {
+      const d = new Date(base.getFullYear(), base.getMonth() + i, 1)
+      return { ano: d.getFullYear(), mes: d.getMonth(), label: `${d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')} de ${String(d.getFullYear()).slice(2)}`, entradas: 0, saidas: 0 }
+    })
+    const idx = (iso: string) => { const d = new Date((iso || '').includes('T') ? iso : iso + 'T00:00:00'); return meses.findIndex((mm) => mm.ano === d.getFullYear() && mm.mes === d.getMonth()) }
+    for (const r of receitas.filter(ativo)) for (const p of r.parcelas) { const k = idx(p.vencimento); if (k >= 0) meses[k].entradas += parcToBrl(r, p, fxHoje) }
+    for (const c of custos.filter(ativo)) for (const p of c.parcelas) { const k = idx(p.vencimento); if (k >= 0) meses[k].saidas += parcToBrl(c, p, fxHoje) }
+    let acc = 0
+    const pontos = meses.map((mm) => { acc += mm.entradas - mm.saidas; return { label: mm.label, entradas: mm.entradas, saidas: mm.saidas, saldo: acc } })
+    const totalEnt = pontos.reduce((s, p) => s + p.entradas, 0)
+    const totalSai = pontos.reduce((s, p) => s + p.saidas, 0)
+    return { pontos, totalEnt, totalSai, totalSaldo: totalEnt - totalSai }
+  }, [receitas, custos, fxHoje, mesesFluxo])
 
   if (loading) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/40" /></div>
   if (erro) return <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erro}</div>
@@ -219,19 +237,12 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
 
       {/* 3 · fluxo / moeda / requerente */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Painel titulo="Fluxo de Caixa Previsto">
-          {fluxo.length === 0 ? <div className="py-8 text-center text-sm text-white/40">Sem recebimentos previstos.</div> : (
-            <div className="space-y-4">
-              {fluxo.map((e, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="w-9 shrink-0 text-center"><div className="text-sm font-bold text-white">{diaMes(e.date).slice(0, 2)}</div><div className="text-[9px] uppercase text-white/40">{new Date(e.date).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}</div></div>
-                  <div className="relative flex flex-col items-center self-stretch"><span className="h-2.5 w-2.5 rounded-full bg-[#4ade80]" />{i < fluxo.length - 1 && <span className="w-px flex-1 bg-white/15" />}</div>
-                  <div className="min-w-0 flex-1"><p className="text-sm text-white/80">Recebimento previsto</p><p className="truncate text-[11px] text-white/45">{e.descricao}</p></div>
-                  <span className="tabular-nums text-sm font-medium text-[#4ade80]">{brl(e.valorBrl)}</span>
-                </div>
-              ))}
-            </div>
-          )}
+        <Painel titulo="Fluxo de Caixa Previsto" acao={
+          <select value={mesesFluxo} onChange={(e) => setMesesFluxo(Number(e.target.value))} className="rounded-md border border-white/15 bg-white/[0.03] px-2 py-1 text-xs text-white/70 outline-none">
+            {[3, 6, 12].map((n) => <option key={n} value={n} className="bg-[#14161a]">{n} meses</option>)}
+          </select>
+        }>
+          <FluxoCaixaChart pontos={fluxoCaixa.pontos} totalEnt={fluxoCaixa.totalEnt} totalSai={fluxoCaixa.totalSai} totalSaldo={fluxoCaixa.totalSaldo} />
         </Painel>
 
         <Painel titulo="Distribuição por Moeda">
@@ -319,6 +330,58 @@ function Donut({ itens }: { itens: { cor: string; valor: number; pct: number; co
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-lg font-bold text-white">{total > 0 ? `${Math.round(principal.pct)}%` : '—'}</span><span className="text-[10px] text-white/40">{total > 0 ? principal.code : ''}</span></div>
     </div>
+  )
+}
+
+// Gráfico de Fluxo de Caixa Previsto (linhas Entradas/Saídas/Saldo por mês).
+// Grid + eixos em HTML (não distorce), linhas em SVG com traço não-escalável,
+// pontos em HTML (círculos perfeitos). Discovery tokens.
+function FluxoCaixaChart({ pontos, totalEnt, totalSai, totalSaldo }: { pontos: { label: string; entradas: number; saidas: number; saldo: number }[]; totalEnt: number; totalSai: number; totalSaldo: number }) {
+  const n = pontos.length
+  const yMax = Math.max(1, ...pontos.flatMap((p) => [p.entradas, p.saidas, p.saldo]))
+  const yMin = Math.min(0, ...pontos.map((p) => p.saldo))
+  const range = (yMax - yMin) || 1
+  const xPct = (i: number) => (n <= 1 ? 50 : (i / (n - 1)) * 100)
+  const yPct = (v: number) => (1 - (v - yMin) / range) * 100
+  const linha = (k: 'entradas' | 'saidas' | 'saldo') => pontos.map((p, i) => `${xPct(i)},${yPct(p[k])}`).join(' ')
+  const gridVals = [0, 1, 2, 3, 4].map((i) => yMin + (range * (4 - i)) / 4)
+  const fmtK = (v: number) => `R$ ${Math.round(v / 1000)}k`
+  const PAD = 44
+  const series = [{ k: 'entradas', cor: '#4ade80' }, { k: 'saidas', cor: '#f87171' }, { k: 'saldo', cor: '#7dd3fc' }] as const
+  return (
+    <div>
+      <div className="relative" style={{ height: 170 }}>
+        {gridVals.map((v, i) => (
+          <div key={i} className="absolute left-0 right-0 flex items-center" style={{ top: `${(i / 4) * 100}%` }}>
+            <span className="shrink-0 -translate-y-1/2 pr-2 text-right text-[10px] text-white/35" style={{ width: PAD }}>{fmtK(v)}</span>
+            <div className="h-px flex-1 bg-white/10" />
+          </div>
+        ))}
+        <svg className="absolute top-0 h-full" style={{ left: PAD, width: `calc(100% - ${PAD}px)` }} viewBox="0 0 100 100" preserveAspectRatio="none">
+          {series.map((s) => <polyline key={s.k} points={linha(s.k)} fill="none" stroke={s.cor} strokeWidth={1.6} vectorEffect="non-scaling-stroke" />)}
+        </svg>
+        {series.map((s) => pontos.map((p, i) => (
+          <span key={s.k + i} className="absolute h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ background: s.cor, left: `calc(${PAD}px + (100% - ${PAD}px) * ${xPct(i) / 100})`, top: `${yPct(p[s.k])}%` }} />
+        )))}
+      </div>
+      <div className="mt-1 flex" style={{ paddingLeft: PAD }}>
+        {pontos.map((p, i) => <span key={i} className="flex-1 text-center text-[10px] text-white/35">{p.label}</span>)}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs">
+        <LegendaFluxo cor="#4ade80" label="Entradas" valor={totalEnt} />
+        <LegendaFluxo cor="#f87171" label="Saídas" valor={totalSai} />
+        <LegendaFluxo cor="#7dd3fc" label="Saldo" valor={totalSaldo} />
+      </div>
+    </div>
+  )
+}
+function LegendaFluxo({ cor, label, valor }: { cor: string; label: string; valor: number }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="h-2 w-2 rounded-full" style={{ background: cor }} />
+      <span className="text-white/55">{label} - </span>
+      <span className="tabular-nums text-white/85">{brl(valor)}</span>
+    </span>
   )
 }
 
