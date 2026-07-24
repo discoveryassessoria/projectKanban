@@ -60,6 +60,8 @@ export interface ReceitaDetalhe {
   pagadores: { nome: string; valor: number }[]
   observacao: string | null
   documentos: { id: number; nome: string; tipo: string | null; url: string; tamanho: number | null; criadoEm: string }[]
+  faturaEmitida: boolean
+  fatura: { id: number; descricao: string; status: string; valor: number; url: string | null } | null
 }
 
 const TITULO: Record<string, string> = {
@@ -143,6 +145,14 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
         .then((rows) => rows.map((r) => ({ id: r.id, nome: r.arquivoNome, tipo: r.tipo, url: r.arquivoUrl, tamanho: r.tamanho, criadoEm: r.criadoEm.toISOString() })))
         .catch(() => [] as { id: number; nome: string; tipo: string | null; url: string; tamanho: number | null; criadoEm: string }[])
     : []
+  // Fatura vinculada à Receita (Fase C) — resiliente durante rollout (null se indisponível)
+  const faturaRow = obr.origemTipo === 'Receita' && obr.origemId
+    ? await prisma.fatura.findFirst({ where: { receitaId: obr.origemId }, orderBy: { createdAt: 'desc' } }).catch(() => null)
+    : null
+  const fatura = faturaRow
+    ? { id: faturaRow.id, descricao: faturaRow.descricao, status: String(faturaRow.status), valor: Number(faturaRow.valor), url: null as string | null }
+    : null
+  const faturaEmitida = !!fatura
   const live = await cotacoesVivas()
   const ca = computeCambioAging({
     moedaBase: moeda, valorBase: contratado, saldoLedger: saldo, recebidoLedger: recebido,
@@ -223,7 +233,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   const semPagamento = pagamentos.length === 0
   const alertas: { tipo: string; severidade: 'crit' | 'warn' | 'info'; label: string; valor: number | null }[] = []
   if (resumoParcelas.vencidas.qtd > 0) alertas.push({ tipo: 'PARCELA_VENCIDA', severidade: 'crit', label: `${resumoParcelas.vencidas.qtd} parcela(s) vencida(s)`, valor: resumoParcelas.vencidas.valor })
-  alertas.push({ tipo: 'FATURA_NAO_EMITIDA', severidade: 'warn', label: 'Fatura não emitida', valor: null })
+  if (!faturaEmitida) alertas.push({ tipo: 'FATURA_NAO_EMITIDA', severidade: 'warn', label: 'Fatura não emitida', valor: null })
   if (semPagamento) alertas.push({ tipo: 'SEM_PAGAMENTO', severidade: 'info', label: 'Nenhum pagamento registrado', valor: null })
   const proximasAcoes = [
     ...(resumoParcelas.vencidas.qtd > 0 ? [{ acao: 'COBRAR_VENCIDA', label: `Existe ${resumoParcelas.vencidas.qtd} parcela vencida`, descricao: `Parcela de ${fmtMoeda(resumoParcelas.vencidas.valor, 'BRL')} vencida.`, disponivel: true }] : []),
@@ -255,6 +265,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     responsaveis: responsaveisSet, pagadores: [...pagadoresAgg.entries()].map(([nome, valor]) => ({ nome, valor })),
     observacao: obr.observacoes ?? null,
     documentos,
+    faturaEmitida, fatura,
   }
 }
 

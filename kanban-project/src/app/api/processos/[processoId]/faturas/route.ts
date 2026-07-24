@@ -126,6 +126,7 @@ export async function GET(
 
       return {
         ...fatura,
+        receitaId: fatura.receitaId,
         valor: valorTotal,
         valorOriginal: toNumber(fatura.valorOriginal),
         cambio: cambioFatura,
@@ -268,7 +269,8 @@ export async function POST(
       parcelas = 1,
       dataVencimento,
       observacoes,
-      destinatarioIds
+      destinatarioIds,
+      receitaId
     } = body
 
     if (!descricao?.trim()) {
@@ -307,6 +309,7 @@ export async function POST(
     const fatura = await prisma.fatura.create({
       data: {
         processoId: processoIdNum,
+        receitaId: receitaId != null ? Number(receitaId) : null,
         descricao: descricao.trim(),
         moeda,
         valor: valorNumerico,

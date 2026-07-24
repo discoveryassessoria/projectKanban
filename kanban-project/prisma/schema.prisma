@@ -700,6 +700,7 @@ model LogAuditoria {
 model Fatura {
   id              Int                  @id @default(autoincrement())
   processoId      Int
+  receitaId       Int?
   descricao       String               @db.VarChar(200)
   valor           Decimal              @db.Decimal(10, 2)
   status          StatusFatura         @default(PENDENTE)
@@ -715,11 +716,13 @@ model Fatura {
   parcelas        Int                  @default(1)
   valorParcela    Decimal?             @db.Decimal(10, 2)
   processo        Processo             @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  receita         Receita?             @relation("ReceitaFaturas", fields: [receitaId], references: [id], onDelete: SetNull)
   destinatarios   FaturaDestinatario[]
   pagamentos      PagamentoFatura[]
   parcelasBoleto  Parcela[]            @relation("ParcelasBoleto")
 
   @@index([processoId])
+  @@index([receitaId])
   @@index([status])
   @@index([dataVencimento])
 }
@@ -1255,6 +1258,7 @@ model Receita {
   processo      Processo            @relation(fields: [processoId], references: [id], onDelete: Cascade)
   requerentes   ReceitaRequerente[]
   documentos    ReceitaDocumento[]
+  faturas       Fatura[]            @relation("ReceitaFaturas")
 
   personId         Int?
   pessoa           Pessoa?      @relation(fields: [personId], references: [id], onDelete: SetNull)

@@ -18,6 +18,7 @@ import {
 // ========================================
 interface NovaFaturaModalProps {
   processoId: number
+  receitaId?: number | null
   onClose: () => void
   onSuccess: () => void
 }
@@ -36,10 +37,11 @@ const MOEDAS: { value: Moeda; label: string; symbol: string }[] = [
 // ========================================
 // COMPONENT
 // ========================================
-export function NovaFaturaModal({ 
-  processoId, 
-  onClose, 
-  onSuccess 
+export function NovaFaturaModal({
+  processoId,
+  receitaId,
+  onClose,
+  onSuccess
 }: NovaFaturaModalProps) {
   // Form state
   const [descricao, setDescricao] = useState('')
@@ -99,7 +101,8 @@ export function NovaFaturaModal({
         moeda,
         valor: valorNumerico,
         cambio: moeda !== 'BRL' ? cambioNumerico : null,  // ✅ Enviar câmbio
-        observacoes: observacoes.trim() || null
+        observacoes: observacoes.trim() || null,
+        receitaId: receitaId != null ? receitaId : null  // ✅ Vínculo à receita (Fase C)
       }
 
       const response = await fetch(`/api/processos/${processoId}/faturas`, {

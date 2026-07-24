@@ -310,12 +310,13 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                   ) : (d.proximasAcoes ?? []).map((a: any, i: number) => {
                     const { Icon, cls } = acaoIcone(a.acao)
                     const btn = acaoBotao(a.acao)
+                    const descricao = a.acao === "EMITIR_FATURA" && d.faturaEmitida ? "Fatura já emitida — emitir outra?" : a.descricao
                     return (
                       <div key={i} className="flex items-start gap-3 rounded-lg border border-white/10 bg-[#161b21] px-3.5 py-3">
                         <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${cls}`}><Icon className="h-4 w-4" /></div>
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium text-white/90">{a.label}</div>
-                          <div className="mt-0.5 text-xs text-white/45">{a.descricao}</div>
+                          <div className="mt-0.5 text-xs text-white/45">{descricao}</div>
                         </div>
                         <button onClick={btn.onClick} disabled={btn.disabled} title={btn.title} className="shrink-0 whitespace-nowrap rounded-lg border border-white/15 bg-[#1b2027] px-3 py-1.5 text-xs font-medium text-white/80 hover:border-white/30 disabled:cursor-not-allowed disabled:opacity-40">{btn.label}</button>
                       </div>
@@ -388,6 +389,12 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
             {/* Documentos principais */}
             <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
               <span className="text-sm font-semibold text-white/85">Documentos principais</span>
+              {d.faturaEmitida && (
+                <div className="mt-3 flex items-center gap-2.5 rounded-lg border border-[#4ade80]/25 bg-[#4ade80]/10 px-3 py-2.5">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-[#4ade80]" />
+                  <span className="min-w-0 flex-1 truncate text-sm text-white/85">Fatura: {d.fatura?.descricao ?? "emitida"}</span>
+                </div>
+              )}
               {documentos.length === 0 ? (
                 <div className="mt-3 rounded-lg border border-dashed border-white/10 bg-[#161b21] px-3 py-6 text-center text-xs text-white/40">Nenhum documento vinculado ainda.</div>
               ) : (
@@ -645,6 +652,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
       {faturaOpen && temProcesso && (
         <NovaFaturaModal
           processoId={d.processo.id}
+          receitaId={d.receitaId}
           onClose={() => setFaturaOpen(false)}
           onSuccess={() => { setFaturaOpen(false); carregar() }}
         />
