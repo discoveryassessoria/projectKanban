@@ -1,35 +1,36 @@
-// CRIAR EM: src/components/financeiroComponents/PagarTab.tsx
+// A PAGAR — Financeiro Geral
 //
-// Aba "A PAGAR" — porte fiel do renderPagar() do mockup, estilo glass.
-// Autossuficiente: busca /api/financas/pagar. Dados REAIS (ContaPagar→
-// Fornecedor/Categoria/ContaBancaria). Só DPO é "prévia".
+// Fiel ao Golden Master aprovado (imagem oficial): 5 KPIs (Total a Pagar /
+// Vencidos / A Vencer 7d / Pago (Mês) / Previsto (Mês)), filtros em chips,
+// toolbar (Mês atual + busca), DataTable com Vencimento/Título/Fornecedor/
+// Categoria/Processo/Valor/Status/Forma de Pagamento/Ações e paginação.
+// Linguagem visual 100% do kit compartilhado.
+//
+// Somente frontend: consome o endpoint EXISTENTE /api/financas/pagar (GET).
+// Campos só-de-exibição do mock (nf/processoCodigo/familia/formaPagamento)
+// são OPCIONAIS: aparecem quando existem e degradam para "—" quando não.
 
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
-  CreditCard, FileText, AlertTriangle, Clock, CheckCircle, RefreshCw,
-  Landmark, Upload, Plus, Loader2, Check, Ban, RotateCcw,
+  CreditCard, AlertTriangle, Calendar, CheckCircle, BarChart3, Download,
+  Filter, Plus, Loader2, Search, ArrowUpDown, FileText, ChevronDown,
 } from "lucide-react"
-import { OrigemBadge, StatusBadge, VerOrigemLink, LancamentoDetalheModal, CancelarEstornarModal } from "@/src/components/financeiro/shared/FinanceiroGeralShared"
+import { LancamentoDetalheModal } from "@/src/components/financeiro/shared/FinanceiroGeralShared"
+import {
+  PageHeader, PrimaryButton, SecondaryButton, KpiCard, SurfaceCard,
+  Thead, Th, Tr, EmptyState, FilterChip, SearchInput, StatusBadge, ActionMenu,
+  Pagination, fmtBRL, fmtDate,
+} from "@/src/components/financeiroComponents/ui/kit"
 
-function fmtBRL(v: number): string { return `R$ ${(v ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }
-function fmtBRLshort(v: number): string {
-  const n = Math.abs(v ?? 0)
-  if (n >= 1000) return `R$ ${(v / 1000).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}k`
-  return fmtBRL(v)
-}
-function fmtDate(d: string | Date | null): string {
-  if (!d) return "—"
-  return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
-}
 function dueText(d: string | Date | null): string {
   if (!d) return ""
   const dias = Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000)
   if (dias < 0) return `há ${Math.abs(dias)}d`
   if (dias === 0) return "hoje"
   if (dias === 1) return "amanhã"
-  return `em ${dias}d`
+  return `${dias} dias`
 }
 
 interface Conta {
@@ -37,15 +38,12 @@ interface Conta {
   conta: string | null; valor: number; vencimento: string; dataPagamento: string | null; status: string
   numeroParcela: number | null; totalParcelas: number | null
   pago: boolean; cancelado: boolean; aberto: boolean; vencido: boolean; diasParaVencer: number
-  // §1/§3/§5 — canônico
-  origem?: string; lancamentoOrigem?: { tipo: "custo" | "contaPagar"; id: number }; editavelEstrutural?: boolean; estorno?: boolean
+  origem?: string; lancamentoOrigem?: { tipo: "custo" | "contaPagar"; id: number }
+  // campos só-de-exibição (opcionais)
+  nf?: string; processoCodigo?: string; familia?: string; formaPagamento?: string
 }
 interface PagarData {
   kpis: { aPagar: number; qtdAbertos: number; vencidosTotal: number; qtdVencidos: number; agendadosTotal: number; qtdAgendados: number; pagosMes: number; qtdPagosMes: number; qtdPendentes: number }
-  pipeline: { pendente: { qtd: number; total: number }; agendado: { qtd: number; total: number }; pago: { qtd: number; total: number }; cancelado: { qtd: number; total: number } }
-  topCategorias: { nome: string; total: number; cor: string | null; qtd: number }[]
-  proximos7: { id: number; fornecedor: string; valor: number; vencimento: string }[]
-  resumo: { total: number; vencido: number; agendados: number; pagos: number; previstoFuturo: number }
   contas: Conta[]
   contagem: { todos: number; vencidos: number; pendentes: number; agendados: number; pagos: number }
   mock: { dpo: number }
@@ -54,263 +52,166 @@ interface PagarData {
 const CHIPS = [
   { key: "todos", label: "Todos" },
   { key: "vencidos", label: "Vencidos" },
-  { key: "pendentes", label: "Pendentes" },
-  { key: "agendados", label: "Agendados" },
-  { key: "pagos", label: "✓ Pagos" },
+  { key: "avencer", label: "A Vencer" },
+  { key: "pagos", label: "Pagos" },
+  { key: "cancelados", label: "Cancelados" },
 ] as const
 
-function statusEntrada(c: Conta) {
-  return { statusBruto: c.status, estorno: c.estorno ?? false, vencida: c.vencido, liquidada: c.pago, canceladoEm: c.cancelado ? new Date() : null }
+function estadoConta(c: Conta): { tone: "danger" | "warning" | "success" | "neutral"; label: string } {
+  if (c.cancelado) return { tone: "neutral", label: "Cancelado" }
+  if (c.pago) return { tone: "success", label: "Pago" }
+  if (c.vencido) return { tone: "danger", label: "Vencido" }
+  return { tone: "warning", label: "A Vencer" }
 }
 
 export default function PagarTab() {
   const [data, setData] = useState<PagarData | null>(null)
   const [loading, setLoading] = useState(true)
   const [chip, setChip] = useState<string>("todos")
+  const [q, setQ] = useState("")
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(20)
   const [detalhe, setDetalhe] = useState<{ tipo: "receita" | "custo"; id: number } | null>(null)
-  const [acao, setAcao] = useState<{ acao: "cancelar" | "estornar"; tipo: "receita" | "custo"; id: number; resumo: { item: string; valor: string; processo: string | null } } | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
 
-  function carregar() {
+  useEffect(() => {
     const token = localStorage.getItem("authToken")
     fetch("/api/financas/pagar", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : null).then(d => setData(d)).catch(e => console.error(e)).finally(() => setLoading(false))
-  }
-  useEffect(() => { carregar() }, [])
+  }, [])
 
-  if (loading || !data) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
+  const derived = useMemo(() => {
+    if (!data) return null
+    const now = new Date()
+    const sameMonth = (d: string | null) => d && new Date(d).getMonth() === now.getMonth() && new Date(d).getFullYear() === now.getFullYear()
+    const avencer = data.contas.filter(c => !c.vencido && !c.pago && !c.cancelado && c.diasParaVencer >= 0 && c.diasParaVencer <= 7)
+    const previstoMes = data.contas.filter(c => sameMonth(c.vencimento) && !c.cancelado)
+    return {
+      aVencer7: avencer.reduce((a, c) => a + c.valor, 0), qtdAVencer7: avencer.length,
+      previstoMes: previstoMes.reduce((a, c) => a + c.valor, 0), qtdPrevistoMes: previstoMes.length,
+    }
+  }, [data])
 
-  const d = data
-  const k = d.kpis
+  if (loading || !data || !derived) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin" style={{ color: "var(--text-muted)" }} /></div>
 
-  const contasFiltradas = d.contas.filter(c => {
-    if (chip === "todos") return true
-    if (chip === "vencidos") return c.vencido
-    if (chip === "pendentes") return c.status === "PENDENTE" && !c.vencido
-    if (chip === "agendados") return c.status === "AGENDADO" && !c.vencido
-    if (chip === "pagos") return c.pago
+  const k = data.kpis
+  const busca = q.trim().toLowerCase()
+  const filtradas = data.contas.filter(c => {
+    if (chip === "vencidos" && !c.vencido) return false
+    if (chip === "avencer" && !(!c.vencido && !c.pago && !c.cancelado)) return false
+    if (chip === "pagos" && !c.pago) return false
+    if (chip === "cancelados" && !c.cancelado) return false
+    if (busca && !(`${c.fornecedor} ${c.descricao} ${c.categoria} ${c.processoCodigo ?? ""} ${c.familia ?? ""}`.toLowerCase().includes(busca))) return false
     return true
   })
+  const total = filtradas.length
+  const pages = Math.max(1, Math.ceil(total / perPage))
+  const pageSafe = Math.min(page, pages)
+  const start = (pageSafe - 1) * perPage
+  const visiveis = filtradas.slice(start, start + perPage)
+
+  const contagem = (key: string) => {
+    if (key === "todos") return data.contas.length
+    if (key === "vencidos") return data.contas.filter(c => c.vencido).length
+    if (key === "avencer") return data.contas.filter(c => !c.vencido && !c.pago && !c.cancelado).length
+    if (key === "pagos") return data.contas.filter(c => c.pago).length
+    if (key === "cancelados") return data.contas.filter(c => c.cancelado).length
+    return 0
+  }
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2"><CreditCard className="h-5 w-5" /> Contas a Pagar</h2>
-          <div className="text-xs text-white/60 mt-1 flex items-center gap-2 flex-wrap">
-            <span><strong className="text-white">{k.qtdAbertos}</strong> pagamentos abertos</span>
-            <span className="text-white/30">·</span>
-            <span><strong className="text-white">{k.qtdAgendados}</strong> agendados</span>
-            <span className="text-white/30">·</span>
-            <span><strong className="text-white">{k.qtdPendentes}</strong> pendentes</span>
-            <span className="text-white/30">·</span>
-            <span>DPO atual: <strong className="text-white">{d.mock.dpo} dias</strong> <span className="text-white/30">·prévia</span></span>
-          </div>
-        </div>
+      <PageHeader
+        icon={<CreditCard className="h-5 w-5" />}
+        title="A Pagar"
+        subtitle="Gerencie todos os seus pagamentos e despesas."
+        actions={
+          <>
+            <SecondaryButton icon={<Download className="h-3.5 w-3.5" />}>Relatório</SecondaryButton>
+            <SecondaryButton icon={<Filter className="h-3.5 w-3.5" />}>Filtros <ChevronDown className="h-3 w-3" /></SecondaryButton>
+            <PrimaryButton icon={<Plus className="h-3.5 w-3.5" />}>Novo Pagamento</PrimaryButton>
+          </>
+        }
+      />
+
+      {/* KPIs (mesmo componente de A Receber; ícone à direita conforme oficial) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+        <KpiCard iconRight iconVariant="plain" icon={<CreditCard className="h-4 w-4" />} label="Total a Pagar" value={fmtBRL(k.aPagar)} sub={`${k.qtdAbertos} títulos`} />
+        <KpiCard iconRight iconVariant="plain" iconTone="danger" icon={<AlertTriangle className="h-4 w-4" />} label="Vencidos" value={fmtBRL(k.vencidosTotal)} tone="danger" sub={`${k.qtdVencidos} títulos`} />
+        <KpiCard iconRight iconVariant="plain" iconTone="warning" icon={<Calendar className="h-4 w-4" />} label="A Vencer (7 dias)" value={fmtBRL(derived.aVencer7)} tone="warning" sub={`${derived.qtdAVencer7} títulos`} />
+        <KpiCard iconRight iconVariant="plain" iconTone="success" icon={<CheckCircle className="h-4 w-4" />} label="Pago (Mês)" value={fmtBRL(k.pagosMes)} tone="success" sub={`${k.qtdPagosMes} títulos`} />
+        <KpiCard iconRight iconVariant="plain" icon={<BarChart3 className="h-4 w-4" />} label="Previsto (Mês)" value={fmtBRL(derived.previstoMes)} sub={`${derived.qtdPrevistoMes} títulos`} />
+      </div>
+
+      {/* TOOLBAR: chips + Mês atual + busca */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          <GlassBtn icon={<RefreshCw className="h-3.5 w-3.5" />}>Recorrentes</GlassBtn>
-          <GlassBtn icon={<Landmark className="h-3.5 w-3.5" />}>Por fornecedor</GlassBtn>
-          <GlassBtn icon={<Upload className="h-3.5 w-3.5" />}>Exportar</GlassBtn>
-          <button
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold rounded-[var(--radius-sm)] transition-colors"
-            style={{ background: "var(--accent-primary)", color: "var(--accent-ink)" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--accent-hover)")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "var(--accent-primary)")}
-          ><Plus className="h-3.5 w-3.5" /> Nova despesa</button>
+          {CHIPS.map(c => (
+            <FilterChip key={c.key} active={chip === c.key} onClick={() => { setChip(c.key); setPage(1) }} count={contagem(c.key)}>{c.label}</FilterChip>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border px-3 py-1.5 text-sm" style={{ background: "var(--surface-primary)", borderColor: "var(--border-default)", color: "var(--text-secondary)" }}>
+            <Calendar className="h-3.5 w-3.5" /> Mês atual <ChevronDown className="h-3 w-3" />
+          </span>
+          <SearchInput value={q} onChange={(v) => { setQ(v); setPage(1) }} icon={<Search className="h-4 w-4" />} placeholder="Pesquisar…" className="w-56" />
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi icon={<FileText className="h-3.5 w-3.5" />} label="Total a Pagar" value={fmtBRL(k.aPagar)} sub={`${k.qtdAbertos} pagamentos`} />
-        <Kpi icon={<AlertTriangle className="h-3.5 w-3.5" />} label="Vencidos" value={fmtBRL(k.vencidosTotal)} valueColor={k.vencidosTotal > 0 ? "text-red-400" : "text-green-400"} sub={k.qtdVencidos > 0 ? `${k.qtdVencidos} atrasados` : "✓ Em dia"} />
-        <Kpi icon={<Clock className="h-3.5 w-3.5" />} label="Agendados" value={fmtBRL(k.agendadosTotal)} sub={`${k.qtdAgendados} prontos p/ pagar`} />
-        <Kpi icon={<CheckCircle className="h-3.5 w-3.5" />} label="Pago no mês" value={fmtBRL(k.pagosMes)} valueColor="text-green-400" sub={`${k.qtdPagosMes} pagamentos efetuados`} />
-      </div>
-
-      {/* PIPELINE */}
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-sm font-semibold text-white flex items-center gap-2"><RefreshCw className="h-4 w-4" /> Pipeline de Pagamentos</div>
-          <span className="text-[11px] text-white/40">{d.contagem.todos} no funil</span>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <PipelineCard color="var(--warning)" label="Pendente" qtd={d.pipeline.pendente.qtd} total={d.pipeline.pendente.total} hint="Aguardando" />
-          <PipelineCard color="var(--info)" label="Agendado" qtd={d.pipeline.agendado.qtd} total={d.pipeline.agendado.total} hint="Pronto p/ pagar" />
-          <PipelineCard color="var(--success)" label="Pago" qtd={d.pipeline.pago.qtd} total={d.pipeline.pago.total} hint="Concluído" />
-          <PipelineCard color="var(--text-muted)" label="Cancelado" qtd={d.pipeline.cancelado.qtd} total={d.pipeline.cancelado.total} hint="Encerrado" />
-        </div>
-      </div>
-
-      {/* QUICK CHIPS */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {CHIPS.map(c => {
-          const count = (d.contagem as any)[c.key] ?? 0
-          const active = chip === c.key
-          return (
-            <button key={c.key} onClick={() => setChip(c.key)}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors ${active ? "bg-white/15 border-white/30 text-white" : "bg-white/5 border-white/10 text-white/60 hover:text-white"}`}>
-              {c.label}<span className="text-[10px] bg-white/10 px-1.5 rounded-full">{count}</span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* TABELA + PAINÉIS */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-        <div className="lg:col-span-3 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 overflow-x-auto">
-          {contasFiltradas.length === 0 ? (
-            <p className="text-sm text-white/40 py-10 text-center">Nenhum pagamento neste filtro.</p>
-          ) : (
-            <table className="w-full text-sm min-w-[720px]">
-              <thead>
-                <tr className="text-white/40 text-xs border-b border-white/10">
-                  <th className="text-left font-medium py-1.5">Fornecedor</th>
-                  <th className="text-left font-medium py-1.5">Descrição</th>
-                  <th className="text-left font-medium py-1.5">Categoria</th>
-                  <th className="text-left font-medium py-1.5">Conta</th>
-                  <th className="text-right font-medium py-1.5">Vencimento</th>
-                  <th className="text-right font-medium py-1.5">Valor</th>
-                  <th className="text-center font-medium py-1.5">Status</th>
-                  <th className="text-center font-medium py-1.5">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {contasFiltradas.map(c => (
-                  <tr key={c.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
-                    <td className="py-2 text-white/90 font-medium"><div className="flex items-center gap-1.5">{c.fornecedor}<OrigemBadge origem={c.origem} /></div></td>
-                    <td className="py-2">
-                      <div className="text-white/80">{c.descricao}</div>
-                      {c.totalParcelas && c.totalParcelas > 1 && c.numeroParcela && <div className="text-[11px] text-white/40">Parcela {c.numeroParcela} de {c.totalParcelas}</div>}
-                      {c.lancamentoOrigem?.tipo === "custo" && <VerOrigemLink tipo="custo" id={c.lancamentoOrigem.id} onOpen={(t, id) => setDetalhe({ tipo: t, id })} />}
-                    </td>
-                    <td className="py-2">
-                      <span className="text-[11px] px-2 py-0.5 rounded" style={{ background: c.categoriaCor ? `${c.categoriaCor}33` : "rgba(255,255,255,0.1)", color: c.categoriaCor || "rgba(255,255,255,0.7)" }}>{c.categoria}</span>
-                    </td>
-                    <td className="py-2 text-white/60 text-xs">{c.conta || "—"}</td>
-                    <td className="py-2 text-right tabular-nums">
-                      <div className="text-white/80">{fmtDate(c.vencimento)}</div>
-                      <div className={`text-[10px] ${c.vencido ? "text-red-400" : "text-white/40"}`}>{c.pago ? "pago " + fmtDate(c.dataPagamento) : dueText(c.vencimento)}</div>
-                    </td>
-                    <td className="py-2 text-right text-white font-medium tabular-nums">{fmtBRL(c.valor)}</td>
-                    <td className="py-2 text-center"><StatusBadge e={statusEntrada(c)} /></td>
-                    <td className="py-2 text-center">
-                      <div className="inline-flex items-center gap-1.5 justify-center">
-                        {/* Corporativa: fluxo operacional atual (pagar/agendar). */}
-                        {c.origem !== "PROCESSO" && c.status === "AGENDADO" && !c.pago && (
-                          <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-green-600/80 hover:bg-green-600 text-white"><Check className="h-3 w-3" /> Pagar</button>
-                        )}
-                        {c.origem !== "PROCESSO" && (c.status === "PENDENTE" || c.vencido) && !c.pago && (
-                          <button className="px-2 py-1 text-[11px] rounded border border-white/20 text-white/80 hover:bg-white/10">Agendar</button>
-                        )}
-                        {/* §5/§6 — custo de PROCESSO: só ações canônicas (cancelar aberto / estornar pago). */}
-                        {c.lancamentoOrigem?.tipo === "custo" && !c.cancelado && !c.estorno && (
-                          c.pago ? (
-                            <button onClick={() => setAcao({ acao: "estornar", tipo: "custo", id: c.lancamentoOrigem!.id, resumo: { item: c.descricao, valor: fmtBRL(c.valor), processo: c.fornecedor } })}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-purple-500/30 text-purple-300 hover:bg-purple-500/10"><RotateCcw className="h-3 w-3" /> Estornar</button>
-                          ) : (
-                            <button onClick={() => setAcao({ acao: "cancelar", tipo: "custo", id: c.lancamentoOrigem!.id, resumo: { item: c.descricao, valor: fmtBRL(c.valor), processo: c.fornecedor } })}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-red-500/30 text-red-300 hover:bg-red-500/10"><Ban className="h-3 w-3" /> Cancelar</button>
-                          )
-                        )}
-                        {c.pago && c.origem !== "PROCESSO" && <span className="text-[11px] text-green-300">✓ Pago</span>}
+      {/* TABELA */}
+      <SurfaceCard padding="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[1040px]">
+            <Thead>
+              <Th><span className="inline-flex items-center gap-1">Vencimento <ArrowUpDown className="h-3 w-3 opacity-50" /></span></Th>
+              <Th><span className="inline-flex items-center gap-1">Título <ArrowUpDown className="h-3 w-3 opacity-50" /></span></Th>
+              <Th>Fornecedor</Th><Th>Categoria</Th><Th>Processo</Th>
+              <Th align="right">Valor</Th><Th align="center">Status</Th><Th>Forma de Pagamento</Th><Th align="right">Ações</Th>
+            </Thead>
+            <tbody>
+              {visiveis.map(c => {
+                const est = estadoConta(c)
+                const iconColor = est.tone === "danger" ? "var(--danger)" : est.tone === "success" ? "var(--success)" : est.tone === "warning" ? "var(--warning)" : "var(--text-muted)"
+                return (
+                  <Tr key={c.id}>
+                    <td className="py-2.5 px-2">
+                      <div className="flex items-center gap-2">
+                        <span className="grid place-items-center h-7 w-7 rounded-md border shrink-0" style={{ background: "var(--surface-secondary)", borderColor: "var(--border-default)", color: iconColor }}><FileText className="h-3.5 w-3.5" /></span>
+                        <div>
+                          <div className="tabular-nums" style={{ color: "var(--text-primary)" }}>{fmtDate(c.vencimento)}</div>
+                          <div className="text-[10px]" style={{ color: c.vencido ? "var(--danger)" : c.pago ? "var(--success)" : "var(--text-muted)" }}>{c.pago ? "Pago" : c.vencido ? "Vencido" : dueText(c.vencimento)}</div>
+                        </div>
                       </div>
                     </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                    <td className="py-2.5 px-2">
+                      <div style={{ color: "var(--text-primary)" }}>{c.descricao}</div>
+                      {(c.nf || (c.totalParcelas && c.totalParcelas > 1)) && <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>{c.nf ? c.nf : `Parcela ${c.numeroParcela} de ${c.totalParcelas}`}</div>}
+                    </td>
+                    <td className="py-2.5 px-2" style={{ color: "var(--text-secondary)" }}>{c.fornecedor}</td>
+                    <td className="py-2.5 px-2" style={{ color: "var(--text-secondary)" }}>{c.categoria}</td>
+                    <td className="py-2.5 px-2">
+                      <div style={{ color: "var(--text-secondary)" }}>{c.processoCodigo ?? "—"}</div>
+                      {c.familia && <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>{c.familia}</div>}
+                    </td>
+                    <td className="py-2.5 px-2 text-right font-medium tabular-nums" style={{ color: "var(--text-primary)" }}>{fmtBRL(c.valor)}</td>
+                    <td className="py-2.5 px-2 text-center"><StatusBadge tone={est.tone}>{est.label}</StatusBadge></td>
+                    <td className="py-2.5 px-2" style={{ color: "var(--text-secondary)" }}>{c.formaPagamento ?? c.conta ?? "—"}</td>
+                    <td className="py-2.5 px-2 text-right"><ActionMenu onClick={() => c.lancamentoOrigem?.tipo === "custo" && setDetalhe({ tipo: "custo", id: c.lancamentoOrigem.id })} /></td>
+                  </Tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
-
-        <div className="space-y-3">
-          <SidePanel title="Resumo do período">
-            <Row label="Total a pagar" value={fmtBRLshort(d.resumo.total)} />
-            <Row label="Vencido" value={fmtBRLshort(d.resumo.vencido)} valueColor="text-red-400" />
-            <Row label="Agendados" value={fmtBRLshort(d.resumo.agendados)} valueColor="text-sky-400" />
-            <Row label="Já pagos" value={fmtBRLshort(d.resumo.pagos)} valueColor="text-green-400" />
-            <Row label="Previsto futuro" value={fmtBRLshort(d.resumo.previstoFuturo)} />
-          </SidePanel>
-          <SidePanel title="Top categorias">
-            {d.topCategorias.length === 0 ? (
-              <p className="text-xs text-white/40">Sem despesas em aberto.</p>
-            ) : d.topCategorias.slice(0, 6).map(cat => (
-              <Row key={cat.nome} label={<span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: cat.cor || "#64748b" }} />{cat.nome}</span>} value={fmtBRLshort(cat.total)} />
-            ))}
-          </SidePanel>
-          <SidePanel title="Próximos 7 dias">
-            {d.proximos7.length === 0 ? (
-              <p className="text-xs text-white/40">Nenhum pagamento nos próximos 7 dias.</p>
-            ) : d.proximos7.map(p => (
-              <div key={p.id} className="flex justify-between items-start text-sm">
-                <div>
-                  <div className="text-white/80">{p.fornecedor}</div>
-                  <div className="text-[10px] text-white/40">{fmtDate(p.vencimento)} · {dueText(p.vencimento)}</div>
-                </div>
-                <span className="text-white font-medium">{fmtBRLshort(p.valor)}</span>
-              </div>
-            ))}
-          </SidePanel>
-        </div>
-      </div>
+        {total === 0 ? (
+          <EmptyState icon={<CreditCard className="h-6 w-6" />} title="Nenhum pagamento neste filtro." subtitle="Ajuste os filtros ou cadastre um novo pagamento." />
+        ) : (
+          <div className="px-3 pb-3">
+            <Pagination from={start + 1} to={Math.min(start + perPage, total)} total={total} unit="títulos" page={pageSafe} pages={pages} onPage={setPage} perPage={perPage} onPerPage={(n) => { setPerPage(n); setPage(1) }} />
+          </div>
+        )}
+      </SurfaceCard>
 
       {detalhe && <LancamentoDetalheModal tipo={detalhe.tipo} id={detalhe.id} onClose={() => setDetalhe(null)} />}
-      {acao && <CancelarEstornarModal {...acao} onClose={() => setAcao(null)} onDone={(m) => { setAcao(null); setToast(m); carregar() }} />}
-      {toast && <div className="fixed bottom-4 right-4 z-50 rounded-lg bg-zinc-800 border border-white/10 px-4 py-2 text-sm text-white shadow-xl" onClick={() => setToast(null)}>{toast}</div>}
-    </div>
-  )
-}
-
-// ============================================================
-// SUBCOMPONENTES
-// ============================================================
-function GlassBtn({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-transparent border border-white/30 text-white hover:bg-white/10">{icon}{children}</button>
-}
-
-function Kpi({ icon, label, value, sub, valueColor = "text-white" }: {
-  icon: React.ReactNode; label: string; value: string; sub?: string; valueColor?: string
-}) {
-  return (
-    <div className="rounded-[var(--radius-md)] border p-4" style={{ background: "var(--surface-primary)", borderColor: "var(--border-default)", boxShadow: "var(--shadow-surface)" }}>
-      <div className="flex items-center gap-2">
-        <span className="h-8 w-8 shrink-0 grid place-items-center rounded-[var(--radius-sm)] border" style={{ background: "var(--surface-secondary)", borderColor: "var(--border-default)", color: "var(--text-secondary)" }}>{icon}</span>
-        <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{label}</span>
-      </div>
-      <div className={`font-bold mt-2 text-2xl tabular-nums ${valueColor}`}>{value}</div>
-      {sub && <div className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>{sub}</div>}
-    </div>
-  )
-}
-
-// Pipeline: superfície neutra, SEM borda superior colorida. O ponto de estado
-// mantém cor semântica (pendente/agendado/pago/cancelado) — significado real.
-function PipelineCard({ color, label, qtd, total, hint }: { color: string; label: string; qtd: number; total: number; hint: string }) {
-  return (
-    <div className="rounded-[var(--radius-sm)] border p-3" style={{ background: "var(--surface-secondary)", borderColor: "var(--border-default)" }}>
-      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
-        <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />{label}
-      </div>
-      <div className="text-xl font-bold mt-1" style={{ color: "var(--text-primary)" }}>{qtd}</div>
-      <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>{fmtBRLshort(total)} · {hint}</div>
-    </div>
-  )
-}
-
-function SidePanel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-      <div className="text-[11px] text-white/50 font-bold uppercase tracking-wider mb-2">{title}</div>
-      <div className="space-y-1.5">{children}</div>
-    </div>
-  )
-}
-function Row({ label, value, valueColor = "text-white" }: { label: React.ReactNode; value: string; valueColor?: string }) {
-  return (
-    <div className="flex justify-between items-center text-sm">
-      <span className="text-white/70">{label}</span>
-      <span className={`font-medium ${valueColor}`}>{value}</span>
     </div>
   )
 }

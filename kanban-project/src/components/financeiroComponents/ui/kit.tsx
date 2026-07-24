@@ -16,7 +16,7 @@
 "use client"
 
 import * as React from "react"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, ChevronLeft, MoreVertical } from "lucide-react"
 
 // ---- token helpers (mantém as páginas livres de valores literais) ----------
 export const ACCENT = "var(--accent-primary)"
@@ -203,25 +203,44 @@ export function LinkAction({
 // SEM linha colorida inferior, SEM borda colorida decorativa.
 // ============================================================================
 export function KpiCard({
-  icon, label, value, sub, tone = "neutral", iconTone = "neutral", previa, footer,
+  icon, label, value, sub, tone = "neutral", iconTone = "neutral",
+  iconRight = false, iconVariant = "subtle", previa, footer,
 }: {
   icon?: React.ReactNode; label: string; value: React.ReactNode; sub?: React.ReactNode
-  tone?: Tone; iconTone?: Tone; previa?: boolean; footer?: React.ReactNode
+  tone?: Tone; iconTone?: Tone
+  // iconRight: ícone no topo-direito (senão topo-esquerdo, ao lado do rótulo).
+  // iconVariant: "subtle" caixa neutra (padrão) · "filled" caixa preenchida com a
+  // cor semântica · "plain" ícone colorido sem caixa. Mesmo componente, sem variante nova.
+  iconRight?: boolean; iconVariant?: "subtle" | "filled" | "plain"
+  previa?: boolean; footer?: React.ReactNode
 }) {
+  const c = iconTone === "neutral" ? S.textSecondary : toneColor(iconTone)
+  const iconEl = icon && (
+    iconVariant === "plain"
+      ? <span className="shrink-0" style={{ color: c }}>{icon}</span>
+      : <span
+          className="h-9 w-9 shrink-0 grid place-items-center rounded-[var(--radius-sm)] border"
+          style={
+            iconVariant === "filled"
+              ? { background: iconTone === "neutral" ? S.surface2 : c, borderColor: "transparent", color: iconTone === "neutral" ? S.textSecondary : "#0a0a0b" }
+              : { background: S.surface2, borderColor: S.border, color: c }
+          }
+        >{icon}</span>
+  )
   return (
     <SurfaceCard padding="p-4" className="relative">
       {previa && <PreviaTag />}
-      <div className="flex items-center gap-2">
-        {icon && (
-          <span
-            className="h-8 w-8 shrink-0 grid place-items-center rounded-[var(--radius-sm)] border"
-            style={{ background: S.surface2, borderColor: S.border, color: iconTone === "neutral" ? S.textSecondary : toneColor(iconTone) }}
-          >
-            {icon}
-          </span>
-        )}
-        <span className="text-xs font-medium" style={{ color: S.textSecondary }}>{label}</span>
-      </div>
+      {iconRight ? (
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-xs font-medium" style={{ color: S.textSecondary }}>{label}</span>
+          {iconEl}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          {iconEl}
+          <span className="text-xs font-medium" style={{ color: S.textSecondary }}>{label}</span>
+        </div>
+      )}
       <div className="text-2xl font-bold mt-2 tabular-nums" style={{ color: toneColor(tone) }}>{value}</div>
       {sub && <div className="text-[11px] mt-1" style={{ color: S.textMuted }}>{sub}</div>}
       {footer && <div className="mt-2">{footer}</div>}
@@ -425,6 +444,68 @@ export function TableToolbar({ left, right }: { left?: React.ReactNode; right?: 
       <div className="flex items-center gap-2 flex-wrap">{left}</div>
       {right && <div className="flex items-center gap-2">{right}</div>}
     </div>
+  )
+}
+
+// Menu de ações (kebab) — mesma célula "Ações" de todas as tabelas
+export function ActionMenu({ onClick }: { onClick?: () => void }) {
+  return (
+    <button type="button" onClick={onClick} aria-label="Ações"
+      className="grid place-items-center h-7 w-7 rounded-md transition-colors hover:bg-[var(--surface-hover)]" style={{ color: S.textSecondary }}>
+      <MoreVertical className="h-4 w-4" />
+    </button>
+  )
+}
+
+// Paginação padrão de tabela (rodapé): "Mostrando X a Y de Z" + páginas + "N por página".
+export function Pagination({
+  from, to, total, unit = "itens", page = 1, pages = 1, onPage, perPage = 20, onPerPage, left,
+}: {
+  from?: number; to?: number; total?: number; unit?: string
+  page?: number; pages?: number; onPage?: (p: number) => void
+  perPage?: number; onPerPage?: (n: number) => void; left?: React.ReactNode
+}) {
+  const nums: (number | "…")[] = []
+  if (pages <= 5) { for (let i = 1; i <= pages; i++) nums.push(i) }
+  else { nums.push(1, 2, 3, "…", pages) }
+  return (
+    <div className="flex items-center justify-between gap-3 flex-wrap pt-3 mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
+      <div>{left ?? <>Mostrando {from ?? 0} a {to ?? 0} de {total ?? 0} {unit}</>}</div>
+      <div className="flex items-center gap-2">
+        {pages > 1 && (
+          <div className="flex items-center gap-1">
+            <PageBtn disabled={page <= 1} onClick={() => onPage?.(page - 1)}><ChevronLeft className="h-4 w-4" /></PageBtn>
+            {nums.map((n, i) => n === "…"
+              ? <span key={`e${i}`} className="px-1" style={{ color: "var(--text-muted)" }}>…</span>
+              : <PageBtn key={n} active={n === page} onClick={() => onPage?.(n)}>{n}</PageBtn>)}
+            <PageBtn disabled={page >= pages} onClick={() => onPage?.(page + 1)}><ChevronRight className="h-4 w-4" /></PageBtn>
+          </div>
+        )}
+        <div className="relative">
+          <select
+            value={perPage} onChange={(e) => onPerPage?.(Number(e.target.value))}
+            className="appearance-none rounded-[var(--radius-sm)] border pl-3 pr-7 py-1.5 text-sm outline-none cursor-pointer"
+            style={{ background: "var(--surface-primary)", borderColor: "var(--border-default)", color: "var(--text-secondary)" }}
+          >
+            {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n} por página</option>)}
+          </select>
+          <ChevronRight className="h-3.5 w-3.5 rotate-90 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+function PageBtn({ children, active, disabled, onClick }: { children: React.ReactNode; active?: boolean; disabled?: boolean; onClick?: () => void }) {
+  return (
+    <button type="button" disabled={disabled} onClick={onClick}
+      className="min-w-8 h-8 px-2 grid place-items-center rounded-[var(--radius-sm)] border text-sm transition-colors disabled:opacity-40"
+      style={{
+        background: active ? "color-mix(in srgb, var(--accent-primary) 15%, transparent)" : "transparent",
+        borderColor: active ? "color-mix(in srgb, var(--accent-primary) 45%, transparent)" : "var(--border-default)",
+        color: active ? "var(--accent-primary)" : "var(--text-secondary)",
+      }}>
+      {children}
+    </button>
   )
 }
 

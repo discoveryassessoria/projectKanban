@@ -91,13 +91,23 @@ export default function FluxoTab() {
             {["D", "S", "T", "Q", "Q", "S", "S"].map((dd, i) => <div key={i} className="text-[10px] text-white/40 font-bold py-1">{dd}</div>)}
             {d.calendario.map((c, i) => {
               if (c.day === null) return <div key={i} />
-              let bg = "bg-white/5"
-              if (c.hasIn && c.hasOut) bg = "bg-gradient-to-br from-green-500/40 to-red-500/40"
-              else if (c.hasIn) bg = "bg-green-500/30"
-              else if (c.hasOut) bg = "bg-red-500/30"
+              // Discreto: célula neutra + pontinhos de movimentação; hoje = contorno dourado.
               return (
-                <div key={i} className={`aspect-square flex items-center justify-center rounded text-xs ${bg} ${c.isToday ? "ring-1 ring-white text-white font-bold" : "text-white/70"}`}>
+                <div key={i} className="aspect-square flex items-center justify-center rounded-md relative text-xs"
+                  style={{
+                    background: "var(--surface-secondary)",
+                    color: c.isToday ? "var(--text-primary)" : "var(--text-secondary)",
+                    fontWeight: c.isToday ? 700 : 400,
+                    outline: c.isToday ? "1.5px solid var(--accent-primary)" : "none",
+                    outlineOffset: "-1.5px",
+                  }}>
                   {c.day}
+                  {(c.hasIn || c.hasOut) && (
+                    <span className="absolute bottom-1 left-0 right-0 flex justify-center gap-0.5">
+                      {c.hasIn && <span className="w-1 h-1 rounded-full" style={{ background: "var(--success)" }} />}
+                      {c.hasOut && <span className="w-1 h-1 rounded-full" style={{ background: "var(--danger)" }} />}
+                    </span>
+                  )}
                 </div>
               )
             })}
@@ -111,7 +121,7 @@ export default function FluxoTab() {
 
         {/* timeline */}
         <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><FileText className="h-4 w-4" /> Timeline de Eventos</div>
+          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><FileText className="h-4 w-4" /> Agenda Financeira</div>
           {d.timeline.length === 0 ? (
             <p className="text-sm text-white/40 py-8 text-center">Sem eventos na janela.</p>
           ) : (
