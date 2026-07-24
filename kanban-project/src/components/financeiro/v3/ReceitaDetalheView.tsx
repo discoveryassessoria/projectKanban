@@ -13,7 +13,7 @@ import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import RegistrarPagamentoModal from "@/src/components/financeiro/v3/RegistrarPagamentoModal"
 import {
-  ArrowLeft, ExternalLink, MoreVertical, Copy, FileText, ChevronDown, ChevronUp,
+  ArrowLeft, ExternalLink, MoreVertical, Copy, ChevronDown, ChevronUp,
   Receipt, CreditCard, Wallet, FileCheck, Clock, Search, SlidersHorizontal, Calendar,
   Plus, Pencil, ChevronLeft, ChevronRight, UserPlus, ArrowDownCircle, CheckCircle2,
   Info as InfoIcon, Plus as PlusIcon,
@@ -67,6 +67,17 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   useEffect(() => { carregar() }, [carregar])
 
   const copiarCodigo = () => { if (!d?.codigo) return; navigator.clipboard?.writeText(d.codigo).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 1500) }).catch(() => {}) }
+
+  // "Editar" um pagamento confirmado = estornar (auditável) e registrar de novo — não há edição in-place de lançamento financeiro (integridade contábil).
+  const estornarPagamento = async (pgId: number, valor: number) => {
+    if (!window.confirm("Estornar este pagamento? Ele será revertido (auditável). Depois você pode registrar novamente para corrigir.")) return
+    try {
+      const res = await fetch("/api/financeiro/v3/ocorrencias", { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ obrigacaoId: d.obrigacaoId, tipo: "ESTORNO", valor, estornaOcorrenciaId: pgId }) })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || !j.ok) alert(j?.erro || j?.motivo || `Falha ao estornar (HTTP ${res.status}).`)
+      else carregar()
+    } catch { alert("Falha de rede ao estornar o pagamento.") }
+  }
 
   if (erro) return <div className="p-8 text-sm text-white/68">{erro}</div>
   if (!d) return <div className="p-8 text-sm text-white/40">carregando…</div>
@@ -168,7 +179,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
         </div>
 
         {/* ── Conteúdo (main + right) ── */}
-        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_320px]">
+        <div className="mt-5">
           <div className="space-y-5">
             {/* Resumo financeiro (5 sub-cards + bloco de câmbio) */}
             {tab === "resumo" && (
@@ -215,7 +226,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                     <td><div className="text-white/70">{p.banco ?? "—"}</div>{(p.agencia || p.conta) && <div className="text-xs text-white/40">Ag: {p.agencia ?? "—"} Cc: {p.conta ?? "—"}</div>}</td>
                     <td className="text-white/68">{p.referencia ?? "—"}</td>
                     <td><span className="inline-flex items-center gap-1.5 text-[#4ade80]"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />{p.status}</span></td>
-                    <td><div className="flex items-center gap-2 text-white/40"><Pencil className="h-4 w-4 hover:text-white/70" /><FileText className="h-4 w-4 hover:text-white/70" /><MoreVertical className="h-4 w-4 hover:text-white/70" /></div></td>
+                    <td><div className="flex items-center gap-2"><button onClick={() => estornarPagamento(p.id, p.valor)} title="Estornar pagamento (para corrigir: estorne e registre novamente)" className="text-white/40 hover:text-[#f87171]"><Pencil className="h-4 w-4" /></button></div></td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -364,33 +375,18 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
             )}
           </div>
 
-          {/* ── Painel direito ── */}
-          <div className="space-y-4">
-            <Painel titulo="Situação financeira" aberto>
-              <Linha k="Valor contratado" v={brl(d.resumo.contratadoBrl)} />
-              <Linha k="Recebido" v={brl(d.resumo.recebidoBrl)} cor="text-[#4ade80]" />
-              <Linha k="Saldo a receber" v={brl(d.resumo.saldoBrl)} cor="text-[#7dd3fc]" />
-              <Linha k="Descontos" v={brl(d.resumo.descontosBrl)} />
-              <Linha k="Juros" v={brl(d.resumo.jurosBrl)} />
-              <Linha k="Multa" v={brl(d.resumo.multaBrl)} />
-              <div className="my-2 border-t border-white/10" />
-              <div className="flex items-center justify-between"><span className="text-sm text-white/70">Valor líquido</span><span className="text-lg font-semibold text-white">{brl(d.resumo.liquidoBrl)}</span></div>
-            </Painel>
-
-            <Painel titulo="Resumo das parcelas" aberto>
-              <DotLinha cor="bg-[#4ade80]" k={`${rp.pagas.qtd} pagas`} v={brl(rp.pagas.valor)} />
-              <DotLinha cor="bg-[#d2a948]" k={`${rp.aVencer.qtd} a vencer`} v={brl(rp.aVencer.valor)} />
-              <DotLinha cor="bg-[#f87171]" k={`${rp.vencidas.qtd} vencida`} v={brl(rp.vencidas.valor)} />
-              <DotLinha cor="bg-white/40" k={`${rp.canceladas.qtd} canceladas`} v={brl(rp.canceladas.valor)} />
-              <div className="my-2 border-t border-white/10" />
-              <div className="flex items-center justify-between"><span className="text-sm text-white/70">Total</span><span className="text-sm text-white/80">{rp.total} parcelas</span></div>
-            </Painel>
-
-          </div>
         </div>
 
         {/* ── Cards complementares (grade horizontal abaixo do conteúdo) ── */}
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <Painel titulo="Resumo das parcelas" aberto>
+            <DotLinha cor="bg-[#4ade80]" k={`${rp.pagas.qtd} pagas`} v={brl(rp.pagas.valor)} />
+            <DotLinha cor="bg-[#d2a948]" k={`${rp.aVencer.qtd} a vencer`} v={brl(rp.aVencer.valor)} />
+            <DotLinha cor="bg-[#f87171]" k={`${rp.vencidas.qtd} vencida`} v={brl(rp.vencidas.valor)} />
+            <DotLinha cor="bg-white/40" k={`${rp.canceladas.qtd} canceladas`} v={brl(rp.canceladas.valor)} />
+            <div className="my-2 border-t border-white/10" />
+            <div className="flex items-center justify-between"><span className="text-sm text-white/70">Total</span><span className="text-sm text-white/80">{rp.total} parcelas</span></div>
+          </Painel>
           {!semBase && (
           <Painel titulo="Regra de câmbio" aberto>
             <Linha k="Moeda base" v={d.moedaBase === "EUR" ? `${d.moedaBase} - Euro (€)` : d.moedaBase} />
