@@ -300,7 +300,7 @@ export function KanbanContent() {
   return (
     <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
       <div className="pointer-events-none fixed inset-0 -z-10 scale-105 blur-[6px] bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-black/85" />
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-black/60" />
 
       <HeaderBar
         title={tabPrincipal === "processos" ? "Processos" : "Clientes"}
