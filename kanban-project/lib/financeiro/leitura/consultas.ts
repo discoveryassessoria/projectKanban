@@ -22,6 +22,8 @@ export interface ObrigacaoLista {
   recebido: number
   vencimento: string | null
   origemTipo: string | null
+  criadoEm: string | null
+  responsavel: string | null
   temAbertura: boolean
 }
 
@@ -47,6 +49,10 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
   const itemPor = new Map(itens.map((i) => [i.id, i.name]))
   const aberturas = ids.length ? await prisma.ledgerOpeningBalance.findMany({ where: { obrigacaoId: { in: ids }, revertidoEm: null }, select: { obrigacaoId: true } }) : []
   const comAbertura = new Set(aberturas.map((a) => a.obrigacaoId))
+  // Responsável (quem lançou) — resolve nomes em lote.
+  const userIds = [...new Set(obrs.map((o) => o.criadoPorId).filter((v): v is number => v != null))]
+  const usuarios = userIds.length ? await prisma.usuario.findMany({ where: { id: { in: userIds } }, select: { id: true, nome: true } }).catch(() => []) : []
+  const userPor = new Map(usuarios.map((u) => [u.id, u.nome]))
   return obrs.map((o) => {
     const p = projPor.get(o.id)
     return {
@@ -55,6 +61,8 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
       valorContratado: Number(o.valorContratado), saldo: p ? Number(p.saldo) : Number(o.valorContratado),
       recebido: p ? Number(p.recebidoBruto) : 0,
       vencimento: o.vencimento ? o.vencimento.toISOString() : null, origemTipo: o.origemTipo ?? null,
+      criadoEm: o.criadoEm ? o.criadoEm.toISOString() : null,
+      responsavel: o.criadoPorId != null ? (userPor.get(o.criadoPorId) ?? null) : null,
       temAbertura: comAbertura.has(o.id),
     }
   })

@@ -170,11 +170,18 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
 
       {/* Filtros */}
       <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          {["Tipo", "Categoria", "Fase", "Responsável"].map((r) => (
-            <label key={r} className="text-xs text-white/40">{r}<div className={`mt-1 flex w-[150px] items-center justify-between ${selCls}`}><span className="text-white/70">Todos</span><ChevronDown className="h-3.5 w-3.5 text-white/40" /></div></label>
-          ))}
-          <div className="relative min-w-[240px] flex-1"><div className="mb-1 text-xs text-white/40">&nbsp;</div><Search className="pointer-events-none absolute left-3 top-[30px] h-4 w-4 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar descrição, documento..." className="w-full rounded-lg border border-white/10 bg-black/20 py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+          <label className="text-xs text-white/40">Período<div className={`mt-1 flex items-center justify-between ${selCls}`}><span className="text-white/70">01/06/2026 - 24/07/2026</span><CalendarDays className="h-3.5 w-3.5 text-white/40" /></div></label>
+          <FiltroBox label="Tipo" valor="Todos" />
+          <FiltroBox label="Categoria" valor="Todas" />
+          <FiltroBox label="Pessoa / Requerente" valor="Todos" />
+          <FiltroBox label="Documento" valor="Todos" />
+        </div>
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <FiltroBox label="Fase" valor="Todas" className="w-[150px]" />
+          <FiltroBox label="Responsável" valor="Todos" className="w-[150px]" />
+          <FiltroBox label="Status" valor="Todos" className="w-[150px]" />
+          <div className="relative min-w-[240px] flex-1"><div className="mb-1 text-xs text-white/40">Buscar</div><Search className="pointer-events-none absolute left-3 top-[30px] h-4 w-4 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar descrição, documento, origem..." className="w-full rounded-lg border border-white/10 bg-black/20 py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
           <button onClick={() => setBusca("")} className="mb-[1px] inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -221,6 +228,13 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
     </div>
   )
 }
+function FiltroBox({ label, valor, className = "" }: { label: string; valor: string; className?: string }) {
+  return (
+    <label className={`text-xs text-white/40 ${className}`}>{label}
+      <div className="mt-1 flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm"><span className="text-white/70">{valor}</span><ChevronDown className="h-3.5 w-3.5 text-white/40" /></div>
+    </label>
+  )
+}
 function ExtKpi({ titulo, valor, sub, icon: Ic, cor }: any) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
@@ -235,39 +249,59 @@ function ExtKpi({ titulo, valor, sub, icon: Ic, cor }: any) {
 // Discovery Design System. Fonte: obrigações do motor V3.
 function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
   const [obrs, setObrs] = useState<any[] | null>(null)
+  const [busca, setBusca] = useState("")
   useEffect(() => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }, [processoId])
-  const movs = useMemo(() => {
+  const movsAll = useMemo(() => {
     const toBRL = (v: number, m: string) => m === "BRL" ? v : v * (fx || 1)
     const base = (obrs ?? []).filter((o) => o.status !== "CANCELADO").map((o) => ({
       id: o.obrigacaoId, receita: o.direcao === "A_RECEBER", codigo: o.codigoOperacional ?? `#${o.obrigacaoId}`,
       descricao: o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`, categoria: o.categoria ?? (o.direcao === "A_RECEBER" ? "Receita" : "Custo"),
-      valorBRL: toBRL(o.valorContratado, o.moeda), vencimento: o.vencimento, quitado: o.recebido >= o.valorContratado - 0.005,
+      valorBRL: toBRL(o.valorContratado, o.moeda), data: o.criadoEm ?? o.vencimento, responsavel: o.responsavel ?? null, quitado: o.recebido >= o.valorContratado - 0.005,
     }))
     const asc = [...base].sort((a, b) => a.id - b.id)
     let acc = 0
     const comSaldo = asc.map((mv) => { acc += mv.receita ? mv.valorBRL : -mv.valorBRL; return { ...mv, saldoAcum: acc } })
     return comSaldo.reverse()
   }, [obrs, fx])
+  const movs = useMemo(() => movsAll.filter((mv) => !busca || `${mv.descricao} ${mv.codigo} ${mv.categoria} ${mv.responsavel ?? ""}`.toLowerCase().includes(busca.toLowerCase())), [movsAll, busca])
+  const iniciais = (nome: string | null) => (nome ?? "").split(" ").filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join("") || "—"
+  const horaBR = (iso?: string | null) => iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""
   if (!obrs) return <div className="py-8 text-sm text-white/40">carregando…</div>
-  const totReceitas = movs.filter((m) => m.receita).reduce((s, m) => s + m.valorBRL, 0)
-  const totCustos = movs.filter((m) => !m.receita).reduce((s, m) => s + m.valorBRL, 0)
+  const totReceitas = movsAll.filter((m) => m.receita).reduce((s, m) => s + m.valorBRL, 0)
+  const totCustos = movsAll.filter((m) => !m.receita).reduce((s, m) => s + m.valorBRL, 0)
   const saldoFinal = totReceitas - totCustos
   // resumo por categoria
   const catMap = new Map<string, number>()
-  movs.forEach((m) => catMap.set(m.categoria, (catMap.get(m.categoria) ?? 0) + m.valorBRL))
+  movsAll.forEach((m) => catMap.set(m.categoria, (catMap.get(m.categoria) ?? 0) + m.valorBRL))
   const totCat = [...catMap.values()].reduce((s, v) => s + v, 0) || 1
   const CORES = ["#4ade80", "#fbbf24", "#7dd3fc", "#a78bfa", "#f87171"]
   const categorias = [...catMap.entries()].sort((a, b) => b[1] - a[1]).map(([nome, valor], i) => ({ nome, valor, pct: (valor / totCat) * 100, cor: CORES[i % CORES.length] }))
   const hojeStr = new Date().toISOString().slice(0, 10)
-  const hojeN = movs.filter((m) => (m.vencimento ?? "").slice(0, 10) === hojeStr).length
-  const recebidas = movs.filter((m) => m.receita && m.quitado).length
-  const pendentes = movs.filter((m) => !m.quitado).length
+  const hojeN = movsAll.filter((m) => (m.data ?? "").slice(0, 10) === hojeStr).length
+  const recebidas = movsAll.filter((m) => m.receita && m.quitado).length
+  const pendentes = movsAll.filter((m) => !m.quitado).length
 
   return (
     <div>
       <div className="flex items-start justify-between gap-3">
         <div><h2 className="text-lg font-semibold text-white">Timeline financeira</h2><p className="text-sm text-white/45">Linha do tempo completa de todas as movimentações e eventos financeiros do processo.</p></div>
         <button className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.03] px-3.5 py-2 text-sm text-white/80 hover:bg-white/[0.06]"><Download className="h-4 w-4" /> Exportar</button>
+      </div>
+
+      {/* Filtros */}
+      <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] p-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+          <label className="text-xs text-white/40">Período<div className="mt-1 flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm"><span className="text-white/70">01/06/2026 - 24/07/2026</span><CalendarDays className="h-3.5 w-3.5 text-white/40" /></div></label>
+          <FiltroBox label="Tipo" valor="Todos" />
+          <FiltroBox label="Categoria" valor="Todas" />
+          <FiltroBox label="Fase" valor="Todas" />
+          <FiltroBox label="Responsável" valor="Todos" />
+        </div>
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <div className="relative min-w-[240px] flex-1"><div className="mb-1 text-xs text-white/40">Buscar</div><Search className="pointer-events-none absolute left-3 top-[30px] h-4 w-4 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar descrição, documento, origem..." className="w-full rounded-lg border border-white/10 bg-black/20 py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
+          <button className="mb-[1px] inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70"><SlidersHorizontal className="h-3.5 w-3.5" /> Filtros rápidos</button>
+          <button onClick={() => setBusca("")} className="mb-[1px] inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_320px]">
@@ -278,7 +312,7 @@ function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
             <div className="relative pl-1">
               {movs.map((mv, i) => (
                 <div key={mv.id} className="flex gap-3">
-                  <div className="flex w-16 shrink-0 flex-col items-end pt-1 text-right"><span className="text-[11px] text-white/60">{mv.vencimento ? dataBR(mv.vencimento) : "—"}</span></div>
+                  <div className="flex w-16 shrink-0 flex-col items-end pt-1 text-right"><span className="text-[11px] text-white/60">{mv.data ? dataBR(mv.data) : "—"}</span><span className="text-[10px] text-white/35">{horaBR(mv.data)}</span></div>
                   <div className="flex flex-col items-center">
                     <span className="grid h-9 w-9 place-items-center rounded-full" style={{ background: `${mv.receita ? "#4ade80" : "#fbbf24"}22`, color: mv.receita ? "#4ade80" : "#fbbf24" }}>{mv.receita ? <ArrowDownRight className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}</span>
                     {i < movs.length - 1 && <span className="mt-1 w-px flex-1 bg-white/10" />}
@@ -290,10 +324,16 @@ function TimelineTab({ processoId, fx }: { processoId: number; fx: number }) {
                         <div className="mt-0.5 truncate text-sm text-white/90">{mv.descricao}</div>
                         <div className="mt-1 flex flex-wrap gap-1.5"><span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">{mv.categoria}</span></div>
                       </div>
-                      <div className="shrink-0 text-right">
-                        <div className="tabular-nums text-sm font-semibold" style={{ color: mv.receita ? "#4ade80" : "#fbbf24" }}>{mv.receita ? "" : "-"}{fmt(mv.valorBRL)}</div>
-                        <div className="text-[11px] text-white/40">Saldo após: {fmt(mv.saldoAcum)}</div>
-                        <div className="mt-1">{mv.quitado ? <span className="rounded bg-[#4ade80]/15 px-2 py-0.5 text-[11px] font-semibold text-[#4ade80]">{mv.receita ? "Recebido" : "Pago"}</span> : <span className="rounded bg-[#fbbf24]/15 px-2 py-0.5 text-[11px] font-semibold text-[#fbbf24]">{mv.receita ? "A receber" : "A pagar"}</span>}</div>
+                      <div className="flex shrink-0 items-start gap-3">
+                        <div className="text-right">
+                          <div className="tabular-nums text-sm font-semibold" style={{ color: mv.receita ? "#4ade80" : "#fbbf24" }}>{mv.receita ? "" : "-"}{fmt(mv.valorBRL)}</div>
+                          <div className="text-[11px] text-white/40">Saldo após: {fmt(mv.saldoAcum)}</div>
+                          <div className="mt-1 flex items-center justify-end gap-2">
+                            {mv.quitado ? <span className="rounded bg-[#4ade80]/15 px-2 py-0.5 text-[11px] font-semibold text-[#4ade80]">{mv.receita ? "Recebido" : "Pago"}</span> : <span className="rounded bg-[#fbbf24]/15 px-2 py-0.5 text-[11px] font-semibold text-[#fbbf24]">{mv.receita ? "A receber" : "A pagar"}</span>}
+                          </div>
+                          {mv.responsavel && <div className="mt-1.5 flex items-center justify-end gap-1.5"><span className="grid h-5 w-5 place-items-center rounded-full bg-white/10 text-[9px] font-semibold text-white/70">{iniciais(mv.responsavel)}</span><span className="text-[11px] text-white/50">{mv.responsavel}</span></div>}
+                        </div>
+                        <button className="mt-0.5 grid h-7 w-7 place-items-center rounded-md text-white/40 hover:bg-white/10 hover:text-white/70"><SlidersHorizontal className="hidden" /><span className="text-lg leading-none">⋮</span></button>
                       </div>
                     </div>
                   </div>
