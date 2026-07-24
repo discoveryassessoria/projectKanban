@@ -190,9 +190,6 @@ export function PainelDaFase({
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3 flex-wrap">
             <h2 className="text-[19px] font-extrabold text-white/95">{faseNome}</h2>
-            <span className="text-[11.5px] font-bold px-3 py-1 rounded-full bg-[#7dd3fc]/15 text-[#7dd3fc] whitespace-nowrap">
-              Fase atual · operacional
-            </span>
           </div>
           <button
             onClick={onAbrirPainelCompleto}
@@ -504,24 +501,19 @@ function PersonRow({
         </div>
 
         {/* Responsável */}
-        <div className="text-[12px] font-bold text-white/55">
+        <div className="text-[12px] font-bold text-white/85">
           {p.responsavel ? (
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-white/25" />
               {p.responsavel.toUpperCase()}
             </div>
           ) : (
-            <span className="text-white/40 font-medium">—</span>
+            <span className="font-medium text-white/85">sem responsável</span>
           )}
         </div>
 
-        {/* Próxima ação */}
+        {/* Próxima ação — somente a ação */}
         <div className="text-[13px] font-semibold text-white/55">
-          {p.proximaAcao?.semResp && (
-            <span className="inline-block text-[10.5px] font-extrabold bg-white/[0.06] text-white/55 border border-white/10 px-2 py-0.5 rounded-md mb-1">
-              sem responsável
-            </span>
-          )}
           <div className={p.proximaAcao?.cls === "crit" ? "text-white/80 font-semibold" : ""}>
             {p.proximaAcao?.txt || <span className="text-white/40">—</span>}
           </div>
@@ -750,14 +742,9 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
 
 function docCls(cls: string): string {
   switch (cls) {
-    case "localizado":
-    case "validado":
-    case "recebido": return "text-[#4ade80]"
-    case "em_busca":
-    case "solicitado": return "text-[#d2a948]"
     case "bloqueado": return "text-[#f87171]"
     case "desnecessario": return "text-white/40"
-    default: return "text-white/40"
+    default: return "text-white/85"
   }
 }
 

@@ -3,7 +3,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { Loader2, Eye, ArrowLeft, ArrowLeftRight } from "lucide-react"
+import { Loader2, Eye, ArrowLeft } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { useAmbiente } from "@/src/contexts/ambiente-context"
 import type { ProcessoWithStatus, Processo, OperationalProjection } from "@/src/types/kanban"
@@ -777,10 +777,7 @@ export function ProcessoCentralOperacional({
       <div className="px-6 py-5">
 
         {/* ===== TOPO: Trilha de fases + Resumo do processo (lado a lado) ===== */}
-        <div
-          className="grid gap-4 items-stretch mb-4"
-          style={{ gridTemplateColumns: "minmax(0,1fr) 290px" }}
-        >
+        <div className="flex flex-col gap-4 mb-4">
           <div className="min-w-0">
             <WorkflowMacroTrilha
               currentPhase={faseAtivaNome}
@@ -797,27 +794,9 @@ export function ProcessoCentralOperacional({
           />
         </div>
 
-        {/* AÇÃO DE FASE: Nova Operação Antecipada (disponível em QUALQUER fase ativa) —
-            usa a operação oficial de outra fase para atender uma necessidade da fase atual. */}
-        {!isView && pode("processos.editar") && (
-          <div className="flex justify-end gap-2 mb-3">
-            {/* TAREFA TRANSVERSAL: orquestra um objetivo transversal referenciando uma operação
-                oficial de outra fase (SEM workflow próprio). Funcionalidade OFICIAL e SEPARADA
-                da Operação Antecipada — as duas coexistem. */}
-            <button
-              onClick={() => setNovaTransversalCtx({})}
-              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg border-[1.5px] border-[#d2a948]/30 bg-[#d2a948]/12 text-[#d2a948] hover:border-[#d2a948]/60 transition-colors"
-            >
-              <ArrowLeftRight className="w-3.5 h-3.5" /> Nova tarefa transversal
-            </button>
-            <button
-              onClick={() => setNovaOperacaoCtx({})}
-              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg border-[1.5px] border-[#a78bfa]/30 bg-[#a78bfa]/12 text-[#a78bfa] hover:border-[#a78bfa]/60 transition-colors"
-            >
-              <ArrowLeftRight className="w-3.5 h-3.5" /> Nova operação antecipada
-            </button>
-          </div>
-        )}
+        {/* Botões "Nova tarefa transversal" / "Nova operação antecipada" removidos da barra
+            da Central Operacional (a pedido). A operação antecipada segue acessível por
+            necessidade/pessoa dentro do painel da fase. */}
 
 
         {/* ===== Cabeçalho do MODO CONSULTA (fase passada) — MESMA casca, só leitura ===== */}
