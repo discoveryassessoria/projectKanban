@@ -289,7 +289,6 @@ function Card({ titulo, valor, sub, icon: Ic, cor, valorCor }: { titulo: string;
       </div>
       <p className={`mt-2 text-xl font-bold ${valorCor ?? 'text-white'}`}>{valor}</p>
       <p className="mt-0.5 text-[11px] text-white/45">{sub}</p>
-      <span className="absolute inset-x-0 bottom-0 h-1" style={{ background: cor }} />
     </div>
   )
 }

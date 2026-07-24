@@ -223,11 +223,10 @@ function ExtratoTab({ processoId, fx }: { processoId: number; fx: number }) {
 }
 function ExtKpi({ titulo, valor, sub, icon: Ic, cor }: any) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] p-4">
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
       <div className="flex items-start justify-between gap-2"><span className="text-[11px] font-medium uppercase tracking-wide text-white/45">{titulo}</span><Ic className="h-4 w-4" style={{ color: cor }} /></div>
       <div className="mt-2 text-2xl font-bold" style={{ color: cor }}>{valor}</div>
       <div className="mt-1 text-[11px] text-white/40">{sub}</div>
-      <span className="absolute inset-y-0 left-0 w-0.5" style={{ background: cor }} />
     </div>
   )
 }
