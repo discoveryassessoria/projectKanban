@@ -48,7 +48,7 @@ export function HomeShell({
     <div className="relative min-h-screen overflow-x-hidden text-white">
       {/* Fundo arquitetônico desfocado e escurecido — idêntico ao Financeiro */}
       <div className="pointer-events-none fixed inset-0 -z-10 scale-105 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat blur-[6px]" />
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-black/85" />
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-black/60" />
 
       <HeaderBar
         title={titulo}
@@ -61,7 +61,7 @@ export function HomeShell({
       />
 
       <div className="relative min-h-screen">
-        <div className="pointer-events-none absolute inset-0 bg-black/25" />
+        <div className="pointer-events-none absolute inset-0 bg-black/10" />
         <main className="relative">{children}</main>
       </div>
     </div>
