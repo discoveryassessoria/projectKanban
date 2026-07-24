@@ -486,7 +486,7 @@ export function ProcessoDetailsModal({
 
   // Abas com o Discovery Design System (dark glass/dourado). As demais permanecem
   // no tema claro. Skin only — layout idêntico.
-  const finDark = activeTab === "faturas" || activeTab === "geral" || activeTab === "central" || activeTab === "documentos"
+  const finDark = activeTab === "faturas" || activeTab === "geral" || activeTab === "central" || activeTab === "documentos" || activeTab === "historico"
 
   const modalContent = (
     <>
