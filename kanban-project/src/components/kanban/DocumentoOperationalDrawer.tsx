@@ -245,6 +245,7 @@ export function DocumentoOperationalDrawer({
   const { pode } = usePermissoes()
   const [doc, setDoc] = useState<Documento | null>(null)
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  const [delegandoResp, setDelegandoResp] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>("operation")
   const [salvando, setSalvando] = useState(false)
@@ -534,12 +535,28 @@ export function DocumentoOperationalDrawer({
                     <UserRound className="w-4 h-4 text-white/50 flex-shrink-0" />
                     <span className="truncate">{doc.responsavel?.nome || "Não atribuído"}</span>
                   </div>
-                  <button
-                    onClick={() => setActiveTab("operation")}
-                    className="self-start text-[#7dd3fc] text-[12px] hover:underline"
-                  >
-                    Delegar
-                  </button>
+                  {delegandoResp ? (
+                    <select
+                      autoFocus
+                      disabled={salvando}
+                      value={doc.responsavelId ?? ""}
+                      onChange={async (e) => { await putDoc({ responsavelId: e.target.value ? Number(e.target.value) : null }); setDelegandoResp(false) }}
+                      onBlur={() => setDelegandoResp(false)}
+                      className="self-start rounded-md border border-white/10 bg-[#12161c] px-1.5 py-1 text-[12px] text-white/85 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 disabled:opacity-50"
+                    >
+                      <option value="" className="bg-[#20262e]">— Não atribuído —</option>
+                      {usuarios.map((u) => (
+                        <option key={u.id} value={u.id} className="bg-[#20262e]">{u.nome}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <button
+                      onClick={() => setDelegandoResp(true)}
+                      className="self-start text-[#7dd3fc] text-[12px] hover:underline"
+                    >
+                      Delegar
+                    </button>
+                  )}
                 </div>
                 {/* SLA */}
                 <div className="flex flex-col gap-1.5">
