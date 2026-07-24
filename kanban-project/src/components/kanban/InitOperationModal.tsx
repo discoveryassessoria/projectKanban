@@ -354,7 +354,7 @@ export function InitOperationModal({
                         [
                           { key: "normal", label: "Normal", bgActive: "bg-[#12161c] text-white", bgIdle: "bg-[#1b2027] text-white/80 border-white/10" },
                           { key: "urgente", label: "Urgente", bgActive: "bg-orange-500 text-white", bgIdle: "bg-[#1b2027] text-white/80 border-white/10" },
-                          { key: "critica", label: "⚠ Crítica", bgActive: "bg-[#f87171]/120 text-white", bgIdle: "bg-[#1b2027] text-white/80 border-white/10" },
+                          { key: "critica", label: "⚠ Crítica", bgActive: "bg-[#f87171] text-white", bgIdle: "bg-[#1b2027] text-white/80 border-white/10" },
                         ] as Array<{ key: Prioridade; label: string; bgActive: string; bgIdle: string }>
                       ).map((p) => {
                         const selected = prioridade === p.key
@@ -409,8 +409,8 @@ export function InitOperationModal({
               disabled={!tipoOperacao || saving}
               className={`px-4 py-2 text-sm font-semibold text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 ${
                 tipoOperacao === "desnecessario"
-                  ? "bg-[#f87171]/120 hover:bg-red-600"
-                  : "bg-[#7dd3fc]/120 hover:bg-[#7dd3fc]"
+                  ? "bg-[#f87171] hover:bg-red-600"
+                  : "bg-[#7dd3fc] hover:bg-[#7dd3fc]"
               }`}
             >
               {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

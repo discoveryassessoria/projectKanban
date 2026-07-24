@@ -60,18 +60,18 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_PILL_CLS: Record<string, string> = {
   PENDENTE: "bg-white/25/20 text-white/40",
-  SOLICITADO: "bg-[#a78bfa]/120/20 text-violet-300",
-  EM_BUSCA: "bg-[#d2a948]/120/20 text-amber-300",
-  SOLICITAR: "bg-[#a78bfa]/120/20 text-violet-300",
+  SOLICITADO: "bg-[#a78bfa]/20 text-violet-300",
+  EM_BUSCA: "bg-[#d2a948]/20 text-amber-300",
+  SOLICITAR: "bg-[#a78bfa]/20 text-violet-300",
   RECEBIDO: "bg-emerald-500/20 text-emerald-300",
-  EM_ANALISE: "bg-[#7dd3fc]/120/20 text-blue-300",
+  EM_ANALISE: "bg-[#7dd3fc]/20 text-blue-300",
   RETIFICANDO: "bg-orange-500/20 text-orange-300",
   EM_TRADUCAO: "bg-cyan-500/20 text-cyan-300",
   TRADUZIDO: "bg-emerald-500/20 text-emerald-300",
   EM_APOSTILAMENTO: "bg-cyan-500/20 text-cyan-300",
   APOSTILADO: "bg-emerald-500/20 text-emerald-300",
   ENTREGUE: "bg-emerald-500/20 text-emerald-300",
-  INVALIDO: "bg-[#f87171]/120/20 text-red-300",
+  INVALIDO: "bg-[#f87171]/20 text-red-300",
   NAO_ENCONTRADO: "bg-[#20262e]0/20 text-white/40",
 }
 
@@ -485,7 +485,7 @@ export function DocumentoOperationalDrawer({
               </div>
 
               {bannerAntecipada && (
-                <div className="mb-3.5 rounded-lg border border-violet-400/30 bg-[#a78bfa]/120/15 px-3 py-2 text-[12px] text-violet-100 flex items-start gap-2">
+                <div className="mb-3.5 rounded-lg border border-violet-400/30 bg-[#a78bfa]/15 px-3 py-2 text-[12px] text-violet-100 flex items-start gap-2">
                   <span className="text-[13px] leading-none mt-0.5">⇄</span>
                   <span>{bannerAntecipada}</span>
                 </div>
@@ -561,7 +561,7 @@ export function DocumentoOperationalDrawer({
                   {t.label}
                   {t.count !== undefined && (
                     <span className={`text-[9.5px] px-1.5 rounded-full font-bold ${
-                      activeTab === t.id ? "bg-[#7dd3fc]/120/30 text-blue-200" : "bg-[#1b2027]/10 text-white/70"
+                      activeTab === t.id ? "bg-[#7dd3fc]/30 text-blue-200" : "bg-[#1b2027]/10 text-white/70"
                     }`}>
                       {t.count}
                     </span>
@@ -720,7 +720,7 @@ function TabOperation({
           <button
             onClick={onOpenInitModal}
             disabled={salvando}
-            className="w-full mt-2 px-3 py-2 bg-[#7dd3fc]/120 hover:bg-[#7dd3fc] disabled:opacity-50 text-white text-sm font-semibold rounded-md"
+            className="w-full mt-2 px-3 py-2 bg-[#252c35] disabled:opacity-50 text-white hover:bg-[#2d353f] text-sm font-semibold rounded-md"
           >
             ▸ Iniciar operação
           </button>
@@ -779,7 +779,7 @@ function TabOperation({
           <button
             onClick={handleSave}
             disabled={salvando}
-            className="px-4 py-2 bg-[#7dd3fc]/120 hover:bg-[#7dd3fc] disabled:opacity-50 text-white text-sm font-semibold rounded-md flex items-center gap-2"
+            className="px-4 py-2 bg-[#252c35] disabled:opacity-50 text-white hover:bg-[#2d353f] text-sm font-semibold rounded-md flex items-center gap-2"
           >
             {salvando ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
             Salvar
@@ -954,7 +954,7 @@ function Placeholder({ titulo, descricao, pendencia }: { titulo: string; descric
       </div>
       <div className="text-base font-semibold text-white mb-2">{titulo}</div>
       <div className="text-sm text-white/60 leading-relaxed mb-4">{descricao}</div>
-      <div className="text-[11px] text-amber-300/80 bg-[#d2a948]/120/10 border border-amber-500/20 rounded-md px-3 py-2 leading-relaxed">
+      <div className="text-[11px] text-amber-300/80 bg-[#d2a948]/10 border border-amber-500/20 rounded-md px-3 py-2 leading-relaxed">
         ⚠ {pendencia}
       </div>
     </div>

@@ -243,7 +243,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
           <Stat label="Documentos validados" value={`${k.valid} / ${k.total}`} ok={k.valid > 0} />
           <Stat label="Progresso da fase" value={`${pct}%`} />
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${pct >= 100 ? "bg-[#4ade80]/12 text-[#4ade80]" : "bg-indigo-50 text-indigo-700"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${pct >= 100 ? "bg-[#4ade80]/120" : "bg-indigo-500"}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${pct >= 100 ? "bg-[#4ade80]" : "bg-indigo-500"}`} />
             {pct >= 100 ? "Concluída" : "Em andamento"}
           </span>
         </div>
@@ -262,7 +262,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
                   return (
                     <div key={s.id} className={`flex items-start ${i < foco.workflow.length - 1 ? "flex-1" : ""}`}>
                       <div className="flex flex-col items-center text-center w-[100px] shrink-0">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${done ? "bg-[#4ade80]/120 text-white" : active ? "bg-indigo-600 text-white" : "bg-[#252c35] text-white/55"}`}>{done ? <Check className="w-4 h-4" /> : i + 1}</div>
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${done ? "bg-[#4ade80] text-white" : active ? "bg-indigo-600 text-white" : "bg-[#252c35] text-white/55"}`}>{done ? <Check className="w-4 h-4" /> : i + 1}</div>
                         <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{RE_SHORT[i]}</div>
                         <div className={`text-[10px] ${done ? "text-[#4ade80]" : active ? "text-indigo-600" : "text-white/40"}`}>{done ? "Concluída" : active ? "Atual" : "Pendente"}</div>
                       </div>
@@ -407,7 +407,7 @@ function RePill({ status }: { status: string }) {
     nova_via: "bg-[#252c35] text-white/68",
     reabrir_averbacao: "bg-[#d2a948]/12 text-[#d2a948]",
   }
-  const dot: Record<string, string> = { validada: "bg-[#4ade80]/120", divergente: "bg-[#f87171]/120", bloqueada: "bg-[#f87171]/120" }
+  const dot: Record<string, string> = { validada: "bg-[#4ade80]", divergente: "bg-[#f87171]", bloqueada: "bg-[#f87171]" }
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${map[status] || "bg-[#d2a948]/12 text-[#d2a948]"}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${dot[status] || "bg-amber-400"}`} />{RE_LABEL[status] || status}
@@ -464,7 +464,7 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
           {tab === "Operação" && (
             green ? (
               <div className="rounded-lg border border-[#4ade80]/30 bg-[#4ade80]/12 p-4 text-center">
-                <div className="w-9 h-9 mx-auto rounded-full bg-[#4ade80]/120 text-white flex items-center justify-center mb-2"><Check className="w-5 h-5" /></div>
+                <div className="w-9 h-9 mx-auto rounded-full bg-[#4ade80] text-white flex items-center justify-center mb-2"><Check className="w-5 h-5" /></div>
                 <h4 className="text-sm font-bold text-white/95">Certidão retificada validada</h4>
                 <p className="text-xs text-white/68">Workflow concluído (100%). Documento corrigido e validado.</p>
               </div>
@@ -722,7 +722,7 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
             <div className="flex flex-wrap gap-1.5">
               {CONF_CHK.map(([key, label]) => (
                 <button key={key} type="button" onClick={() => setCfChk((p) => ({ ...p, [key]: !p[key] }))} className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${cfChk[key] ? "border-green-300 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/68"}`}>
-                  <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${cfChk[key] ? "bg-[#4ade80]/120 text-white" : "border border-white/15"}`}>{cfChk[key] && <Check className="w-2.5 h-2.5" />}</span>{label}
+                  <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${cfChk[key] ? "bg-[#4ade80] text-white" : "border border-white/15"}`}>{cfChk[key] && <Check className="w-2.5 h-2.5" />}</span>{label}
                 </button>
               ))}
             </div>

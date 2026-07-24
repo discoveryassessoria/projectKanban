@@ -120,7 +120,7 @@ export function ProcessoDocumentosBiblioteca({
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50/30">
+    <div className="h-full overflow-y-auto bg-[#15191f]">
       <div
         className="grid gap-[18px] items-start p-6"
         style={{ gridTemplateColumns: "minmax(0,1fr) 300px" }}
@@ -129,22 +129,22 @@ export function ProcessoDocumentosBiblioteca({
         <div className="min-w-0">
           {/* Título */}
           <div className="flex items-center gap-3 mb-[18px]">
-            <div className="w-10 h-10 text-gray-500">
+            <div className="w-10 h-10 text-white/55">
               <FileText className="w-[30px] h-[30px]" strokeWidth={1.7} />
             </div>
             <div>
-              <h2 className="text-[21px] font-extrabold text-gray-900">Documentos</h2>
-              <span className="text-[13px] text-gray-500">Biblioteca documental consolidada do processo.</span>
+              <h2 className="text-[21px] font-extrabold text-white/95">Documentos</h2>
+              <span className="text-[13px] text-white/55">Biblioteca documental consolidada do processo.</span>
             </div>
           </div>
 
           {/* 8 KPIs */}
           <div className="grid gap-2.5 mb-[18px]" style={{ gridTemplateColumns: "repeat(8, 1fr)" }}>
             {kpiCards.map(([label, val, ic, tone], i) => (
-              <div key={i} className="bg-white border border-gray-200 rounded-xl p-[13px]">
-                <span className="text-[10.5px] text-gray-500 block leading-tight min-h-[28px]">{label}</span>
+              <div key={i} className="bg-[#1b2027] border border-white/10 rounded-xl p-[13px]">
+                <span className="text-[10.5px] text-white/55 block leading-tight min-h-[28px]">{label}</span>
                 <div className="flex items-center justify-between mt-1.5">
-                  <b className="text-[23px] font-extrabold text-gray-900">{val}</b>
+                  <b className="text-[23px] font-extrabold text-white/95">{val}</b>
                   <span className="text-[15px] opacity-85">{ic}</span>
                 </div>
               </div>
@@ -154,7 +154,7 @@ export function ProcessoDocumentosBiblioteca({
           {/* Toolbar: filtros + busca */}
           <div className="flex items-center justify-between gap-3.5 mb-5 flex-wrap">
             <div className="flex items-center gap-[7px] flex-wrap">
-              <button className="inline-flex items-center gap-1.5 border border-gray-200 bg-white rounded-lg px-3 py-2 text-[12.5px] font-semibold text-gray-500">
+              <button className="inline-flex items-center gap-1.5 border border-white/10 bg-[#1b2027] rounded-lg px-3 py-2 text-[12.5px] font-semibold text-white/55">
                 <Filter className="w-3.5 h-3.5" /> Filtros
               </button>
               {FILTERS.map((f) => (
@@ -163,33 +163,33 @@ export function ProcessoDocumentosBiblioteca({
                   onClick={() => setFiltro(f)}
                   className={`border rounded-lg px-[13px] py-2 text-[12.5px] font-semibold cursor-pointer transition-colors ${
                     f === filtro
-                      ? "bg-blue-50 border-blue-500 text-blue-600"
-                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-400"
+                      ? "bg-[#7dd3fc]/12 border-[#7dd3fc] text-[#7dd3fc]"
+                      : "border-white/10 bg-[#1b2027] text-white/55 hover:border-white/20"
                   }`}
                 >
                   {f}
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-2 border border-gray-200 bg-white rounded-lg px-[13px] py-2 min-w-[280px] flex-1 max-w-[340px]">
-              <Search className="w-[15px] h-[15px] text-gray-400" />
+            <div className="flex items-center gap-2 border border-white/10 bg-[#1b2027] rounded-lg px-[13px] py-2 min-w-[280px] flex-1 max-w-[340px]">
+              <Search className="w-[15px] h-[15px] text-white/40" />
               <input
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 placeholder="Buscar por pessoa ou documento..."
-                className="border-none outline-none text-[13px] w-full bg-transparent text-gray-900"
+                className="border-none outline-none text-[13px] w-full bg-transparent text-white/95"
               />
             </div>
           </div>
 
           {/* Seção LINHA PRINCIPAL */}
           <div className="mb-6">
-            <div className="border-l-[3px] border-blue-600 pl-3 mb-3.5">
-              <b className="text-[13px] font-extrabold text-gray-900 tracking-wide">LINHA PRINCIPAL · TRANSMISSÃO DE CIDADANIA</b>
-              <span className="block text-[12px] text-gray-500 mt-0.5">Pessoas da linha reta ordenadas por geração</span>
+            <div className="border-l-[3px] border-[#7dd3fc] pl-3 mb-3.5">
+              <b className="text-[13px] font-extrabold text-white/95 tracking-wide">LINHA PRINCIPAL · TRANSMISSÃO DE CIDADANIA</b>
+              <span className="block text-[12px] text-white/55 mt-0.5">Pessoas da linha reta ordenadas por geração</span>
             </div>
             {linhaPrincipal.length === 0 ? (
-              <div className="p-[18px] text-center text-gray-400 text-[13px]">Nenhuma pessoa nesta seção.</div>
+              <div className="p-[18px] text-center text-white/40 text-[13px]">Nenhuma pessoa nesta seção.</div>
             ) : (
               linhaPrincipal.map((g) => (
                 <PersonGroup key={g.personId} g={g} matchFilter={matchFilter} onAbrirDetalhes={onAbrirDetalhes} />
@@ -199,12 +199,12 @@ export function ProcessoDocumentosBiblioteca({
 
           {/* Seção FORA DA LINHAGEM */}
           <div className="mb-6">
-            <div className="border-l-[3px] border-slate-400 pl-3 mb-3.5">
-              <b className="text-[13px] font-extrabold text-gray-900 tracking-wide">FORA DA LINHAGEM · CÔNJUGES / APOIO</b>
-              <span className="block text-[12px] text-gray-500 mt-0.5">Pessoas fora da linha reta ou documentos de apoio</span>
+            <div className="border-l-[3px] border-white/20 pl-3 mb-3.5">
+              <b className="text-[13px] font-extrabold text-white/95 tracking-wide">FORA DA LINHAGEM · CÔNJUGES / APOIO</b>
+              <span className="block text-[12px] text-white/55 mt-0.5">Pessoas fora da linha reta ou documentos de apoio</span>
             </div>
             {foraDaLinha.length === 0 ? (
-              <div className="p-[18px] text-center text-gray-400 text-[13px]">Nenhuma pessoa nesta seção.</div>
+              <div className="p-[18px] text-center text-white/40 text-[13px]">Nenhuma pessoa nesta seção.</div>
             ) : (
               foraDaLinha.map((g) => (
                 <PersonGroup key={g.personId} g={g} matchFilter={matchFilter} onAbrirDetalhes={onAbrirDetalhes} />
@@ -216,24 +216,24 @@ export function ProcessoDocumentosBiblioteca({
         {/* ============== COLUNA LATERAL ============== */}
         <div className="flex flex-col gap-3.5">
           {/* Resumo da biblioteca (donut) */}
-          <div className="bg-white border border-gray-200 rounded-xl p-[15px]">
-            <h3 className="text-[13.5px] font-extrabold text-gray-900 mb-3">Resumo da biblioteca</h3>
+          <div className="bg-[#1b2027] border border-white/10 rounded-xl p-[15px]">
+            <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">Resumo da biblioteca</h3>
             <Donut kpis={kpis} />
           </div>
 
           {/* Legenda */}
-          <div className="bg-white border border-gray-200 rounded-xl p-[15px]">
-            <h3 className="text-[13.5px] font-extrabold text-gray-900 mb-3">Legenda de status</h3>
+          <div className="bg-[#1b2027] border border-white/10 rounded-xl p-[15px]">
+            <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">Legenda de status</h3>
             <Legenda />
           </div>
 
           {/* Informações */}
-          <div className="bg-white border border-gray-200 rounded-xl p-[15px]">
-            <h3 className="text-[13.5px] font-extrabold text-gray-900 mb-3">⚠ Informações</h3>
-            <p className="text-[11.5px] text-gray-500 leading-relaxed mb-2">
+          <div className="bg-[#1b2027] border border-white/10 rounded-xl p-[15px]">
+            <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">⚠ Informações</h3>
+            <p className="text-[11.5px] text-white/55 leading-relaxed mb-2">
               A biblioteca mostra apenas certidões, certidões retificadas, traduções juramentadas e apostilas de Haia.
             </p>
-            <p className="text-[11.5px] text-gray-500 leading-relaxed">
+            <p className="text-[11.5px] text-white/55 leading-relaxed">
               Documentos jurídicos e operacionais ficam dentro das fases que os geraram.
             </p>
           </div>
@@ -264,42 +264,42 @@ function PersonGroup({
   const genTxt = g.lineage === "Linha reta" ? `Geração ${g.generation}` : "Fora da linha"
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl mb-3 overflow-hidden">
+    <div className="bg-[#1b2027] border border-white/10 rounded-2xl mb-3 overflow-hidden">
       {/* Cabeçalho da pessoa */}
       <div
         className="flex items-center gap-3.5 px-[18px] py-4 cursor-pointer"
         onClick={() => setAberto(!aberto)}
       >
-        <span className="w-[38px] h-[38px] rounded-full bg-slate-100 text-gray-500 grid place-items-center text-[13px] font-bold flex-none">
+        <span className="w-[38px] h-[38px] rounded-full bg-[#252c35] text-white/55 grid place-items-center text-[13px] font-bold flex-none">
           {ini}
         </span>
         <div className="flex-1 min-w-0">
-          <b className="text-[14.5px] text-gray-900">
+          <b className="text-[14.5px] text-white/95">
             {g.personName}
-            {g.lineage !== "Linha reta" && <span className="font-medium text-gray-500"> ({g.role})</span>}
+            {g.lineage !== "Linha reta" && <span className="font-medium text-white/55"> ({g.role})</span>}
           </b>
-          <span className="block text-[12px] text-gray-500 mt-px">{genTxt} · {g.lineage} · {g.role}</span>
+          <span className="block text-[12px] text-white/55 mt-px">{genTxt} · {g.lineage} · {g.role}</span>
         </div>
         <div className="flex gap-2.5">
-          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-[11px] py-1.5">
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-white/55 bg-[#20262e] border border-white/10 rounded-lg px-[11px] py-1.5">
             <FileText className="w-3.5 h-3.5" /> {g.stats.totalDocuments} documentos
           </span>
-          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg px-[11px] py-1.5">
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#4ade80] bg-[#4ade80]/12 border border-[#4ade80]/30 rounded-lg px-[11px] py-1.5">
             <CheckCircle2 className="w-3.5 h-3.5" /> {g.stats.readyForProtocol} pronto{g.stats.readyForProtocol === 1 ? "" : "s"}
           </span>
-          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-[11px] py-1.5">
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#d2a948] bg-[#d2a948]/12 border border-[#d2a948]/30 rounded-lg px-[11px] py-1.5">
             <Clock className="w-3.5 h-3.5" /> {g.stats.pending} pendentes
           </span>
         </div>
-        <ChevronDown className={`w-[18px] h-[18px] text-gray-400 transition-transform ${aberto ? "" : "-rotate-90"}`} />
+        <ChevronDown className={`w-[18px] h-[18px] text-white/40 transition-transform ${aberto ? "" : "-rotate-90"}`} />
       </div>
 
       {/* Corpo (tabela) */}
       {aberto && (
-        <div className="border-t border-gray-200">
+        <div className="border-t border-white/10">
           {/* Cabeçalho de colunas */}
           <div
-            className="grid gap-2.5 items-center px-[18px] py-[13px] bg-gray-50 text-gray-400 text-[10px] font-bold tracking-wider"
+            className="grid gap-2.5 items-center px-[18px] py-[13px] bg-[#20262e] text-white/40 text-[10px] font-bold tracking-wider"
             style={{ gridTemplateColumns: "1.6fr .9fr 1fr 1.1fr 1fr 1fr 1.1fr .9fr" }}
           >
             <span>DOCUMENTO</span>
@@ -322,27 +322,27 @@ function PersonGroup({
 
 function DocRow({ it, onAbrirDetalhes }: { it: BibDocItem; onAbrirDetalhes: (docId: number) => void }) {
   const finalCls =
-    it.finalStatus === "pronta_protocolo" ? "text-green-700"
-    : "text-amber-600"
+    it.finalStatus === "pronta_protocolo" ? "text-[#4ade80]"
+    : "text-[#d2a948]"
 
   return (
     <div
-      className="grid gap-2.5 items-center px-[18px] py-[13px] border-t border-gray-100 text-[12.5px]"
+      className="grid gap-2.5 items-center px-[18px] py-[13px] border-t border-white/10 text-[12.5px]"
       style={{ gridTemplateColumns: "1.6fr .9fr 1fr 1.1fr 1fr 1fr 1.1fr .9fr" }}
     >
       {/* Documento */}
       <span className="flex items-center gap-2.5">
-        <span className="w-5 h-5 text-gray-400 flex-none">
+        <span className="w-5 h-5 text-white/40 flex-none">
           <FileText className="w-5 h-5" />
         </span>
         <span>
-          <b className="text-[13px] text-gray-900 block">{it.documentType}</b>
-          <small className="text-[11px] text-gray-400">{it.personName}</small>
+          <b className="text-[13px] text-white/95 block">{it.documentType}</b>
+          <small className="text-[11px] text-white/40">{it.personName}</small>
         </span>
       </span>
 
       {/* Tipo */}
-      <span className="text-[12px] text-gray-500">{it.documentFormat}</span>
+      <span className="text-[12px] text-white/55">{it.documentFormat}</span>
 
       {/* Certidão / Cert. retificada / Tradução / Apostila */}
       <StatusCell st={it.certificate.status} date={it.certificate.date} />
@@ -357,7 +357,7 @@ function DocRow({ it, onAbrirDetalhes }: { it: BibDocItem; onAbrirDetalhes: (doc
       <span>
         <button
           onClick={() => onAbrirDetalhes(it.id)}
-          className="border border-gray-200 bg-white rounded-lg px-[13px] py-[7px] text-[12px] font-semibold text-gray-900 cursor-pointer hover:border-blue-500 hover:text-blue-600 transition-colors"
+          className="border border-white/10 bg-[#1b2027] rounded-lg px-[13px] py-[7px] text-[12px] font-semibold text-white/95 cursor-pointer hover:border-[#7dd3fc] hover:text-[#7dd3fc] transition-colors"
         >
           Abrir detalhes
         </button>
@@ -367,19 +367,19 @@ function DocRow({ it, onAbrirDetalhes }: { it: BibDocItem; onAbrirDetalhes: (doc
 }
 
 function StatusCell({ st, date }: { st: CellStatus; date?: string | null }) {
-  if (st === "nao_aplica") return <span className="text-[11.5px] text-gray-400">Não se aplica</span>
+  if (st === "nao_aplica") return <span className="text-[11.5px] text-white/40">Não se aplica</span>
 
   const cls =
-    st === "validada" ? "text-green-600"
-    : st === "recebida" ? "text-blue-600"
-    : "text-amber-500"
+    st === "validada" ? "text-[#4ade80]"
+    : st === "recebida" ? "text-[#7dd3fc]"
+    : "text-[#d2a948]"
   const txt =
     st === "validada" ? "Validada"
     : st === "recebida" ? "Recebida"
     : "Pendente"
 
   if (st === "pendente" && !date) {
-    return <span className="text-gray-400">—</span>
+    return <span className="text-white/40">—</span>
   }
 
   return (
@@ -388,7 +388,7 @@ function StatusCell({ st, date }: { st: CellStatus; date?: string | null }) {
         <span className="w-[7px] h-[7px] rounded-full bg-current" />
         {txt}
       </span>
-      {date && <small className="block text-[10.5px] text-gray-400 mt-px ml-3">{date}</small>}
+      {date && <small className="block text-[10.5px] text-white/40 mt-px ml-3">{date}</small>}
     </span>
   )
 }
@@ -430,18 +430,18 @@ function Donut({ kpis }: { kpis: BibKpis }) {
           {circles}
         </svg>
         <div className="absolute inset-0 grid place-content-center text-center">
-          <b className="text-[20px] font-extrabold text-gray-900 block">{kpis.obrig}</b>
-          <span className="text-[10px] text-gray-400">Total</span>
+          <b className="text-[20px] font-extrabold text-white/95 block">{kpis.obrig}</b>
+          <span className="text-[10px] text-white/40">Total</span>
         </div>
       </div>
       <div className="flex flex-col gap-[7px]">
         {segs.map((s, i) => {
           const pct = Math.round((s[1] / total) * 100)
           return (
-            <div key={i} className="flex items-center gap-[7px] text-[11.5px] text-gray-500">
+            <div key={i} className="flex items-center gap-[7px] text-[11.5px] text-white/55">
               <span className="w-[9px] h-[9px] rounded-[3px] flex-none" style={{ background: s[2] }} />
               {s[0]}
-              <b className="ml-auto text-gray-900 text-[11.5px]">{s[1]} ({pct}%)</b>
+              <b className="ml-auto text-white/95 text-[11.5px]">{s[1]} ({pct}%)</b>
             </div>
           )
         })}
@@ -453,12 +453,12 @@ function Donut({ kpis }: { kpis: BibKpis }) {
 // ---- Legenda de status ----
 function Legenda() {
   const items: Array<[string, string, string]> = [
-    ["bg-green-600", "Validada", "Documento validado e aprovado"],
-    ["bg-blue-600", "Recebida", "Documento recebido, aguardando validação"],
-    ["bg-amber-500", "Pendente", "Documento ainda não recebido"],
-    ["bg-slate-300", "Não se aplica", "Não aplicável para este documento"],
-    ["bg-green-600", "Pronto para protocolo", "Certidão + Tradução + Apostila concluídas"],
-    ["bg-amber-500", "Aguardando", "Etapa pendente para conclusão"],
+    ["bg-[#4ade80]", "Validada", "Documento validado e aprovado"],
+    ["bg-[#7dd3fc]", "Recebida", "Documento recebido, aguardando validação"],
+    ["bg-[#d2a948]/120", "Pendente", "Documento ainda não recebido"],
+    ["bg-white/20", "Não se aplica", "Não aplicável para este documento"],
+    ["bg-[#4ade80]", "Pronto para protocolo", "Certidão + Tradução + Apostila concluídas"],
+    ["bg-[#d2a948]/120", "Aguardando", "Etapa pendente para conclusão"],
   ]
   return (
     <div className="flex flex-col gap-[11px]">
@@ -466,8 +466,8 @@ function Legenda() {
         <div key={i} className="flex gap-2.5 items-start">
           <span className={`w-[13px] h-[13px] rounded-full flex-none mt-0.5 ${dot}`} />
           <div>
-            <b className="text-[12px] text-gray-900 block">{title}</b>
-            <span className="text-[11px] text-gray-400">{desc}</span>
+            <b className="text-[12px] text-white/95 block">{title}</b>
+            <span className="text-[11px] text-white/40">{desc}</span>
           </div>
         </div>
       ))}

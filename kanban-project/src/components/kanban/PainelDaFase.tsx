@@ -426,8 +426,8 @@ function PersonRow({
     : "border-l-[3px] border-transparent"
 
   const transDot =
-    p.transmissao.state === "OK" ? "bg-[#4ade80]/120"
-    : p.transmissao.state === "BLOQUEADA" ? "bg-[#f87171]/120"
+    p.transmissao.state === "OK" ? "bg-[#4ade80]"
+    : p.transmissao.state === "BLOQUEADA" ? "bg-[#f87171]"
     : "bg-white/25"
   const transColor =
     p.transmissao.state === "OK" ? "text-[#4ade80]"
@@ -460,7 +460,7 @@ function PersonRow({
             {p.iniciais}
           </div>
           <div className="min-w-0">
-            <b className="text-[14px] font-extrabold block leading-tight truncate">{p.nome}</b>
+            <b className="text-[14px] font-extrabold block leading-tight truncate text-white/95">{p.nome}</b>
             <span className="text-[11.5px] text-white/40 font-semibold">
               {p.papel} · {p.isLinha ? "Linha reta" : "Fora da linha"}
             </span>
@@ -623,7 +623,7 @@ function PersonRow({
                   className={`text-[12px] font-bold px-3 py-2 rounded-lg transition-colors ${
                     d.emissaoConcluida
                       ? "border border-white/10 text-white/80 bg-[#1b2027] hover:bg-[#20262e]"
-                      : "bg-[#7dd3fc] text-white hover:bg-[#7dd3fc]/120"
+                      : "bg-[#252c35] text-white/95 border border-white/10 hover:bg-[#2d353f]"
                   }`}
                 >
                   {d.emissaoConcluida ? "Ver workflow" : "Abrir operação"}
@@ -710,7 +710,7 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
         <div className="flex items-center gap-2 flex-none">
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${st.c}`}>{st.t}</span>
           {onAbrir && (
-            <button onClick={() => onAbrir(o)} className="text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-[#7dd3fc] text-white hover:bg-[#7dd3fc]/120">Abrir operação</button>
+            <button onClick={() => onAbrir(o)} className="text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-[#252c35] text-white/95 border border-white/10 hover:bg-[#2d353f]">Abrir operação</button>
           )}
         </div>
       </div>
@@ -729,14 +729,14 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
             )}
             <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder={apoio ? "Observações" : "Resultado obtido"} className="w-full text-[12px] rounded-md border border-white/10 px-2 py-1.5 focus:outline-none focus:border-blue-400" autoFocus />
             <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={() => enviar("SIM")} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[#4ade80] text-white hover:bg-[#4ade80]/120"><CheckCircle2 className="w-3.5 h-3.5" /> Objetivo atingido</button>
+              <button onClick={() => enviar("SIM")} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40 hover:bg-[#4ade80]/25"><CheckCircle2 className="w-3.5 h-3.5" /> Objetivo atingido</button>
               <button onClick={() => enviar("PARCIAL")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-teal-200 text-teal-700 hover:bg-teal-50">Parcialmente</button>
               <button onClick={() => enviar("NAO")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-white/10 text-white/80 hover:bg-[#20262e]">Não atingido</button>
               <button onClick={() => enviar("CANCELAR")} className="text-[11.5px] text-white/40 hover:text-[#f87171] ml-auto">Cancelar operação</button>
             </div>
           </div>
         ) : (
-          <button onClick={() => { setAvaliando(true); setResultado("") }} className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[#4ade80] text-white hover:bg-[#4ade80]/120"><CheckCircle2 className="w-3.5 h-3.5" /> Operação concluída — avaliar objetivo</button>
+          <button onClick={() => { setAvaliando(true); setResultado("") }} className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40 hover:bg-[#4ade80]/25"><CheckCircle2 className="w-3.5 h-3.5" /> Operação concluída — avaliar objetivo</button>
         )
       )}
       {o.resultadoObtido && <div className="text-[11px] text-white/55 mt-1">Resultado: {o.resultadoObtido}</div>}
@@ -765,10 +765,10 @@ function docDot(cls: string): string {
   switch (cls) {
     case "localizado":
     case "validado":
-    case "recebido": return "bg-[#4ade80]/120"
+    case "recebido": return "bg-[#4ade80]"
     case "em_busca":
-    case "solicitado": return "bg-[#d2a948]/120"
-    case "bloqueado": return "bg-[#f87171]/120"
+    case "solicitado": return "bg-[#d2a948]"
+    case "bloqueado": return "bg-[#f87171]"
     default: return "bg-white/25"
   }
 }

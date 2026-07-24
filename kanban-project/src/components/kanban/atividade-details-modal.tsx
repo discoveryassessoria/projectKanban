@@ -567,7 +567,7 @@ export function ProcessoDetailsModal({
         </div>
 
         {/* Conteúdo principal */}
-        <div className="flex-1 overflow-hidden">
+        <div className={`flex-1 overflow-hidden ${finDark ? 'text-white/80' : ''}`}>
           {activeTab === "geral" && (
             <div className="grid grid-cols-2 h-full overflow-hidden">
               {/* ========== COLUNA ESQUERDA - SOBRE O NEGÓCIO ========== */}

@@ -74,9 +74,9 @@ const PILL: Record<string, string> = {
   pendente: "bg-[#252c35] text-white/68",
 }
 const PILL_DOT: Record<string, string> = {
-  validado: "bg-[#4ade80]/120",
-  bloqueado: "bg-[#f87171]/120",
-  correcao_solicitada: "bg-[#f87171]/120",
+  validado: "bg-[#4ade80]",
+  bloqueado: "bg-[#f87171]",
+  correcao_solicitada: "bg-[#f87171]",
   pendente: "bg-white/25",
 }
 const pillCls = (s: string) => PILL[s] || "bg-[#d2a948]/12 text-[#d2a948]"
@@ -220,7 +220,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
           <Stat label="Progresso da fase" value={`${progress}%`} />
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
             concluida ? "bg-[#4ade80]/12 text-[#4ade80]" : "bg-indigo-50 text-indigo-700"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${concluida ? "bg-[#4ade80]/120" : "bg-indigo-500"}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${concluida ? "bg-[#4ade80]" : "bg-indigo-500"}`} />
             {concluida ? "Concluída" : "Em andamento"}
           </span>
         </div>
@@ -243,7 +243,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
                       className={`flex flex-col items-center text-center w-[96px] shrink-0 ${active ? "cursor-pointer" : "cursor-default"}`}
                     >
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                        done ? "bg-[#4ade80]/120 text-white"
+                        done ? "bg-[#4ade80] text-white"
                           : active ? "bg-indigo-600 text-white ring-2 ring-indigo-200"
                             : "bg-[#252c35] text-white/55"}`}>
                         {done ? <Check className="w-4 h-4" /> : i + 1}
@@ -583,7 +583,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
                 {MONTAR_CHK.map(([key, label]) => (
                   <button key={key} type="button" onClick={() => setMontarChk((p) => ({ ...p, [key]: !p[key] }))}
                     className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-left ${montarChk[key] ? "border-green-300 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/80"}`}>
-                    <span className={`w-4 h-4 rounded flex items-center justify-center ${montarChk[key] ? "bg-[#4ade80]/120 text-white" : "border border-white/15"}`}>
+                    <span className={`w-4 h-4 rounded flex items-center justify-center ${montarChk[key] ? "bg-[#4ade80] text-white" : "border border-white/15"}`}>
                       {montarChk[key] && <Check className="w-3 h-3" />}
                     </span>
                     {label}
@@ -686,7 +686,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
                       return (
                         <button key={ci} type="button" onClick={() => setConfChk((p) => ({ ...p, [key]: !p[key] }))}
                           className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${on ? "border-green-300 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/68"}`}>
-                          <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${on ? "bg-[#4ade80]/120 text-white" : "border border-white/15"}`}>{on && <Check className="w-2.5 h-2.5" />}</span>
+                          <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${on ? "bg-[#4ade80] text-white" : "border border-white/15"}`}>{on && <Check className="w-2.5 h-2.5" />}</span>
                           {c}
                         </button>
                       )

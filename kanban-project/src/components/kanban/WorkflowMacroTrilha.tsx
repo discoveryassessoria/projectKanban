@@ -160,8 +160,8 @@ export function WorkflowMacroTrilha({
           const conditional = RETIF_PHASES.includes(title)
 
           const dotCls =
-            st === "concluida" ? "bg-[#4ade80] text-white"
-            : st === "atual" ? "bg-[#7dd3fc] text-white"
+            st === "concluida" ? "bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40"
+            : st === "atual" ? "bg-[#252c35] text-white/95 border border-white/10"
             : st === "pulada" ? "bg-[#252c35] text-white/40"
             : st === "condicional" ? "bg-[#a78bfa]/15 text-[#a78bfa]"
             : st === "bloqueada" ? "bg-[#d2a948]/15 text-[#d2a948]"
@@ -256,7 +256,7 @@ export function WorkflowMacroTrilha({
 
       {/* Legenda */}
       <div className="flex flex-wrap gap-3.5 pt-3 mt-2.5 border-t border-white/10 text-[11px] text-white/55">
-        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#4ade80] text-white grid place-items-center"><Check className="w-2 h-2" strokeWidth={3} /></span>Concluída</span>
+        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40 grid place-items-center"><Check className="w-2 h-2" strokeWidth={3} /></span>Concluída</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#7dd3fc]" />Atual (fase real)</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full border-2 border-white/10 bg-[#1b2027]" />Futura</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#a78bfa]/15 text-[#a78bfa] grid place-items-center text-[8px]">?</span>Condicional</span>
@@ -376,7 +376,7 @@ export function MacroSidebar({
             const st = getPhaseStatus(title, currentPhase, completedPhases, path, needsRectification)
             const prog = progressOf(title)
             const icCls =
-              st === "concluida" ? "bg-[#4ade80] text-white"
+              st === "concluida" ? "bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40"
               : st === "atual" ? "bg-[#7dd3fc]"
               : st === "pulada" ? "bg-[#252c35] text-white/40"
               : "border-[1.5px] border-white/10 bg-[#1b2027]"

@@ -53,7 +53,7 @@ const SEV_STYLE: Record<string, string> = {
   media: "bg-orange-50 text-orange-700",
   critica: "bg-[#f87171]/12 text-[#f87171]",
 }
-const SEV_DOT: Record<string, string> = { baixa: "bg-amber-400", media: "bg-orange-500", critica: "bg-[#f87171]/120" }
+const SEV_DOT: Record<string, string> = { baixa: "bg-amber-400", media: "bg-orange-500", critica: "bg-[#f87171]" }
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("authToken")}` })
 const ini = (nome: string) => {
@@ -180,7 +180,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
               <div key={e.label} className={`flex items-start ${i < etapas.length - 1 ? "flex-1" : ""}`}>
                 <div className="flex flex-col items-center text-center w-[88px] shrink-0">
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                    e.st === "concluida" ? "bg-[#4ade80]/120 text-white"
+                    e.st === "concluida" ? "bg-[#4ade80] text-white"
                     : e.st === "em_andamento" ? "bg-indigo-600 text-white"
                     : "bg-[#252c35] text-white/55"}`}>
                     {e.st === "concluida" ? <Check className="w-4 h-4" /> : i + 1}

@@ -57,18 +57,18 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_PILL_CLS: Record<string, string> = {
   PENDENTE: "bg-white/25/20 text-white/40",
-  SOLICITAR: "bg-[#a78bfa]/120/20 text-violet-300",
-  SOLICITADO: "bg-[#a78bfa]/120/20 text-violet-300",
-  EM_BUSCA: "bg-[#d2a948]/120/20 text-amber-300",
+  SOLICITAR: "bg-[#a78bfa]/20 text-violet-300",
+  SOLICITADO: "bg-[#a78bfa]/20 text-violet-300",
+  EM_BUSCA: "bg-[#d2a948]/20 text-amber-300",
   RECEBIDO: "bg-emerald-500/20 text-emerald-300",
-  EM_ANALISE: "bg-[#7dd3fc]/120/20 text-blue-300",
+  EM_ANALISE: "bg-[#7dd3fc]/20 text-blue-300",
   RETIFICANDO: "bg-orange-500/20 text-orange-300",
   EM_TRADUCAO: "bg-cyan-500/20 text-cyan-300",
   TRADUZIDO: "bg-emerald-500/20 text-emerald-300",
   EM_APOSTILAMENTO: "bg-cyan-500/20 text-cyan-300",
   APOSTILADO: "bg-emerald-500/20 text-emerald-300",
   ENTREGUE: "bg-emerald-500/20 text-emerald-300",
-  INVALIDO: "bg-[#f87171]/120/20 text-red-300",
+  INVALIDO: "bg-[#f87171]/20 text-red-300",
   NAO_ENCONTRADO: "bg-[#20262e]0/20 text-white/40",
   CANCELADO: "bg-[#20262e]0/20 text-white/40",
 }
@@ -381,8 +381,8 @@ export function PessoaOperacionalDrawer({
                     onClick={handleDeleteClick}
                     className={`ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold rounded-md transition-colors ${
                       confirmDelete
-                        ? "bg-[#f87171]/120 text-white hover:bg-red-600"
-                        : "bg-[#f87171]/120/10 text-red-300 hover:bg-[#f87171]/120/20"
+                        ? "bg-[#f87171] text-white hover:bg-red-600"
+                        : "bg-[#f87171]/10 text-red-300 hover:bg-[#f87171]/20"
                     }`}
                   >
                     <Trash2 className="w-3 h-3" />
@@ -411,7 +411,7 @@ export function PessoaOperacionalDrawer({
                   {t.count !== undefined && (
                     <span
                       className={`text-[9.5px] px-1.5 rounded-full font-bold ${
-                        activeTab === t.id ? "bg-[#7dd3fc]/120/30 text-blue-200" : "bg-[#1b2027]/10 text-white/70"
+                        activeTab === t.id ? "bg-[#7dd3fc]/30 text-blue-200" : "bg-[#1b2027]/10 text-white/70"
                       }`}
                     >
                       {t.count}
@@ -647,7 +647,7 @@ function Placeholder({
       </div>
       <div className="text-base font-semibold text-white mb-2">{titulo}</div>
       <div className="text-sm text-white/60 leading-relaxed mb-4">{descricao}</div>
-      <div className="text-[11px] text-amber-300/80 bg-[#d2a948]/120/10 border border-amber-500/20 rounded-md px-3 py-2 leading-relaxed">
+      <div className="text-[11px] text-amber-300/80 bg-[#d2a948]/10 border border-amber-500/20 rounded-md px-3 py-2 leading-relaxed">
         ⚠ {pendencia}
       </div>
     </div>

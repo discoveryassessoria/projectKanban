@@ -60,7 +60,7 @@ export function ProcessoFaseGenerica({ processoId, faseCode, onConcluido }: Prop
           return (
             <button key={s.stepKey} onClick={() => toggle(s.stepKey)} disabled={!!resultado}
               className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-[#20262e] disabled:hover:bg-[#1b2027]">
-              <span className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${ok ? "bg-[#4ade80]/120 text-white" : "border-2 border-white/15 text-transparent"}`}>
+              <span className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${ok ? "bg-[#4ade80] text-white" : "border-2 border-white/15 text-transparent"}`}>
                 <Check className="w-4 h-4" />
               </span>
               <span>
