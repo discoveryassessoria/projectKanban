@@ -140,3 +140,22 @@ export function lancEstorno(pernasOriginais: Perna[]): Lancamento {
 export function lancBaixa(valor: number): Lancamento {
   return montarLancamento('BAIXA', [D(CONTA.DESCONTOS, valor), C(CONTA.CLIENTES_A_RECEBER, valor)])
 }
+
+/**
+ * Ajuste do valor CONTRATADO (redistribuição da Receita consolidada). Δ>0 aumenta
+ * o a receber/pagar contra a receita a realizar; Δ<0 reduz (perna invertida). Mantém
+ * o Ledger append-only consistente: replay reproduz o novo valorContratado. A soma
+ * dos Δ do grupo é ZERO (o total do grupo não muda), mas cada obrigação ajusta o seu.
+ */
+export function lancAjusteContrato(delta: number, aReceber: boolean): Lancamento {
+  const v = cent(Math.abs(delta))
+  const aumenta = delta > 0
+  if (aReceber) {
+    return aumenta
+      ? montarLancamento('AJUSTE', [D(CONTA.CLIENTES_A_RECEBER, v), C(CONTA.RECEITA_A_REALIZAR, v)])
+      : montarLancamento('AJUSTE', [D(CONTA.RECEITA_A_REALIZAR, v), C(CONTA.CLIENTES_A_RECEBER, v)])
+  }
+  return aumenta
+    ? montarLancamento('AJUSTE', [D(CONTA.RECEITA_A_REALIZAR, v), C(CONTA.FORNECEDORES_A_PAGAR, v)])
+    : montarLancamento('AJUSTE', [D(CONTA.FORNECEDORES_A_PAGAR, v), C(CONTA.RECEITA_A_REALIZAR, v)])
+}

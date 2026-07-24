@@ -14,6 +14,7 @@ import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import RegistrarPagamentoModal from "@/src/components/financeiro/v3/RegistrarPagamentoModal"
 import RegistrarPagamentoView from "@/src/components/financeiro/v3/RegistrarPagamentoView"
+import EditarDistribuicaoView from "@/src/components/financeiro/v3/EditarDistribuicaoView"
 import { NovaFaturaModal } from "@/src/components/kanban/NovaFaturaModal"
 import { uploadFiles } from "@/src/lib/storage"
 import {
@@ -60,6 +61,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const [drawerPart, setDrawerPart] = useState<any>(null) // participante aberto no drawer (obrigacaoId + nome)
   const [pagOpen, setPagOpen] = useState(false)
   const [receberOpen, setReceberOpen] = useState(false)
+  const [distribuicaoOpen, setDistribuicaoOpen] = useState(false)
   const [faturaOpen, setFaturaOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [maisOpen, setMaisOpen] = useState(false)
@@ -530,7 +532,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                   <p className="mt-1 text-sm text-white/45">Distribuição desta Receita entre os responsáveis pelo pagamento.</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <button disabled title="Edição de distribuição em breve" className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-sm font-medium text-white/50 opacity-60"><Pencil className="h-4 w-4" /> Editar distribuição</button>
+                  <button onClick={() => setDistribuicaoOpen(true)} title="Editar como o total é dividido entre os participantes" className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-sm font-medium text-white/80 hover:border-white/25"><Pencil className="h-4 w-4" /> Editar distribuição</button>
                   <button onClick={exportarParticipantesCsv} title="Exportar participantes em CSV" className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-sm font-medium text-white/80 hover:border-white/25"><Download className="h-4 w-4" /> Exportar</button>
                 </div>
               </div>
@@ -856,6 +858,14 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
           receitaRef={String(d.obrigacaoId)}
           onClose={() => setReceberOpen(false)}
           onDone={() => { setReceberOpen(false); carregar() }}
+        />
+      )}
+      {distribuicaoOpen && d && (
+        <EditarDistribuicaoView
+          obrigacaoId={d.obrigacaoId}
+          receitaRef={String(d.obrigacaoId)}
+          onClose={() => setDistribuicaoOpen(false)}
+          onDone={() => { setDistribuicaoOpen(false); carregar() }}
         />
       )}
       {faturaOpen && temProcesso && (
