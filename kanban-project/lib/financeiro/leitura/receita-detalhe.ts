@@ -66,13 +66,41 @@ export interface ReceitaDetalhe {
   cobrancaEnviada: boolean
 }
 
+// Detalhe CONSOLIDADO: agrega um grupo de obrigações por-requerente (mesma
+// Receita legada: processo|config|regra|fase|ciclo) numa única visão.
+// REAPROVEITA carregarReceitaDetalhe por obrigação (não duplica câmbio/parcelas).
+export interface ReceitaParticipanteDetalhe {
+  obrigacaoId: number
+  nome: string
+  papel: string
+  valorBase: number
+  moedaBase: string
+  participacaoPct: number
+  valorContratadoBrl: number
+  recebidoBrl: number
+  saldoBrl: number
+  aVencerBrl: number
+  vencidoBrl: number
+  proximoVencimento: string | null
+  status: string
+  parcelas: number
+  parcelasRecebidas: number
+}
+
+export interface ReceitaDetalheConsolidada extends ReceitaDetalhe {
+  consolidado: boolean
+  participantesCount: number
+  metodoDistribuicao: string
+  participantes: ReceitaParticipanteDetalhe[]
+}
+
 const TITULO: Record<string, string> = {
   OBRIGACAO_CRIADA: 'Receita criada', PAGAMENTO: 'Pagamento recebido', PAGAMENTO_PARCIAL: 'Pagamento recebido',
   DESCONTO: 'Desconto aplicado', JUROS: 'Juros aplicados', MULTA: 'Multa aplicada', ESTORNO: 'Estorno',
   ABERTURA: 'Abertura (data de corte)', AJUSTE: 'Ajuste',
 }
 
-async function resolverId(ref: string): Promise<number | null> {
+export async function resolverId(ref: string): Promise<number | null> {
   if (/^\d+$/.test(ref)) {
     const porId = await prisma.obrigacaoEconomica.findUnique({ where: { id: Number(ref) }, select: { id: true } })
     if (porId) return porId.id
@@ -280,3 +308,175 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
 }
 
 function fmtMoeda(v: number, moeda = 'BRL') { return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: moeda }) }
+
+// remove o sufixo "— Primeiro requerente — {nome}" / "— Requerente adicional — {nome}" → rótulo base.
+// (réplica do baseLabel de receitas-lista.ts — dado de exibição)
+function baseLabelDetalhe(desc: string | null): string | null {
+  if (!desc) return null
+  const cut = desc.replace(/\s*[—–-]\s*(Primeiro requerente|Requerente adicional|Requerente principal)\b.*$/i, '').trim()
+  return cut || null
+}
+
+// ============================================================================
+// DETALHE CONSOLIDADO — agrega o grupo por-requerente numa única Receita.
+// ============================================================================
+export async function carregarReceitaConsolidada(ref: string): Promise<ReceitaDetalheConsolidada | null> {
+  const id = await resolverId(ref)
+  if (!id) return null
+
+  // Obrigação representante (mínima) — origem/processo p/ montar o grupo.
+  const base = await prisma.obrigacaoEconomica.findUnique({
+    where: { id },
+    select: { id: true, origemTipo: true, origemId: true, processoId: true },
+  })
+  if (!base) return null
+
+  // ── Descobrir o GRUPO de obrigações (mesma Receita legada consolidada) ──
+  let groupIds: number[] = [id]
+  if (base.origemTipo === 'Receita' && base.origemId != null) {
+    const rec = await prisma.receita.findUnique({
+      where: { id: base.origemId },
+      select: { configFinanceiraId: true, regraFinanceiraId: true, phaseKey: true, phaseCycle: true },
+    }).catch(() => null)
+    if (rec && rec.configFinanceiraId != null) {
+      // Receitas irmãs: mesma (processo, config, regra, fase, ciclo). null casa com null.
+      const irmas = await prisma.receita.findMany({
+        where: {
+          processoId: base.processoId ?? undefined,
+          configFinanceiraId: rec.configFinanceiraId,
+          regraFinanceiraId: rec.regraFinanceiraId,
+          phaseKey: rec.phaseKey,
+          phaseCycle: rec.phaseCycle,
+        },
+        select: { id: true },
+      }).catch(() => [] as { id: number }[])
+      const receitaIds = irmas.map((r) => r.id)
+      if (receitaIds.length) {
+        const irmasObr = await prisma.obrigacaoEconomica.findMany({
+          where: { origemTipo: 'Receita', origemId: { in: receitaIds }, status: { not: 'CANCELADO' } },
+          select: { id: true },
+        }).catch(() => [] as { id: number }[])
+        const set = new Set<number>(irmasObr.map((o) => o.id))
+        set.add(id)
+        groupIds = [...set]
+      }
+    }
+  }
+
+  // ── Carregar cada obrigação REUSANDO o loader por-obrigação ──
+  const rawSlices = await Promise.all(groupIds.map((oid) => carregarReceitaDetalhe(String(oid))))
+  const slices = rawSlices.filter((s): s is ReceitaDetalhe => s != null)
+  if (!slices.length) return null
+
+  // Representante = a própria obrigação do ref (fallback: 'Primeiro'/'Principal', senão a 1ª).
+  const rep = slices.find((s) => s.obrigacaoId === id)
+    ?? slices.find((s) => s.responsavel?.papel === 'Primeiro' || s.responsavel?.papel === 'Principal')
+    ?? slices[0]
+
+  // Somatórios BRL (cent-round).
+  const sumBrl = (f: (s: ReceitaDetalhe) => number) => cent(slices.reduce((acc, s) => acc + (f(s) || 0), 0))
+  const valorContratadoBrl = sumBrl((s) => s.valorContratadoBrl)
+  const recebidoBrl = sumBrl((s) => s.recebidoBrl)
+  const saldoBrl = sumBrl((s) => s.saldoBrl)
+  const aVencerBrl = sumBrl((s) => s.aVencerBrl)
+  const vencidoBrl = sumBrl((s) => s.vencidoBrl)
+
+  // valorBase só soma se todas as moedas-base coincidem; senão mantém o representante.
+  const moedasBase = [...new Set(slices.map((s) => s.moedaBase))]
+  const valorBase = moedasBase.length === 1 ? cent(slices.reduce((a, s) => a + (s.valorBase || 0), 0)) : rep.valorBase
+
+  const parcelas = slices.reduce((a, s) => a + s.parcelas, 0)
+  const parcelasRecebidas = slices.reduce((a, s) => a + s.parcelasRecebidas, 0)
+  const parcelasAVencer = slices.reduce((a, s) => a + s.parcelasAVencer, 0)
+  const parcelasVencidas = slices.reduce((a, s) => a + s.parcelasVencidas, 0)
+
+  const proximosVenc = slices.map((s) => s.proximoVencimento).filter((v): v is string => !!v).sort()
+  const proximoVencimento = proximosVenc[0] ?? null
+
+  // Resumo (soma de todos os campos numéricos — inclui *Brl).
+  const sumResumo = (f: (r: ReceitaDetalhe['resumo']) => number) => cent(slices.reduce((a, s) => a + (f(s.resumo) || 0), 0))
+  const resumo: ReceitaDetalhe['resumo'] = {
+    contratado: sumResumo((r) => r.contratado), recebido: sumResumo((r) => r.recebido), saldo: sumResumo((r) => r.saldo),
+    descontos: sumResumo((r) => r.descontos), ajustes: sumResumo((r) => r.ajustes), liquido: sumResumo((r) => r.liquido),
+    contratadoBrl: sumResumo((r) => r.contratadoBrl), recebidoBrl: sumResumo((r) => r.recebidoBrl), saldoBrl: sumResumo((r) => r.saldoBrl),
+    descontosBrl: sumResumo((r) => r.descontosBrl), ajustesBrl: sumResumo((r) => r.ajustesBrl), liquidoBrl: sumResumo((r) => r.liquidoBrl),
+    jurosBrl: sumResumo((r) => r.jurosBrl), multaBrl: sumResumo((r) => r.multaBrl),
+  }
+
+  // Resumo de parcelas (soma qtd+valor; total = Σ).
+  const sumRP = (f: (r: ReceitaDetalhe['resumoParcelas']) => number) => slices.reduce((a, s) => a + (f(s.resumoParcelas) || 0), 0)
+  const resumoParcelas: ReceitaDetalhe['resumoParcelas'] = {
+    pagas: { qtd: sumRP((r) => r.pagas.qtd), valor: cent(sumRP((r) => r.pagas.valor)) },
+    aVencer: { qtd: sumRP((r) => r.aVencer.qtd), valor: cent(sumRP((r) => r.aVencer.valor)) },
+    vencidas: { qtd: sumRP((r) => r.vencidas.qtd), valor: cent(sumRP((r) => r.vencidas.valor)) },
+    canceladas: { qtd: sumRP((r) => r.canceladas.qtd), valor: cent(sumRP((r) => r.canceladas.valor)) },
+    total: sumRP((r) => r.total),
+  }
+  const baseInad = resumoParcelas.total - resumoParcelas.canceladas.qtd
+  const inadimplenciaPct = baseInad > 0 ? Math.round((resumoParcelas.vencidas.qtd / baseInad) * 100) : 0
+
+  // Campos-array concatenados (dado de exibição).
+  const parcelasDetalhe = slices.flatMap((s) => s.parcelasDetalhe)
+    .sort((a, b) => a.vencimento.localeCompare(b.vencimento))
+  const pagamentos = slices.flatMap((s) => s.pagamentos)
+  const historico = slices.flatMap((s) => s.historico).sort((a, b) => b.data.localeCompare(a.data))
+  const documentos = slices.flatMap((s) => s.documentos)
+  const cobrancas = slices.flatMap((s) => s.cobrancas)
+
+  // Status consolidado.
+  const statusLabel = vencidoBrl > 0.005
+    ? 'VENCIDO'
+    : saldoBrl <= 0.005
+      ? 'QUITADO'
+      : recebidoBrl > 0.005
+        ? 'PARCIAL'
+        : 'A VENCER'
+
+  // Participantes (um por slice) + participacaoPct (soma ~100).
+  const participantes: ReceitaParticipanteDetalhe[] = slices.map((s) => ({
+    obrigacaoId: s.obrigacaoId,
+    nome: s.responsavel?.nome ?? 'Participante não identificado',
+    papel: s.responsavel?.papel ?? 'Participante',
+    valorBase: s.valorBase,
+    moedaBase: s.moedaBase,
+    participacaoPct: valorContratadoBrl > 0 ? cent((s.valorContratadoBrl / valorContratadoBrl) * 100) : 0,
+    valorContratadoBrl: s.valorContratadoBrl,
+    recebidoBrl: s.recebidoBrl,
+    saldoBrl: s.saldoBrl,
+    aVencerBrl: s.aVencerBrl,
+    vencidoBrl: s.vencidoBrl,
+    proximoVencimento: s.proximoVencimento,
+    status: s.statusLabel,
+    parcelas: s.parcelas,
+    parcelasRecebidas: s.parcelasRecebidas,
+  }))
+  // Ajuste do resto de arredondamento no maior, p/ somar exatamente 100.
+  if (participantes.length && valorContratadoBrl > 0) {
+    const somaPct = cent(participantes.reduce((a, p) => a + p.participacaoPct, 0))
+    const resto = cent(100 - somaPct)
+    if (Math.abs(resto) >= 0.01) {
+      let maiorIdx = 0
+      for (let i = 1; i < participantes.length; i++) {
+        if (participantes[i].valorContratadoBrl > participantes[maiorIdx].valorContratadoBrl) maiorIdx = i
+      }
+      participantes[maiorIdx].participacaoPct = cent(participantes[maiorIdx].participacaoPct + resto)
+    }
+  }
+
+  return {
+    ...rep,
+    descricao: baseLabelDetalhe(rep.descricao) ?? rep.servico ?? rep.descricao,
+    statusLabel,
+    responsavel: null,
+    valorBase,
+    valorContratadoBrl, recebidoBrl, saldoBrl, aVencerBrl, vencidoBrl,
+    parcelas, parcelasRecebidas, parcelasAVencer, parcelasVencidas, proximoVencimento,
+    parcelasDetalhe, resumoParcelas, inadimplenciaPct,
+    pagamentos, historico, documentos, cobrancas,
+    resumo,
+    consolidado: slices.length > 1,
+    participantesCount: slices.length,
+    metodoDistribuicao: 'Distribuição personalizada',
+    participantes,
+  }
+}

@@ -86,7 +86,8 @@ export interface ReceitasKpis {
   parcelasAVencer: number
   parcelasVencidas: number
   proximoVencimento: string | null
-  receitas: number
+  receitas: number            // número de GRUPOS (Receitas consolidadas)
+  participantesFinanceiros: number // número de obrigações (participantes)
   // compat (na moeda-base) — mantidas p/ não quebrar consumidores antigos
   totalContratado: number
   recebido: number
@@ -96,10 +97,73 @@ export interface ReceitasKpis {
   moeda: string
 }
 
+// Participante financeiro: uma obrigação (por requerente) dentro de uma Receita consolidada.
+// Reaproveita toda a computação por-obrigação que já existia (câmbio + aging + parcelas).
+export interface ReceitaParticipante {
+  obrigacaoId: number
+  receitaId: number | null
+  nome: string
+  papel: string
+  valorBase: number
+  moedaBase: string
+  cotacao: number | null
+  tipoCambio: TipoCambio
+  valorContratadoBrl: number
+  recebidoBrl: number
+  saldoBrl: number
+  aVencerBrl: number
+  vencidoBrl: number
+  proximoVencimento: string | null
+  status: string
+  parcelas: number
+  parcelasRecebidas: number
+}
+
+// Receita consolidada: um grupo de obrigações (participantes) somadas.
+export interface ReceitaGrupo {
+  id: number                    // min(obrigacaoId) do grupo (estável)
+  codigo: string | null         // código representativo
+  descricao: string | null      // rótulo base (sem sufixo por requerente)
+  servico: string | null
+  moedaBase: string
+  valorBaseTotal: number | null // Σ valorBase (null se moedas-base divergirem)
+  valorContratadoBrlTotal: number
+  recebidoBrlTotal: number
+  saldoBrlTotal: number
+  aVencerBrlTotal: number
+  vencidoBrlTotal: number
+  proximoVencimento: string | null
+  statusConsolidado: string
+  participantesCount: number
+  participantes: ReceitaParticipante[]
+}
+
 export interface ReceitasLista {
   kpis: ReceitasKpis
-  receitas: ReceitaLinha[]
+  receitas: ReceitaGrupo[]
   processo: { id: number; nome: string | null; codigo: string | null } | null
+}
+
+// papel do participante: contextoAplicado.classificacao → sufixo da descrição → 'Principal'.
+const derivePapel = (classificacao: unknown, desc?: string | null): string => {
+  if (typeof classificacao === 'string' && classificacao.trim()) {
+    const c = classificacao.trim()
+    if (/prim/i.test(c)) return 'Primeiro'
+    if (/adic/i.test(c)) return 'Adicional'
+    return c.charAt(0).toUpperCase() + c.slice(1)
+  }
+  if (desc) {
+    if (/Primeiro requerente/i.test(desc)) return 'Primeiro'
+    if (/Requerente adicional/i.test(desc)) return 'Adicional'
+  }
+  return 'Principal'
+}
+
+// remove o sufixo "— Primeiro requerente — {nome}" / "— Requerente adicional — {nome}" → rótulo base.
+const baseLabel = (desc: string | null): string | null => {
+  if (!desc) return null
+  const cut = desc.replace(/\s*[—–-]\s*(Primeiro requerente|Requerente adicional|Requerente principal)\b.*$/i, '').trim()
+  return cut || null
 }
 
 export async function listarReceitas(processoId?: number): Promise<ReceitasLista> {
@@ -117,7 +181,7 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
   const receitas = recIds.length
     ? await prisma.receita.findMany({
         where: { id: { in: recIds } },
-        select: { id: true, descricao: true, categoria: true, data1: true, tipoServicoId: true, moeda: true, valor: true, fxEstimado: true, fxRule: true, fxFixo: true, fxData: true, valorBrlFixo: true },
+        select: { id: true, descricao: true, categoria: true, data1: true, tipoServicoId: true, moeda: true, valor: true, fxEstimado: true, fxRule: true, fxFixo: true, fxData: true, valorBrlFixo: true, configFinanceiraId: true, regraFinanceiraId: true, phaseKey: true, phaseCycle: true, personId: true, contextoAplicado: true },
       })
     : []
   const recPor = new Map(receitas.map((r) => [r.id, r]))
@@ -182,9 +246,23 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
     return { cotacao: liveRate, tipo: 'HOJE' as TipoCambio, data: liveData, contratadoBrl: cent(valorBase * liveRate) }
   }
 
-  const linhas: ReceitaLinha[] = obrs.map((o) => {
+  const rows = obrs.map((o) => {
     const proj = projPor.get(o.id)
     const rec = o.origemId ? recPor.get(o.origemId) : undefined
+
+    // ── chave de agrupamento (Receita consolidada) ──────────────────────────
+    // Agrupa por processo|config|regra|fase|ciclo QUANDO origem é Receita com config.
+    // Caso contrário (manual/nativo, ou sem config) → grupo-de-um por obrigação (nunca funde).
+    const cfgId = rec?.configFinanceiraId ?? null
+    const groupable = o.origemTipo === 'Receita' && cfgId != null
+    const groupKey = groupable
+      ? `grp:${o.processoId}|${cfgId}|${rec?.regraFinanceiraId ?? ''}|${rec?.phaseKey ?? ''}|${rec?.phaseCycle ?? ''}`
+      : `obr:${o.id}`
+    const classificacao = (rec?.contextoAplicado && typeof rec.contextoAplicado === 'object' && !Array.isArray(rec.contextoAplicado))
+      ? (rec.contextoAplicado as Record<string, unknown>).classificacao
+      : null
+    const papel = derivePapel(classificacao, rec?.descricao)
+    const isPrimary = papel === 'Primeiro' || papel === 'Principal'
     const itemMestre = o.itemCatalogoId ? itemPor.get(o.itemCatalogoId) : undefined
     const moedaBase = String(o.moedaContratual)
     const valorBase = Number(o.valorContratado)
@@ -255,7 +333,7 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
 
     const primeiro = (o.distribuicoes[0]?.participacoes ?? []).filter((p) => p.incluido)[0]
 
-    return {
+    const linha: ReceitaLinha = {
       obrigacaoId: o.id,
       receitaId: o.origemTipo === 'Receita' ? (o.origemId ?? null) : null,
       codigo: o.codigoOperacional,
@@ -271,6 +349,73 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
       parcelas: parcelasTot, parcelasRecebidas, parcelasAVencer, parcelasVencidas, proximoVencimento: proximoVenc,
       vencimento: venc ? new Date(venc).toISOString() : null,
       statusLabel,
+    }
+
+    return { linha, groupKey, papel, isPrimary }
+  })
+
+  const linhas: ReceitaLinha[] = rows.map((r) => r.linha)
+
+  // ── AGRUPAMENTO em Receitas consolidadas ────────────────────────────────────
+  const gruposMap = new Map<string, typeof rows>()
+  const ordem: string[] = []
+  for (const row of rows) {
+    const arr = gruposMap.get(row.groupKey)
+    if (arr) { arr.push(row) } else { gruposMap.set(row.groupKey, [row]); ordem.push(row.groupKey) }
+  }
+  const receitasGrupos: ReceitaGrupo[] = ordem.map((key) => {
+    const membros = gruposMap.get(key)!
+    const rep = membros.find((m) => m.isPrimary) ?? membros[0]
+    const participantes: ReceitaParticipante[] = membros.map((m) => ({
+      obrigacaoId: m.linha.obrigacaoId,
+      receitaId: m.linha.receitaId,
+      nome: m.linha.requerente?.nome ?? 'Requerente não identificado',
+      papel: m.papel,
+      valorBase: m.linha.valorBase,
+      moedaBase: m.linha.moedaBase,
+      cotacao: m.linha.cotacaoAplicada,
+      tipoCambio: m.linha.tipoCambio,
+      valorContratadoBrl: m.linha.valorContratadoBrl,
+      recebidoBrl: m.linha.recebidoBrl,
+      saldoBrl: m.linha.saldoBrl,
+      aVencerBrl: m.linha.aVencerBrl,
+      vencidoBrl: m.linha.vencidoBrl,
+      proximoVencimento: m.linha.proximoVencimento,
+      status: m.linha.statusLabel,
+      parcelas: m.linha.parcelas,
+      parcelasRecebidas: m.linha.parcelasRecebidas,
+    }))
+    const moedasGrp = [...new Set(membros.map((m) => m.linha.moedaBase))]
+    const valorBaseTotal = moedasGrp.length === 1 ? cent(membros.reduce((s, m) => s + m.linha.valorBase, 0)) : null
+    const valorContratadoBrlTotal = cent(membros.reduce((s, m) => s + m.linha.valorContratadoBrl, 0))
+    const recebidoBrlTotal = cent(membros.reduce((s, m) => s + m.linha.recebidoBrl, 0))
+    const saldoBrlTotal = cent(membros.reduce((s, m) => s + m.linha.saldoBrl, 0))
+    const aVencerBrlTotal = cent(membros.reduce((s, m) => s + m.linha.aVencerBrl, 0))
+    const vencidoBrlTotal = cent(membros.reduce((s, m) => s + m.linha.vencidoBrl, 0))
+    const proximos = membros.map((m) => m.linha.proximoVencimento).filter((v): v is string => !!v).sort()
+    const statusConsolidado = vencidoBrlTotal > 0.005
+      ? 'VENCIDO'
+      : saldoBrlTotal <= 0.005
+        ? 'QUITADO'
+        : recebidoBrlTotal > 0.005
+          ? 'PARCIAL'
+          : 'A VENCER'
+    return {
+      id: Math.min(...membros.map((m) => m.linha.obrigacaoId)),
+      codigo: rep.linha.codigo,
+      descricao: baseLabel(rep.linha.descricao) ?? rep.linha.servico ?? null,
+      servico: rep.linha.servico,
+      moedaBase: rep.linha.moedaBase,
+      valorBaseTotal,
+      valorContratadoBrlTotal,
+      recebidoBrlTotal,
+      saldoBrlTotal,
+      aVencerBrlTotal,
+      vencidoBrlTotal,
+      proximoVencimento: proximos[0] ?? null,
+      statusConsolidado,
+      participantesCount: membros.length,
+      participantes,
     }
   })
 
@@ -296,7 +441,8 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
     parcelasAVencer: linhas.reduce((s, l) => s + l.parcelasAVencer, 0),
     parcelasVencidas: linhas.reduce((s, l) => s + l.parcelasVencidas, 0),
     proximoVencimento: proximos[0] ?? null,
-    receitas: linhas.length,
+    receitas: receitasGrupos.length,
+    participantesFinanceiros: linhas.length,
     // compat (moeda-base)
     totalContratado: soma((l) => l.valorContratado),
     recebido: soma((l) => l.recebido),
@@ -308,5 +454,5 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
   const processo = processoId
     ? await prisma.processo.findUnique({ where: { id: processoId }, select: { id: true, nome: true, codigo: true } }).catch(() => null)
     : null
-  return { kpis, receitas: linhas, processo }
+  return { kpis, receitas: receitasGrupos, processo }
 }

@@ -20,7 +20,7 @@ import {
   Receipt, CreditCard, Wallet, FileCheck, Clock, Search, SlidersHorizontal, Calendar,
   Plus, Pencil, ChevronLeft, ChevronRight, UserPlus, ArrowDownCircle, CheckCircle2,
   Info as InfoIcon, X, AlertTriangle, Send, FileText, Loader2, ChevronRight as ChevronRightSm,
-  Download, File as FileIcon,
+  Download, File as FileIcon, Users, StickyNote,
 } from "lucide-react"
 
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
@@ -55,7 +55,8 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const router = useRouter()
   const [d, setD] = useState<any>(null)
   const [erro, setErro] = useState<string | null>(null)
-  const [tab, setTab] = useState("cobrancas")
+  const [tab, setTab] = useState("resumo")
+  const [drawerPart, setDrawerPart] = useState<any>(null) // participante aberto no drawer (obrigacaoId + nome)
   const [pagOpen, setPagOpen] = useState(false)
   const [faturaOpen, setFaturaOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
@@ -182,6 +183,32 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const historico: any[] = d.historico ?? []
   const documentos: any[] = d.documentos ?? []
 
+  // ── Participantes financeiros (visão consolidada do grupo) ──
+  const participantes: any[] = d.participantes ?? []
+  const somaBase = participantes.reduce((s, p) => s + (Number(p.valorBase) || 0), 0)
+  const somaContratado = participantes.reduce((s, p) => s + (Number(p.valorContratadoBrl) || 0), 0)
+  const somaRecebido = participantes.reduce((s, p) => s + (Number(p.recebidoBrl) || 0), 0)
+  const somaSaldo = participantes.reduce((s, p) => s + (Number(p.saldoBrl) || 0), 0)
+  const somaParcelas = participantes.reduce((s, p) => s + (Number(p.parcelas) || 0), 0)
+  const somaRecParcelas = participantes.reduce((s, p) => s + (Number(p.parcelasRecebidas) || 0), 0)
+  const papelLabel = (papel?: string | null) => {
+    const P = (papel ?? "").toUpperCase()
+    if (!P || P.includes("PRINCIPAL")) return "Principal"
+    return papel as string
+  }
+
+  // Exportação real (CSV) das linhas de participantes.
+  const exportarParticipantesCsv = () => {
+    const header = ["Participante", "Papel", "Participação", "Moeda", "% Participação", "Valor contratado (BRL)", "Recebido (BRL)", "Saldo (BRL)", "Próximo vencimento", "Status", "Parcelas", "Parcelas recebidas"]
+    const linhas = participantes.map((p) => [p.nome, papelLabel(p.papel), p.valorBase, p.moedaBase, p.participacaoPct, p.valorContratadoBrl, p.recebidoBrl, p.saldoBrl, p.proximoVencimento ? dataBR(p.proximoVencimento) : "", p.status, p.parcelas, p.parcelasRecebidas])
+    const csv = [header, ...linhas].map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n")
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url; a.download = `${d.codigo ?? "participantes"}-participantes.csv`
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+  }
+
   // botão de ação para "Próximas ações"
   const acaoBotao = (acao: string) => {
     switch (acao) {
@@ -205,11 +232,15 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
     return "text-[#7dd3fc]"
   }
 
+  // Contadores só quando > 0 (Resumo/Timeline/Observações não têm contador).
   const tabs: [string, string, any, number][] = [
+    ["resumo", "Resumo", Receipt, 0],
     ["cobrancas", "Cobranças", CreditCard, rp.total],
+    ["participantes", "Participantes Financeiros", Users, d.participantesCount ?? participantes.length],
     ["pagamentos", "Pagamentos", Wallet, (d.pagamentos ?? []).length],
     ["documentos", "Documentos", FileCheck, documentos.length],
-    ["timeline", "Timeline", Clock, historico.length],
+    ["timeline", "Timeline", Clock, 0],
+    ["observacoes", "Observações", StickyNote, 0],
   ]
 
   return (
@@ -222,11 +253,18 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-[28px] font-bold leading-tight text-white">{d.descricao ?? d.codigo}</h1>
               <span className={`rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide ${statusCls(d.statusLabel)}`}>{d.statusLabel}</span>
+              {d.consolidado && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-500/15 px-2.5 py-1 text-xs font-medium text-violet-300"><Users className="h-3.5 w-3.5" /> {d.participantesCount} participantes</span>
+              )}
             </div>
             <div className="mt-2 flex items-center gap-1.5 text-[13px] text-white/40">
               <span>🧾</span> Financeiro <span className="text-white/30">›</span> {isCusto ? "Custos" : "Receitas"} <span className="text-white/30">›</span>
               <span className="text-white/68">{d.codigo}</span>
             </div>
+            {d.criadoPor === "Sistema" && (
+              <div className="mt-1.5 text-[12px] text-white/40">Receita gerada automaticamente pela regra financeira da fase.</div>
+            )}
+            <div className="mt-1 text-[12px] text-white/40">{d.codigo} · {dataBR(d.criadoEm)} · Criado por {d.criadoPor}</div>
           </div>
 
           {/* Ações do topo */}
@@ -314,54 +352,6 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
               </div>
             </div>
 
-            {/* PRÓXIMAS AÇÕES + ÚLTIMA MOVIMENTAÇÃO */}
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-              {/* Próximas ações */}
-              <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-                <h2 className="text-base font-semibold text-white">Próximas ações</h2>
-                <div className="mt-4 space-y-2.5">
-                  {(d.proximasAcoes ?? []).length === 0 ? (
-                    <div className="text-sm text-white/40">Nenhuma ação pendente.</div>
-                  ) : (d.proximasAcoes ?? []).map((a: any, i: number) => {
-                    const { Icon, cls } = acaoIcone(a.acao)
-                    const btn = acaoBotao(a.acao)
-                    const descricao = a.acao === "EMITIR_FATURA" && d.faturaEmitida ? "Fatura já emitida — emitir outra?" : a.descricao
-                    return (
-                      <div key={i} className="flex items-start gap-3 rounded-lg border border-white/10 bg-[#161b21] px-3.5 py-3">
-                        <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${cls}`}><Icon className="h-4 w-4" /></div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-white/90">{a.label}</div>
-                          <div className="mt-0.5 text-xs text-white/45">{descricao}</div>
-                        </div>
-                        <button onClick={btn.onClick} disabled={btn.disabled} title={btn.title} className="shrink-0 whitespace-nowrap rounded-lg border border-white/15 bg-[#1b2027] px-3 py-1.5 text-xs font-medium text-white/80 hover:border-white/30 disabled:cursor-not-allowed disabled:opacity-40">{btn.label}</button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Última movimentação */}
-              <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-                <h2 className="text-base font-semibold text-white">Última movimentação</h2>
-                <div className="mt-4 space-y-4">
-                  {historico.length === 0 ? (
-                    <div className="text-sm text-white/40">Sem movimentações registradas.</div>
-                  ) : historico.slice(0, 3).map((h: any, i: number) => (
-                    <div key={h.id ?? i} className="flex gap-3">
-                      <div className="mt-1 flex flex-col items-center">
-                        <span className="h-2 w-2 rounded-full bg-[#7dd3fc]" />
-                        {i < Math.min(historico.length, 3) - 1 && <span className="mt-1 w-px flex-1 bg-white/10" />}
-                      </div>
-                      <div className="min-w-0 flex-1 pb-1">
-                        <div className="text-sm font-medium text-white/90">{h.titulo}</div>
-                        <div className="mt-0.5 flex items-center gap-2 text-xs text-white/40"><span>{dataBR(h.data)} · {horaBR(h.data)}</span><span className="text-[#7dd3fc]">{h.ator}</span></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => setTab("timeline")} className="mt-3 inline-flex items-center gap-1 text-sm text-[#7dd3fc] hover:underline">Ver timeline completa <ChevronRightSm className="h-3.5 w-3.5" /></button>
-              </div>
-            </div>
           </div>
 
           {/* ─── SIDEBAR ─── */}
@@ -370,23 +360,45 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
             <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-white/85">Distribuição entre requerentes</span>
-                {divisaoIgual && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-300">Divisão igual</span>}
+                {!d.consolidado && divisaoIgual && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-300">Divisão igual</span>}
               </div>
-              <div className="mt-1 text-xs text-white/40">{dist.length} requerente(s)</div>
-              <div className="mt-3 space-y-2.5">
-                {dist.length === 0 ? <div className="text-sm text-white/40">—</div> : dist.map((r: any, i: number) => (
-                  <div key={i} className="flex items-center gap-2.5">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-[11px] font-semibold text-violet-300">{iniciais(r.nome)}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm text-white/85">{r.nome}</div>
-                      <div className="text-[11px] text-white/40">{brl(r.valor)}</div>
-                    </div>
-                    <span className="shrink-0 text-sm font-medium text-white/80">{Number(r.percentual).toFixed(0)}%</span>
+              {participantes.length > 0 ? (
+                <>
+                  <div className="mt-1 text-xs text-white/40">{d.metodoDistribuicao} · {d.participantesCount ?? participantes.length} participantes</div>
+                  <div className="mt-3 space-y-2.5">
+                    {participantes.map((p: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2.5">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-[11px] font-semibold text-violet-300">{iniciais(p.nome)}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm text-white/85">{p.nome}</div>
+                          <div className="text-[11px] text-white/40">{fmt(p.valorBase, p.moedaBase)}</div>
+                        </div>
+                        <span className="shrink-0 text-sm font-medium text-white/80">{Number(p.participacaoPct).toFixed(2)}%</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <div className="my-3 border-t border-white/10" />
-              <div className="flex items-center justify-between"><span className="text-sm text-white/60">Total do contrato</span><span className="text-sm font-semibold text-white/90">{brl(d.valorContratadoBrl)}</span></div>
+                  <div className="my-3 border-t border-white/10" />
+                  <div className="flex items-center justify-between"><span className="text-sm text-white/60">Total</span><span className="text-sm font-semibold text-white/90">{brl(somaContratado)}</span></div>
+                </>
+              ) : (
+                <>
+                  <div className="mt-1 text-xs text-white/40">{dist.length} requerente(s)</div>
+                  <div className="mt-3 space-y-2.5">
+                    {dist.length === 0 ? <div className="text-sm text-white/40">—</div> : dist.map((r: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2.5">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-[11px] font-semibold text-violet-300">{iniciais(r.nome)}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm text-white/85">{r.nome}</div>
+                          <div className="text-[11px] text-white/40">{brl(r.valor)}</div>
+                        </div>
+                        <span className="shrink-0 text-sm font-medium text-white/80">{Number(r.percentual).toFixed(0)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="my-3 border-t border-white/10" />
+                  <div className="flex items-center justify-between"><span className="text-sm text-white/60">Total do contrato</span><span className="text-sm font-semibold text-white/90">{brl(d.valorContratadoBrl)}</span></div>
+                </>
+              )}
             </div>
 
             {/* Pagador */}
@@ -456,6 +468,156 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
 
         {/* ── CONTEÚDO DAS ABAS ── */}
         <div className="mt-5">
+          {/* Resumo (Próximas ações + Última movimentação) */}
+          {tab === "resumo" && (
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              {/* Próximas ações */}
+              <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+                <h2 className="text-base font-semibold text-white">Próximas ações</h2>
+                <div className="mt-4 space-y-2.5">
+                  {(d.proximasAcoes ?? []).length === 0 ? (
+                    <div className="text-sm text-white/40">Nenhuma ação pendente.</div>
+                  ) : (d.proximasAcoes ?? []).map((a: any, i: number) => {
+                    const { Icon, cls } = acaoIcone(a.acao)
+                    const btn = acaoBotao(a.acao)
+                    const descricao = a.acao === "EMITIR_FATURA" && d.faturaEmitida ? "Fatura já emitida — emitir outra?" : a.descricao
+                    return (
+                      <div key={i} className="flex items-start gap-3 rounded-lg border border-white/10 bg-[#161b21] px-3.5 py-3">
+                        <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${cls}`}><Icon className="h-4 w-4" /></div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-white/90">{a.label}</div>
+                          <div className="mt-0.5 text-xs text-white/45">{descricao}</div>
+                        </div>
+                        <button onClick={btn.onClick} disabled={btn.disabled} title={btn.title} className="shrink-0 whitespace-nowrap rounded-lg border border-white/15 bg-[#1b2027] px-3 py-1.5 text-xs font-medium text-white/80 hover:border-white/30 disabled:cursor-not-allowed disabled:opacity-40">{btn.label}</button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Última movimentação */}
+              <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+                <h2 className="text-base font-semibold text-white">Última movimentação</h2>
+                <div className="mt-4 space-y-4">
+                  {historico.length === 0 ? (
+                    <div className="text-sm text-white/40">Sem movimentações registradas.</div>
+                  ) : historico.slice(0, 3).map((h: any, i: number) => (
+                    <div key={h.id ?? i} className="flex gap-3">
+                      <div className="mt-1 flex flex-col items-center">
+                        <span className="h-2 w-2 rounded-full bg-[#7dd3fc]" />
+                        {i < Math.min(historico.length, 3) - 1 && <span className="mt-1 w-px flex-1 bg-white/10" />}
+                      </div>
+                      <div className="min-w-0 flex-1 pb-1">
+                        <div className="text-sm font-medium text-white/90">{h.titulo}</div>
+                        <div className="mt-0.5 flex items-center gap-2 text-xs text-white/40"><span>{dataBR(h.data)} · {horaBR(h.data)}</span><span className="text-[#7dd3fc]">{h.ator}</span></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => setTab("timeline")} className="mt-3 inline-flex items-center gap-1 text-sm text-[#7dd3fc] hover:underline">Ver timeline completa <ChevronRightSm className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
+          )}
+
+          {/* Participantes Financeiros */}
+          {tab === "participantes" && (
+            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="flex items-center gap-2 text-lg font-semibold text-white"><span>👥</span> Participantes Financeiros</h2>
+                  <p className="mt-1 text-sm text-white/45">Distribuição desta Receita entre os responsáveis pelo pagamento.</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button disabled title="Edição de distribuição em breve" className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-sm font-medium text-white/50 opacity-60"><Pencil className="h-4 w-4" /> Editar distribuição</button>
+                  <button onClick={exportarParticipantesCsv} title="Exportar participantes em CSV" className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-sm font-medium text-white/80 hover:border-white/25"><Download className="h-4 w-4" /> Exportar</button>
+                </div>
+              </div>
+
+              {participantes.length === 0 ? (
+                <div className="mt-6 rounded-lg border border-dashed border-white/10 bg-[#12161c] px-4 py-8 text-center text-sm text-white/40">Sem participantes na distribuição desta receita.</div>
+              ) : (
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead><tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/40">
+                      <th className="pb-2 font-medium">Participante</th>
+                      <th className="pb-2 font-medium">Participação ({d.moedaBase})</th>
+                      <th className="pb-2 font-medium">Valor contratado (BRL)</th>
+                      <th className="pb-2 font-medium">Recebido (BRL)</th>
+                      <th className="pb-2 font-medium">Saldo (BRL)</th>
+                      <th className="pb-2 font-medium">Próximo vencimento</th>
+                      <th className="pb-2 font-medium">Status</th>
+                      <th className="pb-2 font-medium">Ações</th>
+                    </tr></thead>
+                    <tbody>
+                      {participantes.map((p: any, i: number) => (
+                        <tr key={p.obrigacaoId ?? i} className="border-b border-white/10 align-top">
+                          <td className="py-3.5">
+                            <div className="flex items-center gap-2.5">
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-[11px] font-semibold text-violet-300">{iniciais(p.nome)}</span>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="truncate text-sm font-medium text-white/90">{p.nome}</span>
+                                  <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-300">{papelLabel(p.papel)}</span>
+                                </div>
+                                <div className="text-[11px] text-white/40">Requerente</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="whitespace-nowrap py-3.5">
+                            <div className="font-medium text-white/90">{fmt(p.valorBase, p.moedaBase)}</div>
+                            <div className="mt-0.5 text-xs text-white/40">{Number(p.participacaoPct).toFixed(2)}%</div>
+                          </td>
+                          <td className="whitespace-nowrap py-3.5 font-medium text-white/95">{brl(p.valorContratadoBrl)}</td>
+                          <td className="whitespace-nowrap py-3.5">
+                            <div className={p.recebidoBrl > 0 ? "font-medium text-[#4ade80]" : "text-white/70"}>{brl(p.recebidoBrl)}</div>
+                            <div className="mt-0.5 text-xs text-white/40">{p.parcelasRecebidas} parcela(s)</div>
+                          </td>
+                          <td className="whitespace-nowrap py-3.5">
+                            <div className="font-medium text-[#7dd3fc]">{brl(p.saldoBrl)}</div>
+                            <div className="mt-0.5 text-xs text-white/40">{p.parcelas} parcela(s)</div>
+                          </td>
+                          <td className="whitespace-nowrap py-3.5 text-white/70">{dataBR(p.proximoVencimento)}</td>
+                          <td className="py-3.5"><span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${statusCls(p.status)}`}>{p.status}</span></td>
+                          <td className="py-3.5">
+                            <div className="flex items-center gap-1.5">
+                              <button onClick={() => setDrawerPart({ obrigacaoId: p.obrigacaoId, nome: p.nome })} className="whitespace-nowrap rounded-lg border border-white/15 bg-[#1b2027] px-2.5 py-1.5 text-xs font-medium text-white/80 hover:border-white/30">Abrir</button>
+                              <button onClick={() => setDrawerPart({ obrigacaoId: p.obrigacaoId, nome: p.nome })} title="Abrir participante" className="rounded-lg border border-white/10 p-1.5 text-white/40 hover:text-white/70"><MoreVertical className="h-4 w-4" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {/* Totalização — valida que a distribuição fecha em 100% e bate com o consolidado */}
+                      <tr className="border-t-2 border-white/15 bg-[#161b21]">
+                        <td className="py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#4ade80]/15 text-[#4ade80]"><CheckCircle2 className="h-4 w-4" /></span>
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-white/90">Total da distribuição</div>
+                              <div className="text-[11px] text-white/45">100,00%</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap py-3.5 font-semibold text-white/90">{fmt(somaBase, d.moedaBase)}</td>
+                        <td className="whitespace-nowrap py-3.5 font-semibold text-white/95">{brl(somaContratado)}</td>
+                        <td className="whitespace-nowrap py-3.5">
+                          <div className="font-semibold text-[#4ade80]">{brl(somaRecebido)}</div>
+                          <div className="mt-0.5 text-xs text-white/40">{somaRecParcelas} parcela(s)</div>
+                        </td>
+                        <td className="whitespace-nowrap py-3.5">
+                          <div className="font-semibold text-[#7dd3fc]">{brl(somaSaldo)}</div>
+                          <div className="mt-0.5 text-xs text-white/40">{somaParcelas} parcela(s)</div>
+                        </td>
+                        <td className="py-3.5 text-white/30">—</td>
+                        <td className="py-3.5 text-white/30">—</td>
+                        <td className="py-3.5 text-white/30">—</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Pagamentos */}
           {tab === "pagamentos" && (
           <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
@@ -650,8 +812,30 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
             })}</div>
           </div>
           )}
+
+          {/* Observações */}
+          {tab === "observacoes" && (
+            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+              <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">Observações</h2></div>
+              <div className="mt-4 rounded-lg border border-white/10 bg-[#161b21] px-4 py-4">
+                <div className="whitespace-pre-wrap text-sm text-white/80">{d.observacao ?? "—"}</div>
+              </div>
+              <div className="mt-2 text-xs text-white/40">Notas internas</div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ── DRAWER DO PARTICIPANTE ── */}
+      {drawerPart && (
+        <ParticipanteDrawer
+          obrigacaoId={drawerPart.obrigacaoId}
+          nome={drawerPart.nome}
+          codigoReceita={d.codigo}
+          onClose={() => setDrawerPart(null)}
+          onPagamentoRegistrado={carregar}
+        />
+      )}
 
       {/* ── MODAIS ── */}
       {pagOpen && d && (
@@ -682,6 +866,153 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
         />
       )}
     </div>
+  )
+}
+
+// ── Drawer do participante: visão de UM requerente DENTRO do contexto da Receita ──
+// Busca a visão single (?obrigacao=<id>) e mostra status/valores/parcelas/pagamentos
+// daquele participante, sem sair da tela consolidada. Read-focused + registrar pagamento.
+function ParticipanteDrawer({ obrigacaoId, nome, codigoReceita, onClose, onPagamentoRegistrado }: { obrigacaoId: number; nome: string; codigoReceita: string; onClose: () => void; onPagamentoRegistrado: () => void }) {
+  const [pd, setPd] = useState<any>(null)
+  const [pErro, setPErro] = useState<string | null>(null)
+  const [pagOpen, setPagOpen] = useState(false)
+
+  const load = useCallback(() => {
+    fetch(`/api/financeiro/v3/receita/${obrigacaoId}?obrigacao=${obrigacaoId}`, { headers: authHeaders() })
+      .then(async (r) => { const j = await r.json(); if (r.ok && j.disponivel) { setPd(j.receita); setPErro(null) } else setPErro("Participante não encontrado.") })
+      .catch(() => setPErro("Falha ao carregar."))
+  }, [obrigacaoId])
+
+  useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    const orig = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+    document.addEventListener("keydown", onEsc)
+    return () => { document.body.style.overflow = orig; document.removeEventListener("keydown", onEsc) }
+  }, [onClose])
+
+  if (typeof document === "undefined") return null
+
+  const parcelas: any[] = pd?.parcelasDetalhe ?? []
+  const pagamentos: any[] = pd?.pagamentos ?? []
+
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-[65] flex justify-end bg-black/60" onClick={onClose}>
+        <div className="flex h-full w-full max-w-[600px] flex-col overflow-hidden border-l border-white/10 bg-[#1b2027] shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-xs font-semibold text-violet-300">{iniciais(nome)}</span>
+              <div className="min-w-0">
+                <h3 className="truncate text-base font-semibold text-white">{nome}</h3>
+                <div className="text-xs text-white/40">participante de {codigoReceita}</div>
+              </div>
+            </div>
+            <button onClick={onClose} className="shrink-0 text-white/40 hover:text-white/80"><X className="h-5 w-5" /></button>
+          </div>
+
+          {/* Corpo */}
+          <div className="flex-1 overflow-y-auto px-5 py-5">
+            {pErro ? (
+              <div className="rounded-lg border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-sm text-[#f87171]">{pErro}</div>
+            ) : !pd ? (
+              <div className="flex items-center gap-2 text-sm text-white/40"><Loader2 className="h-4 w-4 animate-spin" /> carregando…</div>
+            ) : (
+              <div className="space-y-5">
+                {/* Status + valores */}
+                <div>
+                  <span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${statusCls(pd.statusLabel)}`}>{pd.statusLabel}</span>
+                  <div className="mt-3 grid grid-cols-3 gap-3">
+                    <div className="rounded-lg border border-white/10 bg-[#161b21] p-3">
+                      <div className="text-[11px] uppercase tracking-wider text-white/40">Contratado</div>
+                      <div className="mt-1 text-base font-semibold text-white/95">{brl(pd.valorContratadoBrl)}</div>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-[#161b21] p-3">
+                      <div className="text-[11px] uppercase tracking-wider text-white/40">Recebido</div>
+                      <div className="mt-1 text-base font-semibold text-[#4ade80]">{brl(pd.recebidoBrl)}</div>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-[#161b21] p-3">
+                      <div className="text-[11px] uppercase tracking-wider text-white/40">Saldo</div>
+                      <div className="mt-1 text-base font-semibold text-[#7dd3fc]">{brl(pd.saldoBrl)}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Parcelas */}
+                <div>
+                  <div className="mb-2 text-sm font-semibold text-white/85">Parcelas <span className="text-white/40">({parcelas.length})</span></div>
+                  {parcelas.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-white/10 bg-[#12161c] px-3 py-5 text-center text-xs text-white/40">Sem parcelas.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead><tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/40">
+                          <th className="pb-2 font-medium">Parcela</th>
+                          <th className="pb-2 font-medium">Vencimento</th>
+                          <th className="pb-2 font-medium">Valor</th>
+                          <th className="pb-2 font-medium">Recebido</th>
+                          <th className="pb-2 font-medium">Status</th>
+                        </tr></thead>
+                        <tbody>{parcelas.map((p: any, i: number) => (
+                          <tr key={i} className="border-b border-white/10">
+                            <td className="whitespace-nowrap py-2.5 font-medium text-white/90">{p.numero}/{p.totalParcelas}</td>
+                            <td className="whitespace-nowrap py-2.5 text-white/70">{dataBR(p.vencimento)}</td>
+                            <td className="whitespace-nowrap py-2.5 text-white/90">{brl(p.valorBrl)}</td>
+                            <td className={`whitespace-nowrap py-2.5 ${p.recebidoBrl > 0 ? "text-[#4ade80]" : "text-white/70"}`}>{brl(p.recebidoBrl)}</td>
+                            <td className="py-2.5"><span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${parcelaStatusCls(p.status)}`}>{parcelaStatusLabel(p.status)}</span></td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Pagamentos */}
+                <div>
+                  <div className="mb-2 text-sm font-semibold text-white/85">Pagamentos <span className="text-white/40">({pagamentos.length})</span></div>
+                  {pagamentos.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-white/10 bg-[#12161c] px-3 py-5 text-center text-xs text-white/40">Nenhum pagamento registrado.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {pagamentos.map((p: any) => (
+                        <div key={p.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-[#161b21] px-3 py-2.5">
+                          <div className="min-w-0">
+                            <div className="text-sm text-white/85">{fmt(p.valor, pd.moeda)}</div>
+                            <div className="text-[11px] text-white/40">{dataBR(p.data)} · {p.formaLabel ?? "—"}</div>
+                          </div>
+                          <span className="inline-flex items-center gap-1.5 text-xs text-[#4ade80]"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />{p.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Rodapé */}
+          <div className="flex items-center justify-between gap-2 border-t border-white/10 px-5 py-4">
+            <button onClick={onClose} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/70 hover:border-white/25">Fechar</button>
+            <button onClick={() => setPagOpen(true)} disabled={!pd} className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-4 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957] disabled:cursor-not-allowed disabled:opacity-50"><Plus className="h-4 w-4" /> Registrar pagamento</button>
+          </div>
+        </div>
+      </div>
+
+      {pagOpen && pd && (
+        <RegistrarPagamentoModal
+          obrigacaoId={pd.obrigacaoId ?? obrigacaoId}
+          moeda={pd.moeda}
+          saldo={pd.saldo}
+          natureza="RECEITA"
+          onClose={() => setPagOpen(false)}
+          onDone={() => { setPagOpen(false); load(); onPagamentoRegistrado() }}
+        />
+      )}
+    </>,
+    document.body,
   )
 }
 
