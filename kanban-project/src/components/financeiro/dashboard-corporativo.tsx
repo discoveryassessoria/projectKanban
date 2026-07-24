@@ -123,44 +123,36 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
       {/* STRIP TOPO: Fechamento / Conciliação / A Vencer */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <StripCard topColor="#64748b" icon={<Lock className="h-3.5 w-3.5" />} label="Fechamento Mensal"
-          value={m.fechamentoLabel} valueColor="text-amber-300"
-          sub={<>Status: <strong className="text-amber-300">{m.fechamentoStatus}</strong></>}
-          action={{ label: "Ir para DRE", onClick: () => onGoTab("dre") }} mock />
+          value={m.fechamentoLabel}
+          sub={<>Status: <strong className="text-white/80">{m.fechamentoStatus}</strong></>}
+          action={{ label: "Ir para DRE", onClick: () => onGoTab("dre") }} />
         <StripCard topColor="#64748b" icon={<Scale className="h-3.5 w-3.5" />} label="Conciliação Bancária"
           value={fmtBRLshort(Math.abs(m.conciliacaoDiff))}
           sub={<>Diferença · {m.conciliacaoPendencias} pendência(s)</>}
-          action={{ label: "Conciliar", onClick: () => onGoTab("tesouraria") }} mock />
+          action={{ label: "Conciliar", onClick: () => onGoTab("tesouraria") }} />
         <StripCard topColor="#b91c1c" icon={<AlertTriangle className="h-3.5 w-3.5" />} label="A Vencer (fiscal)"
           value={fmtBRLshort(m.aVencerFiscalBRL)}
           sub={<>{m.qtdImpostos} imposto(s) · Comissões {fmtBRLshort(m.comissoesPendBRL)} ({m.qtdComissoes})</>}
-          action={{ label: "Cadastros", onClick: () => onGoTab("comissoes") }} mock />
+          action={{ label: "Cadastros", onClick: () => onGoTab("comissoes") }} />
       </div>
 
-      {/* KPIs PRINCIPAIS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi accent="#22c55e" icon={<Wallet className="h-5 w-5" />} label="Caixa Consolidado"
+      {/* KPIs — 8 indicadores em UMA linha (layout oficial) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+        <Kpi accent="#cbd5e1" icon={<Wallet className="h-4 w-4" />} label="Caixa Consolidado"
           value={fmtBRL(k.caixaBRL)} sub="Saldo das contas bancárias" />
-        <Kpi accent="#38bdf8" icon={<ArrowDownRight className="h-5 w-5" />} label="Recebido no mês"
-          value={fmtBRL(k.recebidoMesBRL)} valueColor="text-green-400" sub={`A receber: ${fmtBRL(k.aReceberMesBRL)}`} />
-        <Kpi accent="#f59e0b" icon={<ArrowUpRight className="h-5 w-5" />} label="A Pagar"
-          value={fmtBRL(k.aPagarBRL)} valueColor="text-amber-400"
-          sub={`${k.qtdPagarPendentes} pendentes · ${k.qtdPagarAgendados} agendados`} />
-        <Kpi accent="#ef4444" icon={<AlertTriangle className="h-5 w-5" />} label="Inadimplência"
-          value={fmtPct(k.inadimplenciaPct)} valueColor={k.inadimplenciaPct > 5 ? "text-red-400" : "text-amber-400"}
-          sub={`${k.qtdVencidas} parcelas · ${fmtBRL(k.vencidasBRL)}`} />
-      </div>
-
-      {/* KPIs SECUNDÁRIOS: Lucro / Margem / Forecast / Exposição */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi compact accent="#22c55e" icon={<TrendingUp className="h-4 w-4" />} label="Lucro do Mês"
-          value={fmtBRL(k.lucroMesBRL)} valueColor={k.lucroMesBRL >= 0 ? "text-green-400" : "text-red-400"}
-          sub={`Realizado · ${hoje.getDate()}/31 dias`} />
-        <Kpi compact accent={OURO} icon={<Target className="h-4 w-4" />} label="Margem Líquida"
-          value={fmtPct(k.margemPct)} valueColor={k.margemPct >= 20 ? "text-green-400" : k.margemPct >= 0 ? "text-amber-400" : "text-red-400"}
-          sub="Meta 35%" />
-        <Kpi compact accent="#38bdf8" icon={<Activity className="h-4 w-4" />} label="Forecast 30 dias"
+        <Kpi accent="#22c55e" icon={<ArrowDownRight className="h-4 w-4" />} label="Recebido no Mês"
+          value={fmtBRL(k.recebidoMesBRL)} sub={`A receber: ${fmtBRL(k.aReceberMesBRL)}`} />
+        <Kpi accent="#f59e0b" icon={<ArrowUpRight className="h-4 w-4" />} label="A Pagar"
+          value={fmtBRL(k.aPagarBRL)} sub={`${k.qtdPagarPendentes} pendentes · ${k.qtdPagarAgendados} agendados`} />
+        <Kpi accent="#ef4444" icon={<AlertTriangle className="h-4 w-4" />} label="Inadimplência"
+          value={fmtPct(k.inadimplenciaPct)} sub={`${k.qtdVencidas} parcelas · ${fmtBRL(k.vencidasBRL)}`} />
+        <Kpi accent="#22c55e" icon={<TrendingUp className="h-4 w-4" />} label="Lucro do Mês"
+          value={fmtBRL(k.lucroMesBRL)} sub={`Realizado · ${hoje.getDate()}/31 dias`} />
+        <Kpi accent={OURO} icon={<Target className="h-4 w-4" />} label="Margem Líquida"
+          value={fmtPct(k.margemPct)} sub="Meta 35%" />
+        <Kpi accent="#38bdf8" icon={<Activity className="h-4 w-4" />} label="Forecast 30 dias"
           value={fmtBRL(m.forecast30BRL)} sub="Entrada líquida prevista" mock />
-        <Kpi compact accent="#a78bfa" icon={<Globe className="h-4 w-4" />} label="Exposição Cambial"
+        <Kpi accent="#38bdf8" icon={<Globe className="h-4 w-4" />} label="Exposição Cambial"
           value={fmtBRL(m.exposicaoBRL)} sub={`${fmtEUR(m.exposicaoEUR)} + ${fmtUSD(m.exposicaoUSD)}`} mock />
       </div>
 
@@ -182,7 +174,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-white flex items-center gap-2"><Activity className="h-4 w-4" style={{ color: OURO }} /> Entradas vs Saídas · Últimos 6 meses</div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] text-white/40 bg-white/5 px-2 py-0.5 rounded">prévia</span>
+              <span className="inline-flex items-center gap-1 text-[11px] text-white/60 bg-white/5 border border-white/10 px-2 py-1 rounded-md">6 meses <span className="text-white/40">▾</span></span>
               <button type="button" aria-label="Opções do gráfico" className="text-white/40 hover:text-white/80 transition-colors">
                 <MoreVertical className="h-4 w-4" />
               </button>
@@ -223,8 +215,8 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
         </div>
       </div>
 
-      {/* PRÓXIMOS RECEBIMENTOS + PAGAMENTOS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      {/* LINHA 1: Próximos Recebimentos · Pagamentos · Exposição Cambial · Atividade Recente (4 colunas, layout oficial) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
         <ListCard icon={<Inbox className="h-4 w-4" style={{ color: OURO }} />} title="Próximos Recebimentos"
           onVerTodos={() => onGoTab("receber")} empty="Nenhum recebimento em aberto."
           colLeft="Cliente" colMid="Descrição"
@@ -240,10 +232,6 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
             id: p.id, left: p.fornecedor, mid: p.categoria, val: fmtBRL(p.valorBRL),
             due: fmtDate(p.vencimento), dueHint: dueText(p.vencimento), critical: p.atrasado,
           }))} />
-      </div>
-
-      {/* EXPOSIÇÃO CAMBIAL + RECEITA POR PAÍS + ATIVIDADE */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <div className={`${CARD} p-4`}>
           <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Globe className="h-4 w-4" style={{ color: OURO }} /> Exposição Cambial <span className="text-[10px] text-white/40 bg-white/5 px-1.5 py-0.5 rounded">prévia</span></div>
           <div className="rounded-lg border border-white/10 bg-white/5 p-3 mb-2">
@@ -261,12 +249,6 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
             <div className="text-xs text-white/50">≈ {fmtBRL(m.exposicaoUSD * dash.fx.USD)}</div>
           </div>
         </div>
-
-        <div className={`${CARD} p-4`}>
-          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Globe className="h-4 w-4" style={{ color: OURO }} /> Receita por País · YTD <span className="text-[10px] text-white/40 bg-white/5 px-1.5 py-0.5 rounded">prévia</span></div>
-          <ReceitaPaisBars data={m.receitaPorPais} />
-        </div>
-
         <div className={`${CARD} p-4`}>
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-white flex items-center gap-2"><FileText className="h-4 w-4" style={{ color: OURO }} /> Atividade Recente</div>
@@ -286,25 +268,32 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
         </div>
       </div>
 
-      {/* CONTAS BANCÁRIAS (real) */}
-      <div className={`${CARD} p-4`}>
-        <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Wallet className="h-4 w-4" style={{ color: OURO }} /> Contas Bancárias</div>
-        {dash.contas.length === 0 ? (
-          <p className="text-sm text-white/40 py-4 text-center">Nenhuma conta bancária cadastrada.</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {dash.contas.map(c => (
-              <div key={c.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-white/50">{c.banco || "Conta"}</span>
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: c.cor || "#64748b" }} />
+      {/* LINHA 2: Receita por País · Contas Bancárias */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className={`${CARD} p-4`}>
+          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Globe className="h-4 w-4" style={{ color: OURO }} /> Receita por País · YTD <span className="text-[10px] text-white/40 bg-white/5 px-1.5 py-0.5 rounded">prévia</span></div>
+          <ReceitaPaisBars data={m.receitaPorPais} />
+        </div>
+
+        <div className={`${CARD} p-4`}>
+          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Wallet className="h-4 w-4" style={{ color: OURO }} /> Contas Bancárias</div>
+          {dash.contas.length === 0 ? (
+            <p className="text-sm text-white/40 py-4 text-center">Nenhuma conta bancária cadastrada.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {dash.contas.map(c => (
+                <div key={c.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-white/50">{c.banco || "Conta"}</span>
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: c.cor || "#64748b" }} />
+                  </div>
+                  <div className="text-white font-semibold mt-1">{c.nome}</div>
+                  <div className="text-lg font-bold text-white mt-1">{fmtBRL(c.saldoBRL)}</div>
                 </div>
-                <div className="text-white font-semibold mt-1">{c.nome}</div>
-                <div className="text-lg font-bold text-white mt-1">{fmtBRL(c.saldoBRL)}</div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -388,28 +377,26 @@ function StripCard({ topColor, icon, label, value, valueColor = "text-white", su
   )
 }
 
-function Kpi({ icon, label, value, sub, valueColor = "text-white", compact, mock, accent }: {
-  icon: React.ReactNode; label: string; value: string; sub?: string; valueColor?: string
-  compact?: boolean; mock?: boolean; accent: string
+// KPI conforme layout oficial: ícone com cor SEMÂNTICA (o significado vive no
+// ícone), rótulo em caixa normal, VALOR branco, SEM linha colorida inferior,
+// SEM borda colorida. Todos os 8 KPIs têm o mesmo tamanho (uma linha).
+function Kpi({ icon, label, value, sub, mock, accent }: {
+  icon: React.ReactNode; label: string; value: string; sub?: string; mock?: boolean; accent: string
 }) {
-  // Neutralização (Golden Master): ícone neutro, SEM linha colorida inferior,
-  // SEM borda colorida. `accent` fica sem efeito visual — cor só permanece no
-  // VALOR (valueColor) quando tiver significado semântico real.
-  void accent
   return (
     <div className={`${CARD} relative overflow-hidden`}>
       {mock && <span className="absolute top-2 right-2 text-[9px] text-white/30 bg-white/5 px-1.5 py-0.5 rounded">prévia</span>}
-      <div className={compact ? "p-3" : "p-4"}>
-        <div className="flex items-center gap-2.5">
+      <div className="p-3.5">
+        <div className="flex items-center gap-2">
           <span
-            className={`${compact ? "h-8 w-8" : "h-9 w-9"} shrink-0 rounded-[var(--radius-sm)] grid place-items-center border`}
-            style={{ background: "var(--surface-secondary)", borderColor: "var(--border-default)", color: "var(--text-secondary)" }}
+            className="h-9 w-9 shrink-0 rounded-full grid place-items-center"
+            style={{ background: `${accent}1f`, border: `1px solid ${accent}40`, color: accent }}
           >
             {icon}
           </span>
-          <span className={`text-[11px] font-semibold uppercase tracking-wide text-white/55 leading-tight ${mock ? "pr-10" : ""}`}>{label}</span>
+          <span className={`text-[11px] font-semibold text-white/60 leading-tight ${mock ? "pr-8" : ""}`}>{label}</span>
         </div>
-        <div className={`font-bold mt-2 ${compact ? "text-lg" : "text-2xl"} ${valueColor}`}>{value}</div>
+        <div className="font-bold mt-2 text-xl text-white">{value}</div>
         {sub && <div className="text-[11px] text-white/40 mt-1">{sub}</div>}
       </div>
     </div>
@@ -478,7 +465,10 @@ function ListCard({ icon, title, rows, colLeft, colMid, empty, onVerTodos }: {
         <button onClick={onVerTodos} className="text-xs text-white/60 hover:text-white">Ver todos</button>
       </div>
       {rows.length === 0 ? (
-        <p className="text-sm text-white/40 py-6 text-center">{empty}</p>
+        <div className="flex flex-col items-center justify-center text-center py-8">
+          <div className="h-11 w-11 rounded-full grid place-items-center bg-white/5 border border-white/10 mb-2 opacity-40">{icon}</div>
+          <p className="text-sm text-white/40">{empty}</p>
+        </div>
       ) : (
         <table className="w-full text-sm">
           <thead>
