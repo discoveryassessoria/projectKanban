@@ -8,8 +8,9 @@
 // ============================================================================
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { X, Plus, Users, User, Building2 } from "lucide-react"
+import { emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
 
 const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
@@ -25,7 +26,7 @@ interface Requerente { id: number; nome: string; personId: number | null }
 interface Fase { phaseKey: string; label: string }
 interface Fornecedor { id: number; nome: string }
 
-export function LancamentoManualModal({ natureza, processoId, onClose, onCriado }: { natureza: Natureza; processoId: number; onClose: () => void; onCriado: () => void }) {
+export function LancamentoManualModal({ natureza, processoId, onClose, onCriado }: { natureza: Natureza; processoId: number; onClose: () => void; onCriado: (r?: { obrigacaoRef: number | null }) => void }) {
   const receita = natureza === "RECEITA"
   const [itens, setItens] = useState<Item[] | null>(null)
   const [requerentes, setRequerentes] = useState<Requerente[]>([])
@@ -60,7 +61,7 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
 
   // ---- carregamentos base ----
   useEffect(() => {
-    fetch(`/api/financeiro/v3/itens-catalogo`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setItens(j.itens ?? [])).catch(() => setItens([]))
+    fetch(`/api/financeiro/v3/itens-catalogo${receita ? '?paraReceita=1' : ''}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setItens(j.itens ?? [])).catch(() => setItens([]))
     fetch(`/api/processos/${processoId}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => {
       const reqs = (j?.processo?.requerentes ?? j?.requerentes ?? []).map((x: any) => ({ id: x.id, nome: [x.nome, x.sobrenome].filter(Boolean).join(" ") || x.nome, personId: x.personId ?? null }))
       setRequerentes(reqs)
@@ -101,6 +102,8 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
   const total = cent(subtotal - desc + acr)
 
   // requerentes elegíveis ao rateio (têm pessoa vinculada)
+  // chave de idempotência estável por sessão (duplo clique/retry não duplica)
+  const idemKey = useRef(`manual-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
   const reqSelecionados = useMemo(() => requerentes.filter((r) => selReq.has(r.id)), [requerentes, selReq])
   const distribuicao = useMemo(() => {
     if (vinculo !== "requerentes" || reqSelecionados.length === 0) return []
@@ -134,19 +137,40 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
     try {
       const url = receita ? `/api/financeiro/v3/receitas` : `/api/financeiro/v3/custos`
       const faseLabel = fases.find((f) => f.phaseKey === faseKey)?.label ?? null
-      const body: any = {
-        processoId, itemCatalogoId: Number(itemId),
-        descricao: [descricao.trim(), observacoes.trim()].filter(Boolean).join(" — ") || undefined,
-        quantidade: qtd, valorUnitario: unit, moeda,
-        desconto: desc || undefined, vencimento: vencimento || undefined,
-        formaCobranca: formaCobranca || undefined, faseLabel: faseLabel || undefined,
-        rateio, registrarPagamento: comPagamento || undefined,
+      let body: any
+      if (receita) {
+        // RECEITA CANÔNICA: item mestre + participantes reais (requerenteId) + idempotência.
+        const vinc = vinculo === "requerentes" ? "PARTICIPANTES" : "PROCESSO"
+        const n = reqSelecionados.length
+        const participantes = vinc === "PARTICIPANTES" ? reqSelecionados.map((r, i) => {
+          let valor = 0
+          if (n === 1) valor = total
+          else if (modoRateio === "IGUAL") { const v = cent(total / n); valor = i === n - 1 ? cent(total - v * (n - 1)) : v }
+          else if (modoRateio === "PERCENTUAL") valor = cent(total * (Number(rateioVal[r.id]) || 0) / 100)
+          else valor = cent(Number(rateioVal[r.id]) || 0)
+          return { requerenteId: r.id, nome: r.nome, valor }
+        }) : []
+        body = {
+          processoId, itemCatalogoId: Number(itemId),
+          descricao: [descricao.trim(), observacoes.trim()].filter(Boolean).join(" — ") || undefined,
+          quantidade: qtd, valorUnitario: unit, desconto: desc || undefined,
+          faseLabel: faseLabel || undefined, vinculo: vinc, participantes,
+          idempotencyKey: idemKey.current,
+        }
+      } else {
+        body = {
+          processoId, itemCatalogoId: Number(itemId),
+          descricao: [descricao.trim(), observacoes.trim()].filter(Boolean).join(" — ") || undefined,
+          quantidade: qtd, valorUnitario: unit, moeda, desconto: desc || undefined, vencimento: vencimento || undefined,
+          formaCobranca: formaCobranca || undefined, faseLabel: faseLabel || undefined, rateio,
+          acrescimo: acr || undefined, fornecedorId: fornecedorId ? Number(fornecedorId) : undefined, centroCustoId: centroCustoId ? Number(centroCustoId) : undefined,
+        }
       }
-      if (!receita) { body.acrescimo = acr || undefined; body.fornecedorId = fornecedorId ? Number(fornecedorId) : undefined; body.centroCustoId = centroCustoId ? Number(centroCustoId) : undefined }
       const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(body) })
       const j = await res.json().catch(() => ({}))
       if (!res.ok || !j.ok) { setErro(j?.erro || j?.motivo || `Falha ao salvar (HTTP ${res.status}).`); return }
-      onCriado()
+      emitirMutacaoFinanceira({ processoId, obrigacaoId: j.obrigacaoRef ?? null })
+      onCriado(comPagamento ? { obrigacaoRef: j.obrigacaoRef ?? null } : undefined)
     } catch { setErro("Erro de conexão ao salvar.") } finally { setSalvando(null) }
   }
 
@@ -186,11 +210,16 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
             <input value={quantidade} onChange={(e) => setQuantidade(e.target.value)} inputMode="numeric" className={inputCls} />
           </label>
           <div className="grid grid-cols-2 gap-3">
-            <label className={labelCls}>Valor unitário
+            <label className={labelCls}>Valor unitário{receita && <span className="ml-1 text-[10px] text-[#7dd3fc]">(Cadastro Mestre)</span>}
               <input value={valorUnitario} onChange={(e) => setValorUnitario(e.target.value)} inputMode="decimal" placeholder="0,00" className={inputCls} />
+              {receita && <span className="mt-0.5 block text-[10px] text-white/35">Definido pelo Cadastro Mestre — alterar exige permissão.</span>}
             </label>
             <label className={labelCls}>Moeda
-              <select value={moeda} onChange={(e) => setMoeda(e.target.value)} className={inputCls}>{["BRL", "EUR", "USD"].map((m) => <option key={m} value={m}>{m}</option>)}</select>
+              {receita ? (
+                <div className={`${inputCls} flex items-center justify-between`}><span>{moeda}</span><span className="text-[10px] text-white/35">Definido pelo Cadastro Mestre</span></div>
+              ) : (
+                <select value={moeda} onChange={(e) => setMoeda(e.target.value)} className={inputCls}>{["BRL", "EUR", "USD"].map((m) => <option key={m} value={m}>{m}</option>)}</select>
+              )}
             </label>
           </div>
 

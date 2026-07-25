@@ -208,7 +208,7 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
         )}
       </div>
 
-      {novo && processoId != null && <LancamentoManualModal natureza="RECEITA" processoId={processoId} onClose={() => setNovo(false)} onCriado={() => { setNovo(false); carregar() }} />}
+      {novo && processoId != null && <LancamentoManualModal natureza="RECEITA" processoId={processoId} onClose={() => setNovo(false)} onCriado={(r) => { setNovo(false); carregar(); if (r?.obrigacaoRef) abrir(r.obrigacaoRef) }} />}
     </div>
   )
 }
