@@ -13,6 +13,7 @@ import { prisma } from '@/lib/prisma'
 import { carregarReceitaConsolidada } from '@/lib/financeiro/leitura/receita-detalhe'
 import { registrarLancamento, criarObrigacaoEconomicaComLedger } from '@/lib/financeiro/ledger/ledger-service'
 import { lancAjusteContrato } from '@/lib/financeiro/ledger/lancamentos'
+import { dedupPorPessoa, registrarPendenciaReconciliacao } from '@/lib/financeiro/identidade/dedup-pessoa'
 import { aReceber, type Natureza } from '@/lib/financeiro/dominio/obrigacao-economica'
 import { gerarCodigoReceita } from '@/lib/financeiro/codigos'
 
@@ -124,8 +125,15 @@ export async function carregarDistribuicaoEditavel(ref: string): Promise<Distrib
   let disponiveis: DisponivelProcesso[] = []
   if (processoId != null) {
     const jaTem = new Set(participantes.map((p) => p.requerenteId).filter((v): v is number => v != null))
-    const pr = await prisma.processoRequerente.findMany({ where: { processoId }, select: { requerente: { select: { id: true, nome: true, dataNascimento: true } } } }).catch(() => [])
-    disponiveis = pr.map((x) => x.requerente).filter((r) => r && !jaTem.has(r.id)).map((r) => {
+    const pr = await prisma.processoRequerente.findMany({ where: { processoId }, select: { requerente: { select: { id: true, nome: true, dataNascimento: true, personId: true } } } }).catch(() => [])
+    const reqs = pr.map((x) => x.requerente).filter((r): r is NonNullable<typeof r> => !!r)
+    // Pessoa já participante (identidade canônica) não reaparece como disponível sob outro requerente.
+    const jaTemPerson = new Set(reqs.filter((r) => jaTem.has(r.id) && r.personId != null).map((r) => r.personId as number))
+    const candidatos = reqs.filter((r) => !jaTem.has(r.id) && !(r.personId != null && jaTemPerson.has(r.personId)))
+    // dedup VISUAL por personId (sem personId → individual); duplicidade real vira pendência (sem merge).
+    const { itens, duplicatas } = dedupPorPessoa(candidatos.map((r) => ({ id: r.id, personId: r.personId, nome: r.nome, dataNascimento: r.dataNascimento })))
+    registrarPendenciaReconciliacao(`redistribuir:processo:${processoId}`, duplicatas)
+    disponiveis = itens.map((r) => {
       const idade = idadeDe(r.dataNascimento); return { requerenteId: r.id, nome: r.nome, idade, isMenor: idade != null && idade < 18, vinculo: 'Requerente' }
     })
   }

@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { X, Plus, Users, User, Building2 } from "lucide-react"
 import { emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
+import { dedupPorPessoa, registrarPendenciaReconciliacao } from "@/lib/financeiro/identidade/dedup-pessoa"
 
 const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
@@ -63,7 +64,11 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
   useEffect(() => {
     fetch(`/api/financeiro/v3/itens-catalogo${receita ? '?paraReceita=1' : ''}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setItens(j.itens ?? [])).catch(() => setItens([]))
     fetch(`/api/processos/${processoId}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => {
-      const reqs = (j?.processo?.requerentes ?? j?.requerentes ?? []).map((x: any) => ({ id: x.id, nome: [x.nome, x.sobrenome].filter(Boolean).join(" ") || x.nome, personId: x.personId ?? null }))
+      const reqsBrutos: Requerente[] = (j?.processo?.requerentes ?? j?.requerentes ?? []).map((x: any) => ({ id: x.id, nome: [x.nome, x.sobrenome].filter(Boolean).join(" ") || x.nome, personId: x.personId ?? null }))
+      // dedup VISUAL por identidade canônica (personId): a mesma Pessoa não aparece 2x na seleção.
+      // Sem personId → mantido individual. Duplicidade real vira pendência de reconciliação (sem merge).
+      const { itens: reqs, duplicatas } = dedupPorPessoa(reqsBrutos)
+      registrarPendenciaReconciliacao(`lancamento-manual:processo:${processoId}`, duplicatas)
       setRequerentes(reqs)
     }).catch(() => setRequerentes([]))
     fetch(`/api/processos/${processoId}/phases`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setFases((j?.phases ?? []).map((p: any) => ({ phaseKey: p.phaseKey, label: p.label })))).catch(() => setFases([]))
