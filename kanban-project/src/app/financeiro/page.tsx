@@ -17,6 +17,7 @@ import { Loader2, FileText } from "lucide-react"
 import dynamic from "next/dynamic"
 import { DashboardCorporativo, OURO, type DashboardData } from "@/src/components/financeiro/dashboard-corporativo"
 import { CentralFinanceira } from "@/src/components/financeiro/CentralFinanceira"
+import { PagamentosView } from "@/src/components/financeiro/PagamentosView"
 
 const TesourariaTab = dynamic(() => import("@/src/components/financeiroComponents/TesourariaTab"), {
   ssr: false,
@@ -70,6 +71,7 @@ const TABS = [
   { key: "tesouraria", label: "Tesouraria" },
   { key: "receber", label: "A Receber" },
   { key: "cobrancas", label: "Cobranças" },
+  { key: "pagamentos", label: "Pagamentos" },
   { key: "pagar", label: "A Pagar" },
   { key: "fluxo", label: "Fluxo de Caixa" },
   { key: "dre", label: "DRE", avancada: true },
@@ -193,6 +195,8 @@ export default function FinanceiroPage() {
             <ReceberTab />
           ) : tab === "cobrancas" ? (
             <CobrancasTab />
+          ) : tab === "pagamentos" ? (
+            <PagamentosView />
           ) : tab === "pagar" ? (
             <PagarTab />
           ) : tab === "fluxo" ? (
