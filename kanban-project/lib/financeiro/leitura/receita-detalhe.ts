@@ -6,6 +6,7 @@
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import { cotacoesVivas, computeCambioAging, labelServico } from './cambio-aging'
+import { ratearBrlPorBase } from '@/lib/financeiro/dominio/cambio'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
@@ -259,7 +260,10 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
 
   // ── blocos do detalhe rico (#80), DERIVADOS (sem migration) ──
   const ultimaMovimentacao = historico[0] ? { data: historico[0].data, titulo: historico[0].titulo, ator: historico[0].ator } : null
-  const distribuicaoRequerentes = reqLeg.map((r) => ({ nome: r.nome, requerenteId: r.requerenteId ?? null, percentual: Number(r.percentual ?? 0), valor: cent((Number(r.percentual ?? 0) / 100) * ca.valorContratadoBrl) }))
+  // BRL por requerente = PARTIÇÃO EXATA do total (percentual como peso; resíduo no maior),
+  // para a soma bater exatamente com valorContratadoBrl (nunca driftar por % arredondado).
+  const brlPorReqLeg = ratearBrlPorBase(reqLeg.map((r) => Number(r.percentual ?? 0)), ca.valorContratadoBrl)
+  const distribuicaoRequerentes = reqLeg.map((r, i) => ({ nome: r.nome, requerenteId: r.requerenteId ?? null, percentual: Number(r.percentual ?? 0), valor: brlPorReqLeg[i] }))
   const responsavelFinanceiro = reqLeg[0] ? { nome: reqLeg[0].nome, requerenteId: reqLeg[0].requerenteId ?? null } : (primeiro ? { nome: nome(primeiro.pessoaId), requerenteId: null } : null)
   const semPagamento = pagamentos.length === 0
   const alertas: { tipo: string; severidade: 'crit' | 'warn' | 'info'; label: string; valor: number | null }[] = []

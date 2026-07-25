@@ -27,6 +27,7 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { resolverId } from '@/lib/financeiro/leitura/receita-detalhe'
 import { cotacoesVivas } from '@/lib/financeiro/leitura/cambio-aging'
+import { taxaDe } from '@/lib/financeiro/dominio/cambio'
 import { registrarLancamento, recomputarProjecao } from '@/lib/financeiro/ledger/ledger-service'
 import { lancAjusteContrato } from '@/lib/financeiro/ledger/lancamentos'
 import { aReceber, type Natureza } from '@/lib/financeiro/dominio/obrigacao-economica'
@@ -194,7 +195,7 @@ function cambioConsolidado(g: Grupo): RegraCambio & { cotacaoEfetiva: number | n
   return {
     fxRule: rep?.fx.fxRule ?? 'VARIAVEL', fxEstimado: rep?.fx.fxEstimado ?? null, fxFixo: rep?.fx.fxFixo ?? null,
     fxData: rep?.fx.fxData ?? null, valorBrlFixo: somaBrlFixo,
-    cotacaoEfetiva: totalBase > 0 ? cent(totalBrl / totalBase) : rep?.fx.fxEstimado ?? null, valorContratadoBrl: totalBrl,
+    cotacaoEfetiva: totalBase > 0 ? taxaDe(totalBrl, totalBase) : rep?.fx.fxEstimado ?? null, valorContratadoBrl: totalBrl,
   }
 }
 

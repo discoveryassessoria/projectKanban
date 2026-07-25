@@ -14,6 +14,7 @@ import { carregarReceitaConsolidada } from '@/lib/financeiro/leitura/receita-det
 import { registrarLancamento, criarObrigacaoEconomicaComLedger } from '@/lib/financeiro/ledger/ledger-service'
 import { lancAjusteContrato } from '@/lib/financeiro/ledger/lancamentos'
 import { dedupPorPessoa, registrarPendenciaReconciliacao } from '@/lib/financeiro/identidade/dedup-pessoa'
+import { taxaDe } from '@/lib/financeiro/dominio/cambio'
 import { aReceber, type Natureza } from '@/lib/financeiro/dominio/obrigacao-economica'
 import { gerarCodigoReceita } from '@/lib/financeiro/codigos'
 
@@ -89,7 +90,9 @@ export async function carregarDistribuicaoEditavel(ref: string): Promise<Distrib
 
   const totalBase = cent(obrs.reduce((s, o) => s + Number(o.valorContratado), 0))
   const totalBrl = cons.valorContratadoBrl
-  const cotacao = totalBase > 0 ? cent(totalBrl / totalBase) : null
+  // taxa efetiva com PRECISÃO TOTAL (nunca arredondar a taxa — ver taxaDe). O
+  // total em BRL fonte-única é `totalBrl`; `cotacao` é derivada só p/ exibir/semear.
+  const cotacao = totalBase > 0 ? taxaDe(totalBrl, totalBase) : null
 
   const participantes: ParticipanteEditavel[] = cons.participantes.map((p) => {
     const o = obrMap.get(p.obrigacaoId)

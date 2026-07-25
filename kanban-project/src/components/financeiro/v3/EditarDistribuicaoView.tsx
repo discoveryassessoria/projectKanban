@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { LAYER } from "@/src/lib/ui/layers"
+import { ratearBrlPorBase } from "@/lib/financeiro/dominio/cambio"
 import {
   Loader2, CheckCircle2, AlertTriangle, Info as InfoIcon, Trash2, UserPlus, Users, Scale, Percent, Coins, Sparkles,
 } from "lucide-react"
@@ -58,7 +59,9 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
   const totalBase: number = dist?.totalBase ?? 0
   const moedaBase: string = dist?.moedaBase ?? "BRL"
   const cotacao: number | null = dist?.cotacao ?? null
-  const brlDe = (base: number) => (cotacao ? base * cotacao : base)
+  // SSOT do total em BRL (soma dos BRL congelados por participante), NUNCA recomputado
+  // de uma taxa arredondada. `cotacao` (precisão total) só semeia base a partir de BRL editado.
+  const totalBrl: number = dist?.totalBrl ?? (cotacao ? cent(totalBase * cotacao) : totalBase)
 
   useEffect(() => {
     let vivo = true
@@ -115,10 +118,15 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
   const soma100 = Math.abs(diferenca) < 0.01
   const pctDe = (v: number) => (totalBase > 0 ? cent((v / totalBase) * 100) : 0)
   const somaPct = cent(incluidos.reduce((s, r) => s + pctDe(r.valorBase), 0))
-  // Fechamento em BRL: a soma em BRL deve bater exatamente com brlDe(totalBase) (tolerância de 1 centavo).
-  const totalDistribuidoBrl = cent(brlDe(totalDistribuido))
-  const alvoBrl = cent(brlDe(totalBase))
-  const fechaBrl = Math.abs(totalDistribuidoBrl - alvoBrl) <= 0.01
+  // BRL = PARTIÇÃO EXATA do SSOT (totalBrl): rateio por base com resíduo determinístico,
+  // logo a soma dos BRL das linhas é SEMPRE = totalBrl. O fechamento é governado pela BASE
+  // (soma == totalBase); o BRL nunca diverge por arredondamento de taxa.
+  const alvoBrl = cent(totalBrl)
+  const brlAlocList = ratearBrlPorBase(incluidos.map((r) => r.valorBase), alvoBrl)
+  const brlAloc = new Map<string, number>(incluidos.map((r, i) => [r.key, brlAlocList[i]]))
+  const brlDeRow = (r: Row) => (r.incluido ? brlAloc.get(r.key) ?? 0 : 0)
+  const totalDistribuidoBrl = cent(brlAlocList.reduce((s, v) => s + v, 0))
+  const fechaBrl = soma100 // BRL é partição exata do total; fechamento vem da base
   const disponiveisRestantes = (dist?.disponiveis ?? []).filter((d: any) => !rows.some((r) => r.requerenteId === d.requerenteId))
 
   const pendencias = useMemo(() => {
@@ -184,7 +192,7 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
               <section className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div><div className="text-xs uppercase tracking-wide text-white/40">Receita</div><div className="text-sm font-medium text-white">{dist?.descricao ?? "—"} <span className="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">{dist?.codigo}</span></div></div>
-                  <div className="text-right"><div className="text-xs uppercase tracking-wide text-white/40">Total a distribuir</div><div className="text-lg font-semibold text-white">{money(totalBase, moedaBase)}</div>{cotacao && <div className="text-[11px] text-white/40">{brl(brlDe(totalBase))} · câmbio {cotacao.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</div>}</div>
+                  <div className="text-right"><div className="text-xs uppercase tracking-wide text-white/40">Total a distribuir</div><div className="text-lg font-semibold text-white">{money(totalBase, moedaBase)}</div>{cotacao && <div className="text-[11px] text-white/40">{brl(alvoBrl)} · câmbio {cotacao.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</div>}</div>
                 </div>
               </section>
 
@@ -212,7 +220,7 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
                     <tbody>
                       {rows.map((r) => {
                         const pct = pctDe(r.valorBase)
-                        const brlRow = cent(brlDe(r.valorBase))
+                        const brlRow = brlDeRow(r)
                         const editPct = metodo === "PERCENTUAL", editVal = metodo === "VALOR"
                         return (
                           <tr key={r.key} className={`border-t border-white/5 ${r.incluido ? "" : "opacity-40"}`}>
@@ -224,7 +232,7 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
                             </td>
                             <td className="px-2 py-2 text-right">{editPct && r.incluido ? <input inputMode="decimal" value={pct === 0 ? "" : String(pct)} onChange={(e) => setPct(r.key, num(e.target.value))} placeholder="0" className={`${inputCls} w-24`} /> : <span className="text-white/80">{pct.toFixed(2)}%</span>}</td>
                             <td className="px-2 py-2 text-right"><span className={editVal ? "text-white/50" : "text-white"}>{money(r.valorBase, moedaBase)}</span></td>
-                            <td className="px-2 py-2 text-right">{editVal && r.incluido ? <input inputMode="decimal" value={brlRow === 0 ? "" : String(brlRow)} onChange={(e) => setBrl(r.key, num(e.target.value))} placeholder="0,00" className={`${inputCls} w-32`} /> : <span className="text-white/50">{brl(brlDe(r.valorBase))}</span>}</td>
+                            <td className="px-2 py-2 text-right">{editVal && r.incluido ? <input inputMode="decimal" value={brlRow === 0 ? "" : String(brlRow)} onChange={(e) => setBrl(r.key, num(e.target.value))} placeholder="0,00" className={`${inputCls} w-32`} /> : <span className="text-white/50">{brl(brlDeRow(r))}</span>}</td>
                             <td className="px-2 py-2 text-right text-[#4ade80]">{r.recebidoBase > 0 ? money(r.recebidoBase, moedaBase) : "—"}</td>
                             <td className="px-2 py-2 text-center">
                               {r.incluido
