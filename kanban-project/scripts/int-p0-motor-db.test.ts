@@ -201,6 +201,21 @@ async function main() {
     ok(near(receb, 0) && near(saldo, 1000), `ledger consistente pós-estorno: recebido 0 + saldo 1000 = contratado (receb ${receb}, saldo ${saldo})`)
   }
 
+  // ── 13) ESTORNO grava MOTIVO na timeline (EventoFinanceiro) + auditoria (outbox)
+  {
+    const { obrigacaoId, receitaId } = await seed(1000)
+    await pagar(obrigacaoId, 1000, 'k13')
+    const pagId = await pagamentoOcId(obrigacaoId)
+    const obsMotivo = '[Valor incorreto] — cobrança errada'
+    const r = await registrarOcorrencia({ obrigacaoId, tipo: 'ESTORNO', valor: 1000, estornaOcorrenciaId: pagId, idempotencyKey: 'e13', observacao: obsMotivo }) as any
+    const evt = await prisma.eventoFinanceiro.findFirst({ where: { receitaId, tipo: 'ESTORNO_RECEBIMENTO' }, orderBy: { id: 'desc' } })
+    const outbox = await prisma.domainOutbox.findFirst({ where: { aggregateId: obrigacaoId }, orderBy: { id: 'desc' } })
+    const payload = (outbox?.payload ?? {}) as any
+    ok(evt != null && String(evt.descricao).includes('Valor incorreto'), `estorno: motivo na TIMELINE (EventoFinanceiro ESTORNO_RECEBIMENTO com categoria)`)
+    ok(payload?.observacao != null && String(payload.observacao).includes('Valor incorreto'), `estorno: motivo na AUDITORIA (outbox payload.observacao)`)
+    void r
+  }
+
   await limpar()
   console.log(`\n${failed === 0 ? '✅' : '❌'} int-p0-motor: ${passed} ok, ${failed} falhas`)
   process.exit(failed === 0 ? 0 : 1)

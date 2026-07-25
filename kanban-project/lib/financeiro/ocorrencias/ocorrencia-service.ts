@@ -169,11 +169,22 @@ export async function registrarOcorrenciaTx(tx: Prisma.TransactionClient, e: Ent
     }
 
     await tx.ocorrenciaFinanceira.update({ where: { id: oc.id }, data: { status: 'PROCESSADA' } })
+
+    // TIMELINE do ESTORNO: o motivo/categoria fica VISÍVEL na timeline da Receita (nunca só
+    // em log técnico). Dentro da transação → some junto se a mutação falhar.
+    if (e.tipo === 'ESTORNO' && obr.origemTipo === 'Receita' && obr.origemId != null) {
+      await tx.eventoFinanceiro.create({ data: {
+        receitaId: obr.origemId, tipo: obr.direcao === 'A_PAGAR' ? 'ESTORNO_PAGAMENTO' : 'ESTORNO_RECEBIMENTO',
+        descricao: `Estorno de ${moeda} ${cent(e.valor)} (pagamento #${e.estornaOcorrenciaId})${e.observacao ? ' · ' + e.observacao : ''}`.slice(0, 480),
+      } })
+    }
+
     // Evento de domínio OBRIGATÓRIO dentro da transação (sem best-effort): se falhar,
-    // a mutação financeira inteira faz rollback (nada de estado parcial).
+    // a mutação financeira inteira faz rollback (nada de estado parcial). O motivo/categoria
+    // (observacao) entra no payload → fica AUDITÁVEL, não só no free-text da ocorrência.
     await tx.domainOutbox.create({ data: {
       tipo: 'financeiro.ocorrencia.processada', aggregateType: 'ObrigacaoEconomica', aggregateId: obr.id,
-      payload: { obrigacaoId: obr.id, ocorrenciaId: oc.id, ocorrenciaTipo: e.tipo } as Prisma.InputJsonValue,
+      payload: { obrigacaoId: obr.id, ocorrenciaId: oc.id, ocorrenciaTipo: e.tipo, observacao: e.observacao ?? null } as Prisma.InputJsonValue,
       chaveIdempotencia: chaveEvento('financeiro.ocorrencia.processada', oc.id),
     } })
 

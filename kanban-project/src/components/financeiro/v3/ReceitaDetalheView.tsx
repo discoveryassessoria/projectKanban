@@ -66,14 +66,12 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const [erro, setErro] = useState<string | null>(null)
   const [tab, setTab] = useState("cobrancas")
   const [drawerPart, setDrawerPart] = useState<any>(null) // participante aberto no drawer (obrigacaoId + nome)
-  const [pagOpen, setPagOpen] = useState(false)
   const [receberOpen, setReceberOpen] = useState(false)
   const [receberEscopo, setReceberEscopo] = useState<EscopoEscolhido | null>(null)
   const [distribuicaoOpen, setDistribuicaoOpen] = useState(false)
   const [acaoModal, setAcaoModal] = useState<AcaoReceita | null>(null)
   const [editarReceitaOpen, setEditarReceitaOpen] = useState(false)
   const [faturaOpen, setFaturaOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
   const [maisOpen, setMaisOpen] = useState(false)
   const [verMais, setVerMais] = useState(false)
   const [busca, setBusca] = useState("")
@@ -153,7 +151,6 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const fmtEUR = (v: number) => fmt(v, d.moedaBase)
   const moedaBaseLabel = d.moedaBase === "EUR" ? "Euro (EUR)" : d.moedaBase
   const pct = d.valorContratadoBrl ? Math.round((d.recebidoBrl / d.valorContratadoBrl) * 100) : 0
-  const podeEditar = d.receitaId != null
   const temProcesso = d.processo?.id != null
 
   const pagamentosFiltrados = (d.pagamentos ?? []).filter((p: any) => {
@@ -265,10 +262,9 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
           {/* Ações do topo */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => podeEditar && setEditOpen(true)}
-              disabled={!podeEditar}
-              title={podeEditar ? "Editar metadados da receita" : "Edição disponível apenas para receitas de origem"}
-              className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#1b2027] px-3.5 py-2 text-sm font-medium text-white/80 hover:border-white/25 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => setEditarReceitaOpen(true)}
+              title="Editar receita (dados e regra de câmbio) — fluxo canônico"
+              className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#1b2027] px-3.5 py-2 text-sm font-medium text-white/80 hover:border-white/25"
             ><Pencil className="h-4 w-4" /> Editar receita</button>
 
             <button onClick={() => setReceberOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957]"><Plus className="h-4 w-4" /> Registrar pagamento</button>
@@ -696,16 +692,6 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
       )}
 
       {/* ── MODAIS ── */}
-      {pagOpen && d && (
-        <RegistrarPagamentoModal
-          obrigacaoId={d.obrigacaoId}
-          moeda={d.moeda}
-          saldo={d.saldo}
-          natureza={isCusto ? "CUSTO" : "RECEITA"}
-          onClose={() => setPagOpen(false)}
-          onDone={() => { setPagOpen(false); carregar() }}
-        />
-      )}
       {receberOpen && d && (
         <DefinirEscopoDrawer
           receitaRef={String(d.obrigacaoId)}
@@ -762,15 +748,6 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
           receitaId={d.receitaId}
           onClose={() => setFaturaOpen(false)}
           onSuccess={() => { setFaturaOpen(false); carregar() }}
-        />
-      )}
-      {editOpen && podeEditar && (
-        <EditarReceitaModal
-          receitaId={d.receitaId}
-          descricaoInicial={d.descricao ?? ""}
-          observacaoInicial={d.observacao ?? ""}
-          onClose={() => setEditOpen(false)}
-          onDone={() => { setEditOpen(false); carregar() }}
         />
       )}
     </div>
@@ -949,68 +926,6 @@ function ParticipanteDrawer({ obrigacaoId, nome, codigoReceita, onClose, onPagam
   )
 }
 
-// ── Modal de edição de metadados seguros (descrição + observações) ──
-function EditarReceitaModal({ receitaId, descricaoInicial, observacaoInicial, onClose, onDone }: { receitaId: number; descricaoInicial: string; observacaoInicial: string; onClose: () => void; onDone: () => void }) {
-  const [descricao, setDescricao] = useState(descricaoInicial)
-  const [observacoes, setObservacoes] = useState(observacaoInicial)
-  const [salvando, setSalvando] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
-
-  useEffect(() => {
-    const orig = document.body.style.overflow
-    document.body.style.overflow = "hidden"
-    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape" && !salvando) onClose() }
-    document.addEventListener("keydown", onEsc)
-    return () => { document.body.style.overflow = orig; document.removeEventListener("keydown", onEsc) }
-  }, [onClose, salvando])
-
-  const salvar = async () => {
-    if (!descricao.trim()) { setErro("A descrição é obrigatória."); return }
-    setSalvando(true); setErro(null)
-    try {
-      const res = await fetch(`/api/financeiro/receitas/${receitaId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ descricao: descricao.trim(), observacoes: observacoes.trim() || null }),
-      })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok) { setErro(j?.error || `Falha ao salvar (HTTP ${res.status}).`); setSalvando(false); return }
-      onDone()
-    } catch { setErro("Falha de rede ao salvar."); setSalvando(false) }
-  }
-
-  const inp = "mt-1 w-full rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/90 outline-none placeholder:text-white/30 focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25"
-  const lbl = "block text-[11px] font-medium uppercase tracking-wider text-white/45"
-
-  if (typeof document === "undefined") return null
-  return createPortal(
-    <div className="fixed inset-0 flex items-center justify-center bg-black/60 p-4" style={{ zIndex: LAYER.aboveProcess }} onClick={() => !salvando && onClose()}>
-      <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#1b2027] shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-          <h3 className="text-base font-semibold text-white">Editar receita</h3>
-          <button onClick={() => !salvando && onClose()} className="text-white/40 hover:text-white/80"><X className="h-5 w-5" /></button>
-        </div>
-        <div className="space-y-4 px-5 py-5">
-          <div>
-            <label className={lbl}>Descrição</label>
-            <input value={descricao} onChange={(e) => setDescricao(e.target.value)} maxLength={300} className={inp} placeholder="Descrição da receita" />
-          </div>
-          <div>
-            <label className={lbl}>Observações</label>
-            <textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value)} rows={4} className={`${inp} resize-none`} placeholder="Observações internas (opcional)" />
-          </div>
-          <p className="text-xs text-white/40">Apenas metadados são editáveis. Valores, câmbio e parcelas são governados pelo Ledger e não mudam por aqui.</p>
-          {erro && <div className="rounded-lg border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-sm text-[#f87171]">{erro}</div>}
-        </div>
-        <div className="flex items-center justify-end gap-2 border-t border-white/10 px-5 py-4">
-          <button onClick={() => !salvando && onClose()} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/70 hover:border-white/25">Cancelar</button>
-          <button onClick={salvar} disabled={salvando} className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-4 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957] disabled:opacity-60">{salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Salvar</button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  )
-}
 
 function Info({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return <div><div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-white/40">{rotulo}</div><div className="text-sm">{children}</div></div>
