@@ -12,6 +12,8 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { X, Plus, Users, User, Building2 } from "lucide-react"
 import { emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
 import { dedupPorPessoa, registrarPendenciaReconciliacao } from "@/lib/financeiro/identidade/dedup-pessoa"
+import { createPortal } from "react-dom"
+import { LAYER } from "@/src/lib/ui/layers"
 
 const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
@@ -182,8 +184,8 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
   const inputCls = "mt-1 w-full rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/95 outline-none placeholder:text-white/30"
   const labelCls = "block text-xs text-white/68"
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4" onClick={onClose}>
+  const modal = (
+    <div className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-black/60 p-4" style={{ zIndex: LAYER.aboveProcess }} onClick={onClose}>
       <div className="my-6 w-full max-w-2xl rounded-xl border border-white/10 bg-[#1b2027] p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="text-base font-semibold text-white">{receita ? "Nova Receita" : "Novo Custo"}</h3>
@@ -342,4 +344,5 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
       </div>
     </div>
   )
+  return typeof document !== "undefined" ? createPortal(modal, document.body) : null
 }

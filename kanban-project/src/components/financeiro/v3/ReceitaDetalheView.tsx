@@ -22,6 +22,7 @@ import EditarReceitaView from "@/src/components/financeiro/v3/EditarReceitaView"
 import { NovaFaturaModal } from "@/src/components/kanban/NovaFaturaModal"
 import { uploadFiles } from "@/src/lib/storage"
 import { emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
+import { LAYER } from "@/src/lib/ui/layers"
 import {
   ArrowLeft, ExternalLink, MoreVertical, Copy, ChevronDown, ChevronUp,
   Receipt, CreditCard, Wallet, FileCheck, Clock, Search, SlidersHorizontal, Calendar,
@@ -832,7 +833,7 @@ function ParticipanteDrawer({ obrigacaoId, nome, codigoReceita, onClose, onPagam
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-[65] flex justify-end bg-black/60" onClick={onClose}>
+      <div className="fixed inset-0 flex justify-end bg-black/60" style={{ zIndex: LAYER.aboveProcessDrawer }} onClick={onClose}>
         <div className="flex h-full w-full max-w-[600px] flex-col overflow-hidden border-l border-white/10 bg-[#1b2027] shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
           {/* Header */}
           <div className="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4">
@@ -983,7 +984,7 @@ function EditarReceitaModal({ receitaId, descricaoInicial, observacaoInicial, on
 
   if (typeof document === "undefined") return null
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => !salvando && onClose()}>
+    <div className="fixed inset-0 flex items-center justify-center bg-black/60 p-4" style={{ zIndex: LAYER.aboveProcess }} onClick={() => !salvando && onClose()}>
       <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#1b2027] shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <h3 className="text-base font-semibold text-white">Editar receita</h3>

@@ -3,6 +3,7 @@
 
 import { X } from "lucide-react"
 import { createPortal } from "react-dom"
+import { LAYER } from "@/src/lib/ui/layers"
 import { useEffect, useState } from "react"
 
 interface Props {
@@ -41,7 +42,7 @@ export function ModalBase({
   if (!mounted) return null
 
   const content = (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/50">
+    <div className="fixed inset-0 flex items-center justify-center p-4 bg-black/50" style={{ zIndex: LAYER.aboveProcess }}>
       <div className={`bg-white rounded-2xl shadow-2xl w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col overflow-hidden`}>
         <div className={`${colorClasses[color]} text-white p-4 flex items-center gap-3`}>
           <div className="bg-white/20 rounded-lg h-10 w-10 flex items-center justify-center text-xl">{icon}</div>

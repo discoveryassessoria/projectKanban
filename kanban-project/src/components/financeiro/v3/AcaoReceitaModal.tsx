@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { X, Loader2, CheckCircle2, AlertTriangle, ReceiptText, RefreshCcw, Ban, Archive } from "lucide-react"
+import { LAYER } from "@/src/lib/ui/layers"
 
 const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 
@@ -59,7 +60,7 @@ export default function AcaoReceitaModal({ acao, receitaRef, onClose, onDone }: 
   }
 
   const modal = (
-    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:items-center" onClick={onClose}>
+    <div className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:items-center" style={{ zIndex: LAYER.aboveProcessCritical }} onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#161b21] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <h2 className="flex items-center gap-2 text-base font-semibold text-white"><m.Ic className="h-4 w-4" style={{ color: m.cor }} /> {m.titulo}</h2>

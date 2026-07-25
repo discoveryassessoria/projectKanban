@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
+import { LAYER } from "@/src/lib/ui/layers"
 import { X, Loader2, CheckCircle2 } from "lucide-react"
 
 const authHeaders = (extra?: Record<string, string>): Record<string, string> => {
@@ -120,8 +121,8 @@ export default function RegistrarPagamentoModal({ obrigacaoId, moeda = "BRL", sa
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-[10040] bg-black/65" onClick={() => !salvando && onClose()} />
-      <div className="fixed inset-0 z-[10041] flex items-center justify-center p-4 pointer-events-none">
+      <div className="fixed inset-0 bg-black/65" style={{ zIndex: LAYER.aboveProcess }} onClick={() => !salvando && onClose()} />
+      <div className="fixed inset-0 flex items-center justify-center p-4 pointer-events-none" style={{ zIndex: LAYER.aboveProcess }}>
         <div className="pointer-events-auto flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0d1117] shadow-2xl">
           {/* header */}
           <div className="flex items-start justify-between gap-4 border-b border-white/10 bg-[#161b21] px-5 py-4">

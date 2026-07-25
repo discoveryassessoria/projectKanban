@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { X, Loader2, Upload, AlertTriangle, RotateCcw, CheckCircle2, Trash2, Eye } from "lucide-react"
+import { LAYER } from "@/src/lib/ui/layers"
 import { uploadFiles } from "@/src/lib/storage"
 
 const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
@@ -84,7 +85,7 @@ export default function EstornoModal({ obrigacaoId, moeda, pagamento, onClose, o
 
   const inputCls = "w-full rounded-lg border border-white/10 bg-[#20262e] px-3 py-2 text-sm text-white outline-none focus:border-[#f87171]/50"
   const modal = (
-    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:items-center" onClick={onClose}>
+    <div className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:items-center" style={{ zIndex: LAYER.aboveProcessCritical }} onClick={onClose}>
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#161b21] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <h2 className="flex items-center gap-2 text-base font-semibold text-white"><RotateCcw className="h-4 w-4 text-[#f87171]" /> Estornar pagamento</h2>

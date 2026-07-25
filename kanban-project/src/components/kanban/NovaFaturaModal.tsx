@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { createPortal } from "react-dom"
+import { LAYER } from "@/src/lib/ui/layers"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { 
@@ -132,8 +134,8 @@ export function NovaFaturaModal({
   // ========================================
   // RENDER
   // ========================================
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+  const modal = (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4" style={{ zIndex: LAYER.aboveProcess }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
         
         {/* Header */}
@@ -307,4 +309,5 @@ export function NovaFaturaModal({
       </div>
     </div>
   )
+  return typeof document !== "undefined" ? createPortal(modal, document.body) : null
 }
