@@ -106,22 +106,36 @@ export async function registrarOcorrencia(e: EntradaOcorrencia) {
         } }).catch(() => {})
       }
       const quitado = res.totalAplicado > 0 ? res.totalAplicado : cent(e.valor - excedente)
-      // Roteia por DIREÇÃO: recebimento (A_RECEBER) vs desembolso/baixa (A_PAGAR).
-      lancPernas = obr.direcao === 'A_PAGAR'
-        ? lancPagamentoPagavel({ valorQuitado: quitado, tarifa: cent(e.tarifa ?? 0) })
-        : lancPagamento({ valorQuitado: quitado, tarifa: cent(e.tarifa ?? 0), diferencaCambial: cent(e.diferencaCambial ?? 0) })
+      // A1: pagamento que quita 0 (tudo virou excedente/crédito) NÃO gera lançamento de pagamento
+      // (evita "exige ≥2 pernas"); o crédito já foi registrado acima.
+      if (quitado > 0.005) {
+        // Roteia por DIREÇÃO: recebimento (A_RECEBER) vs desembolso/baixa (A_PAGAR).
+        lancPernas = obr.direcao === 'A_PAGAR'
+          ? lancPagamentoPagavel({ valorQuitado: quitado, tarifa: cent(e.tarifa ?? 0) })
+          : lancPagamento({ valorQuitado: quitado, tarifa: cent(e.tarifa ?? 0), diferencaCambial: cent(e.diferencaCambial ?? 0) })
+      }
     } else if (e.tipo === 'DESCONTO') {
-      lancPernas = lancDesconto(e.valor)
+      // C1: desconto NUNCA abaixa o a receber além do saldo aberto (não deixa saldo negativo).
+      const projD = await tx.saldoProjecao.findUnique({ where: { obrigacaoId: obr.id } })
+      const saldoAberto = Math.max(0, projD ? cent(Number(projD.saldo)) : cent(e.valor))
+      const descAplicavel = Math.min(cent(e.valor), saldoAberto)
+      if (descAplicavel > 0.005) lancPernas = lancDesconto(descAplicavel)
     } else if (e.tipo === 'JUROS' || e.tipo === 'MULTA') {
       lancPernas = lancEncargo(e.valor, e.tipo)
     } else if (e.tipo === 'ESTORNO' && e.estornaOcorrenciaId) {
       const orig = await tx.ledgerEntry.findMany({ where: { obrigacaoId: obr.id, ocorrenciaId: e.estornaOcorrenciaId }, select: { contaContabil: true, direcao: true, valorContabil: true } })
       if (orig.length) {
-        // ESTORNO PARCIAL: escala as pernas revertidas por (valorEstorno / valorOriginal).
-        // Total por padrão (fator 1); nunca apaga/edita o lançamento original.
         const origOc = await tx.ocorrenciaFinanceira.findUnique({ where: { id: e.estornaOcorrenciaId }, select: { valor: true } })
         const origValor = origOc ? cent(Number(origOc.valor)) : 0
+        // C2: NÃO estornar além do que resta estornável (evita reversão em dobro).
+        const estornosPrev = await tx.ocorrenciaFinanceira.aggregate({ where: { estornaId: e.estornaOcorrenciaId, tipo: 'ESTORNO', status: 'PROCESSADA' }, _sum: { valor: true } })
+        const jaEstornado = cent(Number(estornosPrev._sum.valor ?? 0))
         const pedido = cent(e.valor)
+        if (jaEstornado + pedido > origValor + 0.01) {
+          throw new Error(`Pagamento já estornado (${jaEstornado} de ${origValor}); estorno de ${pedido} excede o restante.`)
+        }
+        // ESTORNO PARCIAL: escala as pernas revertidas por (valorEstorno / valorOriginal).
+        // Total por padrão (fator 1); nunca apaga/edita o lançamento original.
         const fator = pedido > 0 && origValor > 0 && pedido < origValor - 0.005 ? pedido / origValor : 1
         lancPernas = lancEstorno(orig.map((o): Perna => ({ conta: o.contaContabil, direcao: o.direcao as Direcao, valor: cent(Number(o.valorContabil) * fator) })))
       }

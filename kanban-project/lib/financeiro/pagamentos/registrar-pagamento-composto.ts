@@ -152,7 +152,20 @@ export async function registrarPagamentoComposto(input: RegistrarPagamentoCompos
   const multa = Math.max(0, cent(aj.multa ?? 0))
   const acrescimo = Math.max(0, cent(aj.acrescimo ?? 0))
   const creditoUtilizado = Math.max(0, cent(aj.creditoUtilizado ?? 0))
+  // M3: forma NEGATIVA é rejeitada explicitamente (não descartada em silêncio).
+  if ((input.formas ?? []).some((f) => cent(f.valor) < 0)) erros.push('Valor de pagamento não pode ser negativo.')
   if (erros.length) return { ...vazio, erros: [...new Set(erros)] }
+
+  // A2/C1: validações que dependem do ESTADO atual (saldo/crédito) — no BACKEND, não confiar no front.
+  const projAtual = await prisma.saldoProjecao.findUnique({ where: { obrigacaoId: obr.id }, select: { saldo: true } })
+  const saldoAtual = projAtual ? cent(Number(projAtual.saldo)) : cent(Number(input.saldoSelecionado ?? 0))
+  if (desconto > saldoAtual + 0.01) return { ...vazio, erros: [`Desconto (${desconto}) não pode exceder o saldo em aberto (${saldoAtual}).`] }
+  if (creditoUtilizado > 0) {
+    const obrsProc = obr.processoId != null ? (await prisma.obrigacaoEconomica.findMany({ where: { processoId: obr.processoId }, select: { id: true } })).map((o) => o.id) : [obr.id]
+    const credAgg = await prisma.creditoFinanceiro.aggregate({ where: { status: 'ABERTO', obrigacaoId: { in: obrsProc.length ? obrsProc : [obr.id] } }, _sum: { valor: true } })
+    const dispCred = cent(Number(credAgg._sum.valor ?? 0))
+    if (creditoUtilizado > dispCred + 0.01) return { ...vazio, erros: [`Crédito utilizado (${creditoUtilizado}) excede o disponível (${dispCred}).`] }
+  }
 
   // revalidação da FONTE ÚNICA de cálculo — rejeita payload cujos totais não batam
   if (input.totais) {
