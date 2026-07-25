@@ -223,7 +223,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
         const pagadorG = pagadorTipo === "EXTERNO" ? { tipo: "EXTERNO" as const, parteExterna: { nome: ext.nome, documento: ext.documento || null, telefone: ext.telefone || null, observacao: ext.observacao || null } } : { tipo: pagadorTipo, pessoaId: pagadorTipo === "REQUERENTE" ? (pagadorPessoaId || null) : null }
         const r = await fetch(`/api/financeiro/v3/receita/${receitaRef}/registrar-pagamento-geral`, {
           method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-          body: JSON.stringify({ alocacoes: alocacoesGeral.map((a) => ({ obrigacaoId: a.obrigacaoId, valor: a.valor })), formas, ajustes: { desconto, juros, multa, acrescimo, creditoUtilizado }, pagador: pagadorG, observacao: observacao || "[Pagamento geral da Receita]" }),
+          body: JSON.stringify({ alocacoes: alocacoesGeral.map((a) => ({ obrigacaoId: a.obrigacaoId, valor: a.valor })), formas, ajustes: { desconto, juros, multa, acrescimo, creditoUtilizado }, pagador: pagadorG, observacao: observacao || "[Pagamento geral da Receita]", idempotencyKey: idemKey.current }),
         }).then((x) => x.json())
         if (!r?.ok) { setErroSubmit(r?.erro ?? "Falha no pagamento geral."); setEnviando(false); return }
         setOk(true); setTimeout(() => { onDone?.(); onClose() }, 700); return

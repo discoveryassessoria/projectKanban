@@ -18,11 +18,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ref
   if (!Array.isArray(b?.alocacoes) || !Array.isArray(b?.formas)) {
     return NextResponse.json({ ok: false, erro: 'alocacoes e formas são obrigatórios.' }, { status: 400 })
   }
+  // idempotência OBRIGATÓRIA (proteção contra duplo-clique/retry): a mesma chave não duplica.
+  if (typeof b?.idempotencyKey !== 'string' || !b.idempotencyKey) {
+    return NextResponse.json({ ok: false, erro: 'idempotencyKey é obrigatória (proteção contra duplicidade).' }, { status: 400 })
+  }
   const actor = await extrairUsuarioComPermissoes(req)
   try {
     const r = await registrarPagamentoGeral({
       alocacoes: b.alocacoes, formas: b.formas, ajustes: b?.ajustes ?? null, pagador: b?.pagador ?? null,
-      observacao: b?.observacao ?? null, criadoPorId: actor?.userId ?? null,
+      observacao: b?.observacao ?? null, idempotencyKey: b.idempotencyKey, criadoPorId: actor?.userId ?? null,
     })
     if (!r.ok) return NextResponse.json({ ok: false, erro: r.erros[0] ?? 'Falha.', erros: r.erros }, { status: 422 })
     return NextResponse.json({ ...r, ok: true })

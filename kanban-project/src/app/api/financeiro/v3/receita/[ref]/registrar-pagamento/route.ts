@@ -18,6 +18,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ref
   const { ref } = await params
   const b = await req.json().catch(() => ({} as Record<string, unknown>))
 
+  // idempotência OBRIGATÓRIA (proteção contra duplo-clique/retry): a mesma chave não duplica.
+  if (typeof b?.idempotencyKey !== 'string' || !b.idempotencyKey) {
+    return NextResponse.json({ ok: false, erro: 'idempotencyKey é obrigatória (proteção contra duplicidade).' }, { status: 400 })
+  }
+
   let obrigacaoId = Number(b?.obrigacaoId)
   if (!obrigacaoId || Number.isNaN(obrigacaoId)) {
     const rid = await resolverId(ref)

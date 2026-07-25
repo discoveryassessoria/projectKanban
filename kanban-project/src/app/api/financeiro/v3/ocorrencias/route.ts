@@ -23,6 +23,9 @@ export async function POST(req: NextRequest) {
   // (podendo negativar o saldo), contornando o clamp que só existe no ramo DESCONTO.
   const valorNum = Number(b.valor)
   if (!Number.isFinite(valorNum) || valorNum <= 0) return NextResponse.json({ erro: 'valor deve ser um número maior que zero.' }, { status: 400 })
+  // ESTORNO exige idempotencyKey OBRIGATÓRIA (anti duplo-clique/retry concorrente): a mesma
+  // chave retorna o mesmo resultado sem remutar; o motor ainda serializa por FOR UPDATE.
+  if (b.tipo === 'ESTORNO' && !b.idempotencyKey) return NextResponse.json({ erro: 'Estorno exige idempotencyKey (proteção contra duplicidade).' }, { status: 400 })
 
   const actor = await extrairUsuarioComPermissoes(req)
   try {

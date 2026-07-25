@@ -19,6 +19,7 @@ export interface RegistrarPagamentoGeralInput {
   ajustes?: AjustesGerais | null
   pagador?: PagadorEntrada | null
   observacao?: string | null
+  idempotencyKey?: string | null
   criadoPorId?: number | null
 }
 export interface RegistrarPagamentoGeralResultado {
@@ -62,6 +63,9 @@ export async function registrarPagamentoGeral(input: RegistrarPagamentoGeralInpu
       ajustes: { desconto: descS[i], juros: jurosS[i], multa: multaS[i], acrescimo: acrS[i], creditoUtilizado: credS[i] },
       observacao: [input.observacao, '[Pagamento geral da Receita]'].filter(Boolean).join(' '),
       excedenteTratamento: 'CREDITO', saldoSelecionado: a.valor,
+      // idempotência determinística por participante (o composto é atômico/idempotente):
+      // repetir o pagamento geral com a mesma chave não duplica nenhum participante.
+      idempotencyKey: input.idempotencyKey ? `${input.idempotencyKey}:p${a.obrigacaoId}` : null,
       criadoPorId: input.criadoPorId ?? null,
     })
     if (!r.ok) { erros.push(...r.erros); continue }

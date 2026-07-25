@@ -36,13 +36,30 @@ const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
 /** Registra a ocorrência (transacional + idempotente). */
 export async function registrarOcorrencia(e: EntradaOcorrencia) {
+  return prisma.$transaction(async (tx) => registrarOcorrenciaTx(tx, e))
+}
+
+/**
+ * Núcleo transacional da ocorrência — recebe o `tx` para permitir compor VÁRIAS
+ * ocorrências numa ÚNICA transação (ex.: recebimento multi-forma atômico). NÃO abre
+ * transação própria. Idempotente e com exclusão mútua por obrigação (FOR UPDATE).
+ */
+export async function registrarOcorrenciaTx(tx: Prisma.TransactionClient, e: EntradaOcorrencia) {
   const moeda = (e.moeda ?? 'BRL') as any
-  return prisma.$transaction(async (tx) => {
-    // idempotência
-    if (e.idempotencyKey) {
-      const existente = await tx.ocorrenciaFinanceira.findUnique({ where: { idempotencyKey: e.idempotencyKey } })
-      if (existente) return { ocorrenciaId: existente.id, idempotente: true }
+  // MUTEX: lock de linha na obrigação — serializa ocorrências concorrentes na MESMA
+  // obrigação (impede estorno/pagamento duplicado por duplo-clique/retry simultâneo).
+  // Re-lock dentro da mesma transação é no-op. Row-level lock do Postgres.
+  await tx.$queryRaw`SELECT id FROM "ObrigacaoEconomica" WHERE id = ${e.obrigacaoId} FOR UPDATE`
+  // idempotência SOB O LOCK: retry com a mesma key vê a ocorrência já commitada e
+  // retorna o MESMO resultado, sem remutar.
+  if (e.idempotencyKey) {
+    const existente = await tx.ocorrenciaFinanceira.findUnique({ where: { idempotencyKey: e.idempotencyKey } })
+    if (existente) {
+      const projPrev = await tx.saldoProjecao.findUnique({ where: { obrigacaoId: e.obrigacaoId } })
+      return { ocorrenciaId: existente.id, idempotente: true, excedente: 0, saldo: projPrev ? Number(projPrev.saldo) : null }
     }
+  }
+  {
     const obr = await tx.obrigacaoEconomica.findUnique({ where: { id: e.obrigacaoId }, include: { ledger: true } })
     if (!obr || !obr.ledger) throw new Error('Obrigação/Ledger inexistente para a ocorrência.')
 
@@ -103,7 +120,7 @@ export async function registrarOcorrencia(e: EntradaOcorrencia) {
           obrigacaoOrigemId: obr.id, ocorrenciaId: oc.id, pagadorId, pessoaId: e.pagador?.pessoaId ?? null,
           processoId: obr.processoId ?? null, usuarioId: e.criadoPorId ?? null, correlationId: `oc:${oc.id}`,
           observacao: 'Crédito gerado por excedente de pagamento',
-        } }).catch(() => {})
+        } })
       }
       const quitado = res.totalAplicado > 0 ? res.totalAplicado : cent(e.valor - excedente)
       // A1: pagamento que quita 0 (tudo virou excedente/crédito) NÃO gera lançamento de pagamento
@@ -123,22 +140,28 @@ export async function registrarOcorrencia(e: EntradaOcorrencia) {
     } else if (e.tipo === 'JUROS' || e.tipo === 'MULTA') {
       lancPernas = lancEncargo(e.valor, e.tipo)
     } else if (e.tipo === 'ESTORNO' && e.estornaOcorrenciaId) {
+      const origOc = await tx.ocorrenciaFinanceira.findUnique({ where: { id: e.estornaOcorrenciaId }, select: { valor: true } })
+      if (!origOc) throw new Error('Ocorrência a estornar inexistente.')
+      const origValor = cent(Number(origOc.valor))
+      // C2: NÃO estornar além do que resta estornável (evita reversão em dobro). Sob o MUTEX
+      // (FOR UPDATE da obrigação), estornos concorrentes são serializados: o 2º já enxerga o
+      // 1º como PROCESSADA e é corretamente barrado.
+      const estornosPrev = await tx.ocorrenciaFinanceira.aggregate({ where: { estornaId: e.estornaOcorrenciaId, tipo: 'ESTORNO', status: 'PROCESSADA' }, _sum: { valor: true } })
+      const jaEstornado = cent(Number(estornosPrev._sum.valor ?? 0))
+      const pedido = cent(e.valor)
+      if (jaEstornado + pedido > origValor + 0.01) {
+        throw new Error(`Pagamento já estornado (${jaEstornado} de ${origValor}); estorno de ${pedido} excede o restante.`)
+      }
+      // ESTORNO PARCIAL: escala as pernas por (valorEstorno / valorOriginal); total = fator 1.
+      const fator = pedido > 0 && origValor > 0 && pedido < origValor - 0.005 ? pedido / origValor : 1
+      // 1) reverte as pernas do razão (parte QUITADA); nunca apaga/edita o lançamento original
       const orig = await tx.ledgerEntry.findMany({ where: { obrigacaoId: obr.id, ocorrenciaId: e.estornaOcorrenciaId }, select: { contaContabil: true, direcao: true, valorContabil: true } })
       if (orig.length) {
-        const origOc = await tx.ocorrenciaFinanceira.findUnique({ where: { id: e.estornaOcorrenciaId }, select: { valor: true } })
-        const origValor = origOc ? cent(Number(origOc.valor)) : 0
-        // C2: NÃO estornar além do que resta estornável (evita reversão em dobro).
-        const estornosPrev = await tx.ocorrenciaFinanceira.aggregate({ where: { estornaId: e.estornaOcorrenciaId, tipo: 'ESTORNO', status: 'PROCESSADA' }, _sum: { valor: true } })
-        const jaEstornado = cent(Number(estornosPrev._sum.valor ?? 0))
-        const pedido = cent(e.valor)
-        if (jaEstornado + pedido > origValor + 0.01) {
-          throw new Error(`Pagamento já estornado (${jaEstornado} de ${origValor}); estorno de ${pedido} excede o restante.`)
-        }
-        // ESTORNO PARCIAL: escala as pernas revertidas por (valorEstorno / valorOriginal).
-        // Total por padrão (fator 1); nunca apaga/edita o lançamento original.
-        const fator = pedido > 0 && origValor > 0 && pedido < origValor - 0.005 ? pedido / origValor : 1
         lancPernas = lancEstorno(orig.map((o): Perna => ({ conta: o.contaContabil, direcao: o.direcao as Direcao, valor: cent(Number(o.valorContabil) * fator) })))
       }
+      // 2) P0#4: revoga o CRÉDITO de excedente originado por ESTE pagamento (proporcional ao
+      //    estornado). Bloqueia se já consumido (evita benefício duplicado); nunca negativa.
+      await revogarCreditoDeExcedente(tx, e.estornaOcorrenciaId, fator, oc.id, obr.id, e.criadoPorId ?? null)
     }
 
     if (lancPernas) {
@@ -146,13 +169,55 @@ export async function registrarOcorrencia(e: EntradaOcorrencia) {
     }
 
     await tx.ocorrenciaFinanceira.update({ where: { id: oc.id }, data: { status: 'PROCESSADA' } })
+    // Evento de domínio OBRIGATÓRIO dentro da transação (sem best-effort): se falhar,
+    // a mutação financeira inteira faz rollback (nada de estado parcial).
     await tx.domainOutbox.create({ data: {
       tipo: 'financeiro.ocorrencia.processada', aggregateType: 'ObrigacaoEconomica', aggregateId: obr.id,
       payload: { obrigacaoId: obr.id, ocorrenciaId: oc.id, ocorrenciaTipo: e.tipo } as Prisma.InputJsonValue,
       chaveIdempotencia: chaveEvento('financeiro.ocorrencia.processada', oc.id),
-    } }).catch(() => {})
+    } })
 
     const proj = await tx.saldoProjecao.findUnique({ where: { obrigacaoId: obr.id } })
     return { ocorrenciaId: oc.id, idempotente: false, excedente, saldo: proj ? Number(proj.saldo) : null }
-  })
+  }
+}
+
+/**
+ * P0#4 — Revoga o CreditoFinanceiro de excedente originado por um pagamento que está
+ * sendo estornado, proporcional ao fator do estorno. Rastreia origem por
+ * `origemOcorrenciaId`. NUNCA apaga fisicamente: cria CreditoMovimento 'ESTORNO'
+ * (compensação auditável) e reduz o saldo do crédito. Se o crédito já foi consumido
+ * além do revogável, BLOQUEIA o estorno (impede benefício duplicado); nunca deixa saldo
+ * negativo. Preserva histórico e auditoria. Idempotente sob o MUTEX da obrigação.
+ */
+async function revogarCreditoDeExcedente(
+  tx: Prisma.TransactionClient,
+  estornaOcorrenciaId: number,
+  fator: number,
+  estornoOcId: number,
+  obrigacaoId: number,
+  criadoPorId: number | null,
+) {
+  const cred = await tx.creditoFinanceiro.findFirst({ where: { origemOcorrenciaId: estornaOcorrenciaId } })
+  if (!cred) return // pagamento sem excedente → nada a revogar
+  const ger = await tx.creditoMovimento.findFirst({ where: { creditoId: cred.id, tipo: 'GERACAO' }, select: { valor: true } })
+  const gerado = ger ? cent(Number(ger.valor)) : cent(Number(cred.valor))
+  const disponivel = cent(Number(cred.valor)) // coluna decrementada a cada consumo (FIFO)
+  const revogarPedido = cent(gerado * fator)
+  if (revogarPedido <= 0.005) return
+  // Idempotência: se JÁ existe um movimento de ESTORNO deste crédito por esta ocorrência de
+  // estorno, não repete (retry seguro sob a mesma transação/idempotencyKey).
+  const jaRevogado = await tx.creditoMovimento.findFirst({ where: { creditoId: cred.id, tipo: 'ESTORNO', ocorrenciaId: estornoOcId }, select: { id: true } })
+  if (jaRevogado) return
+  if (revogarPedido > disponivel + 0.01) {
+    // crédito consumido além do revogável → estornar geraria benefício duplicado
+    throw new Error(`Estorno bloqueado: o crédito de excedente #${cred.id} originado por este pagamento já foi ${disponivel <= 0.005 ? 'totalmente' : 'parcialmente'} utilizado (disponível ${disponivel} de ${gerado}). Resolva o uso do crédito antes de estornar.`)
+  }
+  const depois = cent(disponivel - revogarPedido)
+  await tx.creditoFinanceiro.update({ where: { id: cred.id }, data: { valor: depois, status: depois <= 0.005 ? 'ESTORNADO' : cred.status } })
+  await tx.creditoMovimento.create({ data: {
+    creditoId: cred.id, tipo: 'ESTORNO', valor: revogarPedido, saldoAnterior: disponivel, saldoPosterior: depois, moeda: cred.moeda,
+    obrigacaoOrigemId: obrigacaoId, ocorrenciaId: estornoOcId, correlationId: `oc:${estornoOcId}`,
+    usuarioId: criadoPorId, observacao: `Crédito revogado por estorno da ocorrência ${estornaOcorrenciaId}`,
+  } })
 }

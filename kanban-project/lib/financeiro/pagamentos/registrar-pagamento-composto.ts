@@ -6,8 +6,9 @@
 // anexa comprovantes e — se pedido — gera a cobrança do saldo. Aditivo e seguro:
 // cada ocorrência é atômica/idempotente; nada é apagado. Ver ocorrencia-service.
 // ============================================================================
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { registrarOcorrencia } from '../ocorrencias/ocorrencia-service'
+import { registrarOcorrenciaTx } from '../ocorrencias/ocorrencia-service'
 import { totaisConsistentes } from '../dominio/calculo-recebimento'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
@@ -94,32 +95,31 @@ function mapExcedente(t?: string | null): 'CREDITO' | 'ADIANTAMENTO' | 'QUITAR_O
   }
 }
 
-/** Marca créditos ABERTOS (da obrigação/pessoa) como UTILIZADO até `valor`. */
-async function consumirCredito(obrigacaoId: number, pessoaId: number | null, valor: number, criadoPorId: number | null, correlationId: string, ocorrenciaId?: number | null, processoId?: number | null) {
+/** Marca créditos ABERTOS (da obrigação/pessoa) como UTILIZADO até `valor`. Usa o `tx`
+ * recebido → parte da MESMA transação atômica do recebimento (sem transação própria,
+ * sem best-effort). FIFO + razão de crédito imutável (saldo anterior→posterior). */
+async function consumirCreditoTx(tx: Prisma.TransactionClient, obrigacaoId: number, pessoaId: number | null, valor: number, criadoPorId: number | null, correlationId: string, ocorrenciaId?: number | null, processoId?: number | null) {
   // Crédito é do PROCESSO/pessoa — não da obrigação-alvo. Busca por obrigações do processo OR pessoa.
-  const obrsProc = processoId != null ? await prisma.obrigacaoEconomica.findMany({ where: { processoId }, select: { id: true } }).then((r) => r.map((o) => o.id)).catch(() => [obrigacaoId]) : [obrigacaoId]
+  const obrsProc = processoId != null ? await tx.obrigacaoEconomica.findMany({ where: { processoId }, select: { id: true } }).then((r) => r.map((o) => o.id)) : [obrigacaoId]
   const ors: Record<string, unknown>[] = [{ obrigacaoId: { in: obrsProc.length ? obrsProc : [obrigacaoId] } }]
   if (pessoaId != null) ors.push({ pessoaId })
   const where = { status: 'ABERTO', OR: ors }
-  // ATÔMICO: consumo FIFO + registro no razão imutável de crédito (saldo anterior→posterior).
-  await prisma.$transaction(async (tx) => {
-    let restante = cent(valor)
-    const creditos = await tx.creditoFinanceiro.findMany({ where, orderBy: { criadoEm: 'asc' } })
-    for (const c of creditos) {
-      if (restante <= 0.005) break
-      const antes = cent(Number(c.valor))
-      const usar = Math.min(antes, restante)
-      const depois = cent(antes - usar)
-      if (depois <= 0.005) await tx.creditoFinanceiro.update({ where: { id: c.id }, data: { valor: 0, status: 'UTILIZADO', aprovadoPorId: criadoPorId } })
-      else await tx.creditoFinanceiro.update({ where: { id: c.id }, data: { valor: depois } })
-      await tx.creditoMovimento.create({ data: {
-        creditoId: c.id, tipo: 'UTILIZACAO', valor: usar, saldoAnterior: antes, saldoPosterior: depois, moeda: (c.moeda as never),
-        obrigacaoDestinoId: obrigacaoId, ocorrenciaId: ocorrenciaId ?? null, pessoaId, processoId: processoId ?? null,
-        usuarioId: criadoPorId, correlationId: cut(correlationId, 80), observacao: 'Crédito utilizado em recebimento',
-      } }).catch(() => {})
-      restante = cent(restante - usar)
-    }
-  }).catch(() => {})
+  let restante = cent(valor)
+  const creditos = await tx.creditoFinanceiro.findMany({ where, orderBy: { criadoEm: 'asc' } })
+  for (const c of creditos) {
+    if (restante <= 0.005) break
+    const antes = cent(Number(c.valor))
+    const usar = Math.min(antes, restante)
+    const depois = cent(antes - usar)
+    if (depois <= 0.005) await tx.creditoFinanceiro.update({ where: { id: c.id }, data: { valor: 0, status: 'UTILIZADO', aprovadoPorId: criadoPorId } })
+    else await tx.creditoFinanceiro.update({ where: { id: c.id }, data: { valor: depois } })
+    await tx.creditoMovimento.create({ data: {
+      creditoId: c.id, tipo: 'UTILIZACAO', valor: usar, saldoAnterior: antes, saldoPosterior: depois, moeda: (c.moeda as never),
+      obrigacaoDestinoId: obrigacaoId, ocorrenciaId: ocorrenciaId ?? null, pessoaId, processoId: processoId ?? null,
+      usuarioId: criadoPorId, correlationId: cut(correlationId, 80), observacao: 'Crédito utilizado em recebimento',
+    } })
+    restante = cent(restante - usar)
+  }
 }
 
 export async function registrarPagamentoComposto(input: RegistrarPagamentoCompostoInput): Promise<RegistrarPagamentoCompostoResultado> {
@@ -186,109 +186,113 @@ export async function registrarPagamentoComposto(input: RegistrarPagamentoCompos
   const excedenteDestino = mapExcedente(input.excedenteTratamento)
   const obsBase = input.observacao ?? null
 
-  let ocorrenciasCriadas = 0
-  let excedente = 0
+  // ── TRANSAÇÃO ÚNICA (P0#2/#3): formas + ajustes + crédito + comprovantes + cobrança de
+  //    saldo + timeline confirmam JUNTAS ou fazem ROLLBACK integral. Sem estado parcial.
+  //    Cada registrarOcorrenciaTx re-usa o mesmo tx (o FOR UPDATE da obrigação é no-op na
+  //    mesma tx). Retry com a mesma idempotencyKey é seguro (ocorrências são idempotentes).
+  const res = await prisma.$transaction(async (tx) => {
+    let ocorrenciasCriadas = 0
+    let excedente = 0
 
-  // ── 1) ajustes primeiro (mudam o saldo antes do pagamento) ──────────────
-  const ajustes: { tipo: 'DESCONTO' | 'JUROS' | 'MULTA'; valor: number; rot: string }[] = []
-  if (desconto > 0) ajustes.push({ tipo: 'DESCONTO', valor: desconto, rot: 'Desconto' })
-  if (juros > 0) ajustes.push({ tipo: 'JUROS', valor: juros, rot: 'Juros' })
-  if (multa > 0) ajustes.push({ tipo: 'MULTA', valor: multa, rot: 'Multa' })
-  if (acrescimo > 0) ajustes.push({ tipo: 'JUROS', valor: acrescimo, rot: 'Acréscimo' })
-  for (let i = 0; i < ajustes.length; i++) {
-    const a = ajustes[i]
-    await registrarOcorrencia({ obrigacaoId: obr.id, tipo: a.tipo, valor: a.valor, moeda, observacao: a.rot, idempotencyKey: `${correlacaoId}:aj:${i}`, criadoPorId })
-    ocorrenciasCriadas++
-  }
-
-  // ── 2) crédito utilizado (pagamento financiado por crédito) ─────────────
-  if (creditoUtilizado > 0) {
-    const rc = await registrarOcorrencia({ obrigacaoId: obr.id, tipo: 'PAGAMENTO', valor: creditoUtilizado, moeda, origemRecurso: 'CREDITO', pagador, aplicacao: { politica }, observacao: 'Crédito utilizado', idempotencyKey: `${correlacaoId}:cred`, criadoPorId }) as OcResp
-    ocorrenciasCriadas++
-    await consumirCredito(obr.id, pagador && 'pessoaId' in pagador ? pagador.pessoaId ?? null : null, creditoUtilizado, criadoPorId, correlacaoId, rc?.ocorrenciaId ?? null, obr.processoId ?? null)
-  }
-
-  // ── 3) linhas de pagamento (uma ocorrência por forma) ───────────────────
-  for (let i = 0; i < formas.length; i++) {
-    const f = formas[i]
-    const ultima = i === formas.length - 1
-    const tarifa = Math.max(0, cent(f.tarifa ?? 0))
-    // Seleção MANUAL com múltiplas formas: escala a alocação por parcela pela fração desta forma
-    // (mantém Σ por forma = valor da forma e Σ por parcela = alocação pedida).
-    const fracao = totalRecebido > 0 ? cent(f.valor) / totalRecebido : 0
-    const manualLinha = politica === 'MANUAL' && Array.isArray(input.aplicacao?.manual)
-      ? input.aplicacao!.manual!.map((m) => ({ parcelaId: m.parcelaId, valor: cent(m.valor * fracao) })).filter((m) => m.valor > 0)
-      : undefined
-    const r = (await registrarOcorrencia({
-      obrigacaoId: obr.id, tipo: 'PAGAMENTO', valor: cent(f.valor), moeda,
-      data: f.dataRecebimento ? new Date(f.dataRecebimento) : undefined,
-      formaPagamentoId: f.formaPagamentoId ?? null,
-      origemRecurso: cut(f.origemRecurso, 20),
-      pagador, aplicacao: { politica, manual: manualLinha },
-      excedenteDestino: ultima ? excedenteDestino : null,
-      tarifa: tarifa > 0 ? tarifa : null,
-      observacao: obsBase, idempotencyKey: `${correlacaoId}:forma:${i}`, criadoPorId,
-    })) as OcResp
-    ocorrenciasCriadas++
-    if (r && r.idempotente !== true && typeof r.excedente === 'number') excedente = cent(excedente + r.excedente)
-    // grava os campos de exibição (forma/conta/referência) na ocorrência
-    if (r?.ocorrenciaId) {
-      await prisma.ocorrenciaFinanceira.update({
-        where: { id: r.ocorrenciaId },
-        data: {
-          formaLabel: cut(f.formaLabel, 40),
-          contaBanco: cut(f.contaBanco ?? f.contaLabel, 80),
-          contaAgencia: cut(f.contaAgencia, 20),
-          contaNumero: cut(f.contaNumero, 30),
-          referencia: cut([f.referencia, [f.adquirenteLabel, f.bandeiraLabel].filter(Boolean).join(" "), tarifa > 0 ? `taxa ${brl(tarifa)}` : null].filter(Boolean).join(" · ") || null, 120),
-          correlacaoId: cut(correlacaoId, 60),
-        },
-      }).catch(() => {})
+    // 1) ajustes primeiro (mudam o saldo antes do pagamento)
+    const ajustes: { tipo: 'DESCONTO' | 'JUROS' | 'MULTA'; valor: number; rot: string }[] = []
+    if (desconto > 0) ajustes.push({ tipo: 'DESCONTO', valor: desconto, rot: 'Desconto' })
+    if (juros > 0) ajustes.push({ tipo: 'JUROS', valor: juros, rot: 'Juros' })
+    if (multa > 0) ajustes.push({ tipo: 'MULTA', valor: multa, rot: 'Multa' })
+    if (acrescimo > 0) ajustes.push({ tipo: 'JUROS', valor: acrescimo, rot: 'Acréscimo' })
+    for (let i = 0; i < ajustes.length; i++) {
+      const a = ajustes[i]
+      await registrarOcorrenciaTx(tx, { obrigacaoId: obr.id, tipo: a.tipo, valor: a.valor, moeda, observacao: a.rot, idempotencyKey: `${correlacaoId}:aj:${i}`, criadoPorId })
+      ocorrenciasCriadas++
     }
-  }
 
-  // ── 4) comprovantes anexados ────────────────────────────────────────────
-  if (receitaId && input.comprovantes?.length) {
-    for (const c of input.comprovantes) {
-      await prisma.receitaDocumento.create({ data: {
-        receitaId, obrigacaoId: obr.id, arquivoUrl: cut(c.arquivoUrl, 400)!, arquivoNome: cut(c.arquivoNome, 200)!,
-        tipo: 'comprovante', tamanho: c.tamanho ?? null, criadoPorId,
-      } }).catch(() => {})
+    // 2) crédito utilizado (pagamento financiado por crédito)
+    if (creditoUtilizado > 0) {
+      const rc = await registrarOcorrenciaTx(tx, { obrigacaoId: obr.id, tipo: 'PAGAMENTO', valor: creditoUtilizado, moeda, origemRecurso: 'CREDITO', pagador, aplicacao: { politica }, observacao: 'Crédito utilizado', idempotencyKey: `${correlacaoId}:cred`, criadoPorId }) as OcResp
+      ocorrenciasCriadas++
+      await consumirCreditoTx(tx, obr.id, pagador && 'pessoaId' in pagador ? pagador.pessoaId ?? null : null, creditoUtilizado, criadoPorId, correlacaoId, rc?.ocorrenciaId ?? null, obr.processoId ?? null)
     }
-  }
 
-  // ── 5) saldo restante (projeção recomputada pelo motor) ─────────────────
-  const proj = await prisma.saldoProjecao.findUnique({ where: { obrigacaoId: obr.id }, select: { saldo: true } })
-  const saldoRestante = proj ? Math.max(0, cent(Number(proj.saldo))) : 0
+    // 3) linhas de pagamento (uma ocorrência por forma)
+    for (let i = 0; i < formas.length; i++) {
+      const f = formas[i]
+      const ultima = i === formas.length - 1
+      const tarifa = Math.max(0, cent(f.tarifa ?? 0))
+      const fracao = totalRecebido > 0 ? cent(f.valor) / totalRecebido : 0
+      const manualLinha = politica === 'MANUAL' && Array.isArray(input.aplicacao?.manual)
+        ? input.aplicacao!.manual!.map((m) => ({ parcelaId: m.parcelaId, valor: cent(m.valor * fracao) })).filter((m) => m.valor > 0)
+        : undefined
+      const r = (await registrarOcorrenciaTx(tx, {
+        obrigacaoId: obr.id, tipo: 'PAGAMENTO', valor: cent(f.valor), moeda,
+        data: f.dataRecebimento ? new Date(f.dataRecebimento) : undefined,
+        formaPagamentoId: f.formaPagamentoId ?? null,
+        origemRecurso: cut(f.origemRecurso, 20),
+        pagador, aplicacao: { politica, manual: manualLinha },
+        excedenteDestino: ultima ? excedenteDestino : null,
+        tarifa: tarifa > 0 ? tarifa : null,
+        observacao: obsBase, idempotencyKey: `${correlacaoId}:forma:${i}`, criadoPorId,
+      })) as OcResp
+      ocorrenciasCriadas++
+      if (r && r.idempotente !== true && typeof r.excedente === 'number') excedente = cent(excedente + r.excedente)
+      // grava os campos de exibição (forma/conta/referência) na ocorrência — mesma tx
+      if (r?.ocorrenciaId) {
+        await tx.ocorrenciaFinanceira.update({
+          where: { id: r.ocorrenciaId },
+          data: {
+            formaLabel: cut(f.formaLabel, 40),
+            contaBanco: cut(f.contaBanco ?? f.contaLabel, 80),
+            contaAgencia: cut(f.contaAgencia, 20),
+            contaNumero: cut(f.contaNumero, 30),
+            referencia: cut([f.referencia, [f.adquirenteLabel, f.bandeiraLabel].filter(Boolean).join(" "), tarifa > 0 ? `taxa ${brl(tarifa)}` : null].filter(Boolean).join(" · ") || null, 120),
+            correlacaoId: cut(correlacaoId, 60),
+          },
+        })
+      }
+    }
 
-  // ── 6) tratamento do saldo parcial ──────────────────────────────────────
-  let cobrancaGeradaId: number | null = null
-  if (saldoRestante > 0.005 && input.parcialTratamento === 'GERAR_COBRANCA' && receitaId && obr.processoId) {
-    const nova = await prisma.cobranca.create({ data: {
-      receitaId, processoId: obr.processoId, valorTotal: saldoRestante, moeda: moeda as never,
-      status: 'ABERTA', obrigacaoId: obr.id, observacoes: 'Saldo remanescente de recebimento parcial',
-      criadoPorId, idempotencyKey: cut(`${correlacaoId}:saldo`, 80),
-    } }).catch(() => null)
-    if (nova) {
+    // 4) comprovantes anexados
+    if (receitaId && input.comprovantes?.length) {
+      for (const c of input.comprovantes) {
+        await tx.receitaDocumento.create({ data: {
+          receitaId, obrigacaoId: obr.id, arquivoUrl: cut(c.arquivoUrl, 400)!, arquivoNome: cut(c.arquivoNome, 200)!,
+          tipo: 'comprovante', tamanho: c.tamanho ?? null, criadoPorId,
+        } })
+      }
+    }
+
+    // 5) saldo restante (projeção recomputada pelo motor DENTRO da tx)
+    const projPos = await tx.saldoProjecao.findUnique({ where: { obrigacaoId: obr.id }, select: { saldo: true } })
+    const saldoRestante = projPos ? Math.max(0, cent(Number(projPos.saldo))) : 0
+
+    // 6) tratamento do saldo parcial
+    let cobrancaGeradaId: number | null = null
+    if (saldoRestante > 0.005 && input.parcialTratamento === 'GERAR_COBRANCA' && receitaId && obr.processoId) {
+      const nova = await tx.cobranca.create({ data: {
+        receitaId, processoId: obr.processoId, valorTotal: saldoRestante, moeda: moeda as never,
+        status: 'ABERTA', obrigacaoId: obr.id, observacoes: 'Saldo remanescente de recebimento parcial',
+        criadoPorId, idempotencyKey: cut(`${correlacaoId}:saldo`, 80),
+      } })
       cobrancaGeradaId = nova.id
-      await prisma.parcelaFinanceira.create({ data: { cobrancaId: nova.id, numero: 1, vencimento: new Date(), valor: saldoRestante, status: 'PENDENTE' } }).catch(() => {})
+      await tx.parcelaFinanceira.create({ data: { cobrancaId: nova.id, numero: 1, vencimento: new Date(), valor: saldoRestante, status: 'PENDENTE' } })
     }
-  }
 
-  // ── 7) auditoria (timeline da Receita) ──────────────────────────────────
-  if (receitaId) {
-    const partes = [`Recebimento ${brl(totalRecebido)} em ${formas.length} forma(s)`]
-    if (desconto || juros || multa || acrescimo) partes.push(`ajustes: ${[desconto && `desc ${brl(desconto)}`, juros && `juros ${brl(juros)}`, multa && `multa ${brl(multa)}`, acrescimo && `acrésc ${brl(acrescimo)}`].filter(Boolean).join(', ')}`)
-    if (creditoUtilizado) partes.push(`crédito usado ${brl(creditoUtilizado)}`)
-    if (excedente > 0.005) partes.push(`excedente ${brl(excedente)} → ${excedenteDestino}`)
-    if (cobrancaGeradaId) partes.push(`cobrança de saldo #${cobrancaGeradaId} gerada`)
-    partes.push(`saldo restante ${brl(saldoRestante)}`)
-    await prisma.eventoFinanceiro.create({ data: { receitaId, tipo: 'PAGAMENTO', descricao: partes.join(' · ').slice(0, 480) } }).catch(() => {})
-  }
+    // 7) auditoria (timeline da Receita) — OBRIGATÓRIA na MESMA transação (P0#3, sem best-effort)
+    if (receitaId) {
+      const partes = [`Recebimento ${brl(totalRecebido)} em ${formas.length} forma(s)`]
+      if (desconto || juros || multa || acrescimo) partes.push(`ajustes: ${[desconto && `desc ${brl(desconto)}`, juros && `juros ${brl(juros)}`, multa && `multa ${brl(multa)}`, acrescimo && `acrésc ${brl(acrescimo)}`].filter(Boolean).join(', ')}`)
+      if (creditoUtilizado) partes.push(`crédito usado ${brl(creditoUtilizado)}`)
+      if (excedente > 0.005) partes.push(`excedente ${brl(excedente)} → ${excedenteDestino}`)
+      if (cobrancaGeradaId) partes.push(`cobrança de saldo #${cobrancaGeradaId} gerada`)
+      partes.push(`saldo restante ${brl(saldoRestante)}`)
+      await tx.eventoFinanceiro.create({ data: { receitaId, tipo: 'PAGAMENTO', descricao: partes.join(' · ').slice(0, 480) } })
+    }
+
+    return { ocorrenciasCriadas, excedente: cent(excedente), saldoRestante, cobrancaGeradaId }
+  }, { timeout: 20000, maxWait: 10000 })
 
   return {
-    ok: true, erros: [], ocorrenciasCriadas, totalRecebido,
+    ok: true, erros: [], ocorrenciasCriadas: res.ocorrenciasCriadas, totalRecebido,
     ajustesAplicados: { desconto, juros, multa, acrescimo, creditoUtilizado },
-    excedente: cent(excedente), saldoRestante, cobrancaGeradaId,
+    excedente: res.excedente, saldoRestante: res.saldoRestante, cobrancaGeradaId: res.cobrancaGeradaId,
   }
 }
