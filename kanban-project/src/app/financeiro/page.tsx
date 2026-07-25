@@ -16,6 +16,7 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { Loader2, FileText } from "lucide-react"
 import dynamic from "next/dynamic"
 import { DashboardCorporativo, OURO, type DashboardData } from "@/src/components/financeiro/dashboard-corporativo"
+import { CentralFinanceira } from "@/src/components/financeiro/CentralFinanceira"
 
 const TesourariaTab = dynamic(() => import("@/src/components/financeiroComponents/TesourariaTab"), {
   ssr: false,
@@ -64,6 +65,7 @@ const AuditoriaTab = dynamic(() => import("@/src/components/financeiroComponents
 // `avancada` = área sem dado real consolidado ainda → escondida da barra para não poluir.
 // Reative removendo o flag quando a área tiver dado de verdade.
 const TABS = [
+  { key: "central", label: "Central" },
   { key: "dashboard", label: "Dashboard" },
   { key: "tesouraria", label: "Tesouraria" },
   { key: "receber", label: "A Receber" },
@@ -87,7 +89,7 @@ export default function FinanceiroPage() {
   const { pode, carregando } = usePermissoes()
   const [mounted, setMounted] = useState(false)
   const [user, setUser] = useState<any>({ nome: "Usuário" })
-  const [tab, setTab] = useState<TabKey>("dashboard")
+  const [tab, setTab] = useState<TabKey>("central")
   const [processos, setProcessos] = useState<any[]>([])
   const [arvores, setArvores] = useState<any[]>([])
   const [dash, setDash] = useState<DashboardData | null>(null)
@@ -175,7 +177,9 @@ export default function FinanceiroPage() {
             <div className="h-px bg-white/10 w-full" />
           </div>
 
-          {tab === "dashboard" ? (
+          {tab === "central" ? (
+            <CentralFinanceira onIrPara={(t) => setTab(t as TabKey)} />
+          ) : tab === "dashboard" ? (
             loading || !dash
               ? <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
               : <DashboardCorporativo
