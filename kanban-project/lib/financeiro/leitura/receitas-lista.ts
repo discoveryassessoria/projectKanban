@@ -282,13 +282,13 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
       return cot ? Number(pc.valor) * cot : Number(pc.valor)
     }
 
-    // recebido em BRL — soma das parcelas quitadas; sem parcelas, converte o recebido do ledger.
-    let recebidoBrl: number
-    if (pcs.length > 0) {
-      recebidoBrl = cent(pcs.filter((pc) => pc.status === 'RECEBIDA' || pc.status === 'PAGA').reduce((s, pc) => s + parcelaBrl(pc), 0))
-    } else {
-      recebidoBrl = moedaBase === 'BRL' ? cent(recebido) : cent(recebido * (cot ?? 1))
-    }
+    // recebido em BRL — FONTE ÚNICA = Ledger (recebido do razão); quando o razão tem
+    // movimento ele manda (o motor V3 não vira ParcelaFinanceira.status). Parcelas quitadas
+    // só cobrem legado sem lançamento no razão. Idêntico ao detalhe (computeCambioAging).
+    const taxaEfetiva = valorBase > 0 ? contratadoBrl / valorBase : (cot ?? 1)
+    const recebidoLedgerBrl = moedaBase === 'BRL' ? cent(recebido) : cent(recebido * taxaEfetiva)
+    const recebidoParcelaBrl = cent(pcs.filter((pc) => pc.status === 'RECEBIDA' || pc.status === 'PAGA').reduce((s, pc) => s + parcelaBrl(pc), 0))
+    const recebidoBrl = recebido > 0.005 ? recebidoLedgerBrl : recebidoParcelaBrl
     // saldo em BRL DERIVADO (garante contratado = recebido + saldo)
     const saldoBrl = cent(contratadoBrl - recebidoBrl)
 
@@ -311,7 +311,20 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
 
     const overdueUnico = venc ? new Date(venc).getTime() < agora : false
     const parcelasTot = pcs.length > 0 ? pcs.length : 1
-    const parcelasRecebidas = pcs.length > 0 ? pcs.filter((pc) => pc.status === 'RECEBIDA' || pc.status === 'PAGA').length : (recebido >= valorBase - 0.005 && valorBase > 0 ? 1 : 0)
+    let parcelasRecebidas: number
+    if (pcs.length > 0) {
+      const porStatus = pcs.filter((pc) => pc.status === 'RECEBIDA' || pc.status === 'PAGA').length
+      if (porStatus > 0) parcelasRecebidas = porStatus
+      else {
+        let resto = recebidoBrl, n = 0
+        for (const pc of [...pcs].sort((a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime())) {
+          const b = parcelaBrl(pc); if (b > 0 && resto >= b - 0.005) { resto = cent(resto - b); n++ } else break
+        }
+        parcelasRecebidas = n
+      }
+    } else {
+      parcelasRecebidas = recebido >= valorBase - 0.005 && valorBase > 0 ? 1 : 0
+    }
     const parcelasAVencer = pcs.length > 0 ? nAV : (saldoBrl > 0.005 && !overdueUnico ? 1 : 0)
     const parcelasVencidas = pcs.length > 0 ? nVenc : (saldoBrl > 0.005 && overdueUnico ? 1 : 0)
     const proximoVenc = open.length > 0

@@ -103,7 +103,7 @@ function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
       <div className="flex items-start justify-between gap-3">
         <div><h2 className="text-lg font-semibold text-white">Custos</h2><p className="text-sm text-white/45">Despesas e custos do processo</p></div>
         <div className="flex items-center gap-2">
-          <button className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#1b2027] px-3.5 py-2 text-sm text-white/80 hover:bg-[#252c35]"><Layers className="h-4 w-4" /> Fases aplicadas</button>
+          <button disabled title="Visão por fases aplicadas indisponível nesta tela" className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#1b2027] px-3.5 py-2 text-sm text-white/80 hover:bg-[#252c35] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#1b2027]"><Layers className="h-4 w-4" /> Fases aplicadas</button>
           <button onClick={() => setNovo(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-medium text-[#1b1508] hover:bg-[#e0b957]"><Plus className="h-4 w-4" /> Novo Custo</button>
         </div>
       </div>
@@ -145,7 +145,7 @@ function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
             })}{lista.length === 0 && <tr><td colSpan={9} className="px-5 py-8 text-center text-white/40">Nenhum custo neste processo.</td></tr>}</tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between px-5 py-4 text-sm text-white/40"><span>Mostrando {lista.length} de {lista.length} registro{lista.length === 1 ? "" : "s"}</span><div className="flex items-center gap-1"><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded border border-[#d2a948]/40 bg-[#d2a948]/12 px-2.5 py-1 text-xs text-[#d2a948]">1</span><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronRight className="h-4 w-4" /></button></div></div>
+        <div className="flex items-center justify-between px-5 py-4 text-sm text-white/40"><span>Mostrando {lista.length} de {lista.length} registro{lista.length === 1 ? "" : "s"}</span><div className="flex items-center gap-1"><button disabled title="Página única" className="rounded border border-white/10 p-1.5 text-white/40 disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded border border-[#d2a948]/40 bg-[#d2a948]/12 px-2.5 py-1 text-xs text-[#d2a948]">1</span><button disabled title="Página única" className="rounded border border-white/10 p-1.5 text-white/40 disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div></div>
       </div>
       {novo && <LancamentoManualModal natureza="CUSTO" processoId={processoId} onClose={() => setNovo(false)} onCriado={() => { setNovo(false); carregar() }} />}
       {pagar && <RegistrarPagamentoModal obrigacaoId={pagar.obrigacaoId} moeda={pagar.moeda} saldo={pagar.saldo} natureza="CUSTO" onClose={() => setPagar(null)} onDone={() => { setPagar(null); carregar() }} />}

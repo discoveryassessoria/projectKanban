@@ -121,13 +121,14 @@ export function computeCambioAging(input: {
     return cot ? Number(pc.valor) * cot : Number(pc.valor)
   }
 
-  // recebido em BRL — parcelas quitadas; sem parcelas, converte o recebido do ledger.
-  let recebidoBrl: number
-  if (pcs.length > 0) {
-    recebidoBrl = cent(pcs.filter((pc) => pc.status === 'RECEBIDA' || pc.status === 'PAGA').reduce((s, pc) => s + parcelaBrl(pc), 0))
-  } else {
-    recebidoBrl = moedaBase === 'BRL' ? cent(input.recebidoLedger) : cent(input.recebidoLedger * (cot ?? 1))
-  }
+  // recebido em BRL — FONTE ÚNICA = Ledger V3 (recebidoLedger, verdade do recebimento).
+  // O motor V3 (registrarOcorrencia) baixa o razão mas NÃO vira ParcelaFinanceira.status;
+  // por isso o razão manda sempre que tem movimento. Parcelas quitadas só cobrem dados
+  // LEGADOS sem lançamento no razão. Taxa efetiva = contratadoBrl/valorBase (precisão total).
+  const taxaEfetiva = valorBase > 0 ? contratadoBrl / valorBase : (cot ?? 1)
+  const recebidoLedgerBrl = moedaBase === 'BRL' ? cent(input.recebidoLedger) : cent(input.recebidoLedger * taxaEfetiva)
+  const recebidoParcelaBrl = cent(pcs.filter((pc) => pc.status === 'RECEBIDA' || pc.status === 'PAGA').reduce((s, pc) => s + parcelaBrl(pc), 0))
+  const recebidoBrl = input.recebidoLedger > 0.005 ? recebidoLedgerBrl : recebidoParcelaBrl
   const saldoBrl = cent(contratadoBrl - recebidoBrl)
 
   // aging: divide o saldoBrl em vencido/a-vencer pela data das parcelas em aberto.
@@ -149,9 +150,22 @@ export function computeCambioAging(input: {
 
   const overdueUnico = venc ? venc.getTime() < agora : false
   const parcelas = pcs.length > 0 ? pcs.length : 1
-  const parcelasRecebidas = pcs.length > 0
-    ? pcs.filter((pc) => pc.status === 'RECEBIDA' || pc.status === 'PAGA').length
-    : (input.recebidoLedger >= valorBase - 0.005 && valorBase > 0 ? 1 : 0)
+  // parcelas recebidas: por status (legado) OU, se o razão pagou sem virar status, por
+  // COBERTURA do recebido sobre as parcelas em ordem de vencimento (consistente c/ o Ledger).
+  let parcelasRecebidas: number
+  if (pcs.length > 0) {
+    const porStatus = pcs.filter((pc) => pc.status === 'RECEBIDA' || pc.status === 'PAGA').length
+    if (porStatus > 0) parcelasRecebidas = porStatus
+    else {
+      let resto = recebidoBrl, n = 0
+      for (const pc of [...pcs].sort((a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime())) {
+        const b = parcelaBrl(pc); if (b > 0 && resto >= b - 0.005) { resto = cent(resto - b); n++ } else break
+      }
+      parcelasRecebidas = n
+    }
+  } else {
+    parcelasRecebidas = input.recebidoLedger >= valorBase - 0.005 && valorBase > 0 ? 1 : 0
+  }
   const parcelasAVencer = pcs.length > 0 ? nAV : (saldoBrl > 0.005 && !overdueUnico ? 1 : 0)
   const parcelasVencidas = pcs.length > 0 ? nVenc : (saldoBrl > 0.005 && overdueUnico ? 1 : 0)
   const proximoVencimento = open.length > 0

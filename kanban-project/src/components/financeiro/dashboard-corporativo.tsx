@@ -107,13 +107,13 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <GlassBtn icon={<BarChart3 className="h-3.5 w-3.5" />}>Comparar</GlassBtn>
-          <GlassBtn icon={<Download className="h-3.5 w-3.5" />}>Exportar</GlassBtn>
+          <GlassBtn icon={<BarChart3 className="h-3.5 w-3.5" />} disabled title="Comparação de períodos indisponível nesta visão">Comparar</GlassBtn>
+          <GlassBtn icon={<Download className="h-3.5 w-3.5" />} disabled title="Exportação indisponível nesta visão">Exportar</GlassBtn>
           <button
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg text-[#1b1508] transition-colors"
+            disabled
+            title="Lançamento financeiro é feito dentro de um processo (Processo › Financeiro)"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg text-[#1b1508] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             style={{ background: OURO }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "#e0b957")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = OURO)}
           >
             <Plus className="h-3.5 w-3.5" /> Novo Lançamento
           </button>
@@ -351,9 +351,9 @@ function FluxoChart({ serie }: { serie: DashboardData["mock"]["serie6meses"] }) 
 // ============================================================
 // SUBCOMPONENTES
 // ============================================================
-function GlassBtn({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+function GlassBtn({ icon, children, onClick, disabled, title }: { icon: React.ReactNode; children: React.ReactNode; onClick?: () => void; disabled?: boolean; title?: string }) {
   return (
-    <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-white/5 border border-white/20 text-white/90 hover:bg-white/10 hover:text-white transition-colors">
+    <button onClick={onClick} disabled={disabled} title={title} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-white/5 border border-white/20 text-white/90 hover:bg-white/10 hover:text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/5">
       {icon}{children}
     </button>
   )

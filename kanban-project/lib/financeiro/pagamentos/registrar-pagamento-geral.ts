@@ -7,6 +7,7 @@
 // crédito, excedente). A soma das alocações tem de bater com a composição.
 // ============================================================================
 import { registrarPagamentoComposto, type FormaLinhaEntrada, type PagadorEntrada } from './registrar-pagamento-composto'
+import { ratearBrlPorBase } from '@/lib/financeiro/dominio/cambio'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
@@ -44,15 +45,21 @@ export async function registrarPagamentoGeral(input: RegistrarPagamentoGeralInpu
   // ao composto de cada um — cada cobrança registra o SEU desconto/juros/multa/acréscimo/crédito
   // (rastreabilidade por cobrança; nunca aplicado silenciosamente a outra). Preview = backend.
   const aj = input.ajustes ?? {}
-  const scale = (v: number | undefined, frac: number) => cent(Math.max(0, Number(v ?? 0)) * frac)
+  // Cada FORMA e cada AJUSTE do nível-Receita é repartido entre participantes por
+  // ratearBrlPorBase (proporcional à alocação, RESÍDUO determinístico no maior): a soma
+  // por forma/ajuste bate EXATAMENTE com o total (sem perder/criar centavos no rateio).
+  const bases = alocacoes.map((a) => cent(a.valor))
+  const formaSplits = formas.map((f) => ratearBrlPorBase(bases, cent(f.valor)))
+  const ajusteSplit = (v: number | undefined) => ratearBrlPorBase(bases, cent(Math.max(0, Number(v ?? 0))))
+  const descS = ajusteSplit(aj.desconto), jurosS = ajusteSplit(aj.juros), multaS = ajusteSplit(aj.multa), acrS = ajusteSplit(aj.acrescimo), credS = ajusteSplit(aj.creditoUtilizado)
   const porParticipante: RegistrarPagamentoGeralResultado['porParticipante'] = []
   const erros: string[] = []
-  for (const a of alocacoes) {
-    const fracao = totalAloc > 0 ? cent(a.valor) / totalAloc : 0
-    const formasEscaladas = formas.map((f) => ({ ...f, valor: cent(f.valor * fracao) }))
+  for (let i = 0; i < alocacoes.length; i++) {
+    const a = alocacoes[i]
+    const formasEscaladas = formas.map((f, fi) => ({ ...f, valor: formaSplits[fi][i] }))
     const r = await registrarPagamentoComposto({
       obrigacaoId: a.obrigacaoId, formas: formasEscaladas, pagador: input.pagador ?? null,
-      ajustes: { desconto: scale(aj.desconto, fracao), juros: scale(aj.juros, fracao), multa: scale(aj.multa, fracao), acrescimo: scale(aj.acrescimo, fracao), creditoUtilizado: scale(aj.creditoUtilizado, fracao) },
+      ajustes: { desconto: descS[i], juros: jurosS[i], multa: multaS[i], acrescimo: acrS[i], creditoUtilizado: credS[i] },
       observacao: [input.observacao, '[Pagamento geral da Receita]'].filter(Boolean).join(' '),
       excedenteTratamento: 'CREDITO', saldoSelecionado: a.valor,
       criadoPorId: input.criadoPorId ?? null,

@@ -18,11 +18,16 @@ export async function POST(req: NextRequest) {
   }
   const b = await req.json().catch(() => ({}))
   if (!b?.obrigacaoId || !b?.tipo || b?.valor == null) return NextResponse.json({ erro: 'obrigacaoId, tipo e valor são obrigatórios.' }, { status: 400 })
+  // sinal: todos os tipos (PAGAMENTO/JUROS/MULTA/DESCONTO/ESTORNO) usam VALOR POSITIVO.
+  // Sem esta guarda, um JUROS/MULTA negativo reduziria o "a receber" arbitrariamente
+  // (podendo negativar o saldo), contornando o clamp que só existe no ramo DESCONTO.
+  const valorNum = Number(b.valor)
+  if (!Number.isFinite(valorNum) || valorNum <= 0) return NextResponse.json({ erro: 'valor deve ser um número maior que zero.' }, { status: 400 })
 
   const actor = await extrairUsuarioComPermissoes(req)
   try {
     const r = await registrarOcorrencia({
-      obrigacaoId: Number(b.obrigacaoId), tipo: b.tipo, valor: Number(b.valor), moeda: b.moeda,
+      obrigacaoId: Number(b.obrigacaoId), tipo: b.tipo, valor: valorNum, moeda: b.moeda,
       data: b.data ? new Date(b.data) : undefined, formaPagamentoId: b.formaPagamentoId ?? null,
       origemRecurso: b.origemRecurso ?? null, pagador: b.pagador ?? null, aplicacao: b.aplicacao ?? null,
       excedenteDestino: b.excedenteDestino ?? null, tarifa: b.tarifa ?? null, diferencaCambial: b.diferencaCambial ?? null,

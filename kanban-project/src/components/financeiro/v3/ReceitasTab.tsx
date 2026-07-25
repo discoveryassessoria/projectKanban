@@ -166,7 +166,7 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
               <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar receita, serviço, participante…" className="w-[260px] rounded-lg border border-white/10 bg-[#12161c] py-1.5 pl-9 pr-3 text-sm text-white/90 outline-none placeholder:text-white/30 focus:border-[#7dd3fc]/50" />
             </div>
-            <button title="Filtros" className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-1.5 text-sm text-white/70 hover:bg-[#20262e]"><SlidersHorizontal className="h-3.5 w-3.5" /> Filtros</button>
+            <button disabled title="Filtros avançados indisponíveis — use a busca ao lado" className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-1.5 text-sm text-white/70 hover:bg-[#20262e] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#12161c]"><SlidersHorizontal className="h-3.5 w-3.5" /> Filtros</button>
             <button onClick={limpar} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-1.5 text-sm text-white/70 hover:bg-[#20262e]"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
           </div>
         </div>

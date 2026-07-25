@@ -485,8 +485,8 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <div className="relative min-w-[180px] flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar pagamentos..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
-              <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><SlidersHorizontal className="h-4 w-4" /> Filtros</button>
-              <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70"><Calendar className="h-4 w-4" /> Período <ChevronDown className="h-3.5 w-3.5" /></button>
+              <button disabled title="Filtro avançado de pagamentos indisponível — use a busca acima" className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70 disabled:cursor-not-allowed disabled:opacity-40"><SlidersHorizontal className="h-4 w-4" /> Filtros</button>
+              <button disabled title="Filtro por período indisponível — use a busca acima" className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70 disabled:cursor-not-allowed disabled:opacity-40"><Calendar className="h-4 w-4" /> Período <ChevronDown className="h-3.5 w-3.5" /></button>
             </div>
             <div className="mt-4 overflow-x-auto">
               <table className="w-full text-sm">
@@ -508,7 +508,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
             </div>
             <div className="mt-4 flex items-center justify-between text-sm text-white/40">
               <span>Mostrando {pagamentosFiltrados.length} de {d.pagamentos.length} pagamentos</span>
-              <div className="flex items-center gap-1"><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded border border-white/15 bg-[#252c35] px-2.5 py-1 text-xs text-white/80">1</span><button className="rounded border border-white/10 p-1.5 text-white/40"><ChevronRight className="h-4 w-4" /></button></div>
+              <div className="flex items-center gap-1"><button disabled title="Página única" className="rounded border border-white/10 p-1.5 text-white/40 disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded border border-white/15 bg-[#252c35] px-2.5 py-1 text-xs text-white/80">1</span><button disabled title="Página única" className="rounded border border-white/10 p-1.5 text-white/40 disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div>
             </div>
           </div>
           )}
