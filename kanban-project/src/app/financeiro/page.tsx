@@ -18,6 +18,7 @@ import dynamic from "next/dynamic"
 import { DashboardCorporativo, OURO, type DashboardData } from "@/src/components/financeiro/dashboard-corporativo"
 import { CentralFinanceira } from "@/src/components/financeiro/CentralFinanceira"
 import { PagamentosView } from "@/src/components/financeiro/PagamentosView"
+import { CreditosView } from "@/src/components/financeiro/CreditosView"
 
 const TesourariaTab = dynamic(() => import("@/src/components/financeiroComponents/TesourariaTab"), {
   ssr: false,
@@ -72,6 +73,7 @@ const TABS = [
   { key: "receber", label: "A Receber" },
   { key: "cobrancas", label: "Cobranças" },
   { key: "pagamentos", label: "Pagamentos" },
+  { key: "creditos", label: "Créditos" },
   { key: "pagar", label: "A Pagar" },
   { key: "fluxo", label: "Fluxo de Caixa" },
   { key: "dre", label: "DRE", avancada: true },
@@ -197,6 +199,8 @@ export default function FinanceiroPage() {
             <CobrancasTab />
           ) : tab === "pagamentos" ? (
             <PagamentosView />
+          ) : tab === "creditos" ? (
+            <CreditosView />
           ) : tab === "pagar" ? (
             <PagarTab />
           ) : tab === "fluxo" ? (
