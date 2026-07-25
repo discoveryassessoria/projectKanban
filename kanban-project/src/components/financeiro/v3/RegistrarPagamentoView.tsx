@@ -70,6 +70,8 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
   const [ajustes, setAjustes] = useState({ desconto: "", juros: "", multa: "", acrescimo: "", creditoUtilizado: "" })
   const [politica, setPolitica] = useState<"NESTA" | "PROXIMAS" | "MAIS_ANTIGA" | "AUTOMATICA" | "MANUAL">("NESTA")
   const [alocManual, setAlocManual] = useState<Record<number, string>>({})
+  const [alocGeralModo, setAlocGeralModo] = useState<"AUTOMATICA" | "MANUAL">("AUTOMATICA")
+  const [alocGeralManual, setAlocGeralManual] = useState<Record<number, string>>({})
   const [parcialTrat, setParcialTrat] = useState<"MANTER" | "GERAR_COBRANCA" | "RENEGOCIAR">("MANTER")
   const [excedenteTrat, setExcedenteTrat] = useState<"CREDITO" | "ABATER_PROXIMAS" | "ADIANTAMENTO" | "DEVOLVER">("CREDITO")
   const [comprovantes, setComprovantes] = useState<{ arquivoUrl: string; arquivoNome: string; tamanho: number }[]>([])
@@ -144,6 +146,21 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
   const parcelasManuais = (det?.parcelasDetalhe ?? []).filter((p: any) => (p.status ?? "").toUpperCase() !== "PAGA")
   const somaManual = Object.values(alocManual).reduce((s, v) => s + num(v), 0)
   const manualInvalido = politica === "MANUAL" && parcelasManuais.length > 0 && Math.abs(somaManual - recebido) >= 0.01
+  // Pagamento GERAL: alocação por participante (automática = proporcional ao saldo / manual)
+  const centR = (v: number) => Math.round((Number(v) || 0) * 100) / 100
+  const ehGeral = escopo?.tipo === "GERAL"
+  const alocacoesGeral = useMemo(() => {
+    if (!ehGeral) return [] as { obrigacaoId: number; nome: string; saldoBrl: number; valor: number }[]
+    const somaSaldo = participantes.reduce((s, p) => s + (p.saldoBrl || 0), 0)
+    return participantes.map((p) => ({
+      obrigacaoId: p.obrigacaoId, nome: p.nome, saldoBrl: p.saldoBrl || 0,
+      valor: alocGeralModo === "AUTOMATICA"
+        ? (somaSaldo > 0 ? centR(recebido * ((p.saldoBrl || 0) / somaSaldo)) : centR(recebido / Math.max(1, participantes.length)))
+        : centR(num(alocGeralManual[p.obrigacaoId])),
+    }))
+  }, [ehGeral, participantes, alocGeralModo, alocGeralManual, recebido])
+  const somaGeral = centR(alocacoesGeral.reduce((s, a) => s + a.valor, 0))
+  const geralInvalido = ehGeral && recebido > 0 && Math.abs(somaGeral - recebido) >= 0.02
 
   const contaPrincipal = useMemo(() => contasOpts.find((c) => c.key === linhas[0]?.contaKey) ?? null, [contasOpts, linhas])
   const pagadorNome = pagadorTipo === "EXTERNO" ? (ext.nome || "Externo") : (participantes.find((p) => p.pessoaId === pagadorPessoaId)?.nome ?? (pagadorTipo === "EMPRESA" ? "Empresa" : pagadorTipo === "TERCEIRO" ? "Terceiro" : "—"))
@@ -161,8 +178,9 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
     if (pagadorTipo === "EXTERNO" && !ext.nome.trim()) p.push("Informe o nome do pagador externo.")
     if (manualInvalido) p.push("Na seleção manual, a soma das alocações deve ser igual ao total informado.")
     if (creditoUtilizado > creditoDisponivel + 0.005) p.push(`Crédito utilizado (${brl(creditoUtilizado)}) excede o disponível (${brl(creditoDisponivel)}).`)
+    if (geralInvalido) p.push("No pagamento geral, a soma das alocações deve ser igual ao total informado.")
     return [...new Set(p)]
-  }, [linhas, pagadorTipo, ext.nome, manualInvalido, creditoUtilizado, creditoDisponivel])
+  }, [linhas, pagadorTipo, ext.nome, manualInvalido, creditoUtilizado, creditoDisponivel, geralInvalido])
   const valido = pendencias.length === 0
 
   // ── ações ─────────────────────────────────────────────────────────────────
@@ -190,6 +208,23 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
   const submit = async () => {
     if (!valido || enviando) return
     setEnviando(true); setErroSubmit(null)
+    // Pagamento GERAL: aplica a alocação por participante (endpoint dedicado)
+    if (ehGeral) {
+      try {
+        const forma1 = formasCad
+        const formas = linhas.filter((l) => num(l.valor) > 0).map((l) => {
+          const forma = forma1.find((f) => f.id === Number(l.formaPagamentoId)); const conta = contasOpts.find((c) => c.key === l.contaKey)
+          return { formaPagamentoId: Number(l.formaPagamentoId) || null, formaLabel: forma?.name ?? null, valor: num(l.valor), contaId: conta?.id ?? null, contaTipo: conta?.tipo ?? null, contaLabel: conta?.label ?? null, contaBanco: conta?.banco ?? null, contaAgencia: conta?.agencia ?? null, contaNumero: conta?.numero ?? null, dataRecebimento: l.dataRec || null, dataCompensacao: l.dataComp || null, referencia: l.referencia || null, origemRecurso: forma ? origemRecurso(forma) : null }
+        })
+        const pagadorG = pagadorTipo === "EXTERNO" ? { tipo: "EXTERNO" as const, parteExterna: { nome: ext.nome, documento: ext.documento || null, telefone: ext.telefone || null, observacao: ext.observacao || null } } : { tipo: pagadorTipo, pessoaId: pagadorTipo === "REQUERENTE" ? (pagadorPessoaId || null) : null }
+        const r = await fetch(`/api/financeiro/v3/receita/${receitaRef}/registrar-pagamento-geral`, {
+          method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ alocacoes: alocacoesGeral.map((a) => ({ obrigacaoId: a.obrigacaoId, valor: a.valor })), formas, pagador: pagadorG, observacao: observacao || "[Pagamento geral da Receita]" }),
+        }).then((x) => x.json())
+        if (!r?.ok) { setErroSubmit(r?.erro ?? "Falha no pagamento geral."); setEnviando(false); return }
+        setOk(true); setTimeout(() => { onDone?.(); onClose() }, 700); return
+      } catch { setErroSubmit("Erro de rede no pagamento geral."); setEnviando(false); return }
+    }
     try {
       const formas = linhas.filter((l) => num(l.valor) > 0).map((l) => {
         const forma = formasCad.find((f) => f.id === Number(l.formaPagamentoId))
@@ -394,7 +429,17 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
               {/* 4. Aplicação do Pagamento */}
               <section className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
                 <h2 className="text-sm font-semibold text-white/80">4. Aplicação do Pagamento</h2>
-                <p className="mb-3 text-xs text-white/45">Defina como este valor será aplicado.</p>
+                <p className="mb-3 text-xs text-white/45">{ehGeral ? "Pagamento geral: aloque o valor entre os participantes (nenhum é assumido)." : "Defina como este valor será aplicado."}</p>
+                {ehGeral ? (
+                  <div className="space-y-3">
+                    <div className="flex gap-2">{(["AUTOMATICA", "MANUAL"] as const).map((mm) => (<button key={mm} onClick={() => setAlocGeralModo(mm)} className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${alocGeralModo === mm ? "border-[#d2a948]/60 bg-[#d2a948]/10 text-[#e0b957]" : "border-white/10 text-white/60 hover:bg-white/5"}`}>{mm === "AUTOMATICA" ? "Distribuição automática" : "Seleção manual"}</button>))}</div>
+                    <div className="space-y-1.5 rounded-lg bg-[#161b21] p-3">
+                      {alocacoesGeral.map((a) => (<div key={a.obrigacaoId} className="flex items-center justify-between gap-2 text-sm"><span className="min-w-0 flex-1 truncate text-white/75">{a.nome} <span className="text-white/40">· saldo {brl(a.saldoBrl)}</span></span>{alocGeralModo === "MANUAL" ? <input inputMode="decimal" value={alocGeralManual[a.obrigacaoId] ?? ""} onChange={(e) => setAlocGeralManual((x) => ({ ...x, [a.obrigacaoId]: e.target.value }))} placeholder="0,00" className="w-28 rounded-lg border border-white/10 bg-[#20262e] px-2.5 py-1.5 text-right text-sm text-white outline-none focus:border-[#2563eb]/60" /> : <span className="text-white/85">{brl(a.valor)}</span>}</div>))}
+                      <div className={`mt-1 flex items-center justify-between border-t border-white/10 pt-1.5 text-xs ${Math.abs(somaGeral - recebido) < 0.02 ? "text-[#4ade80]" : "text-[#f87171]"}`}><span>Alocado</span><span>{brl(somaGeral)} / {brl(recebido)}</span></div>
+                    </div>
+                    <p className="flex items-center gap-1.5 text-[11px] text-white/45"><InfoIcon className="h-3.5 w-3.5" /> Prévia: cada participante recebe a fração acima, aplicada na cobrança dele.</p>
+                  </div>
+                ) : (<>
                 <div className="flex flex-wrap gap-2">
                   {([["NESTA", "Nesta cobrança"], ["PROXIMAS", "Próximas cobranças"], ["MAIS_ANTIGA", "Cobrança mais antiga"], ["AUTOMATICA", "Distribuição automática"], ["MANUAL", "Seleção manual"]] as const).map(([v, lb]) => (
                     <button key={v} onClick={() => setPolitica(v)} className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${politica === v ? "border-[#d2a948]/60 bg-[#d2a948]/10 text-[#e0b957]" : "border-white/10 text-white/60 hover:bg-white/5"}`}>{lb}</button>
@@ -414,6 +459,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
                 ) : (
                   <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-[#161b21] px-3 py-2 text-xs text-white/45"><InfoIcon className="h-3.5 w-3.5" /> {politica === "NESTA" ? "O valor será aplicado prioritariamente nesta cobrança." : politica === "PROXIMAS" ? "O valor será direcionado às próximas cobranças." : politica === "MAIS_ANTIGA" ? "O valor quitará primeiro a cobrança mais antiga em aberto." : "O valor será distribuído proporcionalmente entre as parcelas em aberto."}</p>
                 )}
+                </>)}
               </section>
 
               {/* 5 + 6 */}
