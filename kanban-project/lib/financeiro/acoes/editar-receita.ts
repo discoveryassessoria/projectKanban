@@ -247,15 +247,18 @@ export async function carregarReceitaEditavel(ref: string): Promise<ReceitaEdita
   const valorBaseTotal = cent(g.membros.reduce((s, m) => s + m.valorBase, 0))
   const consolidado = cambioConsolidado(g)
 
-  // pagamentos confirmados (qualquer obrigação do grupo)
-  const pag = await prisma.ocorrenciaFinanceira.count({
-    where: { obrigacaoId: { in: g.membros.map((m) => m.obrigacaoId) }, tipo: { in: ['PAGAMENTO', 'PAGAMENTO_PARCIAL'] }, status: 'PROCESSADA' },
-  })
-  // cobranças ABERTAS = parcelas PENDENTE das Receitas do grupo
+  // "Pagamento confirmado" reflete o RECEBIDO LÍQUIDO (já descontados estornos), não a mera
+  // existência de uma ocorrência PROCESSADA — um pagamento totalmente estornado NÃO confirma.
+  const recebidoTotalBrl = cent(g.membros.reduce((s, m) => s + m.recebidoBrl, 0))
+  // cobranças ABERTAS = parcelas PENDENTE, ligadas por COBRANÇA (cobrancaId) OU receitaId (legado).
   const receitaIds = g.membros.map((m) => m.receitaId).filter((v): v is number => v != null)
-  const cobrancasAbertas = receitaIds.length
-    ? await prisma.parcelaFinanceira.count({ where: { receitaId: { in: receitaIds }, status: 'PENDENTE' } }).catch(() => 0)
-    : 0
+  const cobs = receitaIds.length ? await prisma.cobranca.findMany({ where: { receitaId: { in: receitaIds } }, select: { id: true } }).catch(() => [] as { id: number }[]) : []
+  const cobIds = cobs.map((c) => c.id)
+  const [porCobranca, porReceita] = await Promise.all([
+    cobIds.length ? prisma.parcelaFinanceira.count({ where: { cobrancaId: { in: cobIds }, status: 'PENDENTE' } }).catch(() => 0) : Promise.resolve(0),
+    receitaIds.length ? prisma.parcelaFinanceira.count({ where: { receitaId: { in: receitaIds }, status: 'PENDENTE' } }).catch(() => 0) : Promise.resolve(0),
+  ])
+  const cobrancasAbertas = porCobranca + porReceita
 
   // serviços disponíveis (do processo)
   const servicosDisponiveis = g.processoId != null
@@ -271,9 +274,9 @@ export async function carregarReceitaEditavel(ref: string): Promise<ReceitaEdita
     origem: receitaRep?.origem ?? null, observacoes: receitaRep?.observacoes ?? null,
     moedaBase: g.moeda, valorBaseTotal,
     cambio: { fxRule: consolidado.fxRule, fxEstimado: consolidado.fxEstimado, fxFixo: consolidado.fxFixo, fxData: consolidado.fxData, valorBrlFixo: consolidado.valorBrlFixo, cotacaoEfetiva: consolidado.cotacaoEfetiva },
-    temPagamentoConfirmado: pag > 0,
+    temPagamentoConfirmado: recebidoTotalBrl > 0.005,
     cobrancasAbertas,
-    recebidoTotalBrl: cent(g.membros.reduce((s, m) => s + m.recebidoBrl, 0)),
+    recebidoTotalBrl,
     valorContratadoBrlTotal: consolidado.valorContratadoBrl,
     participantes: g.membros.map((m) => ({ obrigacaoId: m.obrigacaoId, receitaId: m.receitaId, nome: m.nome, valorBase: m.valorBase, recebidoBase: m.recebidoBase, recebidoBrl: m.recebidoBrl })),
     servicosDisponiveis, moedasDisponiveis: ['EUR', 'USD', 'BRL'],
@@ -370,9 +373,7 @@ export async function previaImpactoEdicao(ref: string, patch: EditarReceitaPatch
   const cambioNovo = mesclarCambio(cambioAtual, patch.cambio)
   const mudaCambio = JSON.stringify(cambioAtual) !== JSON.stringify(cambioNovo) || moeda !== g.moeda
 
-  const pag = await prisma.ocorrenciaFinanceira.count({
-    where: { obrigacaoId: { in: g.membros.map((m) => m.obrigacaoId) }, tipo: { in: ['PAGAMENTO', 'PAGAMENTO_PARCIAL'] }, status: 'PROCESSADA' },
-  })
+  const recebidoTotalBrlPrev = cent(g.membros.reduce((s, m) => s + m.recebidoBrl, 0))
 
   const { porObrigacao, bloqueios } = ratear(g, novoTotal)
   const { brl: brlNovoTotal, cotacao: cotNovo } = brlContrato(moeda, novoTotal, cambioNovo, rate(moeda))
@@ -399,7 +400,7 @@ export async function previaImpactoEdicao(ref: string, patch: EditarReceitaPatch
   }
 
   return {
-    ok: bloqueios.length === 0, bloqueios, temPagamentoConfirmado: pag > 0, moedaBase: moeda,
+    ok: bloqueios.length === 0, bloqueios, temPagamentoConfirmado: recebidoTotalBrlPrev > 0.005, moedaBase: moeda,
     mudaValor, mudaCambio,
     valorBaseTotalAntigo: totalAtual, valorBaseTotalNovo: novoTotal,
     cotacaoEfetivaAntiga: cons.cotacaoEfetiva, cotacaoEfetivaNova: novoTotal > 0 ? cent(brlNovoTotal / novoTotal) : cotNovo,

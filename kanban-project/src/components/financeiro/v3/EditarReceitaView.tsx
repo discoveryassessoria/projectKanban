@@ -15,6 +15,7 @@ import { createPortal } from "react-dom"
 import {
   Loader2, CheckCircle2, AlertTriangle, Info as InfoIcon, ShieldCheck, Coins, Receipt, ArrowRight,
 } from "lucide-react"
+import { parseTaxaCambio } from "@/lib/financeiro/dominio/cambio"
 
 const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0)
 const money = (v: number, m: string) => { try { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: m || "BRL" }).format(v || 0) } catch { return `${(v || 0).toFixed(2)} ${m}` } }
@@ -113,8 +114,8 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, onClose, on
     valorBaseTotal: valorBase === "" ? null : cent(num(valorBase)),
     cambio: {
       fxRule,
-      fxFixo: fxFixo === "" ? null : num(fxFixo),
-      fxEstimado: fxEstimado === "" ? null : num(fxEstimado),
+      fxFixo: fxFixo === "" ? null : parseTaxaCambio(fxFixo),
+      fxEstimado: fxEstimado === "" ? null : parseTaxaCambio(fxEstimado),
       fxData: fxData || null,
       valorBrlFixo: valorBrlFixo === "" ? null : num(valorBrlFixo),
     },
@@ -126,8 +127,8 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, onClose, on
     if (moeda !== rec.moedaBase) return true
     if (cent(num(valorBase)) !== cent(rec.valorBaseTotal)) return true
     if (fxRule !== rec.cambio.fxRule) return true
-    if ((fxFixo === "" ? null : num(fxFixo)) !== rec.cambio.fxFixo) return true
-    if ((fxEstimado === "" ? null : num(fxEstimado)) !== rec.cambio.fxEstimado) return true
+    if ((fxFixo === "" ? null : parseTaxaCambio(fxFixo)) !== rec.cambio.fxFixo) return true
+    if ((fxEstimado === "" ? null : parseTaxaCambio(fxEstimado)) !== rec.cambio.fxEstimado) return true
     if ((fxData || null) !== (rec.cambio.fxData ? rec.cambio.fxData.slice(0, 10) : null)) return true
     if ((valorBrlFixo === "" ? null : num(valorBrlFixo)) !== rec.cambio.valorBrlFixo) return true
     return false
