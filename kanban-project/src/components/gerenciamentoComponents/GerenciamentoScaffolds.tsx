@@ -9,6 +9,7 @@
 
 import { useState } from 'react'
 import { Inbox } from 'lucide-react'
+import { AvisoRascunho, TITULO_RASCUNHO, BTN_RASCUNHO } from './_RascunhoUI'
 
 /* ----------------------------- helpers de UI ----------------------------- */
 
@@ -82,7 +83,8 @@ function Table({ headers, empty }: { headers: string[]; empty?: string }) {
 export function TeamsTab() {
   return (
     <div>
-      <Section title="Equipes" action={<button className={BTN_PRIMARY}>+ Nova Equipe</button>} />
+      <AvisoRascunho />
+      <Section title="Equipes" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Nova Equipe</button>} />
       <Table headers={['Equipe', 'Membros', 'Status', 'Ações']} />
     </div>
   )
@@ -92,9 +94,10 @@ export function TeamsTab() {
 export function FinAutomationsTab() {
   return (
     <div>
+      <AvisoRascunho />
       <Section
         title="Automações Financeiras"
-        action={<button className={BTN_PRIMARY}>+ Nova Automação</button>}
+        action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Nova Automação</button>}
       />
       <Table headers={['Nome', 'Gatilho', 'Fase', 'Valor', 'Ação', 'Status', 'Última exec.', 'Ações']} />
     </div>
@@ -105,9 +108,10 @@ export function FinAutomationsTab() {
 export function OpAutomationsTab() {
   return (
     <div>
+      <AvisoRascunho />
       <Section
         title="Automações Operacionais"
-        action={<button className={BTN_PRIMARY}>+ Nova Automação</button>}
+        action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Nova Automação</button>}
       />
       <Table headers={['Nome', 'Gatilho', 'Ação', 'Status', 'Última exec.', 'Ações']} />
     </div>
@@ -118,7 +122,8 @@ export function OpAutomationsTab() {
 export function ProductsTab() {
   return (
     <div>
-      <Section title="Produtos e Serviços" action={<button className={BTN_PRIMARY}>+ Novo Serviço</button>} />
+      <AvisoRascunho />
+      <Section title="Produtos e Serviços" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Novo Serviço</button>} />
       <Table headers={['Código', 'Nome', 'Categoria', 'Nacionalidade', 'Status', 'Ações']} />
     </div>
   )
@@ -129,13 +134,14 @@ const NACIONALIDADES = ['Espanhola', 'Portuguesa', 'Italiana', 'Alemã', 'Judici
 export function ProtocolsTab() {
   return (
     <div>
+      <AvisoRascunho />
       <Section
         title="Regras por Nacionalidade"
         desc="Configuração global de órgãos e regras de protocolo por nacionalidade. A Central de Protocolos consome estas configurações."
       />
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {NACIONALIDADES.map((n) => (
-          <button key={n} className={`${CARD} cursor-pointer p-3 text-left transition hover:border-white/20`}>
+          <button key={n} disabled title={TITULO_RASCUNHO} className={`${CARD} cursor-not-allowed p-3 text-left opacity-60`}>
             <div className="text-sm font-semibold text-white">{n}</div>
             <div className="mt-1 text-[11px] text-white/50">
               Escopo padrão: —<br />
@@ -144,7 +150,7 @@ export function ProtocolsTab() {
           </button>
         ))}
       </div>
-      <Section title="Órgãos" action={<button className={BTN_PRIMARY}>+ Novo Órgão</button>} />
+      <Section title="Órgãos" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Novo Órgão</button>} />
       <Table headers={['Órgão', 'Tipo', 'Nacionalidade', 'Cidade', 'Regra de fila', 'Ações']} />
     </div>
   )
@@ -154,7 +160,8 @@ export function ProtocolsTab() {
 export function SLATab() {
   return (
     <div>
-      <Section title="SLA e Prazos" action={<button className={BTN_PRIMARY}>+ Nova Regra</button>} />
+      <AvisoRascunho />
+      <Section title="SLA e Prazos" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Nova Regra</button>} />
       <Table headers={['Nome', 'Entidade', 'Gatilho', 'Prazo', 'Alertar antes', 'Severidade', 'Ações']} />
     </div>
   )
@@ -164,7 +171,8 @@ export function SLATab() {
 export function TemplatesTab() {
   return (
     <div>
-      <Section title="Modelos" action={<button className={BTN_PRIMARY}>+ Novo Modelo</button>} />
+      <AvisoRascunho />
+      <Section title="Modelos" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Novo Modelo</button>} />
       <Table headers={['Nome', 'Tipo', 'Categoria', 'Variáveis', 'Status', 'Ações']} />
     </div>
   )
@@ -174,7 +182,8 @@ export function TemplatesTab() {
 export function NotificationsTab() {
   return (
     <div>
-      <Section title="Notificações" action={<button className={BTN_PRIMARY}>+ Nova Notificação</button>} />
+      <AvisoRascunho />
+      <Section title="Notificações" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Nova Notificação</button>} />
       <Table headers={['Nome', 'Gatilho', 'Entidade', 'Canais', 'Destinatários', 'Status', 'Ações']} />
     </div>
   )
@@ -184,7 +193,8 @@ export function NotificationsTab() {
 export function AuditTab() {
   return (
     <div>
-      <Section title="Auditoria Global" action={<button className={BTN_GHOST}>Exportar CSV</button>} />
+      <AvisoRascunho />
+      <Section title="Auditoria Global" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>Exportar CSV</button>} />
       <Table headers={['Data', 'Usuário', 'Módulo', 'Entidade', 'Ação', 'Detalhes']} empty="Nenhum registro de auditoria." />
     </div>
   )
@@ -199,12 +209,13 @@ export function ImportExportTab() {
   const [json, setJson] = useState('')
   return (
     <div>
+      <AvisoRascunho />
       <Section title="Importação / Exportação" />
       <div className={`mb-3 ${CARD} p-4`}>
         <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-white/50">Exportar (JSON)</div>
         <div className="flex flex-wrap gap-2">
           {EXPORT_SCOPES.map((s) => (
-            <button key={s} className={BTN_GHOST}>{s}</button>
+            <button key={s} disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>{s}</button>
           ))}
         </div>
       </div>
@@ -218,7 +229,7 @@ export function ImportExportTab() {
           className={`${INPUT} font-mono`}
         />
         <div className="mt-3">
-          <button className={BTN_PRIMARY}>Validar e importar</button>
+          <button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>Validar e importar</button>
         </div>
       </div>
     </div>
@@ -230,7 +241,8 @@ export function BackupTab() {
   const [json, setJson] = useState('')
   return (
     <div>
-      <Section title="Backup / Restauração" action={<button className={BTN_PRIMARY}>Baixar Backup Completo</button>} />
+      <AvisoRascunho />
+      <Section title="Backup / Restauração" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>Baixar Backup Completo</button>} />
       <div className={`mb-3 ${CARD} p-4 text-xs text-white/50`}>
         O backup inclui processos, pessoas, financeiro, protocolos, gerenciamento e configurações. Antes de
         restaurar, um backup automático é criado.
@@ -245,7 +257,7 @@ export function BackupTab() {
           className={`${INPUT} font-mono`}
         />
         <div className="mt-3">
-          <button className={BTN_GHOST}>Validar e restaurar</button>
+          <button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>Validar e restaurar</button>
         </div>
       </div>
       <Section title="Histórico de backups" />
@@ -270,7 +282,8 @@ export function SettingsTab() {
   const set = (k: string, v: any) => setCfg((c) => ({ ...c, [k]: v }))
   return (
     <div>
-      <Section title="Configurações Gerais" action={<button className={BTN_PRIMARY}>Salvar</button>} />
+      <AvisoRascunho />
+      <Section title="Configurações Gerais" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>Salvar</button>} />
       <div className={`${CARD} grid grid-cols-1 gap-3 p-4 sm:grid-cols-2`}>
         <div>
           <label className="mb-1 block text-[11px] text-white/60">Empresa</label>

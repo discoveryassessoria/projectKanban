@@ -3,7 +3,13 @@
  * Cobre a regra do accordion (1 aberto por vez, reclicar fecha, trocar troca) e a
  * 1ª tela padrão de entrada (Processos), sem home de cards.
  */
-import { MANAGEMENT_NAVIGATION, toggleAccordion } from "../src/components/gerenciamentoComponents/managementNavigation"
+import {
+  MANAGEMENT_NAVIGATION,
+  toggleAccordion,
+  itensVisiveisDoModulo,
+  primeiraTelaDoModulo,
+  moduloEhDireto,
+} from "../src/components/gerenciamentoComponents/managementNavigation"
 
 let passed = 0, failed = 0
 const falhas: string[] = []
@@ -32,13 +38,19 @@ ok(toggleAccordion("grp_documentos", "grp_documentos") === null, "5) todos podem
 ok(toggleAccordion(toggleAccordion(null, "grp_pessoas") as string, "grp_pessoas") === null, "abre→fecha o mesmo grupo (ciclo consistente)")
 
 console.log("\nEntrada — 1ª tela padrão (sem home de cards)")
-// O 1º módulo VISÍVEL (mesma lógica do page: !hiddenAsModule + tem item ativo) é Processos
+// O 1º módulo VISÍVEL (mesma lógica do page: !hiddenAsModule + tem item renderizável
+// OU é módulo direto com screen própria) é Visão Geral, na ordem oficial.
 const primeiroVisivel = MANAGEMENT_NAVIGATION
-  .filter((g) => !g.hiddenAsModule && (g.children ?? []).some((c) => c.status === "active"))
+  .filter((g) => !g.hiddenAsModule && (!!g.screen || itensVisiveisDoModulo(g).length > 0))
   .sort((a, b) => a.order - b.order)[0]
-ok(primeiroVisivel?.key === "grp_processos", "1º módulo visível = Processos (entra abrindo Processos)")
-const primeiraTelaProcessos = (primeiroVisivel?.children ?? []).find((c) => c.status === "active")?.key
-ok(!!primeiraTelaProcessos, "Processos tem 1ª tela ativa para abrir na entrada")
+ok(primeiroVisivel?.key === "grp_visao", "1º módulo visível = Visão Geral (ordem oficial)")
+ok(primeiraTelaDoModulo(primeiroVisivel!) === "overview", "Visão Geral abre direto o painel geral (sem submenu)")
+ok(moduloEhDireto(primeiroVisivel!), "Visão Geral não expande (sem seta) — navega direto")
+
+// Todo módulo COM submenu abre em uma 1ª tela útil (defaultRoute)
+const comSubmenu = MANAGEMENT_NAVIGATION.filter((g) => !moduloEhDireto(g) && itensVisiveisDoModulo(g).length > 0)
+ok(comSubmenu.length === 10, "10 módulos com submenu (os 11 oficiais menos Visão Geral)")
+ok(comSubmenu.every((g) => !!primeiraTelaDoModulo(g)), "todo módulo com submenu tem 1ª tela útil para abrir")
 
 console.log(`\n${failed === 0 ? "✅" : "❌"} ACCORDION — ${passed} ok, ${failed} falhas`)
 if (failed > 0) { console.log("Falhas: " + falhas.join("; ")); process.exit(1) }

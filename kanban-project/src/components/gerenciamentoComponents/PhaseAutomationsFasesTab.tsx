@@ -112,7 +112,10 @@ function blankForm(kind: string): Form {
 // ============================================================
 // Componente
 // ============================================================
-export default function PhaseAutomationsFasesTab() {
+// `kindInicial` só escolhe a ABA aberta ao entrar na tela — o módulo Automações
+// tem itens oficiais separados para Financeiras e Eventos e ambos abrem ESTA
+// mesma tela (mesmos dados, mesmas ações, mesma API). Nenhuma regra muda.
+export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?: string }) {
   const [data, setData] = useState<Data | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -120,7 +123,9 @@ export default function PhaseAutomationsFasesTab() {
 
   const [ptId, setPtId] = useState<string>("")
   const [phase, setPhase] = useState<string>("all") // 'all' ou phaseKey
-  const [tab, setTab] = useState<string>("financial")
+  const [tab, setTab] = useState<string>(
+    kindInicial && KIND_TABS.some(([k]) => k === kindInicial) ? kindInicial : "financial",
+  )
   const [showArchived, setShowArchived] = useState(false)
 
   const [applyOpen, setApplyOpen] = useState(false)

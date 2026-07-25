@@ -32,37 +32,37 @@ import dynamic from "next/dynamic"
 import {
   MANAGEMENT_NAVIGATION,
   toggleAccordion,
+  itensAtivosDoModulo as itensAtivos,
+  itensVisiveisDoModulo as itensVisiveis,
+  blocosDoModulo,
+  moduloEhDireto,
+  primeiraTelaDoModulo,
+  moduloDaScreen as grupoDaKey,
   type ManagementNavigationItem,
 } from "@/src/components/gerenciamentoComponents/managementNavigation"
 
-// Lote 1 — 12 telas bespoke
+// Lote 1 — telas bespoke (só as REGISTRADAS no mapa TELAS abaixo)
 import {
-  TeamsTab, ProductsTab, ProtocolsTab,
-  SLATab, TemplatesTab, NotificationsTab, AuditTab, ImportExportTab,
+  TeamsTab, ProtocolsTab,
+  SLATab, TemplatesTab, NotificationsTab, ImportExportTab,
   BackupTab, SettingsTab,
 } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds"
 
-// Lote 2 — Centro do Processo + Diagnóstico Executivo
-import {
-  ProcTypesTab, HealthTab,
-} from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds2"
+// Lote 2 — Diagnóstico Executivo
+import { HealthTab } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds2"
 
-// Lote 3 — Centro do Processo (fases)
-import {
-  PhaseIWFTab, PhaseModesTab,
-} from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds3"
+// Lote 3 — Centro do Processo (fases): telas substituídas pelas versões reais
+// (PhaseWorkflowsFasesTab / ModosInternosFasesTab) — nada a importar aqui.
 
-// Lote 4 — Financeiro + Disparo por Fase + Diagnóstico
-import {
-  FinCatalogTab, HonorariumsTab, PricingRulesTab, PhaseMapTab, DiagnosticsTab,
-} from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds4"
+// Lote 4 — Diagnóstico do Sistema
+import { DiagnosticsTab } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds4"
 
 // Lote 5 — Biblioteca de Modelos: REMOVIDA (legado eliminado).
 
 // Lote 6 — Cadastros do Motor + Saúde do Sistema (telas que faltavam)
 import {
-  ExecMatrixTab, SystemHealthTab, PricingTableTab, RoleCatalogTab,
-  PermProfilesTab, DocMatrixTab, ConfigVersionsTab, ConfigDiagnosisTab,
+  ExecMatrixTab, SystemHealthTab, RoleCatalogTab,
+  DocMatrixTab, ConfigVersionsTab, ConfigDiagnosisTab,
 } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds6"
 
 // ============================================================
@@ -127,6 +127,13 @@ const ExecutorMotorTab = dynamic(() => import("@/src/components/gerenciamentoCom
 // ARQUITETURA NOVA — imports das telas de Tarefa Transversal removidos (telas
 // retiradas da navegação; criavam tarefas nativas, agora do Workflow Interno).
 const PerfisPermissaoMotorTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PerfisPermissaoMotorTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const MigracaoMotorTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MigracaoMotorTab"), { ssr: false, loading: () => <CarregandoTela /> })
+// REESTRUTURAÇÃO 25/07 — telas dedicadas dos cadastros que já tinham API e antes
+// só existiam como modal dentro de Tipos de Processo (países/modalidades) ou como
+// scaffold sem persistência (países). Mesmas rotas, mesmo contrato, mesmas regras.
+const CatalogoFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogoFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const ModalidadesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModalidadesTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const PaisesRegioesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PaisesRegioesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
@@ -164,11 +171,20 @@ const TELAS: Record<string, React.ComponentType> = {
   prottypes: cat("op_prottypes"),
   suppliers: FornecedoresTab,
   departments: DepartamentosTab,
-  countrycatalog: cat("op_country_catalog"),
+  // Países e Regiões: era um scaffold de catálogo sem persistência; agora é a tela
+  // real sobre a MESMA API que o modal "Gerenciar países" já usava. Key preservada.
+  countrycatalog: PaisesRegioesTab,
+  modalidades: ModalidadesTab,
+  // Processos → Estrutura → Fases: cadastro ÚNICO das fases (CatalogoFase).
+  fases: CatalogoFasesTab,
 
   // bespoke (lote 1)
   teams: TeamsTab,
+  // Automações por fase — MESMA tela para os itens oficiais "Financeiras" e
+  // "Eventos" (só muda a aba inicial). `opauto` continua válido como deep-link.
   opauto: PhaseAutomationsFasesTab,
+  autofin: () => <PhaseAutomationsFasesTab kindInicial="financial" />,
+  autoevt: () => <PhaseAutomationsFasesTab kindInicial="event" />,
   protocols: ProtocolsTab,
   sla: SLATab,
   templates: TemplatesTab,
@@ -202,11 +218,14 @@ const TELAS: Record<string, React.ComponentType> = {
   simfase: SimulacaoFaseTab,
   execmotor: ExecutorMotorTab,
   runtimediag: RuntimeWorkflowDiagnostics,
+  migmotor: MigracaoMotorTab,
   diagnostics: DiagnosticsTab,
 
   // bespoke (lote 6) — Cadastros do Motor + Saúde
   rolecat: RoleCatalogTab,
   permprofiles: RolesTab,
+  // Usuários e Acessos → Permissões (perfis de permissão do motor).
+  permmotor: PerfisPermissaoMotorTab,
   pricingtable: TabelaValoresTab,
   docmatrix: MatrizDocumentalTab,
   cfgversions: ConfigVersionsTab,
@@ -230,32 +249,15 @@ function EmBreve({ titulo }: { titulo: string }) {
   )
 }
 
-// ── helpers puros de navegação (derivam tudo da FONTE ÚNICA) ─────────────────
-type Pode = (p: string) => boolean
+// ── helpers de navegação: TODOS derivam da FONTE ÚNICA (managementNavigation).
+// Nenhuma regra de submenu/seção vive neste componente — só renderização.
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
 
-const grupoDaKey = (key: string): ManagementNavigationItem | undefined =>
-  MANAGEMENT_NAVIGATION.find((g) => (g.children ?? []).some((it) => it.key === key))
-
-const itensAtivos = (g: ManagementNavigationItem, pode: Pode): ManagementNavigationItem[] =>
-  (g.children ?? []).filter((it) => it.status === "active" && (!it.permission || pode(it.permission)))
-
-// seções (blocos visuais) na ORDEM em que aparecem no array — reflete a intenção
-// editorial de managementNavigation.tsx (ex.: Financeiro → Configuração, Precificação…).
-interface Secao { nome: string; itens: ManagementNavigationItem[] }
-const secoesDoModulo = (g: ManagementNavigationItem, pode: Pode): Secao[] => {
-  const ordem: string[] = []
-  const mapa = new Map<string, ManagementNavigationItem[]>()
-  for (const it of itensAtivos(g, pode)) {
-    const s = it.section || "Itens"
-    if (!mapa.has(s)) { mapa.set(s, []); ordem.push(s) }
-    mapa.get(s)!.push(it)
-  }
-  return ordem.map((nome) => ({ nome, itens: mapa.get(nome)! }))
-}
-// primeira tela útil do módulo (defaultRoute): 1º item ATIVO na ordem editorial do array.
-const primeiraTelaDoModulo = (g: ManagementNavigationItem, pode: Pode): string | undefined =>
-  itensAtivos(g, pode)[0]?.key
+// ALIASES DE MÓDULO: ?module=<key> antigo → módulo oficial correspondente.
+// "Pessoas e Organizações" virou "Órgãos e Organizações" (mesmo conteúdo);
+// "Automações" voltou a ser módulo próprio (saiu de dentro do Workflow).
+const ALIAS_MODULOS: Record<string, string> = { grp_pessoas: "grp_orgaos" }
+const resolverModulo = (k: string): string => ALIAS_MODULOS[k] || k
 
 interface UserData { nome: string; email?: string; tipo?: string }
 
@@ -266,9 +268,12 @@ export default function GerenciamentoPage() {
   const { pode, carregando: permLoading } = usePermissoes()
   const isAdmin = pode("usuarios.gerenciar")
 
-  // ALIASES: keys antigas → tela real (bookmarks continuam funcionando).
-  // Consolidação: "Tipos de Certidão" foi unificado em "Tipos de Documento".
-  const ALIAS_TELAS: Record<string, string> = { certtypes: "doctypes" }
+  // ALIASES DE TELA: keys antigas → tela real (bookmarks/deep-links continuam
+  // funcionando). NENHUMA rota antiga foi perdida na reestruturação de 25/07:
+  //  • certtypes  → doctypes  (Tipos de Certidão consolidado em Tipos de Documento)
+  //  • opauto     → autofin   (Automações por Fase virou Automações › Financeiras;
+  //                            é a MESMA tela, só muda a aba inicial)
+  const ALIAS_TELAS: Record<string, string> = { certtypes: "doctypes", opauto: "autofin" }
   const resolverTela = useCallback((k: string | null): string => {
     if (!k) return "overview"
     return ALIAS_TELAS[k] || k
@@ -326,12 +331,13 @@ export default function GerenciamentoPage() {
       setActiveModule(g?.key ?? null)
       setExpandedModule(g?.key ?? null)
       setView("screen")
-    } else if (moduleKey && MANAGEMENT_NAVIGATION.some((g) => g.key === moduleKey)) {
+    } else if (moduleKey && MANAGEMENT_NAVIGATION.some((g) => g.key === resolverModulo(moduleKey))) {
       // ?module= legado → abre direto a 1ª tela útil (sem página intermediária de cards).
-      const g = MANAGEMENT_NAVIGATION.find((x) => x.key === moduleKey)!
+      const alvoModulo = resolverModulo(moduleKey)
+      const g = MANAGEMENT_NAVIGATION.find((x) => x.key === alvoModulo)!
       const first = primeiraTelaDoModulo(g, pode)
       if (first) {
-        setActiveScreen(first); setActiveModule(moduleKey); setExpandedModule(moduleKey); setView("screen")
+        setActiveScreen(first); setActiveModule(alvoModulo); setExpandedModule(alvoModulo); setView("screen")
       } else {
         setView("home"); setActiveModule(null); setActiveScreen(null)
       }
@@ -438,12 +444,13 @@ export default function GerenciamentoPage() {
   }
   if (!isAdmin) return null
 
-  // ── módulos visíveis (cards da home): com item ativo, permitidos, não ocultos ─
+  // ── módulos visíveis: os 11 oficiais, na ORDEM OFICIAL (order ascendente).
+  // Entra quem tem item renderizável OU é módulo direto (screen própria, sem submenu).
   const modulosVisiveis = MANAGEMENT_NAVIGATION
     .filter((g) => !g.hiddenAsModule)
     .filter((g) => !g.permission || pode(g.permission))
-    .map((g) => ({ g, itens: itensAtivos(g, pode) }))
-    .filter((m) => m.itens.length > 0)
+    .map((g) => ({ g, itens: itensVisiveis(g, pode) }))
+    .filter((m) => m.itens.length > 0 || !!m.g.screen)
     .sort((x, y) => x.g.order - y.g.order)
 
   // ── busca global (home): módulos + telas ────────────────────────────────────
@@ -451,24 +458,39 @@ export default function GerenciamentoPage() {
   const resultados = q
     ? MANAGEMENT_NAVIGATION
         .filter((g) => !g.permission || pode(g.permission))
-        .flatMap((g) =>
-          itensAtivos(g, pode).map((it) => ({
+        .flatMap((g) => [
+          // módulo SEM submenu (ex.: Visão Geral) também é alcançável pela busca
+          ...(moduloEhDireto(g, pode)
+            ? [{
+                key: g.screen!,
+                label: g.fullLabel || g.label,
+                modulo: g.fullLabel || g.label,
+                secao: "",
+                hay: norm([g.label, g.fullLabel ?? "", g.screen ?? "", ...(g.keywords ?? [])].join(" ")),
+              }]
+            : []),
+          ...itensAtivos(g, pode).map((it) => ({
             key: it.key,
             label: it.label,
             modulo: g.fullLabel || g.label,
             secao: it.section || "",
             hay: norm([it.label, it.fullLabel ?? "", it.key, g.label, g.fullLabel ?? "", it.section ?? "", ...(it.keywords ?? [])].join(" ")),
           })),
-        )
+        ])
         .filter((r) => r.hay.includes(q))
         .slice(0, 40)
     : []
 
   const moduloAtivo = activeModule ? MANAGEMENT_NAVIGATION.find((g) => g.key === activeModule) : undefined
   const TelaAtiva = activeScreen ? TELAS[activeScreen] : undefined
+  const itemAtivo = activeScreen ? moduloAtivo?.children?.find((it) => it.key === activeScreen) : undefined
   const labelTela = activeScreen
-    ? moduloAtivo?.children?.find((it) => it.key === activeScreen)?.label || "Tela"
+    ? itemAtivo?.label
+      ?? (moduloAtivo?.screen === activeScreen ? (moduloAtivo.fullLabel || moduloAtivo.label) : undefined)
+      ?? "Tela"
     : ""
+  // seção (agrupamento interno) da tela ativa — entra no breadcrumb quando existe.
+  const secaoTela = itemAtivo?.section
 
   // classes de superfície — contraste real (fundo semissólido, blur discreto)
   const PANEL = "rounded-2xl border border-white/10 bg-slate-900/75 backdrop-blur-sm"
@@ -654,30 +676,58 @@ export default function GerenciamentoPage() {
                       </button>
                     </div>
 
-                    {/* Árvore: cada MÓDULO é expansível; itens em lista, agrupados por seção */}
+                    {/* Árvore: LISTA VERTICAL de módulos. Módulo com submenu expande
+                        (seta à direita); módulo sem submenu navega direto e NÃO
+                        exibe seta. Agrupamentos internos em caixa alta, itens com
+                        recuo e linha vertical — mesmo padrão visual de sempre. */}
                     <nav aria-label="Módulos do Gerenciamento" className="space-y-0.5">
                       {modulosVisiveis.map(({ g }) => {
                         const Icon = g.icon
-                        const moduloAberto = expandedModule === g.key
+                        const direto = moduloEhDireto(g, pode)
+                        const moduloAberto = !direto && expandedModule === g.key
                         const moduloEhAtivo = activeModule === g.key
-                        const secoesG = secoesDoModulo(g, pode)
-                        const mostrarSecoes = secoesG.length > 1
+                        const blocos = direto ? [] : blocosDoModulo(g, pode)
                         const painelId = `mod-${g.key}`
+                        // item do submenu (ativo ou desabilitado) — mesmo desenho.
+                        const renderItem = (it: ManagementNavigationItem) => {
+                          const ativo = activeScreen === it.key
+                          const indisponivel = it.status !== "active"
+                          return (
+                            <button
+                              key={it.key}
+                              tabIndex={moduloAberto ? undefined : -1}
+                              disabled={indisponivel}
+                              onClick={() => { if (!indisponivel) irParaTela(it.key) }}
+                              title={indisponivel ? (it.note || `${it.label} — ainda sem tela própria.`) : (it.fullLabel || it.label)}
+                              aria-current={ativo ? "page" : undefined}
+                              aria-disabled={indisponivel || undefined}
+                              className={`flex min-h-[38px] w-full items-center gap-2 rounded-lg border-l-2 py-2 pl-3 pr-2.5 text-left text-[13.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+                                ativo
+                                  ? "border-sky-400/80 bg-white/[0.12] font-semibold text-white"
+                                  : indisponivel
+                                    ? "cursor-not-allowed border-transparent text-white/30"
+                                    : "border-transparent text-white/65 hover:bg-white/[0.06] hover:text-white"
+                              }`}
+                            >
+                              <span className="min-w-0 flex-1 truncate">{it.label}</span>
+                            </button>
+                          )
+                        }
                         return (
                           <div key={g.key}>
-                            {/* linha do módulo: título (navega p/ 1ª tela) + chevron (expande) */}
+                            {/* linha do módulo */}
                             <div
                               className={`flex items-stretch rounded-lg transition-colors ${
                                 moduloEhAtivo ? "bg-white/[0.06]" : "hover:bg-white/[0.05]"
                               }`}
                             >
                               <button
-                                onClick={() => toggleModulo(g.key)}
+                                onClick={() => (direto ? irParaModulo(g.key) : toggleModulo(g.key))}
                                 aria-current={moduloEhAtivo ? "true" : undefined}
-                                aria-expanded={moduloAberto}
-                                aria-controls={painelId}
+                                aria-expanded={direto ? undefined : moduloAberto}
+                                aria-controls={direto ? undefined : painelId}
                                 title={g.fullLabel || g.label}
-                                className="flex min-w-0 flex-1 items-center gap-2 rounded-l-lg py-2.5 pl-2.5 pr-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                                className={`flex min-w-0 flex-1 items-center gap-2 rounded-l-lg py-2.5 pl-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${direto ? "rounded-r-lg pr-2.5" : "pr-1"}`}
                               >
                                 {Icon ? (
                                   <Icon className={`h-4 w-4 flex-none ${moduloEhAtivo ? "text-white/85" : "text-white/55"}`} />
@@ -686,56 +736,45 @@ export default function GerenciamentoPage() {
                                   {g.fullLabel || g.label}
                                 </span>
                               </button>
-                              <button
-                                onClick={() => toggleModulo(g.key)}
-                                aria-expanded={moduloAberto}
-                                aria-controls={painelId}
-                                aria-label={moduloAberto ? `Recolher ${g.fullLabel || g.label}` : `Expandir ${g.fullLabel || g.label}`}
-                                className="flex flex-none items-center rounded-r-lg px-2 text-white/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                              >
-                                <ChevronRight className={`h-4 w-4 transition-transform duration-200 motion-reduce:transition-none ${moduloAberto ? "rotate-90" : ""}`} />
-                              </button>
+                              {/* seta SÓ existe quando há submenu */}
+                              {direto ? null : (
+                                <button
+                                  onClick={() => toggleModulo(g.key)}
+                                  aria-expanded={moduloAberto}
+                                  aria-controls={painelId}
+                                  aria-label={moduloAberto ? `Recolher ${g.fullLabel || g.label}` : `Expandir ${g.fullLabel || g.label}`}
+                                  className="flex flex-none items-center rounded-r-lg px-2 text-white/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                                >
+                                  <ChevronRight className={`h-4 w-4 transition-transform duration-200 motion-reduce:transition-none ${moduloAberto ? "rotate-90" : ""}`} />
+                                </button>
+                              )}
                             </div>
 
-                            {/* itens do módulo */}
-                            <div
-                              id={painelId}
-                              aria-hidden={!moduloAberto}
-                              className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${moduloAberto ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
-                            >
-                              <div className="min-h-0 overflow-hidden">
-                                <div className={`ml-[13px] space-y-0.5 border-l border-white/10 pb-1 pl-2 pt-1 transition-opacity duration-200 motion-reduce:transition-none ${moduloAberto ? "opacity-100" : "opacity-0"}`}>
-                                  {secoesG.map((s) => (
-                                    <div key={s.nome}>
-                                      {mostrarSecoes ? (
-                                        <div className="px-2 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-[0.12em] text-white/40">
-                                          {s.nome}
+                            {/* submenu do módulo */}
+                            {direto ? null : (
+                              <div
+                                id={painelId}
+                                aria-hidden={!moduloAberto}
+                                className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${moduloAberto ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+                              >
+                                <div className="min-h-0 overflow-hidden">
+                                  <div className={`ml-[13px] space-y-0.5 border-l border-white/10 pb-1 pl-2 pt-1 transition-opacity duration-200 motion-reduce:transition-none ${moduloAberto ? "opacity-100" : "opacity-0"}`}>
+                                    {blocos.map((b, i) =>
+                                      b.tipo === "item" ? (
+                                        <div key={`i-${b.item.key}-${i}`}>{renderItem(b.item)}</div>
+                                      ) : (
+                                        <div key={`s-${b.nome}-${i}`}>
+                                          <div className="px-2 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-[0.12em] text-white/40">
+                                            {b.nome}
+                                          </div>
+                                          {b.itens.map(renderItem)}
                                         </div>
-                                      ) : null}
-                                      {s.itens.map((it) => {
-                                        const ativo = activeScreen === it.key
-                                        return (
-                                          <button
-                                            key={it.key}
-                                            tabIndex={moduloAberto ? undefined : -1}
-                                            onClick={() => irParaTela(it.key)}
-                                            title={it.fullLabel || it.label}
-                                            aria-current={ativo ? "page" : undefined}
-                                            className={`flex min-h-[38px] w-full items-center gap-2 rounded-lg border-l-2 py-2 pl-3 pr-2.5 text-left text-[13.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
-                                              ativo
-                                                ? "border-sky-400/80 bg-white/[0.12] font-semibold text-white"
-                                                : "border-transparent text-white/65 hover:bg-white/[0.06] hover:text-white"
-                                            }`}
-                                          >
-                                            <span className="min-w-0 flex-1 truncate">{it.label}</span>
-                                          </button>
-                                        )
-                                      })}
-                                    </div>
-                                  ))}
+                                      ),
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
+                            )}
                           </div>
                         )
                       })}
@@ -749,8 +788,14 @@ export default function GerenciamentoPage() {
                 <Breadcrumb
                   trilha={[
                     { label: "Gerenciamento", onClick: irParaHome },
-                    { label: moduloAtivo.fullLabel || moduloAtivo.label, onClick: () => irParaModulo(moduloAtivo.key) },
-                    { label: labelTela },
+                    // módulo sem submenu (Visão Geral) já É a tela — não repete o nome
+                    ...(moduloAtivo.screen === activeScreen
+                      ? [{ label: moduloAtivo.fullLabel || moduloAtivo.label }]
+                      : [
+                          { label: moduloAtivo.fullLabel || moduloAtivo.label, onClick: () => irParaModulo(moduloAtivo.key) },
+                          ...(secaoTela ? [{ label: secaoTela }] : []),
+                          { label: labelTela },
+                        ]),
                   ]}
                 />
 

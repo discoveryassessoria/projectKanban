@@ -10,6 +10,7 @@
 // SCAFFOLD: estrutura/colunas/cards fiéis; dados e CRUD ligados no wiring.
 
 import { useState } from 'react'
+import { AvisoRascunho, TITULO_RASCUNHO, BTN_RASCUNHO } from './_RascunhoUI'
 
 const CARD = 'rounded-xl border border-white/10 bg-white/5 backdrop-blur'
 const BTN_PRIMARY =
@@ -62,11 +63,12 @@ export function FinCatalogTab() {
   const [filtro, setFiltro] = useState('Todos')
   return (
     <div>
+      <AvisoRascunho />
       <div className="mb-3 text-xs text-white/50">
         Itens financeiros mestres usados em honorários, taxas, custos, receitas, propostas, automações e
         lançamentos. <b className="text-white/70">Fonte única</b> — cada código existe uma só vez.
       </div>
-      <Section title="Catálogo Financeiro" action={<button className={BTN_PRIMARY}>+ Novo Item</button>} />
+      <Section title="Catálogo Financeiro" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Novo Item</button>} />
       <div className="mb-3 flex flex-wrap gap-1.5">
         {CAT_FILTERS.map((f) => (
           <button
@@ -91,11 +93,12 @@ export function FinCatalogTab() {
 export function HonorariumsTab() {
   return (
     <div>
+      <AvisoRascunho />
       <div className="mb-3 text-xs text-white/50">
         Visão filtrada do Catálogo Financeiro — apenas itens do tipo <b className="text-white/70">Honorário</b>.
         Valor e fase vêm das Regras de Preço e de Disparo.
       </div>
-      <Section title="Honorários" action={<button className={BTN_PRIMARY}>+ Novo Honorário</button>} />
+      <Section title="Honorários" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Novo Honorário</button>} />
       <Table
         headers={['Código', 'Nome', 'Natureza', 'Moeda', 'Preço base', 'Fase de disparo', 'Automático', 'Ações']}
       />
@@ -107,11 +110,12 @@ export function HonorariumsTab() {
 export function PricingRulesTab() {
   return (
     <div>
+      <AvisoRascunho />
       <div className="mb-3 text-xs text-white/50">
         Quanto custa cada item, para quem e em qual contexto. Não cria item novo — escolhe um do Catálogo
         Financeiro. A proposta do processo tem prioridade sobre estas regras.
       </div>
-      <Section title="Regras de Preço" action={<button className={BTN_PRIMARY}>+ Nova Regra de Preço</button>} />
+      <Section title="Regras de Preço" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Nova Regra de Preço</button>} />
       <Table
         headers={['Item', 'Nome', 'Espécie', 'Nacionalidade', 'Valor', 'Mín / Máx', 'Sobrescreve?', 'Status', 'Ações']}
       />
@@ -151,13 +155,14 @@ function PhaseCard({ nome }: { nome: string }) {
 export function PhaseMapTab() {
   return (
     <div>
+      <AvisoRascunho />
       <div className="mb-3 text-xs text-white/50">
         Regras de disparo por fase — vinculam um item do Catálogo Financeiro a um evento da fase. Não criam
         item duplicado.
       </div>
       <Section
         title="Regras de Disparo por Fase"
-        action={<button className={BTN_PRIMARY}>+ Nova Regra de Disparo</button>}
+        action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Nova Regra de Disparo</button>}
       />
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {FASES.map((f) => <PhaseCard key={f} nome={f} />)}
@@ -179,7 +184,8 @@ function DiagBlock({ title, tone }: { title: string; tone: 'danger' | 'warn' | '
 export function DiagnosticsTab() {
   return (
     <div>
-      <Section title="Diagnóstico do Sistema" action={<button className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/70 transition hover:bg-white/10">Reexecutar</button>} />
+      <AvisoRascunho />
+      <Section title="Diagnóstico do Sistema" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>Reexecutar</button>} />
       <div className={`mb-2.5 ${CARD} p-3.5 text-center`}>
         <div className="text-xl font-extrabold text-green-400">Sistema OK</div>
       </div>

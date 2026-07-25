@@ -1,32 +1,45 @@
 // src/components/gerenciamentoComponents/managementNavigation.tsx
 //
 // CONFIGURAÇÃO CENTRAL E DECLARATIVA da navegação do Gerenciamento.
-// FONTE ÚNICA (módulos, grupos visuais, itens, ordem, ícones, busca, permissão,
-// descrições, status). Alimenta TUDO: cards da home, busca, páginas de módulo,
-// navegação contextual e breadcrumbs. O page.tsx apenas RENDERIZA isto — não
-// hardcoda navegação no JSX e não mantém uma segunda fonte concorrente.
+// FONTE ÚNICA (módulos, agrupamentos internos, itens, ordem, ícones, busca,
+// permissão, descrições, status). Alimenta TUDO: sidebar, busca, breadcrumbs e
+// navegação contextual. O page.tsx apenas RENDERIZA isto — não hardcoda
+// navegação no JSX e não mantém uma segunda fonte concorrente.
 //
-// REGRAS:
-// - `key` é estável e, quando `status:"active"`, é a MESMA screen key do MAPA
-//   DE TELAS (deep-link ?screen=<key> preservado). Nenhuma key existente foi
-//   removida ou renomeada — só reorganizada e enriquecida com metadados visuais.
-// - `status:"active"` = tela existe (aparece no menu/cards). `"coming_soon"` =
-//   mostra desabilitado. `"hidden"` = existe na estrutura oficial mas NÃO
-//   renderiza (sem página falsa).
-// - `section` agrupa os itens ATIVOS de um módulo em blocos visuais na página do
-//   módulo e na navegação contextual (ex.: Financeiro → Configuração / Precificação
-//   / Bancos e moedas / Pagamentos / Fiscal e comercial).
-// - `description` (nos grupos = módulos) é a descrição curta do card e o subtítulo
-//   da página do módulo.
-// - `hiddenAsModule` esconde o grupo da HOME em cards (ex.: Painel/Visão Geral, cuja
-//   função foi substituída pela própria home). A tela continua acessível por URL.
-// - `technicalOnly` (grupo 16) só aparece com permissão técnica.
-// - `permission` é opcional; a página inteira já é gated por usuarios.gerenciar.
+// ARQUITETURA OFICIAL (reestruturação 25/07) — ordem obrigatória dos módulos:
+//   1. Visão Geral   2. Processos   3. Workflow   4. Automações
+//   5. Documentos e Protocolos      6. Serviços   7. Financeiro
+//   8. Órgãos e Organizações        9. Usuários e Acessos
+//  10. Sistema      11. Relatórios e Indicadores
+//
+// REGRAS DE ESTRUTURA
+// - `key` é ESTÁVEL e, quando `status:"active"`, é a MESMA screen key do MAPA DE
+//   TELAS do page.tsx (deep-link ?screen=<key> preservado). NENHUMA key existente
+//   foi removida ou renomeada nesta reestruturação — só reagrupada/renomeada de
+//   RÓTULO. Keys aposentadas viram ALIAS no page.tsx (URL antiga continua válida).
+// - `section` é o AGRUPAMENTO INTERNO (título discreto em caixa alta na sidebar).
+//   Item SEM `section` renderiza direto sob o módulo (sem cabeçalho). A ordem de
+//   renderização é a ORDEM DO ARRAY — seções e itens soltos podem se intercalar.
+// - `status:"active"` = tela existe e navega. `"coming_soon"` = item da estrutura
+//   oficial SEM implementação própria: aparece DESABILITADO com tooltip honesto
+//   (`note`), nunca como página falsa. `"hidden"` = não renderiza (a tela segue
+//   acessível por ?screen=<key> — compatibilidade de URL/bookmark).
+// - Módulo com `screen` e SEM `children` navega DIRETO (sem seta/submenu).
+// - `hiddenAsModule` não é mais usado para esconder módulo algum: todos os 11
+//   módulos oficiais aparecem, na ordem oficial.
+//
+// REGRAS DE DOMÍNIO REFLETIDAS AQUI
+// - Fases são cadastradas EXCLUSIVAMENTE em Processos › Estrutura › Fases.
+//   Workflow apenas REFERENCIA as fases (Fluxos/Transições).
+// - Automações são só financeiras ou de eventos (sem motor paralelo de tarefas).
+// - Serviços nunca guarda preço — preço só na Tabela de Valores (Financeiro).
+// - "Órgãos e Organizações" substitui "Pessoas e Organizações" (entidades
+//   institucionais/jurídicas, não pessoas físicas).
 
 import type { ComponentType } from "react"
 import {
-  LayoutDashboard, GitBranch, Workflow, FileText, DollarSign, Users2,
-  BarChart3, Briefcase,
+  LayoutDashboard, GitBranch, Workflow, Zap, FileText, Briefcase, DollarSign,
+  Building2, Users2, Settings2, BarChart3,
 } from "lucide-react"
 
 export type NavStatus = "active" | "coming_soon" | "hidden"
@@ -34,12 +47,14 @@ export type NavStatus = "active" | "coming_soon" | "hidden"
 export interface ManagementNavigationItem {
   key: string
   label: string
-  /** nome completo p/ tooltip/aria/busca quando o label exibido é encurtado (grupos). */
+  /** nome completo p/ tooltip/aria/busca quando o label exibido é encurtado (módulos). */
   fullLabel?: string
-  /** descrição curta — card da home e subtítulo da página do módulo (usada nos grupos). */
+  /** descrição curta — subtítulo do módulo. */
   description?: string
-  /** bloco visual do item dentro do módulo (página do módulo + nav contextual). */
+  /** agrupamento interno (título em caixa alta). Ausente = item solto sob o módulo. */
   section?: string
+  /** módulo SEM submenu: navega direto para esta screen key. */
+  screen?: string
   href?: string
   icon?: ComponentType<{ className?: string }>
   permission?: string
@@ -49,215 +64,304 @@ export interface ManagementNavigationItem {
   technicalOnly?: boolean
   /** grupo existe, mas NÃO aparece como card na home (tela segue acessível por URL). */
   hiddenAsModule?: boolean
+  /** tooltip honesto do item `coming_soon` (por que ainda não abre / onde vive hoje). */
+  note?: string
   order: number
 }
 
-// Gate do grupo 16 (Motor Técnico): usa EXATAMENTE a mesma regra dos demais
-// módulos administrativos do Gerenciamento — a permissão existente
-// "usuarios.gerenciar", que é o próprio gate da página (isAdmin = pode(
-// "usuarios.gerenciar")). Assim o grupo aparece para o MESMO conjunto de
-// admins que já têm acesso administrativo completo ao Gerenciamento.
-// Nenhuma permissão nova; nenhum papel/auth/backend alterado.
+// Gate de todo o Gerenciamento — a página inteira já é gated por esta permissão.
 export const GESTAO_PERMISSION = "usuarios.gerenciar"
 
-// Accordion da sidebar (regra ÚNICA): 1 grupo aberto por vez, clicar no grupo
+// Accordion da sidebar (regra ÚNICA): 1 módulo aberto por vez, clicar no módulo
 // aberto fecha, clicar em outro troca, todos podem ficar fechados. Puro/testável.
-//   clicar em grupo fechado → abre; clicar no mesmo aberto → fecha; outro → troca.
 export const toggleAccordion = (current: string | null, clicked: string): string | null =>
   current === clicked ? null : clicked
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DERIVAÇÃO DA SIDEBAR (pura e testável) — usada pelo page.tsx e pelos testes.
+// Uma única implementação: não existe segunda regra de submenu em componente.
+// ─────────────────────────────────────────────────────────────────────────────
+export type PodePermissao = (p: string) => boolean
+const permitido = (it: ManagementNavigationItem, pode?: PodePermissao) =>
+  !it.permission || !pode || pode(it.permission)
+
+/** itens que ABREM tela (navegáveis). */
+export const itensAtivosDoModulo = (g: ManagementNavigationItem, pode?: PodePermissao) =>
+  (g.children ?? []).filter((it) => it.status === "active" && permitido(it, pode))
+
+/** itens RENDERIZADOS na sidebar: ativos + `coming_soon` (desabilitados). */
+export const itensVisiveisDoModulo = (g: ManagementNavigationItem, pode?: PodePermissao) =>
+  (g.children ?? []).filter(
+    (it) => (it.status === "active" || it.status === "coming_soon") && permitido(it, pode),
+  )
+
+/** módulo SEM submenu: navega direto, sem seta. */
+export const moduloEhDireto = (g: ManagementNavigationItem, pode?: PodePermissao) =>
+  !!g.screen && itensVisiveisDoModulo(g, pode).length === 0
+
+/** bloco da sidebar: item solto ou agrupamento em caixa alta. */
+export type BlocoNavegacao =
+  | { tipo: "item"; item: ManagementNavigationItem }
+  | { tipo: "secao"; nome: string; itens: ManagementNavigationItem[] }
+
+/** blocos NA ORDEM DO ARRAY — itens soltos e agrupamentos podem se intercalar. */
+export const blocosDoModulo = (g: ManagementNavigationItem, pode?: PodePermissao): BlocoNavegacao[] => {
+  const blocos: BlocoNavegacao[] = []
+  for (const it of itensVisiveisDoModulo(g, pode)) {
+    if (!it.section) { blocos.push({ tipo: "item", item: it }); continue }
+    const ultimo = blocos[blocos.length - 1]
+    if (ultimo && ultimo.tipo === "secao" && ultimo.nome === it.section) ultimo.itens.push(it)
+    else blocos.push({ tipo: "secao", nome: it.section, itens: [it] })
+  }
+  return blocos
+}
+
+/** entradas oficiais do módulo, na ordem: nome do item solto ou do agrupamento. */
+export const entradasOficiais = (g: ManagementNavigationItem, pode?: PodePermissao): string[] =>
+  blocosDoModulo(g, pode).map((b) => (b.tipo === "item" ? b.item.label : b.nome))
+
+/** primeira tela útil do módulo (defaultRoute). */
+export const primeiraTelaDoModulo = (g: ManagementNavigationItem, pode?: PodePermissao): string | undefined =>
+  (moduloEhDireto(g, pode) ? g.screen : undefined) ?? itensAtivosDoModulo(g, pode)[0]?.key ?? g.screen
+
+/** módulo dono de uma screen key (cobre módulo direto). */
+export const moduloDaScreen = (key: string): ManagementNavigationItem | undefined =>
+  MANAGEMENT_NAVIGATION.find((g) => g.screen === key || (g.children ?? []).some((it) => it.key === key))
 
 // item ATIVO: a(order, key, label, keywords?, section?)
 const a = (
   order: number, key: string, label: string, keywords?: string[], section?: string,
 ): ManagementNavigationItem =>
   ({ key, label, keywords, section, status: "active", order })
-// item OCULTO (estrutura oficial, sem tela ainda): não renderiza.
+// item da ESTRUTURA OFICIAL ainda SEM implementação própria: aparece desabilitado
+// com tooltip honesto. Nunca vira página falsa nem botão morto.
+const s = (
+  order: number, key: string, label: string, note: string, section?: string, keywords?: string[],
+): ManagementNavigationItem =>
+  ({ key, label, note, section, keywords, status: "coming_soon", order })
+// item OCULTO (tela existe e continua acessível por ?screen=, fora do menu).
 const h = (order: number, key: string, label: string): ManagementNavigationItem =>
   ({ key, label, status: "hidden", order })
 
 export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
+  // ══════════════════════════════ 1. VISÃO GERAL ══════════════════════════════
+  // Sem submenu: clique navega direto para o painel geral.
   {
-    key: "grp_visao", label: "Painel", fullLabel: "Visão Geral", icon: LayoutDashboard, order: 10, status: "active",
-    hiddenAsModule: true,
-    description: "Visão geral do Gerenciamento.",
-    children: [
-      a(10, "overview", "Painel do Gerenciamento", ["dashboard", "resumo", "inicio", "home"], "Visão"),
-      h(20, "pendencias_config", "Pendências de Configuração"),
-      h(30, "alteracoes_recentes", "Alterações Recentes"),
-    ],
+    key: "grp_visao", label: "Visão Geral", icon: LayoutDashboard, order: 10, status: "active",
+    screen: "overview",
+    description: "Painel geral do Gerenciamento.",
+    keywords: ["painel", "dashboard", "resumo", "inicio", "home", "visao", "visão"],
   },
+
+  // ══════════════════════════════ 2. PROCESSOS ════════════════════════════════
+  // REGRA: fases são cadastradas AQUI e em nenhum outro módulo.
   {
     key: "grp_processos", label: "Processos", icon: GitBranch, order: 20, status: "active",
-    description: "Tipos de processo, países e versões de configuração.",
+    description: "Cadastros, estrutura de fases e configurações do processo.",
     children: [
       a(10, "proctypes", "Tipos de Processo", ["processo", "tipo", "nacionalidade", "cidadania"], "Cadastros"),
-      a(20, "countrycatalog", "Países e Regiões", ["pais", "país", "regiao", "região", "italia", "portugal"], "Cadastros"),
-      a(50, "cfgversions", "Versões por Processo", ["versao", "versão", "config"], "Cadastros"),
-      h(60, "modalidades", "Modalidades"),
-      h(70, "linhas_servico", "Linhas de Serviço"),
-      h(80, "config_padrao", "Configurações Padrão"),
+      a(20, "modalidades", "Modalidades", ["modalidade", "judicial", "administrativo", "via"], "Cadastros"),
+      a(30, "countrycatalog", "Países e Regiões", ["pais", "país", "regiao", "região", "italia", "portugal", "nacionalidade"], "Cadastros"),
+
+      // ESTRUTURA — o catálogo de fases é a fonte única das fases do sistema.
+      a(40, "fases", "Fases", ["fase", "fases", "catalogo", "catálogo", "etapa", "phase"], "Estrutura"),
+      a(50, "phasemodes", "Variações da Fase", ["variacao", "variação", "modo", "interno", "fase"], "Estrutura"),
+      s(60, "marcos", "Marcos", "Marcos ainda não têm cadastro próprio. Os pontos de controle hoje derivam das fases (Estrutura › Fases) e do Workflow Interno.", "Estrutura", ["marco", "milestone", "checkpoint"]),
+
+      // CONFIGURAÇÕES
+      a(70, "sla", "SLA", ["sla", "prazo", "vencimento", "alerta"], "Configurações"),
+      a(80, "cfgversions", "Versões", ["versao", "versão", "config", "publicacao", "publicação"], "Configurações"),
+      s(90, "proccfg", "Configurações Gerais", "Parâmetros gerais do processo ainda não têm tela dedicada. Os padrões vivem em Tipos de Processo e no Fluxo do Workflow.", "Configurações", ["configuracao", "configuração", "padrao", "padrão"]),
     ],
   },
+
+  // ══════════════════════════════ 3. WORKFLOW ═════════════════════════════════
+  // REGRA: Workflow NÃO cria fases — só referencia o catálogo de Processos.
   {
-    // ARQUITETURA: "Automações" NÃO é módulo. Toda a automação de fase (regras,
-    // simulação, histórico) e as bibliotecas de modelos vivem DENTRO do Workflow —
-    // é o mesmo motor de eventos/efeitos. O Financeiro tem sua própria vitrine
-    // ("Regras Financeiras por Fase") reutilizando este mesmo motor.
     key: "grp_workflow", label: "Workflow", icon: Workflow, order: 30, status: "active",
-    description: "Fases, automações, regras e modelos do workflow.",
+    description: "Fluxos, transições e parâmetros do motor de workflow.",
     children: [
-      // Fases (nomes exatamente como a árvore aprovada)
-      a(10, "macrokanban", "Workflow Macro", ["workflow", "macro", "kanban", "fase", "coluna"], "Fases"),
-      a(20, "phaseiwf", "Workflow Interno", ["workflow", "interno", "passo", "fase"], "Fases"),
-      a(30, "phasemodes", "Variações da Fase", ["variacao", "variação", "modo", "interno", "fase"], "Fases"),
-      // Automações e regras (ex-módulo "Automações", agora dentro do Workflow).
-      // ARQUITETURA NOVA: automações só configuram EFEITOS ADICIONAIS (financeiro,
-      // evento, protocolo, notificação). "Regras Transversais" (criavam tarefas
-      // nativas da operação) foram REMOVIDAS da interface — tarefa obrigatória da
-      // fase é exclusiva do Workflow Interno.
-      a(40, "opauto", "Automações por Fase", ["automacao", "automação", "efeito", "fase", "regra", "gatilho", "workflow"], "Automações e regras"),
-      a(60, "simfase", "Simulação", ["simulacao", "simulação", "fase", "teste"], "Automações e regras"),
-      a(70, "execmatrix", "Histórico de Execuções", ["historico", "histórico", "execucao", "execução", "log"], "Automações e regras"),
-      // "Tipos de Protocolo" NÃO pertence ao Workflow → mudou para o módulo
-      // "Documentos e Protocolos" (é configuração operacional, não estrutura de fase).
-      // BIBLIOTECA DE MODELOS — REMOVIDA DEFINITIVAMENTE (legado). A fonte de verdade é o
-      // Workflow Macro/Interno + config real por fase (Automações/Variações). Nenhum "Modelo"
-      // participa da execução. Para reaproveitar, use "Duplicar" como ação direta.
-      h(220, "wf_conclusao", "Regras de Conclusão"),
-      h(230, "wf_dependencias", "Dependências e Paralelismo"),
-      h(240, "wf_blockers", "Blockers"),
-      h(250, "wf_politicas", "Políticas de Entrada e Saída"),
-      h(260, "wf_avanco", "Avanço, Exceção e Reabertura"),
-      h(270, "wf_pacotes", "Pacotes Operacionais"),
+      a(10, "macrokanban", "Workflow Macro", ["workflow", "macro", "kanban", "fluxo", "sequencia", "sequência", "coluna", "sla"], "Fluxos"),
+      a(20, "phaseiwf", "Workflow Interno", ["workflow", "interno", "passo", "fluxo", "tarefa"], "Fluxos"),
+
+      s(30, "transicoes", "Transições", "Os caminhos entre fases são definidos pela regra de entrada de cada fase no Fluxo (Workflow › Fluxos › Workflow Macro). Tela dedicada de transições ainda não existe.", undefined, ["transicao", "transição", "caminho", "entrada", "avanco", "avanço"]),
+
+      a(40, "execmotor", "Executor do Motor", ["executor", "motor", "execucao", "execução", "gatilho"], "Configurações"),
+      a(50, "runtimediag", "Diagnóstico de Runtime", ["runtime", "diagnostico", "diagnóstico", "v2", "motor"], "Configurações"),
+      a(60, "migmotor", "Migração do Motor", ["migracao", "migração", "motor", "runtime"], "Configurações"),
     ],
   },
+
+  // ═════════════════════════════ 4. AUTOMAÇÕES ════════════════════════════════
+  // REGRA: automações são SÓ financeiras ou de eventos — efeitos adicionais.
+  // Nada de motor paralelo de tarefas, BPM paralelo ou cadastro de fases aqui.
   {
-    key: "grp_documentos", label: "Documentos", fullLabel: "Documentos e Protocolos", icon: FileText, order: 40, status: "active",
-    description: "Tipos e categorias de documento, matriz, regras e tipos de protocolo.",
+    key: "grp_automacoes", label: "Automações", icon: Zap, order: 40, status: "active",
+    description: "Efeitos financeiros e de evento disparados pelas fases.",
     children: [
-      a(10, "doctypes", "Tipos de Documento", ["documento", "certidao", "certidão", "tipo", "nascimento", "casamento", "obito"], "Cadastros"),
-      a(15, "doccats", "Categorias Documentais", ["categoria", "categorias", "documental", "classificacao", "classificação"], "Cadastros"),
-      // CONSOLIDADO em "Tipos de Documento" (cadastro mestre). Removido da sidebar;
-      // a rota ?screen=certtypes vira alias/redirect para doctypes (page.tsx).
-      h(20, "certtypes", "Tipos de Certidão"),
-      // "Matriz Documental" foi ABSORVIDA por "Regras Documentais" (fonte única,
-      // mesma tabela MatrizDocumental ampliada). O docmatrix permanece OCULTO como
-      // visão técnica (deep-link), sem ser uma segunda tela de edição na navegação.
-      h(30, "docmatrix", "Matriz Documental (técnica)"),
-      // "Regras Documentais" é a ÚNICA tela de configuração de regras documentais.
+      a(10, "autofin", "Financeiras", ["automacao", "automação", "financeiro", "receita", "custo", "regra", "fase"]),
+      a(20, "autoevt", "Eventos", ["automacao", "automação", "evento", "gatilho", "fase"]),
+
+      a(30, "simfase", "Simulação", ["simulacao", "simulação", "fase", "teste"], "Configurações"),
+      a(40, "execmatrix", "Histórico de Execuções", ["historico", "histórico", "execucao", "execução", "log"], "Configurações"),
+
+      // key legada da tela unificada de automações por fase (deep-link vira alias).
+      h(900, "opauto", "Automações por Fase (legado)"),
+    ],
+  },
+
+  // ══════════════════ 5. DOCUMENTOS E PROTOCOLOS ══════════════════════════════
+  // REGRA: sem submenu "Configurações" aqui — Documentos, Protocolos e Regras.
+  {
+    key: "grp_documentos", label: "Documentos", fullLabel: "Documentos e Protocolos", icon: FileText, order: 50, status: "active",
+    description: "Cadastros documentais, protocolos e políticas documentais.",
+    children: [
+      a(10, "doctypes", "Tipos de Documento", ["documento", "certidao", "certidão", "tipo", "nascimento", "casamento", "obito"], "Documentos"),
+      a(20, "doccats", "Categorias Documentais", ["categoria", "categorias", "documental", "classificacao", "classificação"], "Documentos"),
+
+      a(30, "prottypes", "Tipos de Protocolo", ["protocolo", "orgao", "órgão", "tipo", "modalidade"], "Protocolos"),
+
       a(40, "docrules", "Regras Documentais", ["aplicabilidade", "regra", "documento", "documental", "matriz", "obrigatorio", "obrigatório"], "Regras"),
-      // Tipos de Protocolo: configuração operacional (tipos/modalidades de protocolo
-      // usados nos processos) — pertence a Documentos e Protocolos, não ao Workflow.
-      // (Cartórios/Órgãos, por serem ENTIDADES, seguem em Pessoas e Organizações.)
-      a(45, "prottypes", "Tipos de Protocolo", ["protocolo", "orgao", "órgão", "tipo", "modalidade"], "Protocolos"),
-      h(50, "doc_categorias", "Categorias Documentais"),
-      h(60, "doc_estados", "Estados Documentais"),
-      h(70, "mod_documento", "Modelos de Documento"),
-      h(80, "doc_checklists", "Checklists"),
-      h(90, "doc_motivos_pend", "Motivos de Pendência"),
-      h(100, "doc_motivos_inval", "Motivos de Invalidação"),
+
+      // OCULTOS (telas existentes, acessíveis por ?screen=) — sem cadastro paralelo no menu.
+      h(900, "certtypes", "Tipos de Certidão (consolidado em Tipos de Documento)"),
+      h(910, "docmatrix", "Matriz Documental (visão técnica)"),
+      h(920, "protocols", "Regras de Protocolo por Nacionalidade (rascunho)"),
     ],
   },
+
+  // ══════════════════════════════ 6. SERVIÇOS ═════════════════════════════════
+  // REGRA: "Serviços" (nunca "Produtos") e SEM preço — preço só na Tabela de Valores.
   {
-    key: "grp_servicos", label: "Serviços", icon: Briefcase, order: 45, status: "active",
-    description: "Catálogo operacional de serviços prestados.",
+    key: "grp_servicos", label: "Serviços", icon: Briefcase, order: 60, status: "active",
+    description: "Catálogo operacional de serviços prestados (sem preço).",
     children: [
-      // Cadastro MESTRE operacional de Serviços (o que a empresa vende/executa). Sem financeiro.
-      a(10, "products", "Catálogo de Serviços", ["servico", "serviço", "traducao", "tradução", "apostilamento", "retificacao", "cidadania", "genealogia", "logistica", "assessoria"], "Cadastros"),
+      a(10, "products", "Catálogo de Serviços", ["servico", "serviço", "traducao", "tradução", "apostilamento", "retificacao", "cidadania", "genealogia", "logistica", "assessoria"]),
+      s(20, "servcats", "Categorias", "As categorias de serviço hoje são um campo do próprio serviço (Catálogo de Serviços). Cadastro dedicado de categorias ainda não existe.", undefined, ["categoria", "servico", "serviço"]),
     ],
   },
+
+  // ═════════════════════════════ 7. FINANCEIRO ════════════════════════════════
+  // REGRA: Configurações Financeiras define COMPORTAMENTO (nunca preço).
+  //        Tabela de Valores é a ÚNICA origem oficial de preços/valores.
   {
-    key: "grp_financeiro", label: "Financeiro", icon: DollarSign, order: 50, status: "active",
-    description: "Cadastros, precificação, bancos, pagamentos e configurações financeiras.",
+    key: "grp_financeiro", label: "Financeiro", icon: DollarSign, order: 70, status: "active",
+    description: "Comportamento financeiro dos cadastros mestres, valores e cobrança.",
     children: [
-      // MENU FINAL do Financeiro (arquitetura canônica) — os 18 cadastros/config +
-      // "Regras Financeiras por Fase" (vitrine do motor de efeitos do Workflow).
-      a(10, "catalog", "Configurações Financeiras", ["configuracao", "config", "produto", "financeiro", "catalogo", "preco", "preço", "papel", "custo", "receita"], "Configuração"),
-      a(60, "categories", "Categorias Financeiras", ["categoria", "financeiro"], "Configuração"),
-      a(70, "coa", "Plano de Contas", ["plano", "conta", "contabil"], "Configuração"),
-      a(80, "costcenters", "Centros de Custo", ["centro", "custo"], "Configuração"),
-      a(50, "suppliers", "Fornecedores", ["fornecedor", "parceiro", "cartorio", "tradutor"], "Configuração"),
-      a(20, "pricingtable", "Tabelas de Preços", ["preco", "preço", "tabela", "valor"], "Precificação"),
-      a(40, "discrules", "Regras de Precificação", ["preco", "preço", "regra", "desconto", "economica"], "Precificação"),
-      a(30, "pricing", "Aplicabilidade Econômica", ["preco", "preço", "aplicabilidade", "economica"], "Precificação"),
-      // LEGADO DESCONTINUADO: "Regras Financeiras por Fase" (PhaseTriggerRule, item por
-      // código) saiu do menu — automações financeiras vivem em "Automações por Fase →
-      // Financeiro" (vínculo por Configuração Financeira + preço da Tabela de Preços).
-      a(90, "accounts", "Contas Bancárias", ["conta", "banco", "bancaria"], "Bancos e moedas"),
-      a(100, "banks", "Bancos", ["banco"], "Bancos e moedas"),
-      a(110, "wallets", "Carteiras de Recebimento", ["carteira", "recebimento"], "Bancos e moedas"),
-      a(120, "currencies", "Moedas", ["moeda", "cambio", "câmbio"], "Bancos e moedas"),
-      a(130, "fx", "Câmbio", ["cambio", "câmbio", "cotacao", "moeda"], "Bancos e moedas"),
-      a(140, "methods", "Formas de Pagamento", ["forma", "pagamento"], "Pagamentos"),
-      a(150, "paycond", "Condições de Pagamento", ["condicao", "condição", "pagamento", "parcelamento"], "Pagamentos"),
-      a(160, "fees", "Taxas de Pagamento", ["taxa", "pagamento"], "Pagamentos"),
-      a(170, "taxes", "Impostos", ["imposto", "tributo"], "Fiscal e comercial"),
-      a(180, "commrules", "Comissões", ["comissao", "comissão"], "Fiscal e comercial"),
-      // LEGADOS — OCULTOS da sidebar (status hidden). A rota/tela permanece acessível
-      // como alias/read-only (page.tsx), sem exibição como cadastro paralelo.
-      // (Serviços NÃO é legado: virou cadastro mestre operacional em grp_servicos.)
-      h(910, "honorariums", "Honorários"),
-      h(920, "catalogmestre", "Catálogo Mestre"),
-      h(930, "estruturafin", "Estrutura Financeira"),
-      h(940, "precificacao", "Precificação"),
-      h(950, "comercial", "Comercial"),
-      h(960, "pagamentos", "Pagamentos"),
-      h(970, "fornecedoresconc", "Concentradoras e Adquirentes"),
-      h(980, "integracaofin", "Integração com o Financeiro Geral"),
+      a(10, "catalog", "Configurações Financeiras", ["configuracao", "config", "financeiro", "catalogo", "papel", "custo", "receita", "natureza", "repasse", "reembolsavel"]),
+
+      a(20, "categories", "Categorias Financeiras", ["categoria", "financeiro", "classificacao", "classificação"], "Classificação"),
+      a(30, "coa", "Plano de Contas", ["plano", "conta", "contabil", "contábil"], "Classificação"),
+      a(40, "costcenters", "Centros de Custo", ["centro", "custo"], "Classificação"),
+
+      a(50, "pricingtable", "Tabelas de Preços", ["preco", "preço", "tabela", "valor", "vigencia", "vigência"], "Tabela de Valores"),
+      a(60, "discrules", "Regras de Precificação", ["preco", "preço", "regra", "desconto", "economica"], "Tabela de Valores"),
+      a(70, "pricing", "Aplicabilidade Econômica", ["preco", "preço", "aplicabilidade", "economica", "econômica"], "Tabela de Valores"),
+
+      a(80, "accounts", "Contas Bancárias", ["conta", "banco", "bancaria", "tesouraria"], "Tesouraria"),
+      a(90, "banks", "Bancos", ["banco", "tesouraria"], "Tesouraria"),
+      a(100, "wallets", "Carteiras de Recebimento", ["carteira", "recebimento", "tesouraria"], "Tesouraria"),
+
+      a(110, "currencies", "Moedas", ["moeda", "currency"], "Moedas"),
+      a(120, "fx", "Câmbio", ["cambio", "câmbio", "cotacao", "cotação", "moeda"], "Moedas"),
+
+      a(130, "methods", "Formas de Pagamento", ["forma", "pagamento", "cobranca", "cobrança", "pix", "boleto", "cartao"], "Cobrança"),
+      a(140, "paycond", "Condições de Pagamento", ["condicao", "condição", "pagamento", "parcelamento", "cobranca"], "Cobrança"),
+      a(150, "fees", "Taxas de Pagamento", ["taxa", "pagamento", "encargo", "cobranca"], "Cobrança"),
+
+      s(160, "credito", "Crédito", "A gestão de créditos financeiros é operacional e vive no Financeiro Geral › Créditos. Não há cadastro de política de crédito no Gerenciamento.", undefined, ["credito", "crédito", "saldo"]),
+
+      a(170, "taxes", "Impostos", ["imposto", "tributo", "fiscal"], "Fiscal"),
+
+      a(180, "commrules", "Regras de Comissão", ["comissao", "comissão", "regra"], "Comissões"),
+
+      s(190, "docfin", "Documentos Financeiros", "Recibos, faturas e comprovantes são emitidos pelo Financeiro Geral. Não existe cadastro de documentos financeiros no Gerenciamento.", undefined, ["recibo", "fatura", "nota", "documento", "financeiro"]),
+      s(200, "governanca", "Governança", "As trilhas de alteração financeira estão em Sistema › Auditoria e Logs. Painel de governança financeira dedicado ainda não existe.", undefined, ["governanca", "governança", "auditoria", "trilha"]),
+
+      // LEGADOS — telas antigas mantidas acessíveis por ?screen= (sem cadastro paralelo no menu).
+      h(900, "honorariums", "Honorários (legado)"),
+      h(910, "estruturafin", "Estrutura Financeira (concentradora legada)"),
+      h(920, "precificacao", "Precificação (concentradora legada)"),
+      h(930, "comercial", "Comercial (concentradora legada)"),
+      h(940, "pagamentos", "Pagamentos (concentradora legada)"),
+      h(950, "fornecedoresconc", "Concentradoras e Adquirentes (legado)"),
+      h(960, "integracaofin", "Integração com o Financeiro Geral (legado)"),
     ],
   },
+
+  // ═══════════════════ 8. ÓRGÃOS E ORGANIZAÇÕES ═══════════════════════════════
+  // REGRA: entidades institucionais/jurídicas (cartórios, consulados, tribunais,
+  // órgãos, empresas, escritórios, bancos, tradutores, parceiros, fornecedores).
+  // NÃO é cadastro de pessoa física. Sem cadastros separados por tipo de órgão.
   {
-    key: "grp_pessoas", label: "Pessoas", fullLabel: "Pessoas e Organizações", icon: Users2, order: 60, status: "active",
-    description: "Fornecedores, cartórios e órgãos.",
+    key: "grp_orgaos", label: "Órgãos", fullLabel: "Órgãos e Organizações", icon: Building2, order: 80, status: "active",
+    description: "Entidades institucionais e jurídicas que participam dos processos.",
     children: [
-      // Dono canônico de Fornecedor é o Financeiro → aqui é ATALHO para a mesma tela.
-      a(10, "suppliers", "Fornecedores (Financeiro)", ["fornecedor", "parceiro", "tradutor", "advogado"], "Cadastros"),
-      a(20, "organs", "Cartórios e Órgãos", ["cartorio", "cartório", "orgao", "órgão", "protocolo"], "Cadastros"),
-      h(30, "clientes", "Clientes"),
-      h(40, "requerentes", "Requerentes"),
-      h(50, "familiares", "Familiares"),
-      h(60, "pessoas_juridicas", "Pessoas Jurídicas"),
-      h(70, "tradutores", "Tradutores"),
-      h(80, "advogados", "Advogados"),
-      h(90, "parceiros", "Parceiros"),
-      h(100, "tipos_relacionamento", "Tipos de Relacionamento"),
+      a(10, "organs", "Cartórios e Órgãos", ["cartorio", "cartório", "orgao", "órgão", "consulado", "tribunal", "prefeitura", "comune", "protocolo", "organizacao", "organização"], "Organizações"),
+      a(20, "suppliers", "Fornecedores", ["fornecedor", "parceiro", "tradutor", "advogado", "escritorio", "banco", "empresa", "organizacao"], "Organizações"),
+      s(30, "orgcats", "Categorias", "A categoria hoje é um campo (tipo) do próprio cadastro da organização. Cadastro dedicado de categorias, com múltiplas categorias por organização, ainda não existe.", undefined, ["categoria", "tipo", "orgao", "organizacao"]),
     ],
   },
-  // ESCOPO DEFINITIVO (16/07): módulos "Comunicação", "Integrações", "Governança e
-  // Sistema", "Motor Técnico" e "Biblioteca Operacional" foram REMOVIDOS da navegação
-  // (serão redesenhados em outra etapa). As telas permanecem apenas tecnicamente
-  // acessíveis por ?screen=<key> (mantidas no mapa screen→component em page.tsx),
-  // sem exposição na navegação comum. Grupos vazios "Agenda" e "IA" também removidos.
+
+  // ═══════════════════ 9. USUÁRIOS E ACESSOS ══════════════════════════════════
   {
-    key: "grp_relatorios", label: "Relatórios", fullLabel: "Relatórios e Indicadores", icon: BarChart3, order: 120, status: "active",
-    description: "Diagnósticos e indicadores executivos.",
+    key: "grp_usuarios", label: "Usuários", fullLabel: "Usuários e Acessos", icon: Users2, order: 90, status: "active",
+    description: "Identidade de acesso, autorização, grupos e trilha de acesso.",
     children: [
-      a(10, "mgmthealth", "Diagnóstico Executivo", ["diagnostico", "saude", "indicador", "dashboard"], "Diagnósticos"),
-      a(20, "diagnostics", "Diagnósticos", ["diagnostico", "relatorio"], "Diagnósticos"),
-      a(30, "cfgdiagnosis", "Diagnóstico de Configuração", ["diagnostico", "config"], "Diagnósticos"),
-      h(40, "rel_dashboards", "Dashboards"),
-      h(50, "rel_indicadores", "Indicadores"),
-      h(60, "rel_relatorios", "Relatórios"),
-      h(70, "rel_exportacoes", "Exportações"),
-      h(80, "rel_agendados", "Relatórios Agendados"),
+      a(10, "users", "Usuários", ["usuario", "usuário", "user", "conta", "acesso", "login"]),
+      a(20, "roles", "Perfis", ["perfil", "papel", "role", "permissao", "permissão", "acesso"]),
+      a(30, "permmotor", "Permissões", ["permissao", "permissão", "autorizacao", "autorização", "perfil", "motor"]),
+
+      a(40, "teams", "Equipes", ["equipe", "time", "grupo"], "Grupos"),
+      a(50, "departments", "Departamentos", ["departamento", "setor", "grupo"], "Grupos"),
+      a(60, "rolecat", "Cargos", ["cargo", "funcao", "função", "papel"], "Grupos"),
+
+      s(70, "accaudit", "Auditoria de Acessos", "A trilha de auditoria hoje é global e está em Sistema › Auditoria e Logs. Recorte específico de sessões/autenticações ainda não existe.", undefined, ["auditoria", "acesso", "sessao", "sessão", "login", "bloqueio"]),
+
+      // alias histórico da mesma tela de perfis/permissões (deep-link preservado).
+      h(900, "permprofiles", "Perfis de Permissão (alias)"),
     ],
   },
+
+  // ══════════════════════════════ 10. SISTEMA ═════════════════════════════════
+  // REGRA: só configurações globais e técnicas transversais. Regra de domínio
+  // continua no seu módulo. Auditoria aqui é técnica e global.
   {
-    key: "grp_usuarios", label: "Usuários", fullLabel: "Usuários e Acessos", icon: Users2, order: 140, status: "active",
-    description: "Usuários, equipes, cargos e permissões.",
+    key: "grp_sistema", label: "Sistema", icon: Settings2, order: 100, status: "active",
+    description: "Configurações globais, cadastros transversais e trilha técnica.",
     children: [
-      a(10, "users", "Usuários", ["usuario", "user", "conta", "acesso", "login"], "Estrutura"),
-      a(20, "teams", "Equipes", ["equipe", "time"], "Estrutura"),
-      a(30, "departments", "Departamentos", ["departamento", "setor"], "Estrutura"),
-      a(40, "rolecat", "Cargos", ["cargo", "funcao"], "Estrutura"),
-      // roles e permprofiles usam o MESMO componente (RolesTab). Mostramos 1 item
-      // canônico (key roles); permprofiles segue como alias/deep-link via TELAS.
-      a(50, "roles", "Perfis e Permissões", ["perfil", "papel", "role", "permissao", "permissão", "acesso"], "Acessos"),
-      h(70, "acc_papeis", "Papéis"),
-      h(80, "acc_perm_tarefas", "Permissões de Tarefas"),
-      h(90, "acc_filas", "Filas"),
-      h(100, "acc_delegacoes", "Delegações"),
-      h(110, "acc_alcadas", "Alçadas"),
+      a(10, "settings", "Configurações Gerais", ["configuracao", "configuração", "geral", "empresa", "moeda", "fuso"]),
+
+      a(20, "catalogmestre", "Catálogo Mestre", ["catalogo", "catálogo", "mestre", "item", "cadastro"], "Cadastros Auxiliares"),
+      a(30, "templates", "Modelos", ["modelo", "template"], "Cadastros Auxiliares"),
+
+      s(40, "identidade", "Identidade Visual", "A identidade visual é definida em código (motor de ambiente por país) e ainda não tem tela de configuração.", undefined, ["identidade", "visual", "tema", "cor", "logo", "ambiente"]),
+
+      a(50, "notifications", "Notificações", ["notificacao", "notificação", "email", "aviso", "comunicacao"], "Comunicações"),
+
+      s(60, "integracoes", "Integrações", "As integrações (câmbio, storage, cron) são configuradas por variáveis de ambiente e ainda não têm tela de administração.", undefined, ["integracao", "integração", "api", "webhook", "cron"]),
+
+      a(70, "audit", "Auditoria e Logs", ["auditoria", "log", "trilha", "historico", "histórico"]),
+
+      // OCULTOS — telas existentes, acessíveis por ?screen=.
+      h(900, "backup", "Backup e Restauração (rascunho)"),
+    ],
+  },
+
+  // ═══════════════ 11. RELATÓRIOS E INDICADORES ═══════════════════════════════
+  {
+    key: "grp_relatorios", label: "Relatórios", fullLabel: "Relatórios e Indicadores", icon: BarChart3, order: 110, status: "active",
+    description: "Consultas detalhadas, KPIs, composições visuais e exportações.",
+    children: [
+      a(10, "diagnostics", "Diagnóstico do Sistema", ["diagnostico", "diagnóstico", "relatorio", "relatório"], "Relatórios"),
+      a(20, "cfgdiagnosis", "Diagnóstico de Configuração", ["diagnostico", "diagnóstico", "config", "relatorio"], "Relatórios"),
+
+      a(30, "mgmthealth", "Diagnóstico Executivo", ["indicador", "kpi", "saude", "saúde", "executivo", "score"], "Indicadores"),
+      a(40, "syshealth", "Saúde do Sistema", ["saude", "saúde", "indicador", "score", "auditoria"], "Indicadores"),
+
+      s(50, "dashboards", "Dashboards", "As composições visuais vivem nos módulos operacionais (Home, Financeiro Geral, Kanban). Dashboards configuráveis no Gerenciamento ainda não existem.", undefined, ["dashboard", "painel", "grafico", "gráfico"]),
+
+      a(60, "impexp", "Importação / Exportação", ["exportacao", "exportação", "importacao", "csv", "json"], "Exportações"),
     ],
   },
 ]

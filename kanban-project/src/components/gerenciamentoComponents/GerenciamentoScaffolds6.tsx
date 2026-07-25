@@ -9,6 +9,7 @@
 // SCAFFOLD: estrutura/colunas/KPIs fiéis; dados e CRUD no wiring.
 
 import { useState } from 'react'
+import { AvisoRascunho, TITULO_RASCUNHO, BTN_RASCUNHO } from './_RascunhoUI'
 
 const CARD = 'rounded-xl border border-white/10 bg-white/5 backdrop-blur'
 const BTN_PRIMARY =
@@ -50,6 +51,7 @@ function PickProcess({ title, desc, empty }: { title: string; desc: string; empt
   const [pt, setPt] = useState('')
   return (
     <div>
+      <AvisoRascunho />
       <div className="mb-3 text-xs text-white/50">{desc}</div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-semibold text-white">{title}</h2>
@@ -74,11 +76,12 @@ function Kpi({ value, label, color }: { value: string; label: string; color?: st
 export function ExecMatrixTab() {
   return (
     <div>
+      <AvisoRascunho />
       <div className="mb-3 text-xs text-white/50">
         Cada tipo real de processo e o status de sua configuração (workflow, kanban, documentos, protocolos,
         financeiro, tarefas, automações, SLA). Retificação não aparece aqui — é fase.
       </div>
-      <Section title="Painel Executivo de Configuração" action={<button className={BTN_PRIMARY}>Rodar Auditoria</button>} />
+      <Section title="Painel Executivo de Configuração" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>Rodar Auditoria</button>} />
       <Table
         headers={['Nacionalidade', 'Tipo', 'Workflow', 'Kanban', 'Docs', 'Protoc.', 'Financ.', 'Tarefas', 'Autom.', 'SLA', 'Status', 'Ações']}
         empty="Nenhum tipo de processo configurado ainda."
@@ -91,11 +94,12 @@ export function ExecMatrixTab() {
 export function SystemHealthTab() {
   return (
     <div>
+      <AvisoRascunho />
       <div className="mb-3 text-xs text-white/50">
         Auditoria executiva de classificação, contexto, workflows, kanbans, documentos, protocolos,
         financeiro e retificação.
       </div>
-      <Section title="Saúde do Sistema" action={<button className={BTN_PRIMARY}>Rodar Auditoria Executiva</button>} />
+      <Section title="Saúde do Sistema" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>Rodar Auditoria Executiva</button>} />
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi value="—" label="Score geral" />
         <Kpi value="0" label="Erros críticos" color="#4ade80" />
@@ -115,11 +119,12 @@ export function SystemHealthTab() {
 export function PricingTableTab() {
   return (
     <div>
+      <AvisoRascunho />
       <div className="mb-1.5 text-xs text-white/50">
         Parametrize valores por Processo de Nacionalidade, fase, produto/serviço, país, modalidade e
         fornecedor. As automações financeiras puxam o valor daqui em vez de usar número fixo.
       </div>
-      <Section title="Tabela de Valores" action={<button className={BTN_PRIMARY}>+ Novo valor</button>} />
+      <Section title="Tabela de Valores" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Novo valor</button>} />
       <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
         <input placeholder="Buscar regra..." className={`${INPUT} min-w-[160px]`} readOnly />
         <select className={SELECT}><option className="bg-zinc-900">Todos</option></select>
@@ -137,11 +142,12 @@ export function RoleCatalogTab() {
   const [q, setQ] = useState('')
   return (
     <div>
+      <AvisoRascunho />
       <div className="mb-1.5 text-xs text-white/50">
         Papéis operacionais usados em tarefas, workflows, automações, SLAs e notificações. As automações de
         tarefa puxam o responsável daqui.
       </div>
-      <Section title="Papéis e Responsáveis" action={<button className={BTN_PRIMARY}>+ Novo papel</button>} />
+      <Section title="Papéis e Responsáveis" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Novo papel</button>} />
       <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar papel..." className={`${INPUT} min-w-[160px]`} />
         <select className={SELECT}><option className="bg-zinc-900">Todos</option></select>
@@ -158,10 +164,11 @@ export function RoleCatalogTab() {
 export function PermProfilesTab() {
   return (
     <div>
+      <AvisoRascunho />
       <div className="mb-1.5 text-xs text-white/50">
         Perfis de permissão para ações críticas do Gerenciamento. Marque por checkbox o que cada perfil pode fazer.
       </div>
-      <Section title="Usuários e Permissões" action={<button className={BTN_PRIMARY}>+ Novo perfil</button>} />
+      <Section title="Usuários e Permissões" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Novo perfil</button>} />
       <Table
         headers={['Perfil', 'Permissões', 'Status', 'Usado em', 'Ações']}
         empty="Nenhum perfil cadastrado."

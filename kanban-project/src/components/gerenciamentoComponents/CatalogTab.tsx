@@ -15,6 +15,7 @@
 
 import { useState } from 'react'
 import { MG_CATALOG, type CatalogField } from './gerenciamentoCatalogs'
+import { AvisoRascunho, TITULO_RASCUNHO, BTN_RASCUNHO } from './_RascunhoUI'
 
 type Row = Record<string, any>
 
@@ -56,19 +57,17 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
 
   return (
     <div className="text-white">
+      <AvisoRascunho />
       <div className="mb-3 text-xs text-white/50">{cfg.desc}</div>
 
-      {/* título da seção + ações */}
+      {/* título da seção + ações (desabilitadas enquanto não há persistência) */}
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-base font-semibold text-white">{cfg.title}</h2>
         <div className="flex items-center gap-2">
-          <button className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white">
+          <button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>
             Exportar
           </button>
-          <button
-            onClick={abrirNovo}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500"
-          >
+          <button disabled title={TITULO_RASCUNHO} onClick={abrirNovo} className={BTN_RASCUNHO}>
             + Novo
           </button>
         </div>
@@ -167,8 +166,10 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
 function RowBtn({ children, danger }: { children: React.ReactNode; danger?: boolean }) {
   return (
     <button
-      className={`ml-1 rounded border border-white/10 px-1.5 py-0.5 text-[10px] transition hover:bg-white/10 ${
-        danger ? 'text-red-300/80 hover:text-red-200' : 'text-white/70 hover:text-white'
+      disabled
+      title={TITULO_RASCUNHO}
+      className={`ml-1 cursor-not-allowed rounded border border-white/10 px-1.5 py-0.5 text-[10px] ${
+        danger ? 'text-red-300/40' : 'text-white/35'
       }`}
     >
       {children}

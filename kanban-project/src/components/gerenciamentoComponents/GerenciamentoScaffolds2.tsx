@@ -8,6 +8,7 @@
 // SCAFFOLD: estrutura/colunas/KPIs fiéis; dados e CRUD ligados no wiring.
 
 import { useState } from 'react'
+import { AvisoRascunho, TITULO_RASCUNHO, BTN_RASCUNHO } from './_RascunhoUI'
 
 const CARD = 'rounded-xl border border-white/10 bg-white/5 backdrop-blur'
 const BTN_PRIMARY =
@@ -58,13 +59,14 @@ function Table({ headers, empty }: { headers: string[]; empty?: string }) {
 export function ProcTypesTab() {
   return (
     <div>
+      <AvisoRascunho />
       <div className="mb-3 text-xs text-white/50">
         A unidade-mestre do sistema. Cada Processo de Nacionalidade tem Workflow Macro próprio, Kanban
         derivado, fases, automações, documentos, financeiro e protocolos. Não se cadastra país + tipo soltos.
       </div>
       <Section
         title="Processos de Nacionalidade"
-        action={<button className={BTN_PRIMARY}>+ Novo Processo de Nacionalidade</button>}
+        action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Novo Processo de Nacionalidade</button>}
       />
       <Table
         headers={[
@@ -81,6 +83,7 @@ export function MacroKanbanTab() {
   const [pt, setPt] = useState('')
   return (
     <div>
+      <AvisoRascunho />
       <div className="mb-3 text-xs text-white/50">
         O Workflow Macro define a sequência real de fases do Processo de Nacionalidade. O Kanban é derivado
         automaticamente dessa sequência. Não existe cadastro de fases separado.
@@ -113,13 +116,14 @@ function Kpi({ value, label, color }: { value: string; label: string; color?: st
 export function HealthTab() {
   return (
     <div>
+      <AvisoRascunho />
       <div className="mb-3 text-xs text-white/50">
         Auditoria executiva do Gerenciamento: Processo de Nacionalidade, Workflow Macro, Kanban derivado,
         Workflow Interno, automações e taxonomia.
       </div>
       <Section
         title="Diagnóstico Executivo do Gerenciamento"
-        action={<button className={BTN_PRIMARY}>Rodar Auditoria</button>}
+        action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>Rodar Auditoria</button>}
       />
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi value="—" label="Score" />

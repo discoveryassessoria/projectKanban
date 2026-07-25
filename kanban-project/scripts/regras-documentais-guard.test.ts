@@ -7,6 +7,7 @@
  * BlockingEngine/avanço de fase, nem reativar document-generator/reconcile.
  * Teste ESTÁTICO (source-scan).
  */
+import { MANAGEMENT_NAVIGATION } from "../src/components/gerenciamentoComponents/managementNavigation"
 import { readFileSync, readdirSync, statSync, existsSync } from "fs"
 import { fileURLToPath } from "url"
 import { dirname, join, relative } from "path"
@@ -17,6 +18,8 @@ const viol: string[] = []
 function ok(cond: boolean, nome: string, det?: string) { if (cond) { passed++; console.log(`  ✅ ${nome}`) } else { failed++; viol.push(det ? `${nome} — ${det}` : nome); console.log(`  ❌ ${nome}${det ? ` — ${det}` : ""}`) } }
 function walk(dir: string): string[] { const out: string[] = []; let e: string[] = []; try { e = readdirSync(dir) } catch { return out }; for (const n of e) { const p = join(dir, n); if (statSync(p).isDirectory()) out.push(...walk(p)); else if (/\.(ts|tsx)$/.test(n)) out.push(p) } return out }
 const ler = (rel: string) => (existsSync(join(ROOT, rel)) ? readFileSync(join(ROOT, rel), "utf8") : "")
+const navItem = (key: string) =>
+  MANAGEMENT_NAVIGATION.flatMap((g) => g.children ?? []).find((i) => i.key === key)
 
 // diretórios da feature
 const DIRS = [
@@ -55,9 +58,11 @@ ok(!/prisma\./.test(conflitos) && !/prisma\./.test(condicoes), "conflitos/condi�
 console.log("\n3) Fonte única + navegação")
 const page = ler("src/app/administrator/page.tsx")
 ok(/docrules:\s*RegrasDocumentaisTab/.test(page), "docrules → RegrasDocumentaisTab (tela real, não placeholder)")
-const nav = ler("src/components/gerenciamentoComponents/managementNavigation.tsx")
-ok(/h\(30,\s*"docmatrix"/.test(nav), "Matriz Documental absorvida (docmatrix oculto)")
-ok(/a\(40,\s*"docrules",\s*"Regras Documentais"/.test(nav), "Regras Documentais é item visível único de edição")
+// Checagem por ESTADO da navegação (não por posição no arquivo): a reestruturação
+// de 25/07 reordenou os itens, mas a regra continua a mesma — docmatrix oculto e
+// docrules como ÚNICO item visível de edição de regras documentais.
+ok(!!navItem("docmatrix") && navItem("docmatrix")!.status === "hidden", "Matriz Documental absorvida (docmatrix oculto)")
+ok(navItem("docrules")?.status === "active" && navItem("docrules")?.label === "Regras Documentais", "Regras Documentais é item visível único de edição")
 
 console.log("\n4) Genealogia permanece neutra (não reativada)")
 const pessoasPost = ler("src/app/api/pessoas/route.ts").replace(/\/\/.*$/gm, "")
