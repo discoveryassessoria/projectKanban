@@ -187,12 +187,18 @@ export async function registrarPagamentoComposto(input: RegistrarPagamentoCompos
     const f = formas[i]
     const ultima = i === formas.length - 1
     const tarifa = Math.max(0, cent(f.tarifa ?? 0))
+    // Seleção MANUAL com múltiplas formas: escala a alocação por parcela pela fração desta forma
+    // (mantém Σ por forma = valor da forma e Σ por parcela = alocação pedida).
+    const fracao = totalRecebido > 0 ? cent(f.valor) / totalRecebido : 0
+    const manualLinha = politica === 'MANUAL' && Array.isArray(input.aplicacao?.manual)
+      ? input.aplicacao!.manual!.map((m) => ({ parcelaId: m.parcelaId, valor: cent(m.valor * fracao) })).filter((m) => m.valor > 0)
+      : undefined
     const r = (await registrarOcorrencia({
       obrigacaoId: obr.id, tipo: 'PAGAMENTO', valor: cent(f.valor), moeda,
       data: f.dataRecebimento ? new Date(f.dataRecebimento) : undefined,
       formaPagamentoId: f.formaPagamentoId ?? null,
       origemRecurso: cut(f.origemRecurso, 20),
-      pagador, aplicacao: { politica, manual: input.aplicacao?.manual ?? undefined },
+      pagador, aplicacao: { politica, manual: manualLinha },
       excedenteDestino: ultima ? excedenteDestino : null,
       tarifa: tarifa > 0 ? tarifa : null,
       observacao: obsBase, idempotencyKey: `${correlacaoId}:forma:${i}`, criadoPorId,

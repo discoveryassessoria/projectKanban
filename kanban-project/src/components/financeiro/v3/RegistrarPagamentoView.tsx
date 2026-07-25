@@ -44,13 +44,17 @@ const labelCls = "text-[11px] font-medium uppercase tracking-wide text-white/50"
 
 type Linha = ReturnType<typeof novaLinha>
 
-export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClose, onDone }: {
-  obrigacaoId: number; receitaRef: string; onClose: () => void; onDone?: () => void
+export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo, onTrocarEscopo, onClose, onDone }: {
+  obrigacaoId: number; receitaRef: string
+  escopo?: { tipo: string; tag: string; obrigacaoId: number; saldoBrl: number; participanteNome?: string } | null
+  onTrocarEscopo?: () => void
+  onClose: () => void; onDone?: () => void
 }) {
   const [det, setDet] = useState<any>(null)
   const [participantes, setParticipantes] = useState<any[]>([])
   const [formasCad, setFormasCad] = useState<any[]>([])
   const [contasOpts, setContasOpts] = useState<any[]>([])
+  const [creditoDisponivel, setCreditoDisponivel] = useState(0)
   const [adquirentes, setAdquirentes] = useState<any[]>([])
   const [bandeiras, setBandeiras] = useState<any[]>([])
   const [taxas, setTaxas] = useState<any[]>([])
@@ -65,6 +69,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
   const [ext, setExt] = useState({ nome: "", documento: "", telefone: "", observacao: "" })
   const [ajustes, setAjustes] = useState({ desconto: "", juros: "", multa: "", acrescimo: "", creditoUtilizado: "" })
   const [politica, setPolitica] = useState<"NESTA" | "PROXIMAS" | "MAIS_ANTIGA" | "AUTOMATICA" | "MANUAL">("NESTA")
+  const [alocManual, setAlocManual] = useState<Record<number, string>>({})
   const [parcialTrat, setParcialTrat] = useState<"MANTER" | "GERAR_COBRANCA" | "RENEGOCIAR">("MANTER")
   const [excedenteTrat, setExcedenteTrat] = useState<"CREDITO" | "ABATER_PROXIMAS" | "ADIANTAMENTO" | "DEVOLVER">("CREDITO")
   const [comprovantes, setComprovantes] = useState<{ arquivoUrl: string; arquivoNome: string; tamanho: number }[]>([])
@@ -99,6 +104,8 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
         setAdquirentes(rCad?.adquirentes ?? [])
         setBandeiras(rCad?.bandeiras ?? [])
         setTaxas(rCad?.taxas ?? [])
+        // crédito financeiro disponível (obrigação/pessoa) — limita "Crédito Utilizado"
+        fetch(`/api/financeiro/creditos?obrigacaoId=${obrigacaoId}`, { headers: authHeaders() }).then((x) => x.json()).then((rc) => { if (vivo && rc?.saldoDisponivel != null) setCreditoDisponivel(Number(rc.saldoDisponivel)) }).catch(() => {})
         if (!d) setErro("Não foi possível carregar a cobrança.")
       } catch { if (vivo) setErro("Falha ao carregar.") } finally { if (vivo) setLoading(false) }
     })()
@@ -123,7 +130,8 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
   const totalTarifas = useMemo(() => linhas.reduce((s, l) => s + tarifaDe(l), 0), [linhas, taxas, formasCad, bandeiras])
   const desconto = num(ajustes.desconto), juros = num(ajustes.juros), multa = num(ajustes.multa), acrescimo = num(ajustes.acrescimo), creditoUtilizado = num(ajustes.creditoUtilizado)
   const acrescimos = juros + multa + acrescimo
-  const saldoCobranca = Number(det?.saldoBrl ?? 0)
+  // Saldo do ESCOPO selecionado (cobrança/participante/geral). Sem escopo → saldo da obrigação.
+  const saldoCobranca = escopo ? Number(escopo.saldoBrl ?? 0) : Number(det?.saldoBrl ?? 0)
   // FONTE ÚNICA de cálculo (mesma função revalidada no backend)
   const calc = calcularRecebimento({ saldoSelecionado: saldoCobranca, linhas: linhas.map((l) => ({ valor: num(l.valor) })), desconto, juros, multa, acrescimo, creditoUtilizado })
   const liquidoAReceber = calc.valorLiquidoDevido
@@ -133,6 +141,9 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
   const situacao = calc.situacao // INICIAL | PARCIAL | QUITADO | EXCEDENTE
   const temValor = situacao !== "INICIAL"
   const creditoGerado = excedente
+  const parcelasManuais = (det?.parcelasDetalhe ?? []).filter((p: any) => (p.status ?? "").toUpperCase() !== "PAGA")
+  const somaManual = Object.values(alocManual).reduce((s, v) => s + num(v), 0)
+  const manualInvalido = politica === "MANUAL" && parcelasManuais.length > 0 && Math.abs(somaManual - recebido) >= 0.01
 
   const contaPrincipal = useMemo(() => contasOpts.find((c) => c.key === linhas[0]?.contaKey) ?? null, [contasOpts, linhas])
   const pagadorNome = pagadorTipo === "EXTERNO" ? (ext.nome || "Externo") : (participantes.find((p) => p.pessoaId === pagadorPessoaId)?.nome ?? (pagadorTipo === "EMPRESA" ? "Empresa" : pagadorTipo === "TERCEIRO" ? "Terceiro" : "—"))
@@ -148,8 +159,10 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
       if (num(l.valor) < 0) p.push("Valor não pode ser negativo.")
     }
     if (pagadorTipo === "EXTERNO" && !ext.nome.trim()) p.push("Informe o nome do pagador externo.")
+    if (manualInvalido) p.push("Na seleção manual, a soma das alocações deve ser igual ao total informado.")
+    if (creditoUtilizado > creditoDisponivel + 0.005) p.push(`Crédito utilizado (${brl(creditoUtilizado)}) excede o disponível (${brl(creditoDisponivel)}).`)
     return [...new Set(p)]
-  }, [linhas, pagadorTipo, ext.nome])
+  }, [linhas, pagadorTipo, ext.nome, manualInvalido, creditoUtilizado, creditoDisponivel])
   const valido = pendencias.length === 0
 
   // ── ações ─────────────────────────────────────────────────────────────────
@@ -195,15 +208,18 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
       const pagador = pagadorTipo === "EXTERNO"
         ? { tipo: "EXTERNO" as const, parteExterna: { nome: ext.nome, documento: ext.documento || null, telefone: ext.telefone || null, observacao: ext.observacao || null } }
         : { tipo: pagadorTipo, pessoaId: pagadorTipo === "REQUERENTE" ? (pagadorPessoaId || null) : null }
+      // adiantamento/crédito: sem cobrança → o valor vira crédito financeiro (excedente)
+      const excTrat = escopo?.tipo === "ADIANTAMENTO" ? "ADIANTAMENTO" : escopo?.tipo === "CREDITO" ? "CREDITO" : situacao === "EXCEDENTE" ? excedenteTrat : null
       const body = {
         obrigacaoId, moeda: det?.moeda ?? "BRL", formas, pagador,
         ajustes: { desconto, juros, multa, acrescimo, creditoUtilizado },
-        aplicacao: { politica },
-        excedenteTratamento: situacao === "EXCEDENTE" ? excedenteTrat : null,
+        aplicacao: { politica, manual: politica === "MANUAL" ? parcelasManuais.map((p: any) => ({ parcelaId: p.id, valor: num(alocManual[p.id]) })).filter((x: any) => x.valor > 0) : undefined },
+        excedenteTratamento: excTrat,
         parcialTratamento: situacao === "PARCIAL" ? parcialTrat : null,
         saldoSelecionado: saldoCobranca,
         totais: { totalInformado: recebido, saldoRestante, excedente },
-        comprovantes, observacao: observacao || null,
+        escopo: escopo?.tipo ?? null, escopoTag: escopo?.tag ?? null,
+        comprovantes, observacao: [escopo?.tag ? `[${escopo.tag}]` : null, observacao || null].filter(Boolean).join(" ") || null,
       }
       const r = await fetch(`/api/financeiro/v3/receita/${receitaRef}/registrar-pagamento`, {
         method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(body),
@@ -235,6 +251,13 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
             </button>
           </div>
         </div>
+
+        {escopo && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#d2a948]/25 bg-[#d2a948]/5 px-4 py-2.5">
+            <span className="text-sm text-white/80"><span className="text-white/50">Escopo:</span> <span className="font-medium text-[#e0b957]">{escopo.tag}</span></span>
+            {onTrocarEscopo && <button onClick={onTrocarEscopo} className="rounded-lg border border-white/10 px-3 py-1 text-xs font-medium text-white/70 hover:bg-white/5">Trocar escopo</button>}
+          </div>
+        )}
 
         {loading ? (
           <div className="flex h-64 items-center justify-center text-white/40"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando cobrança…</div>
@@ -344,6 +367,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
                   ))}
                   <div><label className={`${labelCls} flex items-center gap-1`}>Crédito Gerado (BRL) <InfoIcon className="h-3 w-3 text-white/30" /></label><div className="mt-1 rounded-lg border border-white/10 bg-[#161b21] px-3 py-2 text-right text-sm text-white/70">{brl(creditoGerado)}</div></div>
                 </div>
+                {creditoDisponivel > 0.005 && <p className="mt-2 text-[11px] text-white/45">Crédito financeiro disponível: <span className="text-[#4ade80]">{brl(creditoDisponivel)}</span> — informe em "Crédito Utilizado" para abater neste recebimento.</p>}
                 {/* resumo matemático */}
                 <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-[#161b21] px-4 py-3 text-center sm:grid-cols-6">
                   <Mini label="Valor Original">{brl(saldoCobranca)}</Mini>
@@ -378,10 +402,14 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
                 </div>
                 {politica === "MANUAL" ? (
                   <div className="mt-3 rounded-lg bg-[#161b21] p-3">
-                    <p className="mb-2 text-xs text-white/50">Distribua o valor entre as parcelas pendentes:</p>
-                    <div className="space-y-1.5">{(det?.parcelasDetalhe ?? []).filter((p: any) => (p.status ?? "").toUpperCase() !== "PAGA").map((p: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between text-sm"><span className="text-white/70">Parcela {p.numero}/{p.totalParcelas} · vence {dataBR(p.vencimento)}</span><span className="text-white/50">{brl(p.saldoBrl ?? 0)}</span></div>
-                    ))}{!(det?.parcelasDetalhe?.length) && <p className="text-xs text-white/40">Sem parcelas em aberto — o valor será aplicado ao saldo.</p>}</div>
+                    <p className="mb-2 text-xs text-white/50">Distribua o valor entre as parcelas pendentes (a soma deve ser igual ao total informado):</p>
+                    <div className="space-y-1.5">{parcelasManuais.map((p: any) => (
+                      <div key={p.id} className="flex items-center justify-between gap-2 text-sm">
+                        <span className="min-w-0 flex-1 truncate text-white/70">Parcela {p.numero}/{p.totalParcelas} · vence {dataBR(p.vencimento)} · saldo {brl(p.saldoBrl ?? 0)}</span>
+                        <input inputMode="decimal" value={alocManual[p.id] ?? ""} onChange={(e) => setAlocManual((a) => ({ ...a, [p.id]: e.target.value }))} placeholder="0,00" className="w-28 rounded-lg border border-white/10 bg-[#20262e] px-2.5 py-1.5 text-right text-sm text-white outline-none focus:border-[#2563eb]/60" />
+                      </div>
+                    ))}{!parcelasManuais.length && <p className="text-xs text-white/40">Sem parcelas em aberto — o valor será aplicado ao saldo.</p>}</div>
+                    {parcelasManuais.length > 0 && <div className={`mt-2 flex items-center justify-between text-xs ${Math.abs(somaManual - recebido) < 0.01 ? "text-[#4ade80]" : "text-[#f87171]"}`}><span>Alocado</span><span>{brl(somaManual)} / {brl(recebido)}</span></div>}
                   </div>
                 ) : (
                   <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-[#161b21] px-3 py-2 text-xs text-white/45"><InfoIcon className="h-3.5 w-3.5" /> {politica === "NESTA" ? "O valor será aplicado prioritariamente nesta cobrança." : politica === "PROXIMAS" ? "O valor será direcionado às próximas cobranças." : politica === "MAIS_ANTIGA" ? "O valor quitará primeiro a cobrança mais antiga em aberto." : "O valor será distribuído proporcionalmente entre as parcelas em aberto."}</p>

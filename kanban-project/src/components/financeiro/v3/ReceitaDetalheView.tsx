@@ -16,6 +16,9 @@ import RegistrarPagamentoModal from "@/src/components/financeiro/v3/RegistrarPag
 import RegistrarPagamentoView from "@/src/components/financeiro/v3/RegistrarPagamentoView"
 import EditarDistribuicaoView from "@/src/components/financeiro/v3/EditarDistribuicaoView"
 import EstornoModal from "@/src/components/financeiro/v3/EstornoModal"
+import DefinirEscopoDrawer, { type EscopoEscolhido } from "@/src/components/financeiro/v3/DefinirEscopoDrawer"
+import AcaoReceitaModal, { type AcaoReceita } from "@/src/components/financeiro/v3/AcaoReceitaModal"
+import EditarReceitaView from "@/src/components/financeiro/v3/EditarReceitaView"
 import { NovaFaturaModal } from "@/src/components/kanban/NovaFaturaModal"
 import { uploadFiles } from "@/src/lib/storage"
 import {
@@ -24,6 +27,7 @@ import {
   Plus, Pencil, ChevronLeft, ChevronRight, UserPlus, ArrowDownCircle, CheckCircle2,
   Info as InfoIcon, X, AlertTriangle, Send, FileText, Loader2, ChevronRight as ChevronRightSm,
   Download, File as FileIcon, Users, StickyNote, RotateCcw,
+  Archive, RefreshCcw, Ban, ArrowLeftRight,
 } from "lucide-react"
 
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
@@ -62,7 +66,10 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const [drawerPart, setDrawerPart] = useState<any>(null) // participante aberto no drawer (obrigacaoId + nome)
   const [pagOpen, setPagOpen] = useState(false)
   const [receberOpen, setReceberOpen] = useState(false)
+  const [receberEscopo, setReceberEscopo] = useState<EscopoEscolhido | null>(null)
   const [distribuicaoOpen, setDistribuicaoOpen] = useState(false)
+  const [acaoModal, setAcaoModal] = useState<AcaoReceita | null>(null)
+  const [editarReceitaOpen, setEditarReceitaOpen] = useState(false)
   const [faturaOpen, setFaturaOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [maisOpen, setMaisOpen] = useState(false)
@@ -281,7 +288,21 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
               {maisOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setMaisOpen(false)} />
-                  <div className="absolute right-0 z-50 mt-1 w-52 overflow-hidden rounded-lg border border-white/10 bg-[#1b2027] py-1 shadow-xl shadow-black/40">
+                  <div className="absolute right-0 z-50 mt-1 w-60 overflow-hidden rounded-lg border border-white/10 bg-[#1b2027] py-1 shadow-xl shadow-black/40">
+                    <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/30">Gestão financeira</div>
+                    <button onClick={() => { setMaisOpen(false); setEditarReceitaOpen(true) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><Pencil className="h-4 w-4 text-white/45" /> Editar Receita</button>
+                    <button onClick={() => { setMaisOpen(false); setEditarReceitaOpen(true) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><ArrowLeftRight className="h-4 w-4 text-white/45" /> Editar regra de câmbio</button>
+                    <button onClick={() => { setMaisOpen(false); temProcesso ? setFaturaOpen(true) : undefined }} disabled={!temProcesso} title={temProcesso ? "" : "Processo não vinculado"} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5 disabled:opacity-40"><FileText className="h-4 w-4 text-white/45" /> Gerar fatura</button>
+                    <button onClick={() => { setMaisOpen(false); setAcaoModal("recibo") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><FileCheck className="h-4 w-4 text-white/45" /> Gerar recibo</button>
+                    <div className="my-1 border-t border-white/10" />
+                    <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/30">Críticas</div>
+                    <button onClick={() => { setMaisOpen(false); setAcaoModal("renegociar") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><RefreshCcw className="h-4 w-4 text-[#7dd3fc]" /> Renegociar</button>
+                    <button onClick={() => { setMaisOpen(false); setTab("pagamentos") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><RotateCcw className="h-4 w-4 text-[#f87171]" /> Estornar pagamento</button>
+                    <div className="my-1 border-t border-white/10" />
+                    <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/30">Encerramento</div>
+                    <button onClick={() => { setMaisOpen(false); setAcaoModal("arquivar") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><Archive className="h-4 w-4 text-[#a78bfa]" /> Arquivar</button>
+                    <button onClick={() => { setMaisOpen(false); setAcaoModal("cancelar") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#f87171] hover:bg-white/5"><Ban className="h-4 w-4" /> Cancelar Receita</button>
+                    <div className="my-1 border-t border-white/10" />
                     <button onClick={() => { setMaisOpen(false); setTab("timeline") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><Clock className="h-4 w-4 text-white/45" /> Ver movimentações</button>
                     <button onClick={() => { setMaisOpen(false); copiarCodigo() }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5">{copiado ? <CheckCircle2 className="h-4 w-4 text-[#4ade80]" /> : <Copy className="h-4 w-4 text-white/45" />} Copiar código</button>
                   </div>
@@ -852,11 +873,20 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
         />
       )}
       {receberOpen && d && (
-        <RegistrarPagamentoView
-          obrigacaoId={d.obrigacaoId}
+        <DefinirEscopoDrawer
           receitaRef={String(d.obrigacaoId)}
           onClose={() => setReceberOpen(false)}
-          onDone={() => { setReceberOpen(false); carregar() }}
+          onEscolher={(e) => { setReceberEscopo(e); setReceberOpen(false) }}
+        />
+      )}
+      {receberEscopo && d && (
+        <RegistrarPagamentoView
+          obrigacaoId={receberEscopo.obrigacaoId}
+          receitaRef={String(d.obrigacaoId)}
+          escopo={receberEscopo}
+          onTrocarEscopo={() => { setReceberEscopo(null); setReceberOpen(true) }}
+          onClose={() => setReceberEscopo(null)}
+          onDone={() => { setReceberEscopo(null); carregar() }}
         />
       )}
       {distribuicaoOpen && d && (
@@ -874,6 +904,22 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
           pagamento={estornoAlvo}
           onClose={() => setEstornoAlvo(null)}
           onDone={() => { setEstornoAlvo(null); carregar() }}
+        />
+      )}
+      {acaoModal && d && (
+        <AcaoReceitaModal
+          acao={acaoModal}
+          receitaRef={String(d.obrigacaoId)}
+          onClose={() => setAcaoModal(null)}
+          onDone={() => { setAcaoModal(null); carregar() }}
+        />
+      )}
+      {editarReceitaOpen && d && (
+        <EditarReceitaView
+          obrigacaoId={d.obrigacaoId}
+          receitaRef={String(d.obrigacaoId)}
+          onClose={() => setEditarReceitaOpen(false)}
+          onDone={() => { setEditarReceitaOpen(false); carregar() }}
         />
       )}
       {faturaOpen && temProcesso && (

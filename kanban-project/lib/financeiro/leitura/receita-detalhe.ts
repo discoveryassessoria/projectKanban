@@ -41,7 +41,7 @@ export interface ReceitaDetalhe {
   parcelasAVencer: number
   parcelasVencidas: number
   proximoVencimento: string | null
-  parcelasDetalhe: { numero: number; totalParcelas: number; vencimento: string; valorBase: number; moedaBase: string; cotacao: number | null; tipoCambio: string; valorBrl: number; recebidoBrl: number; saldoBrl: number; status: string; forma: string | null; responsavel: string; diasAtraso: number }[]
+  parcelasDetalhe: { id: number; numero: number; totalParcelas: number; vencimento: string; valorBase: number; moedaBase: string; cotacao: number | null; tipoCambio: string; valorBrl: number; recebidoBrl: number; saldoBrl: number; status: string; forma: string | null; responsavel: string; diasAtraso: number }[]
   resumoParcelas: { pagas: { qtd: number; valor: number }; aVencer: { qtd: number; valor: number }; vencidas: { qtd: number; valor: number }; canceladas: { qtd: number; valor: number }; total: number }
   inadimplenciaPct: number
   distribuicaoRequerentes: { nome: string; requerenteId: number | null; percentual: number; valor: number }[]
@@ -167,7 +167,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
 
   // câmbio + aging + BRL — MESMO núcleo da lista de receitas (números idênticos)
   const parcelasAll = obr.origemTipo === 'Receita' && obr.origemId
-    ? await prisma.parcelaFinanceira.findMany({ where: { receitaId: obr.origemId }, orderBy: { numero: 'asc' }, select: { numero: true, vencimento: true, valor: true, status: true, cambioAplicado: true, valorBrl: true, formaPagamento: true } }).catch(() => [])
+    ? await prisma.parcelaFinanceira.findMany({ where: { receitaId: obr.origemId }, orderBy: { numero: 'asc' }, select: { id: true, numero: true, vencimento: true, valor: true, status: true, cambioAplicado: true, valorBrl: true, formaPagamento: true } }).catch(() => [])
     : []
   const parcelasRec = parcelasAll.filter((p) => p.status !== 'CANCELADA')
   // Documentos vinculados à Receita (resiliente durante rollout: [] se a tabela não existir)
@@ -212,7 +212,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     const status = cancel ? 'CANCELADA' : pago ? 'PAGA' : overdue ? 'VENCIDA' : 'A_VENCER'
     const recebidoBrlP = pago ? cent(vBrl) : 0
     return {
-      numero: p.numero, totalParcelas: parcelasAll.length, vencimento: new Date(p.vencimento).toISOString(),
+      id: p.id, numero: p.numero, totalParcelas: parcelasAll.length, vencimento: new Date(p.vencimento).toISOString(),
       valorBase: cent(Number(p.valor)), moedaBase: moeda, cotacao: cotP, tipoCambio: ca.tipoCambio,
       valorBrl: cent(vBrl), recebidoBrl: recebidoBrlP, saldoBrl: cancel ? 0 : cent(vBrl - recebidoBrlP),
       status, forma: p.formaPagamento ? (FORMA_P[p.formaPagamento] ?? String(p.formaPagamento)) : null,

@@ -1248,6 +1248,7 @@ model Receita {
   data1         DateTime
   periodicidade String              @default("Mensal") @db.VarChar(20)
   cancelada     Boolean             @default(false)
+  arquivadaEm   DateTime? // Ação "Mais Ações" — arquivamento sem alterar saldos (aditivo/reversível)
   observacoes   String?
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt

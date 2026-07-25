@@ -97,6 +97,8 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
   const trocarMetodo = (m: Metodo) => { setMetodo(m); setRows((rs) => aplicarMetodo(m, rs)) }
   const setValor = (key: string, valorBase: number) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, valorBase: cent(valorBase) } : r)))
   const setPct = (key: string, pct: number) => setValor(key, (pct / 100) * totalBase)
+  // No modo VALOR edita-se o BRL; grava o canônico em base: valorBase = brl / cotacao (ou brl se sem cotação).
+  const setBrl = (key: string, brlVal: number) => setValor(key, cotacao ? brlVal / cotacao : brlVal)
   const removerRow = (key: string) => setRows((rs) => { const r = rs.find((x) => x.key === key); if (!r) return rs; return r.novo ? rs.filter((x) => x.key !== key) : rs.map((x) => (x.key === key ? { ...x, incluido: false, valorBase: 0 } : x)) })
   const reincluir = (key: string) => setRows((rs) => rs.map((x) => (x.key === key ? { ...x, incluido: true } : x)))
   const adicionar = (d: any) => setRows((rs) => rs.some((r) => r.requerenteId === d.requerenteId) ? rs : [...rs, {
@@ -111,16 +113,21 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
   const soma100 = Math.abs(diferenca) < 0.01
   const pctDe = (v: number) => (totalBase > 0 ? cent((v / totalBase) * 100) : 0)
   const somaPct = cent(incluidos.reduce((s, r) => s + pctDe(r.valorBase), 0))
+  // Fechamento em BRL: a soma em BRL deve bater exatamente com brlDe(totalBase) (tolerância de 1 centavo).
+  const totalDistribuidoBrl = cent(brlDe(totalDistribuido))
+  const alvoBrl = cent(brlDe(totalBase))
+  const fechaBrl = Math.abs(totalDistribuidoBrl - alvoBrl) <= 0.01
   const disponiveisRestantes = (dist?.disponiveis ?? []).filter((d: any) => !rows.some((r) => r.requerenteId === d.requerenteId))
 
   const pendencias = useMemo(() => {
     const p: string[] = []
     if (!incluidos.length) p.push("Inclua ao menos um participante.")
     if (!soma100) p.push(`A distribuição soma ${money(totalDistribuido, moedaBase)}, deve ser ${money(totalBase, moedaBase)} (100%).`)
+    if (soma100 && !fechaBrl) p.push(`Total em BRL de ${brl(totalDistribuidoBrl)} deve fechar em ${brl(alvoBrl)}.`)
     for (const r of incluidos) if (r.valorBase < r.recebidoBase - 0.005) p.push(`${r.nome}: valor abaixo do já recebido (${money(r.recebidoBase, moedaBase)}).`)
     for (const r of incluidos) if (r.valorBase < 0) p.push(`${r.nome}: valor negativo.`)
     return [...new Set(p)]
-  }, [incluidos, soma100, totalDistribuido, totalBase, moedaBase])
+  }, [incluidos, soma100, totalDistribuido, totalBase, moedaBase, fechaBrl, totalDistribuidoBrl, alvoBrl])
   const valido = pendencias.length === 0 && !!dist
 
   const salvar = async () => {
@@ -141,7 +148,7 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
     { v: "HERDADA", lb: "Herdada da regra financeira", desc: "Restaura a divisão calculada pela regra da fase.", Ic: Sparkles },
     { v: "IGUAL", lb: "Divisão igual", desc: "Distribui o total igualmente entre os incluídos.", Ic: Scale },
     { v: "PERCENTUAL", lb: "Percentual personalizado", desc: "Você define o % de cada participante.", Ic: Percent },
-    { v: "VALOR", lb: "Valor personalizado", desc: `Você define o valor (${moedaBase}) de cada participante.`, Ic: Coins },
+    { v: "VALOR", lb: "Valor personalizado em BRL", desc: "Você define o valor em BRL de cada participante; o % e a referência EUR são recalculados.", Ic: Coins },
   ]
 
   return (
@@ -197,11 +204,12 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[720px] text-sm">
                     <thead><tr className="text-left text-[11px] uppercase tracking-wide text-white/40">
-                      <th className="px-2 py-2 font-medium">Participante</th><th className="px-2 py-2 text-right font-medium">Participação %</th><th className="px-2 py-2 text-right font-medium">Valor ({moedaBase})</th><th className="px-2 py-2 text-right font-medium">BRL</th><th className="px-2 py-2 text-right font-medium">Recebido</th><th className="px-2 py-2"></th>
+                      <th className="px-2 py-2 font-medium">Participante</th><th className="px-2 py-2 text-right font-medium">Participação %</th><th className="px-2 py-2 text-right font-medium">{metodo === "VALOR" ? `Referência ${moedaBase}` : `Valor (${moedaBase})`}</th><th className="px-2 py-2 text-right font-medium">{metodo === "VALOR" ? "Valor BRL" : "BRL"}</th><th className="px-2 py-2 text-right font-medium">Recebido</th><th className="px-2 py-2"></th>
                     </tr></thead>
                     <tbody>
                       {rows.map((r) => {
                         const pct = pctDe(r.valorBase)
+                        const brlRow = cent(brlDe(r.valorBase))
                         const editPct = metodo === "PERCENTUAL", editVal = metodo === "VALOR"
                         return (
                           <tr key={r.key} className={`border-t border-white/5 ${r.incluido ? "" : "opacity-40"}`}>
@@ -212,8 +220,8 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
                               </div>
                             </td>
                             <td className="px-2 py-2 text-right">{editPct && r.incluido ? <input inputMode="decimal" value={pct === 0 ? "" : String(pct)} onChange={(e) => setPct(r.key, num(e.target.value))} placeholder="0" className={`${inputCls} w-24`} /> : <span className="text-white/80">{pct.toFixed(2)}%</span>}</td>
-                            <td className="px-2 py-2 text-right">{editVal && r.incluido ? <input inputMode="decimal" value={r.valorBase === 0 ? "" : String(r.valorBase)} onChange={(e) => setValor(r.key, num(e.target.value))} placeholder="0,00" className={`${inputCls} w-32`} /> : <span className="text-white">{money(r.valorBase, moedaBase)}</span>}</td>
-                            <td className="px-2 py-2 text-right text-white/50">{brl(brlDe(r.valorBase))}</td>
+                            <td className="px-2 py-2 text-right"><span className={editVal ? "text-white/50" : "text-white"}>{money(r.valorBase, moedaBase)}</span></td>
+                            <td className="px-2 py-2 text-right">{editVal && r.incluido ? <input inputMode="decimal" value={brlRow === 0 ? "" : String(brlRow)} onChange={(e) => setBrl(r.key, num(e.target.value))} placeholder="0,00" className={`${inputCls} w-32`} /> : <span className="text-white/50">{brl(brlDe(r.valorBase))}</span>}</td>
                             <td className="px-2 py-2 text-right text-[#4ade80]">{r.recebidoBase > 0 ? money(r.recebidoBase, moedaBase) : "—"}</td>
                             <td className="px-2 py-2 text-center">
                               {r.incluido
@@ -229,13 +237,15 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
                         <td className="px-2 py-2.5"><span className="inline-flex items-center gap-1.5 text-sm font-semibold text-white">{soma100 ? <CheckCircle2 className="h-4 w-4 text-[#4ade80]" /> : <AlertTriangle className="h-4 w-4 text-[#f87171]" />} Total da distribuição</span></td>
                         <td className={`px-2 py-2.5 text-right font-semibold ${Math.abs(somaPct - 100) < 0.05 ? "text-[#4ade80]" : "text-[#f87171]"}`}>{somaPct.toFixed(2)}%</td>
                         <td className={`px-2 py-2.5 text-right font-semibold ${soma100 ? "text-[#4ade80]" : "text-[#f87171]"}`}>{money(totalDistribuido, moedaBase)}</td>
-                        <td className="px-2 py-2.5 text-right text-white/50">{brl(brlDe(totalDistribuido))}</td>
+                        <td className={`px-2 py-2.5 text-right font-semibold ${soma100 && fechaBrl ? "text-[#4ade80]" : "text-[#f87171]"}`}>{brl(totalDistribuidoBrl)}</td>
                         <td colSpan={2}></td>
                       </tr>
                     </tfoot>
                   </table>
                 </div>
                 {!soma100 && <p className="mt-2 text-xs text-[#f87171]">Diferença de {money(Math.abs(diferenca), moedaBase)} — ajuste para fechar em {money(totalBase, moedaBase)}.</p>}
+                {soma100 && !fechaBrl && <p className="mt-2 text-xs text-[#f87171]">Total em BRL {brl(totalDistribuidoBrl)} — ajuste para fechar exatamente em {brl(alvoBrl)}.</p>}
+                {metodo === "VALOR" && <p className="mt-2 text-xs text-white/40">Edite o <span className="text-white/60">Valor BRL</span> de cada participante; o % e a referência {moedaBase} são recalculados. Fechamento em BRL: {brl(alvoBrl)}.</p>}
               </section>
 
               {/* Disponíveis */}
