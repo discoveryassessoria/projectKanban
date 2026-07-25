@@ -18,7 +18,7 @@ import {
 } from "lucide-react"
 import {
   OrigemBadge, StatusBadge as SituacaoBadge, VerOrigemLink,
-  LancamentoDetalheModal, CancelarEstornarModal,
+  LancamentoDetalheModal,
 } from "@/src/components/financeiro/shared/FinanceiroGeralShared"
 import PendenciasFinanceirasPanel from "@/src/components/financeiro/shared/PendenciasFinanceirasPanel"
 import {
@@ -75,7 +75,6 @@ export default function ReceberTab() {
   const [loading, setLoading] = useState(true)
   const [chip, setChip] = useState<string>("todos")
   const [detalhe, setDetalhe] = useState<{ tipo: "receita" | "custo"; id: number } | null>(null)
-  const [acao, setAcao] = useState<{ acao: "cancelar" | "estornar"; tipo: "receita" | "custo"; id: number; resumo: { item: string; valor: string; processo: string | null } } | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
   function carregar() {
@@ -208,16 +207,19 @@ export default function ReceberTab() {
                       <td className="py-2.5 px-2 text-center"><SituacaoBadge e={statusEntrada(p)} /></td>
                       <td className="py-2.5 px-2 text-center">
                         <div className="inline-flex items-center gap-1.5 justify-center">
+                          {/* Registrar pagamento/estorno/cancelar é EXCLUSIVO do fluxo canônico
+                              (Financeiro do processo → Receita). Aqui é somente-leitura após o
+                              corte legado: os botões ficam desabilitados com motivo visível. */}
                           {!p.recebida && !p.cancelada && !p.estorno && (
-                            <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded text-white" style={{ background: "color-mix(in srgb, var(--success) 75%, black)" }}><Check className="h-3 w-3" /> Receber</button>
+                            <button disabled title="Registrar pagamento é feito no Financeiro do processo (fluxo canônico)." className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded text-white cursor-not-allowed opacity-40" style={{ background: "color-mix(in srgb, var(--success) 75%, black)" }}><Check className="h-3 w-3" /> Receber</button>
                           )}
                           {p.lancamentoOrigemId != null && !p.cancelada && !p.estorno && !p.estornadoEm && (
                             p.recebida ? (
-                              <button onClick={() => setAcao({ acao: "estornar", tipo: "receita", id: p.lancamentoOrigemId!, resumo: { item: p.descricao, valor: fmtBRL(p.valorBRL), processo: p.cliente } })}
-                                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border" style={{ borderColor: "color-mix(in srgb, var(--info) 30%, transparent)", color: "var(--info)" }}><RotateCcw className="h-3 w-3" /> Estornar</button>
+                              <button disabled title="Estorno é feito no Financeiro do processo → aba Pagamentos (fluxo canônico)."
+                                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border cursor-not-allowed opacity-40" style={{ borderColor: "color-mix(in srgb, var(--info) 30%, transparent)", color: "var(--info)" }}><RotateCcw className="h-3 w-3" /> Estornar</button>
                             ) : (
-                              <button onClick={() => setAcao({ acao: "cancelar", tipo: "receita", id: p.lancamentoOrigemId!, resumo: { item: p.descricao, valor: fmtBRL(p.valorBRL), processo: p.cliente } })}
-                                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border" style={{ borderColor: "color-mix(in srgb, var(--danger) 30%, transparent)", color: "var(--danger)" }}><Ban className="h-3 w-3" /> Cancelar</button>
+                              <button disabled title="Cancelar é feito no Financeiro do processo → Mais ações (fluxo canônico)."
+                                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border cursor-not-allowed opacity-40" style={{ borderColor: "color-mix(in srgb, var(--danger) 30%, transparent)", color: "var(--danger)" }}><Ban className="h-3 w-3" /> Cancelar</button>
                             )
                           )}
                         </div>
@@ -258,7 +260,6 @@ export default function ReceberTab() {
       </div>
 
       {detalhe && <LancamentoDetalheModal tipo={detalhe.tipo} id={detalhe.id} onClose={() => setDetalhe(null)} />}
-      {acao && <CancelarEstornarModal {...acao} onClose={() => setAcao(null)} onDone={(m) => { setAcao(null); setToast(m); carregar() }} />}
       {toast && <div className="fixed bottom-4 right-4 z-50 rounded-lg border px-4 py-2 text-sm shadow-xl" style={{ background: "#27272a", borderColor: "var(--border-default)", color: "var(--text-primary)" }} onClick={() => setToast(null)}>{toast}</div>}
     </div>
   )

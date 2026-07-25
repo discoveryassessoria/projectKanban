@@ -139,7 +139,7 @@ function CobrancaCard({ cobranca, moeda, onPago }: { cobranca: any; moeda: strin
                   <td className="px-3 py-2 tabular-nums">{brl(p.valor, moeda)}</td>
                   <td className="px-3 py-2">{quit ? <span className="text-emerald-400">recebida</span> : <span className="text-white/50">pendente</span>}</td>
                   <td className="px-3 py-2 text-right">
-                    {!quit && <button disabled={pagando === p.id} onClick={() => pagar(p.id, Number(p.valor))} className="rounded-md border border-white/20 px-2.5 py-1 text-xs text-white/80 transition hover:bg-white/10 disabled:opacity-50">{pagando === p.id ? '...' : 'Registrar pagamento'}</button>}
+                    {!quit && <button disabled title="Registrar pagamento é feito no Financeiro do processo (fluxo canônico único)." className="rounded-md border border-white/20 px-2.5 py-1 text-xs text-white/80 cursor-not-allowed opacity-40">Registrar pagamento</button>}
                   </td>
                 </tr>
               )
