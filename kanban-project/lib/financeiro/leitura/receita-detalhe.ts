@@ -283,7 +283,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   return {
     obrigacaoId: id, receitaId: obr.origemTipo === 'Receita' ? (obr.origemId ?? null) : null,
     natureza: obr.direcao === 'A_PAGAR' ? 'CUSTO' : 'RECEITA',
-    codigo: obr.codigoOperacional, descricao: itemMestre?.name ?? receita?.descricao ?? obr.observacoes ?? null, statusLabel,
+    codigo: obr.codigoOperacional ?? `OBR-${obr.id}`, descricao: itemMestre?.name ?? receita?.descricao ?? obr.observacoes ?? `Lançamento ${obr.codigoOperacional ?? obr.id}`, statusLabel,
     processo: { id: processo?.id ?? null, codigo: processo?.codigo ?? null, nome: processo?.nome ?? null },
     responsavel: reqNomeLegado ? { nome: reqNomeLegado, papel: 'Principal' } : (primeiro ? { nome: nome(primeiro.pessoaId), papel: 'Principal' } : null),
     servico: itemMestre?.name ?? tipoServico?.nome ?? labelServico(receita?.categoria ? String(receita.categoria) : null),
@@ -437,7 +437,7 @@ export async function carregarReceitaConsolidada(ref: string): Promise<ReceitaDe
   const participantes: ReceitaParticipanteDetalhe[] = slices.map((s) => ({
     obrigacaoId: s.obrigacaoId,
     pessoaId: s.responsavelFinanceiro?.requerenteId ?? null,
-    nome: s.responsavel?.nome ?? 'Participante não identificado',
+    nome: s.responsavel?.nome ?? (s.descricao ? String(s.descricao).slice(0, 40) : 'Processo inteiro'),
     papel: s.responsavel?.papel ?? 'Participante',
     valorBase: s.valorBase,
     moedaBase: s.moedaBase,
