@@ -63,7 +63,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const router = useRouter()
   const [d, setD] = useState<any>(null)
   const [erro, setErro] = useState<string | null>(null)
-  const [tab, setTab] = useState("resumo")
+  const [tab, setTab] = useState("cobrancas")
   const [drawerPart, setDrawerPart] = useState<any>(null) // participante aberto no drawer (obrigacaoId + nome)
   const [pagOpen, setPagOpen] = useState(false)
   const [receberOpen, setReceberOpen] = useState(false)
@@ -221,23 +221,6 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
   }
 
-  // botão de ação para "Próximas ações"
-  const acaoBotao = (acao: string) => {
-    switch (acao) {
-      case "COBRAR_VENCIDA": return { label: "Ver cobranças", onClick: () => setTab("cobrancas"), disabled: false, title: "" }
-      case "REGISTRAR_PAGAMENTO": return { label: "Registrar", onClick: () => setPagOpen(true), disabled: false, title: "" }
-      case "EMITIR_FATURA": return temProcesso ? { label: "Emitir fatura", onClick: () => setFaturaOpen(true), disabled: false, title: "" } : { label: "Emitir fatura", onClick: () => {}, disabled: true, title: "Processo não vinculado" }
-      case "ENVIAR_COBRANCA": return { label: d.cobrancaEnviada ? "Reenviar" : "Enviar", onClick: enviarCobranca, disabled: false, title: d.cobrancaEnviada ? "Cobrança já enviada — marcar novamente?" : "" }
-      default: return { label: "Abrir", onClick: () => {}, disabled: true, title: "" }
-    }
-  }
-  const acaoIcone = (acao: string, severidade?: string) => {
-    if (acao === "COBRAR_VENCIDA") return { Icon: AlertTriangle, cls: "bg-[#f87171]/15 text-[#f87171]" }
-    if (acao === "REGISTRAR_PAGAMENTO") return { Icon: Wallet, cls: "bg-[#4ade80]/15 text-[#4ade80]" }
-    if (acao === "EMITIR_FATURA") return { Icon: FileText, cls: "bg-[#7dd3fc]/15 text-[#7dd3fc]" }
-    if (acao === "ENVIAR_COBRANCA") return { Icon: Send, cls: "bg-[#d2a948]/15 text-[#d2a948]" }
-    return { Icon: InfoIcon, cls: "bg-white/10 text-white/60" }
-  }
   const alertaIcone = (sev: string) => {
     if (sev === "crit") return "text-[#f87171]"
     if (sev === "warn") return "text-[#d2a948]"
@@ -246,7 +229,6 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
 
   // Contadores só quando > 0 (Resumo/Timeline/Observações não têm contador).
   const tabs: [string, string, any, number][] = [
-    ["resumo", "Resumo", Receipt, 0],
     ["cobrancas", "Cobranças", CreditCard, rp.total],
     ["participantes", "Participantes Financeiros", Users, d.participantesCount ?? participantes.length],
     ["pagamentos", "Pagamentos", Wallet, (d.pagamentos ?? []).length],
@@ -320,7 +302,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
         </div>
 
         {/* ── TOP: (info + situação + ações)  |  sidebar ── */}
-        <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_340px]">
+        <div className="mt-5 space-y-5">
           {/* ─── COLUNA PRINCIPAL ─── */}
           <div className="min-w-0 space-y-5">
             {/* INFO CARD */}
@@ -380,112 +362,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
 
           </div>
 
-          {/* ─── SIDEBAR ─── */}
-          <aside className="space-y-4">
-            {/* Distribuição entre requerentes */}
-            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-white/85">Participantes Financeiros</span>
-                {!d.consolidado && divisaoIgual && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-300">Divisão igual</span>}
-              </div>
-              {participantes.length > 0 ? (
-                <>
-                  <div className="mt-1 text-xs text-white/40">{d.metodoDistribuicao} · {d.participantesCount ?? participantes.length} participantes</div>
-                  <div className="mt-3 space-y-2.5">
-                    {participantes.map((p: any, i: number) => (
-                      <div key={i} className="flex items-center gap-2.5">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-[11px] font-semibold text-violet-300">{iniciais(p.nome)}</span>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm text-white/85">{p.nome}</div>
-                          <div className="text-[11px] text-white/40">{fmt(p.valorBase, p.moedaBase)}</div>
-                        </div>
-                        <span className="shrink-0 text-sm font-medium text-white/80">{Number(p.participacaoPct).toFixed(2)}%</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="my-3 border-t border-white/10" />
-                  <div className="flex items-center justify-between"><span className="text-sm text-white/60">Total</span><span className="text-sm font-semibold text-white/90">{brl(somaContratado)}</span></div>
-                </>
-              ) : (
-                <>
-                  <div className="mt-1 text-xs text-white/40">{dist.length} participante(s)</div>
-                  <div className="mt-3 space-y-2.5">
-                    {dist.length === 0 ? <div className="text-sm text-white/40">—</div> : dist.map((r: any, i: number) => (
-                      <div key={i} className="flex items-center gap-2.5">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-[11px] font-semibold text-violet-300">{iniciais(r.nome)}</span>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm text-white/85">{r.nome}</div>
-                          <div className="text-[11px] text-white/40">{brl(r.valor)}</div>
-                        </div>
-                        <span className="shrink-0 text-sm font-medium text-white/80">{Number(r.percentual).toFixed(0)}%</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="my-3 border-t border-white/10" />
-                  <div className="flex items-center justify-between"><span className="text-sm text-white/60">Total do contrato</span><span className="text-sm font-semibold text-white/90">{brl(d.valorContratadoBrl)}</span></div>
-                </>
-              )}
-            </div>
-
-            {/* Pagadores envolvidos — DERIVADO de pagamentos reais (nunca um pagador fixo da Receita).
-                Some quando não há pagamento: pagador não é atributo absoluto da Receita. */}
-            {Array.isArray(d.pagadores) && d.pagadores.length > 0 && (
-              <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
-                <span className="text-sm font-semibold text-white/85">Pagadores envolvidos</span>
-                <div className="mt-3 space-y-2.5">
-                  {d.pagadores.map((pg: any, i: number) => (
-                    <div key={i} className="flex items-center gap-2.5">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#7dd3fc]/15 text-[11px] font-semibold text-[#7dd3fc]">{iniciais(pg.nome)}</span>
-                      <div className="min-w-0 flex-1"><div className="truncate text-sm text-white/85">{pg.nome}</div></div>
-                      {pg.valor != null && <span className="shrink-0 text-sm text-white/70">{brl(pg.valor)}</span>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Documentos principais */}
-            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
-              <span className="text-sm font-semibold text-white/85">Documentos principais</span>
-              {d.faturaEmitida && (
-                <div className="mt-3 flex items-center gap-2.5 rounded-lg border border-[#4ade80]/25 bg-[#4ade80]/10 px-3 py-2.5">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-[#4ade80]" />
-                  <span className="min-w-0 flex-1 truncate text-sm text-white/85">Fatura: {d.fatura?.descricao ?? "emitida"}</span>
-                </div>
-              )}
-              {documentos.length === 0 ? (
-                <div className="mt-3 rounded-lg border border-dashed border-white/10 bg-[#161b21] px-3 py-6 text-center text-xs text-white/40">Nenhum documento vinculado ainda.</div>
-              ) : (
-                <div className="mt-3 space-y-2">
-                  {documentos.slice(0, 4).map((doc: any) => (
-                    <div key={doc.id} className="flex items-center gap-2.5 rounded-lg border border-white/10 bg-[#161b21] px-3 py-2.5">
-                      <FileIcon className="h-4 w-4 shrink-0 text-white/45" />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm text-white/85">{doc.nome}</div>
-                        <div className="text-[11px] text-white/40">{[doc.tipo, fmtTamanho(doc.tamanho), dataBR(doc.criadoEm)].filter(Boolean).join(" · ")}</div>
-                      </div>
-                      <a href={doc.url} target="_blank" rel="noreferrer" download title="Baixar documento" className="shrink-0 rounded-lg border border-white/10 p-1.5 text-white/45 hover:border-white/25 hover:text-white/80"><Download className="h-4 w-4" /></a>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <button onClick={() => setTab("documentos")} className="mt-3 w-full rounded-lg border border-white/10 py-2 text-xs text-white/70 hover:border-white/25">Ver todos os documentos ({documentos.length})</button>
-            </div>
-
-            {/* Alertas */}
-            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
-              <span className="text-sm font-semibold text-white/85">Alertas</span>
-              <div className="mt-3 space-y-2">
-                {(d.alertas ?? []).length === 0 ? <div className="text-sm text-white/40">Sem alertas.</div> : (d.alertas ?? []).map((a: any, i: number) => (
-                  <div key={i} className="flex items-center gap-2.5 rounded-lg border border-white/10 bg-[#161b21] px-3 py-2.5">
-                    <AlertTriangle className={`h-4 w-4 shrink-0 ${alertaIcone(a.severidade)}`} />
-                    <span className="min-w-0 flex-1 truncate text-sm text-white/80">{a.label}</span>
-                    <span className="shrink-0 text-sm font-medium text-white/70">{a.valor != null ? brl(a.valor) : <ChevronRightSm className="h-4 w-4 text-white/40" />}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </aside>
+          
         </div>
 
         {/* ── ABAS ── */}
@@ -499,57 +376,6 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
 
         {/* ── CONTEÚDO DAS ABAS ── */}
         <div className="mt-5">
-          {/* Resumo (Próximas ações + Última movimentação) */}
-          {tab === "resumo" && (
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-              {/* Próximas ações */}
-              <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-                <h2 className="text-base font-semibold text-white">Próximas ações</h2>
-                <div className="mt-4 space-y-2.5">
-                  {(d.proximasAcoes ?? []).length === 0 ? (
-                    <div className="text-sm text-white/40">Nenhuma ação pendente.</div>
-                  ) : (d.proximasAcoes ?? []).map((a: any, i: number) => {
-                    const { Icon, cls } = acaoIcone(a.acao)
-                    const btn = acaoBotao(a.acao)
-                    const descricao = a.acao === "EMITIR_FATURA" && d.faturaEmitida ? "Fatura já emitida — emitir outra?" : a.descricao
-                    return (
-                      <div key={i} className="flex items-start gap-3 rounded-lg border border-white/10 bg-[#161b21] px-3.5 py-3">
-                        <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${cls}`}><Icon className="h-4 w-4" /></div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-white/90">{a.label}</div>
-                          <div className="mt-0.5 text-xs text-white/45">{descricao}</div>
-                        </div>
-                        <button onClick={btn.onClick} disabled={btn.disabled} title={btn.title} className="shrink-0 whitespace-nowrap rounded-lg border border-white/15 bg-[#1b2027] px-3 py-1.5 text-xs font-medium text-white/80 hover:border-white/30 disabled:cursor-not-allowed disabled:opacity-40">{btn.label}</button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Última movimentação */}
-              <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-                <h2 className="text-base font-semibold text-white">Última movimentação</h2>
-                <div className="mt-4 space-y-4">
-                  {historico.length === 0 ? (
-                    <div className="text-sm text-white/40">Sem movimentações registradas.</div>
-                  ) : historico.slice(0, 3).map((h: any, i: number) => (
-                    <div key={h.id ?? i} className="flex gap-3">
-                      <div className="mt-1 flex flex-col items-center">
-                        <span className="h-2 w-2 rounded-full bg-[#7dd3fc]" />
-                        {i < Math.min(historico.length, 3) - 1 && <span className="mt-1 w-px flex-1 bg-white/10" />}
-                      </div>
-                      <div className="min-w-0 flex-1 pb-1">
-                        <div className="text-sm font-medium text-white/90">{h.titulo}</div>
-                        <div className="mt-0.5 flex items-center gap-2 text-xs text-white/40"><span>{dataBR(h.data)} · {horaBR(h.data)}</span><span className="text-[#7dd3fc]">{h.ator}</span></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => setTab("timeline")} className="mt-3 inline-flex items-center gap-1 text-sm text-[#7dd3fc] hover:underline">Ver timeline completa <ChevronRightSm className="h-3.5 w-3.5" /></button>
-              </div>
-            </div>
-          )}
-
           {/* Participantes Financeiros */}
           {tab === "participantes" && (
             <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
@@ -674,7 +500,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                     <td><div className="text-white/70">{p.banco ?? "—"}</div>{(p.agencia || p.conta) && <div className="text-xs text-white/40">Ag: {p.agencia ?? "—"} Cc: {p.conta ?? "—"}</div>}</td>
                     <td className="text-white/68">{p.referencia ?? "—"}</td>
                     <td><span className="inline-flex items-center gap-1.5 text-[#4ade80]"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />{p.status}</span></td>
-                    <td><div className="flex items-center gap-2"><button onClick={() => setEstornoAlvo(p)} title="Estornar pagamento (total ou parcial)" className="text-white/40 hover:text-[#f87171]"><RotateCcw className="h-4 w-4" /></button></div></td>
+                    <td><PagamentoRowMenu p={p} onEstornar={() => setEstornoAlvo(p)} onTimeline={() => setTab("timeline")} /></td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -945,6 +771,31 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
           onClose={() => setEditOpen(false)}
           onDone={() => { setEditOpen(false); carregar() }}
         />
+      )}
+    </div>
+  )
+}
+
+// ── Menu de ações por linha de PAGAMENTO — só ações realmente ligadas (sem botão morto):
+// Estornar (total/parcial via EstornoModal), Ver movimentações (Timeline) e Copiar referência. ──
+function PagamentoRowMenu({ p, onEstornar, onTimeline }: { p: any; onEstornar: () => void; onTimeline: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [copiado, setCopiado] = useState(false)
+  const ref = p?.referencia ?? p?.codigo ?? null
+  const copiar = async () => { if (!ref) return; try { await navigator.clipboard.writeText(String(ref)); setCopiado(true); setTimeout(() => setCopiado(false), 1400) } catch { /* clipboard indisponível */ } }
+  return (
+    <div className="relative flex justify-end">
+      <button onClick={() => setOpen(o => !o)} title="Ações do pagamento" className="rounded-lg border border-white/10 p-1.5 text-white/40 hover:text-white/80"><MoreVertical className="h-4 w-4" /></button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-8 z-50 w-52 overflow-hidden rounded-lg border border-white/10 bg-[#1b2027] py-1 shadow-xl shadow-black/40">
+            <button onClick={() => { setOpen(false); onTimeline() }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><Clock className="h-4 w-4 text-white/45" /> Ver movimentações</button>
+            <button onClick={() => { setOpen(false); copiar() }} disabled={!ref} title={ref ? "" : "Sem referência"} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5 disabled:opacity-40">{copiado ? <CheckCircle2 className="h-4 w-4 text-[#4ade80]" /> : <Copy className="h-4 w-4 text-white/45" />} Copiar referência</button>
+            <div className="my-1 border-t border-white/10" />
+            <button onClick={() => { setOpen(false); onEstornar() }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#f87171] hover:bg-white/5"><RotateCcw className="h-4 w-4" /> Estornar (total ou parcial)</button>
+          </div>
+        </>
       )}
     </div>
   )
