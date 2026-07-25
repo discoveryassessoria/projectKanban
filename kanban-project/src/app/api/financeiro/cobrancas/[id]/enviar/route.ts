@@ -3,13 +3,14 @@
 // entrega): apenas registra enviadaEm/enviadaPorId + auditoria (fail-safe).
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // legado só-leitura após o corte
+  // "Enviar" NÃO é mutação do motor financeiro (não toca ledger/parcela/ocorrência): só
+  // marca Cobranca.enviadaEm + auditoria. Portanto NÃO é bloqueado pelo corte legado —
+  // é a ação canônica de marcar envio, disponível mesmo com o kill-switch ligado.
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
   const id = Number((await params).id)
   try {
