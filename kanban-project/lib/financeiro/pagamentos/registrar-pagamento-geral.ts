@@ -11,9 +11,11 @@ import { registrarPagamentoComposto, type FormaLinhaEntrada, type PagadorEntrada
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
 export interface AlocacaoGeral { obrigacaoId: number; valor: number }
+export interface AjustesGerais { desconto?: number; juros?: number; multa?: number; acrescimo?: number; creditoUtilizado?: number }
 export interface RegistrarPagamentoGeralInput {
   alocacoes: AlocacaoGeral[]
   formas: FormaLinhaEntrada[]
+  ajustes?: AjustesGerais | null
   pagador?: PagadorEntrada | null
   observacao?: string | null
   criadoPorId?: number | null
@@ -38,6 +40,11 @@ export async function registrarPagamentoGeral(input: RegistrarPagamentoGeralInpu
     return { ...vazio, erros: [`A soma das alocações (${totalAloc}) deve ser igual ao total informado (${totalFormas}).`] }
   }
 
+  // Ajustes do nível-Receita são RATEADOS por participante (fração da alocação) e passados
+  // ao composto de cada um — cada cobrança registra o SEU desconto/juros/multa/acréscimo/crédito
+  // (rastreabilidade por cobrança; nunca aplicado silenciosamente a outra). Preview = backend.
+  const aj = input.ajustes ?? {}
+  const scale = (v: number | undefined, frac: number) => cent(Math.max(0, Number(v ?? 0)) * frac)
   const porParticipante: RegistrarPagamentoGeralResultado['porParticipante'] = []
   const erros: string[] = []
   for (const a of alocacoes) {
@@ -45,6 +52,7 @@ export async function registrarPagamentoGeral(input: RegistrarPagamentoGeralInpu
     const formasEscaladas = formas.map((f) => ({ ...f, valor: cent(f.valor * fracao) }))
     const r = await registrarPagamentoComposto({
       obrigacaoId: a.obrigacaoId, formas: formasEscaladas, pagador: input.pagador ?? null,
+      ajustes: { desconto: scale(aj.desconto, fracao), juros: scale(aj.juros, fracao), multa: scale(aj.multa, fracao), acrescimo: scale(aj.acrescimo, fracao), creditoUtilizado: scale(aj.creditoUtilizado, fracao) },
       observacao: [input.observacao, '[Pagamento geral da Receita]'].filter(Boolean).join(' '),
       excedenteTratamento: 'CREDITO', saldoSelecionado: a.valor,
       criadoPorId: input.criadoPorId ?? null,

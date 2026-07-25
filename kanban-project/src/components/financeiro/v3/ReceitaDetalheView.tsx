@@ -21,6 +21,7 @@ import AcaoReceitaModal, { type AcaoReceita } from "@/src/components/financeiro/
 import EditarReceitaView from "@/src/components/financeiro/v3/EditarReceitaView"
 import { NovaFaturaModal } from "@/src/components/kanban/NovaFaturaModal"
 import { uploadFiles } from "@/src/lib/storage"
+import { emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
 import {
   ArrowLeft, ExternalLink, MoreVertical, Copy, ChevronDown, ChevronUp,
   Receipt, CreditCard, Wallet, FileCheck, Clock, Search, SlidersHorizontal, Calendar,
@@ -84,9 +85,15 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
+  const jaCarregou = useRef(false)
   const carregar = useCallback(() => {
     fetch(`/api/financeiro/v3/receita/${encodeURIComponent(refParam)}`, { headers: authHeaders() })
-      .then(async (r) => { const j = await r.json(); if (r.ok && j.disponivel) { setD(j.receita); setErro(null) } else setErro(j.fallbackLegado ? "Financeiro V3 indisponível." : "Receita não encontrada.") })
+      .then(async (r) => {
+        const j = await r.json(); if (r.ok && j.disponivel) { setD(j.receita); setErro(null) } else setErro(j.fallbackLegado ? "Financeiro V3 indisponível." : "Receita não encontrada.")
+        // RECARGA (pós-mutação) propaga a revalidação p/ lista/dashboard/central; a 1ª carga não.
+        if (jaCarregou.current) emitirMutacaoFinanceira({ obrigacaoId: r.ok && j.disponivel ? j.receita?.obrigacaoId : null })
+        jaCarregou.current = true
+      })
       .catch(() => setErro("Falha ao carregar."))
   }, [refParam])
 

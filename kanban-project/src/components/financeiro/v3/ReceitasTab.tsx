@@ -9,7 +9,8 @@
 // ============================================================================
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRevalidacaoFinanceira } from "@/src/lib/financeiro-bus"
 import { useRouter } from "next/navigation"
 import { LancamentoManualModal } from "./LancamentoManualModal"
 import {
@@ -72,6 +73,9 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
   }
   useEffect(() => { carregar() }, [processoId])
   useEffect(() => { setPage(1) }, [busca, aba])
+  // Revalidação automática: recarrega a lista quando QUALQUER mutação financeira ocorre
+  // (registrar pagamento, editar, redistribuir, estornar, arquivar…) — sem recarregar a página.
+  useRevalidacaoFinanceira(useCallback(() => carregar(), [processoId]))
 
   const grupos: Grupo[] = d?.receitas ?? []
   const k = d?.kpis ?? {}

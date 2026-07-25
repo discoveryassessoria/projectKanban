@@ -4278,6 +4278,35 @@ model CreditoFinanceiro {
   @@index([pessoaId])
 }
 
+/// Razão IMUTÁVEL de movimentos de crédito (append-only). Cada geração/utilização/
+/// devolução/estorno é um registro com saldo anterior→posterior, origem→destino,
+/// pagador, ocorrência, usuário e correlation id. Aditivo; não substitui o Ledger
+/// double-entry das obrigações — é o sub-razão do crédito. Nunca é editado/apagado.
+model CreditoMovimento {
+  id                  Int      @id @default(autoincrement())
+  creditoId           Int
+  tipo                String   @db.VarChar(16) // GERACAO|UTILIZACAO|DEVOLUCAO|ESTORNO
+  valor               Decimal  @db.Decimal(14, 2)
+  saldoAnterior       Decimal  @db.Decimal(14, 2)
+  saldoPosterior      Decimal  @db.Decimal(14, 2)
+  moeda               Moeda    @default(BRL)
+  obrigacaoOrigemId   Int?
+  obrigacaoDestinoId  Int?
+  cobrancaDestinoId   Int?
+  ocorrenciaId        Int?
+  pagadorId           Int?
+  pessoaId            Int?
+  processoId          Int?
+  receitaId           Int?
+  usuarioId           Int?
+  correlationId       String?  @db.VarChar(80)
+  observacao          String?  @db.VarChar(300)
+  criadoEm            DateTime @default(now())
+
+  @@index([creditoId])
+  @@index([correlationId])
+}
+
 /// ProjeÃ§Ã£o materializada (CACHE; nunca fonte). ReconstruÃ­vel do Ledger.
 model SaldoProjecao {
   id                      Int      @id @default(autoincrement())

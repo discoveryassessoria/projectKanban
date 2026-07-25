@@ -81,6 +81,8 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
   const [erroSubmit, setErroSubmit] = useState<string | null>(null)
   const [ok, setOk] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  // chave de idempotência estável por sessão da tela (double-click/retry não duplica)
+  const idemKey = useRef(`ui-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
 
   // ── carregar dados ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -219,7 +221,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
         const pagadorG = pagadorTipo === "EXTERNO" ? { tipo: "EXTERNO" as const, parteExterna: { nome: ext.nome, documento: ext.documento || null, telefone: ext.telefone || null, observacao: ext.observacao || null } } : { tipo: pagadorTipo, pessoaId: pagadorTipo === "REQUERENTE" ? (pagadorPessoaId || null) : null }
         const r = await fetch(`/api/financeiro/v3/receita/${receitaRef}/registrar-pagamento-geral`, {
           method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-          body: JSON.stringify({ alocacoes: alocacoesGeral.map((a) => ({ obrigacaoId: a.obrigacaoId, valor: a.valor })), formas, pagador: pagadorG, observacao: observacao || "[Pagamento geral da Receita]" }),
+          body: JSON.stringify({ alocacoes: alocacoesGeral.map((a) => ({ obrigacaoId: a.obrigacaoId, valor: a.valor })), formas, ajustes: { desconto, juros, multa, acrescimo, creditoUtilizado }, pagador: pagadorG, observacao: observacao || "[Pagamento geral da Receita]" }),
         }).then((x) => x.json())
         if (!r?.ok) { setErroSubmit(r?.erro ?? "Falha no pagamento geral."); setEnviando(false); return }
         setOk(true); setTimeout(() => { onDone?.(); onClose() }, 700); return
@@ -253,6 +255,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
         parcialTratamento: situacao === "PARCIAL" ? parcialTrat : null,
         saldoSelecionado: saldoCobranca,
         totais: { totalInformado: recebido, saldoRestante, excedente },
+        idempotencyKey: idemKey.current,
         escopo: escopo?.tipo ?? null, escopoTag: escopo?.tag ?? null,
         comprovantes, observacao: [escopo?.tag ? `[${escopo.tag}]` : null, observacao || null].filter(Boolean).join(" ") || null,
       }

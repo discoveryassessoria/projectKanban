@@ -130,6 +130,28 @@ export function lancEncargo(valor: number, tipo: 'JUROS' | 'MULTA' = 'JUROS'): L
   return montarLancamento(tipo, [D(CONTA.CLIENTES_A_RECEBER, valor), C(CONTA.ENCARGOS, valor)])
 }
 
+/**
+ * Crédito GERADO por excedente: o caixa que entrou ALÉM do quitado vira passivo
+ * (Créditos de Clientes / adiantamento). D Caixa / C Créditos de Clientes.
+ * Sem dupla contagem: é a perna do dinheiro extra recebido no mesmo recebimento.
+ */
+export function lancCreditoGerado(valor: number): Lancamento {
+  return montarLancamento('CREDITO_GERADO', [D(CONTA.CAIXA_BANCO, valor), C(CONTA.CREDITOS_CLIENTES, valor)])
+}
+
+/**
+ * Crédito UTILIZADO: abate uma cobrança usando o adiantamento — NÃO entra caixa
+ * novo (o dinheiro já entrou na geração). D Créditos de Clientes / C Clientes a Receber.
+ */
+export function lancCreditoUtilizado(valor: number): Lancamento {
+  return montarLancamento('CREDITO_UTILIZADO', [D(CONTA.CREDITOS_CLIENTES, valor), C(CONTA.CLIENTES_A_RECEBER, valor)])
+}
+
+/** Crédito DEVOLVIDO ao cliente: sai caixa contra o passivo. D Créditos / C Caixa. */
+export function lancCreditoDevolvido(valor: number): Lancamento {
+  return montarLancamento('CREDITO_DEVOLVIDO', [D(CONTA.CREDITOS_CLIENTES, valor), C(CONTA.CAIXA_BANCO, valor)])
+}
+
 /** Estorno: inverte as pernas de um lançamento original (novo lançamento). */
 export function lancEstorno(pernasOriginais: Perna[]): Lancamento {
   const invertidas = pernasOriginais.map((p) => ({ ...p, direcao: (p.direcao === 'DEBITO' ? 'CREDITO' : 'DEBITO') as Direcao }))

@@ -54,6 +54,7 @@ export interface RegistrarPagamentoCompostoInput {
   observacao?: string | null
   saldoSelecionado?: number | null
   totais?: { totalInformado?: number; saldoRestante?: number; excedente?: number } | null
+  idempotencyKey?: string | null
   criadoPorId?: number | null
 }
 export interface RegistrarPagamentoCompostoResultado {
@@ -94,21 +95,31 @@ function mapExcedente(t?: string | null): 'CREDITO' | 'ADIANTAMENTO' | 'QUITAR_O
 }
 
 /** Marca créditos ABERTOS (da obrigação/pessoa) como UTILIZADO até `valor`. */
-async function consumirCredito(obrigacaoId: number, pessoaId: number | null, valor: number, criadoPorId: number | null) {
-  let restante = cent(valor)
-  const where = pessoaId != null ? { status: 'ABERTO', OR: [{ obrigacaoId }, { pessoaId }] } : { status: 'ABERTO', obrigacaoId }
-  const creditos = await prisma.creditoFinanceiro.findMany({ where, orderBy: { criadoEm: 'asc' } }).catch(() => [] as { id: number; valor: unknown }[])
-  for (const c of creditos) {
-    if (restante <= 0.005) break
-    const v = cent(Number(c.valor))
-    if (v <= restante + 0.005) {
-      await prisma.creditoFinanceiro.update({ where: { id: c.id }, data: { status: 'UTILIZADO', aprovadoPorId: criadoPorId } }).catch(() => {})
-      restante = cent(restante - v)
-    } else {
-      await prisma.creditoFinanceiro.update({ where: { id: c.id }, data: { valor: cent(v - restante) } }).catch(() => {})
-      restante = 0
+async function consumirCredito(obrigacaoId: number, pessoaId: number | null, valor: number, criadoPorId: number | null, correlationId: string, ocorrenciaId?: number | null, processoId?: number | null) {
+  // Crédito é do PROCESSO/pessoa — não da obrigação-alvo. Busca por obrigações do processo OR pessoa.
+  const obrsProc = processoId != null ? await prisma.obrigacaoEconomica.findMany({ where: { processoId }, select: { id: true } }).then((r) => r.map((o) => o.id)).catch(() => [obrigacaoId]) : [obrigacaoId]
+  const ors: Record<string, unknown>[] = [{ obrigacaoId: { in: obrsProc.length ? obrsProc : [obrigacaoId] } }]
+  if (pessoaId != null) ors.push({ pessoaId })
+  const where = { status: 'ABERTO', OR: ors }
+  // ATÔMICO: consumo FIFO + registro no razão imutável de crédito (saldo anterior→posterior).
+  await prisma.$transaction(async (tx) => {
+    let restante = cent(valor)
+    const creditos = await tx.creditoFinanceiro.findMany({ where, orderBy: { criadoEm: 'asc' } })
+    for (const c of creditos) {
+      if (restante <= 0.005) break
+      const antes = cent(Number(c.valor))
+      const usar = Math.min(antes, restante)
+      const depois = cent(antes - usar)
+      if (depois <= 0.005) await tx.creditoFinanceiro.update({ where: { id: c.id }, data: { valor: 0, status: 'UTILIZADO', aprovadoPorId: criadoPorId } })
+      else await tx.creditoFinanceiro.update({ where: { id: c.id }, data: { valor: depois } })
+      await tx.creditoMovimento.create({ data: {
+        creditoId: c.id, tipo: 'UTILIZACAO', valor: usar, saldoAnterior: antes, saldoPosterior: depois, moeda: (c.moeda as never),
+        obrigacaoDestinoId: obrigacaoId, ocorrenciaId: ocorrenciaId ?? null, pessoaId, processoId: processoId ?? null,
+        usuarioId: criadoPorId, correlationId: cut(correlationId, 80), observacao: 'Crédito utilizado em recebimento',
+      } }).catch(() => {})
+      restante = cent(restante - usar)
     }
-  }
+  }).catch(() => {})
 }
 
 export async function registrarPagamentoComposto(input: RegistrarPagamentoCompostoInput): Promise<RegistrarPagamentoCompostoResultado> {
@@ -153,7 +164,9 @@ export async function registrarPagamentoComposto(input: RegistrarPagamentoCompos
   }
 
   const totalRecebido = cent(formas.reduce((s, f) => s + cent(f.valor), 0))
-  const correlacaoId = `pg:${obr.id}:${Date.now()}`
+  // Idempotência de double-click: chave DETERMINÍSTICA do cliente (se enviada) — repetir a
+  // mesma requisição não duplica (as idempotencyKey por linha ficam estáveis). Sem chave → timestamp.
+  const correlacaoId = input.idempotencyKey ? `pg:${obr.id}:${cut(input.idempotencyKey, 40)}` : `pg:${obr.id}:${Date.now()}`
   const criadoPorId = input.criadoPorId ?? null
   const pagador = mapPagador(input.pagador)
   const politica = mapPolitica(input.aplicacao?.politica)
@@ -177,9 +190,9 @@ export async function registrarPagamentoComposto(input: RegistrarPagamentoCompos
 
   // ── 2) crédito utilizado (pagamento financiado por crédito) ─────────────
   if (creditoUtilizado > 0) {
-    await registrarOcorrencia({ obrigacaoId: obr.id, tipo: 'PAGAMENTO', valor: creditoUtilizado, moeda, origemRecurso: 'CREDITO', pagador, aplicacao: { politica }, observacao: 'Crédito utilizado', idempotencyKey: `${correlacaoId}:cred`, criadoPorId }) as OcResp
+    const rc = await registrarOcorrencia({ obrigacaoId: obr.id, tipo: 'PAGAMENTO', valor: creditoUtilizado, moeda, origemRecurso: 'CREDITO', pagador, aplicacao: { politica }, observacao: 'Crédito utilizado', idempotencyKey: `${correlacaoId}:cred`, criadoPorId }) as OcResp
     ocorrenciasCriadas++
-    await consumirCredito(obr.id, pagador && 'pessoaId' in pagador ? pagador.pessoaId ?? null : null, creditoUtilizado, criadoPorId)
+    await consumirCredito(obr.id, pagador && 'pessoaId' in pagador ? pagador.pessoaId ?? null : null, creditoUtilizado, criadoPorId, correlacaoId, rc?.ocorrenciaId ?? null, obr.processoId ?? null)
   }
 
   // ── 3) linhas de pagamento (uma ocorrência por forma) ───────────────────

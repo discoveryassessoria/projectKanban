@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ref
   const actor = await extrairUsuarioComPermissoes(req)
   try {
     const r = await registrarPagamentoGeral({
-      alocacoes: b.alocacoes, formas: b.formas, pagador: b?.pagador ?? null,
+      alocacoes: b.alocacoes, formas: b.formas, ajustes: b?.ajustes ?? null, pagador: b?.pagador ?? null,
       observacao: b?.observacao ?? null, criadoPorId: actor?.userId ?? null,
     })
     if (!r.ok) return NextResponse.json({ ok: false, erro: r.erros[0] ?? 'Falha.', erros: r.erros }, { status: 422 })

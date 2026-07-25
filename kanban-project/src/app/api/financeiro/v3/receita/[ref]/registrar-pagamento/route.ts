@@ -40,6 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ref
       observacao: b?.observacao ?? null,
       saldoSelecionado: b?.saldoSelecionado ?? null,
       totais: b?.totais ?? null,
+      idempotencyKey: typeof b?.idempotencyKey === 'string' ? b.idempotencyKey : null,
       criadoPorId: actor?.userId ?? null,
     })
     if (!r.ok) return NextResponse.json({ ok: false, erro: r.erros[0] ?? 'Falha na validação.', erros: r.erros }, { status: 422 })

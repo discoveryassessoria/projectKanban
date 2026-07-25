@@ -96,8 +96,14 @@ export async function registrarOcorrencia(e: EntradaOcorrencia) {
       }
       excedente = res.excedente
       if (excedente > 0) {
-        // excedente NUNCA aplicado em silêncio: vira crédito explícito
-        await tx.creditoFinanceiro.create({ data: { obrigacaoId: obr.id, origemOcorrenciaId: oc.id, valor: excedente, moeda, destino: e.excedenteDestino ?? 'CREDITO', status: 'ABERTO' } })
+        // excedente NUNCA aplicado em silêncio: vira crédito explícito + movimento no razão de crédito
+        const cred = await tx.creditoFinanceiro.create({ data: { obrigacaoId: obr.id, pessoaId: e.pagador?.pessoaId ?? null, origemOcorrenciaId: oc.id, valor: excedente, moeda, destino: e.excedenteDestino ?? 'CREDITO', status: 'ABERTO' } })
+        await tx.creditoMovimento.create({ data: {
+          creditoId: cred.id, tipo: 'GERACAO', valor: excedente, saldoAnterior: 0, saldoPosterior: excedente, moeda,
+          obrigacaoOrigemId: obr.id, ocorrenciaId: oc.id, pagadorId, pessoaId: e.pagador?.pessoaId ?? null,
+          processoId: obr.processoId ?? null, usuarioId: e.criadoPorId ?? null, correlationId: `oc:${oc.id}`,
+          observacao: 'Crédito gerado por excedente de pagamento',
+        } }).catch(() => {})
       }
       const quitado = res.totalAplicado > 0 ? res.totalAplicado : cent(e.valor - excedente)
       // Roteia por DIREÇÃO: recebimento (A_RECEBER) vs desembolso/baixa (A_PAGAR).
