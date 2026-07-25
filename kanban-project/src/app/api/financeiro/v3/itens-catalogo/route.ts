@@ -6,15 +6,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
-const NAT_RECEITA = ['SERVICO', 'HONORARIO', 'PRODUTO', 'TAXA', 'OUTRO', 'LOGISTICA']
-
 export async function GET(req: NextRequest) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
-  // ?paraReceita=1 (ou natureza=RECEITA): só itens ELEGÍVEIS a Receita manual — ativos,
-  // natureza compatível e com Configuração Financeira que permita receita (não só-custo).
+  // ?paraReceita=1: itens ELEGÍVEIS a Receita = ATIVOS + com Configuração Financeira que
+  // PERMITA receita (não só-custo). A elegibilidade vem da CONFIG (naturezaFin/possuiReceita),
+  // NÃO do rótulo de natureza — uma Certidão/Documento cobrada do cliente é receita válida.
   const paraReceita = req.nextUrl.searchParams.get('paraReceita') === '1' || req.nextUrl.searchParams.get('natureza') === 'RECEITA'
   let itens = await prisma.itemCatalogo.findMany({
-    where: { ativo: true, ...(paraReceita ? { natureza: { in: NAT_RECEITA as never } } : {}) },
+    where: { ativo: true },
     orderBy: [{ natureza: 'asc' }, { name: 'asc' }],
     select: { id: true, code: true, name: true, natureza: true, categoria: true, unidade: true },
   })

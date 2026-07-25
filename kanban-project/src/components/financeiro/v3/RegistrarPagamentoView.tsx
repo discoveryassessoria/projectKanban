@@ -9,6 +9,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import {
   Plus, Trash2, Upload, Loader2, Info as InfoIcon, AlertTriangle, CheckCircle2,
   Landmark, CreditCard, Users, FileText, Eye, Building2, User as UserIcon, UsersRound,
@@ -270,7 +271,8 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
 
   // ── UI ──────────────────────────────────────────────────────────────────
   const codigo = det?.codigo ?? receitaRef
-  return (
+  if (typeof document === "undefined") return null
+  return createPortal((
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#0d1117]">
       <div className="mx-auto max-w-[1180px] px-4 py-6 sm:px-6">
         {/* cabeçalho */}
@@ -549,7 +551,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
         )}
       </div>
     </div>
-  )
+  ), document.body)
 }
 
 // ── subcomponentes ──────────────────────────────────────────────────────────

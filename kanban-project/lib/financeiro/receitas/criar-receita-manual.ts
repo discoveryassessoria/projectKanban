@@ -46,8 +46,6 @@ export interface CriarReceitaManualResultado {
   idempotente: boolean
 }
 
-const NATUREZAS_RECEITA_OK = new Set(['SERVICO', 'HONORARIO', 'PRODUTO', 'TAXA', 'OUTRO', 'LOGISTICA'])
-
 export async function criarReceitaManualCanonica(input: CriarReceitaManualInput): Promise<CriarReceitaManualResultado> {
   const vazio: CriarReceitaManualResultado = { ok: false, erros: [], receitaIds: [], obrigacaoIds: [], obrigacaoRef: null, moeda: 'BRL', totalContratado: 0, totalBrl: 0, grupo: '', idempotente: false }
   const criadoPorId = input.criadoPorId ?? null
@@ -56,7 +54,6 @@ export async function criarReceitaManualCanonica(input: CriarReceitaManualInput)
   const item = await prisma.itemCatalogo.findUnique({ where: { id: input.itemCatalogoId }, select: { id: true, name: true, natureza: true, categoria: true, unidade: true, ativo: true } })
   if (!item) return { ...vazio, erros: ['Item do Cadastro Mestre inexistente.'] }
   if (!item.ativo) return { ...vazio, erros: ['Item do Cadastro Mestre inativo — não pode gerar Receita.'] }
-  if (!NATUREZAS_RECEITA_OK.has(String(item.natureza))) return { ...vazio, erros: [`Item de natureza ${item.natureza} não é elegível para Receita manual.`] }
 
   // 2) CONFIGURAÇÃO FINANCEIRA (ProdutoFinanceiro) do item — fonte de moeda/regra.
   const cfg = await prisma.produtoFinanceiro.findUnique({ where: { itemCatalogoId: item.id }, select: { id: true, moedaPadrao: true, naturezaFin: true, condicaoPagamentoId: true, categoriaId: true, valorPadrao: true } })

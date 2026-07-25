@@ -11,6 +11,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import {
   Loader2, CheckCircle2, AlertTriangle, Info as InfoIcon, ShieldCheck, Coins, Receipt, ArrowRight,
 } from "lucide-react"
@@ -189,7 +190,8 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, onClose, on
   const cotacaoEfetiva = previa?.cotacaoEfetivaNova ?? rec?.cambio.cotacaoEfetiva ?? null
   const brlTotal = previa && mudouFinanceiro ? previa.valorContratadoBrlNovo : rec?.valorContratadoBrlTotal ?? 0
 
-  return (
+  if (typeof document === "undefined") return null
+  return createPortal((
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#0d1117]">
       <div className="mx-auto max-w-[1180px] px-4 py-6 sm:px-6">
         {/* header */}
@@ -401,5 +403,5 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, onClose, on
         ) : null}
       </div>
     </div>
-  )
+  ), document.body)
 }

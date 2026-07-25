@@ -8,6 +8,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { createPortal } from "react-dom"
 import {
   Loader2, CheckCircle2, AlertTriangle, Info as InfoIcon, Trash2, UserPlus, Users, Scale, Percent, Coins, Sparkles,
 } from "lucide-react"
@@ -151,7 +152,8 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
     { v: "VALOR", lb: "Valor personalizado em BRL", desc: "Você define o valor em BRL de cada participante; o % e a referência EUR são recalculados.", Ic: Coins },
   ]
 
-  return (
+  if (typeof document === "undefined") return null
+  return createPortal((
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#0d1117]">
       <div className="mx-auto max-w-[1180px] px-4 py-6 sm:px-6">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
@@ -314,5 +316,5 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
         )}
       </div>
     </div>
-  )
+  ), document.body)
 }
