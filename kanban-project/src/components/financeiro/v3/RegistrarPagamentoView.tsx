@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { uploadFiles } from "@/src/lib/storage"
 import { calcularTaxas, type TaxaView } from "@/lib/financeiro/taxas-pagamento"
+import { calcularRecebimento } from "@/lib/financeiro/dominio/calculo-recebimento"
 
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
 const brl = (v: number) => fmt(v || 0, "BRL")
@@ -90,7 +91,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
         setDet(d)
         const parts = rCons?.receita?.participantes ?? (d ? [{ obrigacaoId: d.obrigacaoId, pessoaId: d.responsavelFinanceiro?.requerenteId ?? null, nome: d.responsavel?.nome ?? "Participante", papel: d.responsavel?.papel ?? "" }] : [])
         setParticipantes(parts)
-        const p0 = parts[0]; if (p0?.pessoaId != null) setPagadorPessoaId(p0.pessoaId)
+        // NUNCA pré-selecionar um participante como pagador (regra: pagador ≠ responsável da cobrança).
         setFormasCad(rCad?.formasPagamento ?? [])
         const contas = (rCad?.contas ?? []).map((c: any) => ({ key: `c:${c.id}`, id: c.id, tipo: "conta", label: c.nome, sub: [c.banco, [c.agencia, c.conta].filter(Boolean).join("/")].filter(Boolean).join(" · "), banco: c.banco ?? c.nome, agencia: c.agencia ?? null, numero: c.conta ?? null }))
         const cart = (rCad?.carteiras ?? []).map((c: any) => ({ key: `w:${c.id}`, id: c.id, tipo: "carteira", label: c.nome, sub: "Carteira", banco: c.nome, agencia: null, numero: null }))
@@ -123,11 +124,14 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
   const desconto = num(ajustes.desconto), juros = num(ajustes.juros), multa = num(ajustes.multa), acrescimo = num(ajustes.acrescimo), creditoUtilizado = num(ajustes.creditoUtilizado)
   const acrescimos = juros + multa + acrescimo
   const saldoCobranca = Number(det?.saldoBrl ?? 0)
-  const liquidoAReceber = Math.max(0, saldoCobranca - desconto + acrescimos)
-  const recebido = totalInformado + creditoUtilizado
-  const saldoRestante = Math.max(0, liquidoAReceber - recebido)
-  const excedente = Math.max(0, recebido - liquidoAReceber)
-  const situacao = saldoRestante <= 0.005 ? (excedente > 0.005 ? "EXCEDENTE" : "QUITADA") : "PARCIAL"
+  // FONTE ÚNICA de cálculo (mesma função revalidada no backend)
+  const calc = calcularRecebimento({ saldoSelecionado: saldoCobranca, linhas: linhas.map((l) => ({ valor: num(l.valor) })), desconto, juros, multa, acrescimo, creditoUtilizado })
+  const liquidoAReceber = calc.valorLiquidoDevido
+  const recebido = calc.totalInformado
+  const saldoRestante = calc.saldoRestante
+  const excedente = calc.excedente
+  const situacao = calc.situacao // INICIAL | PARCIAL | QUITADO | EXCEDENTE
+  const temValor = situacao !== "INICIAL"
   const creditoGerado = excedente
 
   const contaPrincipal = useMemo(() => contasOpts.find((c) => c.key === linhas[0]?.contaKey) ?? null, [contasOpts, linhas])
@@ -195,8 +199,10 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
         obrigacaoId, moeda: det?.moeda ?? "BRL", formas, pagador,
         ajustes: { desconto, juros, multa, acrescimo, creditoUtilizado },
         aplicacao: { politica },
-        excedenteTratamento: excedente > 0.005 ? excedenteTrat : null,
-        parcialTratamento: saldoRestante > 0.005 ? parcialTrat : null,
+        excedenteTratamento: situacao === "EXCEDENTE" ? excedenteTrat : null,
+        parcialTratamento: situacao === "PARCIAL" ? parcialTrat : null,
+        saldoSelecionado: saldoCobranca,
+        totais: { totalInformado: recebido, saldoRestante, excedente },
         comprovantes, observacao: observacao || null,
       }
       const r = await fetch(`/api/financeiro/v3/receita/${receitaRef}/registrar-pagamento`, {
@@ -347,13 +353,13 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
                   <Mini label="Recebido" cls="text-[#7dd3fc]">{brl(recebido)}</Mini>
                   <Mini label="= Saldo Restante" cls={saldoRestante > 0.005 ? "text-[#f87171]" : "text-[#4ade80]"}>{brl(saldoRestante)}</Mini>
                 </div>
-                {saldoRestante > 0.005 && (
+                {situacao === "PARCIAL" && (
                   <div className="mt-3 rounded-lg border border-[#7dd3fc]/25 bg-[#7dd3fc]/5 p-3">
                     <p className="mb-2 flex items-center gap-1.5 text-sm text-[#7dd3fc]"><InfoIcon className="h-4 w-4" /> Pagamento parcial identificado. Saldo restante: {brl(saldoRestante)}. Como deseja tratar este saldo?</p>
                     <div className="flex flex-wrap gap-4">{([["MANTER", "Manter cobrança aberta"], ["GERAR_COBRANCA", "Gerar nova cobrança para o saldo"], ["RENEGOCIAR", "Renegociar posteriormente"]] as const).map(([v, lb]) => <Radio key={v} checked={parcialTrat === v} onChange={() => setParcialTrat(v)}>{lb}</Radio>)}</div>
                   </div>
                 )}
-                {excedente > 0.005 && (
+                {situacao === "EXCEDENTE" && (
                   <div className="mt-3 rounded-lg border border-[#d2a948]/25 bg-[#d2a948]/5 p-3">
                     <p className="mb-2 flex items-center gap-1.5 text-sm text-[#e0b957]"><AlertTriangle className="h-4 w-4" /> Foi identificado um valor excedente de {brl(excedente)}.</p>
                     <div className="flex flex-wrap gap-4">{([["CREDITO", "Gerar crédito financeiro"], ["ABATER_PROXIMAS", "Abater nas próximas cobranças"], ["ADIANTAMENTO", "Manter como adiantamento"], ["DEVOLVER", "Devolver ao cliente"]] as const).map(([v, lb]) => <Radio key={v} checked={excedenteTrat === v} onChange={() => setExcedenteTrat(v)}>{lb}</Radio>)}</div>
@@ -432,8 +438,8 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
                   <div className="my-2 border-t border-white/10" />
                   {totalTarifas > 0.005 && <Row k="Líquido em caixa" cls="text-white/70">{brl(Math.max(0, totalInformado - totalTarifas))}</Row>}
                   <Row k="Valor Líquido Recebido" cls="font-semibold text-[#7dd3fc]">{brl(recebido)}</Row>
-                  <Row k="Saldo Restante" cls={saldoRestante > 0.005 ? "text-[#f87171]" : "text-[#4ade80]"}>{brl(saldoRestante)}</Row>
-                  <div className="flex items-center justify-between pt-1"><dt className="text-white/50">Situação Final</dt><dd><span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${statusCls(situacao)}`}>{situacao === "QUITADA" ? "Quitada" : situacao === "EXCEDENTE" ? "Excedente" : "Parcial"}</span></dd></div>
+                  <Row k="Saldo Restante" cls={!temValor ? "text-white/70" : saldoRestante > 0.005 ? "text-[#f87171]" : "text-[#4ade80]"}>{brl(saldoRestante)}</Row>
+                  <div className="flex items-center justify-between pt-1"><dt className="text-white/50">Situação Final</dt><dd><span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${temValor ? statusCls(situacao) : "bg-white/10 text-white/60"}`}>{situacao === "INICIAL" ? "Aguardando dados do recebimento" : situacao === "QUITADO" ? "Quitada" : situacao === "EXCEDENTE" ? "Excedente" : "Parcial"}</span></dd></div>
                 </dl>
                 <div className="mt-4 space-y-2 border-t border-white/10 pt-3 text-sm">
                   <Det icon={Landmark} k="Conta Destino (principal)">{contaPrincipal ? `${contaPrincipal.label}${contaPrincipal.sub ? " – " + contaPrincipal.sub : ""}` : "—"}</Det>
@@ -446,13 +452,17 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, onClos
 
               <section className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
                 <h2 className="mb-3 text-sm font-semibold text-white/80">Impacto Financeiro</h2>
+                {!temValor ? (
+                  <p className="flex items-start gap-2 text-xs text-white/45"><InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Preencha a composição do pagamento para visualizar o impacto.</p>
+                ) : (
                 <ul className="space-y-2 text-xs text-white/60">
-                  {saldoRestante > 0.005 ? <Impact icon={InfoIcon} cls="text-[#7dd3fc]">Esta cobrança ficará com saldo de {brl(saldoRestante)}.</Impact> : <Impact icon={CheckCircle2} cls="text-[#4ade80]">Esta cobrança será quitada.</Impact>}
-                  {saldoRestante > 0.005 && parcialTrat === "MANTER" && <Impact icon={InfoIcon} cls="text-white/50">Será mantida aberta para novos recebimentos.</Impact>}
-                  {saldoRestante > 0.005 && parcialTrat === "GERAR_COBRANCA" && <Impact icon={InfoIcon} cls="text-white/50">Será criada uma nova cobrança para o saldo.</Impact>}
-                  {excedente > 0.005 && <Impact icon={AlertTriangle} cls="text-[#d2a948]">Excedente de {brl(excedente)} → {excedenteTrat === "CREDITO" ? "crédito financeiro" : excedenteTrat === "ABATER_PROXIMAS" ? "abater próximas" : excedenteTrat === "ADIANTAMENTO" ? "adiantamento" : "devolução"}.</Impact>}
+                  {situacao === "PARCIAL" ? <Impact icon={InfoIcon} cls="text-[#7dd3fc]">Esta cobrança ficará com saldo de {brl(saldoRestante)}.</Impact> : <Impact icon={CheckCircle2} cls="text-[#4ade80]">Esta cobrança será quitada.</Impact>}
+                  {situacao === "PARCIAL" && parcialTrat === "MANTER" && <Impact icon={InfoIcon} cls="text-white/50">Será mantida aberta para novos recebimentos.</Impact>}
+                  {situacao === "PARCIAL" && parcialTrat === "GERAR_COBRANCA" && <Impact icon={InfoIcon} cls="text-white/50">Será criada uma nova cobrança para o saldo.</Impact>}
+                  {situacao === "EXCEDENTE" && <Impact icon={AlertTriangle} cls="text-[#d2a948]">Excedente de {brl(excedente)} → {excedenteTrat === "CREDITO" ? "crédito financeiro" : excedenteTrat === "ABATER_PROXIMAS" ? "abater próximas" : excedenteTrat === "ADIANTAMENTO" ? "adiantamento" : "devolução"}.</Impact>}
                   <Impact icon={CheckCircle2} cls="text-[#4ade80]">Nenhum pagamento anterior será alterado.</Impact>
                 </ul>
+                )}
               </section>
 
               {erroSubmit && <div className="rounded-lg border border-[#f87171]/30 bg-[#f87171]/10 p-3 text-xs text-[#f87171]">{erroSubmit}</div>}

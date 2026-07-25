@@ -8,6 +8,7 @@
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import { registrarOcorrencia } from '../ocorrencias/ocorrencia-service'
+import { totaisConsistentes } from '../dominio/calculo-recebimento'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 const brl = (v: number) => `R$ ${cent(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -51,6 +52,8 @@ export interface RegistrarPagamentoCompostoInput {
   parcialTratamento?: 'MANTER' | 'GERAR_COBRANCA' | 'RENEGOCIAR' | null
   comprovantes?: { arquivoUrl: string; arquivoNome: string; tamanho?: number | null }[] | null
   observacao?: string | null
+  saldoSelecionado?: number | null
+  totais?: { totalInformado?: number; saldoRestante?: number; excedente?: number } | null
   criadoPorId?: number | null
 }
 export interface RegistrarPagamentoCompostoResultado {
@@ -139,6 +142,15 @@ export async function registrarPagamentoComposto(input: RegistrarPagamentoCompos
   const acrescimo = Math.max(0, cent(aj.acrescimo ?? 0))
   const creditoUtilizado = Math.max(0, cent(aj.creditoUtilizado ?? 0))
   if (erros.length) return { ...vazio, erros: [...new Set(erros)] }
+
+  // revalidação da FONTE ÚNICA de cálculo — rejeita payload cujos totais não batam
+  if (input.totais) {
+    const consistente = totaisConsistentes(
+      { saldoSelecionado: Number(input.saldoSelecionado ?? 0), linhas: formas.map((f) => ({ valor: cent(f.valor) })), desconto, juros, multa, acrescimo, creditoUtilizado },
+      input.totais,
+    )
+    if (!consistente) return { ...vazio, erros: ['Totais divergentes entre cliente e servidor — recálculo rejeitado.'] }
+  }
 
   const totalRecebido = cent(formas.reduce((s, f) => s + cent(f.valor), 0))
   const correlacaoId = `pg:${obr.id}:${Date.now()}`

@@ -357,7 +357,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
             {/* Distribuição entre requerentes */}
             <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-white/85">Distribuição entre requerentes</span>
+                <span className="text-sm font-semibold text-white/85">Participantes Financeiros</span>
                 {!d.consolidado && divisaoIgual && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-300">Divisão igual</span>}
               </div>
               {participantes.length > 0 ? (
@@ -380,7 +380,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                 </>
               ) : (
                 <>
-                  <div className="mt-1 text-xs text-white/40">{dist.length} requerente(s)</div>
+                  <div className="mt-1 text-xs text-white/40">{dist.length} participante(s)</div>
                   <div className="mt-3 space-y-2.5">
                     {dist.length === 0 ? <div className="text-sm text-white/40">—</div> : dist.map((r: any, i: number) => (
                       <div key={i} className="flex items-center gap-2.5">
@@ -399,17 +399,22 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
               )}
             </div>
 
-            {/* Pagador */}
-            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
-              <span className="text-sm font-semibold text-white/85">Pagador</span>
-              <div className="mt-3 flex items-center gap-2.5">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#7dd3fc]/15 text-[11px] font-semibold text-[#7dd3fc]">{iniciais(d.responsavelFinanceiro?.nome)}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm text-white/85">{d.responsavelFinanceiro?.nome ?? "—"}</div>
-                  <span className="mt-1 inline-block rounded bg-[#7dd3fc]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#7dd3fc]">Responsável financeiro</span>
+            {/* Pagadores envolvidos — DERIVADO de pagamentos reais (nunca um pagador fixo da Receita).
+                Some quando não há pagamento: pagador não é atributo absoluto da Receita. */}
+            {Array.isArray(d.pagadores) && d.pagadores.length > 0 && (
+              <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+                <span className="text-sm font-semibold text-white/85">Pagadores envolvidos</span>
+                <div className="mt-3 space-y-2.5">
+                  {d.pagadores.map((pg: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#7dd3fc]/15 text-[11px] font-semibold text-[#7dd3fc]">{iniciais(pg.nome)}</span>
+                      <div className="min-w-0 flex-1"><div className="truncate text-sm text-white/85">{pg.nome}</div></div>
+                      {pg.valor != null && <span className="shrink-0 text-sm text-white/70">{brl(pg.valor)}</span>}
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Documentos principais */}
             <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
