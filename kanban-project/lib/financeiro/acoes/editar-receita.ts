@@ -212,6 +212,7 @@ export interface ReceitaEditavel {
   referenciaContratual: string | null
   tipoServicoId: number | null
   servicoNome: string | null
+  itemMestreNome: string | null
   origem: string | null
   observacoes: string | null
   moedaBase: string
@@ -235,13 +236,19 @@ export async function carregarReceitaEditavel(ref: string): Promise<ReceitaEdita
 
   // textuais de exibição/serviço vêm da Receita representante
   const receitaRep = g.repReceitaId != null
-    ? await prisma.receita.findUnique({ where: { id: g.repReceitaId }, select: { descricao: true, observacoes: true, origem: true, tipoServicoId: true, contextoAplicado: true } }).catch(() => null)
+    ? await prisma.receita.findUnique({ where: { id: g.repReceitaId }, select: { descricao: true, observacoes: true, origem: true, tipoServicoId: true, contextoAplicado: true, configFinanceiraId: true } }).catch(() => null)
     : null
   const tipoServico = receitaRep?.tipoServicoId != null
     ? await prisma.tipoServico.findUnique({ where: { id: receitaRep.tipoServicoId }, select: { nome: true } }).catch(() => null)
     : null
   const ctx = (receitaRep?.contextoAplicado && typeof receitaRep.contextoAplicado === 'object' && !Array.isArray(receitaRep.contextoAplicado))
     ? (receitaRep.contextoAplicado as Record<string, unknown>) : {}
+  // Item mestre CANÔNICO (nome real): do contexto (manual) OU via Config Financeira → ItemCatalogo.
+  let itemMestreNome: string | null = typeof ctx.itemNome === 'string' ? ctx.itemNome : null
+  if (!itemMestreNome && receitaRep?.configFinanceiraId != null) {
+    const cfg = await prisma.produtoFinanceiro.findUnique({ where: { id: receitaRep.configFinanceiraId }, select: { itemCatalogo: { select: { name: true } } } }).catch(() => null)
+    itemMestreNome = cfg?.itemCatalogo?.name ?? null
+  }
   const edicao = (ctx.edicao && typeof ctx.edicao === 'object' && !Array.isArray(ctx.edicao)) ? (ctx.edicao as Record<string, unknown>) : {}
 
   const valorBaseTotal = cent(g.membros.reduce((s, m) => s + m.valorBase, 0))
@@ -270,7 +277,7 @@ export async function carregarReceitaEditavel(ref: string): Promise<ReceitaEdita
     titulo: titulo || null,
     descricaoDetalhada: typeof edicao.descricao === 'string' ? edicao.descricao : null,
     referenciaContratual: typeof edicao.referenciaContratual === 'string' ? edicao.referenciaContratual : null,
-    tipoServicoId: receitaRep?.tipoServicoId ?? null, servicoNome: tipoServico?.nome ?? null,
+    tipoServicoId: receitaRep?.tipoServicoId ?? null, servicoNome: tipoServico?.nome ?? null, itemMestreNome,
     origem: receitaRep?.origem ?? null, observacoes: receitaRep?.observacoes ?? null,
     moedaBase: g.moeda, valorBaseTotal,
     cambio: { fxRule: consolidado.fxRule, fxEstimado: consolidado.fxEstimado, fxFixo: consolidado.fxFixo, fxData: consolidado.fxData, valorBrlFixo: consolidado.valorBrlFixo, cotacaoEfetiva: consolidado.cotacaoEfetiva },

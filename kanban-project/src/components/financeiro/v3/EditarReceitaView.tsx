@@ -29,7 +29,7 @@ interface Cambio { fxRule: FxRule; fxEstimado: number | null; fxFixo: number | n
 interface Receita {
   ref: string; obrigacaoIdRef: number; receitaIdRep: number | null; codigo: string | null; processoId: number | null
   titulo: string | null; descricaoDetalhada: string | null; referenciaContratual: string | null
-  tipoServicoId: number | null; servicoNome: string | null; origem: string | null; observacoes: string | null
+  tipoServicoId: number | null; servicoNome: string | null; itemMestreNome: string | null; origem: string | null; observacoes: string | null
   moedaBase: string; valorBaseTotal: number; cambio: Cambio
   temPagamentoConfirmado: boolean; cobrancasAbertas: number; recebidoTotalBrl: number; valorContratadoBrlTotal: number
   participantes: { obrigacaoId: number; receitaId: number | null; nome: string; valorBase: number; recebidoBase: number; recebidoBrl: number }[]
@@ -56,8 +56,6 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, onClose, on
   const [titulo, setTitulo] = useState("")
   const [descricao, setDescricao] = useState("")
   const [referencia, setReferencia] = useState("")
-  const [tipoServicoId, setTipoServicoId] = useState<number | "">("")
-  const [origem, setOrigem] = useState("")
   const [observacoes, setObservacoes] = useState("")
   const [moeda, setMoeda] = useState("EUR")
   const [valorBase, setValorBase] = useState<string>("")
@@ -90,8 +88,6 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, onClose, on
         setTitulo(d.titulo ?? "")
         setDescricao(d.descricaoDetalhada ?? "")
         setReferencia(d.referenciaContratual ?? "")
-        setTipoServicoId(d.tipoServicoId ?? "")
-        setOrigem(d.origem ?? "manual")
         setObservacoes(d.observacoes ?? "")
         setMoeda(d.moedaBase ?? "EUR")
         setValorBase(String(cent(d.valorBaseTotal)))
@@ -159,8 +155,8 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, onClose, on
   const mudouTextual = useMemo(() => {
     if (!rec) return false
     return titulo !== (rec.titulo ?? "") || descricao !== (rec.descricaoDetalhada ?? "") || referencia !== (rec.referenciaContratual ?? "")
-      || (tipoServicoId === "" ? null : Number(tipoServicoId)) !== rec.tipoServicoId || origem !== (rec.origem ?? "manual") || observacoes !== (rec.observacoes ?? "")
-  }, [rec, titulo, descricao, referencia, tipoServicoId, origem, observacoes])
+      || observacoes !== (rec.observacoes ?? "")
+  }, [rec, titulo, descricao, referencia, observacoes])
 
   const temMudanca = mudouTextual || mudouFinanceiro
   const valido = !!rec && temMudanca && !bloqueado && !previewing
@@ -171,7 +167,7 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, onClose, on
     try {
       const body: Record<string, unknown> = {
         titulo, descricaoDetalhada: descricao, referenciaContratual: referencia,
-        tipoServicoId: tipoServicoId === "" ? null : Number(tipoServicoId), origem, observacoes,
+        observacoes,
         estrategia, justificativa: justificativa || null,
       }
       if (mudouFinanceiro) {
@@ -235,21 +231,15 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, onClose, on
                     <textarea value={descricao} onChange={(e) => setDescricao(e.target.value.slice(0, 500))} rows={2} placeholder="Descrição detalhada (opcional)" className={`${inputCls} resize-none`} />
                   </div>
                   <div>
-                    <label className={labelCls}>Serviço</label>
-                    <select value={tipoServicoId} onChange={(e) => setTipoServicoId(e.target.value === "" ? "" : Number(e.target.value))} className={inputCls}>
-                      <option value="">— Sem serviço —</option>
-                      {rec.servicosDisponiveis.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                    </select>
+                    <label className={labelCls}>Item do Cadastro Mestre</label>
+                    <div className={`${inputCls} flex items-center justify-between`}>
+                      <span className={rec.itemMestreNome ? "text-white" : "text-[#d2a948]"}>{rec.itemMestreNome ?? rec.servicoNome ?? "Item mestre não reconciliado"}</span>
+                      <span className="text-[10px] text-white/35">Definido pelo Cadastro Mestre</span>
+                    </div>
                   </div>
                   <div>
                     <label className={labelCls}>Referência contratual</label>
                     <input value={referencia} onChange={(e) => setReferencia(e.target.value.slice(0, 120))} placeholder="Nº do contrato / proposta" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Origem</label>
-                    <select value={origem} onChange={(e) => setOrigem(e.target.value)} className={inputCls}>
-                      {["manual", "motor", "migration"].map((o) => <option key={o} value={o}>{o}</option>)}
-                    </select>
                   </div>
                   <div className="sm:col-span-2">
                     <label className={labelCls}>Observações</label>
