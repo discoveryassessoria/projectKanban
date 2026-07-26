@@ -1,19 +1,30 @@
-// CRIAR EM: src/components/gerenciamentoComponents/OverviewTab.tsx
+// src/components/gerenciamentoComponents/OverviewTab.tsx
 //
 // Painel Geral do Gerenciamento — cards de contagem REAIS do banco
 // (usuários, perfis, contas, categorias, fornecedores, centros, status),
 // KPI strip, alertas de configuração e última alteração. Busca /api/gerenciamento/overview.
+//
+// Um número, um lugar: o strip só renderiza o que NÃO é card (a API marca as
+// contagens duplicadas com `duplicadoEmCards`). Backend antigo, sem a marca,
+// continua renderizando tudo — comportamento anterior preservado.
+// Os rótulos vêm de lib/gerenciamento/overview-projecao (fonte única).
 
 "use client"
 
 import { useEffect, useState } from "react"
 import { Users, Shield, Landmark, Tag, Truck, Target, Columns3, AlertTriangle, Loader2 } from "lucide-react"
+import { ROTULOS_CONTAGEM, type ItemStrip } from "@/lib/gerenciamento/overview-projecao"
+
+interface RegistroAuditoria { acao: string; entidade: string; em: string }
 
 interface OverviewData {
   cards: { usuarios: number; perfis: number; categorias: number; contas: number; fornecedores: number; centros: number; statusCols: number }
-  strip: { label: string; value: number | string; real: boolean; isText?: boolean }[]
+  strip: ItemStrip[]
   alertas: string[]
-  ultimaAcao: { acao: string; entidade: string; em: string } | null
+  /** alteração de configuração, sem eventos de acesso. Ausente em backend antigo. */
+  ultimaAlteracao?: RegistroAuditoria | null
+  /** DEPRECADO: último log sem filtro (pode ser LOGIN). Só usado como fallback. */
+  ultimaAcao?: RegistroAuditoria | null
 }
 
 export default function OverviewTab() {
@@ -30,14 +41,21 @@ export default function OverviewTab() {
 
   const d = data
   const cards = [
-    { icon: <Users className="h-4 w-4" />, label: "Usuários", value: d.cards.usuarios },
-    { icon: <Shield className="h-4 w-4" />, label: "Perfis", value: d.cards.perfis },
-    { icon: <Landmark className="h-4 w-4" />, label: "Contas bancárias", value: d.cards.contas },
-    { icon: <Tag className="h-4 w-4" />, label: "Categorias", value: d.cards.categorias },
-    { icon: <Truck className="h-4 w-4" />, label: "Fornecedores", value: d.cards.fornecedores },
-    { icon: <Target className="h-4 w-4" />, label: "Centros de custo", value: d.cards.centros },
-    { icon: <Columns3 className="h-4 w-4" />, label: "Colunas de status", value: d.cards.statusCols },
+    { icon: <Users className="h-4 w-4" />, label: ROTULOS_CONTAGEM.usuarios, value: d.cards.usuarios },
+    { icon: <Shield className="h-4 w-4" />, label: ROTULOS_CONTAGEM.perfis, value: d.cards.perfis },
+    { icon: <Landmark className="h-4 w-4" />, label: ROTULOS_CONTAGEM.contas, value: d.cards.contas },
+    { icon: <Tag className="h-4 w-4" />, label: ROTULOS_CONTAGEM.categorias, value: d.cards.categorias },
+    { icon: <Truck className="h-4 w-4" />, label: ROTULOS_CONTAGEM.fornecedores, value: d.cards.fornecedores },
+    { icon: <Target className="h-4 w-4" />, label: ROTULOS_CONTAGEM.centros, value: d.cards.centros },
+    { icon: <Columns3 className="h-4 w-4" />, label: ROTULOS_CONTAGEM.statusCols, value: d.cards.statusCols },
   ]
+
+  // strip = só o que não é card. Sem a marca (backend antigo), mantém tudo.
+  const strip = (d.strip ?? []).filter((k) => !k.duplicadoEmCards)
+
+  // `ultimaAlteracao` ausente = backend antigo → cai no campo depreciado.
+  // Ausente é diferente de null: null significa "não houve alteração ainda".
+  const ultima = d.ultimaAlteracao !== undefined ? d.ultimaAlteracao : d.ultimaAcao ?? null
 
   return (
     <div className="space-y-4">
@@ -47,15 +65,17 @@ export default function OverviewTab() {
         <div className="text-xs text-white/60 mt-1">Visão geral dos cadastros e configurações do sistema.</div>
       </div>
 
-      {/* KPI STRIP */}
+      {/* KPI STRIP — apenas indicadores que não são cards */}
+      {strip.length > 0 && (
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
-        {d.strip.map((k, i) => (
+        {strip.map((k, i) => (
           <div key={i} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-2.5 text-center">
             <div className={`font-bold text-white ${k.isText ? "text-[13px]" : "text-lg"}`}>{k.value}</div>
             <div className="text-[10px] text-white/50 mt-0.5 leading-tight">{k.label}</div>
           </div>
         ))}
       </div>
+      )}
 
       {/* CARDS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -86,13 +106,13 @@ export default function OverviewTab() {
         )}
       </div>
 
-      {/* ÚLTIMA AÇÃO */}
-      {d.ultimaAcao && (
+      {/* ÚLTIMA ALTERAÇÃO (não conta acesso/login) */}
+      {ultima && (
         <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
           <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 mb-2">Última alteração</div>
           <div className="text-sm text-white/80">
-            <strong className="text-white">{d.ultimaAcao.acao}</strong> · {d.ultimaAcao.entidade}
-            <span className="text-white/40 ml-2">{new Date(d.ultimaAcao.em).toLocaleString("pt-BR")}</span>
+            <strong className="text-white">{ultima.acao}</strong> · {ultima.entidade}
+            <span className="text-white/40 ml-2">{new Date(ultima.em).toLocaleString("pt-BR")}</span>
           </div>
         </div>
       )}

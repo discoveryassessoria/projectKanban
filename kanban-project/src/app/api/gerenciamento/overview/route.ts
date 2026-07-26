@@ -1,26 +1,42 @@
-// CRIAR EM: src/app/api/gerenciamento/overview/route.ts
+// src/app/api/gerenciamento/overview/route.ts
 //
 // GET /api/gerenciamento/overview — Painel Geral do Gerenciamento.
-// REAL: contagens das tabelas que existem (Usuario, Perfil, CategoriaFinanceira,
-// ContaBancaria, Fornecedor, CentroCusto, LogAuditoria, Status).
-// MOCK ("prévia"): contagens de coisas sem tabela (valores, automações,
-// workflows, SLA, templates) — devolvidas como exemplo pro strip ficar fiel.
+// TODOS os números são REAIS, lidos das tabelas que existem (Usuario, Perfil,
+// CategoriaFinanceira, ContaBancaria, Fornecedor, CentroCusto, Status,
+// LogAuditoria). NÃO existe valor mock/prévia neste endpoint.
+//
+// A projeção (rótulos, ordem, marcação de duplicidade) vive em
+// lib/gerenciamento/overview-projecao.ts — fonte única compartilhada com o
+// OverviewTab, para que um mesmo número não receba dois nomes diferentes.
+//
+// "Última alteração" IGNORA eventos de acesso (entidade "ACESSO": LOGIN /
+// LOGIN_NEGADO): logar não é alterar configuração. `ultimaAcao` continua
+// devolvendo o último log SEM filtro, por retrocompatibilidade.
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { ENTIDADE_ACESSO, montarStrip } from "@/lib/gerenciamento/overview-projecao"
 
 export async function GET(_req: NextRequest) {
   try {
-    const [usuarios, perfis, categorias, contas, fornecedores, centros, statusCols, ultimoLog] = await Promise.all([
-      prisma.usuario.count(),
-      prisma.perfil.count(),
-      prisma.categoriaFinanceira.count(),
-      prisma.contaBancaria.count(),
-      prisma.fornecedor.count({ where: { ativo: true } }),
-      prisma.centroCusto.count({ where: { ativo: true } }),
-      prisma.status.count(),
-      prisma.logAuditoria.findFirst({ orderBy: { criadoEm: "desc" }, select: { acao: true, entidade: true, criadoEm: true } }),
-    ])
+    const [usuarios, perfis, categorias, contas, fornecedores, centros, statusCols, ultimoLog, ultimaAlteracaoLog] =
+      await Promise.all([
+        prisma.usuario.count(),
+        prisma.perfil.count(),
+        prisma.categoriaFinanceira.count(),
+        prisma.contaBancaria.count(),
+        prisma.fornecedor.count({ where: { ativo: true } }),
+        prisma.centroCusto.count({ where: { ativo: true } }),
+        prisma.status.count(),
+        // último log SEM filtro — mantido só para `ultimaAcao` (retrocompat).
+        prisma.logAuditoria.findFirst({ orderBy: { criadoEm: "desc" }, select: { acao: true, entidade: true, criadoEm: true } }),
+        // última ALTERAÇÃO de fato: exclui acesso. Filtra por entidade (indexada).
+        prisma.logAuditoria.findFirst({
+          where: { NOT: { entidade: ENTIDADE_ACESSO } },
+          orderBy: { criadoEm: "desc" },
+          select: { acao: true, entidade: true, criadoEm: true },
+        }),
+      ])
 
     // alertas/recomendações reais simples
     const alertas: string[] = []
@@ -29,23 +45,20 @@ export async function GET(_req: NextRequest) {
     if (contas === 0) alertas.push("Nenhuma conta bancária cadastrada")
     if (fornecedores === 0) alertas.push("Nenhum fornecedor ativo cadastrado")
 
+    const contagens = { usuarios, perfis, contas, categorias, fornecedores, centros, statusCols }
+
     return NextResponse.json({
       // cards reais
-      cards: {
-        usuarios, perfis, categorias, contas, fornecedores, centros, statusCols,
-      },
-      // strip de KPIs (8) — mistura real + prévia
-      strip: [
-        { label: "Usuários", value: usuarios, real: true },
-        { label: "Perfis", value: perfis, real: true },
-        { label: "Contas bancárias", value: contas, real: true },
-        { label: "Categorias financeiras", value: categorias, real: true },
-        { label: "Fornecedores ativos", value: fornecedores, real: true },
-        { label: "Centros de custo", value: centros, real: true },
-        { label: "Colunas de status", value: statusCols, real: true },
-        { label: "Última alteração", value: ultimoLog ? new Date(ultimoLog.criadoEm).toLocaleDateString("pt-BR") : "—", real: true, isText: true },
-      ],
+      cards: contagens,
+      // strip de KPIs — as 7 contagens vêm marcadas com `duplicadoEmCards`
+      strip: montarStrip(contagens, ultimaAlteracaoLog?.criadoEm ?? null),
       alertas,
+      // alteração de configuração (sem eventos de acesso)
+      ultimaAlteracao: ultimaAlteracaoLog
+        ? { acao: ultimaAlteracaoLog.acao, entidade: ultimaAlteracaoLog.entidade, em: ultimaAlteracaoLog.criadoEm }
+        : null,
+      // DEPRECADO: último log sem filtro (pode ser LOGIN). Mantido enquanto
+      // houver consumidor; usar `ultimaAlteracao`.
       ultimaAcao: ultimoLog ? { acao: ultimoLog.acao, entidade: ultimoLog.entidade, em: ultimoLog.criadoEm } : null,
     })
   } catch (e) {

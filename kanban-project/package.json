@@ -90,7 +90,8 @@
     "lint": "eslint . --max-warnings=-1",
     "lint:gerenciamento": "eslint src/app/administrator src/components/gerenciamentoComponents src/app/api/gerenciamento src/lib/gerenciamento",
     "test:ssot-financeiro": "tsx scripts/ssot-financeiro.test.ts",
-    "test:cambio-canonico": "tsx scripts/cambio-canonico.test.ts"
+    "test:cambio-canonico": "tsx scripts/cambio-canonico.test.ts",
+    "test:overview": "tsx scripts/overview-projecao.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
