@@ -19,12 +19,8 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { carregarFx, converterBrl } from "@/lib/financeiro/cambio-financas"
 
-// câmbio de referência (mesma ideia do mockup FX). TODO: puxar de fonte real depois.
-const FX = { EUR: 5.52, USD: 5.08, BRL: 1 }
-function toBRL(valor: number, moeda: string): number {
-  return valor * (FX[moeda as keyof typeof FX] ?? 1)
-}
 
 function inicioDoMes(d = new Date()) {
   return new Date(d.getFullYear(), d.getMonth(), 1)
@@ -38,6 +34,16 @@ export async function GET(_req: NextRequest) {
     const agora = new Date()
     const mesIni = inicioDoMes(agora)
     const mesFim = fimDoMes(agora)
+
+    // ETAPA 1A — câmbio vem de CotacaoCambio (job diário). Sem cotação real o
+    // valor NÃO é convertido: fica fora do total e é declarado em `fontes`.
+    const fx = await carregarFx()
+    const semCotacao: { moeda: string; valor: number }[] = []
+    const toBRL = (valor: number, moeda?: string | null): number => {
+      const c = converterBrl(fx, valor, moeda)
+      if (c == null) { semCotacao.push({ moeda: (moeda ?? "BRL").toUpperCase(), valor }); return 0 }
+      return c
+    }
 
     const [
       contas,
@@ -193,8 +199,14 @@ export async function GET(_req: NextRequest) {
       proximosRecebimentos,
       proximosPagamentos,
       atividade,
-      // câmbio de referência (pro front mostrar @ R$)
-      fx: FX,
+      // câmbio de referência REAL (pro front mostrar @ R$)
+      fx: fx.taxas,
+      fontes: {
+        cambio: fx.fonte,
+        cambioDataReferencia: fx.dataReferencia,
+        moedasSemCotacao: fx.indisponiveis,
+        naoConvertido: semCotacao,
+      },
       // placeholders (sem fonte no banco ainda) — front mostra como "prévia".
       // SEM DADOS FICTÍCIOS: métricas ainda não consolidadas voltam ZERADAS/vazias
       // (nunca números inventados). Serão preenchidas por dado real numa fatia futura.

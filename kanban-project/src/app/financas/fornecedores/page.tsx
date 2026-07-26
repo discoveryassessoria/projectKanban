@@ -65,6 +65,7 @@ interface Fornecedor {
 export default function FornecedoresPage() {
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
   const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   
@@ -103,57 +104,16 @@ export default function FornecedoresPage() {
         const data = await response.json()
         setFornecedores(data)
       } else {
-        // Dados de exemplo
-        setFornecedores([
-          {
-            id: 1,
-            nome: "Imobiliária Central",
-            nomeFantasia: "Central Imóveis",
-            tipo: 'PJ',
-            cpfCnpj: "12.345.678/0001-90",
-            telefone: "(11) 3456-7890",
-            celular: "(11) 98765-4321",
-            email: "contato@centralimobiliaria.com",
-            cidade: "São Paulo",
-            estado: "SP",
-            ativo: true,
-            totalContas: 12,
-            totalPago: 42000
-          },
-          {
-            id: 2,
-            nome: "Carlos Alberto Silva",
-            nomeFantasia: null,
-            tipo: 'PF',
-            cpfCnpj: "123.456.789-00",
-            telefone: null,
-            celular: "(11) 99876-5432",
-            email: "carlos.advogado@gmail.com",
-            cidade: "São Paulo",
-            estado: "SP",
-            ativo: true,
-            totalContas: 5,
-            totalPago: 10000
-          },
-          {
-            id: 3,
-            nome: "Vivo S.A.",
-            nomeFantasia: "Vivo",
-            tipo: 'PJ',
-            cpfCnpj: "02.449.992/0001-64",
-            telefone: "0800 777 8000",
-            celular: null,
-            email: null,
-            cidade: "São Paulo",
-            estado: "SP",
-            ativo: true,
-            totalContas: 24,
-            totalPago: 10800
-          },
-        ])
+        // ETAPA 1A — SEM FALLBACK SILENCIOSO: falha de API não vira cadastro
+        // fabricado na tela. Mostra erro e lista vazia.
+        console.error("Falha ao carregar fornecedores:", response.status)
+        setErro("Não foi possível carregar os fornecedores.")
+        setFornecedores([])
       }
     } catch (error) {
       console.error("Erro ao carregar fornecedores:", error)
+      setErro("Não foi possível carregar os fornecedores.")
+      setFornecedores([])
     } finally {
       setLoading(false)
     }
@@ -204,6 +164,15 @@ export default function FornecedoresPage() {
 
   return (
     <div className="space-y-6">
+      {erro && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+        >
+          {erro} Tente novamente em instantes — nenhum dado foi exibido no lugar.
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>

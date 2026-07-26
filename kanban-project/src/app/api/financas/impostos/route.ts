@@ -1,57 +1,78 @@
-// CRIAR EM: src/app/api/financas/impostos/route.ts
+// src/app/api/financas/impostos/route.ts
 //
 // GET /api/financas/impostos — aba "Impostos e Tributos".
-// ⚠ O schema NÃO tem tabela de tributos/guias. Toda esta aba é "prévia"
-// (dados de exemplo). Quando existir provisão automática ligada à receita,
-// troca-se a fonte aqui.
+//
+// ETAPA 1A — FONTE ÚNICA. Os tributos vêm EXCLUSIVAMENTE do cadastro oficial
+// `Imposto`, mantido em Gerenciamento (/api/gerenciamento/impostos). Nenhuma
+// constante de negócio permanece neste arquivo.
+//
+// O QUE AINDA NÃO EXISTE: provisionamento. O cadastro define QUAIS tributos
+// existem e suas alíquotas; ele não sabe competência, base de cálculo, guia
+// emitida nem vencimento — não há tabela de provisão/guia no schema. Esses
+// campos voltam ZERADOS/vazios e `previa` permanece true enquanto for assim.
+// Zero é honesto; número inventado não é.
 
 import { NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
 
-function dias(d: string) { return Math.ceil((new Date(d + "T00:00:00").getTime() - Date.now()) / 86_400_000) }
-
-const TRIBUTOS = [
-  { id: "t1", tipo: "DAS Simples Nacional", competencia: "2026-05", base: 42000, aliquota: 8.6, provisao: 3612, vencimento: "2026-06-20", status: "a_pagar" },
-  { id: "t2", tipo: "INSS Patronal", competencia: "2026-05", base: 18800, aliquota: 27.5, provisao: 5180, vencimento: "2026-06-20", status: "a_pagar" },
-  { id: "t3", tipo: "ISS Amparo", competencia: "2026-05", base: 42000, aliquota: 5.0, provisao: 2100, vencimento: "2026-06-22", status: "a_pagar" },
-  { id: "t4", tipo: "IRRF", competencia: "2026-04", base: 18500, aliquota: 10.0, provisao: 1850, vencimento: "2026-05-15", status: "pago", pagoEm: "2026-05-15", pago: 1850 },
-]
-
-const CALENDARIO = [
-  { date: "2026-05-15", tipo: "IRRF", valor: 1850, status: "pago" },
-  { date: "2026-05-20", tipo: "DAS Simples Nacional", valor: 3612, status: "a_pagar" },
-  { date: "2026-05-20", tipo: "INSS Patronal", valor: 5180, status: "a_pagar" },
-  { date: "2026-05-22", tipo: "ISS Amparo", valor: 2100, status: "a_pagar" },
-  { date: "2026-06-15", tipo: "IRRF · Maio", valor: 1950, status: "previsto" },
-  { date: "2026-06-20", tipo: "DAS Simples Nacional", valor: 3680, status: "previsto" },
-  { date: "2026-06-20", tipo: "INSS Patronal", valor: 5260, status: "previsto" },
-  { date: "2026-06-22", tipo: "ISS Amparo", valor: 2140, status: "previsto" },
-]
-
-const CARGA = [
-  { mes: "Maio/26 (parcial)", pct: 14.5 },
-  { mes: "Abril/26", pct: 14.9 },
-  { mes: "Março/26", pct: 15.2 },
-  { mes: "Fevereiro/26", pct: 15.5 },
-]
+const pct = (v: unknown): number => {
+  const n = Number(v ?? 0)
+  return Number.isFinite(n) ? n : 0
+}
 
 export async function GET(_req: NextRequest) {
-  const aPagar = TRIBUTOS.filter((t) => t.status === "a_pagar").reduce((a, t) => a + t.provisao, 0)
-  const pagos = TRIBUTOS.filter((t) => t.status === "pago").reduce((a, t) => a + (t.pago ?? 0), 0)
-  const atrasados = TRIBUTOS.filter((t) => t.status === "a_pagar" && dias(t.vencimento) < 0)
+  try {
+    const impostos = await prisma.imposto.findMany({
+      where: { ativo: true },
+      orderBy: [{ tipo: "asc" }, { nome: "asc" }],
+      select: {
+        id: true, codigo: true, nome: true, tipo: true,
+        modoCalculo: true, percentual: true, valorFixo: true, aplicaA: true,
+      },
+    })
 
-  const peso: Record<string, number> = { a_pagar: 0, previsto: 1, pago: 2 }
-  const lista = [...TRIBUTOS].sort((a, b) => (peso[a.status] - peso[b.status]) || a.vencimento.localeCompare(b.vencimento))
+    const agora = new Date()
+    const competencia = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`
 
-  return NextResponse.json({
-    previa: true,
-    kpis: {
-      provisaoMes: aPagar, qtdGuias: TRIBUTOS.filter((t) => t.status === "a_pagar").length,
-      aPagar, qtdPendentes: TRIBUTOS.filter((t) => t.status === "a_pagar").length,
-      pagosMes: pagos,
-      atrasados: atrasados.length, totalAtrasado: atrasados.reduce((a, t) => a + t.provisao, 0),
-    },
-    calendario: CALENDARIO.map((c) => ({ ...c, dueText: dias(c.date) < 0 ? `há ${Math.abs(dias(c.date))}d` : dias(c.date) === 0 ? "hoje" : `em ${dias(c.date)}d` })),
-    cargaTributaria: CARGA,
-    tributos: lista,
-  })
+    // Um item por tributo CADASTRADO. Alíquota é real; base/provisão/vencimento
+    // não têm fonte — ficam zerados até existir motor de provisionamento.
+    const tributos = impostos.map((i) => ({
+      id: String(i.id),
+      tipo: i.codigo ? `${i.codigo} · ${i.nome}` : i.nome,
+      competencia,
+      base: 0,
+      aliquota: i.modoCalculo === "fixed" ? 0 : pct(i.percentual),
+      provisao: 0,
+      vencimento: "",
+      status: "previsto",
+      // metadados reais do cadastro (aditivos — a tela ignora o que não usa)
+      modoCalculo: i.modoCalculo ?? "percentage",
+      valorFixo: i.valorFixo != null ? Number(i.valorFixo) : null,
+      aplicaA: i.aplicaA ?? null,
+      classificacao: i.tipo ?? null,
+    }))
+
+    return NextResponse.json({
+      // true = tributos são reais, mas a APURAÇÃO ainda não existe
+      previa: true,
+      motivoPrevia:
+        "Cadastro de tributos é real; não há tabela de provisão/guia para apurar competência, base e vencimento.",
+      fonte: "cadastro:Imposto",
+      kpis: {
+        provisaoMes: 0,
+        qtdGuias: 0,
+        aPagar: 0,
+        qtdPendentes: 0,
+        pagosMes: 0,
+        atrasados: 0,
+        totalAtrasado: 0,
+      },
+      calendario: [],
+      cargaTributaria: [],
+      tributos,
+    })
+  } catch (e) {
+    console.error("[financas/impostos] erro:", e)
+    return NextResponse.json({ error: "Erro ao carregar tributos" }, { status: 500 })
+  }
 }

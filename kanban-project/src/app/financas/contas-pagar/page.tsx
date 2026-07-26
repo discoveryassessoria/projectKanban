@@ -73,6 +73,7 @@ const statusConfig = {
 export default function ContasPagarPage() {
   const [contas, setContas] = useState<ContaPagar[]>([])
   const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("todos")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -92,57 +93,23 @@ export default function ContasPagarPage() {
   }, [])
 
   const fetchContas = async () => {
+    setErro(null)
     try {
       const response = await fetch('/api/contas-pagar')
       if (response.ok) {
         const data = await response.json()
         setContas(data)
       } else {
-        // Dados de exemplo se API não existir ainda
-        setContas([
-          {
-            id: 1,
-            descricao: "Aluguel do escritório",
-            fornecedor: { id: 1, nome: "Imobiliária Central" },
-            categoria: { id: 1, nome: "Aluguel" },
-            valor: 3500,
-            valorPago: null,
-            status: 'PENDENTE',
-            dataEmissao: "2026-01-01",
-            dataVencimento: "2026-01-10",
-            dataPagamento: null,
-            formaPagamento: null
-          },
-          {
-            id: 2,
-            descricao: "Internet e Telefone",
-            fornecedor: { id: 2, nome: "Vivo" },
-            categoria: { id: 2, nome: "Telecomunicações" },
-            valor: 450,
-            valorPago: 450,
-            status: 'PAGO',
-            dataEmissao: "2025-12-20",
-            dataVencimento: "2026-01-05",
-            dataPagamento: "2026-01-03",
-            formaPagamento: "PIX"
-          },
-          {
-            id: 3,
-            descricao: "Honorários Advocatícios",
-            fornecedor: { id: 3, nome: "Dr. Carlos Silva" },
-            categoria: { id: 3, nome: "Serviços Profissionais" },
-            valor: 2000,
-            valorPago: null,
-            status: 'VENCIDO',
-            dataEmissao: "2025-12-01",
-            dataVencimento: "2025-12-28",
-            dataPagamento: null,
-            formaPagamento: null
-          },
-        ])
+        // ETAPA 1A — SEM FALLBACK SILENCIOSO: falha de API não pode virar dado
+        // financeiro fabricado na tela. Mostra erro e lista vazia.
+        console.error("Falha ao carregar contas a pagar:", response.status)
+        setErro("Não foi possível carregar as contas a pagar.")
+        setContas([])
       }
     } catch (error) {
       console.error("Erro ao carregar contas:", error)
+      setErro("Não foi possível carregar as contas a pagar.")
+      setContas([])
     } finally {
       setLoading(false)
     }
@@ -191,6 +158,15 @@ export default function ContasPagarPage() {
 
   return (
     <div className="space-y-6">
+      {erro && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+        >
+          {erro} Tente novamente em instantes — nenhum dado foi exibido no lugar.
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>

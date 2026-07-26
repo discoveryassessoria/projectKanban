@@ -10,9 +10,8 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { carregarFx, converterBrl } from "@/lib/financeiro/cambio-financas"
 
-const FX = { EUR: 5.52, USD: 5.08, BRL: 1 }
-function toBRL(v: number, m: string) { return v * (FX[m as keyof typeof FX] ?? 1) }
 function dias(d: Date) { return Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000) }
 
 // rótulos amigáveis pro enum CategoriaReceita
@@ -26,6 +25,16 @@ const CAT_LABEL: Record<string, string> = {
 export async function GET(_req: NextRequest) {
   try {
     const agora = new Date()
+
+    // ETAPA 1A — câmbio da fonte oficial. Sem cotação real não se converte:
+    // o valor fica fora do total e é declarado em `fontes.naoConvertido`.
+    const fx = await carregarFx()
+    const semCotacao: { moeda: string; valor: number }[] = []
+    const toBRL = (v: number, m?: string | null): number => {
+      const c = converterBrl(fx, v, m)
+      if (c == null) { semCotacao.push({ moeda: (m ?? "BRL").toUpperCase(), valor: v }); return 0 }
+      return c
+    }
 
     const [parcelas, processosAtivos] = await Promise.all([
       prisma.parcelaFinanceira.findMany({
@@ -158,6 +167,12 @@ export async function GET(_req: NextRequest) {
         recebidas: itens.filter((i) => i.recebida).length,
       },
       mock: { dso: 0 },
+      fontes: {
+        cambio: fx.fonte,
+        cambioDataReferencia: fx.dataReferencia,
+        moedasSemCotacao: fx.indisponiveis,
+        naoConvertido: semCotacao,
+      },
     })
   } catch (e) {
     console.error("[financas/receber] erro:", e)
