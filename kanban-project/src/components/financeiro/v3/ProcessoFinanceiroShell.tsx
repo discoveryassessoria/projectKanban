@@ -61,20 +61,11 @@ export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) 
 function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx: number; onAbrirDetalhe?: (id: number) => void }) {
   const [obrs, setObrs] = useState<any[] | null>(null)
   const [novo, setNovo] = useState(false)
-  const [cancelando, setCancelando] = useState<number | null>(null)
   const [pagar, setPagar] = useState<any | null>(null)
   const [sub, setSub] = useState<"todos" | "pagos" | "apagar">("todos")
   const carregar = () => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}&natureza=CUSTO`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }
-  async function cancelar(id: number) {
-    if (!window.confirm("Cancelar este custo? O histórico é preservado (estorno auditável).")) return
-    setCancelando(id)
-    try {
-      const res = await fetch(`/api/financeiro/v3/obrigacoes/${id}/cancelar`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: "{}" })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok || !j.ok) alert(j?.erro || `Falha ao cancelar (HTTP ${res.status}).`)
-      else carregar()
-    } finally { setCancelando(null) }
-  }
+  // Cancelamento (com motivo auditável) mora no Detalhe único da Obrigação — paridade
+  // com Receita, sem duplicar lógica nem cancelar sem justificativa a partir da lista.
   useEffect(() => { carregar() }, [processoId])
   if (!obrs) return <div className="py-8 text-sm text-white/40">carregando…</div>
 
@@ -140,7 +131,7 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
                   <td className="px-5 text-white/70">{o.vencimento ? dataBR(o.vencimento) : "—"}</td>
                   <td className="px-5"><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[#4ade80]" style={{ width: `${prog}%` }} /></div><span className="text-[11px] text-white/50">{prog}%</span></div></td>
                   <td className="px-5">{quit ? <span className="rounded bg-[#4ade80]/15 px-2 py-0.5 text-[11px] font-semibold text-[#4ade80]">Pago</span> : <span className="rounded bg-[#fbbf24]/15 px-2 py-0.5 text-[11px] font-semibold text-[#fbbf24]">A pagar</span>}</td>
-                  <td className="px-5"><div className="flex items-center gap-2"><button onClick={() => onAbrirDetalhe?.(o.obrigacaoId)} className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#20262e] px-2.5 py-1 text-xs font-medium text-white/85 hover:bg-[#252c35]"><Eye className="h-3.5 w-3.5" /> Abrir</button>{!quit && <button onClick={() => setPagar(o)} className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-500">Pagar</button>}<button onClick={() => cancelar(o.obrigacaoId)} disabled={cancelando === o.obrigacaoId} className="rounded-lg border border-white/15 px-2.5 py-1 text-xs text-white/70 hover:border-[#f87171]/50 hover:text-[#f87171] disabled:opacity-50">{cancelando === o.obrigacaoId ? "…" : "Cancelar"}</button></div></td>
+                  <td className="px-5"><div className="flex items-center gap-2"><button onClick={() => onAbrirDetalhe?.(o.obrigacaoId)} className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#20262e] px-2.5 py-1 text-xs font-medium text-white/85 hover:bg-[#252c35]"><Eye className="h-3.5 w-3.5" /> Abrir</button>{!quit && <button onClick={() => setPagar(o)} className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-500">Pagar</button>}</div></td>
                 </tr>
               )
             })}{lista.length === 0 && <tr><td colSpan={9} className="px-5 py-8 text-center text-white/40">Nenhum custo neste processo.</td></tr>}</tbody>

@@ -22,10 +22,17 @@ const META: Record<AcaoReceita, { titulo: string; verbo: string; Ic: any; cor: s
   arquivar: { titulo: "Arquivar Receita", verbo: "Arquivar", Ic: Archive, cor: "#a78bfa", exigeMotivo: false, nota: "Não altera saldos. A Receita sai das listagens operacionais.", endpoint: "arquivar" },
 }
 
-export default function AcaoReceitaModal({ acao, receitaRef, onClose, onDone }: {
-  acao: AcaoReceita; receitaRef: string; onClose: () => void; onDone?: () => void
+export default function AcaoReceitaModal({ acao, receitaRef, natureza, onClose, onDone }: {
+  acao: AcaoReceita; receitaRef: string; natureza?: string; onClose: () => void; onDone?: () => void
 }) {
+  const ehCusto = natureza === "CUSTO"
   const m = META[acao]
+  // Rótulo/nota por direção (evita "Cancelar Receita" e texto de cobrança num custo).
+  const titulo = ehCusto && acao === "cancelar" ? "Cancelar custo" : m.titulo
+  const verbo = ehCusto && acao === "cancelar" ? "Cancelar custo" : m.verbo
+  const nota = ehCusto && acao === "cancelar"
+    ? "Estorna automaticamente os pagamentos e lançamentos do custo — o histórico é preservado (estorno auditável) e a obrigação passa a CANCELADO."
+    : m.nota
   const [motivo, setMotivo] = useState("")
   const [novaData, setNovaData] = useState("")
   const [enviando, setEnviando] = useState(false)
@@ -49,7 +56,13 @@ export default function AcaoReceitaModal({ acao, receitaRef, onClose, onDone }: 
       if (m.exigeMotivo) body.motivo = motivo.trim()
       if (acao === "renegociar") { body.observacao = motivo.trim(); if (novaData) body.novaData = novaData }
       if (acao === "cancelar") body.observacao = motivo.trim()
-      const res = await fetch(`/api/financeiro/v3/receita/${receitaRef}/${m.endpoint}`, {
+      // Cancelar é parametrizado por DIREÇÃO: custo (A_PAGAR) usa o cancelamento de
+      // OBRIGAÇÃO (direction-agnóstico, com motivo — reusa cancelarObrigacao); receita
+      // mantém o serviço de Receita. Sem duplicar lógica.
+      const url = (acao === "cancelar" && ehCusto)
+        ? `/api/financeiro/v3/obrigacoes/${receitaRef}/cancelar`
+        : `/api/financeiro/v3/receita/${receitaRef}/${m.endpoint}`
+      const res = await fetch(url, {
         method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(body),
       })
       const j = await res.json().catch(() => ({}))
@@ -63,11 +76,11 @@ export default function AcaoReceitaModal({ acao, receitaRef, onClose, onDone }: 
     <div className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:items-center" style={{ zIndex: LAYER.aboveProcessCritical }} onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#161b21] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-          <h2 className="flex items-center gap-2 text-base font-semibold text-white"><m.Ic className="h-4 w-4" style={{ color: m.cor }} /> {m.titulo}</h2>
+          <h2 className="flex items-center gap-2 text-base font-semibold text-white"><m.Ic className="h-4 w-4" style={{ color: m.cor }} /> {titulo}</h2>
           <button onClick={onClose} className="text-white/40 hover:text-white/70"><X className="h-5 w-5" /></button>
         </div>
         <div className="space-y-3 px-5 py-4">
-          <p className="flex items-start gap-1.5 rounded-lg border p-3 text-xs text-white/70" style={{ borderColor: `${m.cor}40`, background: `${m.cor}0d` }}><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: m.cor }} /> {m.nota}</p>
+          <p className="flex items-start gap-1.5 rounded-lg border p-3 text-xs text-white/70" style={{ borderColor: `${m.cor}40`, background: `${m.cor}0d` }}><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: m.cor }} /> {nota}</p>
           {acao === "renegociar" && (
             <div><label className="text-[11px] uppercase tracking-wide text-white/50">Nova data de vencimento (opcional)</label><input type="date" value={novaData} onChange={(e) => setNovaData(e.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-[#20262e] px-3 py-2 text-sm text-white outline-none focus:border-[#7dd3fc]/50" /></div>
           )}
@@ -79,7 +92,7 @@ export default function AcaoReceitaModal({ acao, receitaRef, onClose, onDone }: 
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-white/10 px-5 py-3">
           <button onClick={onClose} className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium text-white/70 hover:bg-white/5">Cancelar</button>
-          <button onClick={executar} disabled={!valido || enviando || !!ok} className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-[#0d1117] disabled:cursor-not-allowed disabled:opacity-50" style={{ background: m.cor }}>{enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : ok ? <CheckCircle2 className="h-4 w-4" /> : <m.Ic className="h-4 w-4" />} {m.verbo}</button>
+          <button onClick={executar} disabled={!valido || enviando || !!ok} className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-[#0d1117] disabled:cursor-not-allowed disabled:opacity-50" style={{ background: m.cor }}>{enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : ok ? <CheckCircle2 className="h-4 w-4" /> : <m.Ic className="h-4 w-4" />} {verbo}</button>
         </div>
       </div>
     </div>
