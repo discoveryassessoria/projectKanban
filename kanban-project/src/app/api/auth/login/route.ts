@@ -4,6 +4,34 @@ import { prisma } from "@/lib/prisma"
 import { compare } from "bcrypt"
 import { signAuthToken } from "@/lib/auth-jwt"
 
+// TRILHA DE ACESSO (aditiva) — alimenta Usuários e Acessos › Auditoria de Acessos.
+// Grava em LogAuditoria com entidade "ACESSO". NUNCA registra a senha, NUNCA
+// bloqueia o login: qualquer falha ao auditar é engolida de propósito.
+async function registrarAcesso(
+  acao: "LOGIN" | "LOGIN_NEGADO",
+  descricao: string,
+  usuarioId: number | null,
+  request: NextRequest,
+) {
+  try {
+    await prisma.logAuditoria.create({
+      data: {
+        acao,
+        entidade: "ACESSO",
+        entidadeId: usuarioId ?? undefined,
+        descricao,
+        usuarioId: usuarioId ?? undefined,
+        detalhes: {
+          ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+          agente: request.headers.get("user-agent")?.slice(0, 200) ?? null,
+        },
+      },
+    })
+  } catch {
+    /* auditar nunca derruba a autenticação */
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log("🔐 Requisição de login recebida")
@@ -26,6 +54,7 @@ export async function POST(request: NextRequest) {
 
     if (!usuario) {
       console.log("❌ Usuário não encontrado")
+      await registrarAcesso("LOGIN_NEGADO", `Tentativa de acesso com e-mail não cadastrado: ${email}`, null, request)
       return NextResponse.json(
         { error: "Credenciais inválidas" },
         { status: 401 }
@@ -40,6 +69,7 @@ export async function POST(request: NextRequest) {
 
     if (!senhaCorreta) {
       console.log("❌ Senha incorreta")
+      await registrarAcesso("LOGIN_NEGADO", `Senha incorreta para ${usuario.email}`, usuario.id, request)
       return NextResponse.json(
         { error: "Credenciais inválidas" },
         { status: 401 }
@@ -58,6 +88,7 @@ export async function POST(request: NextRequest) {
     })
 
     console.log("🎫 Token JWT gerado com sucesso")
+    await registrarAcesso("LOGIN", `Acesso concedido a ${usuario.email}`, usuario.id, request)
 
     // Retornar dados do usuário (sem a senha)
     const { senha: _, ...usuarioSemSenha } = usuario

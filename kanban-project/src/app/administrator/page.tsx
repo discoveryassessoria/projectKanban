@@ -143,9 +143,33 @@ const VersoesConfiguracaoTab = dynamic(() => import("@/src/components/gerenciame
 const ConfiguracoesGeraisProcessoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ConfiguracaoProcessoViews").then(m => m.ConfiguracoesGeraisProcessoTab), { ssr: false, loading: () => <CarregandoTela /> })
 const TransicoesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ConfiguracaoProcessoViews").then(m => m.TransicoesTab), { ssr: false, loading: () => <CarregandoTela /> })
 const DiagnosticoConfiguracaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ConfiguracaoProcessoViews").then(m => m.DiagnosticoConfiguracaoTab), { ssr: false, loading: () => <CarregandoTela /> })
+// CADASTROS GENÉRICOS — a forma de cada um vem do registro único no backend.
+const CadastroGenericoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CadastroGenericoTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const cad = (entidade: string) => {
+  const Tela = () => <CadastroGenericoTab entidade={entidade} />
+  Tela.displayName = `Cadastro(${entidade})`
+  return Tela
+}
+// CONFIGURAÇÃO GLOBAL (ConfiguracaoSistema) — dois grupos, uma fonte.
+const ConfiguracoesGeraisSistemaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ConfiguracaoSistemaTab").then(m => m.ConfiguracoesGeraisSistemaTab), { ssr: false, loading: () => <CarregandoTela /> })
+const IdentidadeVisualTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ConfiguracaoSistemaTab").then(m => m.IdentidadeVisualTab), { ssr: false, loading: () => <CarregandoTela /> })
+// DIAGNÓSTICOS — quatro lentes sobre o mesmo read-model.
+const DiagnosticoSistemaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DiagnosticoViews").then(m => m.DiagnosticoSistemaTab), { ssr: false, loading: () => <CarregandoTela /> })
+const DiagnosticoExecutivoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DiagnosticoViews").then(m => m.DiagnosticoExecutivoTab), { ssr: false, loading: () => <CarregandoTela /> })
+const SaudeSistemaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DiagnosticoViews").then(m => m.SaudeSistemaTab), { ssr: false, loading: () => <CarregandoTela /> })
+const HistoricoExecucoesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DiagnosticoViews").then(m => m.HistoricoExecucoesTab), { ssr: false, loading: () => <CarregandoTela /> })
+// GESTÃO FINANCEIRA (consulta) + exportações + índice de dashboards.
+const CreditoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/FinanceiroGestaoViews").then(m => m.CreditoTab), { ssr: false, loading: () => <CarregandoTela /> })
+const DocumentosFinanceirosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/FinanceiroGestaoViews").then(m => m.DocumentosFinanceirosTab), { ssr: false, loading: () => <CarregandoTela /> })
+const ExportacoesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ExportacoesTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const DashboardsTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DashboardsTab"), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
-const cat = (k: string) => () => <CatalogTab catalogKey={k} />
+const cat = (k: string) => {
+  const Tela = () => <CatalogTab catalogKey={k} />
+  Tela.displayName = `CatalogTab(${k})`
+  return Tela
+}
 
 const TELAS: Record<string, React.ComponentType> = {
   // reais
@@ -177,7 +201,8 @@ const TELAS: Record<string, React.ComponentType> = {
   taxes: ImpostosTab,
   fees: TaxasPagamentoTab,
   organs: OrgaosProtocoloTab,
-  prottypes: cat("op_prottypes"),
+  prottypes: cad("tipos-protocolo"),
+  "prottypes-rascunho": cat("op_prottypes"),
   suppliers: FornecedoresTab,
   departments: DepartamentosTab,
   // Países e Regiões: era um scaffold de catálogo sem persistência; agora é a tela
@@ -188,12 +213,18 @@ const TELAS: Record<string, React.ComponentType> = {
   fases: CatalogoFasesTab,
 
   // bespoke (lote 1)
-  teams: TeamsTab,
+  // Cadastros REAIS (motor genérico). Os rascunhos do mockup seguem acessíveis
+  // por ?screen=<key>-rascunho.
+  teams: cad("grupos"),
+  "teams-rascunho": TeamsTab,
+  marcos: cad("marcos"),
+  servcats: cad("categorias-servico"),
+  orgcats: cad("categorias-organizacao"),
   // Automações por fase — MESMA tela para os itens oficiais "Financeiras" e
   // "Eventos" (só muda a aba inicial). `opauto` continua válido como deep-link.
   opauto: PhaseAutomationsFasesTab,
-  autofin: () => <PhaseAutomationsFasesTab kindInicial="financial" />,
-  autoevt: () => <PhaseAutomationsFasesTab kindInicial="event" />,
+  autofin: function AutomacoesFinanceiras() { return <PhaseAutomationsFasesTab kindInicial="financial" /> },
+  autoevt: function AutomacoesEventos() { return <PhaseAutomationsFasesTab kindInicial="event" /> },
   protocols: ProtocolsTab,
   // SLA consolidado (real, sobre a configuração de cada processo). O rascunho antigo
   // continua acessível por ?screen=sla-rascunho.
@@ -202,18 +233,24 @@ const TELAS: Record<string, React.ComponentType> = {
   proccfg: ConfiguracoesGeraisProcessoTab,
   transicoes: TransicoesTab,
   integracoes: IntegracoesTab,
-  governanca: () => <LogAuditoriaTab escopo="financeiro" />,
-  templates: TemplatesTab,
-  notifications: NotificationsTab,
+  governanca: function GovernancaFinanceira() { return <LogAuditoriaTab escopo="financeiro" /> },
+  templates: cad("modelos"),
+  "templates-rascunho": TemplatesTab,
+  notifications: cad("notificacoes"),
+  "notifications-rascunho": NotificationsTab,
   audit: LogAuditoriaTab,
-  impexp: ImportExportTab,
+  impexp: ExportacoesTab,
+  "impexp-rascunho": ImportExportTab,
   backup: BackupTab,
-  settings: SettingsTab,
+  settings: ConfiguracoesGeraisSistemaTab,
+  "settings-rascunho": SettingsTab,
+  identidade: IdentidadeVisualTab,
 
   // bespoke (lote 2)
   proctypes: TipoProcessoTab,
   macrokanban: MacroKanbanTab,
-  mgmthealth: HealthTab,
+  mgmthealth: DiagnosticoExecutivoTab,
+  "mgmthealth-rascunho": HealthTab,
 
   // bespoke (lote 3)
   phaseiwf: PhaseWorkflowsFasesTab,
@@ -235,10 +272,16 @@ const TELAS: Record<string, React.ComponentType> = {
   execmotor: ExecutorMotorTab,
   runtimediag: RuntimeWorkflowDiagnostics,
   migmotor: MigracaoMotorTab,
-  diagnostics: DiagnosticsTab,
+  diagnostics: DiagnosticoSistemaTab,
+  "diagnostics-rascunho": DiagnosticsTab,
+  dashboards: DashboardsTab,
+  credito: CreditoTab,
+  docfin: DocumentosFinanceirosTab,
+  accaudit: function AuditoriaDeAcessos() { return <LogAuditoriaTab escopo="acessos" /> },
 
   // bespoke (lote 6) — Cadastros do Motor + Saúde
-  rolecat: RoleCatalogTab,
+  rolecat: cad("cargos"),
+  "rolecat-rascunho": RoleCatalogTab,
   permprofiles: RolesTab,
   // Usuários e Acessos → Permissões (perfis de permissão do motor).
   permmotor: PerfisPermissaoMotorTab,
@@ -250,8 +293,10 @@ const TELAS: Record<string, React.ComponentType> = {
   "cfgversions-rascunho": ConfigVersionsTab,
   cfgdiagnosis: DiagnosticoConfiguracaoTab,
   "cfgdiagnosis-rascunho": ConfigDiagnosisTab,
-  execmatrix: ExecMatrixTab,
-  syshealth: SystemHealthTab,
+  execmatrix: HistoricoExecucoesTab,
+  "execmatrix-rascunho": ExecMatrixTab,
+  syshealth: SaudeSistemaTab,
+  "syshealth-rascunho": SystemHealthTab,
 }
 
 function CarregandoTela() {

@@ -25,8 +25,9 @@ model Usuario {
   historicoTarefas   TarefaHistorico[]
   perfil             Perfil?            @relation(fields: [perfilId], references: [id])
 
-  documentosResponsavel Documento[] @relation("DocumentoResponsavel")
-  eventosResponsavel    Evento[]    @relation("EventoResponsavel")
+  documentosResponsavel Documento[]          @relation("DocumentoResponsavel")
+  eventosResponsavel    Evento[]             @relation("EventoResponsavel")
+  gruposUsuario         GrupoUsuarioMembro[]
 
   @@index([perfilId])
 }
@@ -1016,25 +1017,25 @@ model CentroCusto {
 }
 
 model Evento {
-  publicCode   String?    @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
-  id           Int        @id @default(autoincrement())
-  processoId   Int?
-  titulo       String     @db.VarChar(200)
-  descricao    String?
-  tipo         TipoEvento @default(OUTRO)
-  dataInicio   DateTime
-  dataFim      DateTime?
-  diaInteiro   Boolean    @default(false)
-  local        String?    @db.VarChar(200)
-  lembreteDias Int?
-  cor          String?    @db.VarChar(7)
-  observacoes  String?
-  status       String     @default("PENDENTE") @db.VarChar(20) // CONFIRMADO | PENDENTE | CANCELADO — aditivo
-  responsavelId Int?      // responsável pelo evento — aditivo
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  processo     Processo?  @relation(fields: [processoId], references: [id], onDelete: Cascade)
-  responsavel  Usuario?   @relation("EventoResponsavel", fields: [responsavelId], references: [id])
+  publicCode    String?    @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
+  id            Int        @id @default(autoincrement())
+  processoId    Int?
+  titulo        String     @db.VarChar(200)
+  descricao     String?
+  tipo          TipoEvento @default(OUTRO)
+  dataInicio    DateTime
+  dataFim       DateTime?
+  diaInteiro    Boolean    @default(false)
+  local         String?    @db.VarChar(200)
+  lembreteDias  Int?
+  cor           String?    @db.VarChar(7)
+  observacoes   String?
+  status        String     @default("PENDENTE") @db.VarChar(20) // CONFIRMADO | PENDENTE | CANCELADO — aditivo
+  responsavelId Int? // responsável pelo evento — aditivo
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  processo      Processo?  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  responsavel   Usuario?   @relation("EventoResponsavel", fields: [responsavelId], references: [id])
 
   @@index([processoId])
   @@index([dataInicio])
@@ -1438,9 +1439,9 @@ model Custo {
 // nunca Ã  Receita. Aditivo: legado (parcelas direto na Receita) permanece intacto.
 // ============================================================================
 model Cobranca {
-  id                  Int      @id @default(autoincrement())
+  id                  Int       @id @default(autoincrement())
   receitaId           Int
-  receita             Receita  @relation("ReceitaCobrancas", fields: [receitaId], references: [id], onDelete: Cascade)
+  receita             Receita   @relation("ReceitaCobrancas", fields: [receitaId], references: [id], onDelete: Cascade)
   processoId          Int // snapshot p/ consulta rÃ¡pida
   // IDs do Gerenciamento â Financeiro (FONTE ÃNICA â sÃ³ referÃªncia, nunca cÃ³pia):
   formaPagamentoId    Int? // â FormaPagamentoCadastro
@@ -1448,21 +1449,21 @@ model Cobranca {
   contaBancariaId     Int? // â ContaBancaria
   carteiraId          Int? // â CarteiraRecebimento
   taxaPagamentoId     Int? // â TaxaPagamento
-  gateway             String?  @db.VarChar(40)
-  moeda               Moeda    @default(EUR)
-  valorTotal          Decimal  @db.Decimal(12, 2)
-  status              String   @default("ABERTA") @db.VarChar(20) // ABERTA | PARCIAL | QUITADA | CANCELADA | RENEGOCIADA
+  gateway             String?   @db.VarChar(40)
+  moeda               Moeda     @default(EUR)
+  valorTotal          Decimal   @db.Decimal(12, 2)
+  status              String    @default("ABERTA") @db.VarChar(20) // ABERTA | PARCIAL | QUITADA | CANCELADA | RENEGOCIADA
   // congelamento auditÃ¡vel da condiÃ§Ã£o no momento da criaÃ§Ã£o
   condicaoVersao      Int?
-  condicaoCodigo      String?  @db.VarChar(60)
+  condicaoCodigo      String?   @db.VarChar(60)
   memoriaCalculo      Json?
   observacoes         String?
   criadoPorId         Int?
-  criadoEm            DateTime @default(now())
-  atualizadoEm        DateTime @updatedAt
+  criadoEm            DateTime  @default(now())
+  atualizadoEm        DateTime  @updatedAt
   // Envio da cobrança ao cliente (aditivo) — marca quando foi enviada + link de pagamento.
   enviadaEm           DateTime?
-  linkPagamento       String?  @db.VarChar(500)
+  linkPagamento       String?   @db.VarChar(500)
   enviadaPorId        Int?
 
   // ââ RUNTIME DE CÃLCULO (auditoria; congelado na confirmaÃ§Ã£o) ââ
@@ -2903,6 +2904,9 @@ model OrgaoProtocolo {
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
+  // categorias (N:N) — uma organização pode ser cartório E tradutor, por exemplo
+  categorias OrganizacaoCategoria[]
+
   @@index([type])
 }
 
@@ -3990,34 +3994,34 @@ model OperacaoAntecipada {
 
 /// Aggregate root do ciclo financeiro. Reusa o cÃ³digo operacional atual (REC-n).
 model ObrigacaoEconomica {
-  id                Int      @id @default(autoincrement())
-  codigoOperacional String?  @db.VarChar(40) // = cÃ³digo da Receita/Custo (ex.: REC-105)
-  natureza          String   @db.VarChar(30) // RECEITA|CUSTO|RECEITA_EXTRA|DESCONTO|CREDITO|REEMBOLSO|JUROS|MULTA|AJUSTE|ESTORNO|RENEGOCIACAO|OUTRO
-  direcao           String   @db.VarChar(12) // A_RECEBER|A_PAGAR
+  id                Int       @id @default(autoincrement())
+  codigoOperacional String?   @db.VarChar(40) // = cÃ³digo da Receita/Custo (ex.: REC-105)
+  natureza          String    @db.VarChar(30) // RECEITA|CUSTO|RECEITA_EXTRA|DESCONTO|CREDITO|REEMBOLSO|JUROS|MULTA|AJUSTE|ESTORNO|RENEGOCIACAO|OUTRO
+  direcao           String    @db.VarChar(12) // A_RECEBER|A_PAGAR
   processoId        Int?
   faseId            Int?
   clienteId         Int?
   regraFinanceiraId Int?
-  moedaContratual   Moeda    @default(BRL)
-  moedaContabil     Moeda    @default(BRL)
-  valorContratado   Decimal  @db.Decimal(14, 2)
+  moedaContratual   Moeda     @default(BRL)
+  moedaContabil     Moeda     @default(BRL)
+  valorContratado   Decimal   @db.Decimal(14, 2)
   politicaCambialId Int?
-  politicaDivisao   String?  @db.VarChar(20) // SEM_DIVISAO|IGUAL|PERCENTUAL|VALOR|GRUPO|PERSONALIZADA
+  politicaDivisao   String?   @db.VarChar(20) // SEM_DIVISAO|IGUAL|PERCENTUAL|VALOR|GRUPO|PERSONALIZADA
   contaContabilId   Int?
   centroCustoId     Int?
   fornecedorId      Int? // custo manual: fornecedor vinculado (aditivo; sem FK forte, igual faseId/centroCustoId)
   itemCatalogoId    Int? // FONTE do lançamento manual: item do Cadastro Mestre (Gerenciamento). Aditivo, sem FK forte.
-  status            String   @default("RASCUNHO") @db.VarChar(20) // RASCUNHO|ATIVO|SUSPENSO|LIQUIDADO|CANCELADO
+  status            String    @default("RASCUNHO") @db.VarChar(20) // RASCUNHO|ATIVO|SUSPENSO|LIQUIDADO|CANCELADO
   vencimento        DateTime? // Fase 2 — vencimento da obrigação (ex.: lançamento extra em cobrança futura)
-  versao            Int      @default(1)
+  versao            Int       @default(1)
   substituiId       Int?
-  origemTipo        String?  @db.VarChar(20) // Receita|Custo|nativo
+  origemTipo        String?   @db.VarChar(20) // Receita|Custo|nativo
   origemId          Int?
-  observacoes       String?  @db.Text
-  version           Int      @default(0) // optimistic locking (aggregate)
+  observacoes       String?   @db.Text
+  version           Int       @default(0) // optimistic locking (aggregate)
   criadoPorId       Int?
-  criadoEm          DateTime @default(now())
-  atualizadoEm      DateTime @updatedAt
+  criadoEm          DateTime  @default(now())
+  atualizadoEm      DateTime  @updatedAt
 
   ledger        LedgerFinanceiro?
   ocorrencias   OcorrenciaFinanceira[]
@@ -4100,23 +4104,23 @@ model LedgerOpeningBalance {
 // (informada/importada), conciliada contra uma OcorrenciaFinanceira de pagamento.
 // Aditiva, "ref solta". Estados: INFORMADO|CONCILIADO|DIVERGENTE|IGNORADO|ESTORNADO.
 model LancamentoBancario {
-  id                    Int       @id @default(autoincrement())
-  data                  DateTime
-  moeda                 Moeda     @default(BRL)
-  valorBruto            Decimal   @db.Decimal(14, 2)
-  valorTarifa           Decimal?  @db.Decimal(14, 2)
-  valorLiquido          Decimal   @db.Decimal(14, 2)
+  id                     Int      @id @default(autoincrement())
+  data                   DateTime
+  moeda                  Moeda    @default(BRL)
+  valorBruto             Decimal  @db.Decimal(14, 2)
+  valorTarifa            Decimal? @db.Decimal(14, 2)
+  valorLiquido           Decimal  @db.Decimal(14, 2)
   identificadorTransacao String?  @db.VarChar(120) // id do banco/gateway (dedup)
-  contaRecebimentoId    Int? // → ContaBancaria/CarteiraRecebimento (solto)
-  descricao             String?   @db.VarChar(300)
-  status                String    @default("INFORMADO") @db.VarChar(16)
-  ocorrenciaId          Int? // OcorrenciaFinanceira conciliada
-  obrigacaoId           Int?
-  divergencia           String?   @db.VarChar(200)
-  origem                String    @default("manual") @db.VarChar(20) // manual|import|api
-  criadoPorId           Int?
-  criadoEm              DateTime  @default(now())
-  atualizadoEm          DateTime  @updatedAt
+  contaRecebimentoId     Int? // → ContaBancaria/CarteiraRecebimento (solto)
+  descricao              String?  @db.VarChar(300)
+  status                 String   @default("INFORMADO") @db.VarChar(16)
+  ocorrenciaId           Int? // OcorrenciaFinanceira conciliada
+  obrigacaoId            Int?
+  divergencia            String?  @db.VarChar(200)
+  origem                 String   @default("manual") @db.VarChar(20) // manual|import|api
+  criadoPorId            Int?
+  criadoEm               DateTime @default(now())
+  atualizadoEm           DateTime @updatedAt
 
   @@unique([identificadorTransacao]) // dedup de importação (quando presente)
   @@index([status])
@@ -4283,25 +4287,25 @@ model CreditoFinanceiro {
 /// pagador, ocorrência, usuário e correlation id. Aditivo; não substitui o Ledger
 /// double-entry das obrigações — é o sub-razão do crédito. Nunca é editado/apagado.
 model CreditoMovimento {
-  id                  Int      @id @default(autoincrement())
-  creditoId           Int
-  tipo                String   @db.VarChar(16) // GERACAO|UTILIZACAO|DEVOLUCAO|ESTORNO
-  valor               Decimal  @db.Decimal(14, 2)
-  saldoAnterior       Decimal  @db.Decimal(14, 2)
-  saldoPosterior      Decimal  @db.Decimal(14, 2)
-  moeda               Moeda    @default(BRL)
-  obrigacaoOrigemId   Int?
-  obrigacaoDestinoId  Int?
-  cobrancaDestinoId   Int?
-  ocorrenciaId        Int?
-  pagadorId           Int?
-  pessoaId            Int?
-  processoId          Int?
-  receitaId           Int?
-  usuarioId           Int?
-  correlationId       String?  @db.VarChar(80)
-  observacao          String?  @db.VarChar(300)
-  criadoEm            DateTime @default(now())
+  id                 Int      @id @default(autoincrement())
+  creditoId          Int
+  tipo               String   @db.VarChar(16) // GERACAO|UTILIZACAO|DEVOLUCAO|ESTORNO
+  valor              Decimal  @db.Decimal(14, 2)
+  saldoAnterior      Decimal  @db.Decimal(14, 2)
+  saldoPosterior     Decimal  @db.Decimal(14, 2)
+  moeda              Moeda    @default(BRL)
+  obrigacaoOrigemId  Int?
+  obrigacaoDestinoId Int?
+  cobrancaDestinoId  Int?
+  ocorrenciaId       Int?
+  pagadorId          Int?
+  pessoaId           Int?
+  processoId         Int?
+  receitaId          Int?
+  usuarioId          Int?
+  correlationId      String?  @db.VarChar(80)
+  observacao         String?  @db.VarChar(300)
+  criadoEm           DateTime @default(now())
 
   @@index([creditoId])
   @@index([correlationId])
@@ -4331,4 +4335,156 @@ model SaldoSnapshot {
   criadoEm          DateTime @default(now())
 
   @@index([obrigacaoId, sequenciaAplicada])
+}
+
+// ============================================================================
+// CADASTROS DO GERENCIAMENTO (reestruturação 26/07/2026)
+// 100% ADITIVO: tabelas novas, nenhuma coluna alterada, nenhum dado tocado.
+// Cadastros puros — não participam do runtime do motor; alimentam as telas
+// oficiais do Gerenciamento que antes não tinham backend.
+// ============================================================================
+
+/// Marcos do processo — pontos de controle nomeados (cadastro; sem efeito de runtime).
+model MarcoProcesso {
+  id             Int      @id @default(autoincrement())
+  code           String   @unique @db.VarChar(60)
+  nome           String   @db.VarChar(200)
+  descricao      String?  @db.Text
+  tipoProcessoId Int? // null = vale para todos os tipos
+  phaseKey       String?  @db.VarChar(60) // fase de referência (opcional)
+  ordem          Int      @default(0)
+  ativo          Boolean  @default(true)
+  criadoEm       DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
+
+  @@index([tipoProcessoId])
+  @@index([phaseKey])
+}
+
+/// Categorias que organizam o Catálogo de Serviços (não guardam preço).
+model CategoriaServico {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.VarChar(60)
+  nome         String   @db.VarChar(200)
+  descricao    String?  @db.Text
+  ordem        Int      @default(0)
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+/// Categorias das organizações (cartório, consulado, tribunal, banco, tradutor…).
+/// Uma organização pode ter VÁRIAS categorias — daí a tabela de vínculo.
+model CategoriaOrganizacao {
+  id           Int                    @id @default(autoincrement())
+  code         String                 @unique @db.VarChar(60)
+  nome         String                 @db.VarChar(200)
+  descricao    String?                @db.Text
+  ordem        Int                    @default(0)
+  ativo        Boolean                @default(true)
+  criadoEm     DateTime               @default(now())
+  atualizadoEm DateTime               @updatedAt
+  organizacoes OrganizacaoCategoria[]
+}
+
+model OrganizacaoCategoria {
+  id          Int                  @id @default(autoincrement())
+  orgaoId     Int
+  categoriaId Int
+  criadoEm    DateTime             @default(now())
+  orgao       OrgaoProtocolo       @relation(fields: [orgaoId], references: [id], onDelete: Cascade)
+  categoria   CategoriaOrganizacao @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@unique([orgaoId, categoriaId])
+  @@index([categoriaId])
+}
+
+/// Equipes / grupos que organizam usuários (não concedem permissão por si).
+model GrupoUsuario {
+  id           Int                  @id @default(autoincrement())
+  code         String?              @db.VarChar(40)
+  nome         String               @db.VarChar(200)
+  descricao    String?              @db.Text
+  ativo        Boolean              @default(true)
+  criadoEm     DateTime             @default(now())
+  atualizadoEm DateTime             @updatedAt
+  membros      GrupoUsuarioMembro[]
+}
+
+model GrupoUsuarioMembro {
+  id        Int          @id @default(autoincrement())
+  grupoId   Int
+  usuarioId Int
+  criadoEm  DateTime     @default(now())
+  grupo     GrupoUsuario @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  usuario   Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([grupoId, usuarioId])
+  @@index([usuarioId])
+}
+
+/// Cargos operacionais (papel funcional; autorização continua em Perfis/Permissões).
+model CargoCadastro {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.VarChar(60)
+  nome         String   @db.VarChar(200)
+  area         String?  @db.VarChar(80)
+  descricao    String?  @db.Text
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+/// Tipos de Protocolo (consular, judicial, comune, administrativo…).
+model TipoProtocoloCadastro {
+  id            Int      @id @default(autoincrement())
+  code          String   @unique @db.VarChar(60)
+  nome          String   @db.VarChar(200)
+  escopo        String?  @db.VarChar(40) // person | process | consular_case | comune_case | judicial_case
+  nacionalidade String?  @db.VarChar(60)
+  observacoes   String?  @db.Text
+  ordem         Int      @default(0)
+  ativo         Boolean  @default(true)
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+}
+
+/// Configuração global chave/valor (Sistema › Configurações Gerais e Identidade Visual).
+model ConfiguracaoSistema {
+  chave         String   @id @db.VarChar(80)
+  valor         String?  @db.Text
+  grupo         String   @default("geral") @db.VarChar(40) // geral | identidade
+  atualizadoPor Int?
+  atualizadoEm  DateTime @updatedAt
+
+  @@index([grupo])
+}
+
+/// Modelos de texto reutilizáveis (e-mail, documento, mensagem).
+model ModeloDocumento {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.VarChar(60)
+  nome         String   @db.VarChar(200)
+  tipo         String?  @db.VarChar(40) // email | documento | mensagem
+  categoria    String?  @db.VarChar(80)
+  conteudo     String?  @db.Text
+  variaveis    String?  @db.Text
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+/// Regras de comunicação (quem é avisado, por qual canal, em qual gatilho).
+model RegraNotificacao {
+  id            Int      @id @default(autoincrement())
+  code          String   @unique @db.VarChar(60)
+  nome          String   @db.VarChar(200)
+  gatilho       String   @db.VarChar(80)
+  entidade      String?  @db.VarChar(60)
+  canais        String?  @db.VarChar(120) // email,sistema
+  destinatarios String?  @db.VarChar(200)
+  modeloCode    String?  @db.VarChar(60)
+  ativo         Boolean  @default(true)
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
 }

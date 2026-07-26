@@ -166,7 +166,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       // ESTRUTURA — o catálogo de fases é a fonte única das fases do sistema.
       a(40, "fases", "Fases", ["fase", "fases", "catalogo", "catálogo", "etapa", "phase"], "Estrutura"),
       a(50, "phasemodes", "Variações da Fase", ["variacao", "variação", "modo", "interno", "fase"], "Estrutura"),
-      s(60, "marcos", "Marcos", "Marcos ainda não têm cadastro próprio. Os pontos de controle hoje derivam das fases (Estrutura › Fases) e do Workflow Interno.", "Estrutura", ["marco", "milestone", "checkpoint"]),
+      a(60, "marcos", "Marcos", ["marco", "milestone", "checkpoint", "controle"], "Estrutura"),
 
       // CONFIGURAÇÕES
       a(70, "sla", "SLA", ["sla", "prazo", "vencimento", "alerta"], "Configurações"),
@@ -212,6 +212,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
 
       // key legada da tela unificada de automações por fase (deep-link vira alias).
       h(900, "opauto", "Automações por Fase (legado)"),
+      h(910, "execmatrix-rascunho", "Painel Executivo de Configuração (rascunho do mockup)"),
     ],
   },
 
@@ -232,6 +233,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       h(900, "certtypes", "Tipos de Certidão (consolidado em Tipos de Documento)"),
       h(910, "docmatrix", "Matriz Documental (visão técnica)"),
       h(920, "protocols", "Regras de Protocolo por Nacionalidade (rascunho)"),
+      h(930, "prottypes-rascunho", "Tipos de Protocolo (rascunho do mockup)"),
     ],
   },
 
@@ -242,7 +244,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     description: "Catálogo operacional de serviços prestados (sem preço).",
     children: [
       a(10, "products", "Catálogo de Serviços", ["servico", "serviço", "traducao", "tradução", "apostilamento", "retificacao", "cidadania", "genealogia", "logistica", "assessoria"]),
-      s(20, "servcats", "Categorias", "As categorias de serviço hoje são um campo do próprio serviço (Catálogo de Serviços). Cadastro dedicado de categorias ainda não existe.", undefined, ["categoria", "servico", "serviço"]),
+      a(20, "servcats", "Categorias", ["categoria", "servico", "serviço", "organizacao"]),
     ],
   },
 
@@ -274,13 +276,13 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(140, "paycond", "Condições de Pagamento", ["condicao", "condição", "pagamento", "parcelamento", "cobranca"], "Cobrança"),
       a(150, "fees", "Taxas de Pagamento", ["taxa", "pagamento", "encargo", "cobranca"], "Cobrança"),
 
-      s(160, "credito", "Crédito", "A gestão de créditos financeiros é operacional e vive no Financeiro Geral › Créditos. Não há cadastro de política de crédito no Gerenciamento.", undefined, ["credito", "crédito", "saldo"]),
+      a(160, "credito", "Crédito", ["credito", "crédito", "saldo", "disponivel", "utilizado"]),
 
       a(170, "taxes", "Impostos", ["imposto", "tributo", "fiscal"], "Fiscal"),
 
       a(180, "commrules", "Regras de Comissão", ["comissao", "comissão", "regra"], "Comissões"),
 
-      s(190, "docfin", "Documentos Financeiros", "Recibos, faturas e comprovantes são emitidos pelo Financeiro Geral. Não existe cadastro de documentos financeiros no Gerenciamento.", undefined, ["recibo", "fatura", "nota", "documento", "financeiro"]),
+      a(190, "docfin", "Documentos Financeiros", ["recibo", "fatura", "nota", "documento", "financeiro", "numeracao"]),
       a(200, "governanca", "Governança", ["governanca", "governança", "auditoria", "trilha", "alteracao", "historico"]),
 
       // LEGADOS — telas antigas mantidas acessíveis por ?screen= (sem cadastro paralelo no menu).
@@ -304,7 +306,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     children: [
       a(10, "organs", "Cartórios e Órgãos", ["cartorio", "cartório", "orgao", "órgão", "consulado", "tribunal", "prefeitura", "comune", "protocolo", "organizacao", "organização"], "Organizações"),
       a(20, "suppliers", "Fornecedores", ["fornecedor", "parceiro", "tradutor", "advogado", "escritorio", "banco", "empresa", "organizacao"], "Organizações"),
-      s(30, "orgcats", "Categorias", "A categoria hoje é um campo (tipo) do próprio cadastro da organização. Cadastro dedicado de categorias, com múltiplas categorias por organização, ainda não existe.", undefined, ["categoria", "tipo", "orgao", "organizacao"]),
+      a(30, "orgcats", "Categorias", ["categoria", "tipo", "orgao", "organizacao"]),
     ],
   },
 
@@ -321,10 +323,12 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(50, "departments", "Departamentos", ["departamento", "setor", "grupo"], "Grupos"),
       a(60, "rolecat", "Cargos", ["cargo", "funcao", "função", "papel"], "Grupos"),
 
-      s(70, "accaudit", "Auditoria de Acessos", "A trilha de auditoria hoje é global e está em Sistema › Auditoria e Logs. Recorte específico de sessões/autenticações ainda não existe.", undefined, ["auditoria", "acesso", "sessao", "sessão", "login", "bloqueio"]),
+      a(70, "accaudit", "Auditoria de Acessos", ["auditoria", "acesso", "sessao", "sessão", "login", "bloqueio"]),
 
       // alias histórico da mesma tela de perfis/permissões (deep-link preservado).
       h(900, "permprofiles", "Perfis de Permissão (alias)"),
+      h(910, "teams-rascunho", "Equipes (rascunho do mockup)"),
+      h(920, "rolecat-rascunho", "Papéis e Responsáveis (rascunho do mockup)"),
     ],
   },
 
@@ -340,7 +344,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(20, "catalogmestre", "Catálogo Mestre", ["catalogo", "catálogo", "mestre", "item", "cadastro"], "Cadastros Auxiliares"),
       a(30, "templates", "Modelos", ["modelo", "template"], "Cadastros Auxiliares"),
 
-      s(40, "identidade", "Identidade Visual", "A identidade visual é definida em código (motor de ambiente por país) e ainda não tem tela de configuração.", undefined, ["identidade", "visual", "tema", "cor", "logo", "ambiente"]),
+      a(40, "identidade", "Identidade Visual", ["identidade", "visual", "tema", "cor", "logo", "marca"]),
 
       a(50, "notifications", "Notificações", ["notificacao", "notificação", "email", "aviso", "comunicacao"], "Comunicações"),
 
@@ -350,6 +354,9 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
 
       // OCULTOS — telas existentes, acessíveis por ?screen=.
       h(900, "backup", "Backup e Restauração (rascunho)"),
+      h(910, "settings-rascunho", "Configurações Gerais (rascunho do mockup)"),
+      h(920, "templates-rascunho", "Modelos (rascunho do mockup)"),
+      h(930, "notifications-rascunho", "Notificações (rascunho do mockup)"),
     ],
   },
 
@@ -364,12 +371,16 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(30, "mgmthealth", "Diagnóstico Executivo", ["indicador", "kpi", "saude", "saúde", "executivo", "score"], "Indicadores"),
       a(40, "syshealth", "Saúde do Sistema", ["saude", "saúde", "indicador", "score", "auditoria"], "Indicadores"),
 
-      s(50, "dashboards", "Dashboards", "As composições visuais vivem nos módulos operacionais (Home, Financeiro Geral, Kanban). Dashboards configuráveis no Gerenciamento ainda não existem.", undefined, ["dashboard", "painel", "grafico", "gráfico"]),
+      a(50, "dashboards", "Dashboards", ["dashboard", "painel", "grafico", "gráfico", "indicador"]),
 
       a(60, "impexp", "Importação / Exportação", ["exportacao", "exportação", "importacao", "csv", "json"], "Exportações"),
 
       // RASCUNHO do mockup substituído pela tela real de Diagnóstico de Configuração.
       h(900, "cfgdiagnosis-rascunho", "Diagnóstico de Configuração (rascunho do mockup)"),
+      h(910, "diagnostics-rascunho", "Diagnóstico do Sistema (rascunho do mockup)"),
+      h(920, "mgmthealth-rascunho", "Diagnóstico Executivo (rascunho do mockup)"),
+      h(930, "syshealth-rascunho", "Saúde do Sistema (rascunho do mockup)"),
+      h(940, "impexp-rascunho", "Importação / Exportação (rascunho do mockup)"),
     ],
   },
 ]

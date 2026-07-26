@@ -24,6 +24,12 @@ function fmt(iso: string) {
 // Sistema › Auditoria e Logs usa a trilha inteira; Financeiro › Governança usa o
 // recorte das entidades financeiras/de configuração. Nenhuma segunda fonte.
 const ESCOPOS: Record<string, { titulo: string; descricao: string; entidades: RegExp }> = {
+  acessos: {
+    titulo: "Auditoria de Acessos",
+    descricao:
+      "Autenticações, tentativas negadas e alterações de acesso. A trilha é gravada pelo próprio login (entidade ACESSO) — somente leitura.",
+    entidades: /^acesso$|usuario|perfil|permiss/i,
+  },
   financeiro: {
     titulo: "Governança",
     descricao:

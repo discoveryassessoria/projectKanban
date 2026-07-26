@@ -40,6 +40,8 @@ const ADITIVAS = [
   '20260811000000_conciliacao_bancaria',
   '20260812000000_ocorrencia_detalhe_pagamento',
   '20260815000000_evento_status_responsavel',
+  // Cadastros do Gerenciamento (26/07/2026) — tabelas novas, idempotente.
+  '20260821000000_cadastros_gerenciamento',
 ]
 
 // Colunas-sentinela p/ verificação pós-aplicação.
@@ -73,6 +75,18 @@ const SENTINELAS = [
   ['TaxaParcelamento', ['taxaId', 'parcelasDe', 'parcelasAte', 'feePercent', 'fixedFee', 'antecipacao']],
   // Evento: campos aditivos status + responsável.
   ['Evento', ['status', 'responsavelId']],
+  // Cadastros do Gerenciamento (26/07/2026) — tabelas novas.
+  ['MarcoProcesso', ['code', 'nome', 'tipoProcessoId', 'phaseKey', 'ordem', 'ativo']],
+  ['CategoriaServico', ['code', 'nome', 'ordem', 'ativo']],
+  ['CategoriaOrganizacao', ['code', 'nome', 'ordem', 'ativo']],
+  ['OrganizacaoCategoria', ['orgaoId', 'categoriaId']],
+  ['GrupoUsuario', ['code', 'nome', 'ativo']],
+  ['GrupoUsuarioMembro', ['grupoId', 'usuarioId']],
+  ['CargoCadastro', ['code', 'nome', 'area', 'ativo']],
+  ['TipoProtocoloCadastro', ['code', 'nome', 'escopo', 'nacionalidade', 'ordem', 'ativo']],
+  ['ConfiguracaoSistema', ['chave', 'valor', 'grupo', 'atualizadoEm']],
+  ['ModeloDocumento', ['code', 'nome', 'tipo', 'categoria', 'conteudo', 'ativo']],
+  ['RegraNotificacao', ['code', 'nome', 'gatilho', 'canais', 'destinatarios', 'ativo']],
 ]
 
 const log = (m) => console.log(`[cadastros-aditivas] ${m}`)

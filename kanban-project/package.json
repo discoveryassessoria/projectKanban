@@ -86,7 +86,9 @@
     "test:taxa-aplicabilidade": "tsx scripts/taxa-aplicabilidade.test.ts",
     "test:condicao-formas": "tsx scripts/condicao-formas.test.ts",
     "test:wizard-multiselect": "tsx scripts/wizard-multiselect-guard.test.ts",
-    "test:taxa-parcelamento": "tsx scripts/taxa-parcelamento.test.ts"
+    "test:taxa-parcelamento": "tsx scripts/taxa-parcelamento.test.ts",
+    "lint": "eslint . --max-warnings=-1",
+    "lint:gerenciamento": "eslint src/app/administrator src/components/gerenciamentoComponents src/app/api/gerenciamento src/lib/gerenciamento"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -155,6 +157,7 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.6",
     "@tailwindcss/postcss": "^4",
     "@types/bcrypt": "^6.0.0",
     "@types/bcryptjs": "^2.4.6",
@@ -165,6 +168,8 @@
     "@types/react": "^19",
     "@types/react-datepicker": "^6.2.0",
     "@types/react-dom": "^19",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.2.9",
     "prisma": "^6.16.2",
     "tailwindcss": "^4",
     "tsx": "^4.22.3",

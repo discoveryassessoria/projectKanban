@@ -8,7 +8,7 @@ Fonte única: `src/components/gerenciamentoComponents/managementNavigation.tsx`
 (estrutura + regras de submenu/seção, puras e testáveis).
 `src/app/administrator/page.tsx` apenas **renderiza** e mapeia `screen → componente`.
 
-Guardas: `npm run test:nav` (73 asserções) e `npm run test:accordion` (11 asserções).
+Guardas: `npm run test:nav` (73 asserções), `npm run test:accordion` (11 asserções) e `npm run lint:gerenciamento` (0 erros).
 
 ---
 
@@ -113,27 +113,47 @@ Mais dois, por reuso e por status real:
 Os rascunhos substituídos continuam acessíveis: `?screen=sla-rascunho`,
 `?screen=cfgversions-rascunho`, `?screen=cfgdiagnosis-rascunho`.
 
-## 5. Itens da arquitetura oficial ainda SEM tela própria (8)
+## 5. Terceira leva (26/07) — os 8 últimos itens implementados
 
-Aparecem no menu **desabilitados**, com tooltip honesto dizendo onde a função vive hoje.
-Nunca viram página falsa nem botão morto.
+Os itens que restavam desabilitados passaram a ter tela real. **Zero itens desabilitados no menu.**
 
-| Item | Por que ainda não tem tela |
-|---|---|
-| Processos › Estrutura › Marcos | não existe cadastro de marco no domínio — exige definir os campos e o efeito |
-| Serviços › Categorias | categoria de serviço hoje é campo texto do próprio serviço; virar cadastro exige tabela nova |
-| Órgãos e Organizações › Categorias | idem, com o requisito extra de múltiplas categorias por organização |
-| Financeiro › Crédito | gestão de crédito é operacional e já existe em Financeiro Geral › Créditos — replicar seria duplicar conceito |
-| Financeiro › Documentos Financeiros | recibos/faturas são emitidos pelo Financeiro Geral; não há cadastro no Gerenciamento |
-| Usuários › Auditoria de Acessos | **não há trilha de autenticação**: nenhum ponto do login/sessão grava LogAuditoria |
-| Sistema › Identidade Visual | a identidade é código (motor de ambiente por país), sem tabela de configuração |
-| Relatórios › Dashboards | as composições visuais vivem nos módulos operacionais; dashboards configuráveis exigem modelo próprio |
+Tabelas novas (migration `20260821000000_cadastros_gerenciamento`, 100% aditiva e idempotente,
+aplicada em produção pelo `prod-apply-cadastros-aditivas.mjs`): `MarcoProcesso`,
+`CategoriaServico`, `CategoriaOrganizacao` + `OrganizacaoCategoria`, `GrupoUsuario` +
+`GrupoUsuarioMembro`, `CargoCadastro`, `TipoProtocoloCadastro`, `ConfiguracaoSistema`,
+`ModeloDocumento`, `RegraNotificacao`.
 
-## 6. Telas-rascunho remanescentes (estrutura pronta, sem persistência)
+| Item oficial | Rota | Implementação |
+|---|---|---|
+| Processos › Estrutura › Marcos | `?screen=marcos` | cadastro real (motor genérico) |
+| Serviços › Categorias | `?screen=servcats` | cadastro real `CategoriaServico` |
+| Órgãos › Categorias | `?screen=orgcats` | cadastro real `CategoriaOrganizacao` (N:N com organização) |
+| Financeiro › Crédito | `?screen=credito` | consulta real: gerado/disponível/utilizado/revogado por crédito |
+| Financeiro › Documentos Financeiros | `?screen=docfin` | recibos e faturas emitidos + numerações em uso |
+| Usuários › Auditoria de Acessos | `?screen=accaudit` | **o login passou a gravar trilha** (`entidade=ACESSO`, LOGIN/LOGIN_NEGADO, IP e agente; nunca a senha) |
+| Sistema › Identidade Visual | `?screen=identidade` | marca, logo e cores persistidos em `ConfiguracaoSistema`, com pré-visualização |
+| Relatórios › Dashboards | `?screen=dashboards` | índice dos painéis reais com números vivos e link que abre cada um |
 
-Continuam no menu (não são órfãs), mas com **aviso no topo** e **ações desabilitadas**
-(`_RascunhoUI.tsx`): `teams`, `rolecat`, `settings`, `templates`, `notifications`,
-`impexp`, `syshealth`, `execmatrix`, `mgmthealth`, `diagnostics`, `prottypes`.
+### Rascunhos do mockup substituídos por telas reais
+
+`teams` (Equipes), `rolecat` (Cargos), `prottypes` (Tipos de Protocolo), `templates` (Modelos),
+`notifications` (Notificações), `settings` (Configurações Gerais), `impexp` (Exportações — download
+real em CSV/JSON das rotas canônicas), `diagnostics`, `mgmthealth`, `syshealth` e `execmatrix`
+(quatro lentes sobre `/api/gerenciamento/diagnostico`).
+
+Todos os rascunhos continuam acessíveis em `?screen=<key>-rascunho`, com entrada oculta na
+navegação — nada foi apagado.
+
+### Motor genérico de cadastros
+
+`src/lib/gerenciamento/cadastros-registry.ts` é o registro ÚNICO (allow-list) que alimenta a API
+`/api/gerenciamento/cadastros/[entidade]` e a tela `CadastroGenericoTab`. Oito cadastros com um
+só CRUD: sem spec duplicada entre backend e frontend, sem tabela arbitrária exposta.
+
+## 6. Telas-rascunho remanescentes
+
+Nenhuma no menu. Os rascunhos do mockup seguem apenas como `?screen=<key>-rascunho`
+(referência histórica), com aviso no topo e ações desabilitadas (`_RascunhoUI.tsx`).
 
 ## 7. Regras de arquitetura garantidas por teste
 
