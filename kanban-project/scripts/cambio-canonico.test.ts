@@ -115,12 +115,26 @@ console.log("\n7) UI não exibe R$ 0,00 quando não há cotação")
 const shell = ler("src/components/financeiro/v3/ProcessoFinanceiroShell.tsx")
 const detalheUI = ler("src/components/financeiro/v3/ReceitaDetalheView.tsx")
 
-ok(/BrlOuOrigem/.test(shell), "Shell tem componente de valor não convertido")
-ok(/naoConvertido: obrs\.reduce/.test(shell), "Shell totaliza o não convertido")
-ok(/não incluem esse montante/.test(shell), "Shell avisa que o total exclui o não convertido")
+const valorBrl = ler("src/components/financeiro/v3/ValorBrl.tsx")
+const receitasTab = ler("src/components/financeiro/v3/ReceitasTab.tsx")
+
+ok(/export function ValorBrl/.test(valorBrl), "existe componente único de apresentação")
+ok(/não convertido/.test(valorBrl), "o componente rotula o estado ao usuário")
+ok(/AvisoNaoConvertido/.test(valorBrl), "existe aviso único para totais incompletos")
+
+ok(/<ValorBrl /.test(shell), "Shell usa o componente compartilhado")
+ok(/AvisoNaoConvertido/.test(shell), "Shell usa o aviso compartilhado")
 ok(!/\{fmt\(o\.contratadoBrl \?\? 0\)\}/.test(shell), "Shell não renderiza mais BRL cru na linha")
-ok(/brlOuOrigem/.test(detalheUI), "Detalhe tem helper de valor não convertido")
-ok(/não convertido/.test(detalheUI), "Detalhe rotula o estado ao usuário")
+ok(/textoBrlOuOrigem/.test(detalheUI), "Detalhe usa o helper compartilhado")
+ok(/<ValorBrl /.test(receitasTab), "ReceitasTab usa o componente compartilhado")
+ok(/AvisoNaoConvertido/.test(receitasTab), "ReceitasTab avisa sobre total incompleto")
+ok(!/\{brl\(g\.valorContratadoBrlTotal\)\}/.test(receitasTab), "ReceitasTab não renderiza mais BRL cru no grupo")
+ok(!/\{brl\(p\.valorContratadoBrl\)\}/.test(receitasTab), "ReceitasTab não renderiza mais BRL cru na linha")
+
+// nenhuma cópia local do padrão
+for (const [nome, src] of [["Shell", shell], ["Detalhe", detalheUI], ["ReceitasTab", receitasTab]] as const) {
+  ok(!/const BrlOuOrigem = |const brlOuOrigem = /.test(src), `${nome} não tem cópia local do padrão`)
+}
 
 // ═══════════ 8) LISTA ≡ DETALHE (último read-model paralelo) ═══════════
 console.log("\n8) receitas-lista consolidado")

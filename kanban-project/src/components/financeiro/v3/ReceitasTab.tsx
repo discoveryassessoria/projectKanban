@@ -19,6 +19,8 @@ import {
   AlertTriangle, SlidersHorizontal, Download,
 } from "lucide-react"
 
+import { ValorBrl, AvisoNaoConvertido } from "./ValorBrl"
+
 const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0)
 const fmtMoeda = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m || "BRL" }).format(v || 0)
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : null)
@@ -43,12 +45,14 @@ interface Participante {
   obrigacaoId: number; receitaId: number | null; nome: string; papel: string
   valorBase: number; moedaBase: string; cotacao: number | null; tipoCambio: string
   valorContratadoBrl: number; recebidoBrl: number; saldoBrl: number; aVencerBrl: number; vencidoBrl: number
+  naoConvertido?: number
   proximoVencimento: string | null; status: string; parcelas: number; parcelasRecebidas: number
 }
 interface Grupo {
   id: number; codigo: string | null; descricao: string | null; servico: string | null
   moedaBase: string; valorBaseTotal: number | null; valorContratadoBrlTotal: number
   recebidoBrlTotal: number; saldoBrlTotal: number; aVencerBrlTotal: number; vencidoBrlTotal: number
+  naoConvertidoTotal?: number
   proximoVencimento: string | null; statusConsolidado: string; participantesCount: number; participantes: Participante[]
 }
 
@@ -149,6 +153,7 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
         <Card titulo="Recebido" valor={brl(k.recebidoBrl ?? 0)} icon={CheckCircle2} cor="#4ade80" valorCor={(k.recebidoBrl ?? 0) > 0 ? "text-[#4ade80]" : undefined} sub="Total recebido (BRL)" />
         <Card titulo="Saldo" valor={brl(k.saldoBrl ?? 0)} icon={Wallet} cor="#7dd3fc" valorCor="text-[#7dd3fc]" sub="Total em aberto" />
       </div>
+      <AvisoNaoConvertido className="mt-2" quantidade={grupos.filter((g) => Number(g.naoConvertidoTotal ?? 0) > 0).length} />
 
       {/* TABELA */}
       <div className="mt-5 rounded-xl border border-white/10 bg-[#1b2027]">
@@ -243,7 +248,7 @@ function LinhaGrupo({ g, aberto, onToggle, onAbrir, onAbrirParticipante }: { g: 
             </div>
           ) : <span className="text-white/40">—</span>}
         </td>
-        <td className="px-4 align-top font-semibold text-white/95">{brl(g.valorContratadoBrlTotal)}</td>
+        <td className="px-4 align-top font-semibold text-white/95"><ValorBrl valor={g.valorContratadoBrlTotal} naoConvertido={g.naoConvertidoTotal} moeda={g.moedaBase} /></td>
         <td className="px-4 align-top"><span className={(g.recebidoBrlTotal ?? 0) > 0 ? "text-[#4ade80]" : "text-white/70"}>{brl(g.recebidoBrlTotal)}</span></td>
         <td className="px-4 align-top text-[#7dd3fc]">{brl(g.saldoBrlTotal)}</td>
         <td className="px-4 align-top text-white/70">{dataBR(g.proximoVencimento) ?? <span className="text-white/40">Não definido</span>}</td>
@@ -295,7 +300,7 @@ function LinhaGrupo({ g, aberto, onToggle, onAbrir, onAbrirParticipante }: { g: 
                           </div>
                         </td>
                         <td className="px-4 text-white/80">{p.moedaBase !== "BRL" ? fmtMoeda(p.valorBase, p.moedaBase) : <span className="text-white/40">—</span>}</td>
-                        <td className="px-4 font-semibold text-white/90">{brl(p.valorContratadoBrl)}</td>
+                        <td className="px-4 font-semibold text-white/90"><ValorBrl valor={p.valorContratadoBrl} naoConvertido={p.naoConvertido} moeda={p.moedaBase} /></td>
                         <td className="px-4">
                           <div className={(p.recebidoBrl ?? 0) > 0 ? "text-[#4ade80]" : "text-white/70"}>{brl(p.recebidoBrl)}</div>
                           <div className="text-[11px] text-white/40">{p.parcelasRecebidas ?? 0} parcela(s)</div>
