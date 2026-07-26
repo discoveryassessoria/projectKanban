@@ -18,6 +18,16 @@ import { FileText, FileMinus, CheckSquare, CalendarDays, AlertTriangle, Plus, Ey
 
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
 const dataBR = (s?: string | null) => s ? new Date(s).toLocaleDateString("pt-BR") : "—"
+// APRESENTAÇÃO — política canônica de câmbio: quando `naoConvertido` > 0 não
+// existe cotação e o BRL NÃO representa o montante. Nunca exibir R$ 0,00 nesse
+// caso; mostra-se o valor na moeda de origem, marcado como não convertido.
+const semCotacao = (o: { naoConvertido?: number | null }) => Number(o?.naoConvertido ?? 0) > 0
+const BrlOuOrigem = ({ brl, naoConvertido, moeda }: { brl: number; naoConvertido?: number | null; moeda?: string }) =>
+  Number(naoConvertido ?? 0) > 0
+    ? <span className="text-amber-300/90" title="Sem cotação disponível — valor não convertido para BRL.">
+        {fmt(Number(naoConvertido), moeda)} <span className="text-[11px] text-amber-300/70">não convertido</span>
+      </span>
+    : <>{fmt(brl)}</>
 const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 const SUBTABS: [string, string][] = [["visao", "Visão Geral"], ["receitas", "Receitas"], ["custos", "Custos"], ["extrato", "Extrato"], ["timeline", "Timeline"]]
 // Exporta linhas já carregadas como CSV (client-side, sem endpoint dedicado).
@@ -78,6 +88,8 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
     pago: obrs.reduce((s, o) => s + (o.recebidoBrl ?? 0), 0),
     apagar: obrs.reduce((s, o) => s + (o.saldoBrl ?? 0), 0),
     atraso: emAtraso.length,
+    naoConvertido: obrs.reduce((s, o) => s + (o.naoConvertido ?? 0), 0),
+    semCotacaoQtd: obrs.filter(semCotacao).length,
   }
   const lista = obrs.filter((o) => sub === "pagos" ? quitado(o) : sub === "apagar" ? !quitado(o) : true)
 
@@ -107,6 +119,11 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
         <KpiC titulo="A pagar" valor={fmt(totais.apagar)} sub="a pagar" icon={CalendarDays} cor="#fbbf24" />
         <KpiC titulo="Em atraso" valor={`${totais.atraso} parc.`} sub={`${totais.atraso} parcelas`} icon={AlertTriangle} cor="#f87171" />
       </div>
+      {totais.naoConvertido > 0 && (
+        <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2 text-[12.5px] text-amber-200/90">
+          {totais.semCotacaoQtd} lançamento(s) sem cotação disponível — os totais em BRL acima não incluem esse montante.
+        </div>
+      )}
 
       {/* Tabela */}
       <div className="mt-5 rounded-xl border border-white/10 bg-[#1b2027]">
@@ -126,7 +143,7 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
                   <td className="px-5 py-4"><div className="max-w-[220px] text-white/95">{o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`}</div>{o.codigoOperacional && <div className="text-xs text-white/40">{o.codigoOperacional}</div>}</td>
                   <td className="px-5 text-white/70">{o.categoria ?? "—"}</td>
                   <td className="px-5 text-white/95">{fmt(o.valorContratado, o.moeda)}</td>
-                  <td className="px-5 text-white/70">{fmt(o.contratadoBrl ?? 0)}</td>
+                  <td className="px-5 text-white/70"><BrlOuOrigem brl={o.contratadoBrl ?? 0} naoConvertido={o.naoConvertido} moeda={o.moeda} /></td>
                   <td className="px-5"><span className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] text-white/70">{o.moeda}</span></td>
                   <td className="px-5 text-white/70">{o.vencimento ? dataBR(o.vencimento) : "—"}</td>
                   <td className="px-5"><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[#4ade80]" style={{ width: `${prog}%` }} /></div><span className="text-[11px] text-white/50">{prog}%</span></div></td>

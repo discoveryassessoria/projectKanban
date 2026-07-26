@@ -110,6 +110,18 @@ ok(/naoConvertido: cent\(ca\.valorNaoConvertido/.test(detalhe), "receita-detalhe
 ok(!/cotacaoAplicada \?\? 1/.test(detalhe), "receita-detalhe não tem fallback 1:1")
 ok(/const paraBrl = /.test(detalhe), "derivados (desconto/ajuste/juros/multa) usam conversor único")
 
+// ═══════════ 7) APRESENTAÇÃO (Etapa 3) ═══════════
+console.log("\n7) UI não exibe R$ 0,00 quando não há cotação")
+const shell = ler("src/components/financeiro/v3/ProcessoFinanceiroShell.tsx")
+const detalheUI = ler("src/components/financeiro/v3/ReceitaDetalheView.tsx")
+
+ok(/BrlOuOrigem/.test(shell), "Shell tem componente de valor não convertido")
+ok(/naoConvertido: obrs\.reduce/.test(shell), "Shell totaliza o não convertido")
+ok(/não incluem esse montante/.test(shell), "Shell avisa que o total exclui o não convertido")
+ok(!/\{fmt\(o\.contratadoBrl \?\? 0\)\}/.test(shell), "Shell não renderiza mais BRL cru na linha")
+ok(/brlOuOrigem/.test(detalheUI), "Detalhe tem helper de valor não convertido")
+ok(/não convertido/.test(detalheUI), "Detalhe rotula o estado ao usuário")
+
 console.log(`\n${passed} passaram, ${failed} falharam`)
 if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }
 console.log("Câmbio canônico: política única validada ✅")

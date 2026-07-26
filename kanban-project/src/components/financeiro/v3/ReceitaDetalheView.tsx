@@ -34,6 +34,10 @@ import {
 
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
 const brl = (v: number) => fmt(v, "BRL")
+// APRESENTAÇÃO — política canônica: `naoConvertido` > 0 significa que não há
+// cotação e o BRL NÃO representa o montante. Não exibir R$ 0,00 nesse caso.
+const brlOuOrigem = (v: number, naoConvertido?: number | null, moeda?: string) =>
+  Number(naoConvertido ?? 0) > 0 ? `${fmt(Number(naoConvertido), moeda ?? "BRL")} · não convertido` : brl(v)
 const dataBR = (s?: string | null) => s ? new Date(s).toLocaleDateString("pt-BR") : "—"
 const horaBR = (s?: string | null) => s ? new Date(s).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""
 const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
@@ -315,7 +319,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                   </span>
                   <div className="mt-0.5 text-[11px] text-white/40">{d.tipoCambio === "FIXO" ? `Fixo desde ${dataBR(d.dataCotacao)}` : dataBR(d.dataCotacao)}</div>
                 </Info>
-                <Info rotulo="Valor contratado (BRL)"><span className="font-semibold text-white/95">{brl(d.valorContratadoBrl)}</span></Info>
+                <Info rotulo="Valor contratado (BRL)"><span className={`font-semibold ${Number(d.naoConvertido ?? 0) > 0 ? "text-amber-300/90" : "text-white/95"}`} title={Number(d.naoConvertido ?? 0) > 0 ? "Sem cotação disponível — valor não convertido para BRL." : undefined}>{brlOuOrigem(d.valorContratadoBrl, d.naoConvertido, d.moedaBase)}</span></Info>
               </div>
 
               {verMais && (
@@ -351,7 +355,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
             <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
               <h2 className="text-lg font-semibold text-white">Situação financeira</h2>
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <SubCard rotulo="Valor contratado" valor={brl(d.valorContratadoBrl)} linhas={!semBase ? [`Base contratual: ${fmtEUR(d.valorBase)}`] : []} />
+                <SubCard rotulo="Valor contratado" valor={brlOuOrigem(d.valorContratadoBrl, d.naoConvertido, d.moedaBase)} linhas={!semBase ? [`Base contratual: ${fmtEUR(d.valorBase)}`] : []} />
                 <SubCard rotulo={isCusto ? "Pago" : "Recebido"} valor={brl(d.recebidoBrl)} cor="text-[#4ade80]" linhas={[`${pct}% do total`, `${d.parcelasRecebidas} parcela(s) recebida(s)`]} />
                 <SubCard rotulo="A vencer" valor={brl(d.aVencerBrl)} cor="text-[#d2a948]" linhas={[`${d.parcelasAVencer} parcela(s)`, `Próximo: ${dataBR(d.proximoVencimento)}`]} />
                 <SubCard rotulo="Vencido" valor={brl(d.vencidoBrl)} cor="text-[#f87171]" linhas={[`${d.parcelasVencidas} parcela(s)`, ...(d.parcelasVencidas ? [`Desde ${dataBR(d.proximoVencimento)}`] : [])]} />
