@@ -692,13 +692,25 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
       )}
 
       {/* ── MODAIS ── */}
-      {receberOpen && d && (
+      {/* Etapa 3: pagamento parametrizado por DIREÇÃO. A_PAGAR (custo) = obrigação única
+          via RegistrarPagamentoModal (sem escopo/participantes). A_RECEBER (receita) = fluxo
+          por escopo (DefinirEscopoDrawer → RegistrarPagamentoView). */}
+      {receberOpen && d && (isCusto ? (
+        <RegistrarPagamentoModal
+          obrigacaoId={d.obrigacaoId}
+          moeda={d.moeda ?? "BRL"}
+          saldo={d.saldoBrl}
+          natureza="CUSTO"
+          onClose={() => setReceberOpen(false)}
+          onDone={() => { setReceberOpen(false); carregar() }}
+        />
+      ) : (
         <DefinirEscopoDrawer
           receitaRef={String(d.obrigacaoId)}
           onClose={() => setReceberOpen(false)}
           onEscolher={(e) => { setReceberEscopo(e); setReceberOpen(false) }}
         />
-      )}
+      ))}
       {receberEscopo && d && (
         <RegistrarPagamentoView
           obrigacaoId={receberEscopo.obrigacaoId}

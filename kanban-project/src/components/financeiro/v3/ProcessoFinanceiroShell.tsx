@@ -49,7 +49,7 @@ export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) 
       </div>
       {t === "visao" && <VisaoGeral processoId={processoId} fxHoje={fxEur} onIrPara={(a) => setT(a)} />}
       {t === "receitas" && <ReceitasTab processoId={processoId} onAbrirDetalhe={abrirDetalhe} />}
-      {t === "custos" && <CustosTab processoId={processoId} fx={fxEur} />}
+      {t === "custos" && <CustosTab processoId={processoId} fx={fxEur} onAbrirDetalhe={abrirDetalhe} />}
       {t === "extrato" && <ExtratoTab processoId={processoId} fx={fxEur} onAbrirDetalhe={abrirDetalhe} />}
       {t === "timeline" && <TimelineTab processoId={processoId} fx={fxEur} onAbrirDetalhe={abrirDetalhe} />}
     </div>
@@ -57,7 +57,8 @@ export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) 
 }
 
 // Custos — lista do processo (obrigações de natureza CUSTO). Discovery Design System.
-function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
+// Etapa 3: abre o MESMO Detalhe da Obrigação (parametrizado por direção) usado por Receitas.
+function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx: number; onAbrirDetalhe?: (id: number) => void }) {
   const [obrs, setObrs] = useState<any[] | null>(null)
   const [novo, setNovo] = useState(false)
   const [cancelando, setCancelando] = useState<number | null>(null)
@@ -139,7 +140,7 @@ function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
                   <td className="px-5 text-white/70">{o.vencimento ? dataBR(o.vencimento) : "—"}</td>
                   <td className="px-5"><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[#4ade80]" style={{ width: `${prog}%` }} /></div><span className="text-[11px] text-white/50">{prog}%</span></div></td>
                   <td className="px-5">{quit ? <span className="rounded bg-[#4ade80]/15 px-2 py-0.5 text-[11px] font-semibold text-[#4ade80]">Pago</span> : <span className="rounded bg-[#fbbf24]/15 px-2 py-0.5 text-[11px] font-semibold text-[#fbbf24]">A pagar</span>}</td>
-                  <td className="px-5"><div className="flex items-center gap-2">{!quit && <button onClick={() => setPagar(o)} className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-500">Pagar</button>}<button onClick={() => cancelar(o.obrigacaoId)} disabled={cancelando === o.obrigacaoId} className="rounded-lg border border-white/15 px-2.5 py-1 text-xs text-white/70 hover:border-[#f87171]/50 hover:text-[#f87171] disabled:opacity-50">{cancelando === o.obrigacaoId ? "…" : "Cancelar"}</button></div></td>
+                  <td className="px-5"><div className="flex items-center gap-2"><button onClick={() => onAbrirDetalhe?.(o.obrigacaoId)} className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#20262e] px-2.5 py-1 text-xs font-medium text-white/85 hover:bg-[#252c35]"><Eye className="h-3.5 w-3.5" /> Abrir</button>{!quit && <button onClick={() => setPagar(o)} className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-500">Pagar</button>}<button onClick={() => cancelar(o.obrigacaoId)} disabled={cancelando === o.obrigacaoId} className="rounded-lg border border-white/15 px-2.5 py-1 text-xs text-white/70 hover:border-[#f87171]/50 hover:text-[#f87171] disabled:opacity-50">{cancelando === o.obrigacaoId ? "…" : "Cancelar"}</button></div></td>
                 </tr>
               )
             })}{lista.length === 0 && <tr><td colSpan={9} className="px-5 py-8 text-center text-white/40">Nenhum custo neste processo.</td></tr>}</tbody>
