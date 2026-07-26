@@ -92,36 +92,36 @@ export default function DefinirEscopoDrawer({ receitaRef, onEscolher, onClose }:
   const toggleCob = (chave: string) => setSelCobrancas((s) => tipo === "COBRANCA" ? [chave] : s.includes(chave) ? s.filter((x) => x !== chave) : [...s, chave])
 
   const modal = (
-    <div className="fixed inset-0 z-[65] flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:items-center" onClick={onClose}>
-      <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-[#161b21] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-          <div><h2 className="text-base font-semibold text-white">Definir escopo do pagamento</h2><p className="text-xs text-white/45">{esc?.descricao} {esc?.codigo ? `· ${esc.codigo}` : ""} · saldo {brl(esc?.totalSaldoBrl ?? 0)}</p></div>
-          <button onClick={onClose} className="text-white/40 hover:text-white/70"><X className="h-5 w-5" /></button>
+    <div className="fixed inset-0 z-[65] flex items-start justify-center overflow-y-auto bg-[var(--app-overlay)] p-4 sm:items-center" onClick={onClose}>
+      <div className="w-full max-w-2xl rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--shadow-surface)]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[var(--border-default)] px-5 py-4">
+          <div><h2 className="text-base font-semibold text-[var(--text-primary)]">Definir escopo do pagamento</h2><p className="text-xs text-[var(--text-muted)]">{esc?.descricao} {esc?.codigo ? `· ${esc.codigo}` : ""} · saldo {brl(esc?.totalSaldoBrl ?? 0)}</p></div>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><X className="h-5 w-5" /></button>
         </div>
 
-        {loading ? <div className="flex h-40 items-center justify-center text-white/40"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando…</div>
-        : erro ? <div className="m-5 rounded-lg border border-[#f87171]/30 bg-[#f87171]/10 p-3 text-sm text-[#f87171]">{erro}</div>
+        {loading ? <div className="flex h-40 items-center justify-center text-[var(--text-muted)]"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando…</div>
+        : erro ? <div className="m-5 rounded-[var(--radius-sm)] border p-3 text-sm text-[var(--danger)]" style={{ borderColor: "color-mix(in srgb, var(--danger) 30%, transparent)", background: "color-mix(in srgb, var(--danger) 10%, transparent)" }}>{erro}</div>
         : (
           <div className="max-h-[70vh] space-y-4 overflow-y-auto px-5 py-4">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {OPCOES.map(({ tipo: t, lb, desc, Ic }) => (
-                <button key={t} onClick={() => { setTipo(t); setSelCobrancas([]); setSelParticipante(null) }} className={`flex items-start gap-2.5 rounded-lg border p-3 text-left ${tipo === t ? "border-[#d2a948]/60 bg-[#d2a948]/10" : "border-white/10 hover:bg-white/5"}`}>
-                  <Ic className={`mt-0.5 h-4 w-4 shrink-0 ${tipo === t ? "text-[#e0b957]" : "text-white/40"}`} />
-                  <div><div className="text-sm font-medium text-white">{lb}</div><div className="text-[11px] text-white/45">{desc}</div></div>
+                <button key={t} onClick={() => { setTipo(t); setSelCobrancas([]); setSelParticipante(null) }} className={`flex items-start gap-2.5 rounded-[var(--radius-sm)] border p-3 text-left ${tipo === t ? "" : "border-[var(--border-default)] hover:bg-[var(--surface-hover)]"}`} style={tipo === t ? { borderColor: "color-mix(in srgb, var(--accent-primary) 60%, transparent)", background: "color-mix(in srgb, var(--accent-primary) 10%, transparent)" } : undefined}>
+                  <Ic className={`mt-0.5 h-4 w-4 shrink-0 ${tipo === t ? "text-[var(--accent-hover)]" : "text-[var(--text-muted)]"}`} />
+                  <div><div className="text-sm font-medium text-[var(--text-primary)]">{lb}</div><div className="text-[11px] text-[var(--text-muted)]">{desc}</div></div>
                 </button>
               ))}
             </div>
 
             {(tipo === "COBRANCA" || tipo === "VARIAS") && (
-              <div className="rounded-lg border border-white/10 bg-[#1b2027] p-3">
-                <p className="mb-2 text-xs text-white/50">{tipo === "COBRANCA" ? "Escolha uma cobrança em aberto:" : "Selecione as cobranças (múltipla):"}</p>
+              <div className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
+                <p className="mb-2 text-xs text-[var(--text-muted)]">{tipo === "COBRANCA" ? "Escolha uma cobrança em aberto:" : "Selecione as cobranças (múltipla):"}</p>
                 <div className="space-y-1.5">
-                  {cobrancas.length === 0 ? <p className="text-xs text-white/40">Nenhuma cobrança em aberto.</p> : cobrancas.map((c) => (
-                    <label key={c.chave} className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-sm ${selCobrancas.includes(c.chave) ? "border-[#d2a948]/50 bg-[#d2a948]/5" : "border-white/10"}`}>
-                      <input type={tipo === "COBRANCA" ? "radio" : "checkbox"} checked={selCobrancas.includes(c.chave)} onChange={() => toggleCob(c.chave)} className="accent-[#d2a948]" />
-                      <span className="grid h-6 w-6 place-items-center rounded-full bg-[#a78bfa]/20 text-[10px] font-semibold text-[#a78bfa]">{(c.participanteNome ?? "?").slice(0, 1)}</span>
-                      <div className="min-w-0 flex-1"><div className="truncate text-white/85">{c.participanteNome} · parcela {c.parcelaNumero}/{c.totalParcelas}</div><div className="text-[11px] text-white/40">vence {dataBR(c.vencimento)} · {c.status}</div></div>
-                      <div className="text-right"><div className="text-white/85">{brl(c.saldoBrl)}</div><div className="text-[10px] text-white/40">de {brl(c.valorOriginalBrl)}</div></div>
+                  {cobrancas.length === 0 ? <p className="text-xs text-[var(--text-muted)]">Nenhuma cobrança em aberto.</p> : cobrancas.map((c) => (
+                    <label key={c.chave} className={`flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border p-2 text-sm ${selCobrancas.includes(c.chave) ? "" : "border-[var(--border-default)]"}`} style={selCobrancas.includes(c.chave) ? { borderColor: "color-mix(in srgb, var(--accent-primary) 50%, transparent)", background: "color-mix(in srgb, var(--accent-primary) 5%, transparent)" } : undefined}>
+                      <input type={tipo === "COBRANCA" ? "radio" : "checkbox"} checked={selCobrancas.includes(c.chave)} onChange={() => toggleCob(c.chave)} className="accent-[var(--accent-primary)]" />
+                      <span className="grid h-6 w-6 place-items-center rounded-full text-[10px] font-semibold text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--text-secondary) 20%, transparent)" }}>{(c.participanteNome ?? "?").slice(0, 1)}</span>
+                      <div className="min-w-0 flex-1"><div className="truncate text-[var(--text-primary)]">{c.participanteNome} · parcela {c.parcelaNumero}/{c.totalParcelas}</div><div className="text-[11px] text-[var(--text-muted)]">vence {dataBR(c.vencimento)} · {c.status}</div></div>
+                      <div className="text-right"><div className="text-[var(--text-primary)]">{brl(c.saldoBrl)}</div><div className="text-[10px] text-[var(--text-muted)]">de {brl(c.valorOriginalBrl)}</div></div>
                     </label>
                   ))}
                 </div>
@@ -129,30 +129,30 @@ export default function DefinirEscopoDrawer({ receitaRef, onEscolher, onClose }:
             )}
 
             {tipo === "PARTICIPANTE" && (
-              <div className="rounded-lg border border-white/10 bg-[#1b2027] p-3">
-                <p className="mb-2 text-xs text-white/50">Escolha o participante:</p>
+              <div className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
+                <p className="mb-2 text-xs text-[var(--text-muted)]">Escolha o participante:</p>
                 <div className="space-y-1.5">
                   {participantes.map((p) => (
-                    <label key={p.obrigacaoId} className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-sm ${selParticipante === p.obrigacaoId ? "border-[#d2a948]/50 bg-[#d2a948]/5" : "border-white/10"}`}>
-                      <input type="radio" checked={selParticipante === p.obrigacaoId} onChange={() => setSelParticipante(p.obrigacaoId)} className="accent-[#d2a948]" />
-                      <span className="grid h-6 w-6 place-items-center rounded-full bg-[#a78bfa]/20 text-[10px] font-semibold text-[#a78bfa]">{(p.nome ?? "?").slice(0, 1)}</span>
-                      <div className="min-w-0 flex-1 truncate text-white/85">{p.nome}</div>
-                      <div className="text-right"><div className="text-white/85">{brl(p.saldoBrl)}</div><div className="text-[10px] text-white/40">{p.cobrancasAbertas} cobrança(s)</div></div>
+                    <label key={p.obrigacaoId} className={`flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border p-2 text-sm ${selParticipante === p.obrigacaoId ? "" : "border-[var(--border-default)]"}`} style={selParticipante === p.obrigacaoId ? { borderColor: "color-mix(in srgb, var(--accent-primary) 50%, transparent)", background: "color-mix(in srgb, var(--accent-primary) 5%, transparent)" } : undefined}>
+                      <input type="radio" checked={selParticipante === p.obrigacaoId} onChange={() => setSelParticipante(p.obrigacaoId)} className="accent-[var(--accent-primary)]" />
+                      <span className="grid h-6 w-6 place-items-center rounded-full text-[10px] font-semibold text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--text-secondary) 20%, transparent)" }}>{(p.nome ?? "?").slice(0, 1)}</span>
+                      <div className="min-w-0 flex-1 truncate text-[var(--text-primary)]">{p.nome}</div>
+                      <div className="text-right"><div className="text-[var(--text-primary)]">{brl(p.saldoBrl)}</div><div className="text-[10px] text-[var(--text-muted)]">{p.cobrancasAbertas} cobrança(s)</div></div>
                     </label>
                   ))}
                 </div>
-                {selParticipante != null && <p className="mt-2 text-[11px] text-white/40">{cobrancasDoParticipante.length} cobrança(s) em aberto deste participante serão o alvo.</p>}
+                {selParticipante != null && <p className="mt-2 text-[11px] text-[var(--text-muted)]">{cobrancasDoParticipante.length} cobrança(s) em aberto deste participante serão o alvo.</p>}
               </div>
             )}
 
-            {tipo === "GERAL" && <p className="rounded-lg bg-[#161b21] px-3 py-2 text-xs text-white/50">Nenhuma cobrança/participante/pagador será pré-selecionado. Você definirá a aplicação (automática/manual) na próxima etapa.</p>}
-            {(tipo === "ADIANTAMENTO" || tipo === "CREDITO") && <p className="rounded-lg bg-[#161b21] px-3 py-2 text-xs text-white/50">O recebimento será registrado sem vincular a uma cobrança e gerará crédito financeiro disponível no processo.</p>}
+            {tipo === "GERAL" && <p className="rounded-[var(--radius-sm)] bg-[var(--surface-overlay)] px-3 py-2 text-xs text-[var(--text-muted)]">Nenhuma cobrança/participante/pagador será pré-selecionado. Você definirá a aplicação (automática/manual) na próxima etapa.</p>}
+            {(tipo === "ADIANTAMENTO" || tipo === "CREDITO") && <p className="rounded-[var(--radius-sm)] bg-[var(--surface-overlay)] px-3 py-2 text-xs text-[var(--text-muted)]">O recebimento será registrado sem vincular a uma cobrança e gerará crédito financeiro disponível no processo.</p>}
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-2 border-t border-white/10 px-5 py-3">
-          <button onClick={onClose} className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium text-white/70 hover:bg-white/5">Cancelar</button>
-          <button onClick={confirmar} disabled={!podeConfirmar} className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-4 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957] disabled:cursor-not-allowed disabled:opacity-50">Continuar <ChevronRight className="h-4 w-4" /></button>
+        <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-5 py-3">
+          <button onClick={onClose} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">Cancelar</button>
+          <button onClick={confirmar} disabled={!podeConfirmar} className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50">Continuar <ChevronRight className="h-4 w-4" /></button>
         </div>
       </div>
     </div>

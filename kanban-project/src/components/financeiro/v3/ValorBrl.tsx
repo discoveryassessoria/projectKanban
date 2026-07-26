@@ -41,9 +41,9 @@ export function ValorBrl({
 }) {
   if (Number(naoConvertido ?? 0) > 0) {
     return (
-      <span className={`text-amber-300/90 ${className ?? ""}`} title={TITULO_SEM_COTACAO}>
+      <span className={`text-[var(--warning)] ${className ?? ""}`} title={TITULO_SEM_COTACAO}>
         {moedaFmt(Number(naoConvertido), moeda ?? "BRL")}{" "}
-        <span className="text-[11px] text-amber-300/70">não convertido</span>
+        <span className="text-[11px] text-[var(--warning)]">não convertido</span>
       </span>
     )
   }
@@ -55,7 +55,8 @@ export function AvisoNaoConvertido({ quantidade, className }: { quantidade: numb
   if (!quantidade) return null
   return (
     <div
-      className={`rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2 text-[12.5px] text-amber-200/90 ${className ?? ""}`}
+      className={`rounded-[var(--radius-sm)] border px-3 py-2 text-[12.5px] text-[var(--warning)] ${className ?? ""}`}
+      style={{ borderColor: "color-mix(in srgb, var(--warning) 30%, transparent)", background: "color-mix(in srgb, var(--warning) 5%, transparent)" }}
     >
       {quantidade} lançamento(s) sem cotação disponível — os totais em BRL acima não incluem esse montante.
     </div>

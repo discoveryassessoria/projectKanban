@@ -21,12 +21,20 @@ import { ChevronRight, ChevronLeft, MoreVertical } from "lucide-react"
 // ---- token helpers (mantém as páginas livres de valores literais) ----------
 export const ACCENT = "var(--accent-primary)"
 export const ACCENT_HOVER = "var(--accent-hover)"
+// Superfícies opacas de overlay — expostas pelo DS para modal/drawer/popover.
+export const SURFACE_OVERLAY = "var(--surface-overlay)"
+export const SURFACE_POPOVER = "var(--surface-popover)"
+export const SURFACE_INPUT = "var(--surface-input)"
 
 const S = {
   surface: "var(--surface-primary)",
   surface2: "var(--surface-secondary)",
   surfaceHover: "var(--surface-hover)",
   surfaceActive: "var(--surface-active)",
+  // Superfícies OPACAS (overlays) — tokens globais do DS (globals.css).
+  surfaceOverlay: "var(--surface-overlay)",
+  surfacePopover: "var(--surface-popover)",
+  surfaceInput: "var(--surface-input)",
   border: "var(--border-default)",
   borderStrong: "var(--border-strong)",
   textPrimary: "var(--text-primary)",

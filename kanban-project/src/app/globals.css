@@ -101,6 +101,16 @@
   --surface-hover: rgba(255, 255, 255, 0.08);
   --surface-active: rgba(255, 255, 255, 0.12);
 
+  /* Superfícies OPACAS (overlays) — as superfícies translúcidas acima não servem
+     a modal/dialog/drawer/sheet/popover/menu/tooltip, que precisam OCULTAR o
+     conteúdo atrás. Lacuna do DS dark-glass (os tokens shadcn --background/--popover
+     só existem em claro). Token global do DS: nenhuma tela cria o seu próprio.
+     As superfícies translúcidas (--surface-primary…) podem ser empilhadas SOBRE
+     estas para dar elevação de painéis aninhados dentro do overlay. */
+  --surface-overlay: #161b21;        /* painel de modal/dialog/drawer/sheet */
+  --surface-popover: #1b2027;        /* popover/dropdown/menu/tooltip */
+  --surface-input: rgba(0, 0, 0, 0.30); /* fundo de campo de formulário */
+
   /* Bordas */
   --border-default: rgba(255, 255, 255, 0.10);
   --border-strong: rgba(255, 255, 255, 0.20);

@@ -33,8 +33,8 @@ interface Props {
 }
 
 const inp =
-  "mt-1 w-full rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/90 outline-none placeholder:text-white/30 focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25"
-const lbl = "block text-[11px] font-medium uppercase tracking-wider text-white/45"
+  "mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--info)] focus:ring-1 focus:ring-[color-mix(in_srgb,var(--info)_25%,transparent)]"
+const lbl = "block text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]"
 
 export default function RegistrarPagamentoModal({ obrigacaoId, moeda = "BRL", saldo, natureza = "RECEITA", onClose, onDone }: Props) {
   const recebido = natureza === "CUSTO"
@@ -121,18 +121,18 @@ export default function RegistrarPagamentoModal({ obrigacaoId, moeda = "BRL", sa
 
   return createPortal(
     <>
-      <div className="fixed inset-0 bg-black/65" style={{ zIndex: LAYER.aboveProcess }} onClick={() => !salvando && onClose()} />
+      <div className="fixed inset-0 bg-[var(--app-overlay)]" style={{ zIndex: LAYER.aboveProcess }} onClick={() => !salvando && onClose()} />
       <div className="fixed inset-0 flex items-center justify-center p-4 pointer-events-none" style={{ zIndex: LAYER.aboveProcess }}>
-        <div className="pointer-events-auto flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0d1117] shadow-2xl">
+        <div className="pointer-events-auto flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--shadow-surface)]">
           {/* header */}
-          <div className="flex items-start justify-between gap-4 border-b border-white/10 bg-[#161b21] px-5 py-4">
+          <div className="flex items-start justify-between gap-4 border-b border-[var(--border-default)] bg-[var(--surface-secondary)] px-5 py-4">
             <div>
-              <div className="text-[15px] font-bold text-white">{recebido ? "Registrar pagamento do custo" : "Registrar pagamento"}</div>
-              <div className="mt-0.5 text-[12px] text-white/55">
-                {saldo != null ? <>Saldo {recebido ? "a pagar" : "em aberto"}: <strong className="text-white/80">{fmt(saldo, moeda)}</strong></> : "Lançamento no motor financeiro"}
+              <div className="text-[15px] font-bold text-[var(--text-primary)]">{recebido ? "Registrar pagamento do custo" : "Registrar pagamento"}</div>
+              <div className="mt-0.5 text-[12px] text-[var(--text-secondary)]">
+                {saldo != null ? <>Saldo {recebido ? "a pagar" : "em aberto"}: <strong className="text-[var(--text-secondary)]">{fmt(saldo, moeda)}</strong></> : "Lançamento no motor financeiro"}
               </div>
             </div>
-            <button onClick={() => !salvando && onClose()} className="flex h-8 w-8 items-center justify-center rounded-md text-white/60 hover:bg-white/5 hover:text-white" aria-label="Fechar"><X className="h-4 w-4" /></button>
+            <button onClick={() => !salvando && onClose()} className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]" aria-label="Fechar"><X className="h-4 w-4" /></button>
           </div>
 
           {/* body */}
@@ -140,7 +140,7 @@ export default function RegistrarPagamentoModal({ obrigacaoId, moeda = "BRL", sa
             <div>
               <label className={lbl}>Valor ({moeda}) *</label>
               <input value={valor} onChange={(e) => setValor(e.target.value)} inputMode="decimal" placeholder="0,00" className={inp} autoFocus />
-              {parcial && <div className="mt-1 text-[11px] text-[#d2a948]">Pagamento parcial — restará {fmt(saldo! - valorNum, moeda)}.</div>}
+              {parcial && <div className="mt-1 text-[11px] text-[var(--accent-primary)]">Pagamento parcial — restará {fmt(saldo! - valorNum, moeda)}.</div>}
             </div>
             <div>
               <label className={lbl}>Data *</label>
@@ -150,22 +150,22 @@ export default function RegistrarPagamentoModal({ obrigacaoId, moeda = "BRL", sa
             <div>
               <label className={lbl}>Forma de pagamento</label>
               <select value={formaId} onChange={(e) => setFormaId(e.target.value)} className={inp}>
-                <option value="" className="bg-[#20262e]">— Selecione —</option>
-                {formas.map((f) => <option key={f.id} value={f.id} className="bg-[#20262e]">{f.nome}</option>)}
+                <option value="" className="bg-[var(--surface-input)]">— Selecione —</option>
+                {formas.map((f) => <option key={f.id} value={f.id} className="bg-[var(--surface-input)]">{f.nome}</option>)}
               </select>
             </div>
             <div>
               <label className={lbl}>Aplicação</label>
               <select value={politica} onChange={(e) => setPolitica(e.target.value)} className={inp}>
-                <option value="FIFO" className="bg-[#20262e]">Mais antigas primeiro (FIFO)</option>
-                <option value="PROPORCIONAL" className="bg-[#20262e]">Proporcional</option>
+                <option value="FIFO" className="bg-[var(--surface-input)]">Mais antigas primeiro (FIFO)</option>
+                <option value="PROPORCIONAL" className="bg-[var(--surface-input)]">Proporcional</option>
               </select>
             </div>
 
             <div>
               <label className={lbl}>{recebido ? "Beneficiário" : "Pagador"}</label>
               <select value={pagadorTipo} onChange={(e) => setPagadorTipo(e.target.value)} className={inp}>
-                {["REQUERENTE", "EMPRESA", "TERCEIRO", "EXTERNO"].map((t) => <option key={t} value={t} className="bg-[#20262e]">{t.charAt(0) + t.slice(1).toLowerCase()}</option>)}
+                {["REQUERENTE", "EMPRESA", "TERCEIRO", "EXTERNO"].map((t) => <option key={t} value={t} className="bg-[var(--surface-input)]">{t.charAt(0) + t.slice(1).toLowerCase()}</option>)}
               </select>
             </div>
             <div>
@@ -189,13 +189,13 @@ export default function RegistrarPagamentoModal({ obrigacaoId, moeda = "BRL", sa
               <input value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Opcional" className={inp} />
             </div>
 
-            {erro && <div className="col-span-2 rounded-lg border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-[12px] text-[#f87171]">{erro}</div>}
+            {erro && <div className="col-span-2 rounded-[var(--radius-sm)] border px-3 py-2 text-[12px] text-[var(--danger)]" style={{ borderColor: "color-mix(in srgb, var(--danger) 30%, transparent)", background: "color-mix(in srgb, var(--danger) 10%, transparent)" }}>{erro}</div>}
           </div>
 
           {/* footer */}
-          <div className="flex items-center justify-end gap-3 border-t border-white/10 bg-[#11151b] px-5 py-4">
-            <button onClick={() => !salvando && onClose()} disabled={salvando} className="rounded-lg px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:bg-white/5 hover:text-white disabled:opacity-50">Cancelar</button>
-            <button onClick={enviar} disabled={salvando || !valido} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-[12.5px] font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">
+          <div className="flex items-center justify-end gap-3 border-t border-[var(--border-default)] bg-[var(--surface-secondary)] px-5 py-4">
+            <button onClick={() => !salvando && onClose()} disabled={salvando} className="rounded-[var(--radius-sm)] px-4 py-2 text-[12.5px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-50">Cancelar</button>
+            <button onClick={enviar} disabled={salvando || !valido} className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--success)] px-5 py-2 text-[12.5px] font-semibold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-50">
               {salvando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
               {salvando ? "Registrando…" : "Registrar pagamento"}
             </button>

@@ -145,7 +145,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
     const mp = new Map<string, number>()
     for (const r of receitas.filter(ativo)) { const tot = r.parcelas.reduce((s, p) => s + parcToBrl(r, p, fxHoje), 0); mp.set(r.moeda, (mp.get(r.moeda) || 0) + tot) }
     const total = [...mp.values()].reduce((s, v) => s + v, 0) || 1
-    const cores: Record<string, string> = { BRL: '#4ade80', EUR: '#fbbf24', USD: '#7dd3fc' }
+    const cores: Record<string, string> = { BRL: 'var(--success)', EUR: 'var(--warning)', USD: 'var(--info)' }
     const nomes: Record<string, string> = { BRL: 'Real Brasileiro', EUR: 'Euro', USD: 'Dólar Americano' }
     return { total, itens: ['BRL', 'EUR', 'USD'].map((c) => ({ code: c, nome: nomes[c], cor: cores[c], valor: mp.get(c) || 0, pct: ((mp.get(c) || 0) / total) * 100 })) }
   }, [receitas, fxHoje])
@@ -180,46 +180,46 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
     return { pontos, totalEnt, totalSai, totalSaldo: totalEnt - totalSai }
   }, [receitas, custos, fxHoje, mesesFluxo])
 
-  if (loading) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/40" /></div>
-  if (erro) return <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erro}</div>
+  if (loading) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" /></div>
+  if (erro) return <div className="rounded-[var(--radius-md)] border p-4 text-sm text-[var(--danger)]" style={{ borderColor: 'color-mix(in srgb, var(--danger) 30%, transparent)', background: 'color-mix(in srgb, var(--danger) 10%, transparent)' }}>{erro}</div>
 
   const emDia = m.inadCount === 0
 
   return (
-    <div className="space-y-4 text-white">
+    <div className="space-y-4 text-[var(--text-primary)]">
       {/* 1 · cinco cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Card titulo="A Receber" valor={brl(m.recP)} sub={`${pct(m.pctReceber)} do previsto`} icon={DollarSign} cor="#4ade80" />
-        <Card titulo="Recebido" valor={brl(m.recR)} sub={`${pct(m.pctReceb)} do total`} icon={CreditCard} cor="#7dd3fc" />
-        <Card titulo="Custos" valor={brl(m.cusT)} sub={`${pct(m.pctCustos)} do total`} icon={Database} cor="#fbbf24" />
-        <Card titulo="Lucro" valor={brl(m.lucro)} sub={`${pct(m.pctLucro)} do previsto`} icon={BarChart3} cor="#a78bfa" />
-        <Card titulo="Situação Financeira" valor={emDia ? 'Tudo em dia' : `${m.inadCount} parcela(s) vencida(s)`} valorCor={emDia ? 'text-[#4ade80]' : 'text-red-400'} sub={emDia ? 'Nenhuma pendência' : brl(m.inadBrl)} icon={emDia ? CheckCircle2 : AlertTriangle} cor={emDia ? '#4ade80' : '#f87171'} />
+        <Card titulo="A Receber" valor={brl(m.recP)} sub={`${pct(m.pctReceber)} do previsto`} icon={DollarSign} cor="var(--success)" />
+        <Card titulo="Recebido" valor={brl(m.recR)} sub={`${pct(m.pctReceb)} do total`} icon={CreditCard} cor="var(--info)" />
+        <Card titulo="Custos" valor={brl(m.cusT)} sub={`${pct(m.pctCustos)} do total`} icon={Database} cor="var(--warning)" />
+        <Card titulo="Lucro" valor={brl(m.lucro)} sub={`${pct(m.pctLucro)} do previsto`} icon={BarChart3} cor="var(--info)" />
+        <Card titulo="Situação Financeira" valor={emDia ? 'Tudo em dia' : `${m.inadCount} parcela(s) vencida(s)`} valorCor={emDia ? 'text-[var(--success)]' : 'text-[var(--danger)]'} sub={emDia ? 'Nenhuma pendência' : brl(m.inadBrl)} icon={emDia ? CheckCircle2 : AlertTriangle} cor={emDia ? 'var(--success)' : 'var(--danger)'} />
       </div>
 
       {/* 2 · próximos eventos financeiros */}
       <div className="grid grid-cols-1 gap-4">
-        <Painel titulo="Próximos eventos financeiros" acao={<button onClick={() => onIrPara?.('receitas')} className="rounded-md border border-white/15 px-2.5 py-1 text-xs text-white/70 hover:bg-white/10">Ver todos</button>}>
+        <Painel titulo="Próximos eventos financeiros" acao={<button onClick={() => onIrPara?.('receitas')} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">Ver todos</button>}>
           {eventos.length === 0 ? (
-            <div className="py-10 text-center text-sm text-white/40">Nenhum evento financeiro pendente.</div>
+            <div className="py-10 text-center text-sm text-[var(--text-muted)]">Nenhum evento financeiro pendente.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
-                <thead><tr className="text-left text-[11px] uppercase tracking-wide text-white/40">{['Data', 'Tipo', 'Requerente', 'Descrição', 'Valor', 'Status', ''].map((h) => <th key={h} className="px-3 py-2 font-medium">{h}</th>)}</tr></thead>
+                <thead><tr className="text-left text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{['Data', 'Tipo', 'Requerente', 'Descrição', 'Valor', 'Status', ''].map((h) => <th key={h} className="px-3 py-2 font-medium">{h}</th>)}</tr></thead>
                 <tbody>
                   {eventos.slice(0, 6).map((e, i) => (
-                    <tr key={i} className="border-t border-white/5">
-                      <td className="px-3 py-2.5 text-white/70"><div>{diaMes(e.date)}</div><div className="text-[10px] text-white/35">{diaSemana(e.date)}</div></td>
-                      <td className="px-3 py-2.5"><span className="inline-flex items-center gap-1.5" style={{ color: e.tipo === 'Receita' ? '#4ade80' : '#7dd3fc' }}>{e.tipo === 'Receita' ? <Receipt className="h-3.5 w-3.5" /> : <Wallet className="h-3.5 w-3.5" />}{e.tipo}</span></td>
-                      <td className="px-3 py-2.5 text-white/80">{e.requerente}</td>
-                      <td className="px-3 py-2.5 text-white/60">{e.descricao}</td>
-                      <td className="px-3 py-2.5 tabular-nums font-medium text-white/90">{brl(e.valorBrl)}</td>
+                    <tr key={i} className="border-t border-[var(--border-default)]">
+                      <td className="px-3 py-2.5 text-[var(--text-secondary)]"><div>{diaMes(e.date)}</div><div className="text-[10px] text-[var(--text-muted)]">{diaSemana(e.date)}</div></td>
+                      <td className="px-3 py-2.5"><span className="inline-flex items-center gap-1.5" style={{ color: e.tipo === 'Receita' ? 'var(--success)' : 'var(--info)' }}>{e.tipo === 'Receita' ? <Receipt className="h-3.5 w-3.5" /> : <Wallet className="h-3.5 w-3.5" />}{e.tipo}</span></td>
+                      <td className="px-3 py-2.5 text-[var(--text-secondary)]">{e.requerente}</td>
+                      <td className="px-3 py-2.5 text-[var(--text-secondary)]">{e.descricao}</td>
+                      <td className="px-3 py-2.5 tabular-nums font-medium text-[var(--text-primary)]">{brl(e.valorBrl)}</td>
                       <td className="px-3 py-2.5"><Tag cor={e.cor}>{e.status}</Tag></td>
-                      <td className="px-3 py-2.5"><button onClick={() => onIrPara?.('receitas')} className="rounded-md border border-white/15 px-2.5 py-1 text-xs text-white/80 hover:bg-white/10">Abrir</button></td>
+                      <td className="px-3 py-2.5"><button onClick={() => onIrPara?.('receitas')} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">Abrir</button></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <button onClick={() => onIrPara?.('receitas')} className="mt-3 inline-flex items-center gap-1 text-xs text-white/50 hover:text-white">Ver todos os eventos financeiros <ChevronRight className="h-3.5 w-3.5" /></button>
+              <button onClick={() => onIrPara?.('receitas')} className="mt-3 inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]">Ver todos os eventos financeiros <ChevronRight className="h-3.5 w-3.5" /></button>
             </div>
           )}
         </Painel>
@@ -229,8 +229,8 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
       {/* 3 · fluxo / moeda / requerente */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Painel titulo="Fluxo de Caixa Previsto" acao={
-          <select value={mesesFluxo} onChange={(e) => setMesesFluxo(Number(e.target.value))} className="rounded-md border border-white/15 bg-[#1b2027] px-2 py-1 text-xs text-white/70 outline-none">
-            {[3, 6, 12].map((n) => <option key={n} value={n} className="bg-[#14161a]">{n} meses</option>)}
+          <select value={mesesFluxo} onChange={(e) => setMesesFluxo(Number(e.target.value))} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-input)] px-2 py-1 text-xs text-[var(--text-secondary)] outline-none">
+            {[3, 6, 12].map((n) => <option key={n} value={n} className="bg-[var(--surface-popover)]">{n} meses</option>)}
           </select>
         }>
           <FluxoCaixaChart pontos={fluxoCaixa.pontos} totalEnt={fluxoCaixa.totalEnt} totalSai={fluxoCaixa.totalSai} totalSaldo={fluxoCaixa.totalSaldo} />
@@ -243,24 +243,24 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
               {porMoeda.itens.map((x) => (
                 <div key={x.code} className="flex items-start gap-2">
                   <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: x.cor }} />
-                  <div className="min-w-0"><p className="text-white/80">{x.code} — {x.nome}</p><p className="text-white/45">{brl(x.valor)} ({x.pct.toFixed(0)}%)</p></div>
+                  <div className="min-w-0"><p className="text-[var(--text-secondary)]">{x.code} — {x.nome}</p><p className="text-[var(--text-muted)]">{brl(x.valor)} ({x.pct.toFixed(0)}%)</p></div>
                 </div>
               ))}
             </div>
           </div>
-          <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-sm"><span className="text-white/45">Total</span><span className="tabular-nums font-semibold">{brl(porMoeda.total === 1 ? 0 : porMoeda.total)}</span></div>
+          <div className="mt-3 flex items-center justify-between border-t border-[var(--border-default)] pt-2 text-sm"><span className="text-[var(--text-muted)]">Total</span><span className="tabular-nums font-semibold">{brl(porMoeda.total === 1 ? 0 : porMoeda.total)}</span></div>
         </Painel>
 
         <Painel titulo="Distribuição por Requerente">
-          {porRequerente.linhas.length === 0 ? <div className="py-8 text-center text-sm text-white/40">Sem requerentes.</div> : (
+          {porRequerente.linhas.length === 0 ? <div className="py-8 text-center text-sm text-[var(--text-muted)]">Sem requerentes.</div> : (
             <div className="space-y-3">
               {porRequerente.linhas.map((x, i) => (
                 <div key={i}>
-                  <div className="flex items-center justify-between text-sm"><span className="truncate text-white/80">{x.nome}</span><span className="ml-2 shrink-0 tabular-nums text-white/70">{brl(x.valor)} <span className="text-white/40">{x.pct.toFixed(1)}%</span></span></div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[#4ade80]" style={{ width: `${Math.max(2, x.pct)}%` }} /></div>
+                  <div className="flex items-center justify-between text-sm"><span className="truncate text-[var(--text-secondary)]">{x.nome}</span><span className="ml-2 shrink-0 tabular-nums text-[var(--text-secondary)]">{brl(x.valor)} <span className="text-[var(--text-muted)]">{x.pct.toFixed(1)}%</span></span></div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--surface-hover)]"><span className="block h-full rounded-full bg-[var(--success)]" style={{ width: `${Math.max(2, x.pct)}%` }} /></div>
                 </div>
               ))}
-              <div className="flex items-center justify-between border-t border-white/10 pt-2 text-sm"><span className="text-white/45">Total</span><span className="tabular-nums font-semibold">{brl(porRequerente.total === 1 ? 0 : porRequerente.total)}</span></div>
+              <div className="flex items-center justify-between border-t border-[var(--border-default)] pt-2 text-sm"><span className="text-[var(--text-muted)]">Total</span><span className="tabular-nums font-semibold">{brl(porRequerente.total === 1 ? 0 : porRequerente.total)}</span></div>
             </div>
           )}
         </Painel>
@@ -271,30 +271,31 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
 }
 
 // ── auxiliares de UI (identidade Receitas/Dossiê) ───────────────────────────
-const CARD = 'rounded-xl border border-white/10 bg-[#1b2027]'
+const CARD = 'rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)]'
 function Card({ titulo, valor, sub, icon: Ic, cor, valorCor }: { titulo: string; valor: string; sub: string; icon: any; cor: string; valorCor?: string }) {
   return (
     <div className={`${CARD} relative overflow-hidden p-4`}>
       <div className="flex items-start justify-between">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-white/50">{titulo}</p>
-        <span className="grid h-8 w-8 place-items-center rounded-lg" style={{ background: `${cor}22`, color: cor }}><Ic className="h-4 w-4" /></span>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{titulo}</p>
+        <span className="grid h-8 w-8 place-items-center rounded-[var(--radius-sm)]" style={{ background: `color-mix(in srgb, ${cor} 13%, transparent)`, color: cor }}><Ic className="h-4 w-4" /></span>
       </div>
-      <p className={`mt-2 text-xl font-bold ${valorCor ?? 'text-white'}`}>{valor}</p>
-      <p className="mt-0.5 text-[11px] text-white/45">{sub}</p>
+      <p className={`mt-2 text-xl font-bold ${valorCor ?? 'text-[var(--text-primary)]'}`}>{valor}</p>
+      <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{sub}</p>
     </div>
   )
 }
 function Painel({ titulo, acao, children }: { titulo: string; acao?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className={`${CARD} p-4`}>
-      <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-white">{titulo}</h3>{acao}</div>
+      <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-[var(--text-primary)]">{titulo}</h3>{acao}</div>
       {children}
     </section>
   )
 }
 function Tag({ cor, children }: { cor: string; children: React.ReactNode }) {
-  const map: Record<string, string> = { amber: 'bg-amber-500/15 text-amber-300 border-amber-500/30', red: 'bg-red-500/15 text-red-300 border-red-500/30', sky: 'bg-sky-500/15 text-sky-300 border-sky-500/30', emerald: 'bg-emerald-500/15 text-[#4ade80] border-emerald-500/30' }
-  return <span className={`inline-block rounded-md border px-2 py-0.5 text-[11px] font-medium ${map[cor] ?? map.sky}`}>{children}</span>
+  const map: Record<string, string> = { amber: 'var(--warning)', red: 'var(--danger)', sky: 'var(--info)', emerald: 'var(--success)' }
+  const v = map[cor] ?? map.sky
+  return <span className="inline-block rounded-[var(--radius-sm)] border px-2 py-0.5 text-[11px] font-medium" style={{ color: v, borderColor: `color-mix(in srgb, ${v} 30%, transparent)`, background: `color-mix(in srgb, ${v} 15%, transparent)` }}>{children}</span>
 }
 function Donut({ itens }: { itens: { cor: string; valor: number; pct: number; code: string }[] }) {
   const size = 116, thick = 16, r = (size - thick) / 2, c = size / 2, circ = 2 * Math.PI * r
@@ -304,13 +305,13 @@ function Donut({ itens }: { itens: { cor: string; valor: number; pct: number; co
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={c} cy={c} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={thick} />
+        <circle cx={c} cy={c} r={r} fill="none" stroke="var(--border-default)" strokeWidth={thick} />
         {total > 0 && itens.filter((x) => x.valor > 0).map((x, i) => {
           const frac = x.valor / total; const dash = frac * circ; const off = acc * circ; acc += frac
           return <circle key={i} cx={c} cy={c} r={r} fill="none" stroke={x.cor} strokeWidth={thick} strokeDasharray={`${dash} ${circ - dash}`} strokeDashoffset={-off} />
         })}
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-lg font-bold text-white">{total > 0 ? `${Math.round(principal.pct)}%` : '—'}</span><span className="text-[10px] text-white/40">{total > 0 ? principal.code : ''}</span></div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-lg font-bold text-[var(--text-primary)]">{total > 0 ? `${Math.round(principal.pct)}%` : '—'}</span><span className="text-[10px] text-[var(--text-muted)]">{total > 0 ? principal.code : ''}</span></div>
     </div>
   )
 }
@@ -329,14 +330,14 @@ function FluxoCaixaChart({ pontos, totalEnt, totalSai, totalSaldo }: { pontos: {
   const gridVals = [0, 1, 2, 3, 4].map((i) => yMin + (range * (4 - i)) / 4)
   const fmtK = (v: number) => `R$ ${Math.round(v / 1000)}k`
   const PAD = 44
-  const series = [{ k: 'entradas', cor: '#4ade80' }, { k: 'saidas', cor: '#f87171' }, { k: 'saldo', cor: '#7dd3fc' }] as const
+  const series = [{ k: 'entradas', cor: 'var(--success)' }, { k: 'saidas', cor: 'var(--danger)' }, { k: 'saldo', cor: 'var(--info)' }] as const
   return (
     <div>
       <div className="relative" style={{ height: 170 }}>
         {gridVals.map((v, i) => (
           <div key={i} className="absolute left-0 right-0 flex items-center" style={{ top: `${(i / 4) * 100}%` }}>
-            <span className="shrink-0 -translate-y-1/2 pr-2 text-right text-[10px] text-white/35" style={{ width: PAD }}>{fmtK(v)}</span>
-            <div className="h-px flex-1 bg-white/10" />
+            <span className="shrink-0 -translate-y-1/2 pr-2 text-right text-[10px] text-[var(--text-muted)]" style={{ width: PAD }}>{fmtK(v)}</span>
+            <div className="h-px flex-1 bg-[var(--border-default)]" />
           </div>
         ))}
         <svg className="absolute top-0 h-full" style={{ left: PAD, width: `calc(100% - ${PAD}px)` }} viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -347,12 +348,12 @@ function FluxoCaixaChart({ pontos, totalEnt, totalSai, totalSaldo }: { pontos: {
         )))}
       </div>
       <div className="mt-1 flex" style={{ paddingLeft: PAD }}>
-        {pontos.map((p, i) => <span key={i} className="flex-1 text-center text-[10px] text-white/35">{p.label}</span>)}
+        {pontos.map((p, i) => <span key={i} className="flex-1 text-center text-[10px] text-[var(--text-muted)]">{p.label}</span>)}
       </div>
       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs">
-        <LegendaFluxo cor="#4ade80" label="Entradas" valor={totalEnt} />
-        <LegendaFluxo cor="#f87171" label="Saídas" valor={totalSai} />
-        <LegendaFluxo cor="#7dd3fc" label="Saldo" valor={totalSaldo} />
+        <LegendaFluxo cor="var(--success)" label="Entradas" valor={totalEnt} />
+        <LegendaFluxo cor="var(--danger)" label="Saídas" valor={totalSai} />
+        <LegendaFluxo cor="var(--info)" label="Saldo" valor={totalSaldo} />
       </div>
     </div>
   )
@@ -361,8 +362,8 @@ function LegendaFluxo({ cor, label, valor }: { cor: string; label: string; valor
   return (
     <span className="inline-flex items-center gap-1.5">
       <span className="h-2 w-2 rounded-full" style={{ background: cor }} />
-      <span className="text-white/68">{label} - </span>
-      <span className="tabular-nums text-white/85">{brl(valor)}</span>
+      <span className="text-[var(--text-secondary)]">{label} - </span>
+      <span className="tabular-nums text-[var(--text-primary)]">{brl(valor)}</span>
     </span>
   )
 }

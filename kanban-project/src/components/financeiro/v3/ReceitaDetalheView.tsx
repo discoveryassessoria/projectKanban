@@ -43,24 +43,29 @@ const authHeaders = (): Record<string, string> => { const t = typeof window !== 
 const iniciais = (n?: string | null) => (n ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?"
 const fmtTamanho = (b?: number | null) => { if (b == null) return null; if (b < 1024) return `${b} B`; if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`; return `${(b / (1024 * 1024)).toFixed(1)} MB` }
 
-// classe do badge de status (amber A VENCER · red VENCIDO · blue PARCIAL · green QUITADO)
-const statusCls = (s?: string | null) => {
+// tom do badge de status (amber A VENCER · red VENCIDO · blue PARCIAL · green QUITADO)
+const statusTom = (s?: string | null) => {
   const S = (s ?? "").toUpperCase()
-  if (S.includes("QUITAD")) return "bg-[#4ade80]/15 text-[#4ade80]"
-  if (S.includes("VENCID")) return "bg-[#f87171]/15 text-[#f87171]"
-  if (S.includes("PARCIAL")) return "bg-[#7dd3fc]/15 text-[#7dd3fc]"
-  return "bg-[#d2a948]/15 text-[#d2a948]"
+  if (S.includes("QUITAD")) return "var(--success)"
+  if (S.includes("VENCID")) return "var(--danger)"
+  if (S.includes("PARCIAL")) return "var(--info)"
+  return "var(--accent-primary)"
 }
+// classe (texto) + estilo (fundo translúcido via color-mix) do badge de status
+const statusCls = (s?: string | null) => `text-[${statusTom(s)}]`
+const statusBg = (s?: string | null): React.CSSProperties => ({ background: `color-mix(in srgb, ${statusTom(s)} 15%, transparent)` })
 
-// badge de status da parcela
-const parcelaStatusCls = (s?: string | null) => {
+// tom do badge de status da parcela (null = neutro/cancelada)
+const parcelaTom = (s?: string | null) => {
   switch ((s ?? "").toUpperCase()) {
-    case "PAGA": return "bg-[#4ade80]/15 text-[#4ade80]"
-    case "VENCIDA": return "bg-[#f87171]/15 text-[#f87171]"
-    case "CANCELADA": return "bg-white/10 text-white/50"
-    default: return "bg-[#d2a948]/15 text-[#d2a948]"
+    case "PAGA": return "var(--success)"
+    case "VENCIDA": return "var(--danger)"
+    case "CANCELADA": return null
+    default: return "var(--accent-primary)"
   }
 }
+const parcelaStatusCls = (s?: string | null) => { const t = parcelaTom(s); return t ? `text-[${t}]` : "text-[var(--text-muted)]" }
+const parcelaStatusBg = (s?: string | null): React.CSSProperties => { const t = parcelaTom(s); return t ? { background: `color-mix(in srgb, ${t} 15%, transparent)` } : { background: "var(--surface-hover)" } }
 const parcelaStatusLabel = (s?: string | null) => (s === "A_VENCER" ? "A VENCER" : (s ?? "—"))
 
 export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; onVoltar: () => void }) {
@@ -146,8 +151,8 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
     }
   }
 
-  if (erro) return <div className="p-8 text-sm text-white/68">{erro}</div>
-  if (!d) return <div className="p-8 text-sm text-white/40">carregando…</div>
+  if (erro) return <div className="p-8 text-sm text-[var(--text-secondary)]">{erro}</div>
+  if (!d) return <div className="p-8 text-sm text-[var(--text-muted)]">carregando…</div>
 
   const isCusto = d.natureza === "CUSTO"
   const semBase = d.moedaBase === "BRL"
@@ -188,7 +193,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const limparFiltros = () => { setPStatus("TODAS"); setPForma("TODAS"); setPResp("TODAS"); setPBusca(""); setPPage(1) }
   const hojeStr = new Date().toDateString()
   const ehHoje = (iso?: string | null) => !!iso && new Date(iso).toDateString() === hojeStr
-  const selCls = "rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70 outline-none"
+  const selCls = "rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-secondary)] outline-none"
 
   // ── Distribuição entre requerentes ──
   const dist: any[] = d.distribuicaoRequerentes ?? []
@@ -223,9 +228,9 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   }
 
   const alertaIcone = (sev: string) => {
-    if (sev === "crit") return "text-[#f87171]"
-    if (sev === "warn") return "text-[#d2a948]"
-    return "text-[#7dd3fc]"
+    if (sev === "crit") return "text-[var(--danger)]"
+    if (sev === "warn") return "text-[var(--accent-primary)]"
+    return "text-[var(--info)]"
   }
 
   // Contadores só quando > 0 (Resumo/Timeline/Observações não têm contador).
@@ -239,27 +244,27 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   ]
 
   return (
-    <div className="text-white/80">
+    <div className="text-[var(--text-secondary)]">
       <div className="mx-auto max-w-[1400px] px-1 py-1">
         {/* ── HEADER ── */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <button onClick={onVoltar} className="mb-3 flex items-center gap-2 text-sm text-white/68 hover:text-white/80"><ArrowLeft className="h-4 w-4" /> Voltar para {isCusto ? "Custos" : "Receitas"}</button>
+            <button onClick={onVoltar} className="mb-3 flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"><ArrowLeft className="h-4 w-4" /> Voltar para {isCusto ? "Custos" : "Receitas"}</button>
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-[28px] font-bold leading-tight text-white">{d.descricao ?? d.codigo}</h1>
-              <span className={`rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide ${statusCls(d.statusLabel)}`}>{d.statusLabel}</span>
+              <h1 className="text-[28px] font-bold leading-tight text-[var(--text-primary)]">{d.descricao ?? d.codigo}</h1>
+              <span className={`rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-semibold tracking-wide ${statusCls(d.statusLabel)}`} style={statusBg(d.statusLabel)}>{d.statusLabel}</span>
               {d.consolidado && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-500/15 px-2.5 py-1 text-xs font-medium text-violet-300"><Users className="h-3.5 w-3.5" /> {d.participantesCount} participantes</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)]"><Users className="h-3.5 w-3.5" /> {d.participantesCount} participantes</span>
               )}
             </div>
-            <div className="mt-2 flex items-center gap-1.5 text-[13px] text-white/40">
-              <span>🧾</span> Financeiro <span className="text-white/30">›</span> {isCusto ? "Custos" : "Receitas"} <span className="text-white/30">›</span>
-              <span className="text-white/68">{d.codigo}</span>
+            <div className="mt-2 flex items-center gap-1.5 text-[13px] text-[var(--text-muted)]">
+              <span>🧾</span> Financeiro <span className="text-[var(--text-muted)]">›</span> {isCusto ? "Custos" : "Receitas"} <span className="text-[var(--text-muted)]">›</span>
+              <span className="text-[var(--text-secondary)]">{d.codigo}</span>
             </div>
             {d.criadoPor === "Sistema" && (
-              <div className="mt-1.5 text-[12px] text-white/40">Receita gerada automaticamente pela regra financeira da fase.</div>
+              <div className="mt-1.5 text-[12px] text-[var(--text-muted)]">Receita gerada automaticamente pela regra financeira da fase.</div>
             )}
-            <div className="mt-1 text-[12px] text-white/40">{d.codigo} · {dataBR(d.criadoEm)} · Criado por {d.criadoPor}</div>
+            <div className="mt-1 text-[12px] text-[var(--text-muted)]">{d.codigo} · {dataBR(d.criadoEm)} · Criado por {d.criadoPor}</div>
           </div>
 
           {/* Ações do topo */}
@@ -267,35 +272,35 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
             <button
               onClick={() => setEditarReceitaOpen(true)}
               title="Editar receita (dados e regra de câmbio) — fluxo canônico"
-              className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#1b2027] px-3.5 py-2 text-sm font-medium text-white/80 hover:border-white/25"
+              className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-primary)] px-3.5 py-2 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
             ><Pencil className="h-4 w-4" /> Editar receita</button>
 
-            <button onClick={() => setReceberOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957]"><Plus className="h-4 w-4" /> Registrar pagamento</button>
+            <button onClick={() => setReceberOpen(true)} className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--accent-primary)] px-3.5 py-2 text-sm font-semibold text-[var(--accent-ink)] hover:bg-[var(--accent-hover)]"><Plus className="h-4 w-4" /> Registrar pagamento</button>
 
             <div className="relative">
-              <button onClick={() => setMaisOpen((o) => !o)} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-sm text-white/80 hover:border-white/25">Mais ações <ChevronDown className="h-3.5 w-3.5" /></button>
+              <button onClick={() => setMaisOpen((o) => !o)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-[var(--text-secondary)] hover:border-[var(--border-strong)]">Mais ações <ChevronDown className="h-3.5 w-3.5" /></button>
               {maisOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setMaisOpen(false)} />
-                  <div className="absolute right-0 z-50 mt-1 w-60 overflow-hidden rounded-lg border border-white/10 bg-[#1b2027] py-1 shadow-xl shadow-black/40">
-                    <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/30">Gestão financeira</div>
-                    <button onClick={() => { setMaisOpen(false); setEditarReceitaOpen(true) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><Pencil className="h-4 w-4 text-white/45" /> Editar {isCusto ? "custo" : "Receita"}</button>
-                    <button onClick={() => { setMaisOpen(false); setEditarReceitaOpen(true) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><ArrowLeftRight className="h-4 w-4 text-white/45" /> Editar regra de câmbio</button>
+                  <div className="absolute right-0 z-50 mt-1 w-60 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-popover)] py-1 shadow-[var(--shadow-surface)]">
+                    <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Gestão financeira</div>
+                    <button onClick={() => { setMaisOpen(false); setEditarReceitaOpen(true) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><Pencil className="h-4 w-4 text-[var(--text-muted)]" /> Editar {isCusto ? "custo" : "Receita"}</button>
+                    <button onClick={() => { setMaisOpen(false); setEditarReceitaOpen(true) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><ArrowLeftRight className="h-4 w-4 text-[var(--text-muted)]" /> Editar regra de câmbio</button>
                     {/* Fatura e recibo são do lado A_RECEBER (cobrança/comprovante ao cliente) — não se aplicam a custo. */}
-                    {!isCusto && <button onClick={() => { setMaisOpen(false); temProcesso ? setFaturaOpen(true) : undefined }} disabled={!temProcesso} title={temProcesso ? "" : "Processo não vinculado"} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5 disabled:opacity-40"><FileText className="h-4 w-4 text-white/45" /> Gerar fatura</button>}
-                    {!isCusto && <button onClick={() => { setMaisOpen(false); setAcaoModal("recibo") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><FileCheck className="h-4 w-4 text-white/45" /> Gerar recibo</button>}
-                    <div className="my-1 border-t border-white/10" />
-                    <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/30">Críticas</div>
+                    {!isCusto && <button onClick={() => { setMaisOpen(false); temProcesso ? setFaturaOpen(true) : undefined }} disabled={!temProcesso} title={temProcesso ? "" : "Processo não vinculado"} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] disabled:opacity-40"><FileText className="h-4 w-4 text-[var(--text-muted)]" /> Gerar fatura</button>}
+                    {!isCusto && <button onClick={() => { setMaisOpen(false); setAcaoModal("recibo") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><FileCheck className="h-4 w-4 text-[var(--text-muted)]" /> Gerar recibo</button>}
+                    <div className="my-1 border-t border-[var(--border-default)]" />
+                    <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Críticas</div>
                     {/* Renegociação atua sobre cobranças (A_RECEBER); custo não tem cobrança. */}
-                    {!isCusto && <button onClick={() => { setMaisOpen(false); setAcaoModal("renegociar") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><RefreshCcw className="h-4 w-4 text-[#7dd3fc]" /> Renegociar</button>}
-                    <button onClick={() => { setMaisOpen(false); setTab("pagamentos") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><RotateCcw className="h-4 w-4 text-[#f87171]" /> Estornar pagamento</button>
-                    <div className="my-1 border-t border-white/10" />
-                    <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/30">Encerramento</div>
-                    {!isCusto && <button onClick={() => { setMaisOpen(false); setAcaoModal("arquivar") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><Archive className="h-4 w-4 text-[#a78bfa]" /> Arquivar</button>}
-                    <button onClick={() => { setMaisOpen(false); setAcaoModal("cancelar") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#f87171] hover:bg-white/5"><Ban className="h-4 w-4" /> Cancelar {isCusto ? "custo" : "Receita"}</button>
-                    <div className="my-1 border-t border-white/10" />
-                    <button onClick={() => { setMaisOpen(false); setTab("timeline") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><Clock className="h-4 w-4 text-white/45" /> Ver movimentações</button>
-                    <button onClick={() => { setMaisOpen(false); copiarCodigo() }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5">{copiado ? <CheckCircle2 className="h-4 w-4 text-[#4ade80]" /> : <Copy className="h-4 w-4 text-white/45" />} Copiar código</button>
+                    {!isCusto && <button onClick={() => { setMaisOpen(false); setAcaoModal("renegociar") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><RefreshCcw className="h-4 w-4 text-[var(--info)]" /> Renegociar</button>}
+                    <button onClick={() => { setMaisOpen(false); setTab("pagamentos") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><RotateCcw className="h-4 w-4 text-[var(--danger)]" /> Estornar pagamento</button>
+                    <div className="my-1 border-t border-[var(--border-default)]" />
+                    <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Encerramento</div>
+                    {!isCusto && <button onClick={() => { setMaisOpen(false); setAcaoModal("arquivar") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><Archive className="h-4 w-4 text-[var(--info)]" /> Arquivar</button>}
+                    <button onClick={() => { setMaisOpen(false); setAcaoModal("cancelar") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--danger)] hover:bg-[var(--surface-hover)]"><Ban className="h-4 w-4" /> Cancelar {isCusto ? "custo" : "Receita"}</button>
+                    <div className="my-1 border-t border-[var(--border-default)]" />
+                    <button onClick={() => { setMaisOpen(false); setTab("timeline") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><Clock className="h-4 w-4 text-[var(--text-muted)]" /> Ver movimentações</button>
+                    <button onClick={() => { setMaisOpen(false); copiarCodigo() }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">{copiado ? <CheckCircle2 className="h-4 w-4 text-[var(--success)]" /> : <Copy className="h-4 w-4 text-[var(--text-muted)]" />} Copiar código</button>
                   </div>
                 </>
               )}
@@ -308,57 +313,57 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
           {/* ─── COLUNA PRINCIPAL ─── */}
           <div className="min-w-0 space-y-5">
             {/* INFO CARD */}
-            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+            <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-5">
               <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
-                <Info rotulo={isCusto ? "Custo" : "Receita"}><span className="inline-flex items-center gap-1.5 font-medium text-white/95">{d.codigo}<button onClick={copiarCodigo} title="Copiar código" className="text-white/40 hover:text-white/80">{copiado ? <CheckCircle2 className="h-3.5 w-3.5 text-[#4ade80]" /> : <Copy className="h-3.5 w-3.5" />}</button></span></Info>
-                <Info rotulo={`Moeda-base (Contrato)`}><span className="font-medium text-white/95">{fmtEUR(d.valorBase)}</span><div className="mt-0.5 text-[11px] text-white/40">{moedaBaseLabel}</div></Info>
+                <Info rotulo={isCusto ? "Custo" : "Receita"}><span className="inline-flex items-center gap-1.5 font-medium text-[var(--text-primary)]">{d.codigo}<button onClick={copiarCodigo} title="Copiar código" className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]">{copiado ? <CheckCircle2 className="h-3.5 w-3.5 text-[var(--success)]" /> : <Copy className="h-3.5 w-3.5" />}</button></span></Info>
+                <Info rotulo={`Moeda-base (Contrato)`}><span className="font-medium text-[var(--text-primary)]">{fmtEUR(d.valorBase)}</span><div className="mt-0.5 text-[11px] text-[var(--text-muted)]">{moedaBaseLabel}</div></Info>
                 <Info rotulo="Câmbio aplicado">
-                  <span className="inline-flex items-center gap-2 font-medium text-white/95">{d.cotacaoAplicada != null ? brl(d.cotacaoAplicada) : "—"}
-                    {d.tipoCambio === "FIXO" && <span className="rounded bg-[#4ade80]/15 px-1.5 py-0.5 text-[10px] font-semibold text-[#4ade80]">Fixo</span>}
+                  <span className="inline-flex items-center gap-2 font-medium text-[var(--text-primary)]">{d.cotacaoAplicada != null ? brl(d.cotacaoAplicada) : "—"}
+                    {d.tipoCambio === "FIXO" && <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-[var(--success)]" style={{ background: "color-mix(in srgb, var(--success) 15%, transparent)" }}>Fixo</span>}
                   </span>
-                  <div className="mt-0.5 text-[11px] text-white/40">{d.tipoCambio === "FIXO" ? `Fixo desde ${dataBR(d.dataCotacao)}` : dataBR(d.dataCotacao)}</div>
+                  <div className="mt-0.5 text-[11px] text-[var(--text-muted)]">{d.tipoCambio === "FIXO" ? `Fixo desde ${dataBR(d.dataCotacao)}` : dataBR(d.dataCotacao)}</div>
                 </Info>
-                <Info rotulo="Valor contratado (BRL)"><span className={`font-semibold ${Number(d.naoConvertido ?? 0) > 0 ? "text-amber-300/90" : "text-white/95"}`} title={Number(d.naoConvertido ?? 0) > 0 ? TITULO_SEM_COTACAO : undefined}>{textoBrlOuOrigem(d.valorContratadoBrl, d.naoConvertido, d.moedaBase)}</span></Info>
+                <Info rotulo="Valor contratado (BRL)"><span className={`font-semibold ${Number(d.naoConvertido ?? 0) > 0 ? "text-[var(--warning)]" : "text-[var(--text-primary)]"}`} title={Number(d.naoConvertido ?? 0) > 0 ? TITULO_SEM_COTACAO : undefined}>{textoBrlOuOrigem(d.valorContratadoBrl, d.naoConvertido, d.moedaBase)}</span></Info>
               </div>
 
               {verMais && (
                 <>
-                  <div className="my-4 border-t border-white/10" />
+                  <div className="my-4 border-t border-[var(--border-default)]" />
                   <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
                     <Info rotulo="Status">
-                      <span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${statusCls(d.statusLabel)}`}>{d.statusLabel}</span>
-                      {d.proximoVencimento && <div className="mt-1 text-[11px] text-white/40">Próxima parcela em {dataBR(d.proximoVencimento)}</div>}
+                      <span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${statusCls(d.statusLabel)}`} style={statusBg(d.statusLabel)}>{d.statusLabel}</span>
+                      {d.proximoVencimento && <div className="mt-1 text-[11px] text-[var(--text-muted)]">Próxima parcela em {dataBR(d.proximoVencimento)}</div>}
                     </Info>
-                    <Info rotulo="Descrição"><span className="text-white/80">{d.descricao ?? "—"}</span></Info>
-                    <Info rotulo="Forma de cobrança"><span className="text-white/80">{d.formaCobranca ?? "—"}</span></Info>
-                    <Info rotulo="Responsável">{d.responsavel ? <span className="inline-flex items-center gap-2 text-white/80">{d.responsavel.nome}<span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[11px] text-violet-300">Principal</span></span> : "—"}</Info>
-                    <Info rotulo="Criado em"><span className="text-white/70">{dataBR(d.criadoEm)} às {horaBR(d.criadoEm)}</span><div className="mt-0.5 text-[11px] text-white/40">por {d.criadoPor}</div></Info>
-                    <Info rotulo="Vencimento final"><span className="text-white/80">{dataBR(d.vencimento)}</span></Info>
+                    <Info rotulo="Descrição"><span className="text-[var(--text-secondary)]">{d.descricao ?? "—"}</span></Info>
+                    <Info rotulo="Forma de cobrança"><span className="text-[var(--text-secondary)]">{d.formaCobranca ?? "—"}</span></Info>
+                    <Info rotulo="Responsável">{d.responsavel ? <span className="inline-flex items-center gap-2 text-[var(--text-secondary)]">{d.responsavel.nome}<span className="rounded bg-[var(--surface-hover)] px-1.5 py-0.5 text-[11px] text-[var(--text-secondary)]">Principal</span></span> : "—"}</Info>
+                    <Info rotulo="Criado em"><span className="text-[var(--text-secondary)]">{dataBR(d.criadoEm)} às {horaBR(d.criadoEm)}</span><div className="mt-0.5 text-[11px] text-[var(--text-muted)]">por {d.criadoPor}</div></Info>
+                    <Info rotulo="Vencimento final"><span className="text-[var(--text-secondary)]">{dataBR(d.vencimento)}</span></Info>
                     <Info rotulo="Processo">
-                      <div className="text-white/80">{d.processo.codigo ?? "—"}{d.processo.nome ? ` – ${d.processo.nome}` : ""}</div>
-                      {temProcesso && <a href={`/financeiro/v3/processo-preview?processoId=${d.processo.id}`} className="inline-flex items-center gap-1 text-xs text-[#7dd3fc] hover:underline">Abrir processo <ExternalLink className="h-3 w-3" /></a>}
+                      <div className="text-[var(--text-secondary)]">{d.processo.codigo ?? "—"}{d.processo.nome ? ` – ${d.processo.nome}` : ""}</div>
+                      {temProcesso && <a href={`/financeiro/v3/processo-preview?processoId=${d.processo.id}`} className="inline-flex items-center gap-1 text-xs text-[var(--info)] hover:underline">Abrir processo <ExternalLink className="h-3 w-3" /></a>}
                     </Info>
                     <Info rotulo="Câmbio">
-                      <button onClick={() => router.push("/cambio")} className="inline-flex items-center gap-1 text-sm text-[#7dd3fc] hover:underline">Entenda o câmbio aplicado <ExternalLink className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => router.push("/cambio")} className="inline-flex items-center gap-1 text-sm text-[var(--info)] hover:underline">Entenda o câmbio aplicado <ExternalLink className="h-3.5 w-3.5" /></button>
                     </Info>
                   </div>
                 </>
               )}
 
-              <button onClick={() => setVerMais((v) => !v)} className="mt-4 inline-flex items-center gap-1.5 text-sm text-[#7dd3fc] hover:underline">
+              <button onClick={() => setVerMais((v) => !v)} className="mt-4 inline-flex items-center gap-1.5 text-sm text-[var(--info)] hover:underline">
                 {verMais ? "Ocultar detalhes da receita" : "Ver mais detalhes da receita"} {verMais ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
               </button>
             </div>
 
             {/* SITUAÇÃO FINANCEIRA */}
-            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-              <h2 className="text-lg font-semibold text-white">Situação financeira</h2>
+            <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-5">
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Situação financeira</h2>
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <SubCard rotulo="Valor contratado" valor={textoBrlOuOrigem(d.valorContratadoBrl, d.naoConvertido, d.moedaBase)} linhas={!semBase ? [`Base contratual: ${fmtEUR(d.valorBase)}`] : []} />
-                <SubCard rotulo={isCusto ? "Pago" : "Recebido"} valor={brl(d.recebidoBrl)} cor="text-[#4ade80]" linhas={[`${pct}% do total`, `${d.parcelasRecebidas} parcela(s) recebida(s)`]} />
-                <SubCard rotulo="A vencer" valor={brl(d.aVencerBrl)} cor="text-[#d2a948]" linhas={[`${d.parcelasAVencer} parcela(s)`, `Próximo: ${dataBR(d.proximoVencimento)}`]} />
-                <SubCard rotulo="Vencido" valor={brl(d.vencidoBrl)} cor="text-[#f87171]" linhas={[`${d.parcelasVencidas} parcela(s)`, ...(d.parcelasVencidas ? [`Desde ${dataBR(d.proximoVencimento)}`] : [])]} />
-                <SubCard rotulo="Saldo a receber" valor={brl(d.saldoBrl)} cor="text-[#7dd3fc]" linhas={[`${d.parcelas} parcela(s) em aberto`]} />
+                <SubCard rotulo={isCusto ? "Pago" : "Recebido"} valor={brl(d.recebidoBrl)} cor="text-[var(--success)]" linhas={[`${pct}% do total`, `${d.parcelasRecebidas} parcela(s) recebida(s)`]} />
+                <SubCard rotulo="A vencer" valor={brl(d.aVencerBrl)} cor="text-[var(--accent-primary)]" linhas={[`${d.parcelasAVencer} parcela(s)`, `Próximo: ${dataBR(d.proximoVencimento)}`]} />
+                <SubCard rotulo="Vencido" valor={brl(d.vencidoBrl)} cor="text-[var(--danger)]" linhas={[`${d.parcelasVencidas} parcela(s)`, ...(d.parcelasVencidas ? [`Desde ${dataBR(d.proximoVencimento)}`] : [])]} />
+                <SubCard rotulo="Saldo a receber" valor={brl(d.saldoBrl)} cor="text-[var(--info)]" linhas={[`${d.parcelas} parcela(s) em aberto`]} />
               </div>
             </div>
 
@@ -368,10 +373,10 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
         </div>
 
         {/* ── ABAS ── */}
-        <div className="mt-6 flex items-center gap-7 overflow-x-auto border-b border-white/10">
+        <div className="mt-6 flex items-center gap-7 overflow-x-auto border-b border-[var(--border-default)]">
           {tabs.map(([id, label, Icon, badge]) => (
-            <button key={id} onClick={() => setTab(id)} className={`-mb-px flex shrink-0 items-center gap-2 border-b-2 px-1 pb-3 pt-2 text-sm ${tab === id ? "border-[#d2a948] font-medium text-[#d2a948]" : "border-transparent text-white/68 hover:text-white/80"}`}>
-              <Icon className="h-4 w-4" /> {label}{badge ? <span className="ml-1 rounded-full bg-[#252c35] px-1.5 text-[11px] text-white/70">{badge}</span> : null}
+            <button key={id} onClick={() => setTab(id)} className={`-mb-px flex shrink-0 items-center gap-2 border-b-2 px-1 pb-3 pt-2 text-sm ${tab === id ? "border-[var(--accent-primary)] font-medium text-[var(--accent-primary)]" : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"}`}>
+              <Icon className="h-4 w-4" /> {label}{badge ? <span className="ml-1 rounded-full bg-[var(--surface-hover)] px-1.5 text-[11px] text-[var(--text-secondary)]">{badge}</span> : null}
             </button>
           ))}
         </div>
@@ -380,24 +385,24 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
         <div className="mt-5">
           {/* Participantes Financeiros */}
           {tab === "participantes" && (
-            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+            <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h2 className="flex items-center gap-2 text-lg font-semibold text-white"><span>👥</span> Participantes Financeiros</h2>
-                  <p className="mt-1 text-sm text-white/45">Distribuição desta Receita entre os responsáveis pelo pagamento.</p>
+                  <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--text-primary)]"><span>👥</span> Participantes Financeiros</h2>
+                  <p className="mt-1 text-sm text-[var(--text-muted)]">Distribuição desta Receita entre os responsáveis pelo pagamento.</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <button onClick={() => setDistribuicaoOpen(true)} title="Editar como o total é dividido entre os participantes" className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-sm font-medium text-white/80 hover:border-white/25"><Pencil className="h-4 w-4" /> Editar distribuição</button>
-                  <button onClick={exportarParticipantesCsv} title="Exportar participantes em CSV" className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-sm font-medium text-white/80 hover:border-white/25"><Download className="h-4 w-4" /> Exportar</button>
+                  <button onClick={() => setDistribuicaoOpen(true)} title="Editar como o total é dividido entre os participantes" className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)]"><Pencil className="h-4 w-4" /> Editar distribuição</button>
+                  <button onClick={exportarParticipantesCsv} title="Exportar participantes em CSV" className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)]"><Download className="h-4 w-4" /> Exportar</button>
                 </div>
               </div>
 
               {participantes.length === 0 ? (
-                <div className="mt-6 rounded-lg border border-dashed border-white/10 bg-[#12161c] px-4 py-8 text-center text-sm text-white/40">Sem participantes na distribuição desta receita.</div>
+                <div className="mt-6 rounded-[var(--radius-sm)] border border-dashed border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-8 text-center text-sm text-[var(--text-muted)]">Sem participantes na distribuição desta receita.</div>
               ) : (
                 <div className="mt-4 overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead><tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/40">
+                    <thead><tr className="border-b border-[var(--border-default)] text-left text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
                       <th className="pb-2 font-medium">Participante</th>
                       <th className="pb-2 font-medium">Participação ({d.moedaBase})</th>
                       <th className="pb-2 font-medium">Valor contratado (BRL)</th>
@@ -409,66 +414,66 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                     </tr></thead>
                     <tbody>
                       {participantes.map((p: any, i: number) => (
-                        <tr key={p.obrigacaoId ?? i} className="border-b border-white/10 align-top">
+                        <tr key={p.obrigacaoId ?? i} className="border-b border-[var(--border-default)] align-top">
                           <td className="py-3.5">
                             <div className="flex items-center gap-2.5">
-                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-[11px] font-semibold text-violet-300">{iniciais(p.nome)}</span>
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-hover)] text-[11px] font-semibold text-[var(--text-secondary)]">{iniciais(p.nome)}</span>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="truncate text-sm font-medium text-white/90">{p.nome}</span>
-                                  <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-300">{papelLabel(p.papel)}</span>
+                                  <span className="truncate text-sm font-medium text-[var(--text-primary)]">{p.nome}</span>
+                                  <span className="rounded bg-[var(--surface-hover)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">{papelLabel(p.papel)}</span>
                                 </div>
-                                <div className="text-[11px] text-white/40">Requerente</div>
+                                <div className="text-[11px] text-[var(--text-muted)]">Requerente</div>
                               </div>
                             </div>
                           </td>
                           <td className="whitespace-nowrap py-3.5">
-                            <div className="font-medium text-white/90">{fmt(p.valorBase, p.moedaBase)}</div>
-                            <div className="mt-0.5 text-xs text-white/40">{Number(p.participacaoPct).toFixed(2)}%</div>
+                            <div className="font-medium text-[var(--text-primary)]">{fmt(p.valorBase, p.moedaBase)}</div>
+                            <div className="mt-0.5 text-xs text-[var(--text-muted)]">{Number(p.participacaoPct).toFixed(2)}%</div>
                           </td>
-                          <td className="whitespace-nowrap py-3.5 font-medium text-white/95">{brl(p.valorContratadoBrl)}</td>
+                          <td className="whitespace-nowrap py-3.5 font-medium text-[var(--text-primary)]">{brl(p.valorContratadoBrl)}</td>
                           <td className="whitespace-nowrap py-3.5">
-                            <div className={p.recebidoBrl > 0 ? "font-medium text-[#4ade80]" : "text-white/70"}>{brl(p.recebidoBrl)}</div>
-                            <div className="mt-0.5 text-xs text-white/40">{p.parcelasRecebidas} parcela(s)</div>
+                            <div className={p.recebidoBrl > 0 ? "font-medium text-[var(--success)]" : "text-[var(--text-secondary)]"}>{brl(p.recebidoBrl)}</div>
+                            <div className="mt-0.5 text-xs text-[var(--text-muted)]">{p.parcelasRecebidas} parcela(s)</div>
                           </td>
                           <td className="whitespace-nowrap py-3.5">
-                            <div className="font-medium text-[#7dd3fc]">{brl(p.saldoBrl)}</div>
-                            <div className="mt-0.5 text-xs text-white/40">{p.parcelas} parcela(s)</div>
+                            <div className="font-medium text-[var(--info)]">{brl(p.saldoBrl)}</div>
+                            <div className="mt-0.5 text-xs text-[var(--text-muted)]">{p.parcelas} parcela(s)</div>
                           </td>
-                          <td className="whitespace-nowrap py-3.5 text-white/70">{dataBR(p.proximoVencimento)}</td>
-                          <td className="py-3.5"><span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${statusCls(p.status)}`}>{p.status}</span></td>
+                          <td className="whitespace-nowrap py-3.5 text-[var(--text-secondary)]">{dataBR(p.proximoVencimento)}</td>
+                          <td className="py-3.5"><span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${statusCls(p.status)}`} style={statusBg(p.status)}>{p.status}</span></td>
                           <td className="py-3.5">
                             <div className="flex items-center gap-1.5">
-                              <button onClick={() => setDrawerPart({ obrigacaoId: p.obrigacaoId, nome: p.nome })} className="whitespace-nowrap rounded-lg border border-white/15 bg-[#1b2027] px-2.5 py-1.5 text-xs font-medium text-white/80 hover:border-white/30">Abrir</button>
-                              <button onClick={() => setDrawerPart({ obrigacaoId: p.obrigacaoId, nome: p.nome })} title="Abrir participante" className="rounded-lg border border-white/10 p-1.5 text-white/40 hover:text-white/70"><MoreVertical className="h-4 w-4" /></button>
+                              <button onClick={() => setDrawerPart({ obrigacaoId: p.obrigacaoId, nome: p.nome })} className="whitespace-nowrap rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-primary)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)]">Abrir</button>
+                              <button onClick={() => setDrawerPart({ obrigacaoId: p.obrigacaoId, nome: p.nome })} title="Abrir participante" className="rounded-[var(--radius-sm)] border border-[var(--border-default)] p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><MoreVertical className="h-4 w-4" /></button>
                             </div>
                           </td>
                         </tr>
                       ))}
                       {/* Totalização — valida que a distribuição fecha em 100% e bate com o consolidado */}
-                      <tr className="border-t-2 border-white/15 bg-[#161b21]">
+                      <tr className="border-t-2 border-[var(--border-strong)] bg-[var(--surface-secondary)]">
                         <td className="py-3.5">
                           <div className="flex items-center gap-2.5">
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#4ade80]/15 text-[#4ade80]"><CheckCircle2 className="h-4 w-4" /></span>
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--success)]" style={{ background: "color-mix(in srgb, var(--success) 15%, transparent)" }}><CheckCircle2 className="h-4 w-4" /></span>
                             <div className="min-w-0">
-                              <div className="text-sm font-semibold text-white/90">Total da distribuição</div>
-                              <div className="text-[11px] text-white/45">100,00%</div>
+                              <div className="text-sm font-semibold text-[var(--text-primary)]">Total da distribuição</div>
+                              <div className="text-[11px] text-[var(--text-muted)]">100,00%</div>
                             </div>
                           </div>
                         </td>
-                        <td className="whitespace-nowrap py-3.5 font-semibold text-white/90">{fmt(somaBase, d.moedaBase)}</td>
-                        <td className="whitespace-nowrap py-3.5 font-semibold text-white/95">{brl(somaContratado)}</td>
+                        <td className="whitespace-nowrap py-3.5 font-semibold text-[var(--text-primary)]">{fmt(somaBase, d.moedaBase)}</td>
+                        <td className="whitespace-nowrap py-3.5 font-semibold text-[var(--text-primary)]">{brl(somaContratado)}</td>
                         <td className="whitespace-nowrap py-3.5">
-                          <div className="font-semibold text-[#4ade80]">{brl(somaRecebido)}</div>
-                          <div className="mt-0.5 text-xs text-white/40">{somaRecParcelas} parcela(s)</div>
+                          <div className="font-semibold text-[var(--success)]">{brl(somaRecebido)}</div>
+                          <div className="mt-0.5 text-xs text-[var(--text-muted)]">{somaRecParcelas} parcela(s)</div>
                         </td>
                         <td className="whitespace-nowrap py-3.5">
-                          <div className="font-semibold text-[#7dd3fc]">{brl(somaSaldo)}</div>
-                          <div className="mt-0.5 text-xs text-white/40">{somaParcelas} parcela(s)</div>
+                          <div className="font-semibold text-[var(--info)]">{brl(somaSaldo)}</div>
+                          <div className="mt-0.5 text-xs text-[var(--text-muted)]">{somaParcelas} parcela(s)</div>
                         </td>
-                        <td className="py-3.5 text-white/30">—</td>
-                        <td className="py-3.5 text-white/30">—</td>
-                        <td className="py-3.5 text-white/30">—</td>
+                        <td className="py-3.5 text-[var(--text-muted)]">—</td>
+                        <td className="py-3.5 text-[var(--text-muted)]">—</td>
+                        <td className="py-3.5 text-[var(--text-muted)]">—</td>
                       </tr>
                     </tbody>
                   </table>
@@ -479,53 +484,53 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
 
           {/* Pagamentos */}
           {tab === "pagamentos" && (
-          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+          <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">Pagamentos</h2><span className="rounded-full bg-[#252c35] px-2 py-0.5 text-xs text-white/70">{d.pagamentos.length}</span></div>
-              <button onClick={() => setReceberOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957]"><Plus className="h-4 w-4" /> Registrar pagamento</button>
+              <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-[var(--text-primary)]">Pagamentos</h2><span className="rounded-full bg-[var(--surface-hover)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">{d.pagamentos.length}</span></div>
+              <button onClick={() => setReceberOpen(true)} className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--accent-primary)] px-3.5 py-2 text-sm font-semibold text-[var(--accent-ink)] hover:bg-[var(--accent-hover)]"><Plus className="h-4 w-4" /> Registrar pagamento</button>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <div className="relative min-w-[180px] flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar pagamentos..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
-              <button disabled title="Filtro avançado de pagamentos indisponível — use a busca acima" className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70 disabled:cursor-not-allowed disabled:opacity-40"><SlidersHorizontal className="h-4 w-4" /> Filtros</button>
-              <button disabled title="Filtro por período indisponível — use a busca acima" className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70 disabled:cursor-not-allowed disabled:opacity-40"><Calendar className="h-4 w-4" /> Período <ChevronDown className="h-3.5 w-3.5" /></button>
+              <div className="relative min-w-[180px] flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar pagamentos..." className="w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-[var(--text-muted)]" /></div>
+              <button disabled title="Filtro avançado de pagamentos indisponível — use a busca acima" className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40"><SlidersHorizontal className="h-4 w-4" /> Filtros</button>
+              <button disabled title="Filtro por período indisponível — use a busca acima" className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40"><Calendar className="h-4 w-4" /> Período <ChevronDown className="h-3.5 w-3.5" /></button>
             </div>
             <div className="mt-4 overflow-x-auto">
               <table className="w-full text-sm">
-                <thead><tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/40">
+                <thead><tr className="border-b border-[var(--border-default)] text-left text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
                   <th className="pb-2 font-medium">Data</th><th className="pb-2 font-medium">Valor</th><th className="pb-2 font-medium">Forma</th><th className="pb-2 font-medium">Conta recebida</th><th className="pb-2 font-medium">Referência</th><th className="pb-2 font-medium">Status</th><th className="pb-2 font-medium">Ações</th>
                 </tr></thead>
                 <tbody>{pagamentosFiltrados.map((p: any) => (
-                  <tr key={p.id} className="border-b border-white/10">
-                    <td className="py-3.5 text-white/70">{dataBR(p.data)}</td>
-                    <td className="font-medium text-white/95">{fmt(p.valor, d.moeda)}</td>
-                    <td><span className="inline-flex items-center gap-1.5 text-white/70"><span className="flex h-5 w-5 items-center justify-center rounded bg-[#252c35] text-[10px]">{(p.formaLabel ?? "?").slice(0, 1)}</span>{p.formaLabel ?? "—"}</span></td>
-                    <td><div className="text-white/70">{p.banco ?? "—"}</div>{(p.agencia || p.conta) && <div className="text-xs text-white/40">Ag: {p.agencia ?? "—"} Cc: {p.conta ?? "—"}</div>}</td>
-                    <td className="text-white/68">{p.referencia ?? "—"}</td>
-                    <td><span className="inline-flex items-center gap-1.5 text-[#4ade80]"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />{p.status}</span></td>
+                  <tr key={p.id} className="border-b border-[var(--border-default)]">
+                    <td className="py-3.5 text-[var(--text-secondary)]">{dataBR(p.data)}</td>
+                    <td className="font-medium text-[var(--text-primary)]">{fmt(p.valor, d.moeda)}</td>
+                    <td><span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)]"><span className="flex h-5 w-5 items-center justify-center rounded bg-[var(--surface-hover)] text-[10px]">{(p.formaLabel ?? "?").slice(0, 1)}</span>{p.formaLabel ?? "—"}</span></td>
+                    <td><div className="text-[var(--text-secondary)]">{p.banco ?? "—"}</div>{(p.agencia || p.conta) && <div className="text-xs text-[var(--text-muted)]">Ag: {p.agencia ?? "—"} Cc: {p.conta ?? "—"}</div>}</td>
+                    <td className="text-[var(--text-secondary)]">{p.referencia ?? "—"}</td>
+                    <td><span className="inline-flex items-center gap-1.5 text-[var(--success)]"><span className="h-1.5 w-1.5 rounded-full bg-[var(--success)]" />{p.status}</span></td>
                     <td><PagamentoRowMenu p={p} onEstornar={() => setEstornoAlvo(p)} onTimeline={() => setTab("timeline")} /></td>
                   </tr>
                 ))}</tbody>
               </table>
             </div>
-            <div className="mt-4 flex items-center justify-between text-sm text-white/40">
+            <div className="mt-4 flex items-center justify-between text-sm text-[var(--text-muted)]">
               <span>Mostrando {pagamentosFiltrados.length} de {d.pagamentos.length} pagamentos</span>
-              <div className="flex items-center gap-1"><button disabled title="Página única" className="rounded border border-white/10 p-1.5 text-white/40 disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded border border-white/15 bg-[#252c35] px-2.5 py-1 text-xs text-white/80">1</span><button disabled title="Página única" className="rounded border border-white/10 p-1.5 text-white/40 disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div>
+              <div className="flex items-center gap-1"><button disabled title="Página única" className="rounded border border-[var(--border-default)] p-1.5 text-[var(--text-muted)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded border border-[var(--border-strong)] bg-[var(--surface-active)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">1</span><button disabled title="Página única" className="rounded border border-[var(--border-default)] p-1.5 text-[var(--text-muted)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div>
             </div>
           </div>
           )}
 
           {/* Cobranças (parcelas) */}
           {tab === "cobrancas" && (
-            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-              <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">{isCusto ? "Parcelas" : "Cobranças"}</h2><span className="rounded-full bg-[#252c35] px-2 py-0.5 text-xs text-white/70">{rp.total}</span></div>
+            <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-5">
+              <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-[var(--text-primary)]">{isCusto ? "Parcelas" : "Cobranças"}</h2><span className="rounded-full bg-[var(--surface-hover)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">{rp.total}</span></div>
 
               {/* KPIs */}
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <SubCard rotulo="Total das cobranças" valor={brl(d.valorContratadoBrl)} linhas={[`${rp.total} parcelas`]} />
-                <SubCard rotulo={isCusto ? "Pago" : "Recebido"} valor={brl(d.resumo.recebidoBrl)} cor="text-[#4ade80]" linhas={[`${rp.pagas.qtd} parcelas pagas`]} />
-                <SubCard rotulo="A vencer" valor={brl(d.aVencerBrl)} cor="text-[#d2a948]" linhas={[`${rp.aVencer.qtd} parcelas`]} />
-                <SubCard rotulo="Vencido" valor={brl(d.vencidoBrl)} cor="text-[#f87171]" linhas={[`${rp.vencidas.qtd} parcela(s)`]} />
-                <SubCard rotulo="Inadimplência" valor={`${d.inadimplenciaPct ?? 0}%`} cor="text-[#f87171]" linhas={[`${rp.vencidas.qtd} parcela vencida`]} />
+                <SubCard rotulo={isCusto ? "Pago" : "Recebido"} valor={brl(d.resumo.recebidoBrl)} cor="text-[var(--success)]" linhas={[`${rp.pagas.qtd} parcelas pagas`]} />
+                <SubCard rotulo="A vencer" valor={brl(d.aVencerBrl)} cor="text-[var(--accent-primary)]" linhas={[`${rp.aVencer.qtd} parcelas`]} />
+                <SubCard rotulo="Vencido" valor={brl(d.vencidoBrl)} cor="text-[var(--danger)]" linhas={[`${rp.vencidas.qtd} parcela(s)`]} />
+                <SubCard rotulo="Inadimplência" valor={`${d.inadimplenciaPct ?? 0}%`} cor="text-[var(--danger)]" linhas={[`${rp.vencidas.qtd} parcela vencida`]} />
               </div>
 
               {/* Filtros */}
@@ -543,20 +548,20 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                   {respsDistintos.map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
                 <div className="relative min-w-[180px] flex-1">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
-                  <input value={pBusca} onChange={(e) => { setPBusca(e.target.value); setPPage(1) }} placeholder="Buscar parcela..." className="w-full rounded-lg border border-white/10 bg-[#12161c] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                  <input value={pBusca} onChange={(e) => { setPBusca(e.target.value); setPPage(1) }} placeholder="Buscar parcela..." className="w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-[var(--text-muted)]" />
                 </div>
-                <button onClick={limparFiltros} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-2 text-sm text-white/70 hover:border-white/25">Limpar filtros</button>
+                <button onClick={limparFiltros} className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-secondary)] hover:border-[var(--border-strong)]">Limpar filtros</button>
               </div>
 
               {/* Tabela de parcelas */}
               {parcelas.length === 0 ? (
-                <div className="mt-6 rounded-lg border border-dashed border-white/10 bg-[#12161c] px-4 py-8 text-center text-sm text-white/40">Nenhuma cobrança/parcela para esta receita.</div>
+                <div className="mt-6 rounded-[var(--radius-sm)] border border-dashed border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-8 text-center text-sm text-[var(--text-muted)]">Nenhuma cobrança/parcela para esta receita.</div>
               ) : (
                 <>
                   <div className="mt-4 overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead><tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/40">
+                      <thead><tr className="border-b border-[var(--border-default)] text-left text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
                         <th className="pb-2 font-medium">Parcela</th>
                         <th className="pb-2 font-medium">Responsável</th>
                         <th className="pb-2 font-medium">Vencimento</th>
@@ -569,35 +574,35 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                         <th className="pb-2 font-medium">Ações</th>
                       </tr></thead>
                       <tbody>{parcelasPagina.map((p: any, i: number) => (
-                        <tr key={i} className="border-b border-white/10 align-top">
-                          <td className="whitespace-nowrap py-3.5 font-medium text-white/95">{p.numero}/{p.totalParcelas}</td>
+                        <tr key={i} className="border-b border-[var(--border-default)] align-top">
+                          <td className="whitespace-nowrap py-3.5 font-medium text-[var(--text-primary)]">{p.numero}/{p.totalParcelas}</td>
                           <td className="py-3.5">
-                            <span className="inline-flex items-center gap-1.5 text-white/80">{p.responsavel}
-                              {d.responsavel?.nome && p.responsavel === d.responsavel.nome && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-300">Principal</span>}
+                            <span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)]">{p.responsavel}
+                              {d.responsavel?.nome && p.responsavel === d.responsavel.nome && <span className="rounded bg-[var(--surface-hover)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">Principal</span>}
                             </span>
                           </td>
-                          <td className="whitespace-nowrap py-3.5 text-white/70">{dataBR(p.vencimento)}
-                            {p.status === "VENCIDA" ? <div className="text-xs text-[#f87171]">{p.diasAtraso} dias de atraso</div> : ehHoje(p.vencimento) ? <div className="text-xs text-[#d2a948]">Hoje</div> : null}
+                          <td className="whitespace-nowrap py-3.5 text-[var(--text-secondary)]">{dataBR(p.vencimento)}
+                            {p.status === "VENCIDA" ? <div className="text-xs text-[var(--danger)]">{p.diasAtraso} dias de atraso</div> : ehHoje(p.vencimento) ? <div className="text-xs text-[var(--accent-primary)]">Hoje</div> : null}
                           </td>
-                          <td className="whitespace-nowrap py-3.5 font-medium text-white/95">{brl(p.valorBrl)}</td>
+                          <td className="whitespace-nowrap py-3.5 font-medium text-[var(--text-primary)]">{brl(p.valorBrl)}</td>
                           <td className="whitespace-nowrap py-3.5">
-                            <div className="text-white/80">{fmtEUR(p.valorBase)}</div>
-                            <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-white/40">Câmbio: {p.cotacao != null ? brl(p.cotacao) : "—"}
-                              {p.tipoCambio === "FIXO" && <span className="rounded bg-[#4ade80]/15 px-1 py-0.5 text-[9px] font-semibold text-[#4ade80]">Fixo</span>}
-                              {p.tipoCambio === "NAO_DEFINIDO" && <span className="rounded bg-white/10 px-1 py-0.5 text-[9px] font-semibold text-white/50">—</span>}
+                            <div className="text-[var(--text-secondary)]">{fmtEUR(p.valorBase)}</div>
+                            <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-[var(--text-muted)]">Câmbio: {p.cotacao != null ? brl(p.cotacao) : "—"}
+                              {p.tipoCambio === "FIXO" && <span className="rounded px-1 py-0.5 text-[9px] font-semibold text-[var(--success)]" style={{ background: "color-mix(in srgb, var(--success) 15%, transparent)" }}>Fixo</span>}
+                              {p.tipoCambio === "NAO_DEFINIDO" && <span className="rounded bg-[var(--surface-hover)] px-1 py-0.5 text-[9px] font-semibold text-[var(--text-muted)]">—</span>}
                             </div>
                           </td>
-                          <td className={`whitespace-nowrap py-3.5 ${p.recebidoBrl > 0 ? "font-medium text-[#4ade80]" : "text-white/70"}`}>{brl(p.recebidoBrl)}</td>
-                          <td className="whitespace-nowrap py-3.5 font-medium text-[#7dd3fc]">{brl(p.saldoBrl)}</td>
-                          <td className="py-3.5"><span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${parcelaStatusCls(p.status)}`}>{parcelaStatusLabel(p.status)}</span></td>
-                          <td className="whitespace-nowrap py-3.5 text-white/70">{p.forma ?? "—"}</td>
+                          <td className={`whitespace-nowrap py-3.5 ${p.recebidoBrl > 0 ? "font-medium text-[var(--success)]" : "text-[var(--text-secondary)]"}`}>{brl(p.recebidoBrl)}</td>
+                          <td className="whitespace-nowrap py-3.5 font-medium text-[var(--info)]">{brl(p.saldoBrl)}</td>
+                          <td className="py-3.5"><span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${parcelaStatusCls(p.status)}`} style={parcelaStatusBg(p.status)}>{parcelaStatusLabel(p.status)}</span></td>
+                          <td className="whitespace-nowrap py-3.5 text-[var(--text-secondary)]">{p.forma ?? "—"}</td>
                           <td className="py-3.5">
                             {p.status === "PAGA" ? (
-                              <button onClick={() => setTab("pagamentos")} className="whitespace-nowrap rounded-lg border border-white/15 bg-[#1b2027] px-2.5 py-1.5 text-xs text-white/80 hover:border-white/25">Ver recebimento</button>
+                              <button onClick={() => setTab("pagamentos")} className="whitespace-nowrap rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-primary)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] hover:border-[var(--border-strong)]">Ver recebimento</button>
                             ) : (
                               <div className="flex items-center gap-1.5">
-                                <button onClick={() => setReceberOpen(true)} className="whitespace-nowrap rounded-lg bg-[#d2a948] px-2.5 py-1.5 text-xs font-semibold text-[#1b1508] hover:bg-[#e0b957]">Registrar pagamento</button>
-                                <button onClick={() => setReceberOpen(true)} title="Registrar pagamento" className="rounded-lg border border-white/10 p-1.5 text-white/40 hover:text-white/70"><MoreVertical className="h-4 w-4" /></button>
+                                <button onClick={() => setReceberOpen(true)} className="whitespace-nowrap rounded-[var(--radius-sm)] bg-[var(--accent-primary)] px-2.5 py-1.5 text-xs font-semibold text-[var(--accent-ink)] hover:bg-[var(--accent-hover)]">Registrar pagamento</button>
+                                <button onClick={() => setReceberOpen(true)} title="Registrar pagamento" className="rounded-[var(--radius-sm)] border border-[var(--border-default)] p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><MoreVertical className="h-4 w-4" /></button>
                               </div>
                             )}
                           </td>
@@ -605,12 +610,12 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                       ))}</tbody>
                     </table>
                   </div>
-                  <div className="mt-4 flex items-center justify-between text-sm text-white/40">
+                  <div className="mt-4 flex items-center justify-between text-sm text-[var(--text-muted)]">
                     <span>Mostrando {parcDe}–{parcAte} de {parcelasFiltradas.length} parcelas</span>
                     <div className="flex items-center gap-1">
-                      <button disabled={paginaAtual <= 1} onClick={() => setPPage((p) => Math.max(1, p - 1))} className="rounded border border-white/10 p-1.5 text-white/40 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>
-                      <span className="rounded border border-white/15 bg-[#252c35] px-2.5 py-1 text-xs text-white/80">{paginaAtual}</span>
-                      <button disabled={paginaAtual >= totalPaginas} onClick={() => setPPage((p) => Math.min(totalPaginas, p + 1))} className="rounded border border-white/10 p-1.5 text-white/40 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button>
+                      <button disabled={paginaAtual <= 1} onClick={() => setPPage((p) => Math.max(1, p - 1))} className="rounded border border-[var(--border-default)] p-1.5 text-[var(--text-muted)] disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>
+                      <span className="rounded border border-[var(--border-strong)] bg-[var(--surface-active)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">{paginaAtual}</span>
+                      <button disabled={paginaAtual >= totalPaginas} onClick={() => setPPage((p) => Math.min(totalPaginas, p + 1))} className="rounded border border-[var(--border-default)] p-1.5 text-[var(--text-muted)] disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button>
                     </div>
                   </div>
                 </>
@@ -620,29 +625,29 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
 
           {/* Documentos */}
           {tab === "documentos" && (
-            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
+            <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-5">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">Documentos</h2><span className="rounded-full bg-[#252c35] px-2 py-0.5 text-xs text-white/70">{documentos.length}</span></div>
+                <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-[var(--text-primary)]">Documentos</h2><span className="rounded-full bg-[var(--surface-hover)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">{documentos.length}</span></div>
                 <input ref={fileInputRef} type="file" className="hidden" onChange={onSelecionarArquivo} />
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading || d.receitaId == null}
                   title={d.receitaId == null ? (isCusto ? "Anexo de documentos disponível apenas em receitas de origem" : "Anexo disponível apenas para receitas de origem") : "Anexar documento"}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--accent-primary)] px-3.5 py-2 text-sm font-semibold text-[var(--accent-ink)] hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                 >{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} {uploading ? "Enviando…" : "Anexar documento"}</button>
               </div>
               {documentos.length === 0 ? (
-                <div className="mt-6 rounded-lg border border-dashed border-white/10 bg-[#12161c] px-4 py-8 text-center text-sm text-white/40">Nenhum documento vinculado a {isCusto ? "este custo" : "esta receita"}.</div>
+                <div className="mt-6 rounded-[var(--radius-sm)] border border-dashed border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-8 text-center text-sm text-[var(--text-muted)]">Nenhum documento vinculado a {isCusto ? "este custo" : "esta receita"}.</div>
               ) : (
                 <div className="mt-4 space-y-2">
                   {documentos.map((doc: any) => (
-                    <div key={doc.id} className="flex items-center gap-3 rounded-lg border border-white/10 bg-[#161b21] px-4 py-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#252c35] text-white/60"><FileIcon className="h-4.5 w-4.5" /></div>
+                    <div key={doc.id} className="flex items-center gap-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--surface-hover)] text-[var(--text-secondary)]"><FileIcon className="h-4.5 w-4.5" /></div>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-white/90">{doc.nome}</div>
-                        <div className="mt-0.5 text-xs text-white/40">{[doc.tipo, fmtTamanho(doc.tamanho), `Anexado em ${dataBR(doc.criadoEm)}`].filter(Boolean).join(" · ")}</div>
+                        <div className="truncate text-sm font-medium text-[var(--text-primary)]">{doc.nome}</div>
+                        <div className="mt-0.5 text-xs text-[var(--text-muted)]">{[doc.tipo, fmtTamanho(doc.tamanho), `Anexado em ${dataBR(doc.criadoEm)}`].filter(Boolean).join(" · ")}</div>
                       </div>
-                      <a href={doc.url} target="_blank" rel="noreferrer" download className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-white/80 hover:border-white/25"><Download className="h-4 w-4" /> Baixar</a>
+                      <a href={doc.url} target="_blank" rel="noreferrer" download className="inline-flex shrink-0 items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)]"><Download className="h-4 w-4" /> Baixar</a>
                     </div>
                   ))}
                 </div>
@@ -652,19 +657,19 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
 
           {/* Timeline / Histórico de movimentações */}
           {tab === "timeline" && (
-          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-            <h2 className="text-lg font-semibold text-white">Histórico de movimentações</h2>
+          <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-5">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Histórico de movimentações</h2>
             <div className="mt-4">{historico.map((h: any, i: number) => {
               const Icon = h.tipo === "OBRIGACAO_CRIADA" ? UserPlus : (String(h.tipo).startsWith("PAGAMENTO") ? ArrowDownCircle : Receipt)
-              const cor = h.tipo === "OBRIGACAO_CRIADA" ? "text-violet-400" : (String(h.tipo).startsWith("PAGAMENTO") ? "text-[#4ade80]" : "text-white/68")
+              const cor = h.tipo === "OBRIGACAO_CRIADA" ? "text-[var(--text-secondary)]" : (String(h.tipo).startsWith("PAGAMENTO") ? "text-[var(--success)]" : "text-[var(--text-secondary)]")
               const ultimo = i === historico.length - 1
               return (
                 <div key={h.id ?? i} className="flex gap-4">
-                  <div className="w-16 shrink-0 pt-0.5 text-right text-[11px] leading-tight text-white/40">{dataBR(h.data)}<br />{horaBR(h.data)}</div>
-                  <div className="flex flex-col items-center"><div className={`flex h-8 w-8 items-center justify-center rounded-full bg-[#252c35] ${cor}`}><Icon className="h-4 w-4" /></div>{!ultimo && <div className="w-px flex-1 bg-[#252c35]" />}</div>
+                  <div className="w-16 shrink-0 pt-0.5 text-right text-[11px] leading-tight text-[var(--text-muted)]">{dataBR(h.data)}<br />{horaBR(h.data)}</div>
+                  <div className="flex flex-col items-center"><div className={`flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-hover)] ${cor}`}><Icon className="h-4 w-4" /></div>{!ultimo && <div className="w-px flex-1 bg-[var(--border-default)]" />}</div>
                   <div className={`flex-1 ${ultimo ? "" : "pb-6"}`}>
-                    <div className="flex items-start justify-between"><div className="font-medium text-white/95">{h.titulo}</div><span className="text-xs text-[#7dd3fc]">{h.ator}</span></div>
-                    <div className="mt-0.5 text-sm text-white/68">{h.descricao}</div>
+                    <div className="flex items-start justify-between"><div className="font-medium text-[var(--text-primary)]">{h.titulo}</div><span className="text-xs text-[var(--info)]">{h.ator}</span></div>
+                    <div className="mt-0.5 text-sm text-[var(--text-secondary)]">{h.descricao}</div>
                   </div>
                 </div>
               )
@@ -674,12 +679,12 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
 
           {/* Observações */}
           {tab === "observacoes" && (
-            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-              <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">Observações</h2></div>
-              <div className="mt-4 rounded-lg border border-white/10 bg-[#161b21] px-4 py-4">
-                <div className="whitespace-pre-wrap text-sm text-white/80">{d.observacao ?? "—"}</div>
+            <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-5">
+              <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-[var(--text-primary)]">Observações</h2></div>
+              <div className="mt-4 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-4">
+                <div className="whitespace-pre-wrap text-sm text-[var(--text-secondary)]">{d.observacao ?? "—"}</div>
               </div>
-              <div className="mt-2 text-xs text-white/40">Notas internas</div>
+              <div className="mt-2 text-xs text-[var(--text-muted)]">Notas internas</div>
             </div>
           )}
         </div>
@@ -782,15 +787,15 @@ function PagamentoRowMenu({ p, onEstornar, onTimeline }: { p: any; onEstornar: (
   const copiar = async () => { if (!ref) return; try { await navigator.clipboard.writeText(String(ref)); setCopiado(true); setTimeout(() => setCopiado(false), 1400) } catch { /* clipboard indisponível */ } }
   return (
     <div className="relative flex justify-end">
-      <button onClick={() => setOpen(o => !o)} title="Ações do pagamento" className="rounded-lg border border-white/10 p-1.5 text-white/40 hover:text-white/80"><MoreVertical className="h-4 w-4" /></button>
+      <button onClick={() => setOpen(o => !o)} title="Ações do pagamento" className="rounded-[var(--radius-sm)] border border-[var(--border-default)] p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><MoreVertical className="h-4 w-4" /></button>
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-8 z-50 w-52 overflow-hidden rounded-lg border border-white/10 bg-[#1b2027] py-1 shadow-xl shadow-black/40">
-            <button onClick={() => { setOpen(false); onTimeline() }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"><Clock className="h-4 w-4 text-white/45" /> Ver movimentações</button>
-            <button onClick={() => { setOpen(false); copiar() }} disabled={!ref} title={ref ? "" : "Sem referência"} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5 disabled:opacity-40">{copiado ? <CheckCircle2 className="h-4 w-4 text-[#4ade80]" /> : <Copy className="h-4 w-4 text-white/45" />} Copiar referência</button>
-            <div className="my-1 border-t border-white/10" />
-            <button onClick={() => { setOpen(false); onEstornar() }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#f87171] hover:bg-white/5"><RotateCcw className="h-4 w-4" /> Estornar (total ou parcial)</button>
+          <div className="absolute right-0 top-8 z-50 w-52 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-popover)] py-1 shadow-[var(--shadow-surface)]">
+            <button onClick={() => { setOpen(false); onTimeline() }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><Clock className="h-4 w-4 text-[var(--text-muted)]" /> Ver movimentações</button>
+            <button onClick={() => { setOpen(false); copiar() }} disabled={!ref} title={ref ? "" : "Sem referência"} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] disabled:opacity-40">{copiado ? <CheckCircle2 className="h-4 w-4 text-[var(--success)]" /> : <Copy className="h-4 w-4 text-[var(--text-muted)]" />} Copiar referência</button>
+            <div className="my-1 border-t border-[var(--border-default)]" />
+            <button onClick={() => { setOpen(false); onEstornar() }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--danger)] hover:bg-[var(--surface-hover)]"><RotateCcw className="h-4 w-4" /> Estornar (total ou parcial)</button>
           </div>
         </>
       )}
@@ -829,56 +834,56 @@ function ParticipanteDrawer({ obrigacaoId, nome, codigoReceita, onClose, onPagam
 
   return createPortal(
     <>
-      <div className="fixed inset-0 flex justify-end bg-black/60" style={{ zIndex: LAYER.aboveProcessDrawer }} onClick={onClose}>
-        <div className="flex h-full w-full max-w-[600px] flex-col overflow-hidden border-l border-white/10 bg-[#1b2027] shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
+      <div className="fixed inset-0 flex justify-end bg-[var(--app-overlay)]" style={{ zIndex: LAYER.aboveProcessDrawer }} onClick={onClose}>
+        <div className="flex h-full w-full max-w-[600px] flex-col overflow-hidden border-l border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--shadow-surface)]" onClick={(e) => e.stopPropagation()}>
           {/* Header */}
-          <div className="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4">
+          <div className="flex items-start justify-between gap-3 border-b border-[var(--border-default)] px-5 py-4">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-xs font-semibold text-violet-300">{iniciais(nome)}</span>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-hover)] text-xs font-semibold text-[var(--text-secondary)]">{iniciais(nome)}</span>
               <div className="min-w-0">
-                <h3 className="truncate text-base font-semibold text-white">{nome}</h3>
-                <div className="text-xs text-white/40">participante de {codigoReceita}</div>
+                <h3 className="truncate text-base font-semibold text-[var(--text-primary)]">{nome}</h3>
+                <div className="text-xs text-[var(--text-muted)]">participante de {codigoReceita}</div>
               </div>
             </div>
-            <button onClick={onClose} className="shrink-0 text-white/40 hover:text-white/80"><X className="h-5 w-5" /></button>
+            <button onClick={onClose} className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><X className="h-5 w-5" /></button>
           </div>
 
           {/* Corpo */}
           <div className="flex-1 overflow-y-auto px-5 py-5">
             {pErro ? (
-              <div className="rounded-lg border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-sm text-[#f87171]">{pErro}</div>
+              <div className="rounded-[var(--radius-sm)] border px-3 py-2 text-sm text-[var(--danger)]" style={{ borderColor: "color-mix(in srgb, var(--danger) 30%, transparent)", background: "color-mix(in srgb, var(--danger) 10%, transparent)" }}>{pErro}</div>
             ) : !pd ? (
-              <div className="flex items-center gap-2 text-sm text-white/40"><Loader2 className="h-4 w-4 animate-spin" /> carregando…</div>
+              <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]"><Loader2 className="h-4 w-4 animate-spin" /> carregando…</div>
             ) : (
               <div className="space-y-5">
                 {/* Status + valores */}
                 <div>
-                  <span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${statusCls(pd.statusLabel)}`}>{pd.statusLabel}</span>
+                  <span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${statusCls(pd.statusLabel)}`} style={statusBg(pd.statusLabel)}>{pd.statusLabel}</span>
                   <div className="mt-3 grid grid-cols-3 gap-3">
-                    <div className="rounded-lg border border-white/10 bg-[#161b21] p-3">
-                      <div className="text-[11px] uppercase tracking-wider text-white/40">Contratado</div>
-                      <div className="mt-1 text-base font-semibold text-white/95">{brl(pd.valorContratadoBrl)}</div>
+                    <div className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
+                      <div className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">Contratado</div>
+                      <div className="mt-1 text-base font-semibold text-[var(--text-primary)]">{brl(pd.valorContratadoBrl)}</div>
                     </div>
-                    <div className="rounded-lg border border-white/10 bg-[#161b21] p-3">
-                      <div className="text-[11px] uppercase tracking-wider text-white/40">Recebido</div>
-                      <div className="mt-1 text-base font-semibold text-[#4ade80]">{brl(pd.recebidoBrl)}</div>
+                    <div className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
+                      <div className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">Recebido</div>
+                      <div className="mt-1 text-base font-semibold text-[var(--success)]">{brl(pd.recebidoBrl)}</div>
                     </div>
-                    <div className="rounded-lg border border-white/10 bg-[#161b21] p-3">
-                      <div className="text-[11px] uppercase tracking-wider text-white/40">Saldo</div>
-                      <div className="mt-1 text-base font-semibold text-[#7dd3fc]">{brl(pd.saldoBrl)}</div>
+                    <div className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
+                      <div className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">Saldo</div>
+                      <div className="mt-1 text-base font-semibold text-[var(--info)]">{brl(pd.saldoBrl)}</div>
                     </div>
                   </div>
                 </div>
 
                 {/* Parcelas */}
                 <div>
-                  <div className="mb-2 text-sm font-semibold text-white/85">Parcelas <span className="text-white/40">({parcelas.length})</span></div>
+                  <div className="mb-2 text-sm font-semibold text-[var(--text-primary)]">Parcelas <span className="text-[var(--text-muted)]">({parcelas.length})</span></div>
                   {parcelas.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-white/10 bg-[#12161c] px-3 py-5 text-center text-xs text-white/40">Sem parcelas.</div>
+                    <div className="rounded-[var(--radius-sm)] border border-dashed border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-5 text-center text-xs text-[var(--text-muted)]">Sem parcelas.</div>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
-                        <thead><tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/40">
+                        <thead><tr className="border-b border-[var(--border-default)] text-left text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
                           <th className="pb-2 font-medium">Parcela</th>
                           <th className="pb-2 font-medium">Vencimento</th>
                           <th className="pb-2 font-medium">Valor</th>
@@ -886,12 +891,12 @@ function ParticipanteDrawer({ obrigacaoId, nome, codigoReceita, onClose, onPagam
                           <th className="pb-2 font-medium">Status</th>
                         </tr></thead>
                         <tbody>{parcelas.map((p: any, i: number) => (
-                          <tr key={i} className="border-b border-white/10">
-                            <td className="whitespace-nowrap py-2.5 font-medium text-white/90">{p.numero}/{p.totalParcelas}</td>
-                            <td className="whitespace-nowrap py-2.5 text-white/70">{dataBR(p.vencimento)}</td>
-                            <td className="whitespace-nowrap py-2.5 text-white/90">{brl(p.valorBrl)}</td>
-                            <td className={`whitespace-nowrap py-2.5 ${p.recebidoBrl > 0 ? "text-[#4ade80]" : "text-white/70"}`}>{brl(p.recebidoBrl)}</td>
-                            <td className="py-2.5"><span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${parcelaStatusCls(p.status)}`}>{parcelaStatusLabel(p.status)}</span></td>
+                          <tr key={i} className="border-b border-[var(--border-default)]">
+                            <td className="whitespace-nowrap py-2.5 font-medium text-[var(--text-primary)]">{p.numero}/{p.totalParcelas}</td>
+                            <td className="whitespace-nowrap py-2.5 text-[var(--text-secondary)]">{dataBR(p.vencimento)}</td>
+                            <td className="whitespace-nowrap py-2.5 text-[var(--text-primary)]">{brl(p.valorBrl)}</td>
+                            <td className={`whitespace-nowrap py-2.5 ${p.recebidoBrl > 0 ? "text-[var(--success)]" : "text-[var(--text-secondary)]"}`}>{brl(p.recebidoBrl)}</td>
+                            <td className="py-2.5"><span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${parcelaStatusCls(p.status)}`} style={parcelaStatusBg(p.status)}>{parcelaStatusLabel(p.status)}</span></td>
                           </tr>
                         ))}</tbody>
                       </table>
@@ -901,18 +906,18 @@ function ParticipanteDrawer({ obrigacaoId, nome, codigoReceita, onClose, onPagam
 
                 {/* Pagamentos */}
                 <div>
-                  <div className="mb-2 text-sm font-semibold text-white/85">Pagamentos <span className="text-white/40">({pagamentos.length})</span></div>
+                  <div className="mb-2 text-sm font-semibold text-[var(--text-primary)]">Pagamentos <span className="text-[var(--text-muted)]">({pagamentos.length})</span></div>
                   {pagamentos.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-white/10 bg-[#12161c] px-3 py-5 text-center text-xs text-white/40">Nenhum pagamento registrado.</div>
+                    <div className="rounded-[var(--radius-sm)] border border-dashed border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-5 text-center text-xs text-[var(--text-muted)]">Nenhum pagamento registrado.</div>
                   ) : (
                     <div className="space-y-2">
                       {pagamentos.map((p: any) => (
-                        <div key={p.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-[#161b21] px-3 py-2.5">
+                        <div key={p.id} className="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2.5">
                           <div className="min-w-0">
-                            <div className="text-sm text-white/85">{fmt(p.valor, pd.moeda)}</div>
-                            <div className="text-[11px] text-white/40">{dataBR(p.data)} · {p.formaLabel ?? "—"}</div>
+                            <div className="text-sm text-[var(--text-primary)]">{fmt(p.valor, pd.moeda)}</div>
+                            <div className="text-[11px] text-[var(--text-muted)]">{dataBR(p.data)} · {p.formaLabel ?? "—"}</div>
                           </div>
-                          <span className="inline-flex items-center gap-1.5 text-xs text-[#4ade80]"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />{p.status}</span>
+                          <span className="inline-flex items-center gap-1.5 text-xs text-[var(--success)]"><span className="h-1.5 w-1.5 rounded-full bg-[var(--success)]" />{p.status}</span>
                         </div>
                       ))}
                     </div>
@@ -923,9 +928,9 @@ function ParticipanteDrawer({ obrigacaoId, nome, codigoReceita, onClose, onPagam
           </div>
 
           {/* Rodapé */}
-          <div className="flex items-center justify-between gap-2 border-t border-white/10 px-5 py-4">
-            <button onClick={onClose} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/70 hover:border-white/25">Fechar</button>
-            <button onClick={() => setPagOpen(true)} disabled={!pd} className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-4 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957] disabled:cursor-not-allowed disabled:opacity-50"><Plus className="h-4 w-4" /> Registrar pagamento</button>
+          <div className="flex items-center justify-between gap-2 border-t border-[var(--border-default)] px-5 py-4">
+            <button onClick={onClose} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:border-[var(--border-strong)]">Fechar</button>
+            <button onClick={() => setPagOpen(true)} disabled={!pd} className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"><Plus className="h-4 w-4" /> Registrar pagamento</button>
           </div>
         </div>
       </div>
@@ -947,14 +952,14 @@ function ParticipanteDrawer({ obrigacaoId, nome, codigoReceita, onClose, onPagam
 
 
 function Info({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
-  return <div><div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-white/40">{rotulo}</div><div className="text-sm">{children}</div></div>
+  return <div><div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">{rotulo}</div><div className="text-sm">{children}</div></div>
 }
 function SubCard({ rotulo, valor, cor, linhas }: { rotulo: string; valor: string; cor?: string; linhas?: string[] }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-[#161b21] p-4">
-      <div className="text-[11px] uppercase tracking-wider text-white/40">{rotulo}</div>
-      <div className={`mt-1.5 text-xl font-semibold ${cor ?? "text-white/95"}`}>{valor}</div>
-      {linhas?.map((l, i) => <div key={i} className="mt-1 text-xs text-white/45">{l}</div>)}
+    <div className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4">
+      <div className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">{rotulo}</div>
+      <div className={`mt-1.5 text-xl font-semibold ${cor ?? "text-[var(--text-primary)]"}`}>{valor}</div>
+      {linhas?.map((l, i) => <div key={i} className="mt-1 text-xs text-[var(--text-muted)]">{l}</div>)}
     </div>
   )
 }

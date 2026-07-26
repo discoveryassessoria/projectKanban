@@ -28,13 +28,22 @@ const authHeaders = (): Record<string, string> => { const t = typeof window !== 
 const iniciais = (nome: string) => nome.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("") || "?"
 
 // statusConsolidado/status do backend -> apresentação (label + estado semântico)
-const STATUS: Record<string, { label: string; cls: string }> = {
-  QUITADO: { label: "Quitado", cls: "bg-[#4ade80]/15 text-[#4ade80]" },
-  PARCIAL: { label: "Parcial", cls: "bg-[#7dd3fc]/15 text-[#7dd3fc]" },
-  VENCIDO: { label: "Vencido", cls: "bg-[#f87171]/15 text-[#f87171]" },
-  "A VENCER": { label: "A vencer", cls: "bg-[#d2a948]/15 text-[#d2a948]" },
+const STATUS: Record<string, { label: string; cor: string }> = {
+  QUITADO: { label: "Quitado", cor: "var(--success)" },
+  PARCIAL: { label: "Parcial", cor: "var(--info)" },
+  VENCIDO: { label: "Vencido", cor: "var(--danger)" },
+  "A VENCER": { label: "A vencer", cor: "var(--accent-primary)" },
 }
-const statusView = (s?: string) => STATUS[s ?? ""] ?? { label: s ?? "—", cls: "bg-[#252c35] text-white/70" }
+const statusView = (s?: string) => STATUS[s ?? ""] ?? { label: s ?? "—", cor: "var(--text-secondary)" }
+
+// pílula de status — cor semântica via color-mix (sem hex/opacidade Tailwind sobre var())
+function StatusPill({ st }: { st: { label: string; cor: string } }) {
+  return (
+    <span className="rounded px-2 py-0.5 text-[11px] font-semibold" style={{ background: `color-mix(in srgb, ${st.cor} 15%, transparent)`, color: st.cor }}>
+      {st.label}
+    </span>
+  )
+}
 
 // mapa statusConsolidado -> aba de status (PARCIAL fica em "A vencer": ainda tem saldo)
 const ABA_DE: Record<string, string> = { "A VENCER": "avencer", PARCIAL: "avencer", VENCIDO: "vencidas", QUITADO: "pagas" }
@@ -120,66 +129,66 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
   // ── estados ──────────────────────────────────────────────────────────────
   if (loading && !d) return <SkeletonTela />
   if (erro) return (
-    <div className="rounded-xl border border-white/10 bg-[#1b2027] p-10 text-center">
-      <AlertTriangle className="mx-auto mb-3 h-7 w-7 text-[#f87171]" />
-      <div className="text-sm text-white/80">{erro}</div>
-      <button onClick={carregar} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-white/15 bg-[#20262e] px-4 py-2 text-sm text-white/85 hover:bg-[#252c35]"><RotateCcw className="h-4 w-4" /> Tentar novamente</button>
+    <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-10 text-center">
+      <AlertTriangle className="mx-auto mb-3 h-7 w-7 text-[var(--danger)]" />
+      <div className="text-sm text-[var(--text-secondary)]">{erro}</div>
+      <button onClick={carregar} className="mt-4 inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-active)]"><RotateCcw className="h-4 w-4" /> Tentar novamente</button>
     </div>
   )
 
   return (
     <div className="min-w-0">
       {/* Breadcrumb */}
-      <div className="mb-1.5 flex items-center gap-1.5 text-[12px] text-white/40">
-        Processos <span className="text-white/25">›</span> <span className="text-white/60">{nomeProc}</span> <span className="text-white/25">›</span> Financeiro <span className="text-white/25">›</span> <span className="text-white/60">Receitas</span>
+      <div className="mb-1.5 flex items-center gap-1.5 text-[12px] text-[var(--text-muted)]">
+        Processos <span className="text-[var(--text-muted)]">›</span> <span className="text-[var(--text-secondary)]">{nomeProc}</span> <span className="text-[var(--text-muted)]">›</span> Financeiro <span className="text-[var(--text-muted)]">›</span> <span className="text-[var(--text-secondary)]">Receitas</span>
       </div>
       {/* Cabeçalho */}
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-[22px] font-bold text-white">Receitas</h1>
-          <p className="text-sm text-white/45">Receitas consolidadas do processo {nomeProc}, com a distribuição por participante financeiro.</p>
+          <h1 className="text-[22px] font-bold text-[var(--text-primary)]">Receitas</h1>
+          <p className="text-sm text-[var(--text-muted)]">Receitas consolidadas do processo {nomeProc}, com a distribuição por participante financeiro.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={exportarCsv} className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-[#20262e] px-3.5 py-2 text-sm font-medium text-white/80 hover:bg-[#252c35]"><Download className="h-4 w-4" /> Exportar</button>
-          <button onClick={() => setNovo(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1d4ed8]"><Plus className="h-4 w-4" /> Nova Receita</button>
+          <button onClick={exportarCsv} className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-3.5 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-active)]"><Download className="h-4 w-4" /> Exportar</button>
+          <button onClick={() => setNovo(true)} className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--info)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] hover:brightness-110"><Plus className="h-4 w-4" /> Nova Receita</button>
         </div>
       </div>
 
       {/* 5 CARDS */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
-        <Card titulo="Receitas" valor={String(k.receitas ?? 0)} icon={Layers} cor="#9aa4b2" sub="Total de receitas" />
-        <Card titulo="Participantes financeiros" valor={String(k.participantesFinanceiros ?? 0)} icon={Users} cor="#a78bfa" sub="Responsáveis pelo pagamento" />
-        <Card titulo="Valor contratado" valor={brl(k.totalContratadoBrl ?? 0)} icon={DollarSign} cor="#9aa4b2" sub="Total contratado (BRL)" />
-        <Card titulo="Recebido" valor={brl(k.recebidoBrl ?? 0)} icon={CheckCircle2} cor="#4ade80" valorCor={(k.recebidoBrl ?? 0) > 0 ? "text-[#4ade80]" : undefined} sub="Total recebido (BRL)" />
-        <Card titulo="Saldo" valor={brl(k.saldoBrl ?? 0)} icon={Wallet} cor="#7dd3fc" valorCor="text-[#7dd3fc]" sub="Total em aberto" />
+        <Card titulo="Receitas" valor={String(k.receitas ?? 0)} icon={Layers} cor="var(--text-secondary)" sub="Total de receitas" />
+        <Card titulo="Participantes financeiros" valor={String(k.participantesFinanceiros ?? 0)} icon={Users} cor="var(--text-secondary)" sub="Responsáveis pelo pagamento" />
+        <Card titulo="Valor contratado" valor={brl(k.totalContratadoBrl ?? 0)} icon={DollarSign} cor="var(--text-secondary)" sub="Total contratado (BRL)" />
+        <Card titulo="Recebido" valor={brl(k.recebidoBrl ?? 0)} icon={CheckCircle2} cor="var(--success)" valorCor={(k.recebidoBrl ?? 0) > 0 ? "text-[var(--success)]" : undefined} sub="Total recebido (BRL)" />
+        <Card titulo="Saldo" valor={brl(k.saldoBrl ?? 0)} icon={Wallet} cor="var(--info)" valorCor="text-[var(--info)]" sub="Total em aberto" />
       </div>
       <AvisoNaoConvertido className="mt-2" quantidade={grupos.filter((g) => Number(g.naoConvertidoTotal ?? 0) > 0).length} />
 
       {/* TABELA */}
-      <div className="mt-5 rounded-xl border border-white/10 bg-[#1b2027]">
+      <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)]">
         {/* Abas de status + busca */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-default)] px-5 pt-4">
           <div className="flex items-center gap-6">
             {ABAS.map(([id, label]) => (
-              <button key={id} onClick={() => setAba(id)} className={`-mb-px border-b-2 pb-3 text-sm ${aba === id ? "border-[#d2a948] font-medium text-[#d2a948]" : "border-transparent text-white/60 hover:text-white/80"}`}>
+              <button key={id} onClick={() => setAba(id)} className={`-mb-px border-b-2 pb-3 text-sm ${aba === id ? "border-[var(--accent-primary)] font-medium text-[var(--accent-primary)]" : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"}`}>
                 {label} ({contagem[id] ?? 0})
               </button>
             ))}
           </div>
           <div className="flex items-center gap-2 pb-3">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
-              <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar receita, serviço, participante…" className="w-[260px] rounded-lg border border-white/10 bg-[#12161c] py-1.5 pl-9 pr-3 text-sm text-white/90 outline-none placeholder:text-white/30 focus:border-[#7dd3fc]/50" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+              <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar receita, serviço, participante…" className="w-[260px] rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] py-1.5 pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--info)]" />
             </div>
-            <button disabled title="Filtros avançados indisponíveis — use a busca ao lado" className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-1.5 text-sm text-white/70 hover:bg-[#20262e] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#12161c]"><SlidersHorizontal className="h-3.5 w-3.5" /> Filtros</button>
-            <button onClick={limpar} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#12161c] px-3 py-1.5 text-sm text-white/70 hover:bg-[#20262e]"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
+            <button disabled title="Filtros avançados indisponíveis — use a busca ao lado" className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[var(--surface-secondary)]"><SlidersHorizontal className="h-3.5 w-3.5" /> Filtros</button>
+            <button onClick={limpar} className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
           </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1180px] text-sm">
             <thead>
-              <tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/40">
+              <tr className="border-b border-[var(--border-default)] text-left text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
                 <th className="w-8 px-3 py-3" />
                 {["Receita", "Serviço", "Valor-base (EUR)", "Valor contratado (BRL)", "Recebido (BRL)", "Saldo (BRL)", "Próximo vencimento", "Participantes", "Status", "Ações"].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}
               </tr>
@@ -187,9 +196,9 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
             <tbody>
               {filtrados.length === 0 ? (
                 <tr><td colSpan={11} className="px-5 py-14 text-center">
-                  <div className="text-sm font-medium text-white/80">Nenhuma receita cadastrada</div>
-                  <div className="mt-1 text-sm text-white/40">Crie a primeira receita deste processo.</div>
-                  <button onClick={() => setNovo(true)} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1d4ed8]"><Plus className="h-4 w-4" /> Nova Receita</button>
+                  <div className="text-sm font-medium text-[var(--text-secondary)]">Nenhuma receita cadastrada</div>
+                  <div className="mt-1 text-sm text-[var(--text-muted)]">Crie a primeira receita deste processo.</div>
+                  <button onClick={() => setNovo(true)} className="mt-4 inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--info)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] hover:brightness-110"><Plus className="h-4 w-4" /> Nova Receita</button>
                 </td></tr>
               ) : (
                 pagina.map((g) => (
@@ -202,12 +211,12 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
 
         {/* rodapé + paginação */}
         {filtrados.length > 0 && (
-          <div className="flex items-center justify-between border-t border-white/10 px-5 py-4 text-sm text-white/40">
+          <div className="flex items-center justify-between border-t border-[var(--border-default)] px-5 py-4 text-sm text-[var(--text-muted)]">
             <span>Mostrando {Math.min((page - 1) * PAGE + 1, filtrados.length)}–{Math.min(page * PAGE, filtrados.length)} de {filtrados.length} registro{filtrados.length === 1 ? "" : "s"}</span>
             <div className="flex items-center gap-1">
-              <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-white/10 p-1.5 text-white/60 disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
-              <span className="rounded border border-[#d2a948]/40 bg-[#d2a948]/12 px-2.5 py-1 text-xs text-[#d2a948]">{page} / {totalPag}</span>
-              <button disabled={page >= totalPag} onClick={() => setPage((p) => p + 1)} className="rounded border border-white/10 p-1.5 text-white/60 disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
+              <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-[var(--border-default)] p-1.5 text-[var(--text-secondary)] disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
+              <span className="rounded border px-2.5 py-1 text-xs" style={{ borderColor: "color-mix(in srgb, var(--accent-primary) 40%, transparent)", background: "color-mix(in srgb, var(--accent-primary) 12%, transparent)", color: "var(--accent-primary)" }}>{page} / {totalPag}</span>
+              <button disabled={page >= totalPag} onClick={() => setPage((p) => p + 1)} className="rounded border border-[var(--border-default)] p-1.5 text-[var(--text-secondary)] disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
             </div>
           </div>
         )}
@@ -226,62 +235,62 @@ function LinhaGrupo({ g, aberto, onToggle, onAbrir, onAbrirParticipante }: { g: 
   const nomesLabel = nomes.length <= 2 ? nomes.join(", ") : `${nomes[0]} + ${nomes.length - 1}`
   return (
     <>
-      <tr className={`border-t border-white/10 cursor-pointer ${aberto ? "bg-[#20262e]" : "hover:bg-[#20262e]"}`} onClick={onToggle}>
+      <tr className={`border-t border-[var(--border-default)] cursor-pointer ${aberto ? "bg-[var(--surface-active)]" : "hover:bg-[var(--surface-hover)]"}`} onClick={onToggle}>
         <td className="px-3 py-3.5 align-top">
-          <button onClick={(e) => { e.stopPropagation(); onToggle() }} className="grid h-6 w-6 place-items-center rounded text-white/50 hover:bg-white/10 hover:text-white/80">
+          <button onClick={(e) => { e.stopPropagation(); onToggle() }} className="grid h-6 w-6 place-items-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)]">
             {aberto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </button>
         </td>
         <td className="px-4 py-3.5 align-top">
           <div className="flex items-center gap-2">
-            <span className="max-w-[220px] truncate font-semibold text-white/95">{g.descricao ?? g.codigo ?? "Receita"}</span>
-            <span className="flex-none rounded bg-[#252c35] px-1.5 py-0.5 text-[10px] font-medium text-white/50">ID {g.id}</span>
+            <span className="max-w-[220px] truncate font-semibold text-[var(--text-primary)]">{g.descricao ?? g.codigo ?? "Receita"}</span>
+            <span className="flex-none rounded bg-[var(--surface-active)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">ID {g.id}</span>
           </div>
-          {g.codigo && <div className="mt-0.5 text-[11px] text-white/40">{g.codigo}</div>}
+          {g.codigo && <div className="mt-0.5 text-[11px] text-[var(--text-muted)]">{g.codigo}</div>}
         </td>
-        <td className="px-4 align-top text-white/70">{g.servico ?? "—"}</td>
+        <td className="px-4 align-top text-[var(--text-secondary)]">{g.servico ?? "—"}</td>
         <td className="px-4 align-top">
           {g.valorBaseTotal != null && g.moedaBase !== "BRL" ? (
             <div>
-              <div className="text-white/85">{fmtMoeda(g.valorBaseTotal, g.moedaBase)}</div>
-              {cotacao != null && <div className="mt-0.5 text-[11px] text-white/45">Câmbio: {brl(cotacao)}</div>}
+              <div className="text-[var(--text-primary)]">{fmtMoeda(g.valorBaseTotal, g.moedaBase)}</div>
+              {cotacao != null && <div className="mt-0.5 text-[11px] text-[var(--text-muted)]">Câmbio: {brl(cotacao)}</div>}
             </div>
-          ) : <span className="text-white/40">—</span>}
+          ) : <span className="text-[var(--text-muted)]">—</span>}
         </td>
-        <td className="px-4 align-top font-semibold text-white/95"><ValorBrl valor={g.valorContratadoBrlTotal} naoConvertido={g.naoConvertidoTotal} moeda={g.moedaBase} /></td>
-        <td className="px-4 align-top"><span className={(g.recebidoBrlTotal ?? 0) > 0 ? "text-[#4ade80]" : "text-white/70"}>{brl(g.recebidoBrlTotal)}</span></td>
-        <td className="px-4 align-top text-[#7dd3fc]">{brl(g.saldoBrlTotal)}</td>
-        <td className="px-4 align-top text-white/70">{dataBR(g.proximoVencimento) ?? <span className="text-white/40">Não definido</span>}</td>
+        <td className="px-4 align-top font-semibold text-[var(--text-primary)]"><ValorBrl valor={g.valorContratadoBrlTotal} naoConvertido={g.naoConvertidoTotal} moeda={g.moedaBase} /></td>
+        <td className="px-4 align-top"><span className={(g.recebidoBrlTotal ?? 0) > 0 ? "text-[var(--success)]" : "text-[var(--text-secondary)]"}>{brl(g.recebidoBrlTotal)}</span></td>
+        <td className="px-4 align-top text-[var(--info)]">{brl(g.saldoBrlTotal)}</td>
+        <td className="px-4 align-top text-[var(--text-secondary)]">{dataBR(g.proximoVencimento) ?? <span className="text-[var(--text-muted)]">Não definido</span>}</td>
         <td className="px-4 align-top">
           <div className="inline-flex flex-col gap-0.5">
-            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#a78bfa]/15 px-2 py-0.5 text-[11px] font-medium text-[#a78bfa]"><Users className="h-3 w-3" /> {g.participantesCount}</span>
-            <span className="max-w-[150px] truncate text-[11px] text-white/45">{nomesLabel}</span>
+            <span className="inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ background: "color-mix(in srgb, var(--text-secondary) 15%, transparent)", color: "var(--text-secondary)" }}><Users className="h-3 w-3" /> {g.participantesCount}</span>
+            <span className="max-w-[150px] truncate text-[11px] text-[var(--text-muted)]">{nomesLabel}</span>
           </div>
         </td>
-        <td className="px-4 align-top"><span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${st.cls}`}>{st.label}</span></td>
+        <td className="px-4 align-top"><StatusPill st={st} /></td>
         <td className="px-4 align-top">
           <div className="flex items-center gap-1.5">
-            <button onClick={(e) => { e.stopPropagation(); onAbrir() }} className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#20262e] px-3 py-1.5 text-xs font-medium text-white/85 hover:bg-[#252c35]"><ExternalLink className="h-3.5 w-3.5" /> Abrir</button>
-            <button onClick={(e) => { e.stopPropagation(); onToggle() }} title="Ver distribuição" className="grid h-7 w-7 place-items-center rounded-md text-white/40 hover:bg-white/10 hover:text-white/70"><MoreVertical className="h-4 w-4" /></button>
+            <button onClick={(e) => { e.stopPropagation(); onAbrir() }} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-active)]"><ExternalLink className="h-3.5 w-3.5" /> Abrir</button>
+            <button onClick={(e) => { e.stopPropagation(); onToggle() }} title="Ver distribuição" className="grid h-7 w-7 place-items-center rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)]"><MoreVertical className="h-4 w-4" /></button>
           </div>
         </td>
       </tr>
 
       {aberto && (
-        <tr className="border-t border-white/10 bg-[#161b21]">
+        <tr className="border-t border-[var(--border-default)] bg-[var(--surface-primary)]">
           <td className="px-3 py-4" />
           <td colSpan={10} className="px-4 py-4 pr-5">
             <div className="mb-3 flex items-center gap-2">
-              <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#a78bfa]/15 text-[#a78bfa]"><Users className="h-4 w-4" /></span>
+              <span className="grid h-7 w-7 place-items-center rounded-[var(--radius-sm)] text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--text-secondary) 15%, transparent)" }}><Users className="h-4 w-4" /></span>
               <div>
-                <div className="text-sm font-semibold text-white/90">Distribuição Financeira</div>
-                <div className="text-[11px] text-white/45">Responsáveis pelo pagamento desta receita</div>
+                <div className="text-sm font-semibold text-[var(--text-primary)]">Distribuição Financeira</div>
+                <div className="text-[11px] text-[var(--text-muted)]">Responsáveis pelo pagamento desta receita</div>
               </div>
             </div>
-            <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#1b2027]">
+            <div className="overflow-x-auto rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-primary)]">
               <table className="w-full min-w-[980px] text-sm">
                 <thead>
-                  <tr className="border-b border-white/10 text-left text-[10.5px] uppercase tracking-wider text-white/40">
+                  <tr className="border-b border-[var(--border-default)] text-left text-[10.5px] uppercase tracking-wider text-[var(--text-muted)]">
                     {["Participante", "Valor base (EUR)", "Valor contratado (BRL)", "Recebido (BRL)", "Saldo (BRL)", "Próximo vencimento", "Status", "Ações"].map((h) => <th key={h} className="px-4 py-2.5 font-medium">{h}</th>)}
                   </tr>
                 </thead>
@@ -289,32 +298,32 @@ function LinhaGrupo({ g, aberto, onToggle, onAbrir, onAbrirParticipante }: { g: 
                   {g.participantes.map((p) => {
                     const pst = statusView(p.status)
                     return (
-                      <tr key={p.obrigacaoId} className="border-t border-white/8 hover:bg-[#20262e]">
+                      <tr key={p.obrigacaoId} className="border-t border-[var(--border-default)] hover:bg-[var(--surface-hover)]">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
-                            <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-[#a78bfa]/15 text-[11px] font-semibold text-[#a78bfa]">{iniciais(p.nome)}</span>
+                            <span className="grid h-8 w-8 flex-none place-items-center rounded-full text-[11px] font-semibold text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--text-secondary) 15%, transparent)" }}>{iniciais(p.nome)}</span>
                             <div>
-                              <div className="text-white/90">{p.nome}</div>
-                              <div className="text-[11px] text-white/40">{p.papel}</div>
+                              <div className="text-[var(--text-primary)]">{p.nome}</div>
+                              <div className="text-[11px] text-[var(--text-muted)]">{p.papel}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 text-white/80">{p.moedaBase !== "BRL" ? fmtMoeda(p.valorBase, p.moedaBase) : <span className="text-white/40">—</span>}</td>
-                        <td className="px-4 font-semibold text-white/90"><ValorBrl valor={p.valorContratadoBrl} naoConvertido={p.naoConvertido} moeda={p.moedaBase} /></td>
+                        <td className="px-4 text-[var(--text-primary)]">{p.moedaBase !== "BRL" ? fmtMoeda(p.valorBase, p.moedaBase) : <span className="text-[var(--text-muted)]">—</span>}</td>
+                        <td className="px-4 font-semibold text-[var(--text-primary)]"><ValorBrl valor={p.valorContratadoBrl} naoConvertido={p.naoConvertido} moeda={p.moedaBase} /></td>
                         <td className="px-4">
-                          <div className={(p.recebidoBrl ?? 0) > 0 ? "text-[#4ade80]" : "text-white/70"}>{brl(p.recebidoBrl)}</div>
-                          <div className="text-[11px] text-white/40">{p.parcelasRecebidas ?? 0} parcela(s)</div>
+                          <div className={(p.recebidoBrl ?? 0) > 0 ? "text-[var(--success)]" : "text-[var(--text-secondary)]"}>{brl(p.recebidoBrl)}</div>
+                          <div className="text-[11px] text-[var(--text-muted)]">{p.parcelasRecebidas ?? 0} parcela(s)</div>
                         </td>
                         <td className="px-4">
-                          <div className="text-[#7dd3fc]">{brl(p.saldoBrl)}</div>
-                          <div className="text-[11px] text-white/40">{p.parcelas ?? 0} parcela(s)</div>
+                          <div className="text-[var(--info)]">{brl(p.saldoBrl)}</div>
+                          <div className="text-[11px] text-[var(--text-muted)]">{p.parcelas ?? 0} parcela(s)</div>
                         </td>
-                        <td className="px-4 text-white/70">{dataBR(p.proximoVencimento) ?? <span className="text-white/40">Não definido</span>}</td>
-                        <td className="px-4"><span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${pst.cls}`}>{pst.label}</span></td>
+                        <td className="px-4 text-[var(--text-secondary)]">{dataBR(p.proximoVencimento) ?? <span className="text-[var(--text-muted)]">Não definido</span>}</td>
+                        <td className="px-4"><StatusPill st={pst} /></td>
                         <td className="px-4">
                           <div className="flex items-center gap-1.5">
-                            <button onClick={() => onAbrirParticipante(p.obrigacaoId)} className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#20262e] px-3 py-1.5 text-xs font-medium text-white/85 hover:bg-[#252c35]"><ExternalLink className="h-3.5 w-3.5" /> Abrir</button>
-                            <button onClick={() => onAbrirParticipante(p.obrigacaoId)} title="Abrir participante" className="grid h-7 w-7 place-items-center rounded-md text-white/40 hover:bg-white/10 hover:text-white/70"><MoreVertical className="h-4 w-4" /></button>
+                            <button onClick={() => onAbrirParticipante(p.obrigacaoId)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-active)]"><ExternalLink className="h-3.5 w-3.5" /> Abrir</button>
+                            <button onClick={() => onAbrirParticipante(p.obrigacaoId)} title="Abrir participante" className="grid h-7 w-7 place-items-center rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)]"><MoreVertical className="h-4 w-4" /></button>
                           </div>
                         </td>
                       </tr>
@@ -333,13 +342,13 @@ function LinhaGrupo({ g, aberto, onToggle, onAbrir, onAbrirParticipante }: { g: 
 // ── cards ─────────────────────────────────────────────────────────────────────
 function Card({ titulo, valor, sub, icon: Icon, cor, valorCor }: { titulo: string; valor: string; sub: React.ReactNode; icon: any; cor: string; valorCor?: string }) {
   return (
-    <div className="flex flex-col rounded-xl border border-white/10 bg-[#1b2027] p-4">
+    <div className="flex flex-col rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-4">
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-white/50">{titulo}</span>
-        <span className="grid h-8 w-8 flex-none place-items-center rounded-lg" style={{ background: `${cor}22`, color: cor }}><Icon className="h-4 w-4" /></span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{titulo}</span>
+        <span className="grid h-8 w-8 flex-none place-items-center rounded-[var(--radius-sm)]" style={{ background: `color-mix(in srgb, ${cor} 15%, transparent)`, color: cor }}><Icon className="h-4 w-4" /></span>
       </div>
-      <div className={`mt-2 text-[22px] font-bold leading-tight ${valorCor ?? "text-white"}`}>{valor}</div>
-      <div className="mt-1.5 text-[11px] leading-relaxed text-white/45">{sub}</div>
+      <div className={`mt-2 text-[22px] font-bold leading-tight ${valorCor ?? "text-[var(--text-primary)]"}`}>{valor}</div>
+      <div className="mt-1.5 text-[11px] leading-relaxed text-[var(--text-muted)]">{sub}</div>
     </div>
   )
 }
@@ -348,11 +357,11 @@ function Card({ titulo, valor, sub, icon: Icon, cor, valorCor }: { titulo: strin
 function SkeletonTela() {
   return (
     <div className="animate-pulse">
-      <div className="mb-5 h-8 w-40 rounded bg-[#20262e]" />
+      <div className="mb-5 h-8 w-40 rounded bg-[var(--surface-hover)]" />
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-[104px] rounded-xl bg-[#1b2027]" />)}
+        {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-[104px] rounded-[var(--radius-md)] bg-[var(--surface-primary)]" />)}
       </div>
-      <div className="mt-5 h-96 rounded-xl bg-[#1b2027]" />
+      <div className="mt-5 h-96 rounded-[var(--radius-md)] bg-[var(--surface-primary)]" />
     </div>
   )
 }

@@ -96,66 +96,71 @@ export default function EstornoModal({ obrigacaoId, moeda, pagamento, onClose, o
     } catch { setErro("Falha de rede ao estornar."); setEnviando(false) }
   }
 
-  const inputCls = "w-full rounded-lg border border-white/10 bg-[#20262e] px-3 py-2 text-sm text-white outline-none focus:border-[#f87171]/50"
+  const inputCls = "w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--danger)]"
   const modal = (
-    <div className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:items-center" style={{ zIndex: LAYER.aboveProcessCritical }} onClick={onClose}>
-      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#161b21] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-          <h2 className="flex items-center gap-2 text-base font-semibold text-white"><RotateCcw className="h-4 w-4 text-[#f87171]" /> Estornar pagamento</h2>
-          <button onClick={onClose} className="text-white/40 hover:text-white/70"><X className="h-5 w-5" /></button>
+    <div className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-[var(--app-overlay)] p-4 sm:items-center" style={{ zIndex: LAYER.aboveProcessCritical }} onClick={onClose}>
+      <div className="w-full max-w-lg rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--shadow-surface)]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[var(--border-default)] px-5 py-4">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--text-primary)]"><RotateCcw className="h-4 w-4 text-[var(--danger)]" /> Estornar pagamento</h2>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><X className="h-5 w-5" /></button>
         </div>
 
         <div className="space-y-4 px-5 py-4">
           {/* pagamento original */}
-          <div className="rounded-lg border border-white/10 bg-[#1b2027] p-3 text-sm">
-            <div className="flex items-center justify-between"><span className="text-white/50">Pagamento #{pagamento.id}</span><span className="font-semibold text-white">{money(original, moeda)}</span></div>
-            <div className="mt-1 text-xs text-white/40">{dataBR(pagamento.data)}{pagamento.formaLabel ? ` · ${pagamento.formaLabel}` : ""}{pagamento.referencia ? ` · ${pagamento.referencia}` : ""}</div>
+          <div className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-3 text-sm">
+            <div className="flex items-center justify-between"><span className="text-[var(--text-muted)]">Pagamento #{pagamento.id}</span><span className="font-semibold text-[var(--text-primary)]">{money(original, moeda)}</span></div>
+            <div className="mt-1 text-xs text-[var(--text-muted)]">{dataBR(pagamento.data)}{pagamento.formaLabel ? ` · ${pagamento.formaLabel}` : ""}{pagamento.referencia ? ` · ${pagamento.referencia}` : ""}</div>
           </div>
 
           {/* tipo */}
           <div className="flex gap-2">
             {(["TOTAL", "PARCIAL"] as const).map((t) => (
-              <button key={t} onClick={() => setTipo(t)} className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${tipo === t ? "border-[#f87171]/50 bg-[#f87171]/10 text-[#f87171]" : "border-white/10 text-white/60 hover:bg-white/5"}`}>{t === "TOTAL" ? "Estorno total" : "Estorno parcial"}</button>
+              <button
+                key={t}
+                onClick={() => setTipo(t)}
+                className={`flex-1 rounded-[var(--radius-sm)] border px-3 py-2 text-sm font-medium ${tipo === t ? "text-[var(--danger)]" : "border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"}`}
+                style={tipo === t ? { borderColor: "color-mix(in srgb, var(--danger) 50%, transparent)", background: "color-mix(in srgb, var(--danger) 10%, transparent)" } : undefined}
+              >{t === "TOTAL" ? "Estorno total" : "Estorno parcial"}</button>
             ))}
           </div>
           {tipo === "PARCIAL" && (
-            <div><label className="text-[11px] uppercase tracking-wide text-white/50">Valor do estorno ({moeda})</label><input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" className={`${inputCls} mt-1`} /><p className="mt-1 text-[11px] text-white/40">Máximo {money(original, moeda)}.</p></div>
+            <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Valor do estorno ({moeda})</label><input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" className={`${inputCls} mt-1`} /><p className="mt-1 text-[11px] text-[var(--text-muted)]">Máximo {money(original, moeda)}.</p></div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="text-[11px] uppercase tracking-wide text-white/50">Data do estorno</label><input type="date" value={data} onChange={(e) => setData(e.target.value)} className={`${inputCls} mt-1`} /></div>
-            <div><label className="text-[11px] uppercase tracking-wide text-white/50">Categoria do motivo *</label><select value={motivo} onChange={(e) => setMotivo(e.target.value)} className={`${inputCls} mt-1`}><option value="">Selecione…</option>{MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}</select></div>
+            <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Data do estorno</label><input type="date" value={data} onChange={(e) => setData(e.target.value)} className={`${inputCls} mt-1`} /></div>
+            <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Categoria do motivo *</label><select value={motivo} onChange={(e) => setMotivo(e.target.value)} className={`${inputCls} mt-1`}><option value="">Selecione…</option>{MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}</select></div>
           </div>
-          {motivo === "Outro" && <div><label className="text-[11px] uppercase tracking-wide text-white/50">Justificativa detalhada * (categoria Outro)</label><input value={motivoOutro} onChange={(e) => setMotivoOutro(e.target.value)} placeholder="Descreva o motivo do estorno" className={`${inputCls} mt-1`} /></div>}
+          {motivo === "Outro" && <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Justificativa detalhada * (categoria Outro)</label><input value={motivoOutro} onChange={(e) => setMotivoOutro(e.target.value)} placeholder="Descreva o motivo do estorno" className={`${inputCls} mt-1`} /></div>}
 
-          <div><label className="text-[11px] uppercase tracking-wide text-white/50">Observação</label><textarea value={obs} onChange={(e) => setObs(e.target.value.slice(0, 240))} rows={2} className={`${inputCls} mt-1 resize-none`} placeholder="Detalhes internos (opcional)" /></div>
+          <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Observação</label><textarea value={obs} onChange={(e) => setObs(e.target.value.slice(0, 240))} rows={2} className={`${inputCls} mt-1 resize-none`} placeholder="Detalhes internos (opcional)" /></div>
 
           {/* comprovante */}
           <div>
-            <label className="text-[11px] uppercase tracking-wide text-white/50">Comprovante</label>
+            <label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Comprovante</label>
             {comprovante ? (
-              <div className="mt-1 flex items-center gap-2 rounded-lg bg-[#1b2027] px-3 py-2 text-sm"><span className="min-w-0 flex-1 truncate text-white/80">{comprovante.nome}</span><a href={comprovante.url} target="_blank" rel="noreferrer" className="text-white/40 hover:text-white/70"><Eye className="h-4 w-4" /></a><button onClick={() => setComprovante(null)} className="text-white/40 hover:text-[#f87171]"><Trash2 className="h-4 w-4" /></button></div>
+              <div className="mt-1 flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--surface-primary)] px-3 py-2 text-sm"><span className="min-w-0 flex-1 truncate text-[var(--text-secondary)]">{comprovante.nome}</span><a href={comprovante.url} target="_blank" rel="noreferrer" className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><Eye className="h-4 w-4" /></a><button onClick={() => setComprovante(null)} className="text-[var(--text-muted)] hover:text-[var(--danger)]"><Trash2 className="h-4 w-4" /></button></div>
             ) : (
-              <button onClick={() => fileRef.current?.click()} className="mt-1 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-white/15 bg-[#1b2027] px-3 py-2.5 text-xs text-white/50 hover:border-white/25">{subindo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Anexar comprovante</button>
+              <button onClick={() => fileRef.current?.click()} className="mt-1 flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] border border-dashed border-[var(--border-strong)] bg-[var(--surface-primary)] px-3 py-2.5 text-xs text-[var(--text-muted)] hover:border-[var(--border-strong)]">{subindo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Anexar comprovante</button>
             )}
             <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.docx" className="hidden" onChange={(e) => onFile(e.target.files)} />
           </div>
 
           {/* resumo / impacto previsto antes de confirmar */}
-          <div className="rounded-lg border border-[#f87171]/25 bg-[#f87171]/5 p-3 text-xs text-white/70">
+          <div className="rounded-[var(--radius-sm)] border p-3 text-xs text-[var(--text-secondary)]" style={{ borderColor: "color-mix(in srgb, var(--danger) 25%, transparent)", background: "color-mix(in srgb, var(--danger) 5%, transparent)" }}>
             <div className="mb-2 grid grid-cols-3 gap-2 text-center">
-              <div><div className="text-[10px] uppercase tracking-wide text-white/40">Pago</div><div className="font-semibold text-white/90">{money(original, moeda)}</div></div>
-              <div><div className="text-[10px] uppercase tracking-wide text-white/40">A estornar</div><div className="font-semibold text-[#f87171]">{money(valorEstorno, moeda)}</div></div>
-              <div><div className="text-[10px] uppercase tracking-wide text-white/40">Resta no pagamento</div><div className="font-semibold text-white/90">{money(saldoResultante, moeda)}</div></div>
+              <div><div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Pago</div><div className="font-semibold text-[var(--text-primary)]">{money(original, moeda)}</div></div>
+              <div><div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">A estornar</div><div className="font-semibold text-[var(--danger)]">{money(valorEstorno, moeda)}</div></div>
+              <div><div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Resta no pagamento</div><div className="font-semibold text-[var(--text-primary)]">{money(saldoResultante, moeda)}</div></div>
             </div>
-            <p className="flex items-start gap-1.5"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#f87171]" /> Reverte o razão, reabre o saldo da cobrança e revoga o crédito de excedente proporcional (se houver). O pagamento original é preservado (nunca apagado). <span className="text-[#f87171]">Irreversível pela tela — desfazer exige um novo lançamento.</span></p>
+            <p className="flex items-start gap-1.5"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--danger)]" /> Reverte o razão, reabre o saldo da cobrança e revoga o crédito de excedente proporcional (se houver). O pagamento original é preservado (nunca apagado). <span className="text-[var(--danger)]">Irreversível pela tela — desfazer exige um novo lançamento.</span></p>
           </div>
-          {erro && <div className="rounded-lg border border-[#f87171]/30 bg-[#f87171]/10 p-2.5 text-xs text-[#f87171]">{erro}</div>}
+          {erro && <div className="rounded-[var(--radius-sm)] border p-2.5 text-xs text-[var(--danger)]" style={{ borderColor: "color-mix(in srgb, var(--danger) 30%, transparent)", background: "color-mix(in srgb, var(--danger) 10%, transparent)" }}>{erro}</div>}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-white/10 px-5 py-3">
-          <button onClick={onClose} className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium text-white/70 hover:bg-white/5">Cancelar</button>
-          <button onClick={confirmar} disabled={!valido || enviando || ok} title={valido ? "" : pendencias[0]} className="inline-flex items-center gap-2 rounded-lg bg-[#f87171] px-4 py-2 text-sm font-semibold text-[#2a0e0e] hover:bg-[#fb8a8a] disabled:cursor-not-allowed disabled:opacity-50">{enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : ok ? <CheckCircle2 className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />} Confirmar estorno</button>
+        <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-5 py-3">
+          <button onClick={onClose} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">Cancelar</button>
+          <button onClick={confirmar} disabled={!valido || enviando || ok} title={valido ? "" : pendencias[0]} className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50" style={{ background: "var(--danger)" }}>{enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : ok ? <CheckCircle2 className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />} Confirmar estorno</button>
         </div>
       </div>
     </div>

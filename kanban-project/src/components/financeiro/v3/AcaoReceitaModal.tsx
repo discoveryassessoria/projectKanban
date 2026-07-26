@@ -16,10 +16,10 @@ const authHeaders = (): Record<string, string> => { const t = typeof window !== 
 
 export type AcaoReceita = "recibo" | "renegociar" | "cancelar" | "arquivar"
 const META: Record<AcaoReceita, { titulo: string; verbo: string; Ic: any; cor: string; exigeMotivo: boolean; nota: string; endpoint: string }> = {
-  recibo: { titulo: "Gerar recibo", verbo: "Gerar recibo", Ic: ReceiptText, cor: "#4ade80", exigeMotivo: false, nota: "Exige ao menos um pagamento confirmado. O recibo consolida os pagamentos recebidos.", endpoint: "recibo" },
-  renegociar: { titulo: "Renegociar cobranças", verbo: "Renegociar", Ic: RefreshCcw, cor: "#7dd3fc", exigeMotivo: true, nota: "Atua apenas sobre cobranças em aberto/parciais. Não altera pagamentos confirmados.", endpoint: "renegociar" },
-  cancelar: { titulo: "Cancelar Receita", verbo: "Cancelar Receita", Ic: Ban, cor: "#f87171", exigeMotivo: true, nota: "Não apaga cobranças, pagamentos nem lançamentos. Bloqueado se houver pagamento confirmado sem estorno prévio.", endpoint: "cancelar" },
-  arquivar: { titulo: "Arquivar Receita", verbo: "Arquivar", Ic: Archive, cor: "#a78bfa", exigeMotivo: false, nota: "Não altera saldos. A Receita sai das listagens operacionais.", endpoint: "arquivar" },
+  recibo: { titulo: "Gerar recibo", verbo: "Gerar recibo", Ic: ReceiptText, cor: "var(--success)", exigeMotivo: false, nota: "Exige ao menos um pagamento confirmado. O recibo consolida os pagamentos recebidos.", endpoint: "recibo" },
+  renegociar: { titulo: "Renegociar cobranças", verbo: "Renegociar", Ic: RefreshCcw, cor: "var(--info)", exigeMotivo: true, nota: "Atua apenas sobre cobranças em aberto/parciais. Não altera pagamentos confirmados.", endpoint: "renegociar" },
+  cancelar: { titulo: "Cancelar Receita", verbo: "Cancelar Receita", Ic: Ban, cor: "var(--danger)", exigeMotivo: true, nota: "Não apaga cobranças, pagamentos nem lançamentos. Bloqueado se houver pagamento confirmado sem estorno prévio.", endpoint: "cancelar" },
+  arquivar: { titulo: "Arquivar Receita", verbo: "Arquivar", Ic: Archive, cor: "var(--info)", exigeMotivo: false, nota: "Não altera saldos. A Receita sai das listagens operacionais.", endpoint: "arquivar" },
 }
 
 export default function AcaoReceitaModal({ acao, receitaRef, natureza, onClose, onDone }: {
@@ -73,26 +73,26 @@ export default function AcaoReceitaModal({ acao, receitaRef, natureza, onClose, 
   }
 
   const modal = (
-    <div className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:items-center" style={{ zIndex: LAYER.aboveProcessCritical }} onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#161b21] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-          <h2 className="flex items-center gap-2 text-base font-semibold text-white"><m.Ic className="h-4 w-4" style={{ color: m.cor }} /> {titulo}</h2>
-          <button onClick={onClose} className="text-white/40 hover:text-white/70"><X className="h-5 w-5" /></button>
+    <div className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-[var(--app-overlay)] p-4 sm:items-center" style={{ zIndex: LAYER.aboveProcessCritical }} onClick={onClose}>
+      <div className="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--shadow-surface)]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[var(--border-default)] px-5 py-4">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--text-primary)]"><m.Ic className="h-4 w-4" style={{ color: m.cor }} /> {titulo}</h2>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><X className="h-5 w-5" /></button>
         </div>
         <div className="space-y-3 px-5 py-4">
-          <p className="flex items-start gap-1.5 rounded-lg border p-3 text-xs text-white/70" style={{ borderColor: `${m.cor}40`, background: `${m.cor}0d` }}><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: m.cor }} /> {nota}</p>
+          <p className="flex items-start gap-1.5 rounded-[var(--radius-sm)] border p-3 text-xs text-[var(--text-secondary)]" style={{ borderColor: `color-mix(in srgb, ${m.cor} 25%, transparent)`, background: `color-mix(in srgb, ${m.cor} 5%, transparent)` }}><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: m.cor }} /> {nota}</p>
           {acao === "renegociar" && (
-            <div><label className="text-[11px] uppercase tracking-wide text-white/50">Nova data de vencimento (opcional)</label><input type="date" value={novaData} onChange={(e) => setNovaData(e.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-[#20262e] px-3 py-2 text-sm text-white outline-none focus:border-[#7dd3fc]/50" /></div>
+            <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Nova data de vencimento (opcional)</label><input type="date" value={novaData} onChange={(e) => setNovaData(e.target.value)} className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--info)]" /></div>
           )}
           {m.exigeMotivo && (
-            <div><label className="text-[11px] uppercase tracking-wide text-white/50">{acao === "cancelar" ? "Motivo do cancelamento *" : "Observação / motivo *"}</label><textarea value={motivo} onChange={(e) => setMotivo(e.target.value.slice(0, 300))} rows={3} className="mt-1 w-full resize-none rounded-lg border border-white/10 bg-[#20262e] px-3 py-2 text-sm text-white outline-none focus:border-white/25" placeholder="Justificativa (auditoria)" /></div>
+            <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{acao === "cancelar" ? "Motivo do cancelamento *" : "Observação / motivo *"}</label><textarea value={motivo} onChange={(e) => setMotivo(e.target.value.slice(0, 300))} rows={3} className="mt-1 w-full resize-none rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-strong)]" placeholder="Justificativa (auditoria)" /></div>
           )}
-          {erro && <div className="rounded-lg border border-[#f87171]/30 bg-[#f87171]/10 p-2.5 text-xs text-[#f87171]">{erro}</div>}
-          {ok && <div className="rounded-lg border border-[#4ade80]/30 bg-[#4ade80]/10 p-2.5 text-xs text-[#4ade80]">{ok}</div>}
+          {erro && <div className="rounded-[var(--radius-sm)] border p-2.5 text-xs text-[var(--danger)]" style={{ borderColor: "color-mix(in srgb, var(--danger) 30%, transparent)", background: "color-mix(in srgb, var(--danger) 10%, transparent)" }}>{erro}</div>}
+          {ok && <div className="rounded-[var(--radius-sm)] border p-2.5 text-xs text-[var(--success)]" style={{ borderColor: "color-mix(in srgb, var(--success) 30%, transparent)", background: "color-mix(in srgb, var(--success) 10%, transparent)" }}>{ok}</div>}
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-white/10 px-5 py-3">
-          <button onClick={onClose} className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium text-white/70 hover:bg-white/5">Cancelar</button>
-          <button onClick={executar} disabled={!valido || enviando || !!ok} className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-[#0d1117] disabled:cursor-not-allowed disabled:opacity-50" style={{ background: m.cor }}>{enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : ok ? <CheckCircle2 className="h-4 w-4" /> : <m.Ic className="h-4 w-4" />} {verbo}</button>
+        <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-5 py-3">
+          <button onClick={onClose} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">Cancelar</button>
+          <button onClick={executar} disabled={!valido || enviando || !!ok} className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-50" style={{ background: m.cor }}>{enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : ok ? <CheckCircle2 className="h-4 w-4" /> : <m.Ic className="h-4 w-4" />} {verbo}</button>
         </div>
       </div>
     </div>
