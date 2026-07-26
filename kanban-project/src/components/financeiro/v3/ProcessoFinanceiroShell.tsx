@@ -77,14 +77,14 @@ function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
   useEffect(() => { carregar() }, [processoId])
   if (!obrs) return <div className="py-8 text-sm text-white/40">carregando…</div>
 
-  const toBRL = (v: number, m: string) => m === "BRL" ? v : v * (fx || 1)
+  // BRL vem da FONTE ÚNICA (listarObrigacoes → computeCambioAging), não de fx estimado.
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
   const quitado = (o: any) => o.recebido >= o.valorContratado - 0.005
   const emAtraso = obrs.filter((o) => o.vencimento && new Date(o.vencimento) < hoje && o.saldo > 0.005)
   const totais = {
-    total: obrs.reduce((s, o) => s + toBRL(o.valorContratado, o.moeda), 0),
-    pago: obrs.reduce((s, o) => s + toBRL(o.recebido, o.moeda), 0),
-    apagar: obrs.reduce((s, o) => s + toBRL(o.saldo, o.moeda), 0),
+    total: obrs.reduce((s, o) => s + (o.contratadoBrl ?? 0), 0),
+    pago: obrs.reduce((s, o) => s + (o.recebidoBrl ?? 0), 0),
+    apagar: obrs.reduce((s, o) => s + (o.saldoBrl ?? 0), 0),
     atraso: emAtraso.length,
   }
   const lista = obrs.filter((o) => sub === "pagos" ? quitado(o) : sub === "apagar" ? !quitado(o) : true)
@@ -134,7 +134,7 @@ function CustosTab({ processoId, fx }: { processoId: number; fx: number }) {
                   <td className="px-5 py-4"><div className="max-w-[220px] text-white/95">{o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`}</div>{o.codigoOperacional && <div className="text-xs text-white/40">{o.codigoOperacional}</div>}</td>
                   <td className="px-5 text-white/70">{o.categoria ?? "—"}</td>
                   <td className="px-5 text-white/95">{fmt(o.valorContratado, o.moeda)}</td>
-                  <td className="px-5 text-white/70">{fmt(toBRL(o.valorContratado, o.moeda))}</td>
+                  <td className="px-5 text-white/70">{fmt(o.contratadoBrl ?? 0)}</td>
                   <td className="px-5"><span className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] text-white/70">{o.moeda}</span></td>
                   <td className="px-5 text-white/70">{o.vencimento ? dataBR(o.vencimento) : "—"}</td>
                   <td className="px-5"><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[#4ade80]" style={{ width: `${prog}%` }} /></div><span className="text-[11px] text-white/50">{prog}%</span></div></td>
@@ -166,11 +166,11 @@ function ExtratoTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx
   const [busca, setBusca] = useState("")
   useEffect(() => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }, [processoId])
   const movs = useMemo(() => {
-    const toBRL = (v: number, m: string) => m === "BRL" ? v : v * (fx || 1)
+    // BRL da FONTE ÚNICA (listarObrigacoes → computeCambioAging); sem fx estimado.
     const base = (obrs ?? []).filter((o) => o.status !== "CANCELADO").map((o) => ({
       id: o.obrigacaoId, receita: o.direcao === "A_RECEBER", codigo: o.codigoOperacional ?? `#${o.obrigacaoId}`,
       descricao: o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`, categoria: o.categoria ?? (o.direcao === "A_RECEBER" ? "Receita" : "Custo"),
-      valorBRL: toBRL(o.valorContratado, o.moeda), moeda: o.moeda, vencimento: o.vencimento,
+      valorBRL: o.contratadoBrl ?? 0, moeda: o.moeda, vencimento: o.vencimento,
       requerente: o.requerente ?? null, responsavel: o.responsavel ?? null,
       quitado: o.recebido >= o.valorContratado - 0.005,
     }))
@@ -297,11 +297,11 @@ function TimelineTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; f
   const [busca, setBusca] = useState("")
   useEffect(() => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }, [processoId])
   const movsAll = useMemo(() => {
-    const toBRL = (v: number, m: string) => m === "BRL" ? v : v * (fx || 1)
+    // BRL da FONTE ÚNICA (listarObrigacoes → computeCambioAging); sem fx estimado.
     const base = (obrs ?? []).filter((o) => o.status !== "CANCELADO").map((o) => ({
       id: o.obrigacaoId, receita: o.direcao === "A_RECEBER", codigo: o.codigoOperacional ?? `#${o.obrigacaoId}`,
       descricao: o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`, categoria: o.categoria ?? (o.direcao === "A_RECEBER" ? "Receita" : "Custo"),
-      valorBRL: toBRL(o.valorContratado, o.moeda), data: o.criadoEm ?? o.vencimento, responsavel: o.responsavel ?? null, requerente: o.requerente ?? null, quitado: o.recebido >= o.valorContratado - 0.005,
+      valorBRL: o.contratadoBrl ?? 0, data: o.criadoEm ?? o.vencimento, responsavel: o.responsavel ?? null, requerente: o.requerente ?? null, quitado: o.recebido >= o.valorContratado - 0.005,
     }))
     const asc = [...base].sort((a, b) => a.id - b.id)
     let acc = 0

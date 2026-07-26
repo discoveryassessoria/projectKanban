@@ -5,6 +5,7 @@
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import { projetar, type EntryProjecao } from '../ledger/projecao'
+import { computeCambioAging, cotacoesVivas } from './cambio-aging'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
@@ -26,6 +27,15 @@ export interface ObrigacaoLista {
   responsavel: string | null
   requerente: string | null
   temAbertura: boolean
+  // ── câmbio-aware (FONTE ÚNICA: computeCambioAging — Ledger + fx congelado). Elimina
+  // o `fx=5.5` dos consumidores (Custos/Extrato/Timeline/Visão Geral). ──
+  contratadoBrl: number
+  recebidoBrl: number
+  saldoBrl: number
+  aVencerBrl: number
+  vencidoBrl: number
+  cotacao: number | null
+  statusAging: string
 }
 
 /** Lista obrigações com saldo (projeção). Filtros opcionais. */
@@ -65,18 +75,37 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
   }
   const pessoasReq = pessoaIdSet.size ? await prisma.pessoa.findMany({ where: { id: { in: [...pessoaIdSet] } }, select: { id: true, nome: true, sobrenome: true } }).catch(() => []) : []
   const pessoaNomeReq = new Map(pessoasReq.map((p) => [p.id, [p.nome, p.sobrenome].filter(Boolean).join(' ')]))
+  // ── SSOT de câmbio/aging: fx congelado da Receita de origem + parcelas + cotações vivas ──
+  const recIds = [...new Set(obrs.filter((o) => o.origemTipo === 'Receita' && o.origemId != null).map((o) => o.origemId as number))]
+  const recsFx = recIds.length ? await prisma.receita.findMany({ where: { id: { in: recIds } }, select: { id: true, fxRule: true, fxEstimado: true, fxFixo: true, fxData: true, valorBrlFixo: true } }).catch(() => []) : []
+  const fxPor = new Map(recsFx.map((r) => [r.id, r]))
+  const cobs = ids.length ? await prisma.cobranca.findMany({ where: { obrigacaoId: { in: ids } }, select: { obrigacaoId: true, parcelas: { select: { status: true, valor: true, valorBrl: true, cambioAplicado: true, vencimento: true } } } }).catch(() => []) : []
+  const parcPor = new Map<number, { status: string; valor: unknown; valorBrl: unknown; cambioAplicado: unknown; vencimento: Date }[]>()
+  for (const c of cobs) { if (c.obrigacaoId != null) parcPor.set(c.obrigacaoId, [...(parcPor.get(c.obrigacaoId) ?? []), ...c.parcelas.map((p) => ({ status: p.status, valor: p.valor, valorBrl: p.valorBrl, cambioAplicado: p.cambioAplicado, vencimento: p.vencimento }))]) }
+  const live = await cotacoesVivas().catch(() => ({ rates: {}, data: null }))
   return obrs.map((o) => {
     const p = projPor.get(o.id)
+    const valorContratado = Number(o.valorContratado)
+    const saldo = p ? Number(p.saldo) : valorContratado
+    const recebido = p ? Number(p.recebidoBruto) : 0
+    // FONTE ÚNICA de câmbio/BRL/aging: computeCambioAging (Ledger + fx congelado; custo sem
+    // Receita usa cotação viva — nunca fx fixo/5.5).
+    const rec = o.origemTipo === 'Receita' && o.origemId != null ? (fxPor.get(o.origemId) ?? null) : null
+    const ca = computeCambioAging({
+      moedaBase: String(o.moedaContratual), valorBase: valorContratado, saldoLedger: saldo, recebidoLedger: recebido,
+      vencimento: o.vencimento ?? null, receita: rec as never, parcelas: (parcPor.get(o.id) ?? []) as never, live,
+    })
     return {
       obrigacaoId: o.id, codigoOperacional: o.codigoOperacional, descricao: (o.itemCatalogoId ? itemPor.get(o.itemCatalogoId) : null) ?? o.observacoes ?? null, natureza: o.natureza, direcao: o.direcao,
       status: o.status, processoId: o.processoId, moeda: String(o.moedaContratual),
-      valorContratado: Number(o.valorContratado), saldo: p ? Number(p.saldo) : Number(o.valorContratado),
-      recebido: p ? Number(p.recebidoBruto) : 0,
+      valorContratado, saldo, recebido,
       vencimento: o.vencimento ? o.vencimento.toISOString() : null, origemTipo: o.origemTipo ?? null,
       criadoEm: o.criadoEm ? o.criadoEm.toISOString() : null,
       responsavel: o.criadoPorId != null ? (userPor.get(o.criadoPorId) ?? null) : null,
       requerente: (() => { const pid = primPart.get(o.id); return pid != null ? (pessoaNomeReq.get(pid) ?? null) : null })(),
       temAbertura: comAbertura.has(o.id),
+      contratadoBrl: ca.valorContratadoBrl, recebidoBrl: ca.recebidoBrl, saldoBrl: ca.saldoBrl,
+      aVencerBrl: ca.aVencerBrl, vencidoBrl: ca.vencidoBrl, cotacao: ca.cotacaoAplicada, statusAging: ca.statusLabel,
     }
   })
 }
