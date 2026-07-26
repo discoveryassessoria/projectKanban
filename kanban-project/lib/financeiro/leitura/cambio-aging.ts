@@ -8,9 +8,12 @@
 //   valorContratadoBrl = recebidoBrl + saldoBrl
 //   saldoBrl           = aVencerBrl + vencidoBrl
 // ============================================================================
-import { snapshotCotacoes } from '@/src/lib/cambio/servico-cambio'
+import {
+  carregarCotacoesCorrentes, resolverTaxa, converter, cent as centCanonico,
+  type CotacoesCorrentes,
+} from '@/lib/financeiro/cambio/canonico'
 
-export const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
+export const cent = centCanonico
 const num = (x: unknown): number | null => (x == null ? null : Number(x))
 
 export type TipoCambio = 'FIXO' | 'VARIAVEL' | 'HOJE' | 'BRL' | 'NAO_DEFINIDO'
@@ -29,7 +32,12 @@ export interface ParcelaLite {
   cambioAplicado?: unknown
   valorBrl?: unknown
 }
-export interface CotacoesVivas { rates: Record<string, number | null>; data: string | null }
+export interface CotacoesVivas {
+  rates: Record<string, number | null>
+  data: string | null
+  /** forma canônica — presente quando veio de cotacoesVivas(). */
+  correntes?: CotacoesCorrentes
+}
 
 export interface CambioAging {
   moedaBase: string
@@ -38,6 +46,12 @@ export interface CambioAging {
   tipoCambio: TipoCambio
   dataCotacao: string | null
   valorContratadoBrl: number
+  /**
+   * Valor na MOEDA DE ORIGEM que não pôde ser convertido (estado AUSENTE).
+   * > 0 significa: `valorContratadoBrl` NÃO representa este montante.
+   * Zero aqui não é conversão — é ausência declarada.
+   */
+  valorNaoConvertido: number
   recebidoBrl: number
   saldoBrl: number
   aVencerBrl: number
@@ -52,13 +66,11 @@ export interface CambioAging {
 
 /** Cotações vigentes (LÊ SÓ O BANCO — fonte Confidence). EUR/USD → BRL. Chamar UMA vez por request. */
 export async function cotacoesVivas(): Promise<CotacoesVivas> {
-  const rates: Record<string, number | null> = {}
-  let data: string | null = null
-  try {
-    const snap = await snapshotCotacoes()
-    for (const m of snap.moedas) { rates[String(m.moeda)] = m.valor; if (m.dataReferencia && !data) data = m.dataReferencia }
-  } catch { /* sem cotação viva: cai p/ fx da receita ou "não definido" */ }
-  return { rates, data }
+  // Delega ao SERVIÇO CANÔNICO — consulta e política de ausência vivem lá.
+  const c = await carregarCotacoesCorrentes()
+  const rates: Record<string, number | null> = { ...c.taxas }
+  for (const m of c.indisponiveis) rates[m] = null
+  return { rates, data: c.dataReferencia, correntes: c }
 }
 
 /** Enum de categoria/serviço → label amigável (nunca vazar "HONORARIOS" cru p/ o usuário). */
@@ -95,30 +107,51 @@ export function computeCambioAging(input: {
   const { moedaBase, valorBase, receita: rec, parcelas: pcs, live } = input
   const venc = input.vencimento ? new Date(input.vencimento) : null
 
-  // ── câmbio (precedência: BRL → valorBrlFixo → fxFixo/fxEstimado → cotação viva) ──
-  let cotacao: number | null, tipo: TipoCambio, dataCotacao: string | null, contratadoBrl: number
-  if (moedaBase === 'BRL') { cotacao = 1; tipo = 'BRL'; dataCotacao = null; contratadoBrl = cent(valorBase) }
-  else {
-    const liveRate = live.rates[moedaBase] ?? null
-    if (rec) {
-      const fixo = rec.fxRule === 'FIXO'
-      const cot = fixo ? (num(rec.fxFixo) ?? num(rec.fxEstimado) ?? liveRate) : (num(rec.fxEstimado) ?? num(rec.fxFixo) ?? liveRate)
-      if (cot == null) { cotacao = null; tipo = 'NAO_DEFINIDO'; dataCotacao = null; contratadoBrl = cent(valorBase) }
-      else {
-        cotacao = cot; tipo = fixo ? 'FIXO' : 'VARIAVEL'
-        const brlFixo = num(rec.valorBrlFixo)
-        contratadoBrl = fixo && brlFixo ? cent(brlFixo) : cent(valorBase * cot)
-        dataCotacao = fixo && rec.fxData ? new Date(rec.fxData).toISOString() : live.data
-      }
-    } else if (liveRate == null) { cotacao = null; tipo = 'NAO_DEFINIDO'; dataCotacao = null; contratadoBrl = cent(valorBase) }
-    else { cotacao = liveRate; tipo = 'HOJE'; dataCotacao = live.data; contratadoBrl = cent(valorBase * liveRate) }
+  // ── câmbio: resolvido pelo SERVIÇO CANÔNICO ────────────────────────────────
+  // O fato financeiro do processo é CONSOLIDADO, então a taxa congelada na
+  // Receita de origem tem precedência sobre a cotação corrente
+  // (preferirHistorico). Sem taxa congelada nem cotação oficial, o estado é
+  // AUSENTE: o valor NÃO é convertido e vai para `valorNaoConvertido` — nunca
+  // mais entra no BRL como se fosse 1:1.
+  const correntes: CotacoesCorrentes = live.correntes ?? {
+    taxas: Object.fromEntries(Object.entries(live.rates).filter(([, v]) => v != null) as [string, number][]),
+    indisponiveis: Object.entries(live.rates).filter(([, v]) => v == null).map(([m]) => m),
+    dataReferencia: live.data,
+    fonte: 'CotacaoCambio',
   }
+  const fixo = rec?.fxRule === 'FIXO'
+  const taxaCongelada = rec ? (fixo ? (num(rec.fxFixo) ?? num(rec.fxEstimado)) : (num(rec.fxEstimado) ?? num(rec.fxFixo))) : null
+  const resolucao = resolverTaxa({
+    moeda: moedaBase,
+    correntes,
+    snapshotHistorico: rec ? { taxa: taxaCongelada, data: rec.fxData ?? null } : null,
+    preferirHistorico: true,
+  })
+
+  const cotacao: number | null = resolucao.taxa
+  let tipo: TipoCambio
+  if (resolucao.estado === 'BRL') tipo = 'BRL'
+  else if (resolucao.estado === 'AUSENTE') tipo = 'NAO_DEFINIDO'
+  else if (resolucao.estado === 'HISTORICO') tipo = fixo ? 'FIXO' : 'VARIAVEL'
+  else tipo = 'HOJE'
+
+  const dataCotacao: string | null = resolucao.dataCotacao
+  const brlFixo = rec ? num(rec.valorBrlFixo) : null
+  // BRL congelado é o próprio fato: manda quando a regra é FIXO.
+  const contratadoConvertido =
+    resolucao.estado === 'HISTORICO' && fixo && brlFixo != null
+      ? cent(brlFixo)
+      : converter(valorBase, resolucao)
+  const contratadoBrl = contratadoConvertido ?? 0
+  // rastreabilidade da ausência: o valor NÃO convertido, na moeda de origem
+  const valorNaoConvertido = contratadoConvertido == null ? cent(valorBase) : 0
 
   const cot = cotacao
   const parcelaBrl = (pc: ParcelaLite): number => {
     const vb = num(pc.valorBrl); if (vb != null) return vb
     const ca = num(pc.cambioAplicado); if (ca) return Number(pc.valor) * ca
-    return cot ? Number(pc.valor) * cot : Number(pc.valor)
+    // sem taxa: NÃO converte (0) — o montante é reportado em valorNaoConvertido
+    return cot ? Number(pc.valor) * cot : 0
   }
 
   // recebido em BRL — FONTE ÚNICA = Ledger V3 (recebidoLedger, verdade do recebimento).
@@ -176,7 +209,7 @@ export function computeCambioAging(input: {
 
   return {
     moedaBase, valorBase: cent(valorBase), cotacaoAplicada: cot, tipoCambio: tipo, dataCotacao,
-    valorContratadoBrl: contratadoBrl, recebidoBrl, saldoBrl, aVencerBrl, vencidoBrl,
+    valorContratadoBrl: contratadoBrl, valorNaoConvertido, recebidoBrl, saldoBrl, aVencerBrl, vencidoBrl,
     parcelas, parcelasRecebidas, parcelasAVencer, parcelasVencidas, proximoVencimento, statusLabel,
   }
 }

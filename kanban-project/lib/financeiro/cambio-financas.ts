@@ -1,18 +1,29 @@
 // lib/financeiro/cambio-financas.ts
 // ============================================================================
-// ETAPA 1A — FONTE ÚNICA DE CÂMBIO para o Financeiro Geral (/api/financas/*).
+// Adaptador do Financeiro Geral (/api/financas/*) para o SERVIÇO CANÔNICO de
+// câmbio (lib/financeiro/cambio/canonico).
 //
-// Substitui o `const FX = { EUR: 5.52, USD: 5.08 }` que estava duplicado em
-// dre, receber, dashboard e fluxo. A cotação passa a vir de CotacaoCambio
-// (job diário, fonte Confidence) via snapshotCotacoes — o mesmo caminho que o
-// Financeiro V2 já usa.
+// Este módulo NÃO tem política própria: consulta, arredondamento, precedência
+// e regra de ausência vivem só no canônico. Aqui só existe a forma que as
+// rotas do Financeiro Geral já consomem (FxFinancas), preservada para não
+// exigir mudança nas seis rotas da Etapa 1A.
 //
-// REGRA INEGOCIÁVEL: sem cotação real NÃO se inventa taxa e NÃO se assume 1:1.
-// O valor fica FORA do total e é devolvido em `naoConvertido`, para a tela
-// poder dizer o que não pôde ser convertido em vez de exibir número errado.
+// O Financeiro Geral trabalha com PROJEÇÃO/CONSULTA ATUAL, então a cotação
+// corrente manda; snapshot histórico só entra quando o chamador informa um
+// fato consolidado.
 // ============================================================================
 
-import { snapshotCotacoes } from '@/src/lib/cambio/servico-cambio'
+import {
+  carregarCotacoesCorrentes,
+  converter,
+  resolverTaxa,
+  somarCanonico,
+  cent,
+  MOEDA_CONTABIL,
+  type CotacoesCorrentes,
+} from '@/lib/financeiro/cambio/canonico'
+
+export { cent }
 
 export interface FxFinancas {
   /** apenas moedas com cotação real; BRL sempre 1. */
@@ -29,41 +40,21 @@ export interface SomaBrl {
   naoConvertido: { moeda: string; valor: number }[]
 }
 
-const BRL = 'BRL'
+const comoCorrentes = (fx: FxFinancas): CotacoesCorrentes => ({
+  taxas: fx.taxas,
+  indisponiveis: fx.indisponiveis,
+  dataReferencia: fx.dataReferencia,
+  fonte: fx.fonte,
+})
 
 export async function carregarFx(): Promise<FxFinancas> {
-  const taxas: Record<string, number> = { [BRL]: 1 }
-  const indisponiveis: string[] = []
-  let dataReferencia: string | null = null
-  let fonte = 'CotacaoCambio'
-
-  try {
-    const snap = await snapshotCotacoes()
-    fonte = snap.fonte ?? fonte
-    for (const m of snap.moedas) {
-      const moeda = String(m.moeda)
-      if (m.valor != null && Number.isFinite(Number(m.valor)) && Number(m.valor) > 0) {
-        taxas[moeda] = Number(m.valor)
-        if (!dataReferencia && m.dataReferencia) dataReferencia = m.dataReferencia
-      } else {
-        indisponiveis.push(moeda)
-      }
-    }
-  } catch {
-    // Falha ao ler cotações não pode virar taxa inventada: só BRL permanece
-    // conversível e todo o resto é reportado como indisponível pelo caller.
-    fonte = 'indisponivel'
-  }
-
-  return { taxas, indisponiveis, fonte, dataReferencia }
+  const c = await carregarCotacoesCorrentes()
+  return { taxas: c.taxas, indisponiveis: c.indisponiveis, fonte: c.fonte, dataReferencia: c.dataReferencia }
 }
 
-/** Converte para BRL. Devolve null quando não há cotação real — nunca 1:1. */
+/** Converte para BRL. null quando não há cotação real — nunca 1:1, nunca zero. */
 export function converterBrl(fx: FxFinancas, valor: number, moeda?: string | null): number | null {
-  const m = (moeda ?? BRL).toUpperCase()
-  const taxa = fx.taxas[m]
-  if (taxa == null) return null
-  return Number(valor) * taxa
+  return converter(valor, resolverTaxa({ moeda, correntes: comoCorrentes(fx) }))
 }
 
 /**
@@ -74,26 +65,8 @@ export function somarBrl(
   fx: FxFinancas,
   itens: { valor: number; moeda?: string | null; valorBrl?: number | null }[],
 ): SomaBrl {
-  let total = 0
-  const faltando = new Map<string, number>()
-
-  for (const it of itens) {
-    // valorBrl já congelado no lançamento tem precedência: é fato, não estimativa
-    if (it.valorBrl != null && Number.isFinite(Number(it.valorBrl))) {
-      total += Number(it.valorBrl)
-      continue
-    }
-    const convertido = converterBrl(fx, Number(it.valor) || 0, it.moeda)
-    if (convertido == null) {
-      const m = (it.moeda ?? BRL).toUpperCase()
-      faltando.set(m, (faltando.get(m) ?? 0) + (Number(it.valor) || 0))
-      continue
-    }
-    total += convertido
-  }
-
-  return {
-    total: Math.round(total * 100) / 100,
-    naoConvertido: [...faltando.entries()].map(([moeda, valor]) => ({ moeda, valor: Math.round(valor * 100) / 100 })),
-  }
+  return somarCanonico(
+    comoCorrentes(fx),
+    itens.map((it) => ({ valor: it.valor, moeda: it.moeda ?? MOEDA_CONTABIL, valorBrlCongelado: it.valorBrl })),
+  )
 }
