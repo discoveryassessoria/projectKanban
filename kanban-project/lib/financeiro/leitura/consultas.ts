@@ -30,6 +30,8 @@ export interface ObrigacaoLista {
   // ── câmbio-aware (FONTE ÚNICA: computeCambioAging — Ledger + fx congelado). Elimina
   // o `fx=5.5` dos consumidores (Custos/Extrato/Timeline/Visão Geral). ──
   contratadoBrl: number
+  /** montante NÃO convertido (moeda de origem). > 0 = os campos *Brl não o representam. */
+  naoConvertido: number
   recebidoBrl: number
   saldoBrl: number
   aVencerBrl: number
@@ -106,6 +108,9 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
       temAbertura: comAbertura.has(o.id),
       contratadoBrl: ca.valorContratadoBrl, recebidoBrl: ca.recebidoBrl, saldoBrl: ca.saldoBrl,
       aVencerBrl: ca.aVencerBrl, vencidoBrl: ca.vencidoBrl, cotacao: ca.cotacaoAplicada, statusAging: ca.statusLabel,
+      // ETAPA 3 — ausência de cotação é explícita: > 0 significa que os campos
+      // *Brl acima NÃO representam este montante (que está na moeda de origem).
+      naoConvertido: ca.valorNaoConvertido,
     }
   })
 }

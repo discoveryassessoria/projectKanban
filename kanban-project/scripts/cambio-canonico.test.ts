@@ -99,6 +99,17 @@ const fx: FxFinancas = { taxas: { BRL: 1 }, indisponiveis: ["EUR"], fonte: "test
 ok(converterBrl(fx, 100, "EUR") === null, "converterBrl mantém contrato da Etapa 1A")
 ok(somarBrl(fx, [{ valor: 10, moeda: "BRL" }]).total === 10, "somarBrl mantém contrato da Etapa 1A")
 
+// ═══════════ 6) PROPAGAÇÃO AOS CONSUMIDORES (Etapa 3) ═══════════
+console.log("\n6) Consumidores propagam a ausência")
+const consultas = ler("lib/financeiro/leitura/consultas.ts")
+const detalhe = ler("lib/financeiro/leitura/receita-detalhe.ts")
+
+ok(/naoConvertido: ca\.valorNaoConvertido/.test(consultas), "listarObrigacoes propaga naoConvertido")
+ok(/naoConvertido: number/.test(consultas), "tipo de listarObrigacoes declara naoConvertido")
+ok(/naoConvertido: cent\(ca\.valorNaoConvertido/.test(detalhe), "receita-detalhe propaga naoConvertido")
+ok(!/cotacaoAplicada \?\? 1/.test(detalhe), "receita-detalhe não tem fallback 1:1")
+ok(/const paraBrl = /.test(detalhe), "derivados (desconto/ajuste/juros/multa) usam conversor único")
+
 console.log(`\n${passed} passaram, ${failed} falharam`)
 if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }
 console.log("Câmbio canônico: política única validada ✅")

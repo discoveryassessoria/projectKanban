@@ -33,6 +33,8 @@ export interface ReceitaDetalhe {
   tipoCambio: string
   dataCotacao: string | null
   valorContratadoBrl: number
+  /** montante NÃO convertido (moeda de origem). > 0 = o BRL acima não o representa. */
+  naoConvertido: number
   recebidoBrl: number
   saldoBrl: number
   aVencerBrl: number
@@ -192,12 +194,20 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     receita: receita ? { fxRule: receita.fxRule, fxEstimado: receita.fxEstimado, fxFixo: receita.fxFixo, fxData: receita.fxData, valorBrlFixo: receita.valorBrlFixo } : null,
     parcelas: parcelasRec, live,
   })
-  const descontosBrl = moeda === 'BRL' ? descontos : cent(descontos * (ca.cotacaoAplicada ?? 1))
-  const ajustesBrl = moeda === 'BRL' ? ajustes : cent(ajustes * (ca.cotacaoAplicada ?? 1))
+  // ETAPA 3 — política canônica também nos derivados: sem cotação NÃO se
+  // converte (nada de `?? 1`). O montante vai para `naoConvertido`.
+  const naoConvertidoDerivados: number[] = []
+  const paraBrl = (v: number): number => {
+    if (moeda === 'BRL') return cent(v)
+    if (ca.cotacaoAplicada == null) { if (v) naoConvertidoDerivados.push(cent(v)); return 0 }
+    return cent(v * ca.cotacaoAplicada)
+  }
+  const descontosBrl = paraBrl(descontos)
+  const ajustesBrl = paraBrl(ajustes)
   const juros = cent(obr.ocorrencias.filter((o) => o.tipo === 'JUROS').reduce((s, o) => s + Number(o.valor), 0))
   const multa = cent(obr.ocorrencias.filter((o) => o.tipo === 'MULTA').reduce((s, o) => s + Number(o.valor), 0))
-  const jurosBrl = moeda === 'BRL' ? juros : cent(juros * (ca.cotacaoAplicada ?? 1))
-  const multaBrl = moeda === 'BRL' ? multa : cent(multa * (ca.cotacaoAplicada ?? 1))
+  const jurosBrl = paraBrl(juros)
+  const multaBrl = paraBrl(multa)
   const liquidoBrl = cent(ca.valorContratadoBrl - descontosBrl + ajustesBrl)
 
   // ── Parcelas (aba Cobranças) — detalhe por parcela + resumo ──
@@ -297,6 +307,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     vencimento: (obr.vencimento ?? receita?.data1)?.toISOString() ?? null,
     moedaBase: ca.moedaBase, valorBase: ca.valorBase, cotacaoAplicada: ca.cotacaoAplicada, tipoCambio: ca.tipoCambio, dataCotacao: ca.dataCotacao,
     valorContratadoBrl: ca.valorContratadoBrl, recebidoBrl: ca.recebidoBrl, saldoBrl: ca.saldoBrl, aVencerBrl: ca.aVencerBrl, vencidoBrl: ca.vencidoBrl,
+    naoConvertido: cent(ca.valorNaoConvertido + naoConvertidoDerivados.reduce((a, v) => a + v, 0)),
     parcelas: ca.parcelas, parcelasRecebidas: ca.parcelasRecebidas, parcelasAVencer: ca.parcelasAVencer, parcelasVencidas: ca.parcelasVencidas, proximoVencimento: ca.proximoVencimento,
     parcelasDetalhe, resumoParcelas, inadimplenciaPct,
     distribuicaoRequerentes, responsavelFinanceiro, ultimaMovimentacao, alertas, proximasAcoes,
