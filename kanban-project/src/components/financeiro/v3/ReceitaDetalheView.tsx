@@ -231,7 +231,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
 
   // Contadores só quando > 0 (Resumo/Timeline/Observações não têm contador).
   const tabs: [string, string, any, number][] = [
-    ["cobrancas", "Cobranças", CreditCard, rp.total],
+    ["cobrancas", isCusto ? "Parcelas" : "Cobranças", CreditCard, rp.total],
     ["participantes", "Participantes Financeiros", Users, d.participantesCount ?? participantes.length],
     ["pagamentos", "Pagamentos", Wallet, (d.pagamentos ?? []).length],
     ["documentos", "Documentos", FileCheck, documentos.length],
@@ -518,7 +518,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
           {/* Cobranças (parcelas) */}
           {tab === "cobrancas" && (
             <div className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-              <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">Cobranças</h2><span className="rounded-full bg-[#252c35] px-2 py-0.5 text-xs text-white/70">{rp.total}</span></div>
+              <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-white">{isCusto ? "Parcelas" : "Cobranças"}</h2><span className="rounded-full bg-[#252c35] px-2 py-0.5 text-xs text-white/70">{rp.total}</span></div>
 
               {/* KPIs */}
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -628,12 +628,12 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading || d.receitaId == null}
-                  title={d.receitaId == null ? "Anexo disponível apenas para receitas de origem" : "Anexar documento"}
+                  title={d.receitaId == null ? (isCusto ? "Anexo de documentos disponível apenas em receitas de origem" : "Anexo disponível apenas para receitas de origem") : "Anexar documento"}
                   className="inline-flex items-center gap-2 rounded-lg bg-[#d2a948] px-3.5 py-2 text-sm font-semibold text-[#1b1508] hover:bg-[#e0b957] disabled:cursor-not-allowed disabled:opacity-50"
                 >{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} {uploading ? "Enviando…" : "Anexar documento"}</button>
               </div>
               {documentos.length === 0 ? (
-                <div className="mt-6 rounded-lg border border-dashed border-white/10 bg-[#12161c] px-4 py-8 text-center text-sm text-white/40">Nenhum documento vinculado a esta receita.</div>
+                <div className="mt-6 rounded-lg border border-dashed border-white/10 bg-[#12161c] px-4 py-8 text-center text-sm text-white/40">Nenhum documento vinculado a {isCusto ? "este custo" : "esta receita"}.</div>
               ) : (
                 <div className="mt-4 space-y-2">
                   {documentos.map((doc: any) => (
@@ -757,6 +757,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
         <EditarReceitaView
           obrigacaoId={d.obrigacaoId}
           receitaRef={String(d.obrigacaoId)}
+          natureza={isCusto ? "CUSTO" : "RECEITA"}
           onClose={() => setEditarReceitaOpen(false)}
           onDone={() => { setEditarReceitaOpen(false); carregar() }}
         />

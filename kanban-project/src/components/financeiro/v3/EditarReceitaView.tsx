@@ -46,9 +46,11 @@ interface Previa {
 const inputCls = "w-full rounded-lg border border-white/10 bg-[#20262e] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-[#2563eb]/60"
 const labelCls = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-white/50"
 
-export default function EditarReceitaView({ obrigacaoId, receitaRef, onClose, onDone }: {
-  obrigacaoId: number; receitaRef: string; onClose: () => void; onDone?: () => void
+export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, onClose, onDone }: {
+  obrigacaoId: number; receitaRef: string; natureza?: string; onClose: () => void; onDone?: () => void
 }) {
+  // Detalhe único parametrizado por direção — copy A_PAGAR vs A_RECEBER.
+  const ehCusto = natureza === "CUSTO"
   const [rec, setRec] = useState<Receita | null>(null)
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
@@ -83,7 +85,7 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, onClose, on
       try {
         const r = await fetch(`/api/financeiro/v3/receita/${receitaRef}/editar`, { headers: authHeaders() }).then((x) => x.json())
         if (!vivo) return
-        if (!r?.ok || !r?.receita) { setErro(r?.erro ?? "Não foi possível carregar a Receita."); return }
+        if (!r?.ok || !r?.receita) { setErro(r?.erro ?? (ehCusto ? "Não foi possível carregar o custo." : "Não foi possível carregar a Receita.")); return }
         const d: Receita = r.receita
         setRec(d)
         setTitulo(d.titulo ?? "")
@@ -196,11 +198,11 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, onClose, on
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="mb-1 flex flex-wrap items-center gap-1.5 text-xs text-white/40">
-              <span>Financeiro</span><span>›</span><span>Receitas</span><span>›</span>
-              <span className="text-white/70">{rec?.codigo ?? receitaRef}</span><span>›</span><span className="text-white/70">Editar receita</span>
+              <span>Financeiro</span><span>›</span><span>{ehCusto ? "Custos" : "Receitas"}</span><span>›</span>
+              <span className="text-white/70">{rec?.codigo ?? receitaRef}</span><span>›</span><span className="text-white/70">Editar {ehCusto ? "custo" : "receita"}</span>
             </div>
-            <h1 className="text-2xl font-semibold text-white">Editar receita</h1>
-            <p className="mt-0.5 text-sm text-white/50">Altere os dados desta Receita. A divisão entre participantes é editada em “Editar distribuição”.</p>
+            <h1 className="text-2xl font-semibold text-white">Editar {ehCusto ? "custo" : "receita"}</h1>
+            <p className="mt-0.5 text-sm text-white/50">Altere os dados {ehCusto ? "deste custo" : "desta Receita"}. A divisão entre participantes é editada em “Editar distribuição”.</p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={onClose} className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium text-white/70 hover:bg-white/5">Cancelar</button>
@@ -211,7 +213,7 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, onClose, on
         </div>
 
         {loading ? (
-          <div className="flex h-64 items-center justify-center text-white/40"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando receita…</div>
+          <div className="flex h-64 items-center justify-center text-white/40"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando {ehCusto ? "custo" : "receita"}…</div>
         ) : erro ? (
           <div className="rounded-xl border border-[#f87171]/30 bg-[#f87171]/10 p-4 text-sm text-[#f87171]">{erro}</div>
         ) : rec ? (
@@ -220,11 +222,11 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, onClose, on
             <div className="space-y-5">
               {/* Dados cadastrais */}
               <section className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
-                <h2 className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-white/80"><Receipt className="h-4 w-4" /> Dados da receita</h2>
+                <h2 className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-white/80"><Receipt className="h-4 w-4" /> Dados {ehCusto ? "do custo" : "da receita"}</h2>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <label className={labelCls}>Título</label>
-                    <input value={titulo} onChange={(e) => setTitulo(e.target.value.slice(0, 200))} placeholder="Título da receita" className={inputCls} />
+                    <input value={titulo} onChange={(e) => setTitulo(e.target.value.slice(0, 200))} placeholder={ehCusto ? "Título do custo" : "Título da receita"} className={inputCls} />
                     <p className="mt-1 text-[11px] text-white/35">Propaga a todos os participantes preservando o sufixo de cada um.</p>
                   </div>
                   <div className="sm:col-span-2">
@@ -384,12 +386,12 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, onClose, on
               <section className="rounded-xl border border-white/10 bg-[#1b2027] p-5">
                 <h2 className="mb-2 text-sm font-semibold text-white/80">Justificativa (auditoria)</h2>
                 <textarea value={justificativa} onChange={(e) => setJustificativa(e.target.value.slice(0, 300))} rows={3} placeholder="Motivo desta edição…" className="w-full resize-none rounded-lg border border-white/10 bg-[#20262e] px-3 py-2 text-sm text-white outline-none focus:border-[#2563eb]/60" />
-                <p className="mt-2 text-[11px] text-white/40">Registrada em cada Receita afetada (estado anterior → novo).</p>
+                <p className="mt-2 text-[11px] text-white/40">Registrada em cada obrigação afetada (estado anterior → novo).</p>
               </section>
 
               {erroSave && <div className="rounded-lg border border-[#f87171]/30 bg-[#f87171]/10 p-3 text-xs text-[#f87171]">{erroSave}</div>}
               {!temMudanca && <div className="rounded-lg border border-white/10 bg-[#161b21] p-3 text-xs text-white/50">Nenhuma alteração ainda. Edite um campo para habilitar o salvamento.</div>}
-              {ok && <div className="rounded-lg border border-[#4ade80]/30 bg-[#4ade80]/10 p-3 text-xs text-[#4ade80]">Receita atualizada.</div>}
+              {ok && <div className="rounded-lg border border-[#4ade80]/30 bg-[#4ade80]/10 p-3 text-xs text-[#4ade80]">{ehCusto ? "Custo atualizado." : "Receita atualizada."}</div>}
             </div>
           </div>
         ) : null}
