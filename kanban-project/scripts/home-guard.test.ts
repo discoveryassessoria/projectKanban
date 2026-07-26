@@ -73,7 +73,17 @@ function run() {
   console.log("\nIdentidade visual (idêntica ao Financeiro):")
   const fundoFinanceiro = /bg-\[url\('\/espanha\.jpg'\)\]/
   ok(fundoFinanceiro.test(financeiro) && fundoFinanceiro.test(shell), "mesma imagem europeia de fundo")
-  ok(/bg-black\/85/.test(shell) && /bg-black\/85/.test(financeiro), "mesmo overlay escuro translúcido")
+  // Overlay: compara por IGUALDADE com o Financeiro (fonte da identidade), não por
+  // um literal fixo — o valor já mudou de /85 para /60 e a guarda tem que continuar
+  // exigindo "o MESMO da referência", não um número congelado no teste.
+  const overlayDe = (src: string) =>
+    (src.match(/pointer-events-none fixed inset-0 -z-10 (bg-black\/\d+)/) || [])[1] || null
+  const overlayFin = overlayDe(financeiro)
+  const overlayHome = overlayDe(shell)
+  ok(
+    !!overlayFin && overlayFin === overlayHome,
+    `mesmo overlay escuro translúcido (financeiro=${overlayFin ?? "—"}, home=${overlayHome ?? "—"})`,
+  )
   ok(/backdrop-blur/.test(primitivas), "glassmorphism nos cards")
   ok(shell.includes("<HeaderBar"), "mesma barra superior (HeaderBar)")
   const cardFinanceiro = 'rounded-xl border border-white/10 bg-white/[0.05] backdrop-blur-md'

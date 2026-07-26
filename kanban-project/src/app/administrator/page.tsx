@@ -134,6 +134,15 @@ const MigracaoMotorTab = dynamic(() => import("@/src/components/gerenciamentoCom
 const CatalogoFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogoFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ModalidadesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModalidadesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PaisesRegioesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PaisesRegioesTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const IntegracoesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/IntegracoesTab"), { ssr: false, loading: () => <CarregandoTela /> })
+// CONSULTAS CONSOLIDADAS da configuração por tipo de processo — todas sobre o MESMO
+// read-model (/api/gerenciamento/configuracao-processo). Só leitura: a edição segue
+// nas telas donas (Fluxos, Tipos de Processo, Automações...).
+const SLAConfiguracaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ConfiguracaoProcessoViews").then(m => m.SLAConfiguracaoTab), { ssr: false, loading: () => <CarregandoTela /> })
+const VersoesConfiguracaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ConfiguracaoProcessoViews").then(m => m.VersoesConfiguracaoTab), { ssr: false, loading: () => <CarregandoTela /> })
+const ConfiguracoesGeraisProcessoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ConfiguracaoProcessoViews").then(m => m.ConfiguracoesGeraisProcessoTab), { ssr: false, loading: () => <CarregandoTela /> })
+const TransicoesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ConfiguracaoProcessoViews").then(m => m.TransicoesTab), { ssr: false, loading: () => <CarregandoTela /> })
+const DiagnosticoConfiguracaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ConfiguracaoProcessoViews").then(m => m.DiagnosticoConfiguracaoTab), { ssr: false, loading: () => <CarregandoTela /> })
 
 // cada catálogo do menu aponta pro CatalogTab com a chave do mockup
 const cat = (k: string) => () => <CatalogTab catalogKey={k} />
@@ -186,7 +195,14 @@ const TELAS: Record<string, React.ComponentType> = {
   autofin: () => <PhaseAutomationsFasesTab kindInicial="financial" />,
   autoevt: () => <PhaseAutomationsFasesTab kindInicial="event" />,
   protocols: ProtocolsTab,
-  sla: SLATab,
+  // SLA consolidado (real, sobre a configuração de cada processo). O rascunho antigo
+  // continua acessível por ?screen=sla-rascunho.
+  sla: SLAConfiguracaoTab,
+  "sla-rascunho": SLATab,
+  proccfg: ConfiguracoesGeraisProcessoTab,
+  transicoes: TransicoesTab,
+  integracoes: IntegracoesTab,
+  governanca: () => <LogAuditoriaTab escopo="financeiro" />,
   templates: TemplatesTab,
   notifications: NotificationsTab,
   audit: LogAuditoriaTab,
@@ -228,8 +244,12 @@ const TELAS: Record<string, React.ComponentType> = {
   permmotor: PerfisPermissaoMotorTab,
   pricingtable: TabelaValoresTab,
   docmatrix: MatrizDocumentalTab,
-  cfgversions: ConfigVersionsTab,
-  cfgdiagnosis: ConfigDiagnosisTab,
+  // Versões e Diagnóstico de Configuração passam a ser telas REAIS sobre o
+  // read-model; os rascunhos seguem acessíveis por ?screen=<key>-rascunho.
+  cfgversions: VersoesConfiguracaoTab,
+  "cfgversions-rascunho": ConfigVersionsTab,
+  cfgdiagnosis: DiagnosticoConfiguracaoTab,
+  "cfgdiagnosis-rascunho": ConfigDiagnosisTab,
   execmatrix: ExecMatrixTab,
   syshealth: SystemHealthTab,
 }

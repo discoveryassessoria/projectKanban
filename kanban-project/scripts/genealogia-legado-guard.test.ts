@@ -88,7 +88,9 @@ ok(/genealogiaReestruturacao\s*\n?\s*\?\s*\{[\s\S]*?percentage:\s*0/.test(centra
   "matrix da Genealogia é neutralizada (percentage/total zerados)")
 // front consome o flag
 const front = lerBruto("src/components/kanban/ProcessoCentralOperacional.tsx")
-ok(/modoReestruturacao=\{!!data\.genealogiaReestruturacao\}/.test(front),
+// aceita qualquer origem do payload (data/bodyData/...): o que importa é que o flag
+// REAL da API seja repassado ao painel, não o nome da variável local.
+ok(/modoReestruturacao=\{!!\s*\w+\.genealogiaReestruturacao\s*\}/.test(front),
   "ProcessoCentralOperacional passa modoReestruturacao ao PainelDaFase")
 const painel = lerBruto("src/components/kanban/PainelDaFase.tsx")
 ok(/modoReestruturacao/.test(painel), "PainelDaFase suporta modoReestruturacao (esconde KPIs/progresso antigos)")
@@ -105,8 +107,15 @@ ok(!/matrix\.percentage/.test(phaseAdvance) && !/central-operacional/.test(phase
 const blocking = lerBruto("src/lib/motor/blocking-engine.ts")
 ok(/necessidadeDocumental/i.test(blocking) || /NecessidadeDocumental/.test(blocking),
   "blocking-engine gate usa NecessidadeDocumental (camada preservada)")
-ok(!/STATUS_VALIDADOS/.test(blocking) && !/linhaReta/.test(blocking),
-  "blocking-engine NÃO usa STATUS_VALIDADOS/linhaReta como gate")
+// O que continua PROIBIDO é o gate legado por STATUS de validação do documento
+// (STATUS_VALIDADOS) e o percentual da matriz antiga. `linhaReta` permanece PERMITIDO
+// como FILTRO DE ESCOPO na consulta (commit 76210ee: o gate DOCUMENTO precisa dos
+// documentos da linha reta para exigir todas as certidões obrigatórias resolvidas) —
+// não é gate por status. O gate em si é NecessidadeDocumental (asserção acima).
+ok(!/STATUS_VALIDADOS/.test(blocking) && !/matrix\.percentage/.test(blocking),
+  "blocking-engine NÃO usa STATUS_VALIDADOS/matrix.percentage como gate")
+ok(!/linhaReta/.test(blocking) || /where:\s*\{[^}]*linhaReta:\s*true/.test(blocking),
+  "blocking-engine só usa linhaReta como filtro de escopo da consulta (nunca como regra de gate)")
 
 console.log(`\n${failed === 0 ? "✅" : "❌"} GUARDA GENEALOGIA-LEGADO — ${passed} ok, ${failed} falhas`)
 if (failed > 0) { console.log("\nViolações:"); for (const v of violacoes) console.log(`  · ${v}`); process.exit(1) }

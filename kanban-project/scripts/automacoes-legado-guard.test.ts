@@ -30,6 +30,7 @@ function ler(rel: string): string {
   const p = join(ROOT, rel)
   return existsSync(p) ? readFileSync(p, "utf8") : ""
 }
+const existe = (rel: string): boolean => existsSync(join(ROOT, rel))
 
 // --------------------------------------------------------------------------
 // 1) executor.ts — automação kind=task NÃO cria Tarefa
@@ -58,26 +59,45 @@ ok(/k === 'task' \|\| k === 'document'/.test(apiAutoId), "PUT bloqueia mudar/rea
 // 3) modelos-automacao — só efeitos adicionais
 // --------------------------------------------------------------------------
 console.log("\n3) API modelos-automacao — só efeitos adicionais")
-const apiModelos = ler("src/app/api/gerenciamento/modelos-automacao/route.ts")
-const permitM = (apiModelos.match(/TIPOS_EFEITO_PERMITIDOS = new Set\(\[([^\]]*)\]\)/) || ["", ""])[1]
-ok(!/'task'/.test(permitM) && !/'document'/.test(permitM), "modelos: task/document NÃO são criáveis")
-ok(/TIPOS_TRABALHO_OBRIGATORIO/.test(apiModelos), "modelos: há conjunto TIPOS_TRABALHO_OBRIGATORIO bloqueado")
+// A Biblioteca de Modelos foi ELIMINADA (commit 30e4099): a rota não existe mais.
+// Rota inexistente é a forma MAIS FORTE de desativação — nada a bloquear. Se um dia
+// a rota voltar, as travas de kind precisam voltar junto (é o que este bloco cobre).
+const RELS_MODELOS = "src/app/api/gerenciamento/modelos-automacao/route.ts"
+if (!existe(RELS_MODELOS)) {
+  ok(true, "modelos-automacao: rota REMOVIDA (Biblioteca de Modelos eliminada) — nada a criar")
+} else {
+  const apiModelos = ler(RELS_MODELOS)
+  const permitM = (apiModelos.match(/TIPOS_EFEITO_PERMITIDOS = new Set\(\[([^\]]*)\]\)/) || ["", ""])[1]
+  ok(!/'task'/.test(permitM) && !/'document'/.test(permitM), "modelos: task/document NÃO são criáveis")
+  ok(/TIPOS_TRABALHO_OBRIGATORIO/.test(apiModelos), "modelos: há conjunto TIPOS_TRABALHO_OBRIGATORIO bloqueado")
+}
 
 // --------------------------------------------------------------------------
 // 4) Tarefa Transversal — criação DESATIVADA (410); dados preservados (GET)
 // --------------------------------------------------------------------------
 console.log("\n4) Tarefa Transversal — criação desativada")
+// Duas formas VÁLIDAS de desativação, nesta ordem de força:
+//   (a) rota REMOVIDA  → nada a criar (modelos transversais foram eliminados junto
+//       com a Biblioteca de Modelos, commit 30e4099);
+//   (b) rota presente  → POST 410, GET preservado, sem create no POST.
 for (const rel of [
   "src/app/api/gerenciamento/regras-tarefa-transversal/route.ts",
   "src/app/api/gerenciamento/modelos-tarefa-transversal/route.ts",
 ]) {
+  const nome = rel.split("/").slice(-2).join("/")
+  if (!existe(rel)) { ok(true, `${nome} — rota REMOVIDA (criação impossível)`); continue }
   const src = ler(rel)
-  ok(/status:\s*410/.test(src), `${rel.split("/").slice(-2).join("/")} — POST responde 410`)
-  ok(/export async function GET/.test(src), `${rel.split("/").slice(-2).join("/")} — GET preservado (histórico)`)
-  ok(!/prisma\.\w+\.create\(/.test(src), `${rel.split("/").slice(-2).join("/")} — POST não cria registro`)
+  ok(/status:\s*410/.test(src), `${nome} — POST responde 410`)
+  ok(/export async function GET/.test(src), `${nome} — GET preservado (histórico)`)
+  ok(!/prisma\.\w+\.create\(/.test(src), `${nome} — POST não cria registro`)
 }
-ok(/TRANSVERSAL_DESATIVADO/.test(ler("src/app/api/gerenciamento/regras-tarefa-transversal/[id]/route.ts")), "regra transversal [id] bloqueia reativação")
-ok(/TRANSVERSAL_DESATIVADO/.test(ler("src/app/api/gerenciamento/modelos-tarefa-transversal/[id]/route.ts")), "modelo transversal [id] bloqueia reativação")
+for (const rel of [
+  "src/app/api/gerenciamento/regras-tarefa-transversal/[id]/route.ts",
+  "src/app/api/gerenciamento/modelos-tarefa-transversal/[id]/route.ts",
+]) {
+  const nome = rel.includes("modelos") ? "modelo transversal [id]" : "regra transversal [id]"
+  ok(!existe(rel) || /TRANSVERSAL_DESATIVADO/.test(ler(rel)), `${nome} bloqueia reativação (ou foi removida)`)
+}
 
 // --------------------------------------------------------------------------
 // 5) UI — abas task/document removidas; telas transversais fora da navegação

@@ -171,7 +171,12 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       // CONFIGURAÇÕES
       a(70, "sla", "SLA", ["sla", "prazo", "vencimento", "alerta"], "Configurações"),
       a(80, "cfgversions", "Versões", ["versao", "versão", "config", "publicacao", "publicação"], "Configurações"),
-      s(90, "proccfg", "Configurações Gerais", "Parâmetros gerais do processo ainda não têm tela dedicada. Os padrões vivem em Tipos de Processo e no Fluxo do Workflow.", "Configurações", ["configuracao", "configuração", "padrao", "padrão"]),
+      a(90, "proccfg", "Configurações Gerais", ["configuracao", "configuração", "padrao", "padrão", "identidade", "situacao"], "Configurações"),
+
+      // RASCUNHOS do mockup: as telas reais acima os substituíram no menu, mas eles
+      // continuam acessíveis por ?screen= (nada foi apagado).
+      h(900, "sla-rascunho", "SLA e Prazos (rascunho do mockup)"),
+      h(910, "cfgversions-rascunho", "Versionamento e Publicação (rascunho do mockup)"),
     ],
   },
 
@@ -184,7 +189,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(10, "macrokanban", "Workflow Macro", ["workflow", "macro", "kanban", "fluxo", "sequencia", "sequência", "coluna", "sla"], "Fluxos"),
       a(20, "phaseiwf", "Workflow Interno", ["workflow", "interno", "passo", "fluxo", "tarefa"], "Fluxos"),
 
-      s(30, "transicoes", "Transições", "Os caminhos entre fases são definidos pela regra de entrada de cada fase no Fluxo (Workflow › Fluxos › Workflow Macro). Tela dedicada de transições ainda não existe.", undefined, ["transicao", "transição", "caminho", "entrada", "avanco", "avanço"]),
+      a(30, "transicoes", "Transições", ["transicao", "transição", "caminho", "entrada", "avanco", "avanço", "regra"]),
 
       a(40, "execmotor", "Executor do Motor", ["executor", "motor", "execucao", "execução", "gatilho"], "Configurações"),
       a(50, "runtimediag", "Diagnóstico de Runtime", ["runtime", "diagnostico", "diagnóstico", "v2", "motor"], "Configurações"),
@@ -276,7 +281,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(180, "commrules", "Regras de Comissão", ["comissao", "comissão", "regra"], "Comissões"),
 
       s(190, "docfin", "Documentos Financeiros", "Recibos, faturas e comprovantes são emitidos pelo Financeiro Geral. Não existe cadastro de documentos financeiros no Gerenciamento.", undefined, ["recibo", "fatura", "nota", "documento", "financeiro"]),
-      s(200, "governanca", "Governança", "As trilhas de alteração financeira estão em Sistema › Auditoria e Logs. Painel de governança financeira dedicado ainda não existe.", undefined, ["governanca", "governança", "auditoria", "trilha"]),
+      a(200, "governanca", "Governança", ["governanca", "governança", "auditoria", "trilha", "alteracao", "historico"]),
 
       // LEGADOS — telas antigas mantidas acessíveis por ?screen= (sem cadastro paralelo no menu).
       h(900, "honorariums", "Honorários (legado)"),
@@ -339,7 +344,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
 
       a(50, "notifications", "Notificações", ["notificacao", "notificação", "email", "aviso", "comunicacao"], "Comunicações"),
 
-      s(60, "integracoes", "Integrações", "As integrações (câmbio, storage, cron) são configuradas por variáveis de ambiente e ainda não têm tela de administração.", undefined, ["integracao", "integração", "api", "webhook", "cron"]),
+      a(60, "integracoes", "Integrações", ["integracao", "integração", "api", "webhook", "cron", "cambio", "storage"]),
 
       a(70, "audit", "Auditoria e Logs", ["auditoria", "log", "trilha", "historico", "histórico"]),
 
@@ -362,6 +367,9 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       s(50, "dashboards", "Dashboards", "As composições visuais vivem nos módulos operacionais (Home, Financeiro Geral, Kanban). Dashboards configuráveis no Gerenciamento ainda não existem.", undefined, ["dashboard", "painel", "grafico", "gráfico"]),
 
       a(60, "impexp", "Importação / Exportação", ["exportacao", "exportação", "importacao", "csv", "json"], "Exportações"),
+
+      // RASCUNHO do mockup substituído pela tela real de Diagnóstico de Configuração.
+      h(900, "cfgdiagnosis-rascunho", "Diagnóstico de Configuração (rascunho do mockup)"),
     ],
   },
 ]

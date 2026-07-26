@@ -20,7 +20,21 @@ function fmt(iso: string) {
   return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
 }
 
-export default function LogAuditoriaTab() {
+// ESCOPOS de recorte da MESMA trilha (mesma API, mesmos dados, mesmas ações).
+// Sistema › Auditoria e Logs usa a trilha inteira; Financeiro › Governança usa o
+// recorte das entidades financeiras/de configuração. Nenhuma segunda fonte.
+const ESCOPOS: Record<string, { titulo: string; descricao: string; entidades: RegExp }> = {
+  financeiro: {
+    titulo: "Governança",
+    descricao:
+      "Trilha das alterações que afetam o financeiro: configurações financeiras, tabela de valores, catálogo, condições, taxas, formas de pagamento e lançamentos. Somente leitura.",
+    entidades:
+      /financ|tabelavalor|preco|preço|catalogo|item|condicao|condição|taxa|forma|adquirente|bandeira|receita|custo|cobranca|cobrança|lancamento|lançamento|servico|serviço|economic|comiss|imposto|conta/i,
+  },
+}
+
+export default function LogAuditoriaTab({ escopo }: { escopo?: string }) {
+  const cfg = escopo ? ESCOPOS[escopo] : undefined
   const [logs, setLogs] = useState<Log[]>([])
   const [loading, setLoading] = useState(true)
   const [fEntidade, setFEntidade] = useState("")
@@ -37,17 +51,22 @@ export default function LogAuditoriaTab() {
   }, [])
   useEffect(() => { load() }, [load])
 
-  const entidades = useMemo(() => Array.from(new Set(logs.map(l => l.entidade))).sort(), [logs])
-  const acoes = useMemo(() => Array.from(new Set(logs.map(l => l.acao))).sort(), [logs])
+  // recorte do escopo (quando houver): tudo o mais abaixo opera sobre ele
+  const logsEscopo = useMemo(
+    () => (cfg ? logs.filter(l => cfg.entidades.test(l.entidade)) : logs),
+    [logs, cfg],
+  )
+  const entidades = useMemo(() => Array.from(new Set(logsEscopo.map(l => l.entidade))).sort(), [logsEscopo])
+  const acoes = useMemo(() => Array.from(new Set(logsEscopo.map(l => l.acao))).sort(), [logsEscopo])
 
   const filtered = useMemo(() => {
     const q = busca.trim().toLowerCase()
-    return logs.filter(l =>
+    return logsEscopo.filter(l =>
       (!fEntidade || l.entidade === fEntidade) &&
       (!fAcao || l.acao === fAcao) &&
       (!q || l.descricao.toLowerCase().includes(q) || (l.usuarioNome || "").toLowerCase().includes(q))
     )
-  }, [logs, fEntidade, fAcao, busca])
+  }, [logsEscopo, fEntidade, fAcao, busca])
 
   if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
 
@@ -56,8 +75,10 @@ export default function LogAuditoriaTab() {
       <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-white">Logs / Auditoria</h2>
-            <p className="mt-1 text-sm text-white/60">Registro das ações no sistema. Mostrando os {logs.length} mais recentes.</p>
+            <h2 className="text-lg font-semibold text-white">{cfg?.titulo ?? "Logs / Auditoria"}</h2>
+            <p className="mt-1 max-w-3xl text-sm text-white/60">
+              {cfg?.descricao ?? "Registro das ações no sistema."} Mostrando {logsEscopo.length} de {logs.length} registros recentes.
+            </p>
           </div>
           <button onClick={load} className="flex-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10">Atualizar</button>
         </div>

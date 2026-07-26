@@ -8,7 +8,7 @@ Fonte única: `src/components/gerenciamentoComponents/managementNavigation.tsx`
 (estrutura + regras de submenu/seção, puras e testáveis).
 `src/app/administrator/page.tsx` apenas **renderiza** e mapeia `screen → componente`.
 
-Guardas: `npm run test:nav` (70 asserções) e `npm run test:accordion` (11 asserções).
+Guardas: `npm run test:nav` (73 asserções) e `npm run test:accordion` (11 asserções).
 
 ---
 
@@ -22,7 +22,7 @@ Guardas: `npm run test:nav` (70 asserções) e `npm run test:accordion` (11 asse
 | — (só existia como modal em Tipos de Processo) | — | Processos › Cadastros › Modalidades | `?screen=modalidades` | **`ModalidadesTab`** (mesma API do modal) | novo item, API existente | — |
 | Variações da Fase | `?screen=phasemodes` | Processos › Estrutura | igual | `ModosInternosFasesTab` | idêntica | — |
 | — (catálogo só era lido pelo Workflow Macro) | — | Processos › Estrutura › Fases | `?screen=fases` | **`CatalogoFasesTab`** + API `catalogo-fases` | novo item | — |
-| Versões por Processo | `?screen=cfgversions` | Processos › Configurações › Versões | igual | `ConfigVersionsTab` | idêntica | — |
+| Versões por Processo | `?screen=cfgversions` | Processos › Configurações › Versões | igual | **`VersoesConfiguracaoTab`** (era scaffold; rascunho em `?screen=cfgversions-rascunho`) | rota igual, tela agora real | — |
 | Workflow Macro | `?screen=macrokanban` | Workflow › Fluxos | igual | `MacroKanbanTab` | idêntica | — |
 | Workflow Interno | `?screen=phaseiwf` | Workflow › Fluxos | igual | `PhaseWorkflowsFasesTab` | idêntica | — |
 | Automações por Fase | `?screen=opauto` | Automações › Financeiras | `?screen=autofin` | `PhaseAutomationsFasesTab` (mesma tela, aba inicial `financial`) | preservada | **alias `opauto → autofin`** |
@@ -55,7 +55,7 @@ Guardas: `npm run test:nav` (70 asserções) e `npm run test:accordion` (11 asse
 | Cartórios e Órgãos | `?screen=organs` | Órgãos e Organizações › Organizações | igual | `OrgaosProtocoloTab` | idêntica | — |
 | Diagnóstico Executivo | `?screen=mgmthealth` | Relatórios e Indicadores › Indicadores | igual | `HealthTab` | idêntica | — |
 | Diagnósticos | `?screen=diagnostics` | Relatórios e Indicadores › Relatórios | igual | `DiagnosticsTab` | idêntica | — |
-| Diagnóstico de Configuração | `?screen=cfgdiagnosis` | Relatórios e Indicadores › Relatórios | igual | `ConfigDiagnosisTab` | idêntica | — |
+| Diagnóstico de Configuração | `?screen=cfgdiagnosis` | Relatórios e Indicadores › Relatórios | igual | **`DiagnosticoConfiguracaoTab`** (era scaffold; rascunho em `?screen=cfgdiagnosis-rascunho`) | rota igual, tela agora real | — |
 | Usuários | `?screen=users` | Usuários e Acessos | igual | `UsersTab` | idêntica | — |
 | Perfis e Permissões | `?screen=roles` | Usuários e Acessos › **Perfis** | igual | `RolesTab` | idêntica | — |
 | Equipes | `?screen=teams` | Usuários e Acessos › Grupos | igual | `TeamsTab` | idêntica | — |
@@ -73,7 +73,7 @@ Guardas: `npm run test:nav` (70 asserções) e `npm run test:accordion` (11 asse
 | Perfis de Permissão do Motor | `?screen=permmotor` | Usuários e Acessos › Permissões | componente real **sem rota** |
 | Catálogo Mestre | `?screen=catalogmestre` | Sistema › Cadastros Auxiliares | oculto |
 | Auditoria e Logs | `?screen=audit` | Sistema | registrado, fora do menu |
-| SLA e Prazos | `?screen=sla` | Processos › Configurações › SLA | registrado, fora do menu |
+| SLA e Prazos | `?screen=sla` | Processos › Configurações › SLA | registrado, fora do menu — agora tela REAL (`SLAConfiguracaoTab`); rascunho em `?screen=sla-rascunho` |
 | Configurações Gerais | `?screen=settings` | Sistema | registrado, fora do menu |
 | Modelos | `?screen=templates` | Sistema › Cadastros Auxiliares | registrado, fora do menu |
 | Notificações | `?screen=notifications` | Sistema › Comunicações | registrado, fora do menu |
@@ -89,24 +89,53 @@ histórico de `roles`), `honorariums`, `estruturafin`, `precificacao`, `comercia
 São telas legadas/concentradoras que duplicariam conceitos no menu. Continuam acessíveis por
 `?screen=<key>` — nenhuma foi removida do mapa de telas.
 
-## 4. Itens da arquitetura oficial ainda SEM tela própria
+## 4. Segunda leva (26/07) — consultas consolidadas sobre dados reais
+
+Cinco itens que estavam desabilitados (ou eram rascunho) viraram telas REAIS, todas sobre
+um **read-model único** `/api/gerenciamento/configuracao-processo` (somente leitura — a
+edição continua nas telas donas, sem segunda porta de escrita):
+
+| Item oficial | Rota | O que mostra |
+|---|---|---|
+| Processos › Configurações › SLA | `?screen=sla` | prazo de cada fase, acumulado das obrigatórias e maior SLA de passo |
+| Processos › Configurações › Versões | `?screen=cfgversions` | versão do Macro, de cada fase e de cada Workflow Interno |
+| Processos › Configurações Gerais | `?screen=proccfg` | identidade e situação de todos os tipos de processo |
+| Workflow › Transições | `?screen=transicoes` | cadeia de→para com a regra de entrada de cada fase |
+| Relatórios › Diagnóstico de Configuração | `?screen=cfgdiagnosis` | checklist real do que falta para o tipo operar |
+
+Mais dois, por reuso e por status real:
+
+| Item oficial | Rota | Implementação |
+|---|---|---|
+| Financeiro › Governança | `?screen=governanca` | `LogAuditoriaTab escopo="financeiro"` — MESMA trilha e API, recorte das entidades financeiras |
+| Sistema › Integrações | `?screen=integracoes` | `IntegracoesTab` + `/api/gerenciamento/integracoes` — estado real de câmbio, storage, motor e cron (nunca expõe valor de variável) |
+
+Os rascunhos substituídos continuam acessíveis: `?screen=sla-rascunho`,
+`?screen=cfgversions-rascunho`, `?screen=cfgdiagnosis-rascunho`.
+
+## 5. Itens da arquitetura oficial ainda SEM tela própria (8)
 
 Aparecem no menu **desabilitados**, com tooltip honesto dizendo onde a função vive hoje.
 Nunca viram página falsa nem botão morto.
 
-`Marcos`, `Processos › Configurações Gerais`, `Workflow › Transições`, `Serviços › Categorias`,
-`Financeiro › Crédito`, `Financeiro › Documentos Financeiros`, `Financeiro › Governança`,
-`Órgãos › Categorias`, `Usuários › Auditoria de Acessos`, `Sistema › Identidade Visual`,
-`Sistema › Integrações`, `Relatórios › Dashboards`.
+| Item | Por que ainda não tem tela |
+|---|---|
+| Processos › Estrutura › Marcos | não existe cadastro de marco no domínio — exige definir os campos e o efeito |
+| Serviços › Categorias | categoria de serviço hoje é campo texto do próprio serviço; virar cadastro exige tabela nova |
+| Órgãos e Organizações › Categorias | idem, com o requisito extra de múltiplas categorias por organização |
+| Financeiro › Crédito | gestão de crédito é operacional e já existe em Financeiro Geral › Créditos — replicar seria duplicar conceito |
+| Financeiro › Documentos Financeiros | recibos/faturas são emitidos pelo Financeiro Geral; não há cadastro no Gerenciamento |
+| Usuários › Auditoria de Acessos | **não há trilha de autenticação**: nenhum ponto do login/sessão grava LogAuditoria |
+| Sistema › Identidade Visual | a identidade é código (motor de ambiente por país), sem tabela de configuração |
+| Relatórios › Dashboards | as composições visuais vivem nos módulos operacionais; dashboards configuráveis exigem modelo próprio |
 
-## 5. Telas-rascunho (estrutura pronta, sem persistência)
+## 6. Telas-rascunho remanescentes (estrutura pronta, sem persistência)
 
 Continuam no menu (não são órfãs), mas com **aviso no topo** e **ações desabilitadas**
-(`_RascunhoUI.tsx`): `teams`, `rolecat`, `sla`, `settings`, `templates`, `notifications`,
-`impexp`, `syshealth`, `execmatrix`, `cfgversions`, `cfgdiagnosis`, `mgmthealth`,
-`diagnostics`, `prottypes`.
+(`_RascunhoUI.tsx`): `teams`, `rolecat`, `settings`, `templates`, `notifications`,
+`impexp`, `syshealth`, `execmatrix`, `mgmthealth`, `diagnostics`, `prottypes`.
 
-## 6. Regras de arquitetura garantidas por teste
+## 7. Regras de arquitetura garantidas por teste
 
 - fases cadastradas **exclusivamente** em Processos › Estrutura › Fases (`test:nav`);
 - Workflow não cadastra fases — só referencia;

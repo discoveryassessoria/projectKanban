@@ -42,8 +42,9 @@ const gDe = (k: string) => MANAGEMENT_NAVIGATION.find((g) => g.key === k)
 
 // keys registradas no mapa TELAS do page.tsx (screen → componente)
 const blocoTelas = pageSrc.split("const TELAS: Record<string, React.ComponentType>")[1]?.split("\n}")[0] ?? ""
+// aceita chave simples (foo:) e citada ("foo-bar":) — as duas formas existem no mapa
 const TELAS_KEYS = new Set(
-  Array.from(blocoTelas.matchAll(/^\s{2}([a-zA-Z_][\w]*):/gm)).map((m) => m[1]),
+  Array.from(blocoTelas.matchAll(/^\s{2}"?([a-zA-Z_][\w-]*)"?:/gm)).map((m) => m[1]),
 )
 // aliases de URL declarados no page.tsx (key antiga → tela real)
 const blocoAlias = pageSrc.match(/ALIAS_TELAS: Record<string, string> = \{([^}]*)\}/)?.[1] ?? ""
