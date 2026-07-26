@@ -11,7 +11,7 @@
 //   saldoBrl           = aVencerBrl + vencidoBrl
 // ============================================================================
 import { prisma } from '@/lib/prisma'
-import { snapshotCotacoes } from '@/src/lib/cambio/servico-cambio'
+import { computeCambioAging, cotacoesVivas } from './cambio-aging'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 const num = (x: unknown): number | null => (x == null ? null : Number(x))
@@ -63,6 +63,8 @@ export interface ReceitaLinha {
   saldoBrl: number
   aVencerBrl: number
   vencidoBrl: number
+  /** montante NÃO convertido (moeda de origem). > 0 = os *Brl não o representam. */
+  naoConvertido: number
   // --- parcelas (aging) ---
   parcelas: number
   parcelasRecebidas: number
@@ -132,6 +134,8 @@ export interface ReceitaGrupo {
   saldoBrlTotal: number
   aVencerBrlTotal: number
   vencidoBrlTotal: number
+  /** montante NÃO convertido no grupo (moeda de origem). */
+  naoConvertidoTotal: number
   proximoVencimento: string | null
   statusConsolidado: string
   participantesCount: number
@@ -220,31 +224,10 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
     return n || 'Requerente não identificado'
   }
 
-  // Cotações vigentes (LÊ SÓ O BANCO — fonte Confidence). EUR/USD → BRL.
-  const live: Record<string, number | null> = {}
-  let liveData: string | null = null
-  try {
-    const snap = await snapshotCotacoes()
-    for (const m of snap.moedas) { live[String(m.moeda)] = m.valor; if (m.dataReferencia && !liveData) liveData = m.dataReferencia }
-  } catch { /* sem cotação viva: cai p/ fx da receita ou "não definido" */ }
+  // Cotações vigentes — FONTE ÚNICA via cambio-aging → serviço canônico.
+  const live = await cotacoesVivas()
 
   const agora = Date.now()
-
-  // Resolve o câmbio de uma receita (precedência: BRL → valorBrlFixo → fxFixo/fxEstimado → cotação viva).
-  const resolverCambio = (moedaBase: string, valorBase: number, rec: (typeof receitas)[number] | undefined) => {
-    if (moedaBase === 'BRL') return { cotacao: 1, tipo: 'BRL' as TipoCambio, data: null, contratadoBrl: cent(valorBase) }
-    const liveRate = live[moedaBase] ?? null
-    if (rec) {
-      const fixo = rec.fxRule === 'FIXO'
-      const cot = fixo ? (num(rec.fxFixo) ?? num(rec.fxEstimado) ?? liveRate) : (num(rec.fxEstimado) ?? num(rec.fxFixo) ?? liveRate)
-      if (cot == null) return { cotacao: null, tipo: 'NAO_DEFINIDO' as TipoCambio, data: null, contratadoBrl: cent(valorBase) }
-      const brlFixo = num(rec.valorBrlFixo)
-      const contratadoBrl = fixo && brlFixo ? cent(brlFixo) : cent(valorBase * cot)
-      return { cotacao: cot, tipo: (fixo ? 'FIXO' : 'VARIAVEL') as TipoCambio, data: fixo && rec.fxData ? new Date(rec.fxData).toISOString() : liveData, contratadoBrl }
-    }
-    if (liveRate == null) return { cotacao: null, tipo: 'NAO_DEFINIDO' as TipoCambio, data: null, contratadoBrl: cent(valorBase) }
-    return { cotacao: liveRate, tipo: 'HOJE' as TipoCambio, data: liveData, contratadoBrl: cent(valorBase * liveRate) }
-  }
 
   const rows = obrs.map((o) => {
     const proj = projPor.get(o.id)
@@ -270,74 +253,36 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
     const recebido = proj ? Number(proj.recebidoBruto) : 0
     const venc = o.vencimento ?? rec?.data1 ?? null
 
-    const cambio = resolverCambio(moedaBase, valorBase, rec)
-    const cot = cambio.cotacao
-    const contratadoBrl = cambio.contratadoBrl
-
-    // parcelas legadas desta receita (aging real)
+    // ── câmbio + aging: FONTE ÚNICA computeCambioAging (mesma função do Detalhe) ──
+    // Não existe mais cálculo paralelo aqui: precedência, política de ausência de
+    // cotação, arredondamento, aging e status vêm todos do canônico.
     const pcs = rec ? (parcelasPor.get(rec.id) ?? []) : []
-    const parcelaBrl = (pc: (typeof parcelas)[number]): number => {
-      const vb = num(pc.valorBrl); if (vb != null) return vb
-      const ca = num(pc.cambioAplicado); if (ca) return Number(pc.valor) * ca
-      return cot ? Number(pc.valor) * cot : Number(pc.valor)
-    }
+    const ca = computeCambioAging({
+      moedaBase,
+      valorBase,
+      saldoLedger: saldo,
+      recebidoLedger: recebido,
+      vencimento: venc,
+      receita: rec
+        ? { fxRule: rec.fxRule, fxEstimado: rec.fxEstimado, fxFixo: rec.fxFixo, fxData: rec.fxData, valorBrlFixo: rec.valorBrlFixo }
+        : null,
+      parcelas: pcs as never,
+      live,
+      agora,
+    })
 
-    // recebido em BRL — FONTE ÚNICA = Ledger (recebido do razão); quando o razão tem
-    // movimento ele manda (o motor V3 não vira ParcelaFinanceira.status). Parcelas quitadas
-    // só cobrem legado sem lançamento no razão. Idêntico ao detalhe (computeCambioAging).
-    const taxaEfetiva = valorBase > 0 ? contratadoBrl / valorBase : (cot ?? 1)
-    const recebidoLedgerBrl = moedaBase === 'BRL' ? cent(recebido) : cent(recebido * taxaEfetiva)
-    const recebidoParcelaBrl = cent(pcs.filter((pc) => pc.status === 'RECEBIDA' || pc.status === 'PAGA').reduce((s, pc) => s + parcelaBrl(pc), 0))
-    const recebidoBrl = recebido > 0.005 ? recebidoLedgerBrl : recebidoParcelaBrl
-    // saldo em BRL DERIVADO (garante contratado = recebido + saldo)
-    const saldoBrl = cent(contratadoBrl - recebidoBrl)
-
-    // aging: divide o saldoBrl em vencido/a-vencer pela data das parcelas em aberto
-    const open = pcs.filter((pc) => pc.status === 'PENDENTE')
-    let rawVenc = 0, rawAV = 0, nVenc = 0, nAV = 0
-    for (const pc of open) {
-      const brl = parcelaBrl(pc)
-      if (new Date(pc.vencimento).getTime() < agora) { rawVenc += brl; nVenc++ } else { rawAV += brl; nAV++ }
-    }
-    let vencidoBrl = 0, aVencerBrl = 0
-    const rawTot = rawVenc + rawAV
-    if (rawTot > 0.005) {
-      vencidoBrl = cent((saldoBrl * rawVenc) / rawTot)
-      aVencerBrl = cent(saldoBrl - vencidoBrl)
-    } else if (saldoBrl > 0.005) {
-      const overdue = venc ? new Date(venc).getTime() < agora : false
-      if (overdue) { vencidoBrl = saldoBrl; nVenc = nVenc || 1 } else { aVencerBrl = saldoBrl; nAV = nAV || 1 }
-    }
-
-    const overdueUnico = venc ? new Date(venc).getTime() < agora : false
-    const parcelasTot = pcs.length > 0 ? pcs.length : 1
-    let parcelasRecebidas: number
-    if (pcs.length > 0) {
-      const porStatus = pcs.filter((pc) => pc.status === 'RECEBIDA' || pc.status === 'PAGA').length
-      if (porStatus > 0) parcelasRecebidas = porStatus
-      else {
-        let resto = recebidoBrl, n = 0
-        for (const pc of [...pcs].sort((a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime())) {
-          const b = parcelaBrl(pc); if (b > 0 && resto >= b - 0.005) { resto = cent(resto - b); n++ } else break
-        }
-        parcelasRecebidas = n
-      }
-    } else {
-      parcelasRecebidas = recebido >= valorBase - 0.005 && valorBase > 0 ? 1 : 0
-    }
-    const parcelasAVencer = pcs.length > 0 ? nAV : (saldoBrl > 0.005 && !overdueUnico ? 1 : 0)
-    const parcelasVencidas = pcs.length > 0 ? nVenc : (saldoBrl > 0.005 && overdueUnico ? 1 : 0)
-    const proximoVenc = open.length > 0
-      ? new Date(Math.min(...open.map((pc) => new Date(pc.vencimento).getTime()))).toISOString()
-      : (saldoBrl > 0.005 && venc ? new Date(venc).toISOString() : null)
-
-    const statusLabel = saldoBrl <= 0.005
-      ? 'QUITADO'
-      : vencidoBrl > 0.005
-        ? 'VENCIDO'
-        : recebidoBrl > 0.005
-          ? 'PARCIAL'
-          : 'A VENCER'
+    const cot = ca.cotacaoAplicada
+    const contratadoBrl = ca.valorContratadoBrl
+    const recebidoBrl = ca.recebidoBrl
+    const saldoBrl = ca.saldoBrl
+    const aVencerBrl = ca.aVencerBrl
+    const vencidoBrl = ca.vencidoBrl
+    const parcelasTot = ca.parcelas
+    const parcelasRecebidas = ca.parcelasRecebidas
+    const parcelasAVencer = ca.parcelasAVencer
+    const parcelasVencidas = ca.parcelasVencidas
+    const proximoVenc = ca.proximoVencimento
+    const statusLabel = ca.statusLabel
 
     const servico = itemMestre?.name
       ?? (rec?.tipoServicoId ? tipoPor.get(rec.tipoServicoId) : null)
@@ -357,8 +302,9 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
       servico,
       formaCobranca: 'À vista',
       moeda: moedaBase, moedaBase, valorBase: cent(valorBase), valorContratado: cent(valorBase), recebido: cent(recebido), saldo: cent(saldo),
-      cotacaoAplicada: cot, tipoCambio: cambio.tipo, dataCotacao: cambio.data,
+      cotacaoAplicada: cot, tipoCambio: ca.tipoCambio, dataCotacao: ca.dataCotacao,
       valorContratadoBrl: contratadoBrl, recebidoBrl, saldoBrl, aVencerBrl, vencidoBrl,
+      naoConvertido: ca.valorNaoConvertido,
       parcelas: parcelasTot, parcelasRecebidas, parcelasAVencer, parcelasVencidas, proximoVencimento: proximoVenc,
       vencimento: venc ? new Date(venc).toISOString() : null,
       statusLabel,
@@ -405,6 +351,7 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
     const saldoBrlTotal = cent(membros.reduce((s, m) => s + m.linha.saldoBrl, 0))
     const aVencerBrlTotal = cent(membros.reduce((s, m) => s + m.linha.aVencerBrl, 0))
     const vencidoBrlTotal = cent(membros.reduce((s, m) => s + m.linha.vencidoBrl, 0))
+    const naoConvertidoTotal = cent(membros.reduce((s, m) => s + (m.linha.naoConvertido ?? 0), 0))
     const proximos = membros.map((m) => m.linha.proximoVencimento).filter((v): v is string => !!v).sort()
     const statusConsolidado = vencidoBrlTotal > 0.005
       ? 'VENCIDO'
@@ -425,6 +372,7 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
       saldoBrlTotal,
       aVencerBrlTotal,
       vencidoBrlTotal,
+      naoConvertidoTotal,
       proximoVencimento: proximos[0] ?? null,
       statusConsolidado,
       participantesCount: membros.length,

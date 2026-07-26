@@ -122,6 +122,19 @@ ok(!/\{fmt\(o\.contratadoBrl \?\? 0\)\}/.test(shell), "Shell não renderiza mais
 ok(/brlOuOrigem/.test(detalheUI), "Detalhe tem helper de valor não convertido")
 ok(/não convertido/.test(detalheUI), "Detalhe rotula o estado ao usuário")
 
+// ═══════════ 8) LISTA ≡ DETALHE (último read-model paralelo) ═══════════
+console.log("\n8) receitas-lista consolidado")
+const lista = ler("lib/financeiro/leitura/receitas-lista.ts")
+
+ok(/computeCambioAging\(/.test(lista), "lista usa computeCambioAging (mesma função do detalhe)")
+ok(/cotacoesVivas\(\)/.test(lista), "lista usa as cotações canônicas")
+ok(!/snapshotCotacoes/.test(lista), "lista não consulta snapshotCotacoes direto")
+ok(!/resolverCambio/.test(lista), "helper de câmbio duplicado foi removido")
+ok(!/fxRule === 'FIXO'/.test(lista), "precedência própria eliminada")
+ok(!/liveRate/.test(lista), "resolução de taxa própria eliminada")
+ok(/naoConvertido: ca\.valorNaoConvertido/.test(lista), "lista propaga a política de ausência")
+ok(/naoConvertidoTotal/.test(lista), "totais do grupo declaram o não convertido")
+
 console.log(`\n${passed} passaram, ${failed} falharam`)
 if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }
 console.log("Câmbio canônico: política única validada ✅")
