@@ -19,6 +19,10 @@ import EstornoModal from "@/src/components/financeiro/v3/EstornoModal"
 import DefinirEscopoDrawer, { type EscopoEscolhido } from "@/src/components/financeiro/v3/DefinirEscopoDrawer"
 import AcaoReceitaModal, { type AcaoReceita } from "@/src/components/financeiro/v3/AcaoReceitaModal"
 import EditarReceitaView from "@/src/components/financeiro/v3/EditarReceitaView"
+import CancelamentoAvancadoModal from "@/src/components/financeiro/v3/CancelamentoAvancadoModal"
+import DuplicarReceitaModal from "@/src/components/financeiro/v3/DuplicarReceitaModal"
+import ExcluirReceitaModal from "@/src/components/financeiro/v3/ExcluirReceitaModal"
+import ParticipanteContaView from "@/src/components/financeiro/v3/ParticipanteContaView"
 import { NovaFaturaModal } from "@/src/components/kanban/NovaFaturaModal"
 import { uploadFiles } from "@/src/lib/storage"
 import { emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
@@ -29,7 +33,7 @@ import {
   Plus, Pencil, ChevronLeft, ChevronRight, UserPlus, ArrowDownCircle, CheckCircle2,
   Info as InfoIcon, X, AlertTriangle, Send, FileText, Loader2, ChevronRight as ChevronRightSm,
   Download, File as FileIcon, Users, StickyNote, RotateCcw,
-  Archive, RefreshCcw, Ban, ArrowLeftRight,
+  Archive, RefreshCcw, Ban, ArrowLeftRight, Trash2,
 } from "lucide-react"
 
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
@@ -78,6 +82,10 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const [receberEscopo, setReceberEscopo] = useState<EscopoEscolhido | null>(null)
   const [distribuicaoOpen, setDistribuicaoOpen] = useState(false)
   const [acaoModal, setAcaoModal] = useState<AcaoReceita | null>(null)
+  const [cancelamentoOpen, setCancelamentoOpen] = useState(false)
+  const [duplicarOpen, setDuplicarOpen] = useState(false)
+  const [excluirOpen, setExcluirOpen] = useState(false)
+  const [timelineGeral, setTimelineGeral] = useState<any[] | null>(null)
   const [editarReceitaOpen, setEditarReceitaOpen] = useState(false)
   const [faturaOpen, setFaturaOpen] = useState(false)
   const [maisOpen, setMaisOpen] = useState(false)
@@ -105,6 +113,15 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   }, [refParam])
 
   useEffect(() => { carregar() }, [carregar])
+
+  // Timeline GERAL da Receita (só eventos de negócio; individuais vivem no ParticipanteContaView).
+  // Carregada de forma preguiçosa ao abrir a aba Timeline.
+  useEffect(() => {
+    if (tab !== "timeline" || timelineGeral != null) return
+    fetch(`/api/financeiro/v3/receita/${encodeURIComponent(refParam)}/timeline?escopo=geral`, { headers: authHeaders() })
+      .then(async (r) => { const j = await r.json().catch(() => ({})); if (r.ok && j.disponivel && Array.isArray(j.eventos)) setTimelineGeral(j.eventos); else setTimelineGeral([]) })
+      .catch(() => setTimelineGeral([]))
+  }, [tab, timelineGeral, refParam])
 
   const copiarCodigo = () => { if (!d?.codigo) return; navigator.clipboard?.writeText(d.codigo).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 1500) }).catch(() => {}) }
 
@@ -198,7 +215,6 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   // ── Distribuição entre requerentes ──
   const dist: any[] = d.distribuicaoRequerentes ?? []
   const divisaoIgual = dist.length > 1 && new Set(dist.map((r) => Math.round(Number(r.percentual)))).size === 1
-  const historico: any[] = d.historico ?? []
   const documentos: any[] = d.documentos ?? []
 
   // ── Participantes financeiros (visão consolidada do grupo) ──
@@ -296,8 +312,10 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                     <button onClick={() => { setMaisOpen(false); setTab("pagamentos") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><RotateCcw className="h-4 w-4 text-[var(--danger)]" /> Estornar pagamento</button>
                     <div className="my-1 border-t border-[var(--border-default)]" />
                     <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Encerramento</div>
+                    {!isCusto && <button onClick={() => { setMaisOpen(false); setDuplicarOpen(true) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><Copy className="h-4 w-4 text-[var(--text-muted)]" /> Duplicar receita</button>}
                     {!isCusto && <button onClick={() => { setMaisOpen(false); setAcaoModal("arquivar") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><Archive className="h-4 w-4 text-[var(--info)]" /> Arquivar</button>}
-                    <button onClick={() => { setMaisOpen(false); setAcaoModal("cancelar") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--danger)] hover:bg-[var(--surface-hover)]"><Ban className="h-4 w-4" /> Cancelar {isCusto ? "custo" : "Receita"}</button>
+                    <button onClick={() => { setMaisOpen(false); setCancelamentoOpen(true) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--danger)] hover:bg-[var(--surface-hover)]"><Ban className="h-4 w-4" /> Cancelar {isCusto ? "custo" : "Receita"}</button>
+                    <button onClick={() => { setMaisOpen(false); setExcluirOpen(true) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--danger)] hover:bg-[var(--surface-hover)]"><Trash2 className="h-4 w-4" /> Excluir {isCusto ? "custo" : "Receita"}</button>
                     <div className="my-1 border-t border-[var(--border-default)]" />
                     <button onClick={() => { setMaisOpen(false); setTab("timeline") }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><Clock className="h-4 w-4 text-[var(--text-muted)]" /> Ver movimentações</button>
                     <button onClick={() => { setMaisOpen(false); copiarCodigo() }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">{copiado ? <CheckCircle2 className="h-4 w-4 text-[var(--success)]" /> : <Copy className="h-4 w-4 text-[var(--text-muted)]" />} Copiar código</button>
@@ -655,25 +673,34 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
             </div>
           )}
 
-          {/* Timeline / Histórico de movimentações */}
+          {/* Timeline GERAL da Receita (escopo=geral) — eventos de negócio da Receita
+              consolidada (criação/edição/redistribuição/cancelamento/arquivamento).
+              Eventos individuais de pagamento vivem no ParticipanteContaView. */}
           {tab === "timeline" && (
           <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-5">
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">Histórico de movimentações</h2>
-            <div className="mt-4">{historico.map((h: any, i: number) => {
+            <p className="mt-1 text-sm text-[var(--text-muted)]">Timeline geral desta Receita. A timeline individual de cada participante está na conta do participante.</p>
+            {timelineGeral == null ? (
+              <div className="mt-4 flex items-center gap-2 text-sm text-[var(--text-muted)]"><Loader2 className="h-4 w-4 animate-spin" /> carregando…</div>
+            ) : timelineGeral.length === 0 ? (
+              <div className="mt-4 rounded-[var(--radius-sm)] border border-dashed border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-8 text-center text-sm text-[var(--text-muted)]">Sem eventos de negócio registrados nesta Receita.</div>
+            ) : (
+            <div className="mt-4">{timelineGeral.map((h: any, i: number) => {
               const Icon = h.tipo === "OBRIGACAO_CRIADA" ? UserPlus : (String(h.tipo).startsWith("PAGAMENTO") ? ArrowDownCircle : Receipt)
-              const cor = h.tipo === "OBRIGACAO_CRIADA" ? "text-[var(--text-secondary)]" : (String(h.tipo).startsWith("PAGAMENTO") ? "text-[var(--success)]" : "text-[var(--text-secondary)]")
-              const ultimo = i === historico.length - 1
+              const cor = String(h.tipo).startsWith("PAGAMENTO") ? "text-[var(--success)]" : "text-[var(--text-secondary)]"
+              const ultimo = i === timelineGeral.length - 1
               return (
                 <div key={h.id ?? i} className="flex gap-4">
                   <div className="w-16 shrink-0 pt-0.5 text-right text-[11px] leading-tight text-[var(--text-muted)]">{dataBR(h.data)}<br />{horaBR(h.data)}</div>
                   <div className="flex flex-col items-center"><div className={`flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-hover)] ${cor}`}><Icon className="h-4 w-4" /></div>{!ultimo && <div className="w-px flex-1 bg-[var(--border-default)]" />}</div>
                   <div className={`flex-1 ${ultimo ? "" : "pb-6"}`}>
-                    <div className="flex items-start justify-between"><div className="font-medium text-[var(--text-primary)]">{h.titulo}</div><span className="text-xs text-[var(--info)]">{h.ator}</span></div>
+                    <div className="flex items-start justify-between gap-2"><div className="font-medium text-[var(--text-primary)]">{h.titulo}</div>{h.ator && <span className="shrink-0 text-xs text-[var(--info)]">{h.ator}</span>}</div>
                     <div className="mt-0.5 text-sm text-[var(--text-secondary)]">{h.descricao}</div>
                   </div>
                 </div>
               )
             })}</div>
+            )}
           </div>
           )}
 
@@ -690,14 +717,14 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
         </div>
       </div>
 
-      {/* ── DRAWER DO PARTICIPANTE ── */}
+      {/* ── CONTA INDIVIDUAL DO PARTICIPANTE (visão completa: resumo/parcelas/cobranças/
+           pagamentos/timeline individual/documentos/observações/histórico + ações) ── */}
       {drawerPart && (
-        <ParticipanteDrawer
+        <ParticipanteContaView
           obrigacaoId={drawerPart.obrigacaoId}
           nome={drawerPart.nome}
-          codigoReceita={d.codigo}
           onClose={() => setDrawerPart(null)}
-          onPagamentoRegistrado={carregar}
+          onRecarregar={carregar}
         />
       )}
 
@@ -757,6 +784,28 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
           onDone={() => { setAcaoModal(null); carregar() }}
         />
       )}
+      {cancelamentoOpen && d && (
+        <CancelamentoAvancadoModal
+          receitaRef={String(d.obrigacaoId)}
+          participantes={(d.participantes ?? []).map((p: any) => ({ obrigacaoId: p.obrigacaoId, nome: p.nome }))}
+          onClose={() => setCancelamentoOpen(false)}
+          onDone={() => { setCancelamentoOpen(false); carregar() }}
+        />
+      )}
+      {duplicarOpen && d && (
+        <DuplicarReceitaModal
+          receitaRef={String(d.obrigacaoId)}
+          onClose={() => setDuplicarOpen(false)}
+          onDone={(obrigacaoIdNovo) => { setDuplicarOpen(false); router.push(`/financeiro/v3/receita/${obrigacaoIdNovo}`) }}
+        />
+      )}
+      {excluirOpen && d && (
+        <ExcluirReceitaModal
+          receitaRef={String(d.obrigacaoId)}
+          onClose={() => setExcluirOpen(false)}
+          onDone={() => { setExcluirOpen(false); onVoltar() }}
+        />
+      )}
       {editarReceitaOpen && d && (
         <EditarReceitaView
           obrigacaoId={d.obrigacaoId}
@@ -800,153 +849,6 @@ function PagamentoRowMenu({ p, onEstornar, onTimeline }: { p: any; onEstornar: (
         </>
       )}
     </div>
-  )
-}
-
-// ── Drawer do participante: visão de UM requerente DENTRO do contexto da Receita ──
-// Busca a visão single (?obrigacao=<id>) e mostra status/valores/parcelas/pagamentos
-// daquele participante, sem sair da tela consolidada. Read-focused + registrar pagamento.
-function ParticipanteDrawer({ obrigacaoId, nome, codigoReceita, onClose, onPagamentoRegistrado }: { obrigacaoId: number; nome: string; codigoReceita: string; onClose: () => void; onPagamentoRegistrado: () => void }) {
-  const [pd, setPd] = useState<any>(null)
-  const [pErro, setPErro] = useState<string | null>(null)
-  const [pagOpen, setPagOpen] = useState(false)
-
-  const load = useCallback(() => {
-    fetch(`/api/financeiro/v3/receita/${obrigacaoId}?obrigacao=${obrigacaoId}`, { headers: authHeaders() })
-      .then(async (r) => { const j = await r.json(); if (r.ok && j.disponivel) { setPd(j.receita); setPErro(null) } else setPErro("Participante não encontrado.") })
-      .catch(() => setPErro("Falha ao carregar."))
-  }, [obrigacaoId])
-
-  useEffect(() => { load() }, [load])
-
-  useEffect(() => {
-    const orig = document.body.style.overflow
-    document.body.style.overflow = "hidden"
-    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
-    document.addEventListener("keydown", onEsc)
-    return () => { document.body.style.overflow = orig; document.removeEventListener("keydown", onEsc) }
-  }, [onClose])
-
-  if (typeof document === "undefined") return null
-
-  const parcelas: any[] = pd?.parcelasDetalhe ?? []
-  const pagamentos: any[] = pd?.pagamentos ?? []
-
-  return createPortal(
-    <>
-      <div className="fixed inset-0 flex justify-end bg-[var(--app-overlay)]" style={{ zIndex: LAYER.aboveProcessDrawer }} onClick={onClose}>
-        <div className="flex h-full w-full max-w-[600px] flex-col overflow-hidden border-l border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--shadow-surface)]" onClick={(e) => e.stopPropagation()}>
-          {/* Header */}
-          <div className="flex items-start justify-between gap-3 border-b border-[var(--border-default)] px-5 py-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-hover)] text-xs font-semibold text-[var(--text-secondary)]">{iniciais(nome)}</span>
-              <div className="min-w-0">
-                <h3 className="truncate text-base font-semibold text-[var(--text-primary)]">{nome}</h3>
-                <div className="text-xs text-[var(--text-muted)]">participante de {codigoReceita}</div>
-              </div>
-            </div>
-            <button onClick={onClose} className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><X className="h-5 w-5" /></button>
-          </div>
-
-          {/* Corpo */}
-          <div className="flex-1 overflow-y-auto px-5 py-5">
-            {pErro ? (
-              <div className="rounded-[var(--radius-sm)] border px-3 py-2 text-sm text-[var(--danger)]" style={{ borderColor: "color-mix(in srgb, var(--danger) 30%, transparent)", background: "color-mix(in srgb, var(--danger) 10%, transparent)" }}>{pErro}</div>
-            ) : !pd ? (
-              <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]"><Loader2 className="h-4 w-4 animate-spin" /> carregando…</div>
-            ) : (
-              <div className="space-y-5">
-                {/* Status + valores */}
-                <div>
-                  <span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${statusCls(pd.statusLabel)}`} style={statusBg(pd.statusLabel)}>{pd.statusLabel}</span>
-                  <div className="mt-3 grid grid-cols-3 gap-3">
-                    <div className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
-                      <div className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">Contratado</div>
-                      <div className="mt-1 text-base font-semibold text-[var(--text-primary)]">{brl(pd.valorContratadoBrl)}</div>
-                    </div>
-                    <div className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
-                      <div className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">Recebido</div>
-                      <div className="mt-1 text-base font-semibold text-[var(--success)]">{brl(pd.recebidoBrl)}</div>
-                    </div>
-                    <div className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
-                      <div className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">Saldo</div>
-                      <div className="mt-1 text-base font-semibold text-[var(--info)]">{brl(pd.saldoBrl)}</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Parcelas */}
-                <div>
-                  <div className="mb-2 text-sm font-semibold text-[var(--text-primary)]">Parcelas <span className="text-[var(--text-muted)]">({parcelas.length})</span></div>
-                  {parcelas.length === 0 ? (
-                    <div className="rounded-[var(--radius-sm)] border border-dashed border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-5 text-center text-xs text-[var(--text-muted)]">Sem parcelas.</div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead><tr className="border-b border-[var(--border-default)] text-left text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
-                          <th className="pb-2 font-medium">Parcela</th>
-                          <th className="pb-2 font-medium">Vencimento</th>
-                          <th className="pb-2 font-medium">Valor</th>
-                          <th className="pb-2 font-medium">Recebido</th>
-                          <th className="pb-2 font-medium">Status</th>
-                        </tr></thead>
-                        <tbody>{parcelas.map((p: any, i: number) => (
-                          <tr key={i} className="border-b border-[var(--border-default)]">
-                            <td className="whitespace-nowrap py-2.5 font-medium text-[var(--text-primary)]">{p.numero}/{p.totalParcelas}</td>
-                            <td className="whitespace-nowrap py-2.5 text-[var(--text-secondary)]">{dataBR(p.vencimento)}</td>
-                            <td className="whitespace-nowrap py-2.5 text-[var(--text-primary)]">{brl(p.valorBrl)}</td>
-                            <td className={`whitespace-nowrap py-2.5 ${p.recebidoBrl > 0 ? "text-[var(--success)]" : "text-[var(--text-secondary)]"}`}>{brl(p.recebidoBrl)}</td>
-                            <td className="py-2.5"><span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${parcelaStatusCls(p.status)}`} style={parcelaStatusBg(p.status)}>{parcelaStatusLabel(p.status)}</span></td>
-                          </tr>
-                        ))}</tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-
-                {/* Pagamentos */}
-                <div>
-                  <div className="mb-2 text-sm font-semibold text-[var(--text-primary)]">Pagamentos <span className="text-[var(--text-muted)]">({pagamentos.length})</span></div>
-                  {pagamentos.length === 0 ? (
-                    <div className="rounded-[var(--radius-sm)] border border-dashed border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-5 text-center text-xs text-[var(--text-muted)]">Nenhum pagamento registrado.</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {pagamentos.map((p: any) => (
-                        <div key={p.id} className="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2.5">
-                          <div className="min-w-0">
-                            <div className="text-sm text-[var(--text-primary)]">{fmt(p.valor, pd.moeda)}</div>
-                            <div className="text-[11px] text-[var(--text-muted)]">{dataBR(p.data)} · {p.formaLabel ?? "—"}</div>
-                          </div>
-                          <span className="inline-flex items-center gap-1.5 text-xs text-[var(--success)]"><span className="h-1.5 w-1.5 rounded-full bg-[var(--success)]" />{p.status}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Rodapé */}
-          <div className="flex items-center justify-between gap-2 border-t border-[var(--border-default)] px-5 py-4">
-            <button onClick={onClose} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:border-[var(--border-strong)]">Fechar</button>
-            <button onClick={() => setPagOpen(true)} disabled={!pd} className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"><Plus className="h-4 w-4" /> Registrar pagamento</button>
-          </div>
-        </div>
-      </div>
-
-      {pagOpen && pd && (
-        <RegistrarPagamentoModal
-          obrigacaoId={pd.obrigacaoId ?? obrigacaoId}
-          moeda={pd.moeda}
-          saldo={pd.saldo}
-          natureza="RECEITA"
-          onClose={() => setPagOpen(false)}
-          onDone={() => { setPagOpen(false); load(); onPagamentoRegistrado() }}
-        />
-      )}
-    </>,
-    document.body,
   )
 }
 

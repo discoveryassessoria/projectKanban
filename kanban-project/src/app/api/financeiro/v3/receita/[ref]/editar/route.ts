@@ -30,6 +30,8 @@ function extrairPatch(b: Record<string, unknown>): EditarReceitaPatch {
     moeda: p.moeda as string | null | undefined,
     valorBaseTotal: p.valorBaseTotal === undefined ? undefined : (p.valorBaseTotal == null ? null : Number(p.valorBaseTotal)),
     cambio: (p.cambio ?? undefined) as EditarReceitaPatch['cambio'],
+    responsavelId: p.responsavelId === undefined ? undefined : (p.responsavelId == null ? null : Number(p.responsavelId)),
+    vencimento: p.vencimento === undefined ? undefined : (p.vencimento as string | null),
   }
 }
 

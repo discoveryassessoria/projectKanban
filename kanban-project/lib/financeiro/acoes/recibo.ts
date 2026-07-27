@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { carregarContextoReceita, registrarEventoReceita, type ContextoReceita } from './receita-contexto'
 
 export class AcaoReceitaError extends Error {
-  constructor(message: string, public status: number) {
+  constructor(message: string, public status: number, public motivos?: string[]) {
     super(message)
     this.name = 'AcaoReceitaError'
   }

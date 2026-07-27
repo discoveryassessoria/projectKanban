@@ -41,6 +41,8 @@ interface Previa {
   valorBaseTotalAntigo: number; valorBaseTotalNovo: number; cotacaoEfetivaAntiga: number | null; cotacaoEfetivaNova: number | null
   valorContratadoBrlAntigo: number; valorContratadoBrlNovo: number; recebidoTotalBrl: number
   cobrancasAfetadas: { parcelaId: number; receitaId: number | null; numero: number; vencimento: string | null; valorBaseAntigo: number; valorBaseNovo: number; valorBrlNovo: number }[]
+  // Responsável/vencimento (nível obrigação) — não movem saldo, só refletem no preview.
+  mudaResponsavel?: boolean; mudaVencimento?: boolean; responsavelNovo?: number | null; vencimentoNovo?: string | null
 }
 
 const inputCls = "w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--info)]"
@@ -67,6 +69,15 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
   const [fxEstimado, setFxEstimado] = useState<string>("")
   const [fxData, setFxData] = useState<string>("")
   const [valorBrlFixo, setValorBrlFixo] = useState<string>("")
+
+  // Responsável e vencimento (nível obrigação) — integram o MESMO preview de impacto.
+  const [responsavelId, setResponsavelId] = useState<string>("")
+  const [vencimento, setVencimento] = useState<string>("")
+  const [origResp, setOrigResp] = useState<string>("")
+  const [origVenc, setOrigVenc] = useState<string>("")
+  const [seededOk, setSeededOk] = useState(false)
+  const [usuarios, setUsuarios] = useState<{ id: number; nome: string }[]>([])
+  const seeded = useRef(false)
 
   const [estrategia, setEstrategia] = useState<"ATUALIZAR_ABERTAS" | "AJUSTE_COMPENSATORIO">("ATUALIZAR_ABERTAS")
   const [justificativa, setJustificativa] = useState("")
@@ -104,6 +115,35 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
     return () => { vivo = false; document.body.style.overflow = orig }
   }, [receitaRef])
 
+  // Usuários para o seletor de Responsável (degrade gracioso → input de id se indisponível).
+  useEffect(() => {
+    let vivo = true
+    fetch("/api/usuarios", { headers: authHeaders() })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (vivo && Array.isArray(j?.usuarios)) setUsuarios(j.usuarios.map((u: any) => ({ id: u.id, nome: u.nome ?? u.email ?? `Usuário ${u.id}` }))) })
+      .catch(() => {})
+    return () => { vivo = false }
+  }, [])
+
+  // Seed dos valores atuais de responsável/vencimento via um preview inicial (o motor
+  // devolve responsavelNovo/vencimentoNovo = atuais quando não há patch desses campos).
+  useEffect(() => {
+    if (!rec || seeded.current) return
+    seeded.current = true
+    ;(async () => {
+      try {
+        const r = await fetch(`/api/financeiro/v3/receita/${receitaRef}/editar?preview=1`, {
+          method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ moeda: rec.moedaBase, valorBaseTotal: cent(rec.valorBaseTotal) }),
+        }).then((x) => x.json())
+        const resp = r?.previa?.responsavelNovo != null ? String(r.previa.responsavelNovo) : ""
+        const venc = r?.previa?.vencimentoNovo ? String(r.previa.vencimentoNovo).slice(0, 10) : ""
+        setResponsavelId(resp); setOrigResp(resp)
+        setVencimento(venc); setOrigVenc(venc)
+      } catch { /* preview de seed opcional */ } finally { setSeededOk(true) }
+    })()
+  }, [rec, receitaRef])
+
   const podeEditarValor = !!rec // valor sempre editável; guarda de "abaixo do recebido" é no preview/save
   const moedaEditavel = !(rec?.temPagamentoConfirmado ?? false) // trocar moeda-base só sem pagamento confirmado
 
@@ -133,26 +173,40 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
     return false
   }, [rec, moeda, valorBase, fxRule, fxFixo, fxEstimado, fxData, valorBrlFixo])
 
-  // preview com debounce quando muda o financeiro
+  // mudança de responsável/vencimento (nível obrigação) — integra o mesmo preview.
+  const mudouRespVenc = seededOk && (responsavelId !== origResp || vencimento !== origVenc)
+  const nomeUsuario = (id: string) => { if (!id) return null; const u = usuarios.find((x) => String(x.id) === id); return u?.nome ?? `Usuário ${id}` }
+
+  // patch enviado ao preview: financeiro + responsável/vencimento (após o seed).
+  const patchPreview = useMemo(() => {
+    const p: Record<string, unknown> = { ...patchFinanceiro }
+    if (seededOk) {
+      p.responsavelId = responsavelId === "" ? null : Number(responsavelId)
+      p.vencimento = vencimento === "" ? null : vencimento
+    }
+    return p
+  }, [patchFinanceiro, seededOk, responsavelId, vencimento])
+
+  // preview com debounce quando muda o financeiro OU o responsável/vencimento
   const rodarPreview = useCallback(async () => {
     setPreviewing(true)
     try {
       const r = await fetch(`/api/financeiro/v3/receita/${receitaRef}/editar?preview=1`, {
         method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify(patchFinanceiro),
+        body: JSON.stringify(patchPreview),
       }).then((x) => x.json())
       if (r?.ok && r?.previa) setPrevia(r.previa)
       else setPrevia(null)
     } catch { setPrevia(null) } finally { setPreviewing(false) }
-  }, [receitaRef, patchFinanceiro])
+  }, [receitaRef, patchPreview])
 
   useEffect(() => {
     if (!rec) return
-    if (!mudouFinanceiro) { setPrevia(null); return }
+    if (!mudouFinanceiro && !mudouRespVenc) { setPrevia(null); return }
     if (debounce.current) clearTimeout(debounce.current)
     debounce.current = setTimeout(() => { rodarPreview() }, 450)
     return () => { if (debounce.current) clearTimeout(debounce.current) }
-  }, [rec, mudouFinanceiro, rodarPreview])
+  }, [rec, mudouFinanceiro, mudouRespVenc, rodarPreview])
 
   const bloqueado = (previa?.bloqueios?.length ?? 0) > 0
   const mudouTextual = useMemo(() => {
@@ -161,7 +215,7 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
       || observacoes !== (rec.observacoes ?? "")
   }, [rec, titulo, descricao, referencia, observacoes])
 
-  const temMudanca = mudouTextual || mudouFinanceiro
+  const temMudanca = mudouTextual || mudouFinanceiro || mudouRespVenc
   const valido = !!rec && temMudanca && !bloqueado && !previewing
 
   const salvar = async () => {
@@ -177,6 +231,10 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
         body.moeda = moeda
         body.valorBaseTotal = valorBase === "" ? null : cent(num(valorBase))
         body.cambio = patchFinanceiro.cambio
+      }
+      if (mudouRespVenc) {
+        body.responsavelId = responsavelId === "" ? null : Number(responsavelId)
+        body.vencimento = vencimento === "" ? null : vencimento
       }
       const r = await fetch(`/api/financeiro/v3/receita/${receitaRef}/editar`, {
         method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -243,6 +301,24 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
                   <div>
                     <label className={labelCls}>Referência contratual</label>
                     <input value={referencia} onChange={(e) => setReferencia(e.target.value.slice(0, 120))} placeholder="Nº do contrato / proposta" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Responsável</label>
+                    {usuarios.length > 0 ? (
+                      <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} disabled={!seededOk} className={`${inputCls} disabled:opacity-50`}>
+                        <option value="">— Sem responsável —</option>
+                        {usuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+                        {responsavelId !== "" && !usuarios.some((u) => String(u.id) === responsavelId) && <option value={responsavelId}>Usuário {responsavelId}</option>}
+                      </select>
+                    ) : (
+                      <input inputMode="numeric" value={responsavelId} onChange={(e) => setResponsavelId(e.target.value.replace(/[^0-9]/g, ""))} disabled={!seededOk} placeholder="ID do usuário" className={`${inputCls} disabled:opacity-50`} />
+                    )}
+                    <p className="mt-1 text-[11px] text-[var(--text-muted)]">Responsável da obrigação. Não move saldo.</p>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Vencimento</label>
+                    <input type="date" value={vencimento} onChange={(e) => setVencimento(e.target.value)} disabled={!seededOk} className={`${inputCls} disabled:opacity-50`} />
+                    <p className="mt-1 text-[11px] text-[var(--text-muted)]">Vencimento da obrigação. Não move saldo.</p>
                   </div>
                   <div className="sm:col-span-2">
                     <label className={labelCls}>Observações</label>
@@ -350,6 +426,22 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
                       <ul className="list-inside list-disc space-y-0.5">{previa.bloqueios.map((b, i) => <li key={i}>{b}</li>)}</ul>
                     </div>
                   )}
+                </section>
+              )}
+
+              {/* Impacto de responsável/vencimento (nível obrigação — não move saldo) */}
+              {mudouRespVenc && previa && (previa.mudaResponsavel || previa.mudaVencimento) && (
+                <section className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-5">
+                  <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-[var(--text-secondary)]"><ArrowRight className="h-4 w-4" /> Alteração de responsável / vencimento</h2>
+                  <p className="mb-3 text-xs text-[var(--text-muted)]">Atualiza os dados da obrigação. Não altera valores nem cobranças.</p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {previa.mudaResponsavel && (
+                      <div className="rounded-[var(--radius-sm)] bg-[var(--surface-secondary)] p-3"><div className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Responsável</div><div className="text-sm text-[var(--text-primary)]">{nomeUsuario(origResp) ?? "—"} → <span className="font-semibold text-[var(--text-primary)]">{nomeUsuario(responsavelId) ?? "Sem responsável"}</span></div></div>
+                    )}
+                    {previa.mudaVencimento && (
+                      <div className="rounded-[var(--radius-sm)] bg-[var(--surface-secondary)] p-3"><div className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Vencimento</div><div className="text-sm text-[var(--text-primary)]">{origVenc ? dataBR(origVenc) : "—"} → <span className="font-semibold text-[var(--info)]">{vencimento ? dataBR(vencimento) : "Sem vencimento"}</span></div></div>
+                    )}
+                  </div>
                 </section>
               )}
             </div>

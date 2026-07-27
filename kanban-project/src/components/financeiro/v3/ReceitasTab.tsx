@@ -14,10 +14,18 @@ import { createPortal } from "react-dom"
 import { useRevalidacaoFinanceira } from "@/src/lib/financeiro-bus"
 import { useRouter } from "next/navigation"
 import { LancamentoManualModal } from "./LancamentoManualModal"
+import EditarReceitaView from "./EditarReceitaView"
+import EditarDistribuicaoView from "./EditarDistribuicaoView"
+import RegistrarPagamentoModal from "./RegistrarPagamentoModal"
+import DuplicarReceitaModal from "./DuplicarReceitaModal"
+import CancelamentoAvancadoModal from "./CancelamentoAvancadoModal"
+import AcaoReceitaModal from "./AcaoReceitaModal"
+import ExcluirReceitaModal from "./ExcluirReceitaModal"
 import {
   DollarSign, CheckCircle2, Wallet, Users, Layers, Search, RotateCcw,
   Plus, ExternalLink, ChevronDown, ChevronRight, ChevronLeft, MoreVertical,
   AlertTriangle, SlidersHorizontal, Download,
+  Pencil, GitBranch, CalendarClock, Copy, CreditCard, Ban, Archive, Trash2,
 } from "lucide-react"
 
 import { ValorBrl, AvisoNaoConvertido } from "./ValorBrl"
@@ -67,6 +75,9 @@ interface Grupo {
   proximoVencimento: string | null; statusConsolidado: string; participantesCount: number; participantes: Participante[]
 }
 
+// ações rápidas de estado disponíveis no menu "3 pontos" de cada linha
+type AcaoRow = "editar" | "distribuicao" | "vencimento" | "pagamento" | "duplicar" | "cancelar" | "arquivar" | "excluir"
+
 export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: number; onAbrirDetalhe?: (id: number) => void }) {
   const router = useRouter()
   const [d, setD] = useState<any>(null)
@@ -77,6 +88,9 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
   const [page, setPage] = useState(1)
   const [expandido, setExpandido] = useState<Set<number>>(new Set())
   const [novo, setNovo] = useState(false)
+  // ação rápida de estado disparada no menu "3 pontos" de uma linha (Receita consolidada).
+  // O modal/editor correspondente vive no fim da árvore (renderiza só o alvo por vez).
+  const [acao, setAcao] = useState<{ tipo: AcaoRow; g: Grupo } | null>(null)
 
   const carregar = () => {
     setLoading(true); setErro(null)
@@ -222,7 +236,7 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
                 </td></tr>
               ) : (
                 pagina.map((g) => (
-                  <LinhaGrupo key={g.id} g={g} aberto={expandido.has(g.id)} onToggle={() => toggle(g.id)} onAbrir={() => abrir(g.id)} onAbrirParticipante={abrir} />
+                  <LinhaGrupo key={g.id} g={g} aberto={expandido.has(g.id)} onToggle={() => toggle(g.id)} onAbrir={() => abrir(g.id)} onAbrirParticipante={abrir} onAcao={(tipo) => setAcao({ tipo, g })} />
                 ))
               )}
             </tbody>
@@ -243,12 +257,38 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
       </div>
 
       {novo && processoId != null && <LancamentoManualModal natureza="RECEITA" processoId={processoId} onClose={() => setNovo(false)} onCriado={(r) => { setNovo(false); carregar(); if (r?.obrigacaoRef) abrir(r.obrigacaoRef) }} />}
+
+      {/* ── ações rápidas de estado (reuso de fluxos já prontos; cada onDone recarrega a lista) ── */}
+      {acao?.tipo === "editar" && (
+        <EditarReceitaView obrigacaoId={acao.g.id} receitaRef={String(acao.g.id)} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar() }} />
+      )}
+      {acao?.tipo === "vencimento" && (
+        <EditarReceitaView obrigacaoId={acao.g.id} receitaRef={String(acao.g.id)} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar() }} />
+      )}
+      {acao?.tipo === "distribuicao" && (
+        <EditarDistribuicaoView obrigacaoId={acao.g.id} receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar() }} />
+      )}
+      {acao?.tipo === "pagamento" && (
+        <RegistrarPagamentoModal obrigacaoId={acao.g.id} moeda={acao.g.moedaBase} saldo={acao.g.saldoBrlTotal} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar() }} />
+      )}
+      {acao?.tipo === "duplicar" && (
+        <DuplicarReceitaModal receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={(novoId) => { setAcao(null); carregar(); if (novoId) abrir(novoId) }} />
+      )}
+      {acao?.tipo === "cancelar" && (
+        <CancelamentoAvancadoModal receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar() }} />
+      )}
+      {acao?.tipo === "arquivar" && (
+        <AcaoReceitaModal acao="arquivar" receitaRef={String(acao.g.id)} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar() }} />
+      )}
+      {acao?.tipo === "excluir" && (
+        <ExcluirReceitaModal receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar() }} />
+      )}
     </div>
   )
 }
 
 // ── linha do grupo (Receita consolidada) + subgrid ───────────────────────────
-function LinhaGrupo({ g, aberto, onToggle, onAbrir, onAbrirParticipante }: { g: Grupo; aberto: boolean; onToggle: () => void; onAbrir: () => void; onAbrirParticipante: (id: number) => void }) {
+function LinhaGrupo({ g, aberto, onToggle, onAbrir, onAbrirParticipante, onAcao }: { g: Grupo; aberto: boolean; onToggle: () => void; onAbrir: () => void; onAbrirParticipante: (id: number) => void; onAcao: (tipo: AcaoRow) => void }) {
   const st = statusView(g.statusConsolidado)
   const cotacao = g.participantes[0]?.cotacao ?? null
   const nomes = g.participantes.map((p) => p.nome)
@@ -285,7 +325,7 @@ function LinhaGrupo({ g, aberto, onToggle, onAbrir, onAbrirParticipante }: { g: 
         </td>
         <td className="px-4 align-middle text-center"><StatusPill st={st} /></td>
         <td className="px-3 align-middle text-center" onClick={(e) => e.stopPropagation()}>
-          <RowMenu onAbrir={onAbrir} onToggle={onToggle} aberto={aberto} codigo={g.codigo} />
+          <RowMenu onAbrir={onAbrir} onToggle={onToggle} aberto={aberto} codigo={g.codigo} onAcao={onAcao} saldo={g.saldoBrlTotal} statusConsolidado={g.statusConsolidado} />
         </td>
       </tr>
 
@@ -364,7 +404,7 @@ function LinhaGrupo({ g, aberto, onToggle, onAbrir, onAbrirParticipante }: { g: 
 // ── menu de ações secundárias (3 pontos) ────────────────────────────────────
 // Portal p/ o body: a tabela vive em overflow-x-auto (que recorta o eixo Y) e
 // dentro do modal do processo (z-9999) — o dropdown precisa escapar de ambos.
-function RowMenu({ onAbrir, onToggle, aberto, codigo }: { onAbrir: () => void; onToggle: () => void; aberto: boolean; codigo: string | null }) {
+function RowMenu({ onAbrir, onToggle, aberto, codigo, onAcao, saldo, statusConsolidado }: { onAbrir: () => void; onToggle: () => void; aberto: boolean; codigo: string | null; onAcao: (tipo: AcaoRow) => void; saldo: number; statusConsolidado: string }) {
   const [open, setOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
@@ -373,23 +413,57 @@ function RowMenu({ onAbrir, onToggle, aberto, codigo }: { onAbrir: () => void; o
     const r = btnRef.current.getBoundingClientRect()
     setPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) })
   }, [open])
+  const semSaldo = (saldo ?? 0) <= 0            // Registrar Pagamento sem alvo → desabilita
+  const cancelado = statusConsolidado === "CANCELADO"  // já cancelada → não recancelar
+  // dispara a ação no nível da tabela e fecha o menu (portal) — modais coexistem no fim da árvore
+  const fire = (tipo: AcaoRow) => { setOpen(false); onAcao(tipo) }
   return (
     <>
       <button ref={btnRef} onClick={() => setOpen((o) => !o)} title="Ações" className="grid h-7 w-7 place-items-center rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)]"><MoreVertical className="h-4 w-4" /></button>
       {open && pos && typeof document !== "undefined" && createPortal(
         <>
           <div className="fixed inset-0 z-[10049]" onClick={() => setOpen(false)} />
-          <div className="fixed z-[10050] w-52 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-popover)] py-1 text-left shadow-[var(--shadow-surface)]" style={{ top: pos.top, right: pos.right }}>
+          <div className="fixed z-[10050] max-h-[70vh] w-56 overflow-y-auto rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-popover)] py-1 text-left shadow-[var(--shadow-surface)]" style={{ top: pos.top, right: pos.right }}>
             <MenuItem icon={<ExternalLink className="h-4 w-4" />} onClick={() => { setOpen(false); onAbrir() }}>Abrir detalhe</MenuItem>
             <MenuItem icon={<Users className="h-4 w-4" />} onClick={() => { setOpen(false); onToggle() }}>{aberto ? "Ocultar" : "Ver"} distribuição</MenuItem>
             {codigo && <MenuItem icon={<Layers className="h-4 w-4" />} onClick={() => { setOpen(false); navigator.clipboard?.writeText(codigo).catch(() => {}) }}>Copiar código</MenuItem>}
+
+            <MenuDivider />
+            <MenuLabel>Gestão</MenuLabel>
+            <MenuItem icon={<Pencil className="h-4 w-4" />} onClick={() => fire("editar")}>Editar Receita</MenuItem>
+            <MenuItem icon={<GitBranch className="h-4 w-4" />} onClick={() => fire("distribuicao")}>Editar Distribuição</MenuItem>
+            <MenuItem icon={<CalendarClock className="h-4 w-4" />} onClick={() => fire("vencimento")}>Alterar Vencimento</MenuItem>
+            <MenuItem icon={<Copy className="h-4 w-4" />} onClick={() => fire("duplicar")}>Duplicar Receita</MenuItem>
+
+            <MenuDivider />
+            <MenuLabel>Cobrança</MenuLabel>
+            <MenuItem icon={<CreditCard className="h-4 w-4" />} disabled={semSaldo} title={semSaldo ? "Sem saldo em aberto" : undefined} onClick={() => fire("pagamento")}>Registrar Pagamento</MenuItem>
+
+            <MenuDivider />
+            <MenuLabel>Encerramento</MenuLabel>
+            <MenuItem icon={<Ban className="h-4 w-4" />} disabled={cancelado} title={cancelado ? "Receita já cancelada" : undefined} onClick={() => fire("cancelar")}>Cancelar Receita</MenuItem>
+            <MenuItem icon={<Archive className="h-4 w-4" />} onClick={() => fire("arquivar")}>Arquivar</MenuItem>
+            <MenuItem icon={<Trash2 className="h-4 w-4" />} danger onClick={() => fire("excluir")}>Excluir Receita</MenuItem>
           </div>
         </>, document.body)}
     </>
   )
 }
-function MenuItem({ icon, onClick, children }: { icon: React.ReactNode; onClick: () => void; children: React.ReactNode }) {
-  return <button onClick={onClick} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]">{icon}{children}</button>
+function MenuItem({ icon, onClick, children, disabled, title, danger }: { icon: React.ReactNode; onClick: () => void; children: React.ReactNode; disabled?: boolean; title?: string; danger?: boolean }) {
+  return (
+    <button
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      title={title}
+      className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-40 ${danger ? "text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]" : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]"}`}
+    >{icon}{children}</button>
+  )
+}
+function MenuLabel({ children }: { children: React.ReactNode }) {
+  return <div className="px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{children}</div>
+}
+function MenuDivider() {
+  return <div className="my-1 border-t border-[var(--border-default)]" />
 }
 
 // ── cards ─────────────────────────────────────────────────────────────────────

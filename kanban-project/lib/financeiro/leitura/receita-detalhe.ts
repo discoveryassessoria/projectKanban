@@ -104,6 +104,24 @@ const TITULO: Record<string, string> = {
   ABERTURA: 'Abertura (data de corte)', AJUSTE: 'Ajuste',
 }
 
+// Mapeia ocorrências → linhas de "pagamento" da tela (forma/conta/referência/status).
+// Extraído para ser a FONTE ÚNICA do formato tanto no detalhe (só PAGAMENTO) quanto na
+// conta do participante (que também inclui ESTORNO). Sem duplicar o formato de exibição.
+export type OcorrenciaPagamentoLike = {
+  id: number; tipo: string; data: Date; valor: unknown
+  formaLabel: string | null; contaBanco: string | null; contaAgencia: string | null; contaNumero: string | null
+  referencia: string | null; status: string
+}
+export function mapearPagamentos(
+  ocorrencias: OcorrenciaPagamentoLike[],
+  tipos: string[] = ['PAGAMENTO', 'PAGAMENTO_PARCIAL'],
+): ReceitaDetalhe['pagamentos'] {
+  return ocorrencias.filter((o) => tipos.includes(o.tipo)).map((o) => ({
+    id: o.id, data: o.data.toISOString(), valor: Number(o.valor), formaLabel: o.formaLabel, banco: o.contaBanco, agencia: o.contaAgencia, conta: o.contaNumero,
+    referencia: o.referencia, status: o.status === 'PROCESSADA' ? 'Confirmado' : o.status,
+  }))
+}
+
 export async function resolverId(ref: string): Promise<number | null> {
   if (/^\d+$/.test(ref)) {
     const porId = await prisma.obrigacaoEconomica.findUnique({ where: { id: Number(ref) }, select: { id: true } })
@@ -161,10 +179,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   const descontos = cent(obr.ocorrencias.filter((o) => o.tipo === 'DESCONTO').reduce((s, o) => s + Number(o.valor), 0))
   const ajustes = cent(obr.ocorrencias.filter((o) => o.tipo === 'AJUSTE').reduce((s, o) => s + Number(o.valor), 0))
 
-  const pagamentos = obr.ocorrencias.filter((o) => o.tipo === 'PAGAMENTO' || o.tipo === 'PAGAMENTO_PARCIAL').map((o) => ({
-    id: o.id, data: o.data.toISOString(), valor: Number(o.valor), formaLabel: o.formaLabel, banco: o.contaBanco, agencia: o.contaAgencia, conta: o.contaNumero,
-    referencia: o.referencia, status: o.status === 'PROCESSADA' ? 'Confirmado' : o.status,
-  }))
+  const pagamentos = mapearPagamentos(obr.ocorrencias)
 
   const moeda = String(obr.moedaContratual)
 
@@ -333,9 +348,17 @@ function baseLabelDetalhe(desc: string | null): string | null {
 }
 
 // ============================================================================
-// DETALHE CONSOLIDADO — agrega o grupo por-requerente numa única Receita.
+// DESCOBERTA DO GRUPO — resolve a partir de um ref a Receita consolidada (grupo de
+// obrigações por-requerente: mesma processo|config|regra|fase|ciclo). FONTE ÚNICA da
+// regra de agrupamento; reusada pelo detalhe consolidado E pela timeline geral.
 // ============================================================================
-export async function carregarReceitaConsolidada(ref: string): Promise<ReceitaDetalheConsolidada | null> {
+export interface GrupoObrigacoes {
+  repId: number          // obrigação representante (a do ref)
+  groupIds: number[]     // obrigações do grupo com status != CANCELADO (visão viva)
+  receitaIds: number[]   // Receitas irmãs do grupo (cobre canceladas p/ auditoria)
+  processoId: number | null
+}
+export async function descobrirGrupoObrigacoes(ref: string): Promise<GrupoObrigacoes | null> {
   const id = await resolverId(ref)
   if (!id) return null
 
@@ -346,8 +369,8 @@ export async function carregarReceitaConsolidada(ref: string): Promise<ReceitaDe
   })
   if (!base) return null
 
-  // ── Descobrir o GRUPO de obrigações (mesma Receita legada consolidada) ──
   let groupIds: number[] = [id]
+  let receitaIds: number[] = base.origemTipo === 'Receita' && base.origemId != null ? [base.origemId] : []
   if (base.origemTipo === 'Receita' && base.origemId != null) {
     const rec = await prisma.receita.findUnique({
       where: { id: base.origemId },
@@ -365,10 +388,11 @@ export async function carregarReceitaConsolidada(ref: string): Promise<ReceitaDe
         },
         select: { id: true },
       }).catch(() => [] as { id: number }[])
-      const receitaIds = irmas.map((r) => r.id)
-      if (receitaIds.length) {
+      const recIds = irmas.map((r) => r.id)
+      if (recIds.length) {
+        receitaIds = recIds
         const irmasObr = await prisma.obrigacaoEconomica.findMany({
-          where: { origemTipo: 'Receita', origemId: { in: receitaIds }, status: { not: 'CANCELADO' } },
+          where: { origemTipo: 'Receita', origemId: { in: recIds }, status: { not: 'CANCELADO' } },
           select: { id: true },
         }).catch(() => [] as { id: number }[])
         const set = new Set<number>(irmasObr.map((o) => o.id))
@@ -377,6 +401,17 @@ export async function carregarReceitaConsolidada(ref: string): Promise<ReceitaDe
       }
     }
   }
+  return { repId: id, groupIds, receitaIds, processoId: base.processoId ?? null }
+}
+
+// ============================================================================
+// DETALHE CONSOLIDADO — agrega o grupo por-requerente numa única Receita.
+// ============================================================================
+export async function carregarReceitaConsolidada(ref: string): Promise<ReceitaDetalheConsolidada | null> {
+  const grupo = await descobrirGrupoObrigacoes(ref)
+  if (!grupo) return null
+  const id = grupo.repId
+  const groupIds = grupo.groupIds
 
   // ── Carregar cada obrigação REUSANDO o loader por-obrigação ──
   const rawSlices = await Promise.all(groupIds.map((oid) => carregarReceitaDetalhe(String(oid))))

@@ -304,6 +304,9 @@ export interface EditarReceitaPatch {
   moeda?: string | null
   valorBaseTotal?: number | null
   cambio?: Partial<RegraCambio> | null
+  // Responsável (criadoPorId da obrigação) e vencimento — nível obrigação; não movem saldo.
+  responsavelId?: number | null
+  vencimento?: string | Date | null
 }
 
 // Distribui o novo total entre os irmãos na MESMA proporção atual (a divisão é
@@ -365,6 +368,10 @@ export interface PreviaImpacto {
   valorContratadoBrlNovo: number
   recebidoTotalBrl: number
   cobrancasAfetadas: PreviaCobranca[]
+  mudaResponsavel: boolean
+  mudaVencimento: boolean
+  responsavelNovo: number | null
+  vencimentoNovo: string | null
 }
 
 export async function previaImpactoEdicao(ref: string, patch: EditarReceitaPatch): Promise<PreviaImpacto | null> {
@@ -407,6 +414,13 @@ export async function previaImpactoEdicao(ref: string, patch: EditarReceitaPatch
     }
   }
 
+  // responsável/vencimento (nível obrigação) — não movem saldo; só refletem no preview.
+  const repAtual = await prisma.obrigacaoEconomica.findUnique({ where: { id: g.repObrigacaoId }, select: { criadoPorId: true, vencimento: true } }).catch(() => null)
+  const responsavelNovo = patch.responsavelId !== undefined ? (patch.responsavelId == null ? null : Number(patch.responsavelId)) : (repAtual?.criadoPorId ?? null)
+  const vencNovoDate = patch.vencimento !== undefined ? (patch.vencimento ? new Date(patch.vencimento) : null) : (repAtual?.vencimento ?? null)
+  const mudaResponsavel = patch.responsavelId !== undefined && (patch.responsavelId ?? null) !== (repAtual?.criadoPorId ?? null)
+  const mudaVencimento = patch.vencimento !== undefined && (vencNovoDate?.toISOString() ?? null) !== (repAtual?.vencimento?.toISOString() ?? null)
+
   return {
     ok: bloqueios.length === 0, bloqueios, temPagamentoConfirmado: recebidoTotalBrlPrev > 0.005, moedaBase: moeda,
     mudaValor, mudaCambio,
@@ -415,6 +429,7 @@ export async function previaImpactoEdicao(ref: string, patch: EditarReceitaPatch
     valorContratadoBrlAntigo: cons.valorContratadoBrl, valorContratadoBrlNovo: brlNovoTotal,
     recebidoTotalBrl: cent(g.membros.reduce((s, m) => s + m.recebidoBrl, 0)),
     cobrancasAfetadas,
+    mudaResponsavel, mudaVencimento, responsavelNovo, vencimentoNovo: vencNovoDate ? vencNovoDate.toISOString() : null,
   }
 }
 
@@ -480,6 +495,13 @@ export async function editarReceita(ref: string, patch: EditarReceitaPatch, opts
   const { brl: brlNovoTotal, cotacao: cotNovo } = brlContrato(moeda, novoTotal, cambioNovo, rate(moeda))
   const cotEfetiva = novoTotal > 0 ? cent(brlNovoTotal / novoTotal) : cotNovo
 
+  // responsável/vencimento (nível obrigação) — não movem saldo.
+  const repAtual = await prisma.obrigacaoEconomica.findUnique({ where: { id: g.repObrigacaoId }, select: { criadoPorId: true, vencimento: true } }).catch(() => null)
+  const responsavelNovo = patch.responsavelId !== undefined ? (patch.responsavelId == null ? null : Number(patch.responsavelId)) : (repAtual?.criadoPorId ?? null)
+  const vencNovoDate = patch.vencimento !== undefined ? (patch.vencimento ? new Date(patch.vencimento) : null) : (repAtual?.vencimento ?? null)
+  const mudaResponsavel = patch.responsavelId !== undefined && (patch.responsavelId ?? null) !== (repAtual?.criadoPorId ?? null)
+  const mudaVencimento = patch.vencimento !== undefined && (vencNovoDate?.toISOString() ?? null) !== (repAtual?.vencimento?.toISOString() ?? null)
+
   // patch textual (título com sufixo preservado, serviço, origem, observações, ctx.edicao)
   const tocaTextual = patch.titulo !== undefined || patch.descricaoDetalhada !== undefined || patch.referenciaContratual !== undefined
     || patch.tipoServicoId !== undefined || patch.origem !== undefined || patch.observacoes !== undefined
@@ -489,7 +511,7 @@ export async function editarReceita(ref: string, patch: EditarReceitaPatch, opts
 
   await prisma.$transaction(async (tx) => {
     for (const m of g.membros) {
-      if (m.receitaId == null && !mudaValor && !mudaCambio) continue
+      if (m.receitaId == null && !mudaValor && !mudaCambio && !mudaResponsavel && !mudaVencimento) continue
       const alvoBase = porObrigacao.get(m.obrigacaoId) ?? m.valorBase
       const delta = cent(alvoBase - m.valorBase)
 
@@ -529,12 +551,13 @@ export async function editarReceita(ref: string, patch: EditarReceitaPatch, opts
         if (Object.keys(data).length) await tx.receita.update({ where: { id: m.receitaId }, data })
       }
 
-      // ── ObrigacaoEconomica (valor/moeda) + Ledger AJUSTE ──
-      if (mudaValor || mudaMoeda) {
-        const obrData: Prisma.ObrigacaoEconomicaUpdateInput = { valorContratado: alvoBase, version: { increment: 1 } }
-        if (mudaMoeda) { obrData.moedaContratual = moeda as never; obrData.moedaContabil = moeda as never }
-        await tx.obrigacaoEconomica.update({ where: { id: m.obrigacaoId }, data: obrData })
-      }
+      // ── ObrigacaoEconomica (valor/moeda/responsável/vencimento) + Ledger AJUSTE ──
+      const obrData: Prisma.ObrigacaoEconomicaUpdateInput = {}
+      if (mudaValor || mudaMoeda) { obrData.valorContratado = alvoBase; obrData.version = { increment: 1 } }
+      if (mudaMoeda) { obrData.moedaContratual = moeda as never; obrData.moedaContabil = moeda as never }
+      if (mudaResponsavel) obrData.criadoPorId = responsavelNovo
+      if (mudaVencimento) obrData.vencimento = vencNovoDate
+      if (Object.keys(obrData).length) await tx.obrigacaoEconomica.update({ where: { id: m.obrigacaoId }, data: obrData })
       if (Math.abs(delta) > 0.005) {
         const obr = await tx.obrigacaoEconomica.findUnique({ where: { id: m.obrigacaoId }, include: { ledger: true } })
         if (obr?.ledger) {
@@ -580,6 +603,8 @@ export async function editarReceita(ref: string, patch: EditarReceitaPatch, opts
         if (mudaMoeda) partes.push(`moeda ${g.moeda}→${moeda}`)
         if (mudaValor) partes.push(`valor-base ${m.valorBase}→${alvoBase}`)
         if (mudaCambio && !mudaMoeda) partes.push('regra de câmbio')
+        if (mudaResponsavel) partes.push('responsável')
+        if (mudaVencimento) partes.push('vencimento')
         await tx.eventoFinanceiro.create({ data: {
           receitaId: m.receitaId, tipo: 'EDICAO', usuarioId: criadoPorId,
           descricao: `Edição da Receita: ${partes.join('; ') || 'sem alterações'}${justificativa ? ` — ${justificativa}` : ''}`.slice(0, 500),
