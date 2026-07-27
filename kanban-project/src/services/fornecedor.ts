@@ -93,6 +93,14 @@ export async function criarFornecedor(b: Record<string, unknown>) {
   const nome = s(b.nome)
   if (!nome) throw new Error("VALIDATION:Nome é obrigatório")
   const tipo = s(b.tipo) || "PJ" // legado default; a rota canônica exige tipo antes.
+  // DEDUP: mesmo CPF/CNPJ (comparando só dígitos, ignorando formatação) => REUSA o
+  // cadastro existente em vez de duplicar. Um fornecedor é central e reaproveitável.
+  const cpfCnpjDigits = (s(b.cpfCnpj) ?? "").replace(/\D/g, "")
+  if (cpfCnpjDigits.length >= 11) {
+    const candidatos = await prisma.fornecedor.findMany({ where: { cpfCnpj: { not: null } }, select: { id: true, cpfCnpj: true } })
+    const existente = candidatos.find((f) => (f.cpfCnpj ?? "").replace(/\D/g, "") === cpfCnpjDigits)
+    if (existente) return prisma.fornecedor.findUnique({ where: { id: existente.id } })
+  }
   return prisma.fornecedor.create({
     data: {
       nome,

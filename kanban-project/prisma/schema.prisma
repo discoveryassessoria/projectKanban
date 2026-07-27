@@ -916,6 +916,7 @@ model Fornecedor {
   contasPagar        ContaPagar[]
   tabelasValor       TabelaValor[]
   configFinanceiras  ProdutoFinanceiro[] @relation("ConfigFinFornecedor")
+  obrigacoesEconomicas ObrigacaoEconomica[] // custos V3 (A_PAGAR) vinculados a este fornecedor
 
   // --- novos campos para bater com o mockup ---
   pais        String? @db.VarChar(50)
@@ -4027,6 +4028,7 @@ model ObrigacaoEconomica {
   ledger        LedgerFinanceiro?
   ocorrencias   OcorrenciaFinanceira[]
   distribuicoes DistribuicaoEconomica[]
+  fornecedor    Fornecedor?             @relation(fields: [fornecedorId], references: [id], onDelete: SetNull) // custo: beneficiário a quem se paga (reuso do cadastro central; antes era int órfão)
 
   @@unique([origemTipo, origemId]) // 1:1 com a Receita/Custo de origem (idempotÃªncia do backfill/dual-write)
   @@index([processoId])

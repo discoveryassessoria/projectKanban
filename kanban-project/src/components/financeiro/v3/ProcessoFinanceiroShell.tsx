@@ -129,7 +129,7 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
               const quit = quitado(o)
               return (
                 <tr key={o.obrigacaoId} className="border-t border-[var(--border-default)] hover:bg-[var(--surface-hover)]">
-                  <td className="px-5 py-4"><div className="max-w-[220px] text-[var(--text-primary)]">{o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`}</div>{o.codigoOperacional && <div className="text-xs text-[var(--text-muted)]">{o.codigoOperacional}</div>}</td>
+                  <td className="px-5 py-4"><div className="max-w-[220px] text-[var(--text-primary)]">{o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`}</div>{o.fornecedor && <div className="max-w-[220px] truncate text-xs text-[var(--text-secondary)]" title={o.fornecedor}>{o.fornecedor}</div>}{o.codigoOperacional && <div className="text-xs text-[var(--text-muted)]">{o.codigoOperacional}</div>}</td>
                   <td className="px-5 text-[var(--text-secondary)]">{o.categoria ?? "—"}</td>
                   <td className="px-5 text-[var(--text-primary)]">{fmt(o.valorContratado, o.moeda)}</td>
                   <td className="px-5 text-[var(--text-secondary)]"><ValorBrl valor={o.contratadoBrl ?? 0} naoConvertido={o.naoConvertido} moeda={o.moeda} /></td>

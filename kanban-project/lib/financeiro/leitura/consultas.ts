@@ -27,6 +27,7 @@ export interface ObrigacaoLista {
   criadoEm: string | null
   responsavel: string | null
   requerente: string | null
+  fornecedor: string | null
   temAbertura: boolean
   // ── câmbio-aware (FONTE ÚNICA: computeCambioAging — Ledger + fx congelado). Elimina
   // o `fx=5.5` dos consumidores (Custos/Extrato/Timeline/Visão Geral). ──
@@ -83,6 +84,10 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
   }
   const pessoasReq = pessoaIdSet.size ? await prisma.pessoa.findMany({ where: { id: { in: [...pessoaIdSet] } }, select: { id: true, nome: true, sobrenome: true } }).catch(() => []) : []
   const pessoaNomeReq = new Map(pessoasReq.map((p) => [p.id, [p.nome, p.sobrenome].filter(Boolean).join(' ')]))
+  // Fornecedor (custo A_PAGAR) — nome resolvido em lote a partir da FK real (antes: int órfão nunca lido).
+  const fornIds = [...new Set(obrs.map((o) => o.fornecedorId).filter((v): v is number => v != null))]
+  const forns = fornIds.length ? await prisma.fornecedor.findMany({ where: { id: { in: fornIds } }, select: { id: true, nome: true } }).catch(() => []) : []
+  const fornPor = new Map(forns.map((f) => [f.id, f.nome]))
   // ── SSOT de câmbio/aging: fx congelado da Receita de origem + parcelas + cotações vivas ──
   const recIds = [...new Set(obrs.filter((o) => o.origemTipo === 'Receita' && o.origemId != null).map((o) => o.origemId as number))]
   const recsFx = recIds.length ? await prisma.receita.findMany({ where: { id: { in: recIds } }, select: { id: true, fxRule: true, fxEstimado: true, fxFixo: true, fxData: true, valorBrlFixo: true } }).catch(() => []) : []
@@ -111,6 +116,7 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
       criadoEm: o.criadoEm ? o.criadoEm.toISOString() : null,
       responsavel: o.criadoPorId != null ? (userPor.get(o.criadoPorId) ?? null) : null,
       requerente: (() => { const pid = primPart.get(o.id); return pid != null ? (pessoaNomeReq.get(pid) ?? null) : null })(),
+      fornecedor: o.fornecedorId != null ? (fornPor.get(o.fornecedorId) ?? null) : null,
       temAbertura: comAbertura.has(o.id),
       contratadoBrl: ca.valorContratadoBrl, recebidoBrl: ca.recebidoBrl, saldoBrl: ca.saldoBrl,
       aVencerBrl: ca.aVencerBrl, vencidoBrl: ca.vencidoBrl, cotacao: ca.cotacaoAplicada, statusAging: ca.statusLabel,
