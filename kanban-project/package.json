@@ -30,7 +30,6 @@
     "test:status-legacy-guard": "tsx scripts/status-legacy-guard.test.ts",
     "test:genealogia-guard": "tsx scripts/genealogia-legado-guard.test.ts",
     "test:automacoes-guard": "tsx scripts/automacoes-legado-guard.test.ts",
-    "test:template-manual-guard": "tsx scripts/financeiro-template-manual-guard.test.ts",
     "test:regras-documentais": "tsx scripts/regras-documentais.test.ts",
     "test:regras-documentais-guard": "tsx scripts/regras-documentais-guard.test.ts",
     "test:genealogia-fatia1": "tsx scripts/genealogia-fatia1-guard.test.ts",

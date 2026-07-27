@@ -167,15 +167,15 @@ secao('Cenários 6 e 7 — cancelamento e estorno')
 }
 
 // ── CENÁRIO 8 — caracteres especiais ────────────────────────────────────────
-secao('Cenário 8 — caracteres especiais na interface')
+// Sucessores V3: a lista de Receitas + o shell financeiro do processo + o
+// detalhe da Receita substituem as subabas V1 (Receitas/Custos/Extrato) e o
+// modal V1 (receita-modal/**), removidos na migração.
+secao('Cenário 8 — caracteres especiais na interface (sucessores V3)')
 {
   const alvos = [
-    'src/components/financeiro/subabas/Receitas.tsx',
-    'src/components/financeiro/subabas/Custos.tsx',
-    'src/components/financeiro/subabas/Extrato.tsx',
-    'src/components/financeiro/receita-modal/ReceitaFinanceiraModal.tsx',
-    'src/components/financeiro/receita-modal/ReceitaResumoExecutivo.tsx',
-    'src/components/financeiro/receita-modal/ReceitaVisaoGeral.tsx',
+    'src/components/financeiro/v3/ReceitasTab.tsx',
+    'src/components/financeiro/v3/ProcessoFinanceiroShell.tsx',
+    'src/components/financeiro/v3/ReceitaDetalheView.tsx',
   ]
   // Escape unicode literal em POSIÇÃO DE TEXTO JSX (fora de string) renderiza cru.
   const escapeEmTextoJsx = />[^<>{}\n]*\\u[0-9a-fA-F]{4}/
@@ -185,10 +185,11 @@ secao('Cenário 8 — caracteres especiais na interface')
     const src = readFileSync(p, 'utf8')
     ok(`${rel} sem escape \\uXXXX renderizável`, !escapeEmTextoJsx.test(src))
   }
-  const receitas = readFileSync(join(RAIZ, 'src/components/financeiro/subabas/Receitas.tsx'), 'utf8')
+  const receitas = readFileSync(join(RAIZ, 'src/components/financeiro/v3/ReceitasTab.tsx'), 'utf8')
   ok('travessão — literal presente', receitas.includes('—'))
-  ok('acentuação correta (Cobrança)', receitas.includes('Cobrança'))
   ok('sem sequência de surrogate literal', !receitas.includes('\\ud83d'))
+  const detalhe = readFileSync(join(RAIZ, 'src/components/financeiro/v3/ReceitaDetalheView.tsx'), 'utf8')
+  ok('acentuação correta (Cobrança/Cobranças)', detalhe.includes('Cobranças'))
 }
 
 // ── CENÁRIO 9 — múltiplas moedas ────────────────────────────────────────────
@@ -210,27 +211,26 @@ secao('Cenário 9 — múltiplas moedas')
   ok('nenhum total único substitui as moedas originais', res.porMoeda.length === 3)
 }
 
-// ── CENÁRIO 10 — nenhuma criação manual ─────────────────────────────────────
-secao('Cenário 10 — nenhuma criação manual reintroduzida')
+// ── CENÁRIO 10 — criação manual é disciplinada pelo Catálogo Mestre ────────
+// SUPERSEDIDO: a arquitetura V1 proibia QUALQUER criação manual (o botão
+// "Nova Receita" era só informativo). A arquitetura V3 introduziu um
+// lançamento manual DELIBERADO (LancamentoManualModal → POST
+// /api/financeiro/v3/receitas), mas disciplinado: exige item do Catálogo
+// Mestre (nunca valor livre) e override de preço exige permissão dedicada.
+// O invariante que sobrevive é "nada bypassa o motor/catálogo", não "nada é
+// manual". A página de dossiê V1 foi removida — o detalhe abre inline
+// (ReceitaDetalheView), sem navegar para outra rota.
+secao('Cenário 10 — lançamento manual V3 é disciplinado pelo Catálogo Mestre')
 {
-  const src = readFileSync(join(RAIZ, 'src/components/financeiro/subabas/Receitas.tsx'), 'utf8')
-  // O botão "Nova Receita" do mockup é GUIADO/informativo (explica que receitas
-  // nascem do motor) — nunca cria manualmente. A trava real é a ausência de POST
-  // de criação e das páginas de lançamento manual.
-  const proibidos = ['Novo Custo', 'Adicionar Receita', 'Criar Receita', 'Lançamento Manual', 'NovaReceitaPagina', 'LancarParcelaPagina']
-  for (const p of proibidos) ok(`sem "${p}"`, !src.includes(p))
-  ok('sem POST de criação de receita na tela', !/method:\s*['"]POST['"][\s\S]{0,200}\/api\/financeiro\/receitas['"]/.test(src))
-  ok('"Nova Receita" não posta criação (é guiada)', !/Nova Receita[\s\S]{0,400}method:\s*['"]POST['"]/.test(src))
-  // O detalhe da receita virou PÁGINA CENTRAL (dossiê): a tela NAVEGA (sem modal/
-  // drawer). "Ver dossiê" → /processos/[id]/financeiro/receitas/[receitaId].
-  ok('tela navega para o dossiê (sem modal de detalhe)', src.includes('/financeiro/receitas/') && src.includes('router.push'))
-  ok('não abre mais modal/drawer de detalhe na lista', !src.includes('ReceitaCobrancaModal') && !src.includes('ReceitaDrawer'))
-  ok('drawer lateral removido do repositório', !existsSync(join(RAIZ, 'src/components/financeiro/ReceitaDrawer.tsx')))
-  // A página do dossiê existe e reusa o ReceitaCobrancaModal como modal de OPERAÇÃO.
-  const dossie = join(RAIZ, 'src/app/processos/[processoId]/financeiro/receitas/[receitaId]/page.tsx')
-  ok('página central do dossiê existe', existsSync(dossie))
-  ok('dossiê reusa ReceitaCobrancaModal p/ operar', existsSync(dossie) && readFileSync(dossie, 'utf8').includes('ReceitaCobrancaModal'))
-  ok('dossiê consome o agregador /dossie', existsSync(dossie) && readFileSync(dossie, 'utf8').includes('/dossie'))
+  const tab = readFileSync(join(RAIZ, 'src/components/financeiro/v3/ReceitasTab.tsx'), 'utf8')
+  ok('lista abre o detalhe inline (sem navegar para dossiê separado)', /onAbrirDetalhe \? onAbrirDetalhe\(id\) : router\.push/.test(tab))
+  ok('página de dossiê V1 não existe mais', !existsSync(join(RAIZ, 'src/app/processos/[processoId]/financeiro/receitas/[receitaId]/page.tsx')))
+  ok('drawer lateral V1 não existe mais', !existsSync(join(RAIZ, 'src/components/financeiro/ReceitaDrawer.tsx')))
+
+  const rota = readFileSync(join(RAIZ, 'src/app/api/financeiro/v3/receitas/route.ts'), 'utf8')
+  ok('POST manual exige item do Catálogo Mestre (nunca valor livre)', /Selecione um item do Cadastro Mestre/.test(rota) && /itemCatalogoId/.test(rota))
+  ok('override de preço exige permissão dedicada (não é livre para qualquer um)', /podeOverridePreco/.test(rota) && /financeiro\.custos_editar/.test(rota))
+  ok('criação delega ao serviço canônico (não bypassa o motor)', /criarReceitaManualCanonica/.test(rota) && !/prisma\.receita\.create/.test(rota))
 }
 
 // ── CENÁRIO 11 — supressão impede recriação ─────────────────────────────────
@@ -314,179 +314,44 @@ secao('Câmbio não recalcula o valor contratual')
 }
 
 // ── Guarda: campos calculados bloqueados na API ─────────────────────────────
-secao('Campos calculados bloqueados')
+// As rotas V1 de PATCH de parcela e reparcelamento foram removidas. O mesmo
+// invariante (total não pode ser reescrito livremente; nada abaixo do já
+// recebido; pagamento confirmado nunca é reescrito) migrou para o serviço de
+// redistribuição/edição da Receita no V3 (ver editar-distribuicao-financeira,
+// detalhe-receita-rico).
+secao('Campos calculados bloqueados (sucessor V3: redistribuição/edição da Receita)')
 {
-  const parcela = readFileSync(join(RAIZ, 'src/app/api/financeiro/parcelas/[id]/route.ts'), 'utf8')
-  ok('PATCH de parcela rejeita valor', parcela.includes('FinanceRuleEngine') && parcela.includes('422'))
+  const redistribuir = readFileSync(join(RAIZ, 'lib/financeiro/distribuicao/redistribuir-service.ts'), 'utf8')
+  ok('redistribuição mantém o total da Receita invariante', /deve ser igual ao total da Receita/.test(redistribuir))
+  ok('redistribuição bloqueia valor abaixo do já recebido', /não pode ser menor que o já recebido/.test(redistribuir))
 
-  const rep = readFileSync(join(RAIZ, 'src/app/api/financeiro/receitas/[id]/parcelas/route.ts'), 'utf8')
-  ok('reparcelamento usa o valor do lançamento como total', rep.includes('Number(receita.valor)'))
-  ok('reparcelamento tem guarda de arredondamento', rep.includes('Falha de arredondamento'))
-  ok('reparcelamento bloqueia com recebimento', rep.includes('já existe recebimento'))
+  const editar = readFileSync(join(RAIZ, 'lib/financeiro/acoes/editar-receita.ts'), 'utf8')
+  ok('edição nunca reescreve pagamento confirmado', /NUNCA reescreve pagamento confirmado/.test(editar))
+  ok('mudança de valor posta ajuste balanceado no Ledger (append-only)', /Ledger append-only/.test(editar) && /AJUSTE balanceado/.test(editar))
 }
 
-// ── Guarda: MODAL FINANCEIRO CENTRAL (experiência definitiva) ───────────────
-secao('Modal financeiro central')
+// ── Guarda: DETALHE DA RECEITA V3 (sucessor do modal financeiro central) ───
+// O modal monolítico V1 (receita-modal/**, role="dialog", abas rfm-*) foi
+// substituído por ReceitaDetalheView (embutido no shell do processo) +
+// modais de ação dedicados (RegistrarPagamentoModal/EstornoModal/
+// AcaoReceitaModal/EditarDistribuicaoView/EditarReceitaView). Os invariantes
+// que sobrevivem à mudança de forma (não ao pixel): nenhum cálculo de câmbio
+// no cliente, cada ação recarrega o detalhe, e a apresentação em BRL é uma
+// fonte única (não cada tela decide sozinha como converter).
+secao('Detalhe da Receita V3 — fonte única de apresentação e recarga pós-ação')
 {
-  const base = 'src/components/financeiro/receita-modal'
-  const componentes = [
-    'ReceitaFinanceiraModal',
-    'ReceitaModalHeader',
-    'ReceitaResumoExecutivo',
-    'ReceitaVisaoGeral',
-    'ReceitaParcelasTab',
-    'ReceitaRecebimentosTab',
-    'ReceitaHistoricoTab',
-    'ReceitaInformacoesTecnicasTab',
-    'ReceitaAcoesMenu',
-  ]
-  for (const c of componentes) {
-    ok(`componente ${c} existe`, existsSync(join(RAIZ, `${base}/${c}.tsx`)))
-  }
-  ok('folha de estilo própria do modal', existsSync(join(RAIZ, 'src/styles/receita-modal.css')))
+  const detalhe = readFileSync(join(RAIZ, 'src/components/financeiro/v3/ReceitaDetalheView.tsx'), 'utf8')
+  ok('cada ação recarrega o detalhe (sem estado otimista desalinhado)', (detalhe.match(/carregar\(\)/g) || []).length >= 5)
+  ok('usa a fonte única de apresentação de BRL (ValorBrl)', detalhe.includes('textoBrlOuOrigem'))
+  ok('sem window.prompt (formulários próprios, não prompt nativo)', !detalhe.includes('window.prompt'))
+  ok('sem reload de página', !detalhe.includes('location.reload'))
 
-  const modal = readFileSync(join(RAIZ, `${base}/ReceitaFinanceiraModal.tsx`), 'utf8')
+  const valorBrl = readFileSync(join(RAIZ, 'src/components/financeiro/v3/ValorBrl.tsx'), 'utf8')
+  ok('ValorBrl é só apresentação — não calcula câmbio nem decide política', /não calcula câmbio, não decide política/.test(valorBrl))
+  ok('ValorBrl é a mesma fonte usada no Shell/Detalhe/Receitas (documentado)', /Shell, no[\s\S]{0,20}Detalhe da Receita e na aba Receitas/.test(valorBrl))
 
-  // Modal central — nunca drawer, nunca navegação para outra página.
-  ok('sem drawer lateral', !/ReceitaDrawer|rdw-|rfm-painel-lateral/.test(modal))
-  ok('sem navegação para outra página', !modal.includes('useRouter') && !modal.includes('router.push'))
-
-  // Acessibilidade
-  ok('role dialog + aria-modal', modal.includes('role="dialog"') && modal.includes('aria-modal="true"'))
-  ok('rotulado pelo título', modal.includes('aria-labelledby="rfm-titulo"'))
-  ok('Escape fecha', modal.includes("e.key === 'Escape'"))
-  ok('foco preso no modal (Tab)', modal.includes("e.key !== 'Tab'"))
-  ok('devolve o foco ao elemento de origem', modal.includes('focoAnterior.current?.focus'))
-  ok('trava a rolagem do fundo', modal.includes("document.body.style.overflow = 'hidden'"))
-  ok('abas com role tablist/tab/tabpanel',
-    modal.includes('role="tablist"') && modal.includes('role="tab"') && modal.includes('role="tabpanel"'))
-
-  // Somente a aba ativa renderiza.
-  for (const aba of ['geral', 'parcelas', 'recebimentos', 'historico', 'tecnico']) {
-    ok(`aba ${aba} renderiza sob condição`, modal.includes(`aba === '${aba}'`))
-  }
-
-  // Reutilização integral dos endpoints já existentes — nenhuma API nova.
-  const endpoints = [
-    '/detalhe',
-    '/api/financeiro/parcelas/${p.id}',
-    '/api/financeiro/parcelas/${p.id}/lancamento',
-    '/parcelas`',
-    '/cancelar`',
-    '/estornar`',
-    '/supressao`',
-  ]
-  for (const e of endpoints) ok(`usa endpoint existente ${e}`, modal.includes(e))
-  ok('não recalcula composição no cliente', !modal.includes('requerentesAdicionais') && !modal.includes('* valorBase'))
-  ok('status e totais vêm da fonte única',
-    modal.includes('statusDoLancamento') && modal.includes('totaisDoLancamento'))
-
-  // Ações excepcionais fora do destaque permanente.
-  ok('modal não tem botão de perigo fixo no rodapé', !/rfm-rodape[\s\S]{0,400}rfm-btn-perigo/.test(modal))
-  const menu = readFileSync(join(RAIZ, `${base}/ReceitaAcoesMenu.tsx`), 'utf8')
-  ok('cancelar vive em Mais ações', menu.includes('Cancelar lançamento'))
-  ok('estorno vem resolvido do estado', menu.includes('acoes.lancamento.estornar'))
-  ok('bloqueio mostra o motivo', menu.includes('item.acao.motivo'))
-  ok('menu não decide nada por conta própria', !/podeEstornar|podeCancelar|temRecebimento/.test(menu))
-
-  // Informação técnica fora da leitura principal.
-  const visao = readFileSync(join(RAIZ, `${base}/ReceitaVisaoGeral.tsx`), 'utf8')
-  for (const termo of ['chaveIdempotencia', 'tecnico', 'ruleSource', 'tabelaPrecos', 'vigencia']) {
-    ok(`Visão geral sem "${termo}"`, !visao.includes(termo))
-  }
-  ok('Visão geral sem cadeado', !visao.includes('🔒'))
-  const tecnica = readFileSync(join(RAIZ, `${base}/ReceitaInformacoesTecnicasTab.tsx`), 'utf8')
-  for (const termo of ['tecnico', 'tabelaPrecos', 'Vigência', 'eventoOperacional', 'phaseKey']) {
-    ok(`aba técnica contém "${termo}"`, tecnica.includes(termo))
-  }
-
-  // Moeda original permanece principal.
-  const resumo = readFileSync(join(RAIZ, `${base}/ReceitaResumoExecutivo.tsx`), 'utf8')
-  ok('valor principal usa a moeda original', resumo.includes('fmtMoeda(totais.contratado, moeda)'))
-  ok('BRL aparece como conversão auxiliar', resumo.includes('≈ ') && resumo.includes('fmtBRL'))
-  ok('progresso é percentual recebido', resumo.includes('percentualRecebido'))
-  ok('sem gráfico decorativo', !/donut|pizza|chart|Chart/.test(resumo))
-
-  // Escapes literais em texto JSX.
-  const escapeEmTextoJsx = />[^<>{}\n]*\\u[0-9a-fA-F]{4}/
-  for (const c of componentes) {
-    const src = readFileSync(join(RAIZ, `${base}/${c}.tsx`), 'utf8')
-    ok(`${c} sem escape \\uXXXX renderizável`, !escapeEmTextoJsx.test(src))
-  }
-}
-
-// ── Guarda: CENTRAL DE OPERAÇÃO (Financeiro V2) ─────────────────────────────
-secao('Central de operação do lançamento')
-{
-  const base = 'src/components/financeiro/receita-modal'
-  for (const c of ['ReceitaAcoesRapidas', 'ReceitaRecebimentoForm', 'ReceitaMenuLinha']) {
-    ok(`componente ${c} existe`, existsSync(join(RAIZ, `${base}/${c}.tsx`)))
-  }
-  ok('fonte única de ações existe', existsSync(join(RAIZ, 'lib/financeiro/acoes-lancamento.ts')))
-
-  const modal = readFileSync(join(RAIZ, `${base}/ReceitaFinanceiraModal.tsx`), 'utf8')
-  ok('modal consome a fonte única de ações', modal.includes('resolveAvailableFinancialActions'))
-  ok('modal lê permissões do usuário', modal.includes('usePermissoes'))
-  ok('permissões usam as chaves do backend',
-    modal.includes('financeiro.pagamento_criar') &&
-    modal.includes('financeiro.pagamento_editar') &&
-    modal.includes('financeiro.pagamento_excluir'))
-  ok('sem permissão carregada, nada operacional é oferecido', modal.includes('carregandoPerm ? false'))
-
-  // Operações completas dentro do modal, sem sair da tela.
-  for (const painel of ['recebimento', 'vencimento', 'vencimento-lote', 'recebimento-lote', 'observacoes', 'cancelamento', 'estorno', 'revogacao']) {
-    ok(`painel interno "${painel}"`, modal.includes(`'${painel}'`))
-  }
-  ok('sem window.prompt', !modal.includes('window.prompt'))
-  ok('sem window.confirm', !modal.includes('window.confirm'))
-  ok('sem reload de página', !modal.includes('location.reload'))
-  ok('recarrega o detalhe após cada ação', modal.includes('await carregar()'))
-
-  // Nenhum endpoint novo: só rotas já existentes.
-  const rotasUsadas = modal.match(/\/api\/[a-z0-9/[\]${}.-]+/gi) ?? []
-  // A base é derivada da natureza (receitas|custos) — PARIDADE receita/custo.
-  // Continuam sendo apenas rotas do módulo financeiro, nenhuma inventada.
-  const permitidas = [
-    '/api/financeiro/${vocab.recurso}/${receitaId}',
-    '/api/financeiro/parcelas/${p.id}',
-    '/api/financeiro/parcelas/${p.id}/lancamento',
-  ]
-  for (const rota of rotasUsadas) {
-    ok(`rota existente: ${rota}`, permitidas.includes(rota))
-  }
-  ok('base derivada cobre receitas e custos', modal.includes("recurso: 'receitas'") && modal.includes("recurso: 'custos'"))
-  const form = readFileSync(join(RAIZ, `${base}/ReceitaRecebimentoForm.tsx`), 'utf8')
-  ok('comprovante usa o presign existente', form.includes('/api/storage/presign'))
-  ok('formulário completo de recebimento',
-    ['Data do recebimento', 'Câmbio aplicado', 'Forma de pagamento', 'Conta financeira', 'Observações', 'Comprovante']
-      .every((c) => form.includes(c)))
-  ok('valor e moeda permanecem do motor', form.includes('rfm-campo-fixo'))
-
-  // Ações contextuais: os componentes não decidem, só renderizam.
-  const rapidas = readFileSync(join(RAIZ, `${base}/ReceitaAcoesRapidas.tsx`), 'utf8')
-  ok('ações rápidas renderizam do resolvedor', rapidas.includes('acoes.lancamento') && rapidas.includes('.disponivel'))
-  ok('ações rápidas sem regra própria', !/podeCancelar|podeEstornar|status ===/.test(rapidas))
-
-  const parcelasTab = readFileSync(join(RAIZ, `${base}/ReceitaParcelasTab.tsx`), 'utf8')
-  ok('parcelas usam menu contextual', parcelasTab.includes('ReceitaMenuLinha'))
-  ok('parcelas resolvem ação por linha', parcelasTab.includes('acoes.parcela(p)'))
-  ok('seleção em lote presente', parcelasTab.includes('rfm-lote') && parcelasTab.includes('selecao'))
-  ok('lote só opera parcelas válidas', parcelasTab.includes('acoes.parcela(p).registrarRecebimento.disponivel'))
-  ok('parcelas sem condicional de permissão própria', !parcelasTab.includes('detalhe.acoes.'))
-
-  const recebTab = readFileSync(join(RAIZ, `${base}/ReceitaRecebimentosTab.tsx`), 'utf8')
-  ok('recebimentos têm menu por linha', recebTab.includes('ReceitaMenuLinha'))
-  ok('recebimentos mostram conciliação', recebTab.includes('recebimentoConciliado'))
-  ok('recebimentos sem condicional própria', !recebTab.includes('detalhe.acoes.'))
-
-  const hist = readFileSync(join(RAIZ, `${base}/ReceitaHistoricoTab.tsx`), 'utf8')
-  ok('histórico expande sob demanda', hist.includes('aria-expanded'))
-  ok('histórico mostra responsável', hist.includes('Responsável'))
-  ok('histórico não abre tudo por padrão', hist.includes('useState(false)'))
-
-  const tec = readFileSync(join(RAIZ, `${base}/ReceitaInformacoesTecnicasTab.tsx`), 'utf8')
-  ok('aba técnica é endereçável', tec.includes('secaoInicial'))
-  ok('aba técnica é somente leitura', !/method:\s*['"](POST|PATCH|DELETE)['"]/.test(tec))
+  ok('Shell do processo usa o mesmo componente <ValorBrl>', readFileSync(join(RAIZ, 'src/components/financeiro/v3/ProcessoFinanceiroShell.tsx'), 'utf8').includes('<ValorBrl'))
+  ok('lista de Receitas usa o mesmo componente <ValorBrl>', readFileSync(join(RAIZ, 'src/components/financeiro/v3/ReceitasTab.tsx'), 'utf8').includes('<ValorBrl'))
 }
 
 // ── resultado ───────────────────────────────────────────────────────────────

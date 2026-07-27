@@ -1,15 +1,21 @@
-// /api/financeiro/receitas/[id]/documentos — Documentos vinculados a uma Receita.
-//   GET  → lista os documentos da receita (mais recentes primeiro)
+// /api/financeiro/v3/obrigacoes/[id]/documentos — Documentos vinculados a uma
+// Obrigação (fonte única por obrigacaoId, cobre RECEITA e CUSTO).
+//   GET  → lista os documentos da obrigação (mais recentes primeiro)
 //   POST → vincula um documento já enviado ao storage (arquivoUrl/arquivoNome).
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
+import { flagAtiva } from '@/lib/financeiro/flags'
+import { usuarioFlag } from '../../../_flags'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
-  const { id } = await params
+  if (!flagAtiva('posicaoRead', await usuarioFlag(req))) {
+    return NextResponse.json({ ok: false, motivo: 'Financeiro V3 não habilitado neste ambiente/usuário.' }, { status: 409 })
+  }
+  const id = Number((await params).id)
   const rows = await prisma.receitaDocumento.findMany({
-    where: { receitaId: Number(id) }, orderBy: { criadoEm: 'desc' },
+    where: { obrigacaoId: id }, orderBy: { criadoEm: 'desc' },
   })
   const documentos = rows.map((r) => ({
     id: r.id, nome: r.arquivoNome, tipo: r.tipo, url: r.arquivoUrl, tamanho: r.tamanho,
@@ -20,7 +26,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
-  const { id } = await params
+  if (!flagAtiva('posicaoRead', await usuarioFlag(req))) {
+    return NextResponse.json({ ok: false, motivo: 'Financeiro V3 não habilitado neste ambiente/usuário.' }, { status: 409 })
+  }
+  const id = Number((await params).id)
   const b = await req.json().catch(() => ({}))
   const arquivoUrl = b.arquivoUrl ? String(b.arquivoUrl) : ''
   const arquivoNome = b.arquivoNome ? String(b.arquivoNome) : ''
@@ -32,8 +41,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const doc = await prisma.receitaDocumento.create({
       data: {
-        receitaId: Number(id),
-        obrigacaoId: b.obrigacaoId != null ? Number(b.obrigacaoId) : null,
+        obrigacaoId: id,
+        receitaId: null,
         arquivoUrl, arquivoNome,
         tipo: b.tipo != null ? String(b.tipo) : null,
         tamanho: b.tamanho != null ? Number(b.tamanho) : null,

@@ -1558,7 +1558,7 @@ model ReceitaRequerente {
 // comprovante...). Aditivo/reversível — não interfere no Documento (genealogia).
 model ReceitaDocumento {
   id          Int      @id @default(autoincrement())
-  receitaId   Int
+  receitaId   Int? // legado: preenchido só quando a origem é uma Receita. Fonte única atual = obrigacaoId (cobre RECEITA e CUSTO).
   obrigacaoId Int?
   arquivoUrl  String
   arquivoNome String   @db.VarChar(255)
@@ -1566,7 +1566,7 @@ model ReceitaDocumento {
   tamanho     Int?
   criadoPorId Int?
   criadoEm    DateTime @default(now())
-  receita     Receita  @relation(fields: [receitaId], references: [id], onDelete: Cascade)
+  receita     Receita? @relation(fields: [receitaId], references: [id], onDelete: Cascade)
 
   @@index([receitaId])
 }

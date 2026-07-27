@@ -1,9 +1,10 @@
 // src/components/financeiro/subabas/VisaoGeral.tsx
 // ============================================================================
 // VISÃO GERAL FINANCEIRA DO PROCESSO — painel OPERACIONAL (não é BI genérico).
-// Mesma identidade das telas de Receitas / Dossiê. Só reorganização visual:
-// consome os MESMOS endpoints (/api/financeiro/receitas + /custos) e as MESMAS
-// fórmulas de conversão/agregação — nenhuma regra de negócio ou cálculo mudou.
+// Mesma identidade das telas de Receitas / Dossiê. Fonte ÚNICA V3: consome
+// /api/financeiro/v3/visao-geral (ObrigacaoEconomica + parcelas reais) — as
+// MESMAS fórmulas de conversão/agregação abaixo continuam intactas (mesmo
+// shape ItemAPI/ParcelaAPI → mesma matemática, sem alterar cálculo).
 //
 // Estrutura (mockup aprovado):
 //   1) 5 cards: A Receber · Recebido · Custos · Lucro · Situação Financeira
@@ -13,7 +14,6 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { parseLista } from '@/src/lib/financeiro/parseLista'
 import {
   DollarSign, CreditCard, Database, BarChart3, CheckCircle2, AlertTriangle, ChevronRight,
   Loader2, Calendar, Receipt, Wallet, ArrowRight,
@@ -59,20 +59,6 @@ function parcToBrl(item: ItemAPI, p: ParcelaAPI, FX: number): number {
 }
 const pago = (s: string) => s === 'PAGA' || s === 'RECEBIDA'
 
-// Mapeia uma obrigação nativa V3 (lançamento manual) para o shape ItemAPI que a
-// Visão Geral consome — uma "parcela" sintética = o valor contratado; quitação
-// deriva do recebido. Sem fx próprio → conversão usa fxHoje (estimativa).
-function obrToItem(o: any, natureza: 'RECEITA' | 'CUSTO'): ItemAPI {
-  const quitado = Number(o.recebido) >= Number(o.valorContratado) - 0.005
-  const statusParc = quitado ? (natureza === 'RECEITA' ? 'RECEBIDA' : 'PAGA') : 'PENDENTE'
-  return {
-    id: o.obrigacaoId, codigo: o.codigoOperacional ?? `#${o.obrigacaoId}`,
-    descricao: o.descricao ?? '', moeda: (o.moeda ?? 'BRL') as Moeda,
-    valor: Number(o.valorContratado), fxEstimado: 0, fxRule: 'VARIAVEL', fxFixo: null,
-    status: o.status === 'CANCELADO' ? 'CANCELADA' : 'ATIVA',
-    parcelas: [{ id: o.obrigacaoId, numero: 1, vencimento: o.vencimento ?? '', valor: Number(o.valorContratado), status: statusParc, valorBrl: o.moeda === 'BRL' ? Number(o.valorContratado) : null }],
-  }
-}
 // mesma regra de "ativo" do módulo (exclui cancelados) — sem alterar cálculo.
 const ativo = (x: ItemAPI) => !x.cancelada && !x.cancelado && x.status !== 'CANCELADA'
 
@@ -89,22 +75,16 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
       setLoading(true); setErro(null)
       try {
         const headers = { Authorization: `Bearer ${localStorage.getItem('authToken') || ''}` }
-        // Legado (Receita/Custo) + lançamentos MANUAIS nativos do motor V3
-        // (origemTipo='nativo': só existem como obrigação, sem linha legada → sem
-        // dupla contagem com as receitas legadas já espelhadas em obrigação).
-        const [resR, resC, resNR, resNC] = await Promise.all([
-          fetch(`/api/financeiro/receitas?processoId=${processoId}`, { headers }),
-          fetch(`/api/financeiro/custos?processoId=${processoId}`, { headers }),
-          fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}&natureza=RECEITA&origemTipo=nativo`, { headers }),
-          fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}&natureza=CUSTO&origemTipo=nativo`, { headers }),
-        ])
+        // Fonte ÚNICA V3: uma chamada, já no shape ItemAPI (obrigações + parcelas reais).
+        const res = await fetch(`/api/financeiro/v3/visao-geral?processoId=${processoId}`, { headers })
         if (cancelado) return
-        const nativosR = resNR.ok ? ((await resNR.json())?.obrigacoes ?? []).map((o: any) => obrToItem(o, 'RECEITA')) : []
-        const nativosC = resNC.ok ? ((await resNC.json())?.obrigacoes ?? []).map((o: any) => obrToItem(o, 'CUSTO')) : []
-        if (resR.ok) { const d = await resR.json(); const l = parseLista<ItemAPI>(d); if (!cancelado) setReceitas([...(Array.isArray(l) ? l : []), ...nativosR]) }
-        else if (!cancelado) setReceitas(nativosR)
-        if (resC.ok) { const d = await resC.json(); const l = parseLista<ItemAPI>(d); if (!cancelado) setCustos([...(Array.isArray(l) ? l : []), ...nativosC]) }
-        else if (!cancelado) setCustos(nativosC)
+        if (res.ok) {
+          const d = await res.json()
+          setReceitas(Array.isArray(d?.receitas) ? d.receitas : [])
+          setCustos(Array.isArray(d?.custos) ? d.custos : [])
+        } else {
+          setErro('Erro ao carregar dados financeiros.')
+        }
       } catch { if (!cancelado) setErro('Erro de conexão ao carregar dados financeiros.') }
       finally { if (!cancelado) setLoading(false) }
     })()

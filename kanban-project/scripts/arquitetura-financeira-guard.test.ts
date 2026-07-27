@@ -6,7 +6,7 @@
 //   4. Honorários genéricos por requerente — sem tratamento por nacionalidade.
 // Puro: lê os arquivos, não precisa de banco.
 // ============================================================================
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   MODO,
@@ -70,11 +70,10 @@ secao('Item 4 — honorários sem tratamento por nacionalidade')
 secao('Item 1 — criação manual desativada')
 {
   for (const nat of ['receitas', 'custos']) {
-    const src = readFileSync(join(RAIZ, `src/app/api/financeiro/${nat}/route.ts`), 'utf8')
-    ok(`${nat}: POST retorna 405`, /export async function POST\(\)[\s\S]{0,300}status: 405/.test(src))
-    ok(`${nat}: código CRIACAO_MANUAL_DESATIVADA`, src.includes('CRIACAO_MANUAL_DESATIVADA'))
-    ok(`${nat}: POST não cria mais no banco`, !/export async function POST[\s\S]*prisma\.(receita|custo)\.create/.test(src))
-    ok(`${nat}: GET preservado`, src.includes('export async function GET'))
+    // Etapa 7 (migração V1→V3 definitiva): a rota V1 base foi REMOVIDA — a criação
+    // manual deixou de ter caminho (garantia mais forte que o antigo POST 405) e o
+    // GET/listagem migrou para a fonte única V3 (visão-geral / listarObrigacoes).
+    ok(`${nat}: rota V1 base removida (sem caminho de criação manual)`, !existsSync(join(RAIZ, `src/app/api/financeiro/${nat}/route.ts`)))
   }
   // nenhum criador de lançamento fora do motor e do fluxo de estorno
   // (varredura textual: só executor, matriz-economica e cancelamento-estorno podem criar)

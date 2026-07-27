@@ -120,7 +120,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
     const alvo = cobs.find((c) => c.enviadaEm == null) ?? cobs[0]
     if (!window.confirm("Marcar esta cobrança como enviada ao cliente?")) return
     try {
-      const res = await fetch(`/api/financeiro/cobrancas/${alvo.id}/enviar`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() } })
+      const res = await fetch(`/api/financeiro/v3/cobrancas/${alvo.id}/enviar`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() } })
       const j = await res.json().catch(() => ({}))
       if (!res.ok || !j.ok) alert(j?.erro || `Falha ao enviar a cobrança (HTTP ${res.status}).`)
       else carregar()
@@ -131,12 +131,12 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   const onSelecionarArquivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (e.target) e.target.value = "" // permite reanexar o mesmo arquivo
-    if (!file || d?.receitaId == null) return
+    if (!file) return
     setUploading(true)
     try {
       const [enviado] = await uploadFiles([file], { prefix: "financeiro/documentos" })
       if (!enviado) throw new Error("Falha no upload do arquivo.")
-      const res = await fetch(`/api/financeiro/receitas/${d.receitaId}/documentos`, {
+      const res = await fetch(`/api/financeiro/v3/obrigacoes/${d.obrigacaoId}/documentos`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ arquivoUrl: enviado.url, arquivoNome: enviado.name, tipo: null, tamanho: enviado.size }),
@@ -631,8 +631,8 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                 <input ref={fileInputRef} type="file" className="hidden" onChange={onSelecionarArquivo} />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading || d.receitaId == null}
-                  title={d.receitaId == null ? (isCusto ? "Anexo de documentos disponível apenas em receitas de origem" : "Anexo disponível apenas para receitas de origem") : "Anexar documento"}
+                  disabled={uploading}
+                  title="Anexar documento"
                   className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--accent-primary)] px-3.5 py-2 text-sm font-semibold text-[var(--accent-ink)] hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                 >{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} {uploading ? "Enviando…" : "Anexar documento"}</button>
               </div>

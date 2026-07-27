@@ -173,12 +173,11 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     ? await prisma.parcelaFinanceira.findMany({ where: { receitaId: obr.origemId }, orderBy: { numero: 'asc' }, select: { id: true, numero: true, vencimento: true, valor: true, status: true, cambioAplicado: true, valorBrl: true, formaPagamento: true } }).catch(() => [])
     : []
   const parcelasRec = parcelasAll.filter((p) => p.status !== 'CANCELADA')
-  // Documentos vinculados à Receita (resiliente durante rollout: [] se a tabela não existir)
-  const documentos = obr.origemTipo === 'Receita' && obr.origemId
-    ? await prisma.receitaDocumento.findMany({ where: { receitaId: obr.origemId }, orderBy: { criadoEm: 'desc' } })
-        .then((rows) => rows.map((r) => ({ id: r.id, nome: r.arquivoNome, tipo: r.tipo, url: r.arquivoUrl, tamanho: r.tamanho, criadoEm: r.criadoEm.toISOString() })))
-        .catch(() => [] as { id: number; nome: string; tipo: string | null; url: string; tamanho: number | null; criadoEm: string }[])
-    : []
+  // Documentos vinculados à Obrigação (fonte única por obrigacaoId — cobre RECEITA e CUSTO;
+  // resiliente durante rollout: [] se a tabela não existir)
+  const documentos = await prisma.receitaDocumento.findMany({ where: { obrigacaoId: obr.id }, orderBy: { criadoEm: 'desc' } })
+    .then((rows) => rows.map((r) => ({ id: r.id, nome: r.arquivoNome, tipo: r.tipo, url: r.arquivoUrl, tamanho: r.tamanho, criadoEm: r.criadoEm.toISOString() })))
+    .catch(() => [] as { id: number; nome: string; tipo: string | null; url: string; tamanho: number | null; criadoEm: string }[])
   // Fatura vinculada à Receita (Fase C) — resiliente durante rollout (null se indisponível)
   const faturaRow = obr.origemTipo === 'Receita' && obr.origemId
     ? await prisma.fatura.findFirst({ where: { receitaId: obr.origemId }, orderBy: { createdAt: 'desc' } }).catch(() => null)

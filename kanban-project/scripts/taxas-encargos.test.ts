@@ -238,37 +238,42 @@ secao('Integração com o FinanceRuleEngine')
   ok('migration adiciona condição no Custo', mig.includes('"Custo" ADD COLUMN "condicaoPagamentoId"'))
 }
 
-secao('Renegociação')
+// A rota V1 de renegociação (receitas/[id]/parcelas?modo=renegociacao) foi
+// removida. O mesmo invariante — nunca tocar cobrança já quitada/paga, agir
+// só sobre o saldo em aberto, preservar histórico (sem apagar), transacional —
+// migrou para a ação "Renegociar" do Financeiro V3.
+secao('Renegociação (sucessor V3: ação "Renegociar" do detalhe da Receita)')
 {
-  const rota = readFileSync(join(RAIZ, 'src/app/api/financeiro/receitas/[id]/parcelas/route.ts'), 'utf8')
-  ok('aceita modo renegociacao', rota.includes("modo === 'renegociacao'"))
-  ok('exige motivo', rota.includes('Informe o motivo da renegociação'))
-  ok('opera somente sobre o saldo', rota.includes('totalContratado - recebido'))
-  ok('preserva parcelas liquidadas', rota.includes("status: 'RECEBIDA' || p.status === 'PAGA'") || rota.includes('quitadas'))
-  ok('encerra logicamente as abertas (sem apagar)', rota.includes("data: { status: 'CANCELADA'"))
-  ok('não apaga histórico na renegociação', rota.includes('if (renegociando)') && rota.includes('deleteMany') )
-  ok('numeração não colide com as preservadas', rota.includes('offset'))
-  ok('valor contratado nunca muda', rota.includes('O VALOR contratado nunca muda'))
-  ok('é transacional', rota.includes('prisma.$transaction'))
-  ok('registra evento com motivo', rota.includes('Motivo: ${String(body?.motivo'))
-  ok('bloqueia sem parcelas em aberto', rota.includes('Não há parcelas em aberto para renegociar'))
-  ok('bloqueia saldo zero', rota.includes('Saldo em aberto é zero'))
-  ok('reparcelamento comum segue bloqueado com recebimento', rota.includes('Use a renegociação.'))
+  const acao = readFileSync(join(RAIZ, 'lib/financeiro/acoes/renegociar.ts'), 'utf8')
+  ok('atua só sobre cobranças em aberto/parcial', acao.includes("STATUS_ELEGIVEL = ['ABERTA', 'PARCIAL']"))
+  ok('nunca sobre pagamentos confirmados', acao.includes('NUNCA') && acao.includes('sobre pagamentos confirmados'))
+  ok('preserva histórico (não apaga nada)', /preserva histórico — não apaga/.test(acao) && !/\.delete\(|deleteMany/.test(acao))
+  ok('bloqueia quando não há elegíveis', acao.includes('Nenhuma cobrança em aberto elegível para renegociação'))
+  ok('é transacional', acao.includes('prisma.$transaction'))
+  ok('registra evento com a ação/observação', acao.includes("registrarEventoReceita") && acao.includes("acao: 'RENEGOCIAR'"))
+
+  const rota = readFileSync(join(RAIZ, 'src/app/api/financeiro/v3/receita/[ref]/renegociar/route.ts'), 'utf8')
+  ok('rota V3 delega à ação canônica', rota.includes('renegociar('))
+
+  const detalhe = readFileSync(join(RAIZ, 'src/components/financeiro/v3/ReceitaDetalheView.tsx'), 'utf8')
+  ok('ação "Renegociar" acessível no detalhe da Receita', detalhe.includes('"renegociar"') && detalhe.includes('Renegociar'))
 }
 
-secao('Reflexo nas telas')
+// O modal V1 (receita-modal/tipos.ts, ReceitaVisaoGeral.tsx,
+// ReceitaInformacoesTecnicasTab.tsx) exibia a condição/memória de cálculo
+// CONGELADA no momento da contratação. Essa tela específica foi removida e
+// não foi reconstruída 1:1 no V3 — a taxa passou a ser calculada AO VIVO no
+// momento de registrar o recebimento (RegistrarPagamentoView), por forma de
+// pagamento escolhida ali, em vez de fixada antecipadamente. O invariante que
+// sobrevive é "a taxa é sempre mostrada ao operador, nunca escondida"; o
+// "congelamento por condição contratual" ficou sem tela equivalente — não é
+// reintroduzido aqui por não existir sucessor a apontar.
+secao('Reflexo nas telas — taxa ao vivo no recebimento (sucessor V3)')
 {
-  const tipos = readFileSync(join(RAIZ, 'src/components/financeiro/receita-modal/tipos.ts'), 'utf8')
-  ok('modal conhece a condição aplicada', tipos.includes('condicaoPagamentoId') && tipos.includes('MemoriaCalculo'))
-  ok('modal conhece bruto/taxas/líquido', tipos.includes('valorBruto') && tipos.includes('valorTaxas') && tipos.includes('valorLiquido'))
-
-  const visao = readFileSync(join(RAIZ, 'src/components/financeiro/receita-modal/ReceitaVisaoGeral.tsx'), 'utf8')
-  ok('Visão geral mostra a condição aplicada', visao.includes('Condição de pagamento aplicada'))
-  ok('Visão geral mostra o valor líquido', visao.includes('Valor líquido esperado'))
-  ok('Visão geral explica o congelamento', visao.includes('não recalcula este lançamento'))
-
-  const tec = readFileSync(join(RAIZ, 'src/components/financeiro/receita-modal/ReceitaInformacoesTecnicasTab.tsx'), 'utf8')
-  ok('aba técnica traz a memória de cálculo', tec.includes('Memória de cálculo'))
+  const receber = readFileSync(join(RAIZ, 'src/components/financeiro/v3/RegistrarPagamentoView.tsx'), 'utf8')
+  ok('recebimento calcula a taxa da forma escolhida com a fonte única', receber.includes('calcularTaxas'))
+  ok('taxa é exibida ao operador por linha', /Taxa:/.test(receber))
+  ok('total de taxas aparece no resumo do recebimento', receber.includes('Taxas (cartão)'))
 
   const cond = readFileSync(join(RAIZ, 'src/components/gerenciamentoComponents/CondicoesPagamentoTab.tsx'), 'utf8')
   // wizard premium (regra reutilizável): cobre entrada/parcelamento/cronograma/
@@ -293,33 +298,25 @@ secao('Reflexo nas telas')
   }
 }
 
-secao('Paridade Receita x Custo')
+// V1 dava paridade Receita×Custo DUPLICANDO rotas/telas (custos/[id]/detalhe,
+// custos/[id]/parcelas, CustoFinanceiroModal, subabas/Custos.tsx) — todas
+// removidas. O V3 dá uma paridade mais forte: RECEITA e CUSTO são a mesma
+// ObrigacaoEconomica (campo `natureza`), lidas pelo mesmo read-model e
+// renderizadas pelo mesmo componente (ReceitaDetalheView), sem código
+// duplicado a manter sincronizado.
+secao('Paridade Receita x Custo (sucessor V3: mesma obrigação, campo natureza)')
 {
-  for (const rota of ['detalhe', 'parcelas']) {
-    ok(`custos/[id]/${rota} existe`, existsSync(join(RAIZ, `src/app/api/financeiro/custos/[id]/${rota}/route.ts`)))
-  }
-  const det = readFileSync(join(RAIZ, 'src/app/api/financeiro/custos/[id]/detalhe/route.ts'), 'utf8')
-  ok('detalhe de custo devolve o mesmo envelope', det.includes('receita: {') && det.includes('acoes'))
-  ok('detalhe de custo expõe natureza', det.includes("natureza: 'CUSTO'"))
-  ok('detalhe de custo não recalcula', det.includes('CONGELADAS pelo FinanceRuleEngine'))
-  ok('detalhe de custo mapeia vencimento→data1', det.includes('data1: custo.vencimento'))
+  const leitura = readFileSync(join(RAIZ, 'lib/financeiro/leitura/receita-detalhe.ts'), 'utf8')
+  ok('read-model único expõe natureza RECEITA|CUSTO', /natureza:\s*'RECEITA'\s*\|\s*'CUSTO'/.test(leitura))
+  ok('natureza é derivada da direção da obrigação (A_PAGAR → CUSTO)', /direcao === 'A_PAGAR'\s*\?\s*'CUSTO'\s*:\s*'RECEITA'/.test(leitura))
 
-  const parc = readFileSync(join(RAIZ, 'src/app/api/financeiro/custos/[id]/parcelas/route.ts'), 'utf8')
-  ok('custo tem renegociação', parc.includes("modo === 'renegociacao'"))
-  ok('custo preserva parcelas liquidadas', parc.includes("data: { status: 'CANCELADA'"))
-  ok('custo opera sobre o saldo', parc.includes('totalContratado - recebido'))
-  ok('custo grava vencimento (não data1)', parc.includes('vencimento: plano[0]?.vencimento'))
-  ok('custo usa a tabela certa', parc.includes('prisma.custo.findUnique') && parc.includes('custoId: id'))
+  const detalhe = readFileSync(join(RAIZ, 'src/components/financeiro/v3/ReceitaDetalheView.tsx'), 'utf8')
+  ok('mesmo componente atende Receita e Custo (isCusto deriva de natureza)', detalhe.includes('const isCusto = d.natureza === "CUSTO"'))
+  ok('vocabulário muda por natureza (Recebido/Pago, Cobranças/Parcelas)', detalhe.includes('isCusto ? "Parcelas" : "Cobranças"') && detalhe.includes('isCusto ? "Pago" : "Recebido"'))
+  ok('ações exclusivas de Receita ficam fora do Custo (fatura/recibo/renegociar)', /!isCusto &&.*Gerar fatura/.test(detalhe) && /!isCusto &&.*Gerar recibo/.test(detalhe))
 
-  const modal = readFileSync(join(RAIZ, 'src/components/financeiro/receita-modal/ReceitaFinanceiraModal.tsx'), 'utf8')
-  ok('modal é parametrizado por natureza', modal.includes("natureza?: 'RECEITA' | 'CUSTO'"))
-  ok('modal deriva a base da API', modal.includes('const base = `/api/financeiro/${vocab.recurso}/${receitaId}`'))
-  ok('vocabulário por natureza', modal.includes('Registrar pagamento') && modal.includes('Registrar recebimento'))
-  ok('exporta CustoFinanceiroModal', modal.includes('export function CustoFinanceiroModal'))
-
-  const tela = readFileSync(join(RAIZ, 'src/components/financeiro/subabas/Custos.tsx'), 'utf8')
-  ok('tela de Custos abre o modal', tela.includes('CustoFinanceiroModal'))
-  ok('linha de custo é clicável', tela.includes('role="button"') && tela.includes('setLancamentoAberto'))
+  const shell = readFileSync(join(RAIZ, 'src/components/financeiro/v3/ProcessoFinanceiroShell.tsx'), 'utf8')
+  ok('Custos e Receitas no shell filtram a MESMA rota por natureza', shell.includes("natureza=CUSTO") && shell.includes('/api/financeiro/v3/obrigacoes'))
 }
 
 secao('Financeiro Geral')

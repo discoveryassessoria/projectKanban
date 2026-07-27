@@ -99,7 +99,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
         const [rDet, rCons, rCad] = await Promise.all([
           fetch(`/api/financeiro/v3/receita/${receitaRef}?obrigacao=${obrigacaoId}`, { headers: authHeaders() }).then((r) => r.json()).catch(() => null),
           fetch(`/api/financeiro/v3/receita/${receitaRef}`, { headers: authHeaders() }).then((r) => r.json()).catch(() => null),
-          fetch(`/api/financeiro/cadastros-pagamento`, { headers: authHeaders() }).then((r) => r.json()).catch(() => null),
+          fetch(`/api/financeiro/v3/cadastros-pagamento`, { headers: authHeaders() }).then((r) => r.json()).catch(() => null),
         ])
         if (!vivo) return
         const d = rDet?.receita ?? null
@@ -115,7 +115,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
         setBandeiras(rCad?.bandeiras ?? [])
         setTaxas(rCad?.taxas ?? [])
         // crédito financeiro disponível (obrigação/pessoa) — limita "Crédito Utilizado"
-        fetch(`/api/financeiro/creditos?obrigacaoId=${obrigacaoId}`, { headers: authHeaders() }).then((x) => x.json()).then((rc) => { if (vivo && rc?.saldoDisponivel != null) setCreditoDisponivel(Number(rc.saldoDisponivel)) }).catch(() => {})
+        fetch(`/api/financeiro/v3/creditos?obrigacaoId=${obrigacaoId}`, { headers: authHeaders() }).then((x) => x.json()).then((rc) => { if (vivo && rc?.saldoDisponivel != null) setCreditoDisponivel(Number(rc.saldoDisponivel)) }).catch(() => {})
         if (!d) setErro("Não foi possível carregar a cobrança.")
       } catch { if (vivo) setErro("Falha ao carregar.") } finally { if (vivo) setLoading(false) }
     })()

@@ -48,11 +48,15 @@ console.log('\nConciliação — flag-gated e sem resolução silenciosa')
   ok('divergência nunca silenciosa (DIVERGENTE explícito)', /DIVERGENTE/.test(m) && /SEM_CORRESPONDENCIA/.test(m))
 }
 
-console.log('\nSubstituição das telas — nav, bloqueio legado, telas V3')
+console.log('\nSubstituição das telas — nav, bloqueio legado')
 {
+  // Nota: o hub standalone /financeiro/v3 (abas Obrigações/Conciliação/
+  // Divergências/Auditoria/Data de corte) foi descontinuado — Financeiro V3
+  // passou a viver dentro do processo (aba "Financeiro" → ProcessoFinanceiroShell).
+  // /financeiro/v3 hoje só redireciona para /processos; não há mais item de nav
+  // próprio, então os checks de "hub" e de nav ficaram moot e foram removidos.
   const nav = R('src/components/bitrix-sidebar.tsx')
-  ok('nav tem item Financeiro V3 (/financeiro/v3)', /Financeiro V3/.test(nav) && /\/financeiro\/v3/.test(nav))
-  ok('legado permanece no nav (fallback temporário)', /url: "\/financeiro"/.test(nav))
+  ok('legado permanece no nav (Financeiro Geral corporativo)', /url: "\/financeiro"/.test(nav))
 
   delete process.env.FINANCEIRO_LEGADO_ESCRITA_BLOQUEADA
   ok('bloqueio de escrita legado desligado por padrão', !legadoEscritaBloqueada())
@@ -62,21 +66,31 @@ console.log('\nSubstituição das telas — nav, bloqueio legado, telas V3')
 
   ok('guard aplicado na criação de cobrança (legado)', /guardLegadoEscrita/.test(R('src/app/api/financeiro/receitas/[id]/cobrancas/route.ts')))
   ok('guard aplicado no registro de pagamento (legado)', /guardLegadoEscrita/.test(R('src/app/api/financeiro/cobrancas/[id]/pagamentos/route.ts')))
-  ok('guard aplicado no lançamento de parcela (legado)', /guardLegadoEscrita/.test(R('src/app/api/financeiro/parcelas/[id]/lancamento/route.ts')))
-
-  const hub = R('src/app/financeiro/v3/page.tsx')
-  ok('hub V3 tem as telas mínimas (abas)', /Visão geral/.test(hub) && /Obrigações/.test(hub) && /Conciliação/.test(hub) && /Divergências/.test(hub) && /Auditoria/.test(hub) && /Data de corte/.test(hub))
-  ok('hub V3 consome as rotas do Ledger', /financeiro\/v3\/resumo/.test(hub) && /financeiro\/v3\/obrigacoes/.test(hub) && /financeiro\/v3\/divergencias/.test(hub))
 }
 
 console.log('\nFinanceiro V3 no processo + sweep do guard legado')
 {
-  const comp = R('src/components/financeiro/v3/ProcessoFinanceiroV3.tsx')
+  // ProcessoFinanceiroV3.tsx foi renomeado para ProcessoFinanceiroShell.tsx
+  // (mesmo papel: shell da aba Financeiro dentro do processo, sub-abas Visão
+  // Geral/Receitas/Custos/Extrato/Timeline).
+  const comp = R('src/components/financeiro/v3/ProcessoFinanceiroShell.tsx')
   ok('processo V3 é alimentado pela rota do Ledger', /\/api\/financeiro\/v3\/processo\//.test(comp))
-  ok('processo V3 registra ocorrências pela rota V3 (não legado)', /\/api\/financeiro\/v3\/ocorrencias/.test(comp) && !/\/api\/financeiro\/cobrancas/.test(comp))
-  ok('processo V3 exibe distribuição/responsáveis/timeline/comprovantes', /Distribuição por requerente/.test(comp) && /Responsáveis contratuais/.test(comp) && /Timeline financeira/.test(comp) && /comprovante/.test(comp))
+  ok('processo V3 exibe timeline financeira com comprovantes', /Timeline financeira/.test(comp) && /comprovante/.test(comp))
+
+  // Distribuição por requerente e responsável pelo pagamento migraram para o
+  // detalhe da Receita (ver detalhe-receita-rico), não ficam mais no shell.
+  const detalhe = R('src/components/financeiro/v3/ReceitaDetalheView.tsx')
+  ok('detalhe da Receita exibe distribuição entre requerentes e responsável', /Distribuição entre requerentes/.test(detalhe) && /Responsável/.test(detalhe))
+
+  // Ocorrências (pagamento/estorno) são registradas por componentes V3
+  // dedicados; nenhum componente V3 escreve nas rotas legadas.
+  const dirV3Comp = 'src/components/financeiro/v3'
+  const arquivosV3 = require('node:fs').readdirSync(join(process.cwd(), dirV3Comp)).filter((f: string) => f.endsWith('.tsx'))
+  const fontesV3 = arquivosV3.map((f: string) => R(`${dirV3Comp}/${f}`)).join('\n')
+  ok('componentes V3 registram ocorrências pela rota V3 (não legado)', /\/api\/financeiro\/v3\/ocorrencias/.test(fontesV3) && !/\/api\/financeiro\/cobrancas/.test(fontesV3) && !/\/api\/financeiro\/parcelas/.test(fontesV3))
+
   const modal = R('src/components/kanban/atividade-details-modal.tsx')
-  ok('modal do processo troca V3×legado por flag (fallback)', /financeiroV3Ativo \? \(/.test(modal) && /ProcessoFinanceiroV3/.test(modal) && /<ProcessoFinanceiro\b/.test(modal))
+  ok('modal do processo usa Financeiro V3 (ProcessoFinanceiroShell) sob permissão financeiro.ver', /<ProcessoFinanceiroShell\b/.test(modal) && /pode\('financeiro\.ver'\)/.test(modal))
 
   // sweep: todos os writes de api/financeiro (não-v3) guardados, exceto simular
   const dir = 'src/app/api/financeiro'

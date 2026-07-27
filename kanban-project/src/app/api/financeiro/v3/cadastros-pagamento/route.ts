@@ -1,13 +1,17 @@
-// /api/financeiro/cadastros-pagamento — seletores da tela de recebimento (Registrar
-// Pagamento). Espelha o GET de gerenciamento/formas-pagamento, porém sob a permissão
-// 'financeiro.ver' (o operador financeiro não tem 'usuarios.gerenciar'). Somente leitura.
+// /api/financeiro/v3/cadastros-pagamento — seletores da tela de recebimento (Registrar
+// Pagamento, Motor V3). MESMA query/regra do V1 (/api/financeiro/cadastros-pagamento),
+// que por sua vez espelha o GET de gerenciamento/formas-pagamento sob 'financeiro.ver'
+// (o operador financeiro não tem 'usuarios.gerenciar'). Somente leitura. Flag posicaoRead.
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { flagAtiva } from '@/lib/financeiro/flags'
+import { usuarioFlag } from '../_flags'
 
 export async function GET(request: NextRequest) {
   const erro = await verificarPermissao(request, 'financeiro.ver')
   if (erro) return erro
+  if (!flagAtiva('posicaoRead', await usuarioFlag(request))) return NextResponse.json({ disponivel: false, fallbackLegado: true }, { status: 409 })
   try {
     const [formasPagamento, carteiras, contas, adquirentes, bandeiras, taxasRaw] = await Promise.all([
       prisma.formaPagamentoCadastro.findMany({
@@ -33,7 +37,7 @@ export async function GET(request: NextRequest) {
     const formas = formasPagamento.filter((f) => f.usoRecebimento !== false)
     return NextResponse.json({ formasPagamento: formas.length ? formas : formasPagamento, carteiras, contas, adquirentes, bandeiras, taxas })
   } catch (e) {
-    console.error('cadastros-pagamento GET', e)
+    console.error('v3/cadastros-pagamento GET', e)
     return NextResponse.json({ formasPagamento: [], carteiras: [], contas: [], adquirentes: [], bandeiras: [], taxas: [] })
   }
 }
