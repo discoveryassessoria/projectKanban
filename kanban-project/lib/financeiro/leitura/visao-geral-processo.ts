@@ -13,6 +13,7 @@
 // existia na tela para os lançamentos nativos).
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import { receitasExcluidasIds, obrigacaoExcluida } from './exclusao-filtro'
 
 export type MoedaVG = 'BRL' | 'EUR' | 'USD'
 export type FxRuleVG = 'FIXO' | 'VARIAVEL'
@@ -47,12 +48,15 @@ export interface ItemVG {
 const iso = (d: Date | null | undefined): string => (d ? d.toISOString() : '')
 
 export async function carregarVisaoGeralProcesso(processoId: number): Promise<{ receitas: ItemVG[]; custos: ItemVG[] }> {
-  const obrs = await prisma.obrigacaoEconomica.findMany({
+  let obrs = await prisma.obrigacaoEconomica.findMany({
     where: { processoId, status: { not: 'CANCELADO' } },
     orderBy: { id: 'desc' },
     include: { distribuicoes: { orderBy: { versao: 'desc' }, take: 1, include: { participacoes: true } } },
   })
   if (obrs.length === 0) return { receitas: [], custos: [] }
+  // Receita com exclusão lógica sai das consultas padrão (mesma regra da lista).
+  const excluidas = await receitasExcluidasIds(obrs.filter((o) => o.origemTipo === 'Receita').map((o) => o.origemId))
+  if (excluidas.size) { obrs = obrs.filter((o) => !obrigacaoExcluida(o, excluidas)); if (obrs.length === 0) return { receitas: [], custos: [] } }
 
   const ids = obrs.map((o) => o.id)
 

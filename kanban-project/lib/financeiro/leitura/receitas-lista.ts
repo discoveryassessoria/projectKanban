@@ -12,6 +12,7 @@
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import { computeCambioAging, cotacoesVivas } from './cambio-aging'
+import { temMarcaExclusao } from './exclusao-filtro'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 const num = (x: unknown): number | null => (x == null ? null : Number(x))
@@ -171,7 +172,7 @@ const baseLabel = (desc: string | null): string | null => {
 }
 
 export async function listarReceitas(processoId?: number): Promise<ReceitasLista> {
-  const obrs = await prisma.obrigacaoEconomica.findMany({
+  let obrs = await prisma.obrigacaoEconomica.findMany({
     where: { natureza: 'RECEITA', direcao: 'A_RECEBER', status: { not: 'CANCELADO' }, ...(processoId ? { processoId } : {}) },
     include: { distribuicoes: { orderBy: { versao: 'desc' }, include: { participacoes: true } } },
     orderBy: { id: 'desc' }, take: 500,
@@ -189,6 +190,11 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
       })
     : []
   const recPor = new Map(receitas.map((r) => [r.id, r]))
+  // BUG FIX (exclusão): receita com exclusão lógica (contextoAplicado.exclusao) sai das
+  // consultas padrão. A marca vive na Receita de origem (já carregada acima); a lista de
+  // obrigações precisa honrá-la — senão a receita excluída reaparece na tela. Ledger intacto.
+  const excluidasIds = new Set(receitas.filter((r) => temMarcaExclusao(r.contextoAplicado)).map((r) => r.id))
+  if (excluidasIds.size) obrs = obrs.filter((o) => !(o.origemTipo === 'Receita' && o.origemId != null && excluidasIds.has(o.origemId)))
   // Requerente REAL da receita legada (nome em texto) — fonte confiável do vínculo,
   // preferida sobre a participação da distribuição (que pode não resolver a Pessoa).
   const reqLegado = recIds.length

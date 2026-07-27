@@ -95,7 +95,8 @@
     "test:ssot-financeiro": "tsx scripts/ssot-financeiro.test.ts",
     "test:cambio-canonico": "tsx scripts/cambio-canonico.test.ts",
     "test:overview": "tsx scripts/overview-projecao.test.ts",
-    "test:revalidacao-lista": "tsx scripts/revalidacao-lista-guard.test.ts"
+    "test:revalidacao-lista": "tsx scripts/revalidacao-lista-guard.test.ts",
+    "test:excluir-receita-lista": "tsx scripts/excluir-receita-lista.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -4,6 +4,7 @@
 // Tudo derivado do Ledger/projeções — o legado não é fonte aqui. Ver spec §Projeções.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import { receitasExcluidasIds, obrigacaoExcluida } from './exclusao-filtro'
 import { projetar, type EntryProjecao } from '../ledger/projecao'
 import { computeCambioAging, cotacoesVivas } from './cambio-aging'
 
@@ -42,7 +43,7 @@ export interface ObrigacaoLista {
 
 /** Lista obrigações com saldo (projeção). Filtros opcionais. */
 export async function listarObrigacoes(f?: { processoId?: number; status?: string; natureza?: string; origemTipo?: string }): Promise<ObrigacaoLista[]> {
-  const obrs = await prisma.obrigacaoEconomica.findMany({
+  let obrs = await prisma.obrigacaoEconomica.findMany({
     where: {
       ...(f?.processoId ? { processoId: f.processoId } : {}),
       // Sem status explícito, exclui CANCELADO (segue no Extrato/Timeline p/ histórico).
@@ -54,6 +55,9 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
     take: 500,
     include: { distribuicoes: { orderBy: { versao: 'desc' }, take: 1, include: { participacoes: true } } },
   })
+  // Receita com exclusão lógica sai das consultas padrão (mesma regra da lista).
+  const excluidas = await receitasExcluidasIds(obrs.filter((o) => o.origemTipo === 'Receita').map((o) => o.origemId))
+  if (excluidas.size) obrs = obrs.filter((o) => !obrigacaoExcluida(o, excluidas))
   const ids = obrs.map((o) => o.id)
   const projs = ids.length ? await prisma.saldoProjecao.findMany({ where: { obrigacaoId: { in: ids } } }) : []
   const projPor = new Map(projs.map((p) => [p.obrigacaoId, p]))
