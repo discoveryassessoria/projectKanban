@@ -9,7 +9,8 @@
 // ============================================================================
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { useRevalidacaoFinanceira } from "@/src/lib/financeiro-bus"
 import { useRouter } from "next/navigation"
 import { LancamentoManualModal } from "./LancamentoManualModal"
@@ -33,6 +34,7 @@ const STATUS: Record<string, { label: string; cor: string }> = {
   PARCIAL: { label: "Parcial", cor: "var(--info)" },
   VENCIDO: { label: "Vencido", cor: "var(--danger)" },
   "A VENCER": { label: "A vencer", cor: "var(--accent-primary)" },
+  CANCELADO: { label: "Cancelado", cor: "var(--text-muted)" },
 }
 const statusView = (s?: string) => STATUS[s ?? ""] ?? { label: s ?? "—", cor: "var(--text-secondary)" }
 
@@ -46,7 +48,7 @@ function StatusPill({ st }: { st: { label: string; cor: string } }) {
 }
 
 // mapa statusConsolidado -> aba de status (PARCIAL fica em "A vencer": ainda tem saldo)
-const ABA_DE: Record<string, string> = { "A VENCER": "avencer", PARCIAL: "avencer", VENCIDO: "vencidas", QUITADO: "pagas" }
+const ABA_DE: Record<string, string> = { "A VENCER": "avencer", PARCIAL: "avencer", VENCIDO: "vencidas", QUITADO: "pagas", CANCELADO: "canceladas" }
 const ABAS: [string, string][] = [["todas", "Todas"], ["avencer", "A vencer"], ["vencidas", "Vencidas"], ["pagas", "Pagas"], ["canceladas", "Canceladas"]]
 const PAGE = 10
 
@@ -186,16 +188,34 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1180px] text-sm">
+          <table className="w-full min-w-[1040px] table-fixed text-sm">
+            <colgroup>
+              <col className="w-10" />
+              <col className="min-w-[240px]" />
+              <col className="w-[152px]" />
+              <col className="w-[132px]" />
+              <col className="w-[132px]" />
+              <col className="w-[116px]" />
+              <col className="w-[136px]" />
+              <col className="w-[116px]" />
+              <col className="w-[72px]" />
+            </colgroup>
             <thead>
-              <tr className="border-b border-[var(--border-default)] text-left text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
-                <th className="w-8 px-3 py-3" />
-                {["Receita", "Serviço", "Valor-base (EUR)", "Valor contratado (BRL)", "Recebido (BRL)", "Saldo (BRL)", "Próximo vencimento", "Participantes", "Status", "Ações"].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}
+              <tr className="border-b border-[var(--border-default)] text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
+                <th className="px-3 py-3" />
+                <th className="px-4 py-3 text-left font-medium">Receita</th>
+                <th className="px-4 py-3 text-right font-medium">Valor</th>
+                <th className="px-4 py-3 text-right font-medium">Recebido</th>
+                <th className="px-4 py-3 text-right font-medium">Saldo</th>
+                <th className="px-4 py-3 text-center font-medium">Vencimento</th>
+                <th className="px-4 py-3 text-center font-medium">Participantes</th>
+                <th className="px-4 py-3 text-center font-medium">Situação</th>
+                <th className="px-3 py-3 text-center font-medium">Ações</th>
               </tr>
             </thead>
             <tbody>
               {filtrados.length === 0 ? (
-                <tr><td colSpan={11} className="px-5 py-14 text-center">
+                <tr><td colSpan={9} className="px-5 py-14 text-center">
                   <div className="text-sm font-medium text-[var(--text-secondary)]">Nenhuma receita cadastrada</div>
                   <div className="mt-1 text-sm text-[var(--text-muted)]">Crie a primeira receita deste processo.</div>
                   <button onClick={() => setNovo(true)} className="mt-4 inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--info)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] hover:brightness-110"><Plus className="h-4 w-4" /> Nova Receita</button>
@@ -232,54 +252,47 @@ function LinhaGrupo({ g, aberto, onToggle, onAbrir, onAbrirParticipante }: { g: 
   const st = statusView(g.statusConsolidado)
   const cotacao = g.participantes[0]?.cotacao ?? null
   const nomes = g.participantes.map((p) => p.nome)
-  const nomesLabel = nomes.length <= 2 ? nomes.join(", ") : `${nomes[0]} + ${nomes.length - 1}`
+  const nomesFull = nomes.join(", ") || "—"
+  const primeiroNome = nomes[0] ?? "—"
+  const vencido = g.statusConsolidado === "VENCIDO"
+  const temBase = g.valorBaseTotal != null && g.moedaBase !== "BRL"
   return (
     <>
-      <tr className={`border-t border-[var(--border-default)] cursor-pointer ${aberto ? "bg-[var(--surface-active)]" : "hover:bg-[var(--surface-hover)]"}`} onClick={onToggle}>
-        <td className="px-3 py-3.5 align-top">
-          <button onClick={(e) => { e.stopPropagation(); onToggle() }} className="grid h-6 w-6 place-items-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)]">
+      {/* Clique na linha (ou no nome) abre o DETALHE. Seta só expande a distribuição. */}
+      <tr className={`border-t border-[var(--border-default)] cursor-pointer align-middle ${aberto ? "bg-[var(--surface-active)]" : "hover:bg-[var(--surface-hover)]"}`} onClick={onAbrir}>
+        <td className="px-3 py-3.5 align-middle" onClick={(e) => e.stopPropagation()}>
+          <button onClick={onToggle} title={aberto ? "Ocultar distribuição" : "Ver distribuição"} className="grid h-6 w-6 place-items-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)]">
             {aberto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </button>
         </td>
-        <td className="px-4 py-3.5 align-top">
-          <div className="flex items-center gap-2">
-            <span className="max-w-[220px] truncate font-semibold text-[var(--text-primary)]">{g.descricao ?? g.codigo ?? "Receita"}</span>
-            <span className="flex-none rounded bg-[var(--surface-active)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">ID {g.id}</span>
-          </div>
-          {g.codigo && <div className="mt-0.5 text-[11px] text-[var(--text-muted)]">{g.codigo}</div>}
+        <td className="px-4 py-3.5 align-middle">
+          <div className="truncate font-semibold text-[var(--text-primary)]" title={g.descricao ?? g.codigo ?? undefined}>{g.descricao ?? g.codigo ?? "Receita"}</div>
+          <div className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]" title={[g.codigo, g.servico].filter(Boolean).join(" · ")}>{[g.codigo, g.servico].filter(Boolean).join(" · ") || "—"}</div>
         </td>
-        <td className="px-4 align-top text-[var(--text-secondary)]">{g.servico ?? "—"}</td>
-        <td className="px-4 align-top">
-          {g.valorBaseTotal != null && g.moedaBase !== "BRL" ? (
-            <div>
-              <div className="text-[var(--text-primary)]">{fmtMoeda(g.valorBaseTotal, g.moedaBase)}</div>
-              {cotacao != null && <div className="mt-0.5 text-[11px] text-[var(--text-muted)]">Câmbio: {brl(cotacao)}</div>}
-            </div>
-          ) : <span className="text-[var(--text-muted)]">—</span>}
+        <td className="px-4 align-middle text-right">
+          <div className="font-semibold tabular-nums text-[var(--text-primary)]"><ValorBrl valor={g.valorContratadoBrlTotal} naoConvertido={g.naoConvertidoTotal} moeda={g.moedaBase} /></div>
+          {temBase && <div className="mt-0.5 truncate text-[11px] tabular-nums text-[var(--text-muted)]" title={cotacao != null ? `Câmbio ${brl(cotacao)}` : undefined}>{fmtMoeda(g.valorBaseTotal as number, g.moedaBase)}{cotacao != null ? ` · ${brl(cotacao)}` : ""}</div>}
         </td>
-        <td className="px-4 align-top font-semibold text-[var(--text-primary)]"><ValorBrl valor={g.valorContratadoBrlTotal} naoConvertido={g.naoConvertidoTotal} moeda={g.moedaBase} /></td>
-        <td className="px-4 align-top"><span className={(g.recebidoBrlTotal ?? 0) > 0 ? "text-[var(--success)]" : "text-[var(--text-secondary)]"}>{brl(g.recebidoBrlTotal)}</span></td>
-        <td className="px-4 align-top text-[var(--info)]">{brl(g.saldoBrlTotal)}</td>
-        <td className="px-4 align-top text-[var(--text-secondary)]">{dataBR(g.proximoVencimento) ?? <span className="text-[var(--text-muted)]">Não definido</span>}</td>
-        <td className="px-4 align-top">
-          <div className="inline-flex flex-col gap-0.5">
-            <span className="inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ background: "color-mix(in srgb, var(--text-secondary) 15%, transparent)", color: "var(--text-secondary)" }}><Users className="h-3 w-3" /> {g.participantesCount}</span>
-            <span className="max-w-[150px] truncate text-[11px] text-[var(--text-muted)]">{nomesLabel}</span>
+        <td className="px-4 align-middle text-right tabular-nums"><span className={(g.recebidoBrlTotal ?? 0) > 0 ? "text-[var(--success)]" : "text-[var(--text-secondary)]"}>{brl(g.recebidoBrlTotal)}</span></td>
+        <td className="px-4 align-middle text-right tabular-nums text-[var(--info)]">{brl(g.saldoBrlTotal)}</td>
+        <td className="px-4 align-middle text-center text-[13px]"><span className={vencido ? "font-medium text-[var(--danger)]" : "text-[var(--text-secondary)]"}>{dataBR(g.proximoVencimento) ?? <span className="text-[var(--text-muted)]">—</span>}</span></td>
+        <td className="px-4 align-middle">
+          <div className="flex items-center justify-center gap-1.5" title={nomesFull}>
+            <span className="inline-flex flex-none items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ background: "color-mix(in srgb, var(--text-secondary) 15%, transparent)", color: "var(--text-secondary)" }}><Users className="h-3 w-3" />{g.participantesCount}</span>
+            {/* nome só quando há UM participante (evita "primeiro de N" cortado e confuso) */}
+            {g.participantesCount === 1 && <span className="max-w-[84px] truncate text-[11px] text-[var(--text-muted)]">{primeiroNome}</span>}
           </div>
         </td>
-        <td className="px-4 align-top"><StatusPill st={st} /></td>
-        <td className="px-4 align-top">
-          <div className="flex items-center gap-1.5">
-            <button onClick={(e) => { e.stopPropagation(); onAbrir() }} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-active)]"><ExternalLink className="h-3.5 w-3.5" /> Abrir</button>
-            <button onClick={(e) => { e.stopPropagation(); onToggle() }} title="Ver distribuição" className="grid h-7 w-7 place-items-center rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)]"><MoreVertical className="h-4 w-4" /></button>
-          </div>
+        <td className="px-4 align-middle text-center"><StatusPill st={st} /></td>
+        <td className="px-3 align-middle text-center" onClick={(e) => e.stopPropagation()}>
+          <RowMenu onAbrir={onAbrir} onToggle={onToggle} aberto={aberto} codigo={g.codigo} />
         </td>
       </tr>
 
       {aberto && (
         <tr className="border-t border-[var(--border-default)] bg-[var(--surface-primary)]">
           <td className="px-3 py-4" />
-          <td colSpan={10} className="px-4 py-4 pr-5">
+          <td colSpan={8} className="px-4 py-4 pr-5">
             <div className="mb-3 flex items-center gap-2">
               <span className="grid h-7 w-7 place-items-center rounded-[var(--radius-sm)] text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--text-secondary) 15%, transparent)" }}><Users className="h-4 w-4" /></span>
               <div>
@@ -288,43 +301,52 @@ function LinhaGrupo({ g, aberto, onToggle, onAbrir, onAbrirParticipante }: { g: 
               </div>
             </div>
             <div className="overflow-x-auto rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-primary)]">
-              <table className="w-full min-w-[980px] text-sm">
+              <table className="w-full min-w-[900px] table-fixed text-sm">
+                <colgroup>
+                  <col className="min-w-[220px]" /><col className="w-[130px]" /><col className="w-[150px]" />
+                  <col className="w-[130px]" /><col className="w-[130px]" /><col className="w-[116px]" />
+                  <col className="w-[116px]" /><col className="w-[64px]" />
+                </colgroup>
                 <thead>
-                  <tr className="border-b border-[var(--border-default)] text-left text-[10.5px] uppercase tracking-wider text-[var(--text-muted)]">
-                    {["Participante", "Valor base (EUR)", "Valor contratado (BRL)", "Recebido (BRL)", "Saldo (BRL)", "Próximo vencimento", "Status", "Ações"].map((h) => <th key={h} className="px-4 py-2.5 font-medium">{h}</th>)}
+                  <tr className="border-b border-[var(--border-default)] text-[10.5px] uppercase tracking-wider text-[var(--text-muted)]">
+                    <th className="px-4 py-2.5 text-left font-medium">Participante</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Valor base</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Contratado (BRL)</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Recebido</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Saldo</th>
+                    <th className="px-4 py-2.5 text-center font-medium">Vencimento</th>
+                    <th className="px-4 py-2.5 text-center font-medium">Situação</th>
+                    <th className="px-3 py-2.5 text-center font-medium">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {g.participantes.map((p) => {
                     const pst = statusView(p.status)
                     return (
-                      <tr key={p.obrigacaoId} className="border-t border-[var(--border-default)] hover:bg-[var(--surface-hover)]">
-                        <td className="px-4 py-3">
+                      <tr key={p.obrigacaoId} className="cursor-pointer border-t border-[var(--border-default)] align-middle hover:bg-[var(--surface-hover)]" onClick={() => onAbrirParticipante(p.obrigacaoId)}>
+                        <td className="px-4 py-3 align-middle">
                           <div className="flex items-center gap-2.5">
                             <span className="grid h-8 w-8 flex-none place-items-center rounded-full text-[11px] font-semibold text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--text-secondary) 15%, transparent)" }}>{iniciais(p.nome)}</span>
-                            <div>
-                              <div className="text-[var(--text-primary)]">{p.nome}</div>
-                              <div className="text-[11px] text-[var(--text-muted)]">{p.papel}</div>
+                            <div className="min-w-0">
+                              <div className="truncate text-[var(--text-primary)]" title={p.nome}>{p.nome}</div>
+                              <div className="truncate text-[11px] text-[var(--text-muted)]">{p.papel}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 text-[var(--text-primary)]">{p.moedaBase !== "BRL" ? fmtMoeda(p.valorBase, p.moedaBase) : <span className="text-[var(--text-muted)]">—</span>}</td>
-                        <td className="px-4 font-semibold text-[var(--text-primary)]"><ValorBrl valor={p.valorContratadoBrl} naoConvertido={p.naoConvertido} moeda={p.moedaBase} /></td>
-                        <td className="px-4">
+                        <td className="px-4 align-middle text-right tabular-nums text-[var(--text-primary)]">{p.moedaBase !== "BRL" ? fmtMoeda(p.valorBase, p.moedaBase) : <span className="text-[var(--text-muted)]">—</span>}</td>
+                        <td className="px-4 align-middle text-right font-semibold tabular-nums text-[var(--text-primary)]"><ValorBrl valor={p.valorContratadoBrl} naoConvertido={p.naoConvertido} moeda={p.moedaBase} /></td>
+                        <td className="px-4 align-middle text-right tabular-nums">
                           <div className={(p.recebidoBrl ?? 0) > 0 ? "text-[var(--success)]" : "text-[var(--text-secondary)]"}>{brl(p.recebidoBrl)}</div>
-                          <div className="text-[11px] text-[var(--text-muted)]">{p.parcelasRecebidas ?? 0} parcela(s)</div>
+                          <div className="text-[11px] text-[var(--text-muted)]">{p.parcelasRecebidas ?? 0} parc.</div>
                         </td>
-                        <td className="px-4">
+                        <td className="px-4 align-middle text-right tabular-nums">
                           <div className="text-[var(--info)]">{brl(p.saldoBrl)}</div>
-                          <div className="text-[11px] text-[var(--text-muted)]">{p.parcelas ?? 0} parcela(s)</div>
+                          <div className="text-[11px] text-[var(--text-muted)]">{p.parcelas ?? 0} parc.</div>
                         </td>
-                        <td className="px-4 text-[var(--text-secondary)]">{dataBR(p.proximoVencimento) ?? <span className="text-[var(--text-muted)]">Não definido</span>}</td>
-                        <td className="px-4"><StatusPill st={pst} /></td>
-                        <td className="px-4">
-                          <div className="flex items-center gap-1.5">
-                            <button onClick={() => onAbrirParticipante(p.obrigacaoId)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-active)]"><ExternalLink className="h-3.5 w-3.5" /> Abrir</button>
-                            <button onClick={() => onAbrirParticipante(p.obrigacaoId)} title="Abrir participante" className="grid h-7 w-7 place-items-center rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)]"><MoreVertical className="h-4 w-4" /></button>
-                          </div>
+                        <td className="px-4 align-middle text-center text-[13px] text-[var(--text-secondary)]">{dataBR(p.proximoVencimento) ?? <span className="text-[var(--text-muted)]">—</span>}</td>
+                        <td className="px-4 align-middle text-center"><StatusPill st={pst} /></td>
+                        <td className="px-3 align-middle text-center">
+                          <button onClick={(e) => { e.stopPropagation(); onAbrirParticipante(p.obrigacaoId) }} title="Abrir participante" className="grid h-7 w-7 place-items-center rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)]"><ExternalLink className="h-4 w-4" /></button>
                         </td>
                       </tr>
                     )
@@ -337,6 +359,37 @@ function LinhaGrupo({ g, aberto, onToggle, onAbrir, onAbrirParticipante }: { g: 
       )}
     </>
   )
+}
+
+// ── menu de ações secundárias (3 pontos) ────────────────────────────────────
+// Portal p/ o body: a tabela vive em overflow-x-auto (que recorta o eixo Y) e
+// dentro do modal do processo (z-9999) — o dropdown precisa escapar de ambos.
+function RowMenu({ onAbrir, onToggle, aberto, codigo }: { onAbrir: () => void; onToggle: () => void; aberto: boolean; codigo: string | null }) {
+  const [open, setOpen] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current) return
+    const r = btnRef.current.getBoundingClientRect()
+    setPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) })
+  }, [open])
+  return (
+    <>
+      <button ref={btnRef} onClick={() => setOpen((o) => !o)} title="Ações" className="grid h-7 w-7 place-items-center rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)]"><MoreVertical className="h-4 w-4" /></button>
+      {open && pos && typeof document !== "undefined" && createPortal(
+        <>
+          <div className="fixed inset-0 z-[10049]" onClick={() => setOpen(false)} />
+          <div className="fixed z-[10050] w-52 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-popover)] py-1 text-left shadow-[var(--shadow-surface)]" style={{ top: pos.top, right: pos.right }}>
+            <MenuItem icon={<ExternalLink className="h-4 w-4" />} onClick={() => { setOpen(false); onAbrir() }}>Abrir detalhe</MenuItem>
+            <MenuItem icon={<Users className="h-4 w-4" />} onClick={() => { setOpen(false); onToggle() }}>{aberto ? "Ocultar" : "Ver"} distribuição</MenuItem>
+            {codigo && <MenuItem icon={<Layers className="h-4 w-4" />} onClick={() => { setOpen(false); navigator.clipboard?.writeText(codigo).catch(() => {}) }}>Copiar código</MenuItem>}
+          </div>
+        </>, document.body)}
+    </>
+  )
+}
+function MenuItem({ icon, onClick, children }: { icon: React.ReactNode; onClick: () => void; children: React.ReactNode }) {
+  return <button onClick={onClick} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]">{icon}{children}</button>
 }
 
 // ── cards ─────────────────────────────────────────────────────────────────────
