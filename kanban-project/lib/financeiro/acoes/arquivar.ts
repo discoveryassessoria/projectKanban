@@ -10,7 +10,8 @@ import { carregarContextoReceita, registrarEventoReceita } from './receita-conte
 import { AcaoReceitaError } from './recibo'
 
 export interface ArquivarResultado {
-  receitaId: number
+  receitaId: number | null
+  obrigacaoId: number
   arquivada: boolean
   arquivadaEm: string | null
 }
@@ -21,13 +22,33 @@ export async function arquivarReceita(
   opts: { usuarioId?: number | null } = {},
 ): Promise<ArquivarResultado> {
   const ctx = await carregarContextoReceita(ref)
-  if (!ctx) throw new AcaoReceitaError('Receita não encontrada.', 404)
-  if (ctx.receitaId == null || !ctx.receita) throw new AcaoReceitaError('Receita legada de origem não encontrada; nada a arquivar.', 422)
+  if (!ctx) throw new AcaoReceitaError('Registro não encontrado.', 404)
 
   const arquivar = body.arquivar !== false // default: arquivar
+  const obs = body.observacao?.trim()
+
+  // ── CUSTO (sem Receita de origem): arquiva a própria obrigação (ObrigacaoEconomica
+  // .arquivadaEm, mesma coluna do soft-delete de custo). Arquivar ≠ cancelar; suporta
+  // desarquivar. Antes lançava erro "Receita legada não encontrada" — no-op p/ custo.
+  if (ctx.receitaId == null || !ctx.receita) {
+    const obr = await prisma.obrigacaoEconomica.findUnique({ where: { id: ctx.obrigacaoId }, select: { arquivadaEm: true } })
+    if (!obr) throw new AcaoReceitaError('Custo não encontrado.', 404)
+    const jaArq = obr.arquivadaEm != null
+    if (arquivar === jaArq) return { receitaId: null, obrigacaoId: ctx.obrigacaoId, arquivada: jaArq, arquivadaEm: obr.arquivadaEm?.toISOString() ?? null }
+    const arquivadaEm = arquivar ? new Date() : null
+    await prisma.obrigacaoEconomica.update({ where: { id: ctx.obrigacaoId }, data: { arquivadaEm } })
+    await prisma.logAuditoria.create({ data: {
+      acao: arquivar ? 'ARQUIVAR' : 'DESARQUIVAR', entidade: 'ObrigacaoEconomica', entidadeId: ctx.obrigacaoId,
+      descricao: `Custo ${ctx.codigo ?? ctx.obrigacaoId} ${arquivar ? 'arquivado' : 'desarquivado'}.${obs ? ` Obs.: ${obs}` : ''} Saldos inalterados.`.slice(0, 1000),
+      detalhes: { acao: arquivar ? 'ARQUIVAR' : 'DESARQUIVAR', natureza: 'CUSTO' } as never, usuarioId: opts.usuarioId ?? null,
+    } }).catch(() => {})
+    return { receitaId: null, obrigacaoId: ctx.obrigacaoId, arquivada: arquivar, arquivadaEm: arquivadaEm?.toISOString() ?? null }
+  }
+
+  // ── RECEITA: comportamento existente (Receita.arquivadaEm) ──
   const jaArquivada = ctx.receita.arquivadaEm != null
   if (arquivar === jaArquivada) {
-    return { receitaId: ctx.receitaId, arquivada: jaArquivada, arquivadaEm: ctx.receita.arquivadaEm?.toISOString() ?? null }
+    return { receitaId: ctx.receitaId, obrigacaoId: ctx.obrigacaoId, arquivada: jaArquivada, arquivadaEm: ctx.receita.arquivadaEm?.toISOString() ?? null }
   }
 
   const arquivadaEm = arquivar ? new Date() : null
@@ -36,10 +57,10 @@ export async function arquivarReceita(
   await registrarEventoReceita({
     receitaId: ctx.receitaId,
     tipo: 'EDICAO',
-    descricao: `Receita ${ctx.codigo ?? ctx.receitaId} ${arquivar ? 'arquivada' : 'desarquivada'}.${body.observacao?.trim() ? ` Obs.: ${body.observacao.trim()}` : ''} Saldos inalterados.`,
+    descricao: `Receita ${ctx.codigo ?? ctx.receitaId} ${arquivar ? 'arquivada' : 'desarquivada'}.${obs ? ` Obs.: ${obs}` : ''} Saldos inalterados.`,
     usuarioId: opts.usuarioId ?? null,
     dados: { acao: arquivar ? 'ARQUIVAR' : 'DESARQUIVAR', obrigacaoId: ctx.obrigacaoId },
   })
 
-  return { receitaId: ctx.receitaId, arquivada: arquivar, arquivadaEm: arquivadaEm?.toISOString() ?? null }
+  return { receitaId: ctx.receitaId, obrigacaoId: ctx.obrigacaoId, arquivada: arquivar, arquivadaEm: arquivadaEm?.toISOString() ?? null }
 }

@@ -216,6 +216,8 @@ export interface ReceitaEditavel {
   itemMestreNome: string | null
   origem: string | null
   observacoes: string | null
+  fornecedorId: number | null
+  fornecedorNome: string | null
   moedaBase: string
   valorBaseTotal: number
   cambio: RegraCambio & { cotacaoEfetiva: number | null }
@@ -234,6 +236,9 @@ export async function carregarReceitaEditavel(ref: string): Promise<ReceitaEdita
 
   const rep = g.membros.find((m) => m.obrigacaoId === g.repObrigacaoId) ?? g.membros[0]
   const { base: titulo } = splitDescricao(rep?.descricao ?? null)
+
+  // Fornecedor do custo (nível obrigação) — para semear o editor. Custo mantém domínio próprio.
+  const repObr = await prisma.obrigacaoEconomica.findUnique({ where: { id: g.repObrigacaoId }, select: { fornecedorId: true, fornecedor: { select: { nome: true } } } }).catch(() => null)
 
   // textuais de exibição/serviço vêm da Receita representante
   const receitaRep = g.repReceitaId != null
@@ -280,6 +285,7 @@ export async function carregarReceitaEditavel(ref: string): Promise<ReceitaEdita
     referenciaContratual: typeof edicao.referenciaContratual === 'string' ? edicao.referenciaContratual : null,
     tipoServicoId: receitaRep?.tipoServicoId ?? null, servicoNome: tipoServico?.nome ?? null, itemMestreNome,
     origem: receitaRep?.origem ?? null, observacoes: receitaRep?.observacoes ?? null,
+    fornecedorId: repObr?.fornecedorId ?? null, fornecedorNome: repObr?.fornecedor?.nome ?? null,
     moedaBase: g.moeda, valorBaseTotal,
     cambio: { fxRule: consolidado.fxRule, fxEstimado: consolidado.fxEstimado, fxFixo: consolidado.fxFixo, fxData: consolidado.fxData, valorBrlFixo: consolidado.valorBrlFixo, cotacaoEfetiva: consolidado.cotacaoEfetiva },
     temPagamentoConfirmado: recebidoTotalBrl > 0.005,
@@ -307,6 +313,10 @@ export interface EditarReceitaPatch {
   // Responsável (criadoPorId da obrigação) e vencimento — nível obrigação; não movem saldo.
   responsavelId?: number | null
   vencimento?: string | Date | null
+  // Custo (nível obrigação): beneficiário/fase/centro de custo — não movem saldo.
+  fornecedorId?: number | null
+  faseId?: number | null
+  centroCustoId?: number | null
 }
 
 // Distribui o novo total entre os irmãos na MESMA proporção atual (a divisão é
@@ -511,8 +521,9 @@ export async function editarReceita(ref: string, patch: EditarReceitaPatch, opts
 
   await prisma.$transaction(async (tx) => {
     for (const m of g.membros) {
-      // Custo (sem Receita) também é afetado quando só a descrição (titulo) muda.
-      if (m.receitaId == null && !mudaValor && !mudaCambio && !mudaResponsavel && !mudaVencimento && patch.titulo === undefined) continue
+      // Custo (sem Receita) também é afetado quando muda descrição/fornecedor/fase/centro.
+      const mudaCampoObrigacao = patch.titulo !== undefined || patch.fornecedorId !== undefined || patch.faseId !== undefined || patch.centroCustoId !== undefined
+      if (m.receitaId == null && !mudaValor && !mudaCambio && !mudaResponsavel && !mudaVencimento && !mudaCampoObrigacao) continue
       const alvoBase = porObrigacao.get(m.obrigacaoId) ?? m.valorBase
       const delta = cent(alvoBase - m.valorBase)
 
@@ -558,6 +569,12 @@ export async function editarReceita(ref: string, patch: EditarReceitaPatch, opts
       if (mudaMoeda) { obrData.moedaContratual = moeda as never; obrData.moedaContabil = moeda as never }
       if (mudaResponsavel) obrData.criadoPorId = responsavelNovo
       if (mudaVencimento) obrData.vencimento = vencNovoDate
+      // Custo (nível obrigação): beneficiário/fase/centro de custo — só p/ custo (obrigação sem Receita).
+      if (m.receitaId == null) {
+        if (patch.fornecedorId !== undefined) obrData.fornecedor = patch.fornecedorId == null ? { disconnect: true } : { connect: { id: patch.fornecedorId } }
+        if (patch.faseId !== undefined) obrData.faseId = patch.faseId
+        if (patch.centroCustoId !== undefined) obrData.centroCustoId = patch.centroCustoId
+      }
       // Custo (sem Receita): a descrição vive em ObrigacaoEconomica.observacoes — editável aqui
       // (o caminho textual acima só grava em prisma.receita e era no-op para custo).
       let obsCustoAntes: string | null = null

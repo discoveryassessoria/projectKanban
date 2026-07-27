@@ -9,7 +9,7 @@
 import { prisma } from '@/lib/prisma'
 import { resolverId } from '@/lib/financeiro/leitura/receita-detalhe'
 import { criarObrigacaoEconomicaComLedger } from '@/lib/financeiro/ledger/ledger-service'
-import { gerarCodigoReceita } from '@/lib/financeiro/codigos'
+import { gerarCodigoReceita, gerarCodigoCusto } from '@/lib/financeiro/codigos'
 import { AcaoReceitaError } from './recibo'
 import type { Natureza } from '@/lib/financeiro/dominio/obrigacao-economica'
 
@@ -37,7 +37,9 @@ export async function duplicarReceita(ref: string, opts: DuplicarOpts = {}): Pro
   const valor = cent(Number(origem.valorContratado))
   const moeda = String(origem.moedaContratual)
   const vencimento = opts.vencimentoEmDias != null ? new Date(Date.now() + opts.vencimentoEmDias * 86400000) : null
-  const codigo = await gerarCodigoReceita()
+  // Custo e Receita continuam domínios distintos — código com o prefixo correto.
+  const isCusto = origem.natureza === 'CUSTO'
+  const codigo = isCusto ? await gerarCodigoCusto() : await gerarCodigoReceita()
 
   // ── Receita de origem (para copiar snapshot de preço/câmbio/requerentes) ──
   const recOrigem = origem.origemTipo === 'Receita' && origem.origemId != null
@@ -75,7 +77,7 @@ export async function duplicarReceita(ref: string, opts: DuplicarOpts = {}): Pro
     processoId: origem.processoId ?? null, faseId: origem.faseId ?? null, clienteId: origem.clienteId ?? null,
     fornecedorId: origem.fornecedorId ?? null, centroCustoId: origem.centroCustoId ?? null, itemCatalogoId: origem.itemCatalogoId ?? null,
     regraFinanceiraId: origem.regraFinanceiraId ?? null, vencimento,
-    observacoes: novaReceitaId == null ? `${origem.observacoes ?? 'Receita'} (cópia)`.slice(0, 300) : null,
+    observacoes: novaReceitaId == null ? `${origem.observacoes ?? (isCusto ? 'Custo' : 'Receita')} (cópia)`.slice(0, 300) : null,
     origemTipo: novaReceitaId != null ? 'Receita' : 'nativo', origemId: novaReceitaId,
     criadoPorId,
   })
@@ -92,6 +94,9 @@ export async function duplicarReceita(ref: string, opts: DuplicarOpts = {}): Pro
 
   if (novaReceitaId != null) {
     await prisma.eventoFinanceiro.create({ data: { receitaId: novaReceitaId, tipo: 'CRIACAO', usuarioId: criadoPorId, descricao: `Receita duplicada a partir de ${ref} (${codigo}). Sem pagamentos/cobranças da origem.`.slice(0, 500), dados: { acao: 'DUPLICAR', origemObrigacaoId: origemObrId, obrigacaoId } } }).catch(() => {})
+  } else {
+    // Custo (sem Receita): auditoria na fonte que a timeline financeira consome.
+    await prisma.logAuditoria.create({ data: { acao: 'DUPLICAR', entidade: 'ObrigacaoEconomica', entidadeId: obrigacaoId, descricao: `Custo duplicado a partir de ${ref} (${codigo}). Sem pagamentos da origem.`.slice(0, 1000), detalhes: { acao: 'DUPLICAR', origemObrigacaoId: origemObrId, codigo } as never, usuarioId: criadoPorId } }).catch(() => {})
   }
 
   return { obrigacaoId, receitaId: novaReceitaId, codigo }

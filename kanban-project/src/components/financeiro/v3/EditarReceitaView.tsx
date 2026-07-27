@@ -31,6 +31,7 @@ interface Receita {
   ref: string; obrigacaoIdRef: number; receitaIdRep: number | null; codigo: string | null; processoId: number | null
   titulo: string | null; descricaoDetalhada: string | null; referenciaContratual: string | null
   tipoServicoId: number | null; servicoNome: string | null; itemMestreNome: string | null; origem: string | null; observacoes: string | null
+  fornecedorId?: number | null; fornecedorNome?: string | null
   moedaBase: string; valorBaseTotal: number; cambio: Cambio
   temPagamentoConfirmado: boolean; cobrancasAbertas: number; recebidoTotalBrl: number; valorContratadoBrlTotal: number
   participantes: { obrigacaoId: number; receitaId: number | null; nome: string; valorBase: number; recebidoBase: number; recebidoBrl: number }[]
@@ -72,6 +73,10 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
 
   // Responsável e vencimento (nível obrigação) — integram o MESMO preview de impacto.
   const [responsavelId, setResponsavelId] = useState<string>("")
+  // Fornecedor (só custo) — beneficiário a quem se paga; reusa o cadastro central.
+  const [fornecedores, setFornecedores] = useState<{ id: number; nome: string }[]>([])
+  const [fornecedorId, setFornecedorId] = useState<string>("")
+  const [origFornecedor, setOrigFornecedor] = useState<string>("")
   const [vencimento, setVencimento] = useState<string>("")
   const [origResp, setOrigResp] = useState<string>("")
   const [origVenc, setOrigVenc] = useState<string>("")
@@ -110,6 +115,8 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
         setFxEstimado(d.cambio.fxEstimado != null ? String(d.cambio.fxEstimado) : "")
         setFxData(d.cambio.fxData ? d.cambio.fxData.slice(0, 10) : "")
         setValorBrlFixo(d.cambio.valorBrlFixo != null ? String(d.cambio.valorBrlFixo) : "")
+        setFornecedorId(d.fornecedorId != null ? String(d.fornecedorId) : "")
+        setOrigFornecedor(d.fornecedorId != null ? String(d.fornecedorId) : "")
       } catch { if (vivo) setErro("Falha ao carregar.") } finally { if (vivo) setLoading(false) }
     })()
     return () => { vivo = false; document.body.style.overflow = orig }
@@ -124,6 +131,17 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
       .catch(() => {})
     return () => { vivo = false }
   }, [])
+
+  // Fornecedores para o seletor (só custo). Reusa o cadastro central de fornecedores.
+  useEffect(() => {
+    if (!ehCusto) return
+    let vivo = true
+    fetch(`/api/fornecedores?ativo=true`, { headers: authHeaders() })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (vivo) setFornecedores((Array.isArray(j) ? j : j?.fornecedores ?? []).map((f: any) => ({ id: f.id, nome: f.nome }))) })
+      .catch(() => {})
+    return () => { vivo = false }
+  }, [ehCusto])
 
   // Seed dos valores atuais de responsável/vencimento via um preview inicial (o motor
   // devolve responsavelNovo/vencimentoNovo = atuais quando não há patch desses campos).
@@ -215,7 +233,8 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
       || observacoes !== (rec.observacoes ?? "")
   }, [rec, titulo, descricao, referencia, observacoes])
 
-  const temMudanca = mudouTextual || mudouFinanceiro || mudouRespVenc
+  const mudouFornecedor = ehCusto && fornecedorId !== origFornecedor
+  const temMudanca = mudouTextual || mudouFinanceiro || mudouRespVenc || mudouFornecedor
   const valido = !!rec && temMudanca && !bloqueado && !previewing
 
   const salvar = async () => {
@@ -236,6 +255,7 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
         body.responsavelId = responsavelId === "" ? null : Number(responsavelId)
         body.vencimento = vencimento === "" ? null : vencimento
       }
+      if (mudouFornecedor) body.fornecedorId = fornecedorId === "" ? null : Number(fornecedorId)
       const r = await fetch(`/api/financeiro/v3/receita/${receitaRef}/editar`, {
         method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(body),
@@ -320,6 +340,17 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
                     <input type="date" value={vencimento} onChange={(e) => setVencimento(e.target.value)} disabled={!seededOk} className={`${inputCls} disabled:opacity-50`} />
                     <p className="mt-1 text-[11px] text-[var(--text-muted)]">Vencimento da obrigação. Não move saldo.</p>
                   </div>
+                  {ehCusto && (
+                    <div>
+                      <label className={labelCls}>Fornecedor</label>
+                      <select value={fornecedorId} onChange={(e) => setFornecedorId(e.target.value)} className={inputCls}>
+                        <option value="">— Sem fornecedor —</option>
+                        {fornecedores.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                        {fornecedorId !== "" && !fornecedores.some((f) => String(f.id) === fornecedorId) && <option value={fornecedorId}>{rec.fornecedorNome ?? `Fornecedor ${fornecedorId}`}</option>}
+                      </select>
+                      <p className="mt-1 text-[11px] text-[var(--text-muted)]">Beneficiário a quem o custo é pago. Não move saldo.</p>
+                    </div>
+                  )}
                   <div className="sm:col-span-2">
                     <label className={labelCls}>Observações</label>
                     <textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value.slice(0, 500))} rows={2} placeholder="Observações internas (opcional)" className={`${inputCls} resize-none`} />
