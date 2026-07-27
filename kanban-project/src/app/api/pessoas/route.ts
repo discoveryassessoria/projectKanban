@@ -163,7 +163,11 @@ export async function POST(request: NextRequest) {
         navio: navio || null,
 
         // ✅ Requerente e Linhagem
-        requerente: requerente || 'nao',
+        // INVARIANTE (dedup): uma Pessoa NUNCA nasce requerente por este endpoint
+        // genérico — requerente é definido só pelo vínculo com o Processo
+        // (ProcessoRequerente, via lib/genealogia/vincular-requerente). Aqui normaliza
+        // qualquer tentativa para 'nao'. Fonte única de requerente = ProcessoRequerente.
+        requerente: ehRequerente(requerente) ? 'nao' : (requerente || 'nao'),
         numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null,
         linhaReta: linhaReta ?? true,
         documentacao: documentacao ?? true,

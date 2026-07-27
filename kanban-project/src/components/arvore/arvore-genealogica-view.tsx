@@ -10,6 +10,7 @@ import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
 import { ReactFlowTree, ReactFlowTreeRef } from "./react-flow-tree"
 import { TreeOnboarding } from "./tree-onboarding"
+import { RequerenteSelector } from "./requerente-selector"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import {
   Plus,
@@ -606,10 +607,11 @@ export function ArvoreGenealogicaView({
   if (showOnboarding && arvoreId) {
     return (
       <div ref={containerRef} className="h-full">
-        <TreeOnboarding 
-          arvoreId={arvoreId} 
+        <TreeOnboarding
+          arvoreId={arvoreId}
+          processoId={processoId}
           paisProcesso={paisProcesso}
-          onComplete={handleOnboardingComplete} 
+          onComplete={handleOnboardingComplete}
         />
       </div>
     )
@@ -784,6 +786,7 @@ export function ArvoreGenealogicaView({
       {showAddPersonModal && (
         <AddPersonModal
           arvoreId={arvoreId!}
+          processoId={processoId}
           type={addPersonType}
           parentId={addPersonParentId}
           conjugeDePessoaId={addConjugeForPessoaId}
@@ -831,6 +834,7 @@ export function ArvoreGenealogicaView({
 // ========================================
 function AddPersonModal({
   arvoreId,
+  processoId,
   type,
   parentId,
   conjugeDePessoaId,
@@ -840,6 +844,7 @@ function AddPersonModal({
   onSuccess
 }: {
   arvoreId: number
+  processoId: number
   type: 'pai' | 'mae' | 'filho' | 'pessoa' | 'conjuge' | null
   parentId: number | null
   conjugeDePessoaId?: number | null
@@ -848,6 +853,9 @@ function AddPersonModal({
   onClose: () => void
   onSuccess: () => void
 }) {
+  // Modo de cadastro: pessoa comum (cria Pessoa) OU requerente do processo (REUSA a
+  // Pessoa já existente — nunca duplica). O requerente NUNCA é criado por este form.
+  const [modo, setModo] = useState<'pessoa' | 'requerente'>('pessoa')
   const [nome, setNome] = useState('')
   const [sobrenome, setSobrenome] = useState('')
   const [sexo, setSexo] = useState<string>('')
@@ -885,6 +893,56 @@ function AddPersonModal({
   useEffect(() => {
     if (type === 'conjuge') setIsCasado(true)
   }, [type])
+
+  // Relação estrutural do tipo de adição, para o caminho de REUSO do requerente:
+  // ao vincular a Pessoa existente, propaga os mesmos vínculos que o form aplicaria.
+  const relacaoRequerente = (): { paiId?: number; maeId?: number } => {
+    if (type !== 'filho' || !parentId) return {}
+    const rel: { paiId?: number; maeId?: number } = {}
+    const pessoaPai = pessoas.find(p => p.id === parentId)
+    if (pessoaPai?.sexo === 'Feminino') rel.maeId = parentId
+    else rel.paiId = parentId
+    const uniaoExistente = unioes.find(u => u.pessoa1Id === parentId || u.pessoa2Id === parentId)
+    if (uniaoExistente) {
+      const cId = uniaoExistente.pessoa1Id === parentId ? uniaoExistente.pessoa2Id : uniaoExistente.pessoa1Id
+      const conjuge = pessoas.find(p => p.id === cId)
+      if (conjuge) {
+        if (conjuge.sexo === 'Feminino') rel.maeId = cId
+        else rel.paiId = cId
+      }
+    }
+    return rel
+  }
+
+  // Após o vínculo do requerente (Pessoa reusada/criada), aplica a relação estrutural
+  // que este tipo de adição implica (pai/mãe de um existente, ou cônjuge) via endpoints
+  // já existentes — sem nunca criar uma segunda Pessoa.
+  const handleRequerenteLinked = async (pessoaId: number) => {
+    try {
+      if ((type === 'pai' || type === 'mae') && parentId) {
+        await authFetch(`/api/pessoas/${parentId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(type === 'pai' ? { paiId: pessoaId } : { maeId: pessoaId }),
+        })
+      }
+      if (type === 'conjuge' && conjugeDePessoaId) {
+        await authFetch('/api/unioes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pessoa1Id: conjugeDePessoaId,
+            pessoa2Id: pessoaId,
+            tipo: 'casamento',
+          }),
+        })
+      }
+    } catch (err) {
+      console.error('Erro ao aplicar relação do requerente vinculado:', err)
+    } finally {
+      onSuccess()
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -994,6 +1052,42 @@ function AddPersonModal({
         <div className="px-6 py-4 border-b sticky top-0 bg-white">
           <h2 className="text-xl font-semibold text-gray-900">{titles[type || 'pessoa']}</h2>
         </div>
+
+        {/* Seletor de modo: pessoa comum (cria) x requerente do processo (REUSA) */}
+        <div className="px-6 pt-4">
+          <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+            <button
+              type="button"
+              onClick={() => setModo('pessoa')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${modo === 'pessoa' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Pessoa da família
+            </button>
+            <button
+              type="button"
+              onClick={() => setModo('requerente')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${modo === 'requerente' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Requerente do processo
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1.5">
+            Requerentes do processo são reaproveitados — a árvore não cria uma pessoa duplicada.
+          </p>
+        </div>
+
+        {modo === 'requerente' ? (
+          <div className="p-6">
+            <RequerenteSelector
+              processoId={processoId}
+              arvoreId={arvoreId}
+              paiId={relacaoRequerente().paiId ?? null}
+              maeId={relacaoRequerente().maeId ?? null}
+              onLinked={handleRequerenteLinked}
+              onCancel={onClose}
+            />
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
 
           {/* ===== Identificação ===== */}
@@ -1107,19 +1201,14 @@ function AddPersonModal({
             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Classificação no processo</h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Requerente</label>
-                <select value={requerente} onChange={(e) => setRequerente(e.target.value)} className={selectClass} style={selectStyle}>
-                  <option value="nao">Não</option>
-                  <option value="maior">Sim - Maior de idade</option>
-                  <option value="menor">Sim - Menor de idade</option>
-                </select>
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nº Linhagem</label>
                 <input type="number" min="1" value={numeroLinhagem} onChange={(e) => setNumeroLinhagem(e.target.value)} placeholder="Ex: 1, 2, 3..." className={inputClass} />
                 <span className="block text-xs text-gray-400 mt-1">Ordena a pasta documental — vale pra todas as pessoas.</span>
               </div>
             </div>
+            <p className="text-xs text-gray-400 mt-2">
+              É um requerente do processo? Use a opção <strong>Requerente do processo</strong> no topo — a pessoa existente é reaproveitada, sem duplicar.
+            </p>
             <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 p-3 mt-3">
               <input type="checkbox" checked={isLinhaReta} onChange={(e) => setIsLinhaReta(e.target.checked)} className="w-5 h-5 mt-0.5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
               <span>
@@ -1149,6 +1238,7 @@ function AddPersonModal({
             </button>
           </div>
         </form>
+        )}
       </div>
     </>
   )
@@ -1416,11 +1506,19 @@ function EditPersonModal({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Requerente</label>
-                <select value={requerente} onChange={(e) => setRequerente(e.target.value)} className={selectClass} style={selectStyle}>
-                  <option value="nao">Não</option>
-                  <option value="maior">Sim - Maior de idade</option>
-                  <option value="menor">Sim - Menor de idade</option>
-                </select>
+                {/* Requerente tem o Processo (ProcessoRequerente) como única fonte de verdade:
+                    não se marca requerente por edição livre. Já-requerente pode trocar o
+                    principal (maior/menor); demais é somente leitura. */}
+                {["sim", "maior", "menor"].includes(String((pessoa as any).requerente ?? "").toLowerCase()) ? (
+                  <select value={requerente} onChange={(e) => setRequerente(e.target.value)} className={selectClass} style={selectStyle}>
+                    <option value="maior">Sim - Maior de idade</option>
+                    <option value="menor">Sim - Menor de idade</option>
+                  </select>
+                ) : (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                    Definido pelo processo — adicione pela lista de requerentes do processo.
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nº Linhagem</label>

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
-import { houveTransicaoParaRequerente } from "@/lib/genealogia/requerente-flag"
+import { houveTransicaoParaRequerente, ehRequerente } from "@/lib/genealogia/requerente-flag"
 import { enfileirarEventoRequerente, TIPO_EVENTO_REQUERENTE } from "@/src/services/genealogia/emitir-evento-requerente"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
 // LEGADO_INATIVO (desativação Genealogia): editar Pessoa NÃO reconcilia mais
@@ -118,7 +118,23 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.navio !== undefined) dataToUpdate.navio = body.navio
 
     // Requerente e Linhagem
-    if (body.requerente !== undefined) dataToUpdate.requerente = body.requerente
+    // INVARIANTE (dedup): só é possível MARCAR uma Pessoa como requerente se ela já
+    // estiver vinculada a um Requerente do Processo (ProcessoRequerente → personId).
+    // Assim, requerente na Árvore tem ProcessoRequerente como única fonte de verdade —
+    // não se cria identidade de requerente por edição livre. Trocar o principal
+    // (maior/menor/sim) entre requerentes JÁ vinculados e desmarcar ('nao') seguem ok.
+    if (body.requerente !== undefined) {
+      if (ehRequerente(body.requerente) && !ehRequerente(antes?.requerente)) {
+        const vinculo = await prisma.requerente.findFirst({ where: { personId: id }, select: { id: true } })
+        if (!vinculo) {
+          return NextResponse.json(
+            { error: "Requerente é definido pelo vínculo com o Processo. Use a lista de requerentes do processo para adicioná-lo à árvore." },
+            { status: 422 },
+          )
+        }
+      }
+      dataToUpdate.requerente = body.requerente
+    }
     if (body.numeroLinhagem !== undefined) dataToUpdate.numeroLinhagem = body.numeroLinhagem ? parseInt(body.numeroLinhagem) : null
     if (body.linhaReta !== undefined) dataToUpdate.linhaReta = body.linhaReta === true
     if (body.documentacao !== undefined) dataToUpdate.documentacao = body.documentacao === true
@@ -136,6 +152,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         data: dataToUpdate,
         include: { pai: true, mae: true, arvore: true, documentos: { orderBy: { createdAt: 'desc' } } },
       })
+      // Único PRINCIPAL por árvore: promover explicitamente a "maior" (principal)
+      // demove qualquer outro "maior" para "sim" — impede dois principais e permite
+      // a troca explícita do principal quando há mais de um requerente.
+      if (body.requerente === "maior" && p.arvoreId) {
+        await tx.pessoa.updateMany({
+          where: { arvoreId: p.arvoreId, requerente: "maior", id: { not: p.id } },
+          data: { requerente: "sim" },
+        })
+        await tx.arvore.update({ where: { id: p.arvoreId }, data: { pessoaPrincipalId: p.id } })
+      }
       if (houveTransicao && p.arvoreId) {
         await enfileirarEventoRequerente(tx, { pessoaId: p.id, arvoreId: p.arvoreId, actorId })
       }

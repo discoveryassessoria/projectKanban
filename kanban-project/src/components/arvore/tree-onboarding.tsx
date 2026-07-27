@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Loader2, ArrowLeft, Check } from "lucide-react"
 import { DatePickerField } from "@/components/ui/date-picker-field"
+import { RequerenteSelector } from "./requerente-selector"
 
 // ─────────────────────────────────────────────────────────────
 // Tipos
@@ -20,6 +21,11 @@ interface TypePresets {
 
 interface TreeOnboardingProps {
   arvoreId: number
+  /**
+   * ID do processo — necessário para o fluxo de REUSO do requerente (o tipo
+   * "applicant" não cria Pessoa: reutiliza o Requerente participante do processo).
+   */
+  processoId: number
   /**
    * País do processo (PORTUGAL | ESPANHA | ALEMANHA | ITALIA).
    * Usado para nomear o "ancestral de origem" com a nacionalidade correta.
@@ -108,6 +114,7 @@ function typeRoleLabel(t: PersonType, pais?: PaisProcesso): string {
 
 export function TreeOnboarding({
   arvoreId,
+  processoId,
   paisProcesso,
   onComplete,
 }: TreeOnboardingProps) {
@@ -124,6 +131,23 @@ export function TreeOnboarding({
           if (selectedType) setStep(2)
         }}
       />
+    )
+  }
+
+  // REUSO: o requerente ("applicant") NÃO é criado como Pessoa nova — reutiliza o
+  // Requerente já participante do processo (evita duplicidade de identidade).
+  if (selectedType === "applicant") {
+    return (
+      <div className="h-full overflow-y-auto bg-gradient-to-b from-gray-50 to-gray-100">
+        <div className="min-h-full flex items-center justify-center px-4 py-8">
+          <RequerenteSelector
+            processoId={processoId}
+            arvoreId={arvoreId}
+            onLinked={onComplete}
+            onBack={() => setStep(1)}
+          />
+        </div>
+      </div>
     )
   }
 
