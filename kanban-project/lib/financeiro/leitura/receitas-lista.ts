@@ -173,7 +173,7 @@ const baseLabel = (desc: string | null): string | null => {
 
 export async function listarReceitas(processoId?: number): Promise<ReceitasLista> {
   let obrs = await prisma.obrigacaoEconomica.findMany({
-    where: { natureza: 'RECEITA', direcao: 'A_RECEBER', status: { not: 'CANCELADO' }, ...(processoId ? { processoId } : {}) },
+    where: { natureza: 'RECEITA', direcao: 'A_RECEBER', status: { not: 'CANCELADO' }, arquivadaEm: null, ...(processoId ? { processoId } : {}) },
     include: { distribuicoes: { orderBy: { versao: 'desc' }, include: { participacoes: true } } },
     orderBy: { id: 'desc' }, take: 500,
   })

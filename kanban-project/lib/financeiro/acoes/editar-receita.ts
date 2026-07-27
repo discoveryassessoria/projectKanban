@@ -511,7 +511,8 @@ export async function editarReceita(ref: string, patch: EditarReceitaPatch, opts
 
   await prisma.$transaction(async (tx) => {
     for (const m of g.membros) {
-      if (m.receitaId == null && !mudaValor && !mudaCambio && !mudaResponsavel && !mudaVencimento) continue
+      // Custo (sem Receita) também é afetado quando só a descrição (titulo) muda.
+      if (m.receitaId == null && !mudaValor && !mudaCambio && !mudaResponsavel && !mudaVencimento && patch.titulo === undefined) continue
       const alvoBase = porObrigacao.get(m.obrigacaoId) ?? m.valorBase
       const delta = cent(alvoBase - m.valorBase)
 
@@ -557,7 +558,23 @@ export async function editarReceita(ref: string, patch: EditarReceitaPatch, opts
       if (mudaMoeda) { obrData.moedaContratual = moeda as never; obrData.moedaContabil = moeda as never }
       if (mudaResponsavel) obrData.criadoPorId = responsavelNovo
       if (mudaVencimento) obrData.vencimento = vencNovoDate
+      // Custo (sem Receita): a descrição vive em ObrigacaoEconomica.observacoes — editável aqui
+      // (o caminho textual acima só grava em prisma.receita e era no-op para custo).
+      let obsCustoAntes: string | null = null
+      const descCustoNova = m.receitaId == null && patch.titulo !== undefined ? (patch.titulo ?? '').slice(0, 500) : null
+      if (descCustoNova != null) {
+        const oa = await tx.obrigacaoEconomica.findUnique({ where: { id: m.obrigacaoId }, select: { observacoes: true } })
+        obsCustoAntes = oa?.observacoes ?? null
+        obrData.observacoes = descCustoNova
+      }
       if (Object.keys(obrData).length) await tx.obrigacaoEconomica.update({ where: { id: m.obrigacaoId }, data: obrData })
+      if (descCustoNova != null && obsCustoAntes !== descCustoNova) {
+        await tx.logAuditoria.create({ data: {
+          acao: 'EDITAR', entidade: 'ObrigacaoEconomica', entidadeId: m.obrigacaoId,
+          descricao: 'Custo editado (descrição).', usuarioId: criadoPorId ?? null,
+          detalhes: { campo: 'descricao', de: obsCustoAntes, para: descCustoNova } as Prisma.InputJsonValue,
+        } }).catch(() => {})
+      }
       if (Math.abs(delta) > 0.005) {
         const obr = await tx.obrigacaoEconomica.findUnique({ where: { id: m.obrigacaoId }, include: { ledger: true } })
         if (obr?.ledger) {

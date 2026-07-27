@@ -103,14 +103,21 @@ export async function excluirReceita(ref: string, ctx: { usuarioId?: number | nu
 
   const motivo = ctx.motivo?.trim() || null
 
-  // Exclusão LÓGICA (soft-delete): oculta (arquivadaEm) + marca no contexto. Ledger intacto.
-  if (check.receitaId != null) {
-    const rec = await prisma.receita.findUnique({ where: { id: check.receitaId }, select: { contextoAplicado: true } })
+  // Exclusão LÓGICA (soft-delete): oculta + marca de origem. Ledger intacto.
+  // Receita → Receita.arquivadaEm + contextoAplicado.exclusao (fonte do filtro de receitas).
+  // Custo (sem Receita) → ObrigacaoEconomica.arquivadaEm (fonte do filtro de obrigações).
+  const isCusto = check.receitaId == null
+  if (!isCusto) {
+    const rec = await prisma.receita.findUnique({ where: { id: check.receitaId! }, select: { contextoAplicado: true } })
     const ctxBase = (rec?.contextoAplicado && typeof rec.contextoAplicado === 'object' && !Array.isArray(rec.contextoAplicado)) ? (rec.contextoAplicado as Record<string, unknown>) : {}
     const contextoAplicado = { ...ctxBase, exclusao: { em: new Date().toISOString(), porId: ctx.usuarioId ?? null, motivo } } as Prisma.InputJsonValue
-    await prisma.receita.update({ where: { id: check.receitaId }, data: { arquivadaEm: new Date(), contextoAplicado } })
+    await prisma.receita.update({ where: { id: check.receitaId! }, data: { arquivadaEm: new Date(), contextoAplicado } })
+  } else {
+    await prisma.obrigacaoEconomica.update({ where: { id: check.obrigacaoId }, data: { arquivadaEm: new Date() } })
   }
 
+  // Auditoria: Receita usa o EventoFinanceiro legado; Custo grava no LogAuditoria
+  // (fonte que a timeline financeira consome para obrigações — fonte única, sem tabela morta).
   await registrarEventoReceita({
     receitaId: check.receitaId,
     tipo: 'CANCELAMENTO',
@@ -118,6 +125,14 @@ export async function excluirReceita(ref: string, ctx: { usuarioId?: number | nu
     usuarioId: ctx.usuarioId ?? null,
     dados: { acao: 'EXCLUIR', obrigacaoId: check.obrigacaoId, motivo },
   })
+  await prisma.logAuditoria.create({
+    data: {
+      acao: 'EXCLUIR', entidade: 'ObrigacaoEconomica', entidadeId: check.obrigacaoId,
+      descricao: `${isCusto ? 'Custo' : 'Receita'} excluído (exclusão lógica).${motivo ? ` Motivo: ${motivo}` : ''} Ledger preservado.`.slice(0, 1000),
+      detalhes: { acao: 'EXCLUIR', natureza: isCusto ? 'CUSTO' : 'RECEITA', receitaId: check.receitaId, motivo } as Prisma.InputJsonValue,
+      usuarioId: ctx.usuarioId ?? null,
+    },
+  }).catch(() => {})
 
   return { receitaId: check.receitaId, obrigacaoId: check.obrigacaoId, excluida: true }
 }

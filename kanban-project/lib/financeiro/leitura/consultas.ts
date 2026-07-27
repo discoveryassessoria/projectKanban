@@ -48,6 +48,8 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
       ...(f?.processoId ? { processoId: f.processoId } : {}),
       // Sem status explícito, exclui CANCELADO (segue no Extrato/Timeline p/ histórico).
       ...(f?.status ? { status: f.status } : { status: { not: 'CANCELADO' } }),
+      // Exclusão lógica de custo (ObrigacaoEconomica.arquivadaEm) sai das consultas padrão.
+      arquivadaEm: null,
       ...(f?.natureza ? { natureza: f.natureza } : {}),
       ...(f?.origemTipo ? { origemTipo: f.origemTipo } : {}),
     },

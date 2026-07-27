@@ -49,7 +49,7 @@ const iso = (d: Date | null | undefined): string => (d ? d.toISOString() : '')
 
 export async function carregarVisaoGeralProcesso(processoId: number): Promise<{ receitas: ItemVG[]; custos: ItemVG[] }> {
   let obrs = await prisma.obrigacaoEconomica.findMany({
-    where: { processoId, status: { not: 'CANCELADO' } },
+    where: { processoId, status: { not: 'CANCELADO' }, arquivadaEm: null },
     orderBy: { id: 'desc' },
     include: { distribuicoes: { orderBy: { versao: 'desc' }, take: 1, include: { participacoes: true } } },
   })

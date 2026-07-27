@@ -4012,6 +4012,7 @@ model ObrigacaoEconomica {
   fornecedorId      Int? // custo manual: fornecedor vinculado (aditivo; sem FK forte, igual faseId/centroCustoId)
   itemCatalogoId    Int? // FONTE do lançamento manual: item do Cadastro Mestre (Gerenciamento). Aditivo, sem FK forte.
   status            String    @default("RASCUNHO") @db.VarChar(20) // RASCUNHO|ATIVO|SUSPENSO|LIQUIDADO|CANCELADO
+  arquivadaEm       DateTime? // exclusão LÓGICA (soft-delete) — oculta das listas operacionais; Ledger preservado. Simétrico a Receita.arquivadaEm; usado p/ custo (sem Receita de origem).
   vencimento        DateTime? // Fase 2 — vencimento da obrigação (ex.: lançamento extra em cobrança futura)
   versao            Int       @default(1)
   substituiId       Int?
