@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { useRevalidacaoFinanceira } from "@/src/lib/financeiro-bus"
+import { useRevalidacaoFinanceira, emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
 import { useRouter } from "next/navigation"
 import { LancamentoManualModal } from "./LancamentoManualModal"
 import EditarReceitaView from "./EditarReceitaView"
@@ -260,28 +260,28 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
 
       {/* ── ações rápidas de estado (reuso de fluxos já prontos; cada onDone recarrega a lista) ── */}
       {acao?.tipo === "editar" && (
-        <EditarReceitaView obrigacaoId={acao.g.id} receitaRef={String(acao.g.id)} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar() }} />
+        <EditarReceitaView obrigacaoId={acao.g.id} receitaRef={String(acao.g.id)} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar(); emitirMutacaoFinanceira() }} />
       )}
       {acao?.tipo === "vencimento" && (
-        <EditarReceitaView obrigacaoId={acao.g.id} receitaRef={String(acao.g.id)} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar() }} />
+        <EditarReceitaView obrigacaoId={acao.g.id} receitaRef={String(acao.g.id)} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar(); emitirMutacaoFinanceira() }} />
       )}
       {acao?.tipo === "distribuicao" && (
-        <EditarDistribuicaoView obrigacaoId={acao.g.id} receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar() }} />
+        <EditarDistribuicaoView obrigacaoId={acao.g.id} receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar(); emitirMutacaoFinanceira() }} />
       )}
       {acao?.tipo === "pagamento" && (
-        <RegistrarPagamentoModal obrigacaoId={acao.g.id} moeda={acao.g.moedaBase} saldo={acao.g.saldoBrlTotal} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar() }} />
+        <RegistrarPagamentoModal obrigacaoId={acao.g.id} moeda={acao.g.moedaBase} saldo={acao.g.saldoBrlTotal} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar(); emitirMutacaoFinanceira() }} />
       )}
       {acao?.tipo === "duplicar" && (
-        <DuplicarReceitaModal receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={(novoId) => { setAcao(null); carregar(); if (novoId) abrir(novoId) }} />
+        <DuplicarReceitaModal receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={(novoId) => { setAcao(null); carregar(); emitirMutacaoFinanceira(); if (novoId) abrir(novoId) }} />
       )}
       {acao?.tipo === "cancelar" && (
-        <CancelamentoAvancadoModal receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar() }} />
+        <CancelamentoAvancadoModal receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar(); emitirMutacaoFinanceira() }} />
       )}
       {acao?.tipo === "arquivar" && (
-        <AcaoReceitaModal acao="arquivar" receitaRef={String(acao.g.id)} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar() }} />
+        <AcaoReceitaModal acao="arquivar" receitaRef={String(acao.g.id)} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar(); emitirMutacaoFinanceira() }} />
       )}
       {acao?.tipo === "excluir" && (
-        <ExcluirReceitaModal receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar() }} />
+        <ExcluirReceitaModal receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar(); emitirMutacaoFinanceira() }} />
       )}
     </div>
   )
