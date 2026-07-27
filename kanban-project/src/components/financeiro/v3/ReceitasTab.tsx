@@ -25,7 +25,7 @@ import {
   DollarSign, CheckCircle2, Wallet, Users, Layers, Search, RotateCcw,
   Plus, ExternalLink, ChevronDown, ChevronRight, ChevronLeft, MoreVertical,
   AlertTriangle, SlidersHorizontal, Download,
-  Pencil, GitBranch, CalendarClock, Copy, CreditCard, Ban, Archive, Trash2,
+  Pencil, GitBranch, CalendarClock, Copy, CreditCard, Ban, Archive, Trash2, X,
 } from "lucide-react"
 
 import { ValorBrl, AvisoNaoConvertido } from "./ValorBrl"
@@ -91,6 +91,10 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
   // ação rápida de estado disparada no menu "3 pontos" de uma linha (Receita consolidada).
   // O modal/editor correspondente vive no fim da árvore (renderiza só o alvo por vez).
   const [acao, setAcao] = useState<{ tipo: AcaoRow; g: Grupo } | null>(null)
+  // Após uma ação da lista, a receita pode mudar de situação (ex.: alterar vencimento
+  // → aging VENCIDO→A VENCER) e sair da aba filtrada. Em vez de "sumir" em silêncio,
+  // avisamos e oferecemos "Ver em Todas" — o filtro do operador é preservado.
+  const [movida, setMovida] = useState<{ id: number; nome: string } | null>(null)
 
   const carregar = () => {
     setLoading(true); setErro(null)
@@ -113,6 +117,15 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
   const abrir = (id: number) => (onAbrirDetalhe ? onAbrirDetalhe(id) : router.push(`/financeiro/v3/receita/${id}`))
   const toggle = (id: number) => setExpandido((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
+  // conclusão padrão de uma ação da lista: fecha o modal, recarrega, propaga no bus e
+  // passa a observar a receita (para avisar caso ela saia da aba filtrada após a mutação).
+  const aoConcluir = useCallback((g: Grupo) => {
+    setAcao(null); carregar(); emitirMutacaoFinanceira()
+    setMovida({ id: g.id, nome: g.descricao ?? g.codigo ?? `#${g.id}` })
+  }, [carregar])
+  // o aviso vale só para a aba corrente; trocar de aba (ou limpar) o dispensa.
+  useEffect(() => { setMovida(null) }, [aba])
+
   // contagem por aba (sobre TODOS os grupos, independente da busca)
   const contagem = useMemo(() => {
     const c: Record<string, number> = { todas: grupos.length, avencer: 0, vencidas: 0, pagas: 0, canceladas: 0 }
@@ -133,6 +146,10 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
   const totalPag = Math.max(1, Math.ceil(filtrados.length / PAGE))
   const pagina = filtrados.slice((page - 1) * PAGE, page * PAGE)
   const limpar = () => { setBusca(""); setAba("todas") }
+  // Mostra o aviso só quando a receita observada AINDA existe (não foi excluída) mas saiu
+  // da aba filtrada atual — o caso do "sumiu após alterar o vencimento".
+  const movidaForaDoFiltro = movida != null && aba !== "todas"
+    && grupos.some((g) => g.id === movida.id) && !filtrados.some((g) => g.id === movida.id)
 
   const exportarCsv = () => {
     const head = ["ID", "Codigo", "Receita", "Servico", "ValorBase", "MoedaBase", "ContratadoBRL", "RecebidoBRL", "SaldoBRL", "ProximoVencimento", "Status", "Participantes"]
@@ -201,6 +218,16 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
           </div>
         </div>
 
+        {movidaForaDoFiltro && movida && (
+          <div className="mx-4 mb-3 flex items-center justify-between gap-3 rounded-[var(--radius-sm)] border border-[var(--info)] bg-[var(--surface-secondary)] px-4 py-2.5 text-sm text-[var(--text-secondary)]">
+            <span>A receita <span className="font-medium text-[var(--text-primary)]">{movida.nome}</span> mudou de situação e saiu deste filtro.</span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setAba("todas")} className="rounded-[var(--radius-sm)] border border-[var(--info)] px-2.5 py-1 text-xs font-medium text-[var(--info)] hover:bg-[var(--surface-hover)]">Ver em Todas</button>
+              <button onClick={() => setMovida(null)} title="Dispensar" className="rounded-[var(--radius-sm)] p-1 text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)]"><X className="h-4 w-4" /></button>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1040px] table-fixed text-sm">
             <colgroup>
@@ -260,28 +287,28 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
 
       {/* ── ações rápidas de estado (reuso de fluxos já prontos; cada onDone recarrega a lista) ── */}
       {acao?.tipo === "editar" && (
-        <EditarReceitaView obrigacaoId={acao.g.id} receitaRef={String(acao.g.id)} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar(); emitirMutacaoFinanceira() }} />
+        <EditarReceitaView obrigacaoId={acao.g.id} receitaRef={String(acao.g.id)} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => aoConcluir(acao.g)} />
       )}
       {acao?.tipo === "vencimento" && (
-        <EditarReceitaView obrigacaoId={acao.g.id} receitaRef={String(acao.g.id)} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar(); emitirMutacaoFinanceira() }} />
+        <EditarReceitaView obrigacaoId={acao.g.id} receitaRef={String(acao.g.id)} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => aoConcluir(acao.g)} />
       )}
       {acao?.tipo === "distribuicao" && (
-        <EditarDistribuicaoView obrigacaoId={acao.g.id} receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar(); emitirMutacaoFinanceira() }} />
+        <EditarDistribuicaoView obrigacaoId={acao.g.id} receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={() => aoConcluir(acao.g)} />
       )}
       {acao?.tipo === "pagamento" && (
-        <RegistrarPagamentoModal obrigacaoId={acao.g.id} moeda={acao.g.moedaBase} saldo={acao.g.saldoBrlTotal} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar(); emitirMutacaoFinanceira() }} />
+        <RegistrarPagamentoModal obrigacaoId={acao.g.id} moeda={acao.g.moedaBase} saldo={acao.g.saldoBrlTotal} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => aoConcluir(acao.g)} />
       )}
       {acao?.tipo === "duplicar" && (
-        <DuplicarReceitaModal receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={(novoId) => { setAcao(null); carregar(); emitirMutacaoFinanceira(); if (novoId) abrir(novoId) }} />
+        <DuplicarReceitaModal receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={(novoId) => { aoConcluir(acao.g); if (novoId) abrir(novoId) }} />
       )}
       {acao?.tipo === "cancelar" && (
-        <CancelamentoAvancadoModal receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar(); emitirMutacaoFinanceira() }} />
+        <CancelamentoAvancadoModal receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={() => aoConcluir(acao.g)} />
       )}
       {acao?.tipo === "arquivar" && (
-        <AcaoReceitaModal acao="arquivar" receitaRef={String(acao.g.id)} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar(); emitirMutacaoFinanceira() }} />
+        <AcaoReceitaModal acao="arquivar" receitaRef={String(acao.g.id)} natureza="RECEITA" onClose={() => setAcao(null)} onDone={() => aoConcluir(acao.g)} />
       )}
       {acao?.tipo === "excluir" && (
-        <ExcluirReceitaModal receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={() => { setAcao(null); carregar(); emitirMutacaoFinanceira() }} />
+        <ExcluirReceitaModal receitaRef={String(acao.g.id)} onClose={() => setAcao(null)} onDone={() => aoConcluir(acao.g)} />
       )}
     </div>
   )
