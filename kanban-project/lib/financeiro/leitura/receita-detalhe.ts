@@ -7,6 +7,7 @@
 import { prisma } from '@/lib/prisma'
 import { cotacoesVivas, computeCambioAging, labelServico } from './cambio-aging'
 import { ratearBrlPorBase } from '@/lib/financeiro/dominio/cambio'
+import { parcelasPagaveisComStatus } from '@/lib/financeiro/pagavel/cronograma-pagavel'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
@@ -63,6 +64,8 @@ export interface ReceitaDetalhe {
   pagadores: { nome: string; valor: number }[]
   observacao: string | null
   documentos: { id: number; nome: string; tipo: string | null; url: string; tamanho: number | null; criadoEm: string }[]
+  // F5 — cronograma de pagáveis (só custo/A_PAGAR); status derivado do Ledger. Vazio p/ receita.
+  cronogramaPagavel: { id: number; numero: number; vencimento: string; valor: number; moeda: string; status: string }[]
   faturaEmitida: boolean
   fatura: { id: number; descricao: string; status: string; valor: number; url: string | null } | null
   cobrancas: { id: number; status: string; valorTotal: number; moeda: string; enviadaEm: string | null }[]
@@ -193,6 +196,8 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   const documentos = await prisma.receitaDocumento.findMany({ where: { obrigacaoId: obr.id }, orderBy: { criadoEm: 'desc' } })
     .then((rows) => rows.map((r) => ({ id: r.id, nome: r.arquivoNome, tipo: r.tipo, url: r.arquivoUrl, tamanho: r.tamanho, criadoEm: r.criadoEm.toISOString() })))
     .catch(() => [] as { id: number; nome: string; tipo: string | null; url: string; tamanho: number | null; criadoEm: string }[])
+  // F5 — cronograma de pagáveis (só custo/A_PAGAR); status derivado do Ledger. Vazio p/ receita.
+  const cronogramaPagavel = obr.direcao === 'A_PAGAR' ? await parcelasPagaveisComStatus(obr.id).catch(() => []) : []
   // Fatura vinculada à Receita (Fase C) — resiliente durante rollout (null se indisponível)
   const faturaRow = obr.origemTipo === 'Receita' && obr.origemId
     ? await prisma.fatura.findFirst({ where: { receitaId: obr.origemId }, orderBy: { createdAt: 'desc' } }).catch(() => null)
@@ -332,6 +337,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     responsaveis: responsaveisSet, pagadores: [...pagadoresAgg.entries()].map(([nome, valor]) => ({ nome, valor })),
     observacao: obr.observacoes ?? null,
     documentos,
+    cronogramaPagavel,
     faturaEmitida, fatura,
     cobrancas, cobrancaEnviada,
   }

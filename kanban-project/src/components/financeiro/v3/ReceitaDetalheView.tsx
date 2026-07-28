@@ -21,6 +21,7 @@ import AcaoReceitaModal, { type AcaoReceita } from "@/src/components/financeiro/
 import EditarReceitaView from "@/src/components/financeiro/v3/EditarReceitaView"
 import CancelamentoAvancadoModal from "@/src/components/financeiro/v3/CancelamentoAvancadoModal"
 import DuplicarReceitaModal from "@/src/components/financeiro/v3/DuplicarReceitaModal"
+import { CronogramaPagavelPanel } from "@/src/components/financeiro/v3/CronogramaPagavelPanel"
 import ExcluirReceitaModal from "@/src/components/financeiro/v3/ExcluirReceitaModal"
 import ParticipanteContaView from "@/src/components/financeiro/v3/ParticipanteContaView"
 import { NovaFaturaModal } from "@/src/components/kanban/NovaFaturaModal"
@@ -537,8 +538,13 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
           </div>
           )}
 
-          {/* Cobranças (parcelas) */}
-          {tab === "cobrancas" && (
+          {/* F5 — Cronograma de pagáveis (custo): aba "Parcelas" */}
+          {tab === "cobrancas" && isCusto && (
+            <CronogramaPagavelPanel obrigacaoId={d.obrigacaoId} parcelas={d.cronogramaPagavel ?? []} valorContratado={d.valorContratado} moeda={d.moeda} onChange={() => carregar()} />
+          )}
+
+          {/* Cobranças (parcelas) — receita */}
+          {tab === "cobrancas" && !isCusto && (
             <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-5">
               <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-[var(--text-primary)]">{isCusto ? "Parcelas" : "Cobranças"}</h2><span className="rounded-full bg-[var(--surface-hover)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">{rp.total}</span></div>
 
