@@ -8,6 +8,7 @@ import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verif
 import { flagAtiva } from '@/lib/financeiro/flags'
 import { usuarioFlag } from '../../../_flags'
 import { previsaoCancelamento, executarCancelamento, type CancelamentoInput, type ModoCancelamento } from '@/lib/financeiro/acoes/cancelamento-avancado'
+import { verificarPermissaoCustoPorRef } from '@/lib/financeiro/permissoes-custo'
 
 const MODOS: ModoCancelamento[] = ['TOTAL', 'PARCIAL_VALOR', 'PARCIAL_PERCENTUAL', 'POR_PARTICIPANTE', 'POR_PARCELA']
 
@@ -52,6 +53,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ref
     }
   }
 
+  // F6 — segregação: cancelar custo exige financeiro.custo_cancelar (natureza-aware; preview livre).
+  const gCusto = await verificarPermissaoCustoPorRef(req, 'cancelar', ref); if (gCusto) return gCusto
   const actor = await extrairUsuarioComPermissoes(req)
   try {
     const r = await executarCancelamento(input, { criadoPorId: actor?.userId ?? null })

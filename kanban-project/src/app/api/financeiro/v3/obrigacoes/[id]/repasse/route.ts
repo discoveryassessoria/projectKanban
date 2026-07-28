@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { flagAtiva } from '@/lib/financeiro/flags'
 import { registrarRepasse, repassesDoCusto } from '@/lib/financeiro/pagavel/repasse'
+import { verificarPermissaoCustoDaObrigacao } from '@/lib/financeiro/permissoes-custo'
 import { usuarioFlag } from '../../../_flags'
 
 async function guard(req: NextRequest) {
@@ -25,6 +26,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const b = await guard(req); if (b) return b
   const id = Number((await params).id)
   if (!id) return NextResponse.json({ ok: false, erro: 'id inválido.' }, { status: 400 })
+  // F6 — segregação: registrar repasse/reembolso do custo exige financeiro.custo_editar.
+  const gCusto = await verificarPermissaoCustoDaObrigacao(req, 'editar', id); if (gCusto) return gCusto
   const body = await req.json().catch(() => ({}))
   const actor = await extrairUsuarioComPermissoes(req)
   try {

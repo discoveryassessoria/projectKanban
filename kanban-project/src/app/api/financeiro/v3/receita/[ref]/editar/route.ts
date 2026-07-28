@@ -8,6 +8,7 @@ import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verif
 import { flagAtiva } from '@/lib/financeiro/flags'
 import { usuarioFlag } from '../../../_flags'
 import { carregarReceitaEditavel, previaImpactoEdicao, editarReceita, type EditarReceitaPatch } from '@/lib/financeiro/acoes/editar-receita'
+import { verificarPermissaoCustoPorRef } from '@/lib/financeiro/permissoes-custo'
 
 async function guard(req: NextRequest) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
@@ -76,6 +77,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ re
 }
 
 async function aplicar(req: NextRequest, ref: string, b: Record<string, unknown>, patch: EditarReceitaPatch) {
+  // F6 — segregação: se a obrigação é custo (A_PAGAR), editar exige financeiro.custo_editar.
+  const gCusto = await verificarPermissaoCustoPorRef(req, 'editar', ref); if (gCusto) return gCusto
   const actor = await extrairUsuarioComPermissoes(req)
   const estrategia = b?.estrategia === 'AJUSTE_COMPENSATORIO' ? 'AJUSTE_COMPENSATORIO' : 'ATUALIZAR_ABERTAS'
   try {

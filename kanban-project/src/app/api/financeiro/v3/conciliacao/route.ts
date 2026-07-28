@@ -6,6 +6,7 @@ import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verif
 import { flagAtiva } from '@/lib/financeiro/flags'
 import { importarExtrato, conciliarPendentes } from '@/lib/financeiro/conciliacao/conciliacao-service'
 import { prisma } from '@/lib/prisma'
+import { verificarPermissaoCusto } from '@/lib/financeiro/permissoes-custo'
 import { usuarioFlag } from '../_flags'
 
 export async function GET(req: NextRequest) {
@@ -22,8 +23,11 @@ export async function POST(req: NextRequest) {
   if (!flagAtiva('conciliacao', await usuarioFlag(req))) {
     return NextResponse.json({ ok: false, motivo: 'Conciliação bancária V3 não habilitada neste ambiente/usuário.' }, { status: 409 })
   }
-  const actor = await extrairUsuarioComPermissoes(req)
   const b = await req.json().catch(() => ({}))
+  // F6 — segregação: PERSISTIR a conciliação (aplicar:true) é ato de tesouraria e exige
+  // financeiro.custo_conciliar. Dry-run (previsão) e importação de extrato seguem em financeiro.ver.
+  if (b?.aplicar === true) { const gCusto = await verificarPermissaoCusto(req, 'conciliar'); if (gCusto) return gCusto }
+  const actor = await extrairUsuarioComPermissoes(req)
   try {
     let importado
     if (Array.isArray(b?.importar) && b.importar.length) {

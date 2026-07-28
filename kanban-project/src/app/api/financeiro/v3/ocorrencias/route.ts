@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { flagAtiva } from '@/lib/financeiro/flags'
 import { registrarOcorrencia } from '@/lib/financeiro/ocorrencias/ocorrencia-service'
+import { verificarPermissaoCustoDaObrigacao } from '@/lib/financeiro/permissoes-custo'
 import { usuarioFlag } from '../_flags'
 
 export async function POST(req: NextRequest) {
@@ -26,6 +27,12 @@ export async function POST(req: NextRequest) {
   // ESTORNO exige idempotencyKey OBRIGATÓRIA (anti duplo-clique/retry concorrente): a mesma
   // chave retorna o mesmo resultado sem remutar; o motor ainda serializa por FOR UPDATE.
   if (b.tipo === 'ESTORNO' && !b.idempotencyKey) return NextResponse.json({ erro: 'Estorno exige idempotencyKey (proteção contra duplicidade).' }, { status: 400 })
+
+  // F6 — segregação: em custo (A_PAGAR), pagar exige financeiro.custo_pagar; estornar exige
+  // financeiro.custo_estornar. Natureza-aware: receita segue seu gate. Ajustes (juros/multa/
+  // desconto) fazem parte do ato de pagar → custo_pagar.
+  const opCusto = b.tipo === 'ESTORNO' ? 'estornar' : 'pagar'
+  const gCusto = await verificarPermissaoCustoDaObrigacao(req, opCusto, Number(b.obrigacaoId)); if (gCusto) return gCusto
 
   const actor = await extrairUsuarioComPermissoes(req)
   try {

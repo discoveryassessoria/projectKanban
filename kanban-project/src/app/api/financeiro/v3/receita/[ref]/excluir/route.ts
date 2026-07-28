@@ -8,6 +8,7 @@ import { flagAtiva } from '@/lib/financeiro/flags'
 import { usuarioFlag } from '../../../_flags'
 import { podeExcluir, excluirReceita } from '@/lib/financeiro/acoes/excluir-receita'
 import { AcaoReceitaError } from '@/lib/financeiro/acoes/recibo'
+import { verificarPermissaoCustoPorRef } from '@/lib/financeiro/permissoes-custo'
 
 async function guard(req: NextRequest) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
@@ -33,6 +34,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ ref:
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ ref: string }> }) {
   const bloqueio = await guard(req); if (bloqueio) return bloqueio
   const { ref } = await params
+  // F6 — segregação: excluir custo exige financeiro.custo_excluir (natureza-aware).
+  const gCusto = await verificarPermissaoCustoPorRef(req, 'excluir', ref); if (gCusto) return gCusto
   const b = await req.json().catch(() => ({} as Record<string, unknown>))
   const actor = await extrairUsuarioComPermissoes(req)
   try {

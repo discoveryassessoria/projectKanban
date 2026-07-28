@@ -8,6 +8,7 @@ import { flagAtiva } from '@/lib/financeiro/flags'
 import { usuarioFlag } from '../../../_flags'
 import { resolverId } from '@/lib/financeiro/leitura/receita-detalhe'
 import { registrarPagamentoComposto } from '@/lib/financeiro/pagamentos/registrar-pagamento-composto'
+import { verificarPermissaoCustoDaObrigacao } from '@/lib/financeiro/permissoes-custo'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ ref: string }> }) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
@@ -30,6 +31,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ref
     obrigacaoId = rid
   }
 
+  // F6 — segregação: pagar custo exige financeiro.custo_pagar (natureza-aware por obrigação).
+  const gCusto = await verificarPermissaoCustoDaObrigacao(req, 'pagar', obrigacaoId); if (gCusto) return gCusto
   const actor = await extrairUsuarioComPermissoes(req)
   try {
     const r = await registrarPagamentoComposto({

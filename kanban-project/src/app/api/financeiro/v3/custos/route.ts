@@ -12,6 +12,7 @@ import { flagAtiva } from '@/lib/financeiro/flags'
 import { criarLancamentoManual } from '@/lib/financeiro/extras/lancamento-manual'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { usuarioFlag } from '../_flags'
+import { verificarPermissaoCusto } from '@/lib/financeiro/permissoes-custo'
 
 const MOEDAS = new Set(['BRL', 'EUR', 'USD'])
 
@@ -22,6 +23,8 @@ export async function POST(req: NextRequest) {
   }
 
   const b = await req.json().catch(() => ({}))
+  // F6 — segregação: criar custo exige financeiro.custo_criar (retrocompat via financeiro.ver).
+  if (String(b?.natureza ?? 'CUSTO').toUpperCase() === 'CUSTO') { const g = await verificarPermissaoCusto(req, 'criar'); if (g) return g }
   const processoId = b?.processoId != null ? Number(b.processoId) : null
   const itemCatalogoId = b?.itemCatalogoId != null ? Number(b.itemCatalogoId) : null
   // Retrocompat: aceita `valor` (versão antiga do modal) como valorUnitário.

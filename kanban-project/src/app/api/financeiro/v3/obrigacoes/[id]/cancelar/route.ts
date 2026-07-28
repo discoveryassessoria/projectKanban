@@ -6,6 +6,7 @@ import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verif
 import { flagAtiva } from '@/lib/financeiro/flags'
 import { cancelarObrigacao } from '@/lib/financeiro/extras/cancelar-lancamento'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
+import { verificarPermissaoCustoDaObrigacao } from '@/lib/financeiro/permissoes-custo'
 import { usuarioFlag } from '../../../_flags'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -15,6 +16,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   const id = Number((await params).id)
   if (!id) return NextResponse.json({ ok: false, erro: 'id inválido.' }, { status: 400 })
+  // F6 — segregação: cancelar custo exige financeiro.custo_cancelar (natureza-aware).
+  const gCusto = await verificarPermissaoCustoDaObrigacao(req, 'cancelar', id); if (gCusto) return gCusto
   const b = await req.json().catch(() => ({}))
   const actor = await extrairUsuarioComPermissoes(req)
   try {
