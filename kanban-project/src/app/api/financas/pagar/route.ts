@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { listarObrigacoes } from "@/lib/financeiro/leitura/consultas"
 
 function dias(d: Date) { return Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000) }
 
@@ -38,18 +39,18 @@ export async function GET(_req: NextRequest) {
       },
     })
 
-    // §6 — Contas a Pagar também PROJETA os custos de PROCESSO (model Custo), sem
-    // recriar lançamento (fonte única). Cada custo aparece UMA vez, tagueado
-    // origem=PROCESSO; as ContaPagar são origem=CORPORATIVA. Cancelados fora.
-    const custosProcesso = await prisma.custo.findMany({
+    // F3 — Custos de PROCESSO: fonte primária é o MOTOR V3 (listarObrigacoes), que já inclui
+    // os custos espelhados do legado (dual-write) + os nativos V3. Para NÃO perder custos
+    // legados ainda não espelhados (leitura-compat enquanto houver legado), unimos os Custos
+    // legados SEM espelho. Sem dupla contagem: o espelhado sai do fallback via mirroredSet.
+    const custosProcesso = await listarObrigacoes({ natureza: "CUSTO" })
+    const mirrored = await prisma.obrigacaoEconomica.findMany({ where: { origemTipo: "Custo", origemId: { not: null } }, select: { origemId: true } })
+    const mirroredSet = new Set(mirrored.map((m) => m.origemId))
+    const custosLegado = (await prisma.custo.findMany({
       where: { canceladoEm: null, status: { not: "CANCELADA" }, cancelado: false },
       orderBy: { vencimento: "asc" },
-      select: {
-        id: true, descricao: true, valor: true, moeda: true, status: true, vencimento: true, fornecedor: true,
-        processoId: true, estornoDeId: true,
-        parcelas: { select: { status: true } },
-      },
-    })
+      select: { id: true, descricao: true, valor: true, status: true, vencimento: true, fornecedor: true, processoId: true, estornoDeId: true, parcelas: { select: { status: true } } },
+    })).filter((c) => !mirroredSet.has(c.id))
 
     const itensCorp = contas.map((c) => {
       const valor = Number(c.valor)
@@ -80,8 +81,39 @@ export async function GET(_req: NextRequest) {
       }
     })
 
-    // §6/§7/§14 — custos de PROCESSO projetados (não editáveis no Geral).
-    const itensProcesso = custosProcesso.map((c) => {
+    // custos de PROCESSO projetados do V3 (não editáveis no Geral). "Pago" pela projeção
+    // do Ledger (saldo≈0), não por contagem de parcelas legadas.
+    const itensProcesso = custosProcesso.map((o) => {
+      const valor = Number(o.valorContratado)
+      const venc = o.vencimento ? new Date(o.vencimento) : null
+      const d = venc ? dias(venc) : 9999
+      const pago = Number(o.saldo) <= 0.005
+      const aberto = !pago
+      const vencido = aberto && venc != null && venc < agora
+      return {
+        id: `custo-${o.obrigacaoId}`,
+        fornecedor: o.fornecedor ?? "—",
+        descricao: o.descricao ?? "—",
+        categoria: "Processo",
+        categoriaCor: null as string | null,
+        conta: null as string | null,
+        valor,
+        vencimento: venc ?? agora,
+        dataPagamento: null as Date | null,
+        status: (pago ? "PAGO" : vencido ? "VENCIDO" : "PENDENTE") as string,
+        numeroParcela: null as number | null,
+        totalParcelas: null as number | null,
+        pago, cancelado: false, aberto, vencido,
+        diasParaVencer: d,
+        origem: "PROCESSO" as const,
+        lancamentoOrigem: { tipo: "custo" as const, id: o.obrigacaoId },
+        editavelEstrutural: false,
+        estorno: false,
+      }
+    })
+
+    // leitura-compat: custos legados ainda NÃO espelhados no V3 (não somem da tela).
+    const itensProcessoLegado = custosLegado.map((c) => {
       const valor = Number(c.valor)
       const d = dias(c.vencimento)
       const totalP = c.parcelas.length
@@ -90,7 +122,7 @@ export async function GET(_req: NextRequest) {
       const aberto = !pago
       const vencido = aberto && c.vencimento < agora
       return {
-        id: `custo-${c.id}`,
+        id: `custo-leg-${c.id}`,
         fornecedor: c.fornecedor ?? "—",
         descricao: c.descricao,
         categoria: "Processo",
@@ -111,7 +143,7 @@ export async function GET(_req: NextRequest) {
       }
     })
 
-    const itens = [...itensCorp, ...itensProcesso]
+    const itens = [...itensCorp, ...itensProcesso, ...itensProcessoLegado]
 
     const abertos = itens.filter((i) => i.aberto)
     const aPagar = abertos.reduce((a, i) => a + i.valor, 0)
