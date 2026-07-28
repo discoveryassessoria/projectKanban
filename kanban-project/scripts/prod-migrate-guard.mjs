@@ -47,8 +47,18 @@ if (process.env.VERCEL_ENV === 'preview') {
   const urlPrev = process.env.PRISMA_DATABASE_URL
   if (!urlPrev) abortar('PRISMA_DATABASE_URL ausente no build de Preview.')
   console.log(`[migrate-guard] PREVIEW · alvo: ${identificador(urlPrev)}`)
+  // DIRECT_DATABASE_URL do projeto é OBSOLETA (aponta para o banco danificado de
+  // 21/07, db.prisma.io). O Prisma CLI usa `directUrl` para migrar — sem esta
+  // sobrescrita, o `migrate deploy` do Preview ia para o banco ERRADO, não para o
+  // banco de homologação. Mesma trava já aplicada no caminho de produção abaixo.
+  if (/db\.prisma\.io/i.test(identificador(urlPrev))) {
+    abortar('PRISMA_DATABASE_URL do Preview aponta para db.prisma.io (Prisma Postgres = produção). Preview só pode migrar homologação.')
+  }
   try {
-    execSync('npx prisma migrate deploy', { stdio: 'inherit' })
+    execSync('npx prisma migrate deploy', {
+      stdio: 'inherit',
+      env: { ...process.env, DIRECT_DATABASE_URL: urlPrev },
+    })
     console.log('[migrate-guard] PREVIEW · migrate deploy concluído.')
   } catch (err) {
     abortar(`migrate deploy falhou no Preview: ${String(err?.message ?? err).slice(0, 200)}`)
