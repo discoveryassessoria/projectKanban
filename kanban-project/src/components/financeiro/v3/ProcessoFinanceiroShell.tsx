@@ -21,9 +21,10 @@ import AcaoReceitaModal from "./AcaoReceitaModal"
 import { createPortal } from "react-dom"
 import { useRef } from "react"
 import { emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
+import { ContasAPagarDashboard } from "./ContasAPagarDashboard"
 import { MoreVertical, Pencil, Copy, Ban, Trash2, Archive } from "lucide-react"
 import { VisaoGeral } from "@/src/components/financeiro/subabas/VisaoGeral"
-import { FileText, FileMinus, CheckSquare, CalendarDays, AlertTriangle, Plus, Eye, Layers, ChevronLeft, ChevronRight, ChevronDown, ArrowDownRight, ArrowUpRight, RefreshCw, SlidersHorizontal, Download, Search, Wallet, BarChart3, Settings, RotateCcw } from "lucide-react"
+import { FileText, FileMinus, CheckSquare, CalendarDays, AlertTriangle, Plus, Eye, ChevronLeft, ChevronRight, ChevronDown, ArrowDownRight, ArrowUpRight, RefreshCw, SlidersHorizontal, Download, Search, Wallet, BarChart3, Settings, RotateCcw } from "lucide-react"
 
 import { ValorBrl, AvisoNaoConvertido, semCotacao } from "./ValorBrl"
 import { ROTULO_ESTADO_CUSTO } from "@/lib/financeiro/dominio/estado-custo"
@@ -125,6 +126,7 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
   const [novo, setNovo] = useState(false)
   const [pagar, setPagar] = useState<any | null>(null)
   const [sub, setSub] = useState<"todos" | "pagos" | "apagar">("todos")
+  const [vista, setVista] = useState<"lista" | "painel">("lista")
   // F5-UI.3 — lista rica (paridade com ReceitasTab): busca, filtros, ordenação, paginação,
   // persistência de filtros, RowMenu de ações (reuso dos modais compartilhados).
   const [busca, setBusca] = useState("")
@@ -201,11 +203,17 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
       <div className="flex items-start justify-between gap-3">
         <div><h2 className="text-lg font-semibold text-[var(--text-primary)]">Custos</h2><p className="text-sm text-[var(--text-muted)]">Despesas e custos do processo</p></div>
         <div className="flex items-center gap-2">
-          <button disabled title="Visão por fases aplicadas indisponível nesta tela" className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-primary)] px-3.5 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-active)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[var(--surface-primary)]"><Layers className="h-4 w-4" /> Fases aplicadas</button>
+          <div className="inline-flex overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-strong)]">
+            {(["lista", "painel"] as const).map((v) => <button key={v} onClick={() => setVista(v)} className={`px-3.5 py-2 text-sm ${vista === v ? "bg-[var(--accent-primary)] text-[var(--accent-ink)]" : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"}`}>{v === "lista" ? "Lista" : "Painel"}</button>)}
+          </div>
           <button onClick={() => setNovo(true)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--accent-primary)] px-3.5 py-2 text-sm font-medium text-[var(--accent-ink)] hover:bg-[var(--accent-hover)]"><Plus className="h-4 w-4" /> Novo Custo</button>
         </div>
       </div>
 
+      {/* F5-UI.4 — painel dedicado (dashboard/relatório de Contas a Pagar) */}
+      {vista === "painel" && <div className="mt-4"><ContasAPagarDashboard processoId={processoId} /></div>}
+
+      {vista === "lista" && (<>
       {/* KPIs */}
       <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
         <KpiC titulo="Total" valor={fmt(totais.total)} sub={`${obrs.length} custo(s)`} icon={FileMinus} cor="var(--info)" />
@@ -255,6 +263,8 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
         </div>
         <div className="flex items-center justify-between px-5 py-4 text-sm text-[var(--text-muted)]"><span>Mostrando {ordenados.length === 0 ? 0 : (pageSafe - 1) * PAGE + 1}–{Math.min(pageSafe * PAGE, ordenados.length)} de {ordenados.length} registro{ordenados.length === 1 ? "" : "s"}</span><div className="flex items-center gap-1"><button disabled={pageSafe <= 1} onClick={() => setPage(pageSafe - 1)} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] p-1.5 text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded-[var(--radius-sm)] border px-2.5 py-1 text-xs" style={{ borderColor: "color-mix(in srgb, var(--accent-primary) 40%, transparent)", background: "color-mix(in srgb, var(--accent-primary) 12%, transparent)", color: "var(--accent-primary)" }}>{pageSafe}/{totalPag}</span><button disabled={pageSafe >= totalPag} onClick={() => setPage(pageSafe + 1)} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] p-1.5 text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div></div>
       </div>
+      </>)}
+
       {novo && <LancamentoManualModal natureza="CUSTO" processoId={processoId} onClose={() => setNovo(false)} onCriado={() => { setNovo(false); carregar() }} />}
       {pagar && <RegistrarPagamentoModal obrigacaoId={pagar.obrigacaoId} moeda={pagar.moeda} saldo={pagar.saldo} natureza="CUSTO" onClose={() => setPagar(null)} onDone={() => { setPagar(null); carregar() }} />}
 
