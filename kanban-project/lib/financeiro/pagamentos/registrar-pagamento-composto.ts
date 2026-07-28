@@ -250,11 +250,12 @@ export async function registrarPagamentoComposto(input: RegistrarPagamentoCompos
       }
     }
 
-    // 4) comprovantes anexados
-    if (receitaId && input.comprovantes?.length) {
+    // 4) comprovantes anexados — F5: fonte única = obrigacaoId (cobre RECEITA e CUSTO).
+    // Antes só anexava quando havia receitaId (custo ficava sem comprovante rico).
+    if (input.comprovantes?.length) {
       for (const c of input.comprovantes) {
         await tx.receitaDocumento.create({ data: {
-          receitaId, obrigacaoId: obr.id, arquivoUrl: cut(c.arquivoUrl, 400)!, arquivoNome: cut(c.arquivoNome, 200)!,
+          receitaId: receitaId ?? null, obrigacaoId: obr.id, arquivoUrl: cut(c.arquivoUrl, 400)!, arquivoNome: cut(c.arquivoNome, 200)!,
           tipo: 'comprovante', tamanho: c.tamanho ?? null, criadoPorId,
         } })
       }
