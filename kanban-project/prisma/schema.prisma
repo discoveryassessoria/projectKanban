@@ -4030,6 +4030,7 @@ model ObrigacaoEconomica {
   ocorrencias      OcorrenciaFinanceira[]
   distribuicoes    DistribuicaoEconomica[]
   parcelasPagaveis ParcelaPagavel[] // F5 — cronograma de vencimentos de PAGÁVEIS (Contas a Pagar). Saldo continua no Ledger.
+  repasses         RepasseCusto[]   @relation("RepassesDoCusto") // F5 — vínculos explícitos de repasse/reembolso deste custo a cobranças do cliente
   fornecedor       Fornecedor?             @relation(fields: [fornecedorId], references: [id], onDelete: SetNull) // custo: beneficiário a quem se paga (reuso do cadastro central; antes era int órfão)
 
   @@unique([origemTipo, origemId]) // 1:1 com a Receita/Custo de origem (idempotÃªncia do backfill/dual-write)
@@ -4060,6 +4061,28 @@ model ParcelaPagavel {
   @@unique([obrigacaoId, numero])
   @@index([obrigacaoId])
   @@index([vencimento])
+}
+
+// F5 — VÍNCULO EXPLÍCITO e AUDITÁVEL de Repasse/Reembolso: liga uma obrigação de CUSTO
+// (A_PAGAR) à cobrança/receita do cliente que a recupera. Custo e Receita seguem domínios
+// distintos: NUNCA se converte um no outro — este registro é o elo rastreável entre eles.
+model RepasseCusto {
+  id                 Int                @id @default(autoincrement())
+  custoObrigacaoId   Int
+  custoObrigacao     ObrigacaoEconomica @relation("RepassesDoCusto", fields: [custoObrigacaoId], references: [id], onDelete: Cascade)
+  receitaObrigacaoId Int? // obrigação de RECEITA (cobrança ao cliente) que recupera o custo — ref soft (sem FK forte, como faseId/centroCustoId)
+  cobrancaId         Int? // cobrança específica, quando aplicável
+  tipo               String             @db.VarChar(12) // REPASSE | REEMBOLSO
+  valor              Decimal            @db.Decimal(14, 2)
+  percentual         Decimal?           @db.Decimal(6, 3)
+  pagadorPessoaId    Int? // participante pagador (quem reembolsa/paga o repasse)
+  status             String             @default("ATIVO") @db.VarChar(12) // ATIVO | CANCELADO
+  motivo             String?            @db.VarChar(300)
+  criadoPorId        Int?
+  criadoEm           DateTime           @default(now())
+
+  @@index([custoObrigacaoId])
+  @@index([receitaObrigacaoId])
 }
 
 /// Livro-razÃ£o (double-entry) de UMA obrigaÃ§Ã£o. Ãnica fonte da verdade.
