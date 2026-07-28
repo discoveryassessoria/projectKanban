@@ -4026,16 +4026,40 @@ model ObrigacaoEconomica {
   criadoEm          DateTime  @default(now())
   atualizadoEm      DateTime  @updatedAt
 
-  ledger        LedgerFinanceiro?
-  ocorrencias   OcorrenciaFinanceira[]
-  distribuicoes DistribuicaoEconomica[]
-  fornecedor    Fornecedor?             @relation(fields: [fornecedorId], references: [id], onDelete: SetNull) // custo: beneficiário a quem se paga (reuso do cadastro central; antes era int órfão)
+  ledger           LedgerFinanceiro?
+  ocorrencias      OcorrenciaFinanceira[]
+  distribuicoes    DistribuicaoEconomica[]
+  parcelasPagaveis ParcelaPagavel[] // F5 — cronograma de vencimentos de PAGÁVEIS (Contas a Pagar). Saldo continua no Ledger.
+  fornecedor       Fornecedor?             @relation(fields: [fornecedorId], references: [id], onDelete: SetNull) // custo: beneficiário a quem se paga (reuso do cadastro central; antes era int órfão)
 
   @@unique([origemTipo, origemId]) // 1:1 com a Receita/Custo de origem (idempotÃªncia do backfill/dual-write)
   @@index([processoId])
   @@index([status])
   @@index([natureza])
   @@index([codigoOperacional])
+}
+
+// F5 — CRONOGRAMA de vencimentos de PAGÁVEIS (Contas a Pagar). Componente OFICIAL e
+// genérico: qualquer ObrigacaoEconomica A_PAGAR (custo/reembolso/corporativo) pode ter
+// um cronograma. Guarda SÓ o plano (vencimento + valor planejado); NUNCA saldo/recebido
+// — a fonte única do saldo é o Ledger. Status de pagamento é DERIVADO (Ledger + vencimento).
+// NÃO reutiliza ParcelaFinanceira (recebíveis): pagável e recebível são domínios distintos.
+model ParcelaPagavel {
+  id           Int                @id @default(autoincrement())
+  obrigacaoId  Int
+  obrigacao    ObrigacaoEconomica @relation(fields: [obrigacaoId], references: [id], onDelete: Cascade)
+  numero       Int
+  vencimento   DateTime
+  valor        Decimal            @db.Decimal(14, 2) // valor PLANEJADO da parcela (cronograma), não é saldo
+  moeda        Moeda              @default(BRL)
+  canceladaEm  DateTime? // parcela cancelada (cronograma) — status derivado passa a CANCELADA
+  criadoPorId  Int?
+  criadoEm     DateTime           @default(now())
+  atualizadoEm DateTime           @updatedAt
+
+  @@unique([obrigacaoId, numero])
+  @@index([obrigacaoId])
+  @@index([vencimento])
 }
 
 /// Livro-razÃ£o (double-entry) de UMA obrigaÃ§Ã£o. Ãnica fonte da verdade.
