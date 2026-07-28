@@ -28,7 +28,7 @@ function Kpi({ titulo, valor, sub, icon: Ic, cor }: any) {
   )
 }
 
-export function ContasAPagarDashboard({ processoId }: { processoId: number }) {
+export function ContasAPagarDashboard({ processoId, onAbrirDetalhe }: { processoId: number; onAbrirDetalhe?: (obrigacaoId: number) => void }) {
   const [d, setD] = useState<any | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   useEffect(() => {
@@ -63,6 +63,42 @@ export function ContasAPagarDashboard({ processoId }: { processoId: number }) {
         <Kpi titulo="A pagar (aberto)" valor={brl(d.kpis.aPagarBrl)} sub={`${d.kpis.qtdAbertas} conta(s) aberta(s)`} icon={Wallet} cor="var(--warning)" />
         <Kpi titulo="Vencido" valor={brl(d.kpis.vencidoBrl)} sub={`${d.kpis.qtdVencidas} vencida(s)`} icon={AlertTriangle} cor="var(--danger)" />
         <Kpi titulo="Total de contas" valor={String(d.kpis.total)} sub="no processo" icon={CalendarDays} cor="var(--info)" />
+      </div>
+
+      {/* F8.2 — Riscos e pendências: o que está EMPERRADO ou ERRADO agora (os baldes acima
+          respondem "quanto vence quando"; isto responde "o que gera trabalho"). Cada risco
+          diz o que fazer e abre o primeiro caso com um clique. */}
+      <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-5">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold text-[var(--text-secondary)]">Riscos e pendências</h3>
+          <span className="text-[11px] text-[var(--text-muted)]">{d.analisados ?? 0} custo(s) analisado(s)</span>
+        </div>
+        {!(d.riscos ?? []).length ? (
+          <p className="text-sm text-[var(--text-muted)]">Nada pendente: sem vencidos, sem duplicidade provável, sem custo parado em análise ou incompleto.</p>
+        ) : (
+          <div className="space-y-2">
+            {(d.riscos as any[]).map((r) => {
+              const cor = r.severidade === "alto" ? "var(--danger)" : r.severidade === "atencao" ? "var(--accent-primary)" : "var(--info)"
+              return (
+                <div key={r.codigo} className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-sm)] border px-3 py-2.5" style={{ borderColor: `color-mix(in srgb, ${cor} 25%, transparent)`, background: `color-mix(in srgb, ${cor} 6%, transparent)` }}>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 text-sm font-medium" style={{ color: cor }}>
+                      <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `color-mix(in srgb, ${cor} 18%, transparent)` }}>{r.qtd}</span>
+                      {r.titulo}
+                    </div>
+                    <div className="mt-0.5 text-xs text-[var(--text-muted)]">{r.acao}</div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-[var(--text-secondary)]">{brl(r.totalBrl)}</span>
+                    {onAbrirDetalhe && !!r.obrigacaoIds?.length && (
+                      <button onClick={() => onAbrirDetalhe(r.obrigacaoIds[0])} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-primary)] px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--surface-active)]">Abrir o primeiro</button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Gráfico de baldes (barras CSS) */}

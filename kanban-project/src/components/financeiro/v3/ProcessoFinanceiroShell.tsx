@@ -244,7 +244,7 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
       </div>
 
       {/* F5-UI.4 — painel dedicado (dashboard/relatório de Contas a Pagar) */}
-      {vista === "painel" && <div className="mt-4"><ContasAPagarDashboard processoId={processoId} /></div>}
+      {vista === "painel" && <div className="mt-4"><ContasAPagarDashboard processoId={processoId} onAbrirDetalhe={onAbrirDetalhe} /></div>}
 
       {vista === "lista" && (<>
       {/* KPIs */}
