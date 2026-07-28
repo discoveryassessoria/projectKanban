@@ -8,6 +8,7 @@ import { flagAtiva } from '@/lib/financeiro/flags'
 import { usuarioFlag } from '../../../_flags'
 import { duplicarReceita } from '@/lib/financeiro/acoes/duplicar-receita'
 import { AcaoReceitaError } from '@/lib/financeiro/acoes/recibo'
+import { verificarPermissaoCustoPorRef } from '@/lib/financeiro/permissoes-custo'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ ref: string }> }) {
   const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
@@ -16,6 +17,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ref
     return NextResponse.json({ ok: false, erro: 'Duplicação V3 não habilitada neste ambiente/usuário.' }, { status: 409 })
   }
   const { ref } = await params
+  // F6 — segregação: duplicar um custo CRIA um novo custo → exige financeiro.custo_criar
+  // (natureza-aware; receita segue seu gate). Fecha a paridade com POST /v3/custos.
+  const gCusto = await verificarPermissaoCustoPorRef(req, 'criar', ref); if (gCusto) return gCusto
   const b = await req.json().catch(() => ({} as Record<string, unknown>))
   const actor = await extrairUsuarioComPermissoes(req)
   try {

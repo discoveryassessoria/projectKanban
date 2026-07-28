@@ -58,6 +58,9 @@ async function main() {
   chk(status(await verificarPermissaoCustoPorRef(reqCom(tkVer), 'excluir', String(custoId))) === 403, 'estrito: PorRef(custo) + só financeiro.ver → 403')
   chk(status(await verificarPermissaoCustoPorRef(reqCom(tkVer), 'excluir', String(receitaId))) === 'PASS', 'estrito: PorRef(receita) → passa (natureza-aware)')
   chk(status(await verificarPermissaoCustoPorRef(reqCom(tkVer), 'excluir', '99999999')) === 'PASS', 'PorRef inexistente → passa (rota trata o 404)')
+  // duplicar custo = CRIAR novo custo → PorRef('criar') deve gatear como as demais
+  chk(status(await verificarPermissaoCustoPorRef(reqCom(tkVer), 'criar', String(custoId))) === 403, 'estrito: duplicar custo (PorRef criar) + só financeiro.ver → 403')
+  chk(status(await verificarPermissaoCustoPorRef(reqCom(tkPagar), 'criar', String(custoId))) === 403, 'estrito: duplicar custo com custo_pagar (sem custo_criar) → 403 (segregação)')
 
   // ========================= RETROCOMPAT (não estrito) =========================
   setEstrito(false)
