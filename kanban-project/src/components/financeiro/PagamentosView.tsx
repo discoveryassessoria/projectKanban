@@ -10,9 +10,9 @@
 import { useEffect, useMemo, useState } from "react"
 import { Receipt, ExternalLink, Paperclip, RotateCcw } from "lucide-react"
 import { PageHeader, SectionCard, Thead, Th, Tr, StatusBadge, EmptyState, SearchInput, FilterChip, LinkAction } from "@/src/components/financeiroComponents/ui/kit"
+import { authHeaders } from "@/src/lib/financeiro/http"
+import { fmtMoeda as brl } from "@/src/lib/financeiro/formato"
 
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
-const brl = (v: number, m = "BRL") => { try { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: m || "BRL" }).format(v || 0) } catch { return `${(v || 0).toFixed(2)} ${m}` } }
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—")
 
 interface Pag {

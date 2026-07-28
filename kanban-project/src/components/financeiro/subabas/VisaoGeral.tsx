@@ -18,6 +18,8 @@ import {
   DollarSign, CreditCard, Database, BarChart3, CheckCircle2, AlertTriangle, ChevronRight,
   Loader2, Calendar, Receipt, Wallet, ArrowRight,
 } from 'lucide-react'
+import { authHeaders } from "@/src/lib/financeiro/http"
+import { fmtBrl as brl } from "@/src/lib/financeiro/formato"
 
 type Moeda = 'BRL' | 'EUR' | 'USD'
 type FxRule = 'FIXO' | 'VARIAVEL'
@@ -39,7 +41,6 @@ export interface VisaoGeralProps {
 }
 
 const num = (v: unknown): number => { if (v == null) return 0; if (typeof v === 'number') return v; const n = parseFloat(String(v)); return isFinite(n) ? n : 0 }
-const brl = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const pct = (v: number) => `${(v || 0).toFixed(2).replace('.', ',')}%`
 const todayISO = () => new Date().toISOString().slice(0, 10)
 const diaMes = (iso: string) => { const d = new Date((iso || '').includes('T') ? iso : iso + 'T00:00:00'); return isNaN(d.getTime()) ? '—' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}` }
@@ -74,7 +75,7 @@ export function VisaoGeral({ processoId, fxHoje = 5.5, onIrPara }: VisaoGeralPro
     ;(async () => {
       setLoading(true); setErro(null)
       try {
-        const headers = { Authorization: `Bearer ${localStorage.getItem('authToken') || ''}` }
+        const headers = authHeaders()
         // Fonte ÚNICA V3: uma chamada, já no shape ItemAPI (obrigações + parcelas reais).
         const res = await fetch(`/api/financeiro/v3/visao-geral?processoId=${processoId}`, { headers })
         if (cancelado) return

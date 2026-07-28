@@ -18,14 +18,14 @@ import {
 import { uploadFiles } from "@/src/lib/storage"
 import { calcularTaxas, type TaxaView } from "@/lib/financeiro/taxas-pagamento"
 import { calcularRecebimento } from "@/lib/financeiro/dominio/calculo-recebimento"
+import { authHeaders } from "@/src/lib/financeiro/http"
+import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
 
-const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
 const brl = (v: number) => fmt(v || 0, "BRL")
 const eur = (v: number) => fmt(v || 0, "EUR")
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—")
 const iniciais = (n?: string | null) => (n ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?"
 const fmtTamanho = (b?: number | null) => { if (b == null) return ""; if (b < 1024) return `${b} B`; if (b < 1048576) return `${(b / 1024).toFixed(0)} KB`; return `${(b / 1048576).toFixed(1)} MB` }
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 const hoje = () => new Date().toISOString().slice(0, 10)
 const num = (v: unknown) => { const n = Number(String(v ?? "").replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : Number(v) || 0 }
 

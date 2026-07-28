@@ -29,11 +29,11 @@ import {
 } from "lucide-react"
 
 import { ValorBrl, AvisoNaoConvertido } from "./ValorBrl"
+import { authHeaders } from "@/src/lib/financeiro/http"
+import { fmtBrl as brl } from "@/src/lib/financeiro/formato"
+import { fmtMoeda } from "@/src/lib/financeiro/formato"
 
-const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0)
-const fmtMoeda = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m || "BRL" }).format(v || 0)
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : null)
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 const iniciais = (nome: string) => nome.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("") || "?"
 
 // statusConsolidado/status do backend -> apresentação (label + estado semântico)

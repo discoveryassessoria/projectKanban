@@ -9,15 +9,15 @@
 // ============================================================================
 import * as React from 'react'
 import { X, ArrowRight, ArrowLeft, Check, CreditCard, CalendarClock, Wallet, Landmark, ReceiptText, Sparkles } from 'lucide-react'
+import { authToken } from "@/src/lib/financeiro/http"
+import { fmtMoeda as brl } from "@/src/lib/financeiro/formato"
 
 const OURO = '#D2A948'
 const GLASS = 'rounded-xl border border-white/10 bg-white/[0.05] backdrop-blur-md'
-const brl = (v: any, m = 'BRL') => { const n = v == null ? 0 : Number(v); try { return n.toLocaleString('pt-BR', { style: 'currency', currency: m }) } catch { return `${m} ${n.toFixed(2)}` } }
 const dt = (s: any) => (s ? new Date(s).toLocaleDateString('pt-BR') : '—')
 
-function tok() { return typeof window !== 'undefined' ? localStorage.getItem('authToken') : null }
 async function jf(url: string, opts: RequestInit = {}) {
-  const t = tok()
+  const t = authToken()
   const r = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}), ...(opts.headers || {}) }, cache: 'no-store' })
   const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error((d as any)?.error || `Erro ${r.status}`); return d
 }

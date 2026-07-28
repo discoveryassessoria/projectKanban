@@ -3,8 +3,8 @@
 // cobrança do cliente. Nunca converte custo em receita — só registra o elo rastreável.
 import { useState } from "react"
 import { ArrowLeftRight, Plus, X } from "lucide-react"
+import { authHeaders } from "@/src/lib/financeiro/http"
 
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 type Repasse = { id: number; tipo: string; valor: number; percentual: number | null; receitaObrigacaoId: number | null; status: string; motivo: string | null; criadoEm: string }
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
 const dataBR = (s: string) => new Date(s).toLocaleDateString("pt-BR")

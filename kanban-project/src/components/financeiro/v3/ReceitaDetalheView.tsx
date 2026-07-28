@@ -39,14 +39,14 @@ import {
   Archive, RefreshCcw, Ban, ArrowLeftRight, Trash2,
 } from "lucide-react"
 
-const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
 import { textoBrlOuOrigem, TITULO_SEM_COTACAO } from "./ValorBrl"
+import { authHeaders } from "@/src/lib/financeiro/http"
+import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
 
 const brl = (v: number) => fmt(v, "BRL")
 // Apresentação de valor não convertido: helper compartilhado (ValorBrl).
 const dataBR = (s?: string | null) => s ? new Date(s).toLocaleDateString("pt-BR") : "—"
 const horaBR = (s?: string | null) => s ? new Date(s).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 const iniciais = (n?: string | null) => (n ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?"
 const fmtTamanho = (b?: number | null) => { if (b == null) return null; if (b < 1024) return `${b} B`; if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`; return `${(b / (1024 * 1024)).toFixed(1)} MB` }
 

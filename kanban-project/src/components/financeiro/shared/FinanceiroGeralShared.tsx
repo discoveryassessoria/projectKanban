@@ -13,8 +13,8 @@
 import { useEffect, useState } from "react"
 import { Building2, Workflow, ExternalLink, Loader2, X, Ban, RotateCcw } from "lucide-react"
 import { statusUi, rotuloStatus, corStatus, type EntradaStatus } from "@/lib/financeiro/status-financeiro"
+import { authToken } from "@/src/lib/financeiro/http"
 
-function auth() { return typeof window !== "undefined" ? localStorage.getItem("authToken") : null }
 function fmt(v: number | null | undefined, moeda = "BRL") { return v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: moeda }) }
 function fmtD(d: string | Date | null | undefined) { return d ? new Date(d).toLocaleDateString("pt-BR") : "—" }
 
@@ -48,7 +48,7 @@ export function LancamentoDetalheModal({ tipo, id, onClose }: { tipo: "receita" 
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => {
-    fetch(`/api/financeiro/lancamento?tipo=${tipo}&id=${id}`, { headers: { Authorization: `Bearer ${auth()}` } })
+    fetch(`/api/financeiro/lancamento?tipo=${tipo}&id=${id}`, { headers: { Authorization: `Bearer ${authToken()}` } })
       .then((r) => (r.ok ? r.json() : null)).then(setData).finally(() => setLoading(false))
   }, [tipo, id])
   const l = data?.lancamento
@@ -111,7 +111,7 @@ export function CancelarEstornarModal({ acao, tipo, id, resumo, onClose, onDone 
     setSaving(true); setErro(null)
     try {
       const res = await fetch(`/api/financeiro/${tipo === "receita" ? "receitas" : "custos"}/${id}/${acao}`, {
-        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth()}` },
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken()}` },
         body: JSON.stringify({ motivo, eventoRef: `ui-${acao}` }),
       })
       const j = await res.json().catch(() => ({}))

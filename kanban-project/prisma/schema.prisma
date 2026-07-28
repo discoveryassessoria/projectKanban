@@ -1570,6 +1570,9 @@ model ReceitaDocumento {
   receita     Receita? @relation(fields: [receitaId], references: [id], onDelete: Cascade)
 
   @@index([receitaId])
+  // Fonte única atual das buscas de documento (comprovante de custo/receita) é a obrigação:
+  // sem este índice toda consulta por obrigacaoId varria a tabela inteira.
+  @@index([obrigacaoId])
 }
 
 model EventoFinanceiro {

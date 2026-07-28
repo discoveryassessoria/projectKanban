@@ -10,10 +10,10 @@
 import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { X, Loader2, Receipt, Layers, User as UserIcon, Wallet, ArrowDownCircle, Coins, ChevronRight, Check } from "lucide-react"
+import { authHeaders } from "@/src/lib/financeiro/http"
+import { fmtBrl as brl } from "@/src/lib/financeiro/formato"
 
-const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0)
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—")
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 
 export type EscopoTipo = "COBRANCA" | "VARIAS" | "PARTICIPANTE" | "GERAL" | "ADIANTAMENTO" | "CREDITO"
 export interface EscopoEscolhido {

@@ -14,9 +14,9 @@ import { emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
 import { dedupPorPessoa, registrarPendenciaReconciliacao } from "@/lib/financeiro/identidade/dedup-pessoa"
 import { createPortal } from "react-dom"
 import { LAYER } from "@/src/lib/ui/layers"
+import { authHeaders } from "@/src/lib/financeiro/http"
+import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
 
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
-const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 const NATUREZA_LABEL: Record<string, string> = { DOCUMENTO: "Documento", PRODUTO: "Produto", SERVICO: "Serviço", HONORARIO: "Honorário", TAXA: "Taxa", DESPESA: "Despesa", LOGISTICA: "Logística", OUTRO: "Outro" }
 

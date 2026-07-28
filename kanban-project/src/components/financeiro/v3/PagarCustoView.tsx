@@ -20,11 +20,11 @@ import {
 } from "lucide-react"
 import { uploadFiles } from "@/src/lib/storage"
 import { calcularRecebimento } from "@/lib/financeiro/dominio/calculo-recebimento"
+import { authHeaders } from "@/src/lib/financeiro/http"
+import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
 
-const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—")
 const fmtTamanho = (b?: number | null) => { if (b == null) return ""; if (b < 1024) return `${b} B`; if (b < 1048576) return `${(b / 1024).toFixed(0)} KB`; return `${(b / 1048576).toFixed(1)} MB` }
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 const hoje = () => new Date().toISOString().slice(0, 10)
 const num = (v: unknown) => { const n = Number(String(v ?? "").replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : Number(v) || 0 }
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100

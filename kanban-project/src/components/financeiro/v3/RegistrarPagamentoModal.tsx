@@ -10,14 +10,10 @@
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { LAYER } from "@/src/lib/ui/layers"
+import { authHeaders } from "@/src/lib/financeiro/http"
+import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
 import { X, Loader2, CheckCircle2 } from "lucide-react"
 
-const authHeaders = (extra?: Record<string, string>): Record<string, string> => {
-  const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
-  return { ...(t ? { Authorization: `Bearer ${t}` } : {}), ...(extra ?? {}) }
-}
-const fmt = (v: number, m = "BRL") =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
 
 interface FormaPagamento { id: number; nome: string }
 

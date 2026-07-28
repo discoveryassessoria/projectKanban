@@ -30,6 +30,8 @@ import { FileText, FileMinus, CheckSquare, CalendarDays, AlertTriangle, Plus, Ey
 import { ValorBrl, AvisoNaoConvertido, semCotacao } from "./ValorBrl"
 import { ROTULO_ESTADO_CUSTO } from "@/lib/financeiro/dominio/estado-custo"
 import { ESTADOS_REPROVAVEIS } from "@/lib/financeiro/acoes/reprovar-custo"
+import { authHeaders } from "@/src/lib/financeiro/http"
+import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
 
 // F4.3 — cor semântica do estado de negócio do custo (badge; SÓ ícone/badge tem cor, kit DS).
 const COR_ESTADO_CUSTO: Record<string, string> = {
@@ -42,10 +44,8 @@ function EstadoCustoBadge({ estado }: { estado: string }) {
   return <span className="rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-semibold" style={{ background: `color-mix(in srgb, ${cor} 16%, transparent)`, color: cor }}>{ROTULO_ESTADO_CUSTO[estado as keyof typeof ROTULO_ESTADO_CUSTO] ?? estado}</span>
 }
 
-const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
 const dataBR = (s?: string | null) => s ? new Date(s).toLocaleDateString("pt-BR") : "—"
 // Apresentação de valor não convertido: componente compartilhado (ValorBrl).
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 const SUBTABS: [string, string][] = [["visao", "Visão Geral"], ["receitas", "Receitas"], ["custos", "Custos"], ["extrato", "Extrato"], ["timeline", "Timeline"]]
 // Exporta linhas já carregadas como CSV (client-side, sem endpoint dedicado).
 function baixarCSV(nome: string, rows: Record<string, any>[]) {

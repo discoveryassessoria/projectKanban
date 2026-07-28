@@ -152,27 +152,35 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     },
   })
   if (!obr) return null
-  const proj = await prisma.saldoProjecao.findUnique({ where: { obrigacaoId: id } })
-  // Contraparte do CUSTO: o fornecedor. O detalhe é compartilhado com Receita, então o campo
-  // é nulo quando a obrigação não tem fornecedor — nunca inventa "cliente" para custo.
-  const fornecedorNome = obr.fornecedorId != null
-    ? (await prisma.fornecedor.findUnique({ where: { id: obr.fornecedorId }, select: { nome: true } }).catch(() => null))?.nome ?? null
-    : null
+  // F7.6 — estes metadados são INDEPENDENTES entre si: buscar em paralelo (antes eram 6
+  // idas ao banco em série, e este loader ainda é chamado uma vez por participante).
+  const [proj, fornecedor, receita, itemMestre, processo, criador] = await Promise.all([
+    prisma.saldoProjecao.findUnique({ where: { obrigacaoId: id } }),
+    // Contraparte do CUSTO: o fornecedor. O detalhe é compartilhado com Receita, então o campo
+    // é nulo quando a obrigação não tem fornecedor — nunca inventa "cliente" para custo.
+    obr.fornecedorId != null
+      ? prisma.fornecedor.findUnique({ where: { id: obr.fornecedorId }, select: { nome: true } }).catch(() => null)
+      : Promise.resolve(null),
+    // Receita/Processo de origem (metadados) + criador
+    obr.origemTipo === 'Receita' && obr.origemId
+      ? prisma.receita.findUnique({ where: { id: obr.origemId }, select: { codigo: true, descricao: true, categoria: true, data1: true, createdAt: true, processoId: true, tipoServicoId: true, moeda: true, valor: true, fxEstimado: true, fxRule: true, fxFixo: true, fxData: true, valorBrlFixo: true } }).catch(() => null)
+      : Promise.resolve(null),
+    // Item do Cadastro Mestre (fonte do lançamento manual) — preferido sobre o legado.
+    obr.itemCatalogoId ? prisma.itemCatalogo.findUnique({ where: { id: obr.itemCatalogoId }, select: { name: true } }).catch(() => null) : Promise.resolve(null),
+    obr.processoId ? prisma.processo.findUnique({ where: { id: obr.processoId }, select: { id: true, codigo: true, nome: true } }) : Promise.resolve(null),
+    obr.criadoPorId ? prisma.usuario.findUnique({ where: { id: obr.criadoPorId }, select: { nome: true } }).catch(() => null) : Promise.resolve(null),
+  ])
+  const fornecedorNome = fornecedor?.nome ?? null
 
-  // Receita/Processo de origem (metadados) + criador
-  const receita = obr.origemTipo === 'Receita' && obr.origemId
-    ? await prisma.receita.findUnique({ where: { id: obr.origemId }, select: { codigo: true, descricao: true, categoria: true, data1: true, createdAt: true, processoId: true, tipoServicoId: true, moeda: true, valor: true, fxEstimado: true, fxRule: true, fxFixo: true, fxData: true, valorBrlFixo: true } }).catch(() => null)
-    : null
-  const tipoServico = receita?.tipoServicoId ? await prisma.tipoServico.findUnique({ where: { id: receita.tipoServicoId }, select: { nome: true } }).catch(() => null) : null
-  // Requerente REAL (nome em texto) da Receita legada — fonte confiável do vínculo.
-  const reqLeg = (obr.origemTipo === 'Receita' && obr.origemId)
-    ? await prisma.receitaRequerente.findMany({ where: { receitaId: obr.origemId }, orderBy: { idx: 'asc' }, select: { nome: true, percentual: true, requerenteId: true } }).catch(() => [])
-    : []
+  // Dependem da Receita de origem — segundo lote, também em paralelo.
+  const [tipoServico, reqLeg] = await Promise.all([
+    receita?.tipoServicoId ? prisma.tipoServico.findUnique({ where: { id: receita.tipoServicoId }, select: { nome: true } }).catch(() => null) : Promise.resolve(null),
+    // Requerente REAL (nome em texto) da Receita legada — fonte confiável do vínculo.
+    (obr.origemTipo === 'Receita' && obr.origemId)
+      ? prisma.receitaRequerente.findMany({ where: { receitaId: obr.origemId }, orderBy: { idx: 'asc' }, select: { nome: true, percentual: true, requerenteId: true } }).catch(() => [])
+      : Promise.resolve([] as { nome: string; percentual: unknown; requerenteId: number | null }[]),
+  ])
   const reqNomeLegado = reqLeg.find((r) => r.nome?.trim())?.nome?.trim() || null
-  // Item do Cadastro Mestre (fonte do lançamento manual) — preferido sobre o legado.
-  const itemMestre = obr.itemCatalogoId ? await prisma.itemCatalogo.findUnique({ where: { id: obr.itemCatalogoId }, select: { name: true } }).catch(() => null) : null
-  const processo = obr.processoId ? await prisma.processo.findUnique({ where: { id: obr.processoId }, select: { id: true, codigo: true, nome: true } }) : null
-  const criador = obr.criadoPorId ? await prisma.usuario.findUnique({ where: { id: obr.criadoPorId }, select: { nome: true } }).catch(() => null) : null
 
   // nomes de pessoas (distribuição + pagadores)
   const dist = obr.distribuicoes[0]

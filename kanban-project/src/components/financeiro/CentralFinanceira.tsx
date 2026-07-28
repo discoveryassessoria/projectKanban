@@ -13,9 +13,9 @@
 import { useEffect, useMemo, useState } from "react"
 import { Wallet, TrendingUp, AlertTriangle, Clock, Landmark, Coins, ArrowRight, Receipt, FileText, RefreshCw } from "lucide-react"
 import { PageHeader, KpiCard, SectionCard, Thead, Th, Tr, StatusBadge, EmptyState, PrimaryButton, SecondaryButton, LinkAction, FilterChip } from "@/src/components/financeiroComponents/ui/kit"
+import { authHeaders } from "@/src/lib/financeiro/http"
+import { fmtBrl as brl } from "@/src/lib/financeiro/formato"
 
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
-const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0)
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—")
 const diasAte = (s?: string | null) => (s ? Math.ceil((new Date(s).getTime() - Date.now()) / 86400000) : null)
 

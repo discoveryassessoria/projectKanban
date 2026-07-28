@@ -14,10 +14,10 @@ import { ratearBrlPorBase } from "@/lib/financeiro/dominio/cambio"
 import {
   Loader2, CheckCircle2, AlertTriangle, Info as InfoIcon, Trash2, UserPlus, Users, Scale, Percent, Coins, Sparkles,
 } from "lucide-react"
+import { authHeaders } from "@/src/lib/financeiro/http"
+import { fmtBrl as brl } from "@/src/lib/financeiro/formato"
+import { fmtMoeda as money } from "@/src/lib/financeiro/formato"
 
-const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0)
-const money = (v: number, m: string) => { try { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: m || "BRL" }).format(v || 0) } catch { return `${(v || 0).toFixed(2)} ${m}` } }
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 const iniciais = (n?: string | null) => (n ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?"
 const num = (v: unknown) => { const n = Number(String(v ?? "").replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : Number(v) || 0 }
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100

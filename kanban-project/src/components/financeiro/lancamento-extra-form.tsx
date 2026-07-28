@@ -10,12 +10,13 @@
 
 import { useMemo, useState } from "react"
 import { X, Plus, Trash2 } from "lucide-react"
+import { authToken } from "@/src/lib/financeiro/http"
+import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
 
 const OURO = "#C6A15B"
 const NATUREZAS = ["RECEITA_EXTRA", "DESCONTO", "JUROS", "MULTA", "REEMBOLSO", "CREDITO", "AJUSTE"]
 const MOEDAS = ["BRL", "EUR", "USD"]
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
-const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
 
 interface Req { pessoaId: string; percentual: string; valor: string }
 
@@ -85,7 +86,7 @@ export function LancamentoExtraForm({ processoIdInicial, onClose, onDone }: { pr
       }
     }
     try {
-      const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
+      const t = authToken()
       const r = await fetch("/api/financeiro/v3/lancamentos-extras", { method: "POST", headers: { "Content-Type": "application/json", ...(t ? { Authorization: `Bearer ${t}` } : {}) }, body: JSON.stringify(body) })
       const d = await r.json()
       if (r.ok && d.ok) onDone()

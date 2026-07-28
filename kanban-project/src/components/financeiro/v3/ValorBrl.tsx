@@ -13,8 +13,7 @@
 
 "use client"
 
-const moedaFmt = (v: number, m = "BRL") =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
+import { fmtMoeda as moedaFmt } from "@/src/lib/financeiro/formato"
 
 export const semCotacao = (x?: { naoConvertido?: number | null } | null): boolean =>
   Number(x?.naoConvertido ?? 0) > 0

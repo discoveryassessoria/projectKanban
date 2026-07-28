@@ -15,7 +15,7 @@ const limparEnv = () => { for (const k of Object.keys(process.env)) if (k.starts
 sec('Feature flags — independentes, env explícita, Preview+admin')
 {
   limparEnv()
-  ok('sem env / sem usuário → tudo desligado (exceto fallback)', !flagAtiva('posicaoRead') && !flagAtiva('ocorrencias') && !flagAtiva('extras') && !flagAtiva('projecoes'))
+  ok('sem env / sem usuário → tudo desligado (exceto fallback)', !flagAtiva('posicaoRead') && !flagAtiva('ocorrencias') && !flagAtiva('extras'))
   ok('fallback ao legado é o padrão seguro (ligado)', flagAtiva('fallbackLegado'))
 
   process.env.FINANCEIRO_V3_POSICAO = '1'

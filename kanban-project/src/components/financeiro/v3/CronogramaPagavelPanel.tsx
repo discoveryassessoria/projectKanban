@@ -4,8 +4,8 @@
 // Saldo/valores vêm do backend; a UI só agenda. Reutilizável por qualquer obrigação A_PAGAR.
 import { useState } from "react"
 import { CalendarClock, Plus, X } from "lucide-react"
+import { authHeaders } from "@/src/lib/financeiro/http"
 
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 
 type Parcela = { id: number; numero: number; vencimento: string; valor: number; moeda: string; status: string }
 

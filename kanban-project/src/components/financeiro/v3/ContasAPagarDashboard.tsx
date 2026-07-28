@@ -5,8 +5,8 @@
 // CSP-safe). Navegação integrada: abrir item chama onAbrirDetalhe.
 import { useEffect, useState } from "react"
 import { AlertTriangle, CalendarDays, Wallet, Download } from "lucide-react"
+import { authHeaders } from "@/src/lib/financeiro/http"
 
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 const brl = (v: number) => `R$ ${(v ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
 
 const BALDES: { key: string; label: string; cor: string }[] = [

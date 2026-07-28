@@ -13,8 +13,8 @@ import { createPortal } from "react-dom"
 import { LAYER } from "@/src/lib/ui/layers"
 import { vocabularioFinanceiro } from "@/lib/financeiro/vocabulario"
 import { X, Loader2, CheckCircle2, AlertTriangle, Trash2, ShieldAlert } from "lucide-react"
+import { authHeaders } from "@/src/lib/financeiro/http"
 
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 const CONFIRMA = "EXCLUIR"
 
 export default function ExcluirReceitaModal({ receitaRef, natureza, onClose, onDone }: {

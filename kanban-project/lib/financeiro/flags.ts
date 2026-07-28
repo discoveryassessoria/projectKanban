@@ -12,7 +12,6 @@ export type FlagV3 =
   | 'posicaoRead' // leitura da nova Posição Financeira
   | 'extras' // lançamentos financeiros extras
   | 'ocorrencias' // registrar ocorrência financeira
-  | 'projecoes' // projeções agregadas (processo/requerente/pagador)
   | 'dataCorte' // Fase 3 — ativação por data de corte (LedgerOpeningBalance)
   | 'conciliacao' // Fase 3 — conciliação bancária (extrato ↔ ocorrências)
   | 'fallbackLegado' // manter legado como fallback (default: ligado)
@@ -21,7 +20,6 @@ const ENV: Record<FlagV3, string> = {
   posicaoRead: 'FINANCEIRO_V3_POSICAO',
   extras: 'FINANCEIRO_V3_EXTRAS',
   ocorrencias: 'FINANCEIRO_V3_OCORRENCIAS',
-  projecoes: 'FINANCEIRO_V3_PROJECOES',
   dataCorte: 'FINANCEIRO_V3_DATA_CORTE',
   conciliacao: 'FINANCEIRO_V3_CONCILIACAO',
   fallbackLegado: 'FINANCEIRO_V3_FALLBACK_LEGADO',
@@ -67,7 +65,6 @@ export function flagsV3(usuario?: UsuarioFlag | null): Record<FlagV3, boolean> {
     posicaoRead: flagAtiva('posicaoRead', usuario),
     extras: flagAtiva('extras', usuario),
     ocorrencias: flagAtiva('ocorrencias', usuario),
-    projecoes: flagAtiva('projecoes', usuario),
     dataCorte: flagAtiva('dataCorte', usuario),
     conciliacao: flagAtiva('conciliacao', usuario),
     fallbackLegado: flagAtiva('fallbackLegado', usuario),

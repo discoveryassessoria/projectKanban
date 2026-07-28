@@ -15,9 +15,9 @@ import { createPortal } from "react-dom"
 import { LAYER } from "@/src/lib/ui/layers"
 import { vocabularioFinanceiro } from "@/lib/financeiro/vocabulario"
 import { X, Loader2, CheckCircle2, AlertTriangle, Ban, Info as InfoIcon, ArrowRight } from "lucide-react"
+import { authHeaders } from "@/src/lib/financeiro/http"
+import { fmtMoeda as money } from "@/src/lib/financeiro/formato"
 
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
-const money = (v: number, m: string) => { try { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: m || "BRL" }).format(v || 0) } catch { return `${(v || 0).toFixed(2)} ${m}` } }
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—")
 const num = (v: unknown) => { const n = Number(String(v ?? "").replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : Number(v) || 0 }
 

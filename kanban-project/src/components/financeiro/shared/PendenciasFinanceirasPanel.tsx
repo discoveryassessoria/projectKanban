@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react"
 import { AlertTriangle, Loader2, CheckCircle2 } from "lucide-react"
+import { authToken } from "@/src/lib/financeiro/http"
 
 interface Pendencia {
   id: number; processoId: number; processoNome: string | null; phaseKey: string
@@ -15,7 +16,7 @@ interface Pendencia {
 export default function PendenciasFinanceirasPanel({ processoId, compact = false }: { processoId?: number; compact?: boolean }) {
   const [itens, setItens] = useState<Pendencia[] | null>(null)
   useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
+    const token = authToken()
     const qs = processoId ? `?processoId=${processoId}` : ""
     fetch(`/api/financas/pendencias${qs}`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => (r.ok ? r.json() : null)).then((d) => setItens(d?.itens ?? [])).catch(() => setItens([]))

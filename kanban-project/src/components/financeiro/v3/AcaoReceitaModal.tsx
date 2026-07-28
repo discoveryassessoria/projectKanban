@@ -11,8 +11,8 @@ import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { X, Loader2, CheckCircle2, AlertTriangle, ReceiptText, RefreshCcw, Ban, Archive, ThumbsDown } from "lucide-react"
 import { LAYER } from "@/src/lib/ui/layers"
+import { authHeaders } from "@/src/lib/financeiro/http"
 
-const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 
 export type AcaoReceita = "recibo" | "renegociar" | "cancelar" | "arquivar" | "reprovar"
 const META: Record<AcaoReceita, { titulo: string; verbo: string; Ic: any; cor: string; exigeMotivo: boolean; nota: string; endpoint: string }> = {
