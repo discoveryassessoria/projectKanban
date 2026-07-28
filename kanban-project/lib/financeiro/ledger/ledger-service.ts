@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { lancObrigacaoCriada, type Lancamento, type Direcao as PernaDirecao } from './lancamentos'
 import { projetar, type EntryProjecao } from './projecao'
 import { direcaoDe, aReceber, type Natureza } from '../dominio/obrigacao-economica'
+import { ESTADO_CUSTO_INICIAL } from '../dominio/estado-custo'
 import { chaveEvento } from '../dominio/eventos'
 
 type Tx = Prisma.TransactionClient
@@ -86,6 +87,7 @@ export interface CriarObrigacaoInput {
   observacoes?: string | null
   origemTipo?: string | null // 'Receita' | 'Custo' | 'nativo'
   origemId?: number | null
+  estadoCusto?: string | null // F4 — estado de negócio inicial (só custo); default CONTRATADO
   criadoPorId?: number | null
   db?: PrismaClient
 }
@@ -120,6 +122,7 @@ export async function criarObrigacaoEconomicaComLedgerTx(tx: Tx, input: CriarObr
       valorContratado: input.valorContratado,
       vencimento: input.vencimento ?? null, observacoes: input.observacoes ?? null,
       status: 'ATIVO', origemTipo: input.origemTipo ?? 'nativo', origemId: input.origemId ?? null,
+      estadoCusto: input.natureza === 'CUSTO' ? (input.estadoCusto ?? ESTADO_CUSTO_INICIAL) : null,
       criadoPorId: input.criadoPorId ?? null,
     } })
 
