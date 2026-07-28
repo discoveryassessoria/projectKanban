@@ -13,6 +13,15 @@ import { ReceitasTab } from "./ReceitasTab"
 import { ReceitaDetalheView } from "./ReceitaDetalheView"
 import { LancamentoManualModal } from "./LancamentoManualModal"
 import RegistrarPagamentoModal from "./RegistrarPagamentoModal"
+import EditarReceitaView from "./EditarReceitaView"
+import CancelamentoAvancadoModal from "./CancelamentoAvancadoModal"
+import ExcluirReceitaModal from "./ExcluirReceitaModal"
+import DuplicarReceitaModal from "./DuplicarReceitaModal"
+import AcaoReceitaModal from "./AcaoReceitaModal"
+import { createPortal } from "react-dom"
+import { useRef } from "react"
+import { emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
+import { MoreVertical, Pencil, Copy, Ban, Trash2, Archive } from "lucide-react"
 import { VisaoGeral } from "@/src/components/financeiro/subabas/VisaoGeral"
 import { FileText, FileMinus, CheckSquare, CalendarDays, AlertTriangle, Plus, Eye, Layers, ChevronLeft, ChevronRight, ChevronDown, ArrowDownRight, ArrowUpRight, RefreshCw, SlidersHorizontal, Download, Search, Wallet, BarChart3, Settings, RotateCcw } from "lucide-react"
 
@@ -72,13 +81,68 @@ export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) 
 }
 
 // Custos — lista do processo (obrigações de natureza CUSTO). Discovery Design System.
+// KPI card (nível de módulo — evita recriar componente no render).
+function KpiC({ titulo, valor, sub: s, icon: Ic, cor }: any) {
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-4">
+      <div className="flex items-start justify-between gap-2"><span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{titulo}</span>{Ic && <span className="grid h-8 w-8 place-items-center rounded-[var(--radius-sm)]" style={{ background: `color-mix(in srgb, ${cor} 15%, transparent)`, color: cor }}><Ic className="h-4 w-4" /></span>}</div>
+      <div className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{valor}</div>
+      <div className="mt-1 text-[11px] text-[var(--text-muted)]">{s}</div>
+    </div>
+  )
+}
+
+// F5-UI.3 — RowMenu de ações rápidas da linha de Contas a Pagar (portal, paridade com
+// o RowMenu de Receitas). Reusa os modais compartilhados via callback onAcao.
+function RowMenuCusto({ onAcao }: { onAcao: (tipo: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
+  const btn = useRef<HTMLButtonElement>(null)
+  const abrir = () => { const r = btn.current?.getBoundingClientRect(); if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right }); setOpen(true) }
+  const item = (tipo: string, label: string, Icon: any, danger = false) => (
+    <button onClick={() => { setOpen(false); onAcao(tipo) }} className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--surface-hover)] ${danger ? "text-[var(--danger)]" : "text-[var(--text-secondary)]"}`}><Icon className={`h-4 w-4 ${danger ? "" : "text-[var(--text-muted)]"}`} /> {label}</button>
+  )
+  return (
+    <>
+      <button ref={btn} onClick={abrir} title="Mais ações" className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] p-1.5 text-[var(--text-secondary)] hover:bg-[var(--surface-active)]"><MoreVertical className="h-4 w-4" /></button>
+      {open && pos && createPortal(<>
+        <div className="fixed inset-0 z-[10049]" onClick={() => setOpen(false)} />
+        <div className="fixed z-[10050] w-48 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-overlay)] py-1 shadow-[var(--shadow-surface)]" style={{ top: pos.top, right: pos.right }}>
+          {item("editar", "Editar custo", Pencil)}
+          {item("duplicar", "Duplicar custo", Copy)}
+          {item("arquivar", "Arquivar custo", Archive)}
+          {item("cancelar", "Cancelar custo", Ban, true)}
+          {item("excluir", "Excluir custo", Trash2, true)}
+        </div>
+      </>, document.body)}
+    </>
+  )
+}
+
 // Etapa 3: abre o MESMO Detalhe da Obrigação (parametrizado por direção) usado por Receitas.
 function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx: number; onAbrirDetalhe?: (id: number) => void }) {
   const [obrs, setObrs] = useState<any[] | null>(null)
   const [novo, setNovo] = useState(false)
   const [pagar, setPagar] = useState<any | null>(null)
   const [sub, setSub] = useState<"todos" | "pagos" | "apagar">("todos")
+  // F5-UI.3 — lista rica (paridade com ReceitasTab): busca, filtros, ordenação, paginação,
+  // persistência de filtros, RowMenu de ações (reuso dos modais compartilhados).
+  const [busca, setBusca] = useState("")
+  const [fFornecedor, setFFornecedor] = useState("")
+  const [fMoeda, setFMoeda] = useState("Todas")
+  const [fEstado, setFEstado] = useState("Todos")
+  const [ordenar, setOrdenar] = useState<"vencimento" | "valor" | "estado" | "descricao">("vencimento")
+  const [ordem, setOrdem] = useState<"asc" | "desc">("asc")
+  const [page, setPage] = useState(1)
+  const [acao, setAcao] = useState<{ tipo: string; o: any } | null>(null)
+  const PAGE = 12
+  const chaveFiltros = `cp-filtros-${processoId}`
   const carregar = () => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}&natureza=CUSTO`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }
+  // persistência de filtros (localStorage por processo)
+  useEffect(() => { try { const s = JSON.parse(localStorage.getItem(chaveFiltros) || "{}"); if (s.sub) setSub(s.sub); if (s.busca) setBusca(s.busca); if (s.fMoeda) setFMoeda(s.fMoeda); if (s.fEstado) setFEstado(s.fEstado); if (s.ordenar) setOrdenar(s.ordenar); if (s.ordem) setOrdem(s.ordem) } catch { /* ignore */ } }, [chaveFiltros])
+  useEffect(() => { try { localStorage.setItem(chaveFiltros, JSON.stringify({ sub, busca, fMoeda, fEstado, ordenar, ordem })) } catch { /* ignore */ } }, [chaveFiltros, sub, busca, fMoeda, fEstado, ordenar, ordem])
+  // conclusão de uma ação de linha: fecha, recarrega, propaga no bus.
+  const aoConcluir = () => { setAcao(null); carregar(); emitirMutacaoFinanceira() }
   // F4.3 — avança o estado de negócio do custo (Aprovar/Contratar/Executar) via ação server-side.
   const mudarEstado = async (obrigacaoId: number, estado: string) => {
     try {
@@ -106,15 +170,30 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
     naoConvertido: obrs.reduce((s, o) => s + (o.naoConvertido ?? 0), 0),
     semCotacaoQtd: obrs.filter(semCotacao).length,
   }
-  const lista = obrs.filter((o) => sub === "pagos" ? quitado(o) : sub === "apagar" ? !quitado(o) : true)
+  const filtrados = obrs.filter((o) => {
+    if (sub === "pagos" && !quitado(o)) return false
+    if (sub === "apagar" && quitado(o)) return false
+    if (fMoeda !== "Todas" && o.moeda !== fMoeda) return false
+    if (fEstado !== "Todos" && (o.estadoCusto ?? "") !== fEstado) return false
+    if (fFornecedor && !(o.fornecedor ?? "").toLowerCase().includes(fFornecedor.toLowerCase())) return false
+    if (busca.trim()) { const q = busca.toLowerCase(); const hay = [o.descricao, o.codigoOperacional, o.fornecedor].filter(Boolean).map(String).join(" ").toLowerCase(); if (!hay.includes(q)) return false }
+    return true
+  })
+  const dir = ordem === "asc" ? 1 : -1
+  const ordenados = [...filtrados].sort((a, b) => {
+    if (ordenar === "valor") return (Number(a.saldoBrl ?? 0) - Number(b.saldoBrl ?? 0)) * dir
+    if (ordenar === "estado") return String(a.estadoCusto ?? "").localeCompare(String(b.estadoCusto ?? "")) * dir
+    if (ordenar === "descricao") return String(a.descricao ?? "").localeCompare(String(b.descricao ?? "")) * dir
+    const av = a.vencimento ? new Date(a.vencimento).getTime() : Infinity, bv = b.vencimento ? new Date(b.vencimento).getTime() : Infinity
+    return (av - bv) * dir
+  })
+  const totalPag = Math.max(1, Math.ceil(ordenados.length / PAGE))
+  const pageSafe = Math.min(page, totalPag)
+  const lista = ordenados.slice((pageSafe - 1) * PAGE, pageSafe * PAGE)
+  const estadosDistintos = [...new Set(obrs.map((o) => o.estadoCusto).filter(Boolean))] as string[]
+  const moedasDistintas = [...new Set(obrs.map((o) => o.moeda).filter(Boolean))] as string[]
+  const limparFiltros = () => { setBusca(""); setFFornecedor(""); setFMoeda("Todas"); setFEstado("Todos"); setSub("todos"); setPage(1) }
 
-  const KpiC = ({ titulo, valor, sub: s, icon: Ic, cor }: any) => (
-    <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-4">
-      <div className="flex items-start justify-between gap-2"><span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{titulo}</span>{Ic && <span className="grid h-8 w-8 place-items-center rounded-[var(--radius-sm)]" style={{ background: `color-mix(in srgb, ${cor} 15%, transparent)`, color: cor }}><Ic className="h-4 w-4" /></span>}</div>
-      <div className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{valor}</div>
-      <div className="mt-1 text-[11px] text-[var(--text-muted)]">{s}</div>
-    </div>
-  )
 
   return (
     <div>
@@ -140,8 +219,17 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
       <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)]">
         <div className="flex items-center gap-6 border-b border-[var(--border-default)] px-5 pt-4">
           {([["todos", "Todos"], ["pagos", "Pagos"], ["apagar", "A Pagar"]] as const).map(([id, label]) => (
-            <button key={id} onClick={() => setSub(id)} className={`-mb-px border-b-2 pb-3 text-sm ${sub === id ? "border-[var(--accent-primary)] font-medium text-[var(--accent-primary)]" : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"}`}>{label}</button>
+            <button key={id} onClick={() => { setSub(id); setPage(1) }} className={`-mb-px border-b-2 pb-3 text-sm ${sub === id ? "border-[var(--accent-primary)] font-medium text-[var(--accent-primary)]" : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"}`}>{label}</button>
           ))}
+        </div>
+        {/* F5-UI.3 — busca + filtros avançados + ordenação (persistidos) */}
+        <div className="flex flex-wrap items-center gap-2 px-5 py-3">
+          <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" /><input value={busca} onChange={(e) => { setBusca(e.target.value); setPage(1) }} placeholder="Buscar descrição, código, fornecedor…" className="w-[240px] rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] py-1.5 pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]" /></div>
+          <input value={fFornecedor} onChange={(e) => { setFFornecedor(e.target.value); setPage(1) }} placeholder="Fornecedor" className="w-[150px] rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]" />
+          <select value={fMoeda} onChange={(e) => { setFMoeda(e.target.value); setPage(1) }} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 py-1.5 text-sm text-[var(--text-secondary)]"><option value="Todas">Moeda</option>{moedasDistintas.map((m) => <option key={m} value={m}>{m}</option>)}</select>
+          <select value={fEstado} onChange={(e) => { setFEstado(e.target.value); setPage(1) }} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 py-1.5 text-sm text-[var(--text-secondary)]"><option value="Todos">Estado</option>{estadosDistintos.map((s) => <option key={s} value={s}>{ROTULO_ESTADO_CUSTO[s as keyof typeof ROTULO_ESTADO_CUSTO] ?? s}</option>)}</select>
+          <select value={`${ordenar}:${ordem}`} onChange={(e) => { const [o, dd] = e.target.value.split(":"); setOrdenar(o as any); setOrdem(dd as any) }} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 py-1.5 text-sm text-[var(--text-secondary)]"><option value="vencimento:asc">Vencimento ↑</option><option value="vencimento:desc">Vencimento ↓</option><option value="valor:desc">Saldo ↓</option><option value="valor:asc">Saldo ↑</option><option value="estado:asc">Estado</option><option value="descricao:asc">Descrição</option></select>
+          <button onClick={limparFiltros} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><RotateCcw className="h-3.5 w-3.5" /> Limpar</button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -159,16 +247,23 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
                   <td className="px-5 text-[var(--text-secondary)]">{o.vencimento ? dataBR(o.vencimento) : "—"}</td>
                   <td className="px-5"><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full" style={{ background: "var(--surface-active)" }}><span className="block h-full rounded-full" style={{ background: "var(--success)", width: `${prog}%` }} /></div><span className="text-[11px] text-[var(--text-muted)]">{prog}%</span></div></td>
                   <td className="px-5">{o.estadoCusto ? <EstadoCustoBadge estado={o.estadoCusto} /> : (quit ? <span className="rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-semibold" style={{ background: "color-mix(in srgb, var(--success) 16%, transparent)", color: "var(--success)" }}>Pago</span> : <span className="rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-semibold" style={{ background: "color-mix(in srgb, var(--warning) 16%, transparent)", color: "var(--warning)" }}>A pagar</span>)}</td>
-                  <td className="px-5"><div className="flex items-center gap-2"><button onClick={() => onAbrirDetalhe?.(o.obrigacaoId)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-active)]"><Eye className="h-3.5 w-3.5" /> Abrir</button>{o.estadoCusto && proximoAvanco[o.estadoCusto] && <button onClick={() => mudarEstado(o.obrigacaoId, proximoAvanco[o.estadoCusto].estado)} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-active)]">{proximoAvanco[o.estadoCusto].label}</button>}{!quit && <button onClick={() => setPagar(o)} className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90" style={{ background: "var(--success)" }}>Pagar</button>}</div></td>
+                  <td className="px-5"><div className="flex items-center gap-2"><button onClick={() => onAbrirDetalhe?.(o.obrigacaoId)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-active)]"><Eye className="h-3.5 w-3.5" /> Abrir</button>{o.estadoCusto && proximoAvanco[o.estadoCusto] && <button onClick={() => mudarEstado(o.obrigacaoId, proximoAvanco[o.estadoCusto].estado)} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-active)]">{proximoAvanco[o.estadoCusto].label}</button>}{!quit && <button onClick={() => setPagar(o)} className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90" style={{ background: "var(--success)" }}>Pagar</button>}<RowMenuCusto onAcao={(tipo) => setAcao({ tipo, o })} /></div></td>
                 </tr>
               )
             })}{lista.length === 0 && <tr><td colSpan={9} className="px-5 py-8 text-center text-[var(--text-muted)]">Nenhum custo neste processo.</td></tr>}</tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between px-5 py-4 text-sm text-[var(--text-muted)]"><span>Mostrando {lista.length} de {lista.length} registro{lista.length === 1 ? "" : "s"}</span><div className="flex items-center gap-1"><button disabled title="Página única" className="rounded-[var(--radius-sm)] border border-[var(--border-default)] p-1.5 text-[var(--text-muted)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded-[var(--radius-sm)] border px-2.5 py-1 text-xs" style={{ borderColor: "color-mix(in srgb, var(--accent-primary) 40%, transparent)", background: "color-mix(in srgb, var(--accent-primary) 12%, transparent)", color: "var(--accent-primary)" }}>1</span><button disabled title="Página única" className="rounded-[var(--radius-sm)] border border-[var(--border-default)] p-1.5 text-[var(--text-muted)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div></div>
+        <div className="flex items-center justify-between px-5 py-4 text-sm text-[var(--text-muted)]"><span>Mostrando {ordenados.length === 0 ? 0 : (pageSafe - 1) * PAGE + 1}–{Math.min(pageSafe * PAGE, ordenados.length)} de {ordenados.length} registro{ordenados.length === 1 ? "" : "s"}</span><div className="flex items-center gap-1"><button disabled={pageSafe <= 1} onClick={() => setPage(pageSafe - 1)} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] p-1.5 text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button><span className="rounded-[var(--radius-sm)] border px-2.5 py-1 text-xs" style={{ borderColor: "color-mix(in srgb, var(--accent-primary) 40%, transparent)", background: "color-mix(in srgb, var(--accent-primary) 12%, transparent)", color: "var(--accent-primary)" }}>{pageSafe}/{totalPag}</span><button disabled={pageSafe >= totalPag} onClick={() => setPage(pageSafe + 1)} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] p-1.5 text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div></div>
       </div>
       {novo && <LancamentoManualModal natureza="CUSTO" processoId={processoId} onClose={() => setNovo(false)} onCriado={() => { setNovo(false); carregar() }} />}
       {pagar && <RegistrarPagamentoModal obrigacaoId={pagar.obrigacaoId} moeda={pagar.moeda} saldo={pagar.saldo} natureza="CUSTO" onClose={() => setPagar(null)} onDone={() => { setPagar(null); carregar() }} />}
+
+      {/* F5-UI.3 — modais compartilhados das ações rápidas da linha (mesmos de Receitas) */}
+      {acao?.tipo === "editar" && <EditarReceitaView obrigacaoId={acao.o.obrigacaoId} receitaRef={String(acao.o.obrigacaoId)} natureza="CUSTO" onClose={() => setAcao(null)} onDone={aoConcluir} />}
+      {acao?.tipo === "duplicar" && <DuplicarReceitaModal receitaRef={String(acao.o.obrigacaoId)} onClose={() => setAcao(null)} onDone={(novoId?: number) => { aoConcluir(); if (novoId) onAbrirDetalhe?.(novoId) }} />}
+      {acao?.tipo === "arquivar" && <AcaoReceitaModal acao="arquivar" receitaRef={String(acao.o.obrigacaoId)} natureza="CUSTO" onClose={() => setAcao(null)} onDone={aoConcluir} />}
+      {acao?.tipo === "cancelar" && <CancelamentoAvancadoModal receitaRef={String(acao.o.obrigacaoId)} onClose={() => setAcao(null)} onDone={aoConcluir} />}
+      {acao?.tipo === "excluir" && <ExcluirReceitaModal receitaRef={String(acao.o.obrigacaoId)} onClose={() => setAcao(null)} onDone={aoConcluir} />}
     </div>
   )
 }
@@ -279,8 +374,10 @@ function TimelineTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; f
       valorBRL: o.contratadoBrl ?? 0, data: o.criadoEm ?? o.vencimento, responsavel: o.responsavel ?? null, requerente: o.requerente ?? null, quitado: o.recebido >= o.valorContratado - 0.005,
     }))
     const asc = [...base].sort((a, b) => a.id - b.id)
-    let acc = 0
-    const comSaldo = asc.map((mv) => { acc += mv.receita ? mv.valorBRL : -mv.valorBRL; return { ...mv, saldoAcum: acc } })
+    const comSaldo = asc.reduce<Array<typeof asc[number] & { saldoAcum: number }>>((arr, mv) => {
+      const prev = arr.length ? arr[arr.length - 1].saldoAcum : 0
+      return [...arr, { ...mv, saldoAcum: prev + (mv.receita ? mv.valorBRL : -mv.valorBRL) }]
+    }, [])
     return comSaldo.reverse()
   }, [obrs, fx])
   const cats = useMemo(() => ["Todas", ...Array.from(new Set(movsAll.map((mv) => mv.categoria)))], [movsAll])
