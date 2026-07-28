@@ -148,8 +148,20 @@ try {
   const retrato = await retratar(prisma)
   const classe = classificar(retrato)
   log(`alvo: ${identificador(url)} — ${classe} (tabelas=${retrato.tabelas}, migrations=${retrato.migrations}, requerentes=${retrato.requerentes})`)
-  if (classe === CLASSE.PRODUCAO || classe === CLASSE.STAGING) {
-    console.error(`[sandbox] ABORTADO: alvo classificado ${classe}. O sandbox NUNCA escreve em produção/staging.`); process.exit(1)
+  // A guarda protege contra PRODUÇÃO e contra DADO REAL — não contra o rótulo
+  // STAGING. Depois do baseline (98 migrations registradas), o próprio banco de
+  // homologação passa a classificar STAGING; barrar por isso trancaria o sandbox
+  // fora do banco que ele existe para semear. O que realmente importa continua
+  // valendo, e agora vale SEMPRE (antes só era checado no ramo de banco vazio):
+  // assinatura de produção, endpoint de produção e presença de requerentes reais.
+  if (classe === CLASSE.PRODUCAO) {
+    console.error('[sandbox] ABORTADO: alvo classificado PRODUCAO. O sandbox NUNCA escreve em produção.'); process.exit(1)
+  }
+  if (/db\.prisma\.io/i.test(identificador(url))) {
+    console.error('[sandbox] ABORTADO: alvo é db.prisma.io (Prisma Postgres = produção).'); process.exit(1)
+  }
+  if (retrato.requerentes > 0) {
+    console.error(`[sandbox] ABORTADO: ${retrato.requerentes} requerentes no alvo — há dado real. O sandbox só escreve em banco sintético.`); process.exit(1)
   }
 
   // ── 2) Materializa o schema atual se o banco estiver VAZIO ──
@@ -176,7 +188,14 @@ try {
   // ── 2b) Deltas ADITIVOS (Fase 2/3) idempotentes — cobre deploys incrementais
   // sobre sandbox já existente (db push só roda em banco vazio). Todos IF NOT EXISTS.
   const DELTAS = ['20260809000000_obrigacao_vencimento', '20260810000000_opening_balance_rollback', '20260811000000_conciliacao_bancaria', '20260812000000_ocorrencia_detalhe_pagamento']
-  for (const m of DELTAS) {
+  // Depois do baseline o histórico existe e o `migrate deploy` é o dono das
+  // migrations — reexecutar o SQL cru aqui só produziria ruído.
+  const gerido = await prisma
+    .$queryRawUnsafe(`SELECT count(*)::int n FROM _prisma_migrations WHERE migration_name = ANY($1)`, DELTAS)
+    .then((r) => Number(r[0].n) === DELTAS.length)
+    .catch(() => false)
+  if (gerido) log('deltas aditivos já sob controle do migrate deploy — pulando reaplicação crua.')
+  for (const m of gerido ? [] : DELTAS) {
     try {
       const sql = readFileSync(join(import.meta.dirname, '..', 'prisma/migrations', m, 'migration.sql'), 'utf8')
       for (const s of statements(sql)) await prisma.$executeRawUnsafe(s)

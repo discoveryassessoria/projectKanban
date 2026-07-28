@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "prebuild": "node scripts/gerar-manifesto-ambiente.mjs",
-    "build": "prisma generate && node scripts/homolog-baseline.mjs && node scripts/prod-migrate-guard.mjs && node scripts/prod-apply-cadastros-aditivas.mjs && node scripts/prod-seed-formas-pagamento.mjs && node scripts/prod-seed-adquirentes-bandeiras.mjs && node scripts/prod-seed-condicoes-taxas.mjs && node scripts/prod-seed-tabela-taxas.mjs && node scripts/prod-seed-plano-contas.mjs && node scripts/prod-smoke-dual-write.mjs && node scripts/preview-sandbox-setup.mjs && next build --turbopack",
+    "build": "prisma generate && node scripts/homolog-baseline.mjs && node scripts/prod-migrate-guard.mjs && node scripts/homolog-validar.mjs && node scripts/prod-apply-cadastros-aditivas.mjs && node scripts/prod-seed-formas-pagamento.mjs && node scripts/prod-seed-adquirentes-bandeiras.mjs && node scripts/prod-seed-condicoes-taxas.mjs && node scripts/prod-seed-tabela-taxas.mjs && node scripts/prod-seed-plano-contas.mjs && node scripts/prod-smoke-dual-write.mjs && node scripts/preview-sandbox-setup.mjs && node scripts/homolog-smokes.mjs && next build --turbopack",
     "start": "next start",
     "seed": "tsx prisma/seed.ts",
     "test:cp-sec": "tsx scripts/cp-sec.test.ts",
