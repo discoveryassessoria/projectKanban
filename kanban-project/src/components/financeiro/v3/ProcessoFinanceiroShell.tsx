@@ -22,12 +22,13 @@ import { createPortal } from "react-dom"
 import { useRef } from "react"
 import { emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
 import { ContasAPagarDashboard } from "./ContasAPagarDashboard"
-import { MoreVertical, Pencil, Copy, Ban, Trash2, Archive } from "lucide-react"
+import { MoreVertical, Pencil, Copy, Ban, Trash2, Archive, ThumbsDown } from "lucide-react"
 import { VisaoGeral } from "@/src/components/financeiro/subabas/VisaoGeral"
 import { FileText, FileMinus, CheckSquare, CalendarDays, AlertTriangle, Plus, Eye, ChevronLeft, ChevronRight, ChevronDown, ArrowDownRight, ArrowUpRight, RefreshCw, SlidersHorizontal, Download, Search, Wallet, BarChart3, Settings, RotateCcw } from "lucide-react"
 
 import { ValorBrl, AvisoNaoConvertido, semCotacao } from "./ValorBrl"
 import { ROTULO_ESTADO_CUSTO } from "@/lib/financeiro/dominio/estado-custo"
+import { ESTADOS_REPROVAVEIS } from "@/lib/financeiro/acoes/reprovar-custo"
 
 // F4.3 — cor semântica do estado de negócio do custo (badge; SÓ ícone/badge tem cor, kit DS).
 const COR_ESTADO_CUSTO: Record<string, string> = {
@@ -95,7 +96,9 @@ function KpiC({ titulo, valor, sub: s, icon: Ic, cor }: any) {
 
 // F5-UI.3 — RowMenu de ações rápidas da linha de Contas a Pagar (portal, paridade com
 // o RowMenu de Receitas). Reusa os modais compartilhados via callback onAcao.
-function RowMenuCusto({ onAcao, pode }: { onAcao: (tipo: string) => void; pode: (op: string) => boolean }) {
+function RowMenuCusto({ onAcao, pode, estadoCusto }: { onAcao: (tipo: string) => void; pode: (op: string) => boolean; estadoCusto?: string | null }) {
+  // Reprovar só faz sentido enquanto o custo está EM ANÁLISE (mesma regra do servidor).
+  const reprovavel = ESTADOS_REPROVAVEIS.includes(String(estadoCusto ?? "") as any)
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
   const btn = useRef<HTMLButtonElement>(null)
@@ -117,6 +120,7 @@ function RowMenuCusto({ onAcao, pode }: { onAcao: (tipo: string) => void; pode: 
           {item("editar", "Editar custo", Pencil, "editar")}
           {item("duplicar", "Duplicar custo", Copy, "criar")}
           {item("arquivar", "Arquivar custo", Archive, "arquivar")}
+          {reprovavel && item("reprovar", "Reprovar custo", ThumbsDown, "reprovar", true)}
           {item("cancelar", "Cancelar custo", Ban, "cancelar", true)}
           {item("excluir", "Excluir custo", Trash2, "excluir", true)}
         </div>
@@ -265,7 +269,7 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
                   <td className="px-5 text-[var(--text-secondary)]">{o.vencimento ? dataBR(o.vencimento) : "—"}</td>
                   <td className="px-5"><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full" style={{ background: "var(--surface-active)" }}><span className="block h-full rounded-full" style={{ background: "var(--success)", width: `${prog}%` }} /></div><span className="text-[11px] text-[var(--text-muted)]">{prog}%</span></div></td>
                   <td className="px-5">{o.estadoCusto ? <EstadoCustoBadge estado={o.estadoCusto} /> : (quit ? <span className="rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-semibold" style={{ background: "color-mix(in srgb, var(--success) 16%, transparent)", color: "var(--success)" }}>Pago</span> : <span className="rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-semibold" style={{ background: "color-mix(in srgb, var(--warning) 16%, transparent)", color: "var(--warning)" }}>A pagar</span>)}</td>
-                  <td className="px-5"><div className="flex items-center gap-2"><button onClick={() => onAbrirDetalhe?.(o.obrigacaoId)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-active)]"><Eye className="h-3.5 w-3.5" /> Abrir</button>{o.estadoCusto && proximoAvanco[o.estadoCusto] && (() => { const opAv = proximoAvanco[o.estadoCusto].estado === "APROVADO" ? "aprovar" : "editar"; const okAv = pode(opAv); return <button disabled={!okAv} title={okAv ? undefined : "Você não tem permissão para esta ação"} onClick={() => mudarEstado(o.obrigacaoId, proximoAvanco[o.estadoCusto].estado)} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-active)] disabled:cursor-not-allowed disabled:opacity-40">{proximoAvanco[o.estadoCusto].label}</button> })()}{!quit && <button onClick={() => setPagar(o)} disabled={!pode("pagar")} title={pode("pagar") ? undefined : "Você não tem permissão para pagar"} className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: "var(--success)" }}>Pagar</button>}<RowMenuCusto pode={pode} onAcao={(tipo) => setAcao({ tipo, o })} /></div></td>
+                  <td className="px-5"><div className="flex items-center gap-2"><button onClick={() => onAbrirDetalhe?.(o.obrigacaoId)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-active)]"><Eye className="h-3.5 w-3.5" /> Abrir</button>{o.estadoCusto && proximoAvanco[o.estadoCusto] && (() => { const opAv = proximoAvanco[o.estadoCusto].estado === "APROVADO" ? "aprovar" : "editar"; const okAv = pode(opAv); return <button disabled={!okAv} title={okAv ? undefined : "Você não tem permissão para esta ação"} onClick={() => mudarEstado(o.obrigacaoId, proximoAvanco[o.estadoCusto].estado)} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-active)] disabled:cursor-not-allowed disabled:opacity-40">{proximoAvanco[o.estadoCusto].label}</button> })()}{!quit && <button onClick={() => setPagar(o)} disabled={!pode("pagar")} title={pode("pagar") ? undefined : "Você não tem permissão para pagar"} className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: "var(--success)" }}>Pagar</button>}<RowMenuCusto pode={pode} estadoCusto={o.estadoCusto} onAcao={(tipo) => setAcao({ tipo, o })} /></div></td>
                 </tr>
               )
             })}{lista.length === 0 && <tr><td colSpan={9} className="px-5 py-8 text-center text-[var(--text-muted)]">Nenhum custo neste processo.</td></tr>}</tbody>
@@ -282,6 +286,7 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
       {acao?.tipo === "editar" && <EditarReceitaView obrigacaoId={acao.o.obrigacaoId} receitaRef={String(acao.o.obrigacaoId)} natureza="CUSTO" onClose={() => setAcao(null)} onDone={aoConcluir} />}
       {acao?.tipo === "duplicar" && <DuplicarReceitaModal receitaRef={String(acao.o.obrigacaoId)} onClose={() => setAcao(null)} onDone={(novoId?: number) => { aoConcluir(); if (novoId) onAbrirDetalhe?.(novoId) }} />}
       {acao?.tipo === "arquivar" && <AcaoReceitaModal acao="arquivar" receitaRef={String(acao.o.obrigacaoId)} natureza="CUSTO" onClose={() => setAcao(null)} onDone={aoConcluir} />}
+      {acao?.tipo === "reprovar" && <AcaoReceitaModal acao="reprovar" receitaRef={String(acao.o.obrigacaoId)} natureza="CUSTO" onClose={() => setAcao(null)} onDone={aoConcluir} />}
       {acao?.tipo === "cancelar" && <CancelamentoAvancadoModal receitaRef={String(acao.o.obrigacaoId)} onClose={() => setAcao(null)} onDone={aoConcluir} />}
       {acao?.tipo === "excluir" && <ExcluirReceitaModal receitaRef={String(acao.o.obrigacaoId)} onClose={() => setAcao(null)} onDone={aoConcluir} />}
     </div>

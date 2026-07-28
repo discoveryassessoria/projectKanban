@@ -9,17 +9,19 @@
 
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
-import { X, Loader2, CheckCircle2, AlertTriangle, ReceiptText, RefreshCcw, Ban, Archive } from "lucide-react"
+import { X, Loader2, CheckCircle2, AlertTriangle, ReceiptText, RefreshCcw, Ban, Archive, ThumbsDown } from "lucide-react"
 import { LAYER } from "@/src/lib/ui/layers"
 
 const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 
-export type AcaoReceita = "recibo" | "renegociar" | "cancelar" | "arquivar"
+export type AcaoReceita = "recibo" | "renegociar" | "cancelar" | "arquivar" | "reprovar"
 const META: Record<AcaoReceita, { titulo: string; verbo: string; Ic: any; cor: string; exigeMotivo: boolean; nota: string; endpoint: string }> = {
   recibo: { titulo: "Gerar recibo", verbo: "Gerar recibo", Ic: ReceiptText, cor: "var(--success)", exigeMotivo: false, nota: "Exige ao menos um pagamento confirmado. O recibo consolida os pagamentos recebidos.", endpoint: "recibo" },
   renegociar: { titulo: "Renegociar cobranças", verbo: "Renegociar", Ic: RefreshCcw, cor: "var(--info)", exigeMotivo: true, nota: "Atua apenas sobre cobranças em aberto/parciais. Não altera pagamentos confirmados.", endpoint: "renegociar" },
   cancelar: { titulo: "Cancelar Receita", verbo: "Cancelar Receita", Ic: Ban, cor: "var(--danger)", exigeMotivo: true, nota: "Não apaga cobranças, pagamentos nem lançamentos. Bloqueado se houver pagamento confirmado sem estorno prévio.", endpoint: "cancelar" },
   arquivar: { titulo: "Arquivar Receita", verbo: "Arquivar", Ic: Archive, cor: "var(--info)", exigeMotivo: false, nota: "Não altera saldos. A Receita sai das listagens operacionais.", endpoint: "arquivar" },
+  // F7.2 — reprovação: recusa de um custo em análise. Só existe para CUSTO.
+  reprovar: { titulo: "Reprovar custo", verbo: "Reprovar custo", Ic: ThumbsDown, cor: "var(--danger)", exigeMotivo: true, nota: "Recusa o custo em análise (Previsto/Aprovado) e encerra a obrigação — o histórico é preservado e a reprovação fica registrada com autor e motivo. Custo já contratado/executado ou com pagamento deve ser cancelado/estornado.", endpoint: "reprovar" },
 }
 
 export default function AcaoReceitaModal({ acao, receitaRef, natureza, onClose, onDone }: {
@@ -59,8 +61,8 @@ export default function AcaoReceitaModal({ acao, receitaRef, natureza, onClose, 
       // Cancelar é parametrizado por DIREÇÃO: custo (A_PAGAR) usa o cancelamento de
       // OBRIGAÇÃO (direction-agnóstico, com motivo — reusa cancelarObrigacao); receita
       // mantém o serviço de Receita. Sem duplicar lógica.
-      const url = (acao === "cancelar" && ehCusto)
-        ? `/api/financeiro/v3/obrigacoes/${receitaRef}/cancelar`
+      const url = (acao === "cancelar" && ehCusto) || acao === "reprovar"
+        ? `/api/financeiro/v3/obrigacoes/${receitaRef}/${m.endpoint}`
         : `/api/financeiro/v3/receita/${receitaRef}/${m.endpoint}`
       const res = await fetch(url, {
         method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(body),
@@ -85,7 +87,7 @@ export default function AcaoReceitaModal({ acao, receitaRef, natureza, onClose, 
             <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Nova data de vencimento (opcional)</label><input type="date" value={novaData} onChange={(e) => setNovaData(e.target.value)} className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--info)]" /></div>
           )}
           {m.exigeMotivo && (
-            <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{acao === "cancelar" ? "Motivo do cancelamento *" : "Observação / motivo *"}</label><textarea value={motivo} onChange={(e) => setMotivo(e.target.value.slice(0, 300))} rows={3} className="mt-1 w-full resize-none rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-strong)]" placeholder="Justificativa (auditoria)" /></div>
+            <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{acao === "cancelar" ? "Motivo do cancelamento *" : acao === "reprovar" ? "Motivo da reprovação *" : "Observação / motivo *"}</label><textarea value={motivo} onChange={(e) => setMotivo(e.target.value.slice(0, 300))} rows={3} className="mt-1 w-full resize-none rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-strong)]" placeholder="Justificativa (auditoria)" /></div>
           )}
           {erro && <div className="rounded-[var(--radius-sm)] border p-2.5 text-xs text-[var(--danger)]" style={{ borderColor: "color-mix(in srgb, var(--danger) 30%, transparent)", background: "color-mix(in srgb, var(--danger) 10%, transparent)" }}>{erro}</div>}
           {ok && <div className="rounded-[var(--radius-sm)] border p-2.5 text-xs text-[var(--success)]" style={{ borderColor: "color-mix(in srgb, var(--success) 30%, transparent)", background: "color-mix(in srgb, var(--success) 10%, transparent)" }}>{ok}</div>}

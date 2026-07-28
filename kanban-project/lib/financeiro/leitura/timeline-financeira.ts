@@ -34,6 +34,14 @@ const TITULO_OC: Record<string, string> = {
   BAIXA: 'Baixa', RENEGOCIACAO: 'Renegociação', DIFERENCA_CAMBIAL: 'Diferença cambial',
 }
 
+// Ações de LogAuditoria que são de NÍVEL AGREGADO por definição (ciclo de vida do custo).
+// Ficam isentas do filtro heurístico acima — senão um motivo escrito pelo usuário
+// ("pagamento em duplicidade") apagaria o próprio evento da timeline.
+const ACOES_LOG_GLOBAIS = new Set(['REPROVAR', 'ESTADO_CUSTO'])
+const TITULO_LOG: Record<string, string> = {
+  REPROVAR: 'Custo reprovado', ESTADO_CUSTO: 'Estado do custo', EDITAR: 'Edição', EXCLUIR: 'Exclusão',
+}
+
 export interface EventoTimeline {
   id: string
   escopo: 'GERAL' | 'INDIVIDUAL'
@@ -101,10 +109,10 @@ export async function timelineGeralReceita(refConsolidada: string): Promise<Even
   // LogAuditoria/Outbox são de NÍVEL AGREGADO — mas descartamos qualquer linha que
   // caracterize evento individual (pagamento/cobrança) para blindar o escopo geral.
   for (const l of logs) {
-    if (INDIVIDUAL_RE.test(`${l.acao} ${l.descricao}`)) continue
+    if (!ACOES_LOG_GLOBAIS.has(l.acao) && INDIVIDUAL_RE.test(`${l.acao} ${l.descricao}`)) continue
     eventos.push({
       id: `log-${l.id}`, escopo: 'GERAL', data: l.criadoEm.toISOString(), tipo: l.acao,
-      titulo: l.acao, descricao: l.descricao, fonte: 'LogAuditoria',
+      titulo: TITULO_LOG[l.acao] ?? l.acao, descricao: l.descricao, fonte: 'LogAuditoria',
       obrigacaoId: l.entidade === 'ObrigacaoEconomica' ? (l.entidadeId ?? null) : null,
       ator: l.usuarioId != null ? (atores.get(l.usuarioId) ?? null) : null,
     })
