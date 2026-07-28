@@ -195,7 +195,7 @@ export default function PagarCustoView({ obrigacaoId, fornecedor, onClose, onDon
   }
 
   const conteudo = (
-    <div className="fixed inset-0 overflow-y-auto bg-[var(--app-surface,var(--surface-secondary))]" style={{ zIndex: LAYER.aboveProcessCritical }}>
+    <div className="fixed inset-0 overflow-y-auto bg-[var(--surface-overlay)]" style={{ zIndex: LAYER.aboveProcessCritical }}>
       <div className="mx-auto w-full max-w-5xl px-6 py-6">
         {/* Cabeçalho */}
         <div className="mb-5 flex items-start justify-between gap-4">

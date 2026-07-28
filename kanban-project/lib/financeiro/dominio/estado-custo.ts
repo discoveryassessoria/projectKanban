@@ -39,6 +39,11 @@ const TRANSICOES: Record<EstadoCusto, EstadoCusto[]> = {
   ARQUIVADO: [], // desarquivar restaura o estado anterior — tratado fora da máquina
 }
 
+/** Estados em que a REPROVAÇÃO faz sentido: o custo ainda está em análise (F7.2).
+ *  Vive aqui, no domínio PURO, porque a UI também precisa dele — módulo de ação
+ *  toca o banco e não pode ser importado por componente cliente. */
+export const ESTADOS_REPROVAVEIS: EstadoCusto[] = ['PREVISTO', 'APROVADO']
+
 export function ehEstadoCusto(v: unknown): v is EstadoCusto {
   return typeof v === 'string' && (ESTADOS_CUSTO as string[]).includes(v)
 }

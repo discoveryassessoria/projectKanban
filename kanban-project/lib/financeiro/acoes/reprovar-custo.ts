@@ -18,10 +18,10 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { cancelarObrigacao } from '../extras/cancelar-lancamento'
 import { resolverId } from '../leitura/receita-detalhe'
-import { ROTULO_ESTADO_CUSTO, ehEstadoCusto, type EstadoCusto } from '../dominio/estado-custo'
+import { ROTULO_ESTADO_CUSTO, ehEstadoCusto, ESTADOS_REPROVAVEIS, type EstadoCusto } from '../dominio/estado-custo'
 
-/** Estados em que a reprovação faz sentido: o custo ainda está em análise. */
-export const ESTADOS_REPROVAVEIS: EstadoCusto[] = ['PREVISTO', 'APROVADO']
+// Reexporta por compatibilidade: a definição canônica vive no domínio puro.
+export { ESTADOS_REPROVAVEIS }
 
 export type ResultadoReprovacao = {
   ok: boolean

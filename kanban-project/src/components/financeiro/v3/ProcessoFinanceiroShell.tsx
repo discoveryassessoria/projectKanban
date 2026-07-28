@@ -28,8 +28,7 @@ import { VisaoGeral } from "@/src/components/financeiro/subabas/VisaoGeral"
 import { FileText, FileMinus, CheckSquare, CalendarDays, AlertTriangle, Plus, Eye, ChevronLeft, ChevronRight, ChevronDown, ArrowDownRight, ArrowUpRight, RefreshCw, SlidersHorizontal, Download, Search, Wallet, BarChart3, Settings, RotateCcw } from "lucide-react"
 
 import { ValorBrl, AvisoNaoConvertido, semCotacao } from "./ValorBrl"
-import { ROTULO_ESTADO_CUSTO } from "@/lib/financeiro/dominio/estado-custo"
-import { ESTADOS_REPROVAVEIS } from "@/lib/financeiro/acoes/reprovar-custo"
+import { ROTULO_ESTADO_CUSTO, ESTADOS_REPROVAVEIS } from "@/lib/financeiro/dominio/estado-custo"
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
 
@@ -177,7 +176,10 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
 
   // BRL vem da FONTE ÚNICA (listarObrigacoes → computeCambioAging), não de fx estimado.
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
-  const quitado = (o: any) => o.recebido >= o.valorContratado - 0.005
+  // Quitado = SALDO zerado no Ledger (fonte única, a mesma que o read-model usa para o balde
+  // PAGA). Comparar "recebido vs contratado" ignorava ABATIMENTOS: um custo com desconto
+  // obtido ficava com saldo 0, badge Pago e ainda assim oferecia o botão "Pagar".
+  const quitado = (o: any) => Number(o.saldo ?? 0) <= 0.005
   const emAtraso = obrs.filter((o) => o.vencimento && new Date(o.vencimento) < hoje && o.saldo > 0.005)
   const totais = {
     total: obrs.reduce((s, o) => s + (o.contratadoBrl ?? 0), 0),
@@ -278,7 +280,9 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
           <table className="w-full text-sm">
             <thead><tr className="text-left text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{["Descrição", "Categoria", "Total", "Total (BRL)", "Câmbio", "Vencimento", "Progresso", "Status", "Ações"].map((h) => <th key={h} className="px-5 py-3 font-medium">{h}</th>)}</tr></thead>
             <tbody>{lista.map((o) => {
-              const prog = o.valorContratado > 0 ? Math.min(100, Math.round((o.recebido / o.valorContratado) * 100)) : 0
+              // Progresso = quanto da dívida foi LIQUIDADA (pagamento + abatimento), não só o
+              // pago: assim 100% ⟺ quitado, sem barra travada em 90% num custo já fechado.
+              const prog = o.valorContratado > 0 ? Math.min(100, Math.max(0, Math.round(((o.valorContratado - Number(o.saldo ?? 0)) / o.valorContratado) * 100))) : 0
               const quit = quitado(o)
               return (
                 <tr key={o.obrigacaoId} className="border-t border-[var(--border-default)] hover:bg-[var(--surface-hover)]">
