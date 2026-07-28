@@ -172,6 +172,26 @@ export const MODULOS_PERMISSOES = [
       'financeiro.coluna_editar',
       'financeiro.coluna_excluir',
       'financeiro.custos_editar',
+      // OPT-IN: não vem em nenhum perfil padrão; só existe se concedida aqui, explicitamente.
+      'financeiro.dataCorte',
+    ],
+  },
+  {
+    // F6 — Segregação de funções do Custo. Cada operação do ciclo de vida é uma permissão
+    // independente e CONCEDÍVEL na tela (antes só existiam via seed). Enforcement server-side.
+    modulo: 'Financeiro — Custos (Contas a Pagar)',
+    icone: '🧾',
+    permissoes: [
+      'financeiro.custo_criar',
+      'financeiro.custo_editar',
+      'financeiro.custo_aprovar',
+      'financeiro.custo_reprovar',
+      'financeiro.custo_cancelar',
+      'financeiro.custo_pagar',
+      'financeiro.custo_estornar',
+      'financeiro.custo_conciliar',
+      'financeiro.custo_excluir',
+      'financeiro.custo_arquivar',
     ],
   },
   {
@@ -284,6 +304,18 @@ export const PERFIS_PADRAO = [
       'financeiro.coluna_editar': false,
       'financeiro.coluna_excluir': false,
       'financeiro.custos_editar': false,
+      // Sem operar Contas a Pagar (coerente com "sem gerenciar financeiro"): o Assistente VÊ,
+      // mas não cria/aprova/paga/concilia custo. Antes herdava as 10 chaves de TODAS_PERMISSOES.
+      'financeiro.custo_criar': false,
+      'financeiro.custo_editar': false,
+      'financeiro.custo_aprovar': false,
+      'financeiro.custo_reprovar': false,
+      'financeiro.custo_cancelar': false,
+      'financeiro.custo_pagar': false,
+      'financeiro.custo_estornar': false,
+      'financeiro.custo_conciliar': false,
+      'financeiro.custo_excluir': false,
+      'financeiro.custo_arquivar': false,
       // Sem admin
       'usuarios.gerenciar': false,
     },
