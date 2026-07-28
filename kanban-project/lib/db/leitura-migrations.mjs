@@ -88,7 +88,12 @@ export function asserçoes(sql) {
       while ((a = rNull.exec(resto))) add('nulavel', `${tabela}.${semAspas(a[1])}`, a[2].toUpperCase() === 'DROP')
     }
   }
-  return out
+  // O arquivo roda em ordem: o padrão idempotente `DROP CONSTRAINT IF EXISTS x`
+  // seguido de `ADD CONSTRAINT x` termina COM a constraint. Vale a última palavra
+  // sobre cada objeto, não a primeira.
+  const ultima = new Map()
+  for (const a of out) ultima.set(`${a.tipo}:${a.chave}`, a)
+  return [...ultima.values()]
 }
 
 /** Estado do schema numa passada só. Devolve os conjuntos e o avaliador `existe`. */
