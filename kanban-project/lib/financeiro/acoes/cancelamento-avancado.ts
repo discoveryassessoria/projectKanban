@@ -29,6 +29,7 @@ import { registrarLancamento } from '@/lib/financeiro/ledger/ledger-service'
 import { lancAjusteContrato } from '@/lib/financeiro/ledger/lancamentos'
 import { cancelarObrigacao } from '@/lib/financeiro/extras/cancelar-lancamento'
 import { aReceber, type Natureza } from '@/lib/financeiro/dominio/obrigacao-economica'
+import { aplicarTransicaoEstadoCustoTx } from '@/lib/financeiro/acoes/estado-custo-service'
 import { registrarEventoReceita } from './receita-contexto'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
@@ -324,6 +325,8 @@ export async function executarCancelamento(input: CancelamentoInput, ctx: Cancel
 
       // 2) obrigação: reduz o valorContratado (espelha o Ledger).
       await tx.obrigacaoEconomica.update({ where: { id: obrigacaoId }, data: { valorContratado: cent(o.valorContratado - valorCancelar), version: { increment: 1 } } })
+      // F4.2 — estado de negócio: cancelamento PARCIAL de custo → CANCELADO_PARCIAL (só custo).
+      await aplicarTransicaoEstadoCustoTx(tx, obrigacaoId, 'CANCELADO_PARCIAL', { usuarioId: criadoPorId, motivo: `cancelamento ${input.modo}` })
 
       // 3) Receita: reduz o valor congelado (quando há Receita de origem).
       if (o.receitaId != null) {

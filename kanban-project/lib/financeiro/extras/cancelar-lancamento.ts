@@ -11,6 +11,7 @@ import { registrarLancamento } from '../ledger/ledger-service'
 import { lancEstorno, type Perna, type Direcao } from '../ledger/lancamentos'
 import { transicionar, type StatusObrigacao } from '../dominio/obrigacao-economica'
 import { chaveEvento } from '../dominio/eventos'
+import { aplicarTransicaoEstadoCustoTx } from '../acoes/estado-custo-service'
 
 export async function cancelarObrigacao(input: { obrigacaoId: number; motivo?: string | null; criadoPorId?: number | null }): Promise<{ obrigacaoId: number; jaCancelada: boolean }> {
   return prisma.$transaction(async (tx) => {
@@ -32,6 +33,8 @@ export async function cancelarObrigacao(input: { obrigacaoId: number; motivo?: s
     }
 
     await tx.obrigacaoEconomica.update({ where: { id: obr.id }, data: { status: 'CANCELADO' } })
+    // F4.2 — estado de negócio do custo: cancelamento total → CANCELADO.
+    await aplicarTransicaoEstadoCustoTx(tx, obr.id, 'CANCELADO', { usuarioId: input.criadoPorId ?? null, motivo: input.motivo ?? 'cancelamento' })
 
     await tx.domainOutbox.create({ data: {
       tipo: 'financeiro.obrigacao.cancelada', aggregateType: 'ObrigacaoEconomica', aggregateId: obr.id,

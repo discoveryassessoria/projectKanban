@@ -11,6 +11,7 @@ import { registrarLancamento } from '../ledger/ledger-service'
 import { lancPagamento, lancPagamentoPagavel, lancDesconto, lancEncargo, lancEstorno, type Perna, type Direcao } from '../ledger/lancamentos'
 import { aplicar, type PoliticaAplicacao } from '../dominio/aplicacao'
 import { chaveEvento } from '../dominio/eventos'
+import { aplicarTransicaoEstadoCustoTx } from '../acoes/estado-custo-service'
 
 export interface EntradaOcorrencia {
   obrigacaoId: number
@@ -189,7 +190,18 @@ export async function registrarOcorrenciaTx(tx: Prisma.TransactionClient, e: Ent
     } })
 
     const proj = await tx.saldoProjecao.findUnique({ where: { obrigacaoId: obr.id } })
-    return { ocorrenciaId: oc.id, idempotente: false, excedente, saldo: proj ? Number(proj.saldo) : null }
+    const saldoNovo = proj ? Number(proj.saldo) : null
+
+    // F4.2 — estado de negócio do CUSTO dirigido pelo evento (transição explícita, não
+    // inferida no read): pagamento que quita → PAGO; estorno que reabre saldo → CONTRATADO.
+    if (obr.natureza === 'CUSTO' && saldoNovo != null) {
+      if ((e.tipo === 'PAGAMENTO' || e.tipo === 'PAGAMENTO_PARCIAL') && saldoNovo <= 0.005) {
+        await aplicarTransicaoEstadoCustoTx(tx, obr.id, 'PAGO', { usuarioId: e.criadoPorId ?? null, motivo: 'pagamento total' })
+      } else if (e.tipo === 'ESTORNO' && saldoNovo > 0.005) {
+        await aplicarTransicaoEstadoCustoTx(tx, obr.id, 'CONTRATADO', { usuarioId: e.criadoPorId ?? null, motivo: 'estorno reabriu o saldo' })
+      }
+    }
+    return { ocorrenciaId: oc.id, idempotente: false, excedente, saldo: saldoNovo }
   }
 }
 

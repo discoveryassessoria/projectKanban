@@ -8,6 +8,7 @@
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import { conciliar, type LinhaExtrato, type OcorrenciaConciliavel } from './matching'
+import { aplicarTransicaoEstadoCustoTx } from '../acoes/estado-custo-service'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
@@ -71,7 +72,11 @@ export async function conciliarPendentes(input?: { toleranciaDias?: number; apli
   if (aplicar) {
     for (const r of resultado.linhas) {
       if (r.status === 'CONCILIADO') {
-        await prisma.lancamentoBancario.update({ where: { id: r.linhaId }, data: { status: 'CONCILIADO', ocorrenciaId: r.ocorrenciaId, obrigacaoId: r.obrigacaoId, divergencia: null } })
+        await prisma.$transaction(async (tx) => {
+          await tx.lancamentoBancario.update({ where: { id: r.linhaId }, data: { status: 'CONCILIADO', ocorrenciaId: r.ocorrenciaId, obrigacaoId: r.obrigacaoId, divergencia: null } })
+          // F4.2 — custo já PAGO conciliado → CONCILIADO (máquina barra custo não-pago).
+          if (r.obrigacaoId != null) await aplicarTransicaoEstadoCustoTx(tx, r.obrigacaoId, 'CONCILIADO', { usuarioId: input?.criadoPorId ?? null, motivo: 'conciliação bancária' })
+        })
       } else if (r.status === 'DIVERGENTE') {
         await prisma.lancamentoBancario.update({ where: { id: r.linhaId }, data: { status: 'DIVERGENTE', divergencia: r.divergencia } })
       }

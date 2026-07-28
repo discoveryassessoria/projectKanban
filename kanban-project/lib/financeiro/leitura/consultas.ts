@@ -28,6 +28,7 @@ export interface ObrigacaoLista {
   responsavel: string | null
   requerente: string | null
   fornecedor: string | null
+  estadoCusto: string | null
   temAbertura: boolean
   // ── câmbio-aware (FONTE ÚNICA: computeCambioAging — Ledger + fx congelado). Elimina
   // o `fx=5.5` dos consumidores (Custos/Extrato/Timeline/Visão Geral). ──
@@ -117,6 +118,7 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
       responsavel: o.criadoPorId != null ? (userPor.get(o.criadoPorId) ?? null) : null,
       requerente: (() => { const pid = primPart.get(o.id); return pid != null ? (pessoaNomeReq.get(pid) ?? null) : null })(),
       fornecedor: o.fornecedorId != null ? (fornPor.get(o.fornecedorId) ?? null) : null,
+      estadoCusto: o.estadoCusto ?? null,
       temAbertura: comAbertura.has(o.id),
       contratadoBrl: ca.valorContratadoBrl, recebidoBrl: ca.recebidoBrl, saldoBrl: ca.saldoBrl,
       aVencerBrl: ca.aVencerBrl, vencidoBrl: ca.vencidoBrl, cotacao: ca.cotacaoAplicada, statusAging: ca.statusLabel,
