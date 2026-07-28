@@ -15,6 +15,7 @@ import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
 import { reconciliarFinanceiroDaFase, processarRequerenteAdicionado } from "@/src/lib/motor/executor"
 import type { EventoRequerentePayload } from "@/src/lib/motor/executor"
 import { reconciliarEconomicoDoProcesso } from "@/src/lib/motor/matriz-economica"
+import { espelharCustosDoProcesso } from "@/lib/financeiro/dual-write"
 import { reconciliarOperacoesAntecipadas } from "@/src/services/operacao-antecipada"
 
 const MAX_TENTATIVAS = 5
@@ -75,6 +76,12 @@ async function aplicarPhaseEntered(payload: PhaseEnteredPayload, correlationId: 
     // duplicar (via adaptador do catálogo). Isolado/best-effort.
     try { await reconciliarOperacoesAntecipadas(payload.processId, payload.newPhaseKey) }
     catch (e) { console.error("[outbox] reconciliação de operação antecipada falhou:", e) }
+
+    // F3 — CONSOLIDAÇÃO V3: espelha no motor V3 os Custos gerados pela fase (dual-write
+    // idempotente, post-commit, best-effort). O V3 passa a ser a fonte lida pelas telas,
+    // sem alterar a geração legada nem sua transação. Isolado: falha aqui não afeta a fase.
+    try { await espelharCustosDoProcesso(payload.processId) }
+    catch (e) { console.error("[outbox] espelho de custos no V3 falhou:", e) }
   }
   return criadas
 }
