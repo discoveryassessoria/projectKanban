@@ -38,6 +38,25 @@ if (process.env.MIGRATE_ON_BUILD !== '1') {
   console.log('[migrate-guard] desligado (MIGRATE_ON_BUILD != 1) — seguindo o build.')
   process.exit(0)
 }
+// HOMOLOGAÇÃO — Preview com MIGRATE_ON_BUILD=1 aplica as migrations no banco de
+// homologação. Caminho SEPARADO e mais curto de propósito: as provas de identidade
+// abaixo (fingerprint PRODUCAO, sentinelas, confirmação explícita) existem para
+// proteger PRODUÇÃO e classificariam um banco de homologação como não-produção.
+// Aqui não há seed nem backfill: só `prisma migrate deploy`.
+if (process.env.VERCEL_ENV === 'preview') {
+  const urlPrev = process.env.PRISMA_DATABASE_URL
+  if (!urlPrev) abortar('PRISMA_DATABASE_URL ausente no build de Preview.')
+  console.log(`[migrate-guard] PREVIEW · alvo: ${identificador(urlPrev)}`)
+  try {
+    execSync('npx prisma migrate deploy', { stdio: 'inherit' })
+    console.log('[migrate-guard] PREVIEW · migrate deploy concluído.')
+  } catch (err) {
+    abortar(`migrate deploy falhou no Preview: ${String(err?.message ?? err).slice(0, 200)}`)
+  }
+  process.exit(0)
+}
+
+// Produção: segue o caminho completo — identidade, shadow, confirmação explícita.
 if (process.env.VERCEL_ENV !== 'production') {
   console.log(`[migrate-guard] VERCEL_ENV=${process.env.VERCEL_ENV ?? '(vazio)'} — só roda em production.`)
   process.exit(0)
