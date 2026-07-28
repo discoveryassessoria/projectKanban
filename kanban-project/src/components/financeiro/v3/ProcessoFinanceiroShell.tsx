@@ -95,25 +95,30 @@ function KpiC({ titulo, valor, sub: s, icon: Ic, cor }: any) {
 
 // F5-UI.3 — RowMenu de ações rápidas da linha de Contas a Pagar (portal, paridade com
 // o RowMenu de Receitas). Reusa os modais compartilhados via callback onAcao.
-function RowMenuCusto({ onAcao }: { onAcao: (tipo: string) => void }) {
+function RowMenuCusto({ onAcao, pode }: { onAcao: (tipo: string) => void; pode: (op: string) => boolean }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
   const btn = useRef<HTMLButtonElement>(null)
   const abrir = () => { const r = btn.current?.getBoundingClientRect(); if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right }); setOpen(true) }
-  const item = (tipo: string, label: string, Icon: any, danger = false) => (
-    <button onClick={() => { setOpen(false); onAcao(tipo) }} className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--surface-hover)] ${danger ? "text-[var(--danger)]" : "text-[var(--text-secondary)]"}`}><Icon className={`h-4 w-4 ${danger ? "" : "text-[var(--text-muted)]"}`} /> {label}</button>
-  )
+  // F6 — a UI só CONSOME as permissões (o enforcement real é server-side). Ação sem permissão
+  // fica desabilitada com tooltip honesto (nunca botão morto), não escondida.
+  const item = (tipo: string, label: string, Icon: any, op: string, danger = false) => {
+    const ok = pode(op)
+    return (
+      <button disabled={!ok} onClick={() => { if (!ok) return; setOpen(false); onAcao(tipo) }} title={ok ? undefined : "Você não tem permissão para esta ação"} className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${ok ? "hover:bg-[var(--surface-hover)]" : "cursor-not-allowed opacity-40"} ${danger ? "text-[var(--danger)]" : "text-[var(--text-secondary)]"}`}><Icon className={`h-4 w-4 ${danger ? "" : "text-[var(--text-muted)]"}`} /> {label}</button>
+    )
+  }
   return (
     <>
       <button ref={btn} onClick={abrir} title="Mais ações" className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] p-1.5 text-[var(--text-secondary)] hover:bg-[var(--surface-active)]"><MoreVertical className="h-4 w-4" /></button>
       {open && pos && createPortal(<>
         <div className="fixed inset-0 z-[10049]" onClick={() => setOpen(false)} />
         <div className="fixed z-[10050] w-48 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-overlay)] py-1 shadow-[var(--shadow-surface)]" style={{ top: pos.top, right: pos.right }}>
-          {item("editar", "Editar custo", Pencil)}
-          {item("duplicar", "Duplicar custo", Copy)}
-          {item("arquivar", "Arquivar custo", Archive)}
-          {item("cancelar", "Cancelar custo", Ban, true)}
-          {item("excluir", "Excluir custo", Trash2, true)}
+          {item("editar", "Editar custo", Pencil, "editar")}
+          {item("duplicar", "Duplicar custo", Copy, "criar")}
+          {item("arquivar", "Arquivar custo", Archive, "arquivar")}
+          {item("cancelar", "Cancelar custo", Ban, "cancelar", true)}
+          {item("excluir", "Excluir custo", Trash2, "excluir", true)}
         </div>
       </>, document.body)}
     </>
@@ -137,6 +142,10 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
   const [ordem, setOrdem] = useState<"asc" | "desc">("asc")
   const [page, setPage] = useState(1)
   const [acao, setAcao] = useState<{ tipo: string; o: any } | null>(null)
+  // F6 — permissões EFETIVAS de custo (consumo da UI; server-side é a fonte de verdade).
+  // Enquanto não carregam (null), não bloqueia a UI — o servidor rejeita o que não é permitido.
+  const [perm, setPerm] = useState<Record<string, boolean> | null>(null)
+  const pode = (op: string) => !perm || perm[op] === true
   const PAGE = 12
   const chaveFiltros = `cp-filtros-${processoId}`
   const carregar = () => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}&natureza=CUSTO`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }
@@ -158,6 +167,7 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
   // Cancelamento (com motivo auditável) mora no Detalhe único da Obrigação — paridade
   // com Receita, sem duplicar lógica nem cancelar sem justificativa a partir da lista.
   useEffect(() => { carregar() }, [processoId])
+  useEffect(() => { fetch(`/api/financeiro/v3/permissoes-custo`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setPerm(j?.permissoes ?? null)).catch(() => setPerm(null)) }, [])
   if (!obrs) return <div className="py-8 text-sm text-[var(--text-muted)]">carregando…</div>
 
   // BRL vem da FONTE ÚNICA (listarObrigacoes → computeCambioAging), não de fx estimado.
@@ -206,7 +216,7 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
           <div className="inline-flex overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-strong)]">
             {(["lista", "painel"] as const).map((v) => <button key={v} onClick={() => setVista(v)} className={`px-3.5 py-2 text-sm ${vista === v ? "bg-[var(--accent-primary)] text-[var(--accent-ink)]" : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"}`}>{v === "lista" ? "Lista" : "Painel"}</button>)}
           </div>
-          <button onClick={() => setNovo(true)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--accent-primary)] px-3.5 py-2 text-sm font-medium text-[var(--accent-ink)] hover:bg-[var(--accent-hover)]"><Plus className="h-4 w-4" /> Novo Custo</button>
+          <button onClick={() => setNovo(true)} disabled={!pode("criar")} title={pode("criar") ? undefined : "Você não tem permissão para criar custos"} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--accent-primary)] px-3.5 py-2 text-sm font-medium text-[var(--accent-ink)] hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-40"><Plus className="h-4 w-4" /> Novo Custo</button>
         </div>
       </div>
 
@@ -255,7 +265,7 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
                   <td className="px-5 text-[var(--text-secondary)]">{o.vencimento ? dataBR(o.vencimento) : "—"}</td>
                   <td className="px-5"><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full" style={{ background: "var(--surface-active)" }}><span className="block h-full rounded-full" style={{ background: "var(--success)", width: `${prog}%` }} /></div><span className="text-[11px] text-[var(--text-muted)]">{prog}%</span></div></td>
                   <td className="px-5">{o.estadoCusto ? <EstadoCustoBadge estado={o.estadoCusto} /> : (quit ? <span className="rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-semibold" style={{ background: "color-mix(in srgb, var(--success) 16%, transparent)", color: "var(--success)" }}>Pago</span> : <span className="rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-semibold" style={{ background: "color-mix(in srgb, var(--warning) 16%, transparent)", color: "var(--warning)" }}>A pagar</span>)}</td>
-                  <td className="px-5"><div className="flex items-center gap-2"><button onClick={() => onAbrirDetalhe?.(o.obrigacaoId)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-active)]"><Eye className="h-3.5 w-3.5" /> Abrir</button>{o.estadoCusto && proximoAvanco[o.estadoCusto] && <button onClick={() => mudarEstado(o.obrigacaoId, proximoAvanco[o.estadoCusto].estado)} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-active)]">{proximoAvanco[o.estadoCusto].label}</button>}{!quit && <button onClick={() => setPagar(o)} className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90" style={{ background: "var(--success)" }}>Pagar</button>}<RowMenuCusto onAcao={(tipo) => setAcao({ tipo, o })} /></div></td>
+                  <td className="px-5"><div className="flex items-center gap-2"><button onClick={() => onAbrirDetalhe?.(o.obrigacaoId)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-active)]"><Eye className="h-3.5 w-3.5" /> Abrir</button>{o.estadoCusto && proximoAvanco[o.estadoCusto] && (() => { const opAv = proximoAvanco[o.estadoCusto].estado === "APROVADO" ? "aprovar" : "editar"; const okAv = pode(opAv); return <button disabled={!okAv} title={okAv ? undefined : "Você não tem permissão para esta ação"} onClick={() => mudarEstado(o.obrigacaoId, proximoAvanco[o.estadoCusto].estado)} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-active)] disabled:cursor-not-allowed disabled:opacity-40">{proximoAvanco[o.estadoCusto].label}</button> })()}{!quit && <button onClick={() => setPagar(o)} disabled={!pode("pagar")} title={pode("pagar") ? undefined : "Você não tem permissão para pagar"} className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: "var(--success)" }}>Pagar</button>}<RowMenuCusto pode={pode} onAcao={(tipo) => setAcao({ tipo, o })} /></div></td>
                 </tr>
               )
             })}{lista.length === 0 && <tr><td colSpan={9} className="px-5 py-8 text-center text-[var(--text-muted)]">Nenhum custo neste processo.</td></tr>}</tbody>
