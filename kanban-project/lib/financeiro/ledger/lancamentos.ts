@@ -125,9 +125,24 @@ export function lancDesconto(valor: number): Lancamento {
   return montarLancamento('DESCONTO', [D(CONTA.DESCONTOS, valor), C(CONTA.CLIENTES_A_RECEBER, valor)])
 }
 
+/**
+ * Desconto OBTIDO num pagável (custo): reduz o passivo "Fornecedores/Custos a Pagar"
+ * contra a conta de descontos. Espelho do lancDesconto — orientado a PAGÁVEL.
+ * Sem isto, um desconto em custo abateria o "a receber" (conta errada) e o saldo a
+ * pagar nunca fecharia.
+ */
+export function lancDescontoPagavel(valor: number): Lancamento {
+  return montarLancamento('DESCONTO', [D(CONTA.FORNECEDORES_A_PAGAR, valor), C(CONTA.DESCONTOS, valor)])
+}
+
 /** Juros/multa: aumenta o a receber contra encargos. */
 export function lancEncargo(valor: number, tipo: 'JUROS' | 'MULTA' = 'JUROS'): Lancamento {
   return montarLancamento(tipo, [D(CONTA.CLIENTES_A_RECEBER, valor), C(CONTA.ENCARGOS, valor)])
+}
+
+/** Juros/multa de um pagável (custo): aumenta o passivo a pagar contra encargos. */
+export function lancEncargoPagavel(valor: number, tipo: 'JUROS' | 'MULTA' = 'JUROS'): Lancamento {
+  return montarLancamento(tipo, [D(CONTA.ENCARGOS, valor), C(CONTA.FORNECEDORES_A_PAGAR, valor)])
 }
 
 /**

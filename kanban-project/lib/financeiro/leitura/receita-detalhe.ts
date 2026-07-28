@@ -16,6 +16,8 @@ export interface ReceitaDetalhe {
   obrigacaoId: number
   receitaId: number | null
   natureza: 'RECEITA' | 'CUSTO'
+  /** Nome do fornecedor (contraparte do custo). null para receita ou custo sem fornecedor. */
+  fornecedorNome: string | null
   codigo: string | null
   descricao: string | null
   statusLabel: string // A VENCER | QUITADO | ...
@@ -151,6 +153,11 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   })
   if (!obr) return null
   const proj = await prisma.saldoProjecao.findUnique({ where: { obrigacaoId: id } })
+  // Contraparte do CUSTO: o fornecedor. O detalhe é compartilhado com Receita, então o campo
+  // é nulo quando a obrigação não tem fornecedor — nunca inventa "cliente" para custo.
+  const fornecedorNome = obr.fornecedorId != null
+    ? (await prisma.fornecedor.findUnique({ where: { id: obr.fornecedorId }, select: { nome: true } }).catch(() => null))?.nome ?? null
+    : null
 
   // Receita/Processo de origem (metadados) + criador
   const receita = obr.origemTipo === 'Receita' && obr.origemId
@@ -320,6 +327,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   return {
     obrigacaoId: id, receitaId: obr.origemTipo === 'Receita' ? (obr.origemId ?? null) : null,
     natureza: obr.direcao === 'A_PAGAR' ? 'CUSTO' : 'RECEITA',
+    fornecedorNome,
     codigo: obr.codigoOperacional ?? `OBR-${obr.id}`, descricao: itemMestre?.name ?? receita?.descricao ?? obr.observacoes ?? `Lançamento ${obr.codigoOperacional ?? obr.id}`, statusLabel,
     processo: { id: processo?.id ?? null, codigo: processo?.codigo ?? null, nome: processo?.nome ?? null },
     responsavel: reqNomeLegado ? { nome: reqNomeLegado, papel: 'Principal' } : (primeiro ? { nome: nome(primeiro.pessoaId), papel: 'Principal' } : null),

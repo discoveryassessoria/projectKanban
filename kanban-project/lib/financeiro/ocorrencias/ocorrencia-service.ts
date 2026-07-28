@@ -8,7 +8,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { registrarLancamento } from '../ledger/ledger-service'
-import { lancPagamento, lancPagamentoPagavel, lancDesconto, lancEncargo, lancEstorno, type Perna, type Direcao } from '../ledger/lancamentos'
+import { lancPagamento, lancPagamentoPagavel, lancDesconto, lancDescontoPagavel, lancEncargo, lancEncargoPagavel, lancEstorno, type Perna, type Direcao } from '../ledger/lancamentos'
 import { aplicar, type PoliticaAplicacao } from '../dominio/aplicacao'
 import { chaveEvento } from '../dominio/eventos'
 import { aplicarTransicaoEstadoCustoTx } from '../acoes/estado-custo-service'
@@ -137,9 +137,13 @@ export async function registrarOcorrenciaTx(tx: Prisma.TransactionClient, e: Ent
       const projD = await tx.saldoProjecao.findUnique({ where: { obrigacaoId: obr.id } })
       const saldoAberto = Math.max(0, projD ? cent(Number(projD.saldo)) : cent(e.valor))
       const descAplicavel = Math.min(cent(e.valor), saldoAberto)
-      if (descAplicavel > 0.005) lancPernas = lancDesconto(descAplicavel)
+      // Roteia por DIREÇÃO: desconto CONCEDIDO (a receber) × desconto OBTIDO (a pagar).
+      // Sem isto o desconto de um custo abateria "Clientes a Receber" e o saldo a pagar
+      // ficaria eternamente em aberto.
+      if (descAplicavel > 0.005) lancPernas = obr.direcao === 'A_PAGAR' ? lancDescontoPagavel(descAplicavel) : lancDesconto(descAplicavel)
     } else if (e.tipo === 'JUROS' || e.tipo === 'MULTA') {
-      lancPernas = lancEncargo(e.valor, e.tipo)
+      // Idem para encargos: no custo, juros/multa AUMENTAM o passivo a pagar.
+      lancPernas = obr.direcao === 'A_PAGAR' ? lancEncargoPagavel(e.valor, e.tipo) : lancEncargo(e.valor, e.tipo)
     } else if (e.tipo === 'ESTORNO' && e.estornaOcorrenciaId) {
       const origOc = await tx.ocorrenciaFinanceira.findUnique({ where: { id: e.estornaOcorrenciaId }, select: { valor: true } })
       if (!origOc) throw new Error('Ocorrência a estornar inexistente.')

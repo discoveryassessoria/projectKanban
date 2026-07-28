@@ -18,6 +18,7 @@ import CancelamentoAvancadoModal from "./CancelamentoAvancadoModal"
 import ExcluirReceitaModal from "./ExcluirReceitaModal"
 import DuplicarReceitaModal from "./DuplicarReceitaModal"
 import AcaoReceitaModal from "./AcaoReceitaModal"
+import PagarCustoView from "./PagarCustoView"
 import { createPortal } from "react-dom"
 import { useRef } from "react"
 import { emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
@@ -209,6 +210,24 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
   const estadosDistintos = [...new Set(obrs.map((o) => o.estadoCusto).filter(Boolean))] as string[]
   const moedasDistintas = [...new Set(obrs.map((o) => o.moeda).filter(Boolean))] as string[]
   const limparFiltros = () => { setBusca(""); setFFornecedor(""); setFMoeda("Todas"); setFEstado("Todos"); setSub("todos"); setPage(1) }
+  // F7.5 — exportação CSV da lista de custos: exporta o RESULTADO FILTRADO/ORDENADO (não a
+  // página atual nem a base inteira), com os mesmos números que a tela mostra.
+  const exportarCustosCsv = () => baixarCSV(`custos-processo-${processoId}`, ordenados.map((o) => ({
+    Codigo: o.codigoOperacional ?? "",
+    Descricao: o.descricao ?? "",
+    Categoria: o.categoria ?? "",
+    Fornecedor: o.fornecedor ?? "",
+    Moeda: o.moeda,
+    Total: o.valorContratado,
+    TotalBRL: o.contratadoBrl ?? "",
+    Pago: o.recebido,
+    PagoBRL: o.recebidoBrl ?? "",
+    Saldo: o.saldo,
+    SaldoBRL: o.saldoBrl ?? "",
+    Vencimento: o.vencimento ? dataBR(o.vencimento) : "",
+    Estado: o.estadoCusto ? (ROTULO_ESTADO_CUSTO[o.estadoCusto as keyof typeof ROTULO_ESTADO_CUSTO] ?? o.estadoCusto) : (quitado(o) ? "Pago" : "A pagar"),
+    Status: o.status ?? "",
+  })))
 
 
   return (
@@ -252,6 +271,8 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
           <select value={fEstado} onChange={(e) => { setFEstado(e.target.value); setPage(1) }} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 py-1.5 text-sm text-[var(--text-secondary)]"><option value="Todos">Estado</option>{estadosDistintos.map((s) => <option key={s} value={s}>{ROTULO_ESTADO_CUSTO[s as keyof typeof ROTULO_ESTADO_CUSTO] ?? s}</option>)}</select>
           <select value={`${ordenar}:${ordem}`} onChange={(e) => { const [o, dd] = e.target.value.split(":"); setOrdenar(o as any); setOrdem(dd as any) }} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 py-1.5 text-sm text-[var(--text-secondary)]"><option value="vencimento:asc">Vencimento ↑</option><option value="vencimento:desc">Vencimento ↓</option><option value="valor:desc">Saldo ↓</option><option value="valor:asc">Saldo ↑</option><option value="estado:asc">Estado</option><option value="descricao:asc">Descrição</option></select>
           <button onClick={limparFiltros} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><RotateCcw className="h-3.5 w-3.5" /> Limpar</button>
+          {/* F7.5 — exporta exatamente o que está FILTRADO/ORDENADO na tela (paridade com Receitas/Extrato). */}
+          <button onClick={exportarCustosCsv} disabled={ordenados.length === 0} title={ordenados.length === 0 ? "Nada para exportar" : "Exportar os custos filtrados em CSV"} className="ml-auto inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-primary)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-active)] disabled:cursor-not-allowed disabled:opacity-40"><Download className="h-3.5 w-3.5" /> Exportar</button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -280,7 +301,8 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
       </>)}
 
       {novo && <LancamentoManualModal natureza="CUSTO" processoId={processoId} onClose={() => setNovo(false)} onCriado={() => { setNovo(false); carregar() }} />}
-      {pagar && <RegistrarPagamentoModal obrigacaoId={pagar.obrigacaoId} moeda={pagar.moeda} saldo={pagar.saldo} natureza="CUSTO" onClose={() => setPagar(null)} onDone={() => { setPagar(null); carregar() }} />}
+      {/* F7.5 — pagamento de custo RICO (multi-forma, ajustes, comprovantes, parcelas). */}
+      {pagar && <PagarCustoView obrigacaoId={pagar.obrigacaoId} fornecedor={pagar.fornecedor} onClose={() => setPagar(null)} onDone={() => { setPagar(null); carregar(); emitirMutacaoFinanceira() }} />}
 
       {/* F5-UI.3 — modais compartilhados das ações rápidas da linha (mesmos de Receitas) */}
       {acao?.tipo === "editar" && <EditarReceitaView obrigacaoId={acao.o.obrigacaoId} receitaRef={String(acao.o.obrigacaoId)} natureza="CUSTO" onClose={() => setAcao(null)} onDone={aoConcluir} />}

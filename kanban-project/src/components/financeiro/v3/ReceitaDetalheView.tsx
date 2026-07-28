@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
-import RegistrarPagamentoModal from "@/src/components/financeiro/v3/RegistrarPagamentoModal"
+import PagarCustoView from "@/src/components/financeiro/v3/PagarCustoView"
 import RegistrarPagamentoView from "@/src/components/financeiro/v3/RegistrarPagamentoView"
 import EditarDistribuicaoView from "@/src/components/financeiro/v3/EditarDistribuicaoView"
 import EstornoModal from "@/src/components/financeiro/v3/EstornoModal"
@@ -744,15 +744,14 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
       )}
 
       {/* ── MODAIS ── */}
-      {/* Etapa 3: pagamento parametrizado por DIREÇÃO. A_PAGAR (custo) = obrigação única
-          via RegistrarPagamentoModal (sem escopo/participantes). A_RECEBER (receita) = fluxo
-          por escopo (DefinirEscopoDrawer → RegistrarPagamentoView). */}
+      {/* Etapa 3: pagamento parametrizado por DIREÇÃO. A_PAGAR (custo) = assistente rico
+          nativo de custo (PagarCustoView: multi-forma, ajustes, comprovantes, parcelas
+          pagáveis). A_RECEBER (receita) = fluxo por escopo (DefinirEscopoDrawer →
+          RegistrarPagamentoView). */}
       {receberOpen && d && (isCusto ? (
-        <RegistrarPagamentoModal
+        <PagarCustoView
           obrigacaoId={d.obrigacaoId}
-          moeda={d.moeda ?? "BRL"}
-          saldo={d.saldoBrl}
-          natureza="CUSTO"
+          fornecedor={d.fornecedorNome ?? null}
           onClose={() => setReceberOpen(false)}
           onDone={() => { setReceberOpen(false); carregar() }}
         />

@@ -60,8 +60,15 @@ export function projetar(entries: EntryProjecao[]): Projecao {
   const pagavelCredito = creditos(entries, CONTA.FORNECEDORES_A_PAGAR) // contratado (custo)
   const ehPagavel = pagavelCredito > 0.004
 
+  // PAGO (custo) = dinheiro que SAIU do caixa e liquidou a obrigação. É medido pelo CAIXA
+  // (espelho do recebível), não pelos débitos do passivo: débito em "Fornecedores a Pagar"
+  // também acontece em DESCONTO OBTIDO — que abate a dívida sem sair caixa e, portanto, não
+  // é "pago". A tarifa bancária sai do caixa mas não liquida a obrigação, então é descontada.
+  const caixaSaida = cent(creditos(entries, CONTA.CAIXA_BANCO) - debitos(entries, CONTA.CAIXA_BANCO))
+  const pagoPagavel = cent(caixaSaida - debitos(entries, CONTA.TAXAS))
+
   const saldo = ehPagavel ? cent(pagavelCredito - pagavelDebito) : recebivelSaldo
-  const recebidoBruto = ehPagavel ? pagavelDebito : recebidoReceb
+  const recebidoBruto = ehPagavel ? pagoPagavel : recebidoReceb
   const ultimaSequenciaAplicada = entries.reduce((m, e) => Math.max(m, e.sequencia ?? 0), 0)
   return { saldo, recebidoBruto, recebidoLiquido, ultimaSequenciaAplicada }
 }
