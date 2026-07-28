@@ -6,10 +6,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { flagAtiva } from '@/lib/financeiro/flags'
 import { usuarioFlag } from '@/src/app/api/financeiro/v3/_flags'
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
 export async function GET(req: NextRequest) {
+  const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
   if (!flagAtiva('posicaoRead', await usuarioFlag(req))) return NextResponse.json({ disponivel: false, fallbackLegado: true }, { status: 409 })
   try {
     const take = Math.min(500, Math.max(1, Number(req.nextUrl.searchParams.get('take') ?? 200)))

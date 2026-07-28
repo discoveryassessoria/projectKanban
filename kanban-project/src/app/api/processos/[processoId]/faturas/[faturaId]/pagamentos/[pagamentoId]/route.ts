@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Decimal } from "@prisma/client/runtime/library"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 
 function toNumber(value: Decimal | number | null | undefined): number {
   if (value === null || value === undefined) return 0
@@ -15,6 +16,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ processoId: string; faturaId: string; pagamentoId: string }> }
 ) {
+  const erro = await verificarPermissao(request, 'financeiro.pagamento_editar'); if (erro) return erro
   try {
     const { processoId, faturaId, pagamentoId } = await params
     const body = await request.json()
@@ -132,6 +134,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ processoId: string; faturaId: string; pagamentoId: string }> }
 ) {
+  const erro = await verificarPermissao(request, 'financeiro.pagamento_excluir'); if (erro) return erro
   try {
     const { processoId, faturaId, pagamentoId } = await params
 

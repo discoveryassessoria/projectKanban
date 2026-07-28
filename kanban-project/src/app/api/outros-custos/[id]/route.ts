@@ -9,6 +9,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { verificarPermissaoCusto } from '@/lib/financeiro/permissoes-custo'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -45,7 +47,8 @@ function parseNumeroOuNull(valor: unknown): number | null {
 // GET
 // ---------------------------------------------------------------------------
 
-export async function GET(_req: NextRequest, ctx: RouteContext) {
+export async function GET(req: NextRequest, ctx: RouteContext) {
+  const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
   try {
     const { id } = await ctx.params
     const ocId = Number(id)
@@ -76,6 +79,8 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
 // ---------------------------------------------------------------------------
 
 export async function PUT(req: NextRequest, ctx: RouteContext) {
+  const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
+  const semCusto = await verificarPermissaoCusto(req, 'editar'); if (semCusto) return semCusto
   const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // F3: OutroCusto legado só-leitura quando bloqueado
   try {
     const { id } = await ctx.params
@@ -172,7 +177,9 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
 // DELETE
 // ---------------------------------------------------------------------------
 
-export async function DELETE(_req: NextRequest, ctx: RouteContext) {
+export async function DELETE(req: NextRequest, ctx: RouteContext) {
+  const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
+  const semCusto = await verificarPermissaoCusto(req, 'excluir'); if (semCusto) return semCusto
   const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // F3: OutroCusto legado só-leitura quando bloqueado
   try {
     const { id } = await ctx.params

@@ -12,6 +12,7 @@ import {
   formatZodError,
 } from "@/lib/financeiro/validacao";
 import { withRetry } from "@/lib/db-retry"; // 🆕
+import { verificarPermissao } from "@/src/lib/verificar-permissao";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -56,7 +57,8 @@ function gerarParcelas(opts: {
 // ============================================================
 // GET
 // ============================================================
-export async function GET(_req: NextRequest, ctx: RouteContext) {
+export async function GET(req: NextRequest, ctx: RouteContext) {
+  const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
   try {
     const id = await parseId(ctx);
     if (id == null) {
@@ -104,6 +106,7 @@ const CAMPOS_QUE_AFETAM_PARCELAS = [
 ] as const;
 
 export async function PATCH(req: NextRequest, ctx: RouteContext) {
+  const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
   const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // legado só-leitura após o corte
   try {
     const id = await parseId(ctx);
@@ -242,7 +245,8 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
 // ============================================================
 // DELETE — soft delete (marca cancelada=true)
 // ============================================================
-export async function DELETE(_req: NextRequest, ctx: RouteContext) {
+export async function DELETE(req: NextRequest, ctx: RouteContext) {
+  const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
   const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // legado só-leitura após o corte
   try {
     const id = await parseId(ctx);

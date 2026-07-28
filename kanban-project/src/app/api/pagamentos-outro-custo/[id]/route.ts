@@ -11,6 +11,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { verificarPermissaoCusto } from '@/lib/financeiro/permissoes-custo'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -48,6 +50,8 @@ function parseNumeroOuNull(valor: unknown): number | null {
 // ---------------------------------------------------------------------------
 
 export async function PUT(req: NextRequest, ctx: RouteContext) {
+  const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
+  const semCusto = await verificarPermissaoCusto(req, 'pagar'); if (semCusto) return semCusto
   const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // F3: pagamento de OutroCusto legado só-leitura quando bloqueado
   try {
     const { id } = await ctx.params
@@ -121,7 +125,9 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
 // DELETE
 // ---------------------------------------------------------------------------
 
-export async function DELETE(_req: NextRequest, ctx: RouteContext) {
+export async function DELETE(req: NextRequest, ctx: RouteContext) {
+  const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
+  const semCusto = await verificarPermissaoCusto(req, 'estornar'); if (semCusto) return semCusto
   const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // F3: pagamento de OutroCusto legado só-leitura quando bloqueado
   try {
     const { id } = await ctx.params

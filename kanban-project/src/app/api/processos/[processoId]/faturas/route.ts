@@ -33,6 +33,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ processoId: string }> }
 ) {
+  const erro = await verificarPermissao(request, 'financeiro.ver'); if (erro) return erro
   try {
     const { processoId } = await params
     const processoIdNum = parseInt(processoId)

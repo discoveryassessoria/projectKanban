@@ -11,6 +11,7 @@ import { prisma } from '@/lib/prisma'
 import { withRetry } from '@/lib/db-retry'
 import { origemOperacionalDoLancamento } from '@/lib/financeiro/supressao-motor'
 import { rotularPhaseKey } from '@/lib/financeiro/apresentacao-lancamento'
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -76,7 +77,8 @@ function montarComposicao(r: {
   return null
 }
 
-export async function GET(_req: NextRequest, ctx: RouteContext) {
+export async function GET(req: NextRequest, ctx: RouteContext) {
+  const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
   try {
     const { id: idStr } = await ctx.params
     const id = Number(idStr)

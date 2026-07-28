@@ -11,6 +11,9 @@ import { listarObrigacoes } from '@/lib/financeiro/leitura/consultas'
 let ok = 0, fail = 0
 const chk = (c: boolean, m: string) => { if (c) { ok++; console.log('  ✅', m) } else { fail++; console.log('  ❌', m) } }
 const D = `9${Date.now().toString().slice(-13)}`.padStart(14, '9').slice(0, 14)
+// 2º CNPJ SEMPRE distinto do 1º (antes usava o dígito fixo '8' e colidia com D quando o
+// último dígito do timestamp era 8 → dedup devolvia o MESMO fornecedor e o teste falhava 1x a cada 10).
+const D2 = `${D.slice(0, 13)}${(Number(D[13]) + 1) % 10}`
 
 async function limparObr(id: number) {
   await prisma.logAuditoria.deleteMany({ where: { entidade: 'ObrigacaoEconomica', entidadeId: id } }).catch(() => {})
@@ -26,7 +29,7 @@ async function limparObr(id: number) {
 async function main() {
   const PROC = 16
   const fA = await criarFornecedor({ nome: 'Cartório A', tipo: 'PJ', cpfCnpj: D })
-  const fB = await criarFornecedor({ nome: 'Tradutor B', tipo: 'PJ', cpfCnpj: `${D.slice(0,13)}8` })
+  const fB = await criarFornecedor({ nome: 'Tradutor B', tipo: 'PJ', cpfCnpj: D2 })
   const { obrigacaoId } = await criarObrigacaoEconomicaComLedger({ natureza: 'CUSTO', valorContratado: 400, moedaContratual: 'BRL', processoId: PROC, criadoPorId: 1, fornecedorId: fA!.id, observacoes: 'Custo base' })
   const ref = String(obrigacaoId)
 

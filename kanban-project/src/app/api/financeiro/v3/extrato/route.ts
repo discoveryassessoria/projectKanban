@@ -5,8 +5,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { flagAtiva } from '@/lib/financeiro/flags'
 import { usuarioFlag } from '@/src/app/api/financeiro/v3/_flags'
 import { listarExtratoLedger } from '@/lib/financeiro/leitura/extrato-ledger'
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 export async function GET(req: NextRequest) {
+  const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
   if (!flagAtiva('posicaoRead', await usuarioFlag(req))) return NextResponse.json({ disponivel: false, fallbackLegado: true }, { status: 409 })
   const processoId = Number(req.nextUrl.searchParams.get('processoId'))
   if (!processoId) return NextResponse.json({ erro: 'processoId inválido' }, { status: 400 })

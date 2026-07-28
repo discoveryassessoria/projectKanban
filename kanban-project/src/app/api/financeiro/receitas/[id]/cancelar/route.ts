@@ -9,8 +9,10 @@ import { cancelarLancamento } from '@/lib/financeiro/cancelamento-estorno'
 import { origemOperacionalDoLancamento, suprimirOrigem } from '@/lib/financeiro/supressao-motor'
 import { prisma } from '@/lib/prisma'
 import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
   const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // legado só-leitura após o corte
   try {
     const { id: idStr } = await ctx.params

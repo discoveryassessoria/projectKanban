@@ -3,8 +3,10 @@
 // rastreabilidade, origem, cancelamento, estorno e vínculo inverso.
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 export async function GET(req: NextRequest) {
+  const erro = await verificarPermissao(req, 'financeiro.ver'); if (erro) return erro
   try {
     const { searchParams } = new URL(req.url)
     const tipo = searchParams.get('tipo')
