@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -51,6 +52,7 @@ const FORMAS_VALIDAS = [
 // ---------------------------------------------------------------------------
 
 export async function POST(req: NextRequest, ctx: RouteContext) {
+  const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // F3: pagamento de OutroCusto legado só-leitura quando bloqueado
   try {
     const { id } = await ctx.params
     const outroCustoId = Number(id)

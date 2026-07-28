@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -75,6 +76,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
 // ---------------------------------------------------------------------------
 
 export async function PUT(req: NextRequest, ctx: RouteContext) {
+  const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // F3: OutroCusto legado só-leitura quando bloqueado
   try {
     const { id } = await ctx.params
     const ocId = Number(id)
@@ -171,6 +173,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
 // ---------------------------------------------------------------------------
 
 export async function DELETE(_req: NextRequest, ctx: RouteContext) {
+  const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // F3: OutroCusto legado só-leitura quando bloqueado
   try {
     const { id } = await ctx.params
     const ocId = Number(id)

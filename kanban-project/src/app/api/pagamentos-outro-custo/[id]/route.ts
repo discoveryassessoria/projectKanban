@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { guardLegadoEscrita } from '@/lib/financeiro/legado-guard'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -47,6 +48,7 @@ function parseNumeroOuNull(valor: unknown): number | null {
 // ---------------------------------------------------------------------------
 
 export async function PUT(req: NextRequest, ctx: RouteContext) {
+  const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // F3: pagamento de OutroCusto legado só-leitura quando bloqueado
   try {
     const { id } = await ctx.params
     const pagamentoId = Number(id)
@@ -120,6 +122,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
 // ---------------------------------------------------------------------------
 
 export async function DELETE(_req: NextRequest, ctx: RouteContext) {
+  const __bloqLegado = guardLegadoEscrita(); if (__bloqLegado) return __bloqLegado; // F3: pagamento de OutroCusto legado só-leitura quando bloqueado
   try {
     const { id } = await ctx.params
     const pagamentoId = Number(id)
