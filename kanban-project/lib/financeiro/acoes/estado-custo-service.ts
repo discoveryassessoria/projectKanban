@@ -8,7 +8,9 @@
 // Transição inválida = no-op seguro (nunca quebra a mutação financeira).
 // ============================================================================
 import type { Prisma } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import { transicionarEstadoCusto, ROTULO_ESTADO_CUSTO, ehEstadoCusto, type EstadoCusto } from '../dominio/estado-custo'
+import { resolverId } from '../leitura/receita-detalhe'
 
 type Tx = Prisma.TransactionClient
 
@@ -30,4 +32,24 @@ export async function aplicarTransicaoEstadoCustoTx(
     usuarioId: ctx.usuarioId ?? null,
   } }).catch(() => {})
   return { aplicada: true, de, para: novoEstado }
+}
+
+/**
+ * F4.3 — Ação manual de mudança de estado do custo (Aprovar/Contratar/Executar…).
+ * Resolve a referência, valida a transição pela máquina de estados e aplica de forma
+ * transacional e auditada. Retorna erro compreensível em transição inválida (não lança).
+ */
+export async function mudarEstadoCusto(
+  ref: string, novoEstado: EstadoCusto,
+  ctx: { motivo?: string | null; usuarioId?: number | null } = {},
+): Promise<{ ok: boolean; de: EstadoCusto | null; para: EstadoCusto; erro?: string }> {
+  const obrigacaoId = await resolverId(ref)
+  if (!obrigacaoId) return { ok: false, de: null, para: novoEstado, erro: 'Custo não encontrado.' }
+  const obr = await prisma.obrigacaoEconomica.findUnique({ where: { id: obrigacaoId }, select: { natureza: true, estadoCusto: true } })
+  if (!obr || obr.natureza !== 'CUSTO' || !ehEstadoCusto(obr.estadoCusto)) return { ok: false, de: null, para: novoEstado, erro: 'Registro não é um custo com estado de negócio.' }
+  const de = obr.estadoCusto
+  const t = transicionarEstadoCusto(de, novoEstado)
+  if (!t.ok) return { ok: false, de, para: novoEstado, erro: t.erro }
+  await prisma.$transaction(async (tx) => { await aplicarTransicaoEstadoCustoTx(tx, obrigacaoId, novoEstado, ctx) })
+  return { ok: true, de, para: novoEstado }
 }

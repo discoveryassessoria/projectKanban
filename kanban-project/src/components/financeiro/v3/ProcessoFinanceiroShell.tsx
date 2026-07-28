@@ -17,6 +17,18 @@ import { VisaoGeral } from "@/src/components/financeiro/subabas/VisaoGeral"
 import { FileText, FileMinus, CheckSquare, CalendarDays, AlertTriangle, Plus, Eye, Layers, ChevronLeft, ChevronRight, ChevronDown, ArrowDownRight, ArrowUpRight, RefreshCw, SlidersHorizontal, Download, Search, Wallet, BarChart3, Settings, RotateCcw } from "lucide-react"
 
 import { ValorBrl, AvisoNaoConvertido, semCotacao } from "./ValorBrl"
+import { ROTULO_ESTADO_CUSTO } from "@/lib/financeiro/dominio/estado-custo"
+
+// F4.3 — cor semântica do estado de negócio do custo (badge; SÓ ícone/badge tem cor, kit DS).
+const COR_ESTADO_CUSTO: Record<string, string> = {
+  PREVISTO: "var(--text-muted)", APROVADO: "var(--info)", CONTRATADO: "var(--text-secondary)",
+  EXECUTADO: "var(--info)", PAGO: "var(--success)", CONCILIADO: "var(--success)",
+  CANCELADO_PARCIAL: "var(--warning)", CANCELADO: "var(--danger)", ARQUIVADO: "var(--text-muted)",
+}
+function EstadoCustoBadge({ estado }: { estado: string }) {
+  const cor = COR_ESTADO_CUSTO[estado] ?? "var(--text-secondary)"
+  return <span className="rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-semibold" style={{ background: `color-mix(in srgb, ${cor} 16%, transparent)`, color: cor }}>{ROTULO_ESTADO_CUSTO[estado as keyof typeof ROTULO_ESTADO_CUSTO] ?? estado}</span>
+}
 
 const fmt = (v: number, m = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency: m }).format(v || 0)
 const dataBR = (s?: string | null) => s ? new Date(s).toLocaleDateString("pt-BR") : "—"
@@ -67,6 +79,16 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
   const [pagar, setPagar] = useState<any | null>(null)
   const [sub, setSub] = useState<"todos" | "pagos" | "apagar">("todos")
   const carregar = () => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}&natureza=CUSTO`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }
+  // F4.3 — avança o estado de negócio do custo (Aprovar/Contratar/Executar) via ação server-side.
+  const mudarEstado = async (obrigacaoId: number, estado: string) => {
+    try {
+      const r = await fetch(`/api/financeiro/v3/obrigacoes/${obrigacaoId}/estado`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ estado }) }).then((x) => x.json())
+      if (!r?.ok) { alert(r?.erro ?? "Não foi possível mudar o estado."); return }
+      carregar()
+    } catch { alert("Falha ao mudar o estado.") }
+  }
+  // próxima ação de avanço contextual (null quando não há avanço manual disponível).
+  const proximoAvanco: Record<string, { estado: string; label: string }> = { PREVISTO: { estado: "APROVADO", label: "Aprovar" }, APROVADO: { estado: "CONTRATADO", label: "Contratar" }, CONTRATADO: { estado: "EXECUTADO", label: "Marcar executado" } }
   // Cancelamento (com motivo auditável) mora no Detalhe único da Obrigação — paridade
   // com Receita, sem duplicar lógica nem cancelar sem justificativa a partir da lista.
   useEffect(() => { carregar() }, [processoId])
@@ -136,8 +158,8 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
                   <td className="px-5"><span className="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[11px] text-[var(--text-secondary)]" style={{ background: "var(--surface-active)" }}>{o.moeda}</span></td>
                   <td className="px-5 text-[var(--text-secondary)]">{o.vencimento ? dataBR(o.vencimento) : "—"}</td>
                   <td className="px-5"><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full" style={{ background: "var(--surface-active)" }}><span className="block h-full rounded-full" style={{ background: "var(--success)", width: `${prog}%` }} /></div><span className="text-[11px] text-[var(--text-muted)]">{prog}%</span></div></td>
-                  <td className="px-5">{quit ? <span className="rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-semibold" style={{ background: "color-mix(in srgb, var(--success) 16%, transparent)", color: "var(--success)" }}>Pago</span> : <span className="rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-semibold" style={{ background: "color-mix(in srgb, var(--warning) 16%, transparent)", color: "var(--warning)" }}>A pagar</span>}</td>
-                  <td className="px-5"><div className="flex items-center gap-2"><button onClick={() => onAbrirDetalhe?.(o.obrigacaoId)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-active)]"><Eye className="h-3.5 w-3.5" /> Abrir</button>{!quit && <button onClick={() => setPagar(o)} className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90" style={{ background: "var(--success)" }}>Pagar</button>}</div></td>
+                  <td className="px-5">{o.estadoCusto ? <EstadoCustoBadge estado={o.estadoCusto} /> : (quit ? <span className="rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-semibold" style={{ background: "color-mix(in srgb, var(--success) 16%, transparent)", color: "var(--success)" }}>Pago</span> : <span className="rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-semibold" style={{ background: "color-mix(in srgb, var(--warning) 16%, transparent)", color: "var(--warning)" }}>A pagar</span>)}</td>
+                  <td className="px-5"><div className="flex items-center gap-2"><button onClick={() => onAbrirDetalhe?.(o.obrigacaoId)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-active)]"><Eye className="h-3.5 w-3.5" /> Abrir</button>{o.estadoCusto && proximoAvanco[o.estadoCusto] && <button onClick={() => mudarEstado(o.obrigacaoId, proximoAvanco[o.estadoCusto].estado)} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-active)]">{proximoAvanco[o.estadoCusto].label}</button>}{!quit && <button onClick={() => setPagar(o)} className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90" style={{ background: "var(--success)" }}>Pagar</button>}</div></td>
                 </tr>
               )
             })}{lista.length === 0 && <tr><td colSpan={9} className="px-5 py-8 text-center text-[var(--text-muted)]">Nenhum custo neste processo.</td></tr>}</tbody>
