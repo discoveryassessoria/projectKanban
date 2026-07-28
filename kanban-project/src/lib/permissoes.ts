@@ -304,10 +304,12 @@ export const PERFIS_PADRAO = [
       'financeiro.coluna_editar': false,
       'financeiro.coluna_excluir': false,
       'financeiro.custos_editar': false,
-      // Sem operar Contas a Pagar (coerente com "sem gerenciar financeiro"): o Assistente VÊ,
-      // mas não cria/aprova/paga/concilia custo. Antes herdava as 10 chaves de TODAS_PERMISSOES.
-      'financeiro.custo_criar': false,
-      'financeiro.custo_editar': false,
+      // MATRIZ DE CUSTOS (homologação): o Assistente ORIGINA o custo (cria, corrige e
+      // arquiva) mas não decide nem movimenta dinheiro — aprovar/reprovar/cancelar/pagar/
+      // estornar/conciliar/excluir ficam com Gerente e Administrador.
+      'financeiro.custo_criar': true,
+      'financeiro.custo_editar': true,
+      'financeiro.custo_arquivar': true,
       'financeiro.custo_aprovar': false,
       'financeiro.custo_reprovar': false,
       'financeiro.custo_cancelar': false,
@@ -315,7 +317,6 @@ export const PERFIS_PADRAO = [
       'financeiro.custo_estornar': false,
       'financeiro.custo_conciliar': false,
       'financeiro.custo_excluir': false,
-      'financeiro.custo_arquivar': false,
       // Sem admin
       'usuarios.gerenciar': false,
     },

@@ -39,8 +39,10 @@ async function main() {
   // (5) PERFIS PADRÃO — segregação real
   const assistente = PERFIS_PADRAO.find((p) => p.nome === 'Assistente')!
   const efetivasAssistente = calcularPermissoes('operador', assistente.permissoes)
-  chk(OPERACOES_CUSTO.every((op) => efetivasAssistente[CHAVE_CUSTO[op]] === false),
-    'Assistente NÃO opera Contas a Pagar (coerente com a descrição do perfil)')
+  // MATRIZ homologada: Assistente ORIGINA (criar/editar/arquivar) e nada mais.
+  const ASSISTENTE_PODE = new Set(['criar', 'editar', 'arquivar'])
+  chk(OPERACOES_CUSTO.every((op) => efetivasAssistente[CHAVE_CUSTO[op]] === ASSISTENTE_PODE.has(op)),
+    'Assistente segue a matriz: cria/edita/arquiva, não aprova nem movimenta dinheiro')
   chk(efetivasAssistente['financeiro.ver'] === true, 'Assistente continua VENDO o financeiro')
 
   const gerente = PERFIS_PADRAO.find((p) => p.nome === 'Gerente')!
