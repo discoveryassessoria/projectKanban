@@ -84,25 +84,38 @@ try {
   let corte = null
   try { corte = JSON.parse(fs.readFileSync(ARQUIVO_CORTE, 'utf8')) } catch { /* sem corte deste build */ }
 
-  if (!corte) {
-    console.log('  (sem registro de corte neste build — validando o inventário inteiro em modo informativo)')
+  // Toda migration registrada como aplicada tem de estar refletida no schema —
+  // EXCETO as lacunas conhecidas do prefixo baselinado (passos históricos que um
+  // schema nascido de push nunca reproduz, e CHECK/EXCLUDE que o Prisma não
+  // modela). Essas são listadas, não derrubam o build.
+  const lacunaConhecida = new Map((corte?.lacunasDoPrefixo ?? []).map((l) => [l.migration, l.falhas]))
+  if (corte) {
+    console.log(`  corte: após ${corte.corte} · ${corte.baselinadas.length} baselinadas · ${corte.aAplicar.length} aplicadas pelo deploy neste build`)
   } else {
-    console.log(`  corte: após ${corte.corte} · ${corte.baselinadas.length} baselinadas · ${corte.aAplicar.length} aplicadas pelo deploy`)
-    for (const nome of corte.aAplicar) {
-      const r = classificarMigration(sqlDaMigration(DIR, nome), existe)
-      if (r.estado === 'REFLETIDA') passar(`${nome} (${r.ok}/${r.total})`)
-      else if (r.estado === 'INDETERMINADA') passar(`${nome} (sem DDL verificável — aplicada segundo o histórico)`)
-      else {
-        falhar(`${nome} aplicada mas NÃO refletida (${r.ok}/${r.total})`)
-        for (const f of r.falhas) console.error(`      · falta ${f}`)
-      }
-    }
-    if (corte.lacunasDoPrefixo?.length) {
-      console.log('\n  LACUNAS CONHECIDAS do prefixo baselinado (informativo — não derrubam o build):')
-      for (const l of corte.lacunasDoPrefixo) {
-        console.log(`   · ${l.migration}: ${l.falhas.join('; ')}`)
-      }
-    }
+    console.log('  (sem registro de corte neste build — toda divergência será tratada como erro)')
+  }
+
+  const aplicadas = migrations.filter((m) => porNome.has(m))
+  const conhecidas = []
+  let refletidas = 0
+  let indeterminadas = 0
+  for (const nome of aplicadas) {
+    const r = classificarMigration(sqlDaMigration(DIR, nome), existe)
+    if (r.estado === 'REFLETIDA') { refletidas++; continue }
+    if (r.estado === 'INDETERMINADA') { indeterminadas++; continue }
+    if (lacunaConhecida.has(nome)) { conhecidas.push(`${nome}: ${r.falhas.join('; ')}`); continue }
+    falhar(`${nome} registrada como aplicada mas NÃO refletida (${r.ok}/${r.total})`)
+    for (const f of r.falhas) console.error(`      · falta ${f}`)
+  }
+  passar(`${refletidas} migrations integralmente refletidas · ${indeterminadas} sem DDL verificável`)
+  if (corte?.aAplicar?.length) {
+    const naoRefletida = corte.aAplicar.filter((n) => classificarMigration(sqlDaMigration(DIR, n), existe).estado === 'PENDENTE')
+    if (naoRefletida.length) falhar(`aplicadas neste build mas não refletidas: ${naoRefletida.join(', ')}`)
+    else passar(`as ${corte.aAplicar.length} aplicadas neste build estão refletidas`)
+  }
+  if (conhecidas.length) {
+    console.log(`\n  LACUNAS CONHECIDAS do prefixo baselinado (${conhecidas.length}) — informativo:`)
+    for (const l of conhecidas) console.log(`   · ${l}`)
   }
 
   // ── 3) Prisma Client × schema ──────────────────────────────────────────────
