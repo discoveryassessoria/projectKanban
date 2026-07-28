@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { cotacoesVivas, computeCambioAging, labelServico } from './cambio-aging'
 import { ratearBrlPorBase } from '@/lib/financeiro/dominio/cambio'
 import { parcelasPagaveisComStatus } from '@/lib/financeiro/pagavel/cronograma-pagavel'
+import { repassesDoCusto } from '@/lib/financeiro/pagavel/repasse'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
@@ -66,6 +67,8 @@ export interface ReceitaDetalhe {
   documentos: { id: number; nome: string; tipo: string | null; url: string; tamanho: number | null; criadoEm: string }[]
   // F5 — cronograma de pagáveis (só custo/A_PAGAR); status derivado do Ledger. Vazio p/ receita.
   cronogramaPagavel: { id: number; numero: number; vencimento: string; valor: number; moeda: string; status: string }[]
+  // F5 — repasses/reembolsos vinculados (só custo). Vínculo auditável custo→cobrança.
+  repasses: { id: number; tipo: string; valor: number; percentual: number | null; receitaObrigacaoId: number | null; status: string; motivo: string | null; criadoEm: string }[]
   faturaEmitida: boolean
   fatura: { id: number; descricao: string; status: string; valor: number; url: string | null } | null
   cobrancas: { id: number; status: string; valorTotal: number; moeda: string; enviadaEm: string | null }[]
@@ -198,6 +201,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     .catch(() => [] as { id: number; nome: string; tipo: string | null; url: string; tamanho: number | null; criadoEm: string }[])
   // F5 — cronograma de pagáveis (só custo/A_PAGAR); status derivado do Ledger. Vazio p/ receita.
   const cronogramaPagavel = obr.direcao === 'A_PAGAR' ? await parcelasPagaveisComStatus(obr.id).catch(() => []) : []
+  const repasses = obr.direcao === 'A_PAGAR' ? await repassesDoCusto(obr.id).catch(() => []) : []
   // Fatura vinculada à Receita (Fase C) — resiliente durante rollout (null se indisponível)
   const faturaRow = obr.origemTipo === 'Receita' && obr.origemId
     ? await prisma.fatura.findFirst({ where: { receitaId: obr.origemId }, orderBy: { createdAt: 'desc' } }).catch(() => null)
@@ -337,7 +341,7 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
     responsaveis: responsaveisSet, pagadores: [...pagadoresAgg.entries()].map(([nome, valor]) => ({ nome, valor })),
     observacao: obr.observacoes ?? null,
     documentos,
-    cronogramaPagavel,
+    cronogramaPagavel, repasses,
     faturaEmitida, fatura,
     cobrancas, cobrancaEnviada,
   }

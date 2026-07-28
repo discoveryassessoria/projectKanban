@@ -22,6 +22,7 @@ import EditarReceitaView from "@/src/components/financeiro/v3/EditarReceitaView"
 import CancelamentoAvancadoModal from "@/src/components/financeiro/v3/CancelamentoAvancadoModal"
 import DuplicarReceitaModal from "@/src/components/financeiro/v3/DuplicarReceitaModal"
 import { CronogramaPagavelPanel } from "@/src/components/financeiro/v3/CronogramaPagavelPanel"
+import { RepassePanel } from "@/src/components/financeiro/v3/RepassePanel"
 import ExcluirReceitaModal from "@/src/components/financeiro/v3/ExcluirReceitaModal"
 import ParticipanteContaView from "@/src/components/financeiro/v3/ParticipanteContaView"
 import { NovaFaturaModal } from "@/src/components/kanban/NovaFaturaModal"
@@ -256,6 +257,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
     ["participantes", "Participantes Financeiros", Users, d.participantesCount ?? participantes.length],
     ["pagamentos", "Pagamentos", Wallet, (d.pagamentos ?? []).length],
     ["documentos", "Documentos", FileCheck, documentos.length],
+    ...((isCusto ? [["repasses", "Repasses", ArrowLeftRight, (d.repasses ?? []).filter((r: { status: string }) => r.status !== "CANCELADO").length]] : []) as [string, string, any, number][]),
     ["timeline", "Timeline", Clock, 0],
     ["observacoes", "Observações", StickyNote, 0],
   ]
@@ -541,6 +543,11 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
           {/* F5 — Cronograma de pagáveis (custo): aba "Parcelas" */}
           {tab === "cobrancas" && isCusto && (
             <CronogramaPagavelPanel obrigacaoId={d.obrigacaoId} parcelas={d.cronogramaPagavel ?? []} valorContratado={d.valorContratado} moeda={d.moeda} onChange={() => carregar()} />
+          )}
+
+          {/* F5 — Repasses/reembolsos (custo) */}
+          {tab === "repasses" && isCusto && (
+            <RepassePanel obrigacaoId={d.obrigacaoId} repasses={d.repasses ?? []} onChange={() => carregar()} />
           )}
 
           {/* Cobranças (parcelas) — receita */}
