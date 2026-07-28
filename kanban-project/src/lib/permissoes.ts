@@ -44,6 +44,18 @@ export const PERMISSOES = {
   'financeiro.coluna_editar': 'Editar nome de coluna',
   'financeiro.coluna_excluir': 'Excluir coluna da planilha',
   'financeiro.custos_editar': 'Editar valores e reordenar planilha',
+  // F6 — Segregação de permissões de CUSTO (Contas a Pagar V3). Criar ≠ Aprovar ≠ Pagar ≠
+  // Conciliar. Enforcement server-side; retrocompat via financeiro.ver durante a migração.
+  'financeiro.custo_criar': 'Criar custo (Contas a Pagar)',
+  'financeiro.custo_editar': 'Editar custo (descrição/valor/fornecedor/cronograma/repasse)',
+  'financeiro.custo_aprovar': 'Aprovar custo',
+  'financeiro.custo_reprovar': 'Reprovar custo',
+  'financeiro.custo_cancelar': 'Cancelar custo',
+  'financeiro.custo_pagar': 'Pagar custo (registrar pagamento)',
+  'financeiro.custo_estornar': 'Estornar pagamento de custo',
+  'financeiro.custo_conciliar': 'Conciliar custo',
+  'financeiro.custo_excluir': 'Excluir custo (exclusão lógica)',
+  'financeiro.custo_arquivar': 'Arquivar/desarquivar custo',
 
   // Mensagens
   'mensagens.ver': 'Ver mensagens de clientes',
