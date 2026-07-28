@@ -70,7 +70,7 @@ export async function recomputarProjecao(tx: Tx, obrigacaoId: number): Promise<v
  * lançamento OBRIGACAO_CRIADA balanceado; emite evento no Outbox. Idempotente
  * por (origemTipo, origemId): reprocessar NÃO duplica.
  */
-export async function criarObrigacaoEconomicaComLedger(input: {
+export interface CriarObrigacaoInput {
   natureza: Natureza
   valorContratado: number
   moedaContratual?: string
@@ -88,12 +88,22 @@ export async function criarObrigacaoEconomicaComLedger(input: {
   origemId?: number | null
   criadoPorId?: number | null
   db?: PrismaClient
-}): Promise<{ obrigacaoId: number; reaproveitada: boolean }> {
+}
+
+export async function criarObrigacaoEconomicaComLedger(input: CriarObrigacaoInput): Promise<{ obrigacaoId: number; reaproveitada: boolean }> {
   const client = input.db ?? prisma
+  return client.$transaction((tx) => criarObrigacaoEconomicaComLedgerTx(tx, input))
+}
+
+/**
+ * Cria a obrigação + Ledger DENTRO de uma transação já aberta. Usado pelo motor de
+ * fase V3-native para criar Custo diretamente no V3, na mesma transação do MotorArtefato
+ * (idempotência/rollback atômicos). Mesma lógica de criarObrigacaoEconomicaComLedger.
+ */
+export async function criarObrigacaoEconomicaComLedgerTx(tx: Tx, input: CriarObrigacaoInput): Promise<{ obrigacaoId: number; reaproveitada: boolean }> {
   const moeda = (input.moedaContratual ?? 'BRL') as any
   const dir = direcaoDe(input.natureza)
-
-  return client.$transaction(async (tx) => {
+  {
     // idempotência pela origem
     if (input.origemTipo && input.origemId != null) {
       const existente = await tx.obrigacaoEconomica.findUnique({ where: { origemTipo_origemId: { origemTipo: input.origemTipo, origemId: input.origemId } } })
@@ -131,5 +141,22 @@ export async function criarObrigacaoEconomicaComLedger(input: {
     } }).catch(() => { /* já emitido (chave única) — idempotente */ })
 
     return { obrigacaoId: obr.id, reaproveitada: false }
-  })
+  }
+}
+
+/**
+ * Remove uma obrigação ÓRFÃ do motor (reconciliação: regra/config deixou de aplicar),
+ * DENTRO de uma transação. LANÇA se houver pagamento (recebido>0) — o catch da
+ * reconciliação preserva o lançamento (mesma semântica do FK RESTRICT do Custo legado).
+ * Filhos removidos em ordem de FK; o Ledger histórico só é apagado quando não há pagamento.
+ */
+export async function removerObrigacaoOrfaTx(tx: Tx, obrigacaoId: number): Promise<void> {
+  const proj = await tx.saldoProjecao.findUnique({ where: { obrigacaoId }, select: { recebidoBruto: true } })
+  if (proj && Number(proj.recebidoBruto) > 0.005) throw new Error(`obrigação ${obrigacaoId} tem pagamento — reconciliação não remove`)
+  await tx.ledgerEntry.deleteMany({ where: { obrigacaoId } })
+  await tx.ocorrenciaFinanceira.deleteMany({ where: { obrigacaoId } })
+  await tx.saldoProjecao.deleteMany({ where: { obrigacaoId } })
+  await tx.ledgerFinanceiro.deleteMany({ where: { obrigacaoId } })
+  await tx.domainOutbox.deleteMany({ where: { aggregateType: 'ObrigacaoEconomica', aggregateId: obrigacaoId } })
+  await tx.obrigacaoEconomica.delete({ where: { id: obrigacaoId } })
 }

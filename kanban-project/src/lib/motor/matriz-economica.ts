@@ -23,6 +23,7 @@ import {
 } from '@prisma/client'
 import { gerarCodigoReceita, gerarCodigoCusto } from '@/lib/financeiro/codigos'
 import { aplicarCondicaoPagamento } from '@/lib/financeiro/aplicar-condicao'
+import { criarObrigacaoEconomicaComLedger, removerObrigacaoOrfaTx } from '@/lib/financeiro/ledger/ledger-service'
 // LOTE A · B4 — trava de estado civil (reusa a MESMA engine da árvore, não recria)
 import { analyzePessoa } from '@/src/lib/document-generator'
 // LOTE A · B3 — preço hierárquico (arquivo separado, testável isolado)
@@ -189,7 +190,7 @@ export async function gerarEconomicoDaMatriz(
               // Conta Contábil de CUSTO ao gerar CUSTO (fallback: conta legada única).
               const contaCustoId = prodCusto.planoContaCustoId ?? prodCusto.planoContaId ?? null
               const cong = congelar(rC, NaturezaPreco.CUSTO, prodCusto.id, regra.id, chave, { tipoProcessoId, phaseKey, phaseCycle, contaContabilId: contaCustoId })
-              await comIdempotencia(chave, processoId, tipoProcessoId, phaseKey, 'financial', regra.id, 'Custo', desc,
+              await comIdempotencia(chave, processoId, tipoProcessoId, phaseKey, 'financial', regra.id, 'ObrigacaoEconomica', desc,
                 () => criarCusto(processoId, desc, cong, { ...vinc, productServiceId: prodCusto.id }),
                 (id) => { item.custoId = id; item.custo = { valor: cong.valor, moeda: cong.moeda } }, pulados, erros)
               // §13 — se havia pendência para esta chave, o reprocesso bem-sucedido a resolve.
@@ -251,8 +252,9 @@ export async function reconciliarEconomicoDaFase(
     try {
       await prisma.$transaction(async (tx) => {
         if (a.targetId) {
-          if (a.targetTable === 'Custo') await tx.custo.delete({ where: { id: a.targetId } })
+          if (a.targetTable === 'Custo') await tx.custo.delete({ where: { id: a.targetId } }) // legado histórico
           else if (a.targetTable === 'Receita') await tx.receita.delete({ where: { id: a.targetId } })
+          else if (a.targetTable === 'ObrigacaoEconomica') await removerObrigacaoOrfaTx(tx, a.targetId) // V3-native (guarda-se-paga)
         }
         await tx.motorArtefato.update({ where: { id: a.id }, data: { status: 'removed' } })
       }, { timeout: 30000, maxWait: 10000 })
@@ -385,30 +387,19 @@ async function registrarPendencia(
 async function criarCusto(pid: number, descricao: string, c: Congelado, v: Vinc): Promise<number> {
   const codigo = await gerarCodigoCusto()
   const dataBase = new Date()
-  const ap = await aplicarCondicaoPagamento({
-    configId: c.configId, natureza: 'CUSTO', moeda: String(c.moeda), valor: Number(c.valor), dataBase,
+  // condição → vencimento (data1); parcelas eram do legado. Rastreabilidade do documento
+  // (a granularidade da Matriz é por documento) preservada em observacoes; a distinção por
+  // documento continua garantida pela automaticKey do MotorArtefato (…::doc:<id>).
+  const ap = await aplicarCondicaoPagamento({ configId: c.configId, natureza: 'CUSTO', moeda: String(c.moeda), valor: Number(c.valor), dataBase })
+  const docRef = v.documentoId ? ` · doc#${v.documentoId}` : ''
+  const observacoes = `Custo do motor (Matriz)${docRef}: ${descricao}`.slice(0, 300)
+  // V3-native: nasce DIRETO como ObrigacaoEconomica + Ledger. NÃO grava no model Custo legado.
+  const { obrigacaoId } = await criarObrigacaoEconomicaComLedger({
+    natureza: 'CUSTO', valorContratado: Number(c.valor), moedaContratual: String(c.moeda), codigoOperacional: codigo,
+    processoId: pid, regraFinanceiraId: c.regraFinanceiraId ?? null, vencimento: ap.data1, observacoes,
+    origemTipo: 'nativo', origemId: null, criadoPorId: null,
   })
-  const parcelas = ap.parcelas
-  const vencimento = ap.data1
-  const row = await prisma.custo.create({
-    data: {
-      codigo, processoId: pid, tipo: TipoCusto.SERVICO, categoria: CategoriaCusto.OUTROS,
-      descricao: descricao.slice(0, 300), moeda: c.moeda, valor: c.valor,
-      fxEstimado: 1, fxRule: FxRule.VARIAVEL, nParcelas: ap.campos.nParcelas, vencimento, custoOperacional: false, status: CustoStatus.ATIVA,
-      condicaoPagamentoId: ap.campos.condicaoPagamentoId, condicaoVersao: ap.campos.condicaoVersao, condicaoCodigo: ap.campos.condicaoCodigo,
-      valorBruto: ap.campos.valorBruto, valorTaxas: ap.campos.valorTaxas, valorLiquido: ap.campos.valorLiquido,
-      memoriaCalculo: (ap.campos.memoriaCalculo ?? undefined) as Prisma.InputJsonValue | undefined,
-      personId: v.personId, documentoId: v.documentoId, tipoServicoId: v.tipoServicoId,
-      phaseKey: v.phaseKey, phaseCycle: v.phaseCycle, productServiceId: v.productServiceId, origem: 'motor',
-      // §6/§8 — preço CONGELADO + rastreabilidade
-      pricingRuleId: c.tabelaValorId, valorUnitario: c.valorUnitario, quantidade: c.quantidade, valorTotalCongelado: c.valor,
-      modoCalculoAplicado: c.modoCalculo, naturezaPreco: c.natureza, configFinanceiraId: c.configId,
-      regraFinanceiraId: c.regraFinanceiraId, contextoAplicado: c.contexto, dataReferencia: c.dataReferencia, chaveIdempotencia: c.chaveIdempotencia,
-      parcelas: { create: parcelas },
-      eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Custo criado pelo motor (Matriz): ${descricao}`.slice(0, 500), valor: c.valor } },
-    },
-  })
-  return row.id
+  return obrigacaoId
 }
 
 async function criarReceita(pid: number, descricao: string, c: Congelado, v: Vinc): Promise<number> {

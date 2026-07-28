@@ -23,6 +23,7 @@ import { ordenarRequerentes, classificarRequerente, valorDoRequerente, chaveIdem
 // Cronograma OFICIAL: a Condição de Pagamento decide entrada, quantidade,
 // periodicidade e vencimentos. O motor consome o plano pronto.
 import { aplicarCondicaoPagamento } from '@/lib/financeiro/aplicar-condicao'
+import { criarObrigacaoEconomicaComLedgerTx, removerObrigacaoOrfaTx } from '@/lib/financeiro/ledger/ledger-service'
 import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
 // ✅ E8 (fatia Emissão) — motor econômico por ELEGIBILIDADE. Roda AO LADO do
 // executor clássico, atrás da MESMA trava (autoExecutarAoAvancar). Import
@@ -218,30 +219,19 @@ async function criarReceita(db: DbLancamento, pid: number, descricao: string, va
 async function criarCusto(db: DbLancamento, pid: number, descricao: string, valor: number, moeda: Moeda, fx: number, fz: FreezeExec = {}): Promise<number> {
   const codigo = await gerarCodigoCusto()
   const dataBase = new Date()
-  const ap = await aplicarCondicaoPagamento({
-    configId: fz.configId ?? null, natureza: 'CUSTO', moeda: String(moeda), valor, dataBase,
+  // A condição de pagamento define o VENCIMENTO (data1). A quebra em parcelas é do modelo
+  // legado; no V3-native o Custo é UMA obrigação (A_PAGAR) e pagamentos parciais vivem no
+  // Ledger. O resumo da condição fica em observacoes (auditoria).
+  const ap = await aplicarCondicaoPagamento({ configId: fz.configId ?? null, natureza: 'CUSTO', moeda: String(moeda), valor, dataBase })
+  const observacoes = `Custo do motor: ${descricao}${ap.resumo}`.slice(0, 300)
+  // V3-native: nasce DIRETO como ObrigacaoEconomica + Ledger, na MESMA transação do
+  // MotorArtefato (idempotência/rollback atômicos). NÃO grava mais no model Custo legado.
+  const { obrigacaoId } = await criarObrigacaoEconomicaComLedgerTx(db as Prisma.TransactionClient, {
+    natureza: 'CUSTO', valorContratado: valor, moedaContratual: String(moeda), codigoOperacional: codigo,
+    processoId: pid, regraFinanceiraId: fz.regraId ?? null, itemCatalogoId: null, vencimento: ap.data1,
+    observacoes, origemTipo: 'nativo', origemId: null, criadoPorId: null,
   })
-  const parcelas = ap.parcelas
-  const vencimento = ap.data1
-  const valorBrlRef = Number((valor * fx).toFixed(2))
-  const c = await db.custo.create({
-    data: {
-      codigo, processoId: pid, tipo: TipoCusto.SERVICO, categoria: CategoriaCusto.OUTROS,
-      descricao: descricao.slice(0, 300), moeda, valor,
-      fxEstimado: fx, fxRule: FxRule.VARIAVEL, nParcelas: ap.campos.nParcelas, vencimento, custoOperacional: false, status: CustoStatus.ATIVA,
-      condicaoPagamentoId: ap.campos.condicaoPagamentoId, condicaoVersao: ap.campos.condicaoVersao, condicaoCodigo: ap.campos.condicaoCodigo,
-      valorBruto: ap.campos.valorBruto, valorTaxas: ap.campos.valorTaxas, valorLiquido: ap.campos.valorLiquido,
-      memoriaCalculo: (ap.campos.memoriaCalculo ?? undefined) as Prisma.InputJsonValue | undefined,
-      origem: 'motor', origemLancamento: 'PROCESSO', naturezaLancamento: 'CUSTO',
-      pricingRuleId: fz.tabelaValorId ?? null, valorUnitario: valor, quantidade: 1, valorTotalCongelado: valor,
-      modoCalculoAplicado: fz.tabelaValorId != null ? 'fixed' : 'manual', naturezaPreco: fz.naturezaPreco ?? 'CUSTO',
-      configFinanceiraId: fz.configId ?? null, regraFinanceiraId: fz.regraId ?? null, contextoAplicado: fz.contexto ?? undefined, dataReferencia: dataBase,
-      phaseKey: fz.phaseKey ?? null, phaseCycle: fz.phaseCycle ?? null, chaveIdempotencia: fz.chaveIdempotencia ?? null,
-      parcelas: { create: parcelas },
-      eventos: { create: { tipo: 'CRIACAO' as const, descricao: `Custo criado pelo motor: ${descricao}${ap.resumo}`.slice(0, 500), valor, cambio: fx, valorBrl: valorBrlRef } },
-    },
-  })
-  return c.id
+  return obrigacaoId
 }
 async function criarEvento(db: DbLancamento, pid: number, titulo: string, descricao: string | null, dataInicio: Date, tipo: TipoEvento): Promise<number> {
   const ev = await db.evento.create({ data: { processoId: pid, titulo: titulo.slice(0, 200), descricao: descricao || null, tipo, dataInicio, observacoes: 'Criado pelo motor' } })
@@ -370,10 +360,10 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
         // Idempotência estrutural: processo + fase + automação + natureza (config/aplicação fixos na regra).
         const akey = `${processoId}::${phaseKey}::automation::${r.id}::${isRec ? 'VENDA' : 'CUSTO'}`
         const fz: FreezeExec = { tabelaValorId: preco.tabelaValorId, configId: r.configItemId, regraId: r.id, naturezaPreco: isRec ? 'VENDA' : 'CUSTO', phaseKey, chaveIdempotencia: akey, contexto: { fonte: 'automation', ruleId: r.id, phaseKey, configItemId: r.configItemId, aplicacao: ap, mestre: mestreNome } }
-        await fazer(akey, isRec ? 'Receita' : 'Custo', 'financial', 'automation', r.id, titulo,
+        await fazer(akey, isRec ? 'Receita' : 'ObrigacaoEconomica', 'financial', 'automation', r.id, titulo,
           { configItemId: r.configItemId, mestre: mestreNome, aplicacao: ap, natureza: isRec ? 'VENDA' : 'CUSTO', valor: preco.valor, moeda: preco.moeda, tabelaValorId: preco.tabelaValorId, ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
           async (tx) => (isRec ? criarReceita(tx, processoId, descricaoLanc, preco.valor, preco.moeda, fx, false, fz) : criarCusto(tx, processoId, descricaoLanc, preco.valor, preco.moeda, fx, fz)),
-          (id) => created.push({ kind: 'financial', targetTable: isRec ? 'Receita' : 'Custo', targetId: id, name: titulo, amount: preco.valor, currency: preco.moeda, condicaoNaoVerificada: naoVerificada || undefined }))
+          (id) => created.push({ kind: 'financial', targetTable: isRec ? 'Receita' : 'ObrigacaoEconomica', targetId: id, name: titulo, amount: preco.valor, currency: preco.moeda, condicaoNaoVerificada: naoVerificada || undefined }))
       }
       continue
     }
@@ -566,7 +556,7 @@ export async function executarFinanceirasNaFaseV2(
           await tx.motorArtefato.create({
             data: {
               processoId, tipoProcessoId, phaseKey, event: 'entered', ruleKind: 'financial', ruleSource: 'automation', ruleId: r.id,
-              automaticKey: akey, targetTable: isRec ? 'Receita' : 'Custo', targetId: id, status: 'active', descricao: titulo.slice(0, 300),
+              automaticKey: akey, targetTable: isRec ? 'Receita' : 'ObrigacaoEconomica', targetId: id, status: 'active', descricao: titulo.slice(0, 300),
               detalhes: { configItemId: r.configItemId, mestre: mestreNome, aplicacao: ap, natureza: isRec ? 'VENDA' : 'CUSTO', valor: preco.valor, moeda: preco.moeda, tabelaValorId: preco.tabelaValorId },
             },
           })
@@ -654,7 +644,8 @@ export async function reconciliarFinanceiroDaFase(
       await prisma.$transaction(async (tx) => {
         if (a.targetId) {
           if (a.targetTable === 'Receita') await tx.receita.delete({ where: { id: a.targetId } })
-          else if (a.targetTable === 'Custo') await tx.custo.delete({ where: { id: a.targetId } })
+          else if (a.targetTable === 'Custo') await tx.custo.delete({ where: { id: a.targetId } }) // legado histórico
+          else if (a.targetTable === 'ObrigacaoEconomica') await removerObrigacaoOrfaTx(tx, a.targetId) // V3-native (guarda-se-paga)
         }
         await tx.motorArtefato.update({ where: { id: a.id }, data: { status: 'removed' } })
       }, { timeout: 30000, maxWait: 10000 })
