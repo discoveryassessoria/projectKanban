@@ -50,8 +50,13 @@ async function main() {
   const dry = process.argv.includes('--dry-run')
   const url = process.env.PRISMA_DATABASE_URL ?? ''
   const local = /(127\.0\.0\.1|localhost)/.test(url)
-  if (!local && process.env.EU_CONFIRMO_ESCRITA_EM_PRODUCAO !== '1' && !dry) {
-    console.error('❌ Banco não-local: exija EU_CONFIRMO_ESCRITA_EM_PRODUCAO=1 (ou rode com --dry-run).')
+  // Duas convenções de confirmação convivem no projeto: '1' (scripts de seed) e a
+  // frase exigida pelo guard de migration. Ambas são a MESMA autorização humana
+  // explícita, dada fora do código — aceitar as duas evita que o rollout de
+  // produção tenha de reescrever a variável no meio do build.
+  const confirmado = ['1', 'SIM, ESCREVER EM PRODUCAO'].includes(process.env.EU_CONFIRMO_ESCRITA_EM_PRODUCAO ?? '')
+  if (!local && !confirmado && !dry) {
+    console.error("❌ Banco não-local: exija EU_CONFIRMO_ESCRITA_EM_PRODUCAO=1 (ou 'SIM, ESCREVER EM PRODUCAO'), ou rode com --dry-run.")
     process.exit(1)
   }
   console.log(`Seed de permissões de custo — ${local ? 'banco LOCAL' : 'banco REMOTO'}${dry ? ' (dry-run)' : ''}\n`)

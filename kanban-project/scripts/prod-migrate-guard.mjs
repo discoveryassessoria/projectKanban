@@ -110,6 +110,33 @@ try {
   }
 
   const antes = retrato.migrations
+
+  // ---- PLANO (leitura pura, antes de qualquer escrita) --------------------
+  // Quais migrations do repositório ainda não estão em `_prisma_migrations`, e
+  // quais delas contêm SQL destrutivo. Produção é patrimônio: o que vai ser
+  // executado precisa estar no log ANTES de ser executado.
+  try {
+    const { default: path } = await import('node:path')
+    const { listarMigrations, sqlDaMigration } = await import('../lib/db/leitura-migrations.mjs')
+    const DIR = path.join(process.cwd(), 'prisma', 'migrations')
+    const todas = listarMigrations(DIR)
+    const registradas = new Set(
+      (await prisma.$queryRawUnsafe('SELECT migration_name FROM _prisma_migrations')).map((r) => r.migration_name),
+    )
+    const pendentes = todas.filter((m) => !registradas.has(m))
+    console.log(`[migrate-guard] PLANO: ${todas.length} no repositório · ${registradas.size} registradas · ${pendentes.length} pendentes`)
+    const DESTRUTIVO = /\b(DROP\s+(TABLE|COLUMN|SCHEMA|DATABASE)|TRUNCATE|DELETE\s+FROM)\b/i
+    const MUTACAO = /\bUPDATE\s+"?\w+"?\s+SET\b/i
+    for (const m of pendentes) {
+      const sql = sqlDaMigration(DIR, m)
+      const marcas = [DESTRUTIVO.test(sql) && 'DESTRUTIVO', MUTACAO.test(sql) && 'UPDATE de dado'].filter(Boolean)
+      console.log(`[migrate-guard]   ○ ${m}${marcas.length ? `  ⚠ ${marcas.join(' + ')}` : ''}`)
+    }
+    if (!pendentes.length) console.log('[migrate-guard]   (nada pendente — migrate deploy será no-op)')
+  } catch (e) {
+    console.log(`[migrate-guard] AVISO: não consegui montar o plano (${String(e?.message ?? e).slice(0, 150)}). Seguindo — o Prisma loga cada migration aplicada.`)
+  }
+
   console.log('[migrate-guard] identidade CONFIRMADA — aplicando migrations (migrate deploy).')
 
   // directUrl forçada para a mesma URL: DIRECT_DATABASE_URL do projeto está
