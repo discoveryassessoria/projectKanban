@@ -25,6 +25,7 @@ import { CronogramaPagavelPanel } from "@/src/components/financeiro/v3/Cronogram
 import { RepassePanel } from "@/src/components/financeiro/v3/RepassePanel"
 import ExcluirReceitaModal from "@/src/components/financeiro/v3/ExcluirReceitaModal"
 import ParticipanteContaView from "@/src/components/financeiro/v3/ParticipanteContaView"
+import { vocabularioFinanceiro } from "@/lib/financeiro/vocabulario"
 import { NovaFaturaModal } from "@/src/components/kanban/NovaFaturaModal"
 import { uploadFiles } from "@/src/lib/storage"
 import { emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
@@ -174,6 +175,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   if (!d) return <div className="p-8 text-sm text-[var(--text-muted)]">carregando…</div>
 
   const isCusto = d.natureza === "CUSTO"
+  const voc = vocabularioFinanceiro(d.natureza)
   const semBase = d.moedaBase === "BRL"
   const fmtEUR = (v: number) => fmt(v, d.moedaBase)
   const moedaBaseLabel = d.moedaBase === "EUR" ? "Euro (EUR)" : d.moedaBase
@@ -254,7 +256,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
   // Contadores só quando > 0 (Resumo/Timeline/Observações não têm contador).
   const tabs: [string, string, any, number][] = [
     ["cobrancas", isCusto ? "Parcelas" : "Cobranças", CreditCard, rp.total],
-    ["participantes", "Participantes Financeiros", Users, d.participantesCount ?? participantes.length],
+    ...((isCusto ? [] : [["participantes", "Participantes Financeiros", Users, d.participantesCount ?? participantes.length]]) as [string, string, any, number][]),
     ["pagamentos", "Pagamentos", Wallet, (d.pagamentos ?? []).length],
     ["documentos", "Documentos", FileCheck, documentos.length],
     ...((isCusto ? [["repasses", "Repasses", ArrowLeftRight, (d.repasses ?? []).filter((r: { status: string }) => r.status !== "CANCELADO").length]] : []) as [string, string, any, number][]),
@@ -384,7 +386,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                 <SubCard rotulo={isCusto ? "Pago" : "Recebido"} valor={brl(d.recebidoBrl)} cor="text-[var(--success)]" linhas={[`${pct}% do total`, `${d.parcelasRecebidas} parcela(s) recebida(s)`]} />
                 <SubCard rotulo="A vencer" valor={brl(d.aVencerBrl)} cor="text-[var(--accent-primary)]" linhas={[`${d.parcelasAVencer} parcela(s)`, `Próximo: ${dataBR(d.proximoVencimento)}`]} />
                 <SubCard rotulo="Vencido" valor={brl(d.vencidoBrl)} cor="text-[var(--danger)]" linhas={[`${d.parcelasVencidas} parcela(s)`, ...(d.parcelasVencidas ? [`Desde ${dataBR(d.proximoVencimento)}`] : [])]} />
-                <SubCard rotulo="Saldo a receber" valor={brl(d.saldoBrl)} cor="text-[var(--info)]" linhas={[`${d.parcelas} parcela(s) em aberto`]} />
+                <SubCard rotulo={voc.saldo} valor={brl(d.saldoBrl)} cor="text-[var(--info)]" linhas={[`${d.parcelas} parcela(s) em aberto`]} />
               </div>
             </div>
 
@@ -800,6 +802,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
       {cancelamentoOpen && d && (
         <CancelamentoAvancadoModal
           receitaRef={String(d.obrigacaoId)}
+          natureza={isCusto ? "CUSTO" : "RECEITA"}
           participantes={(d.participantes ?? []).map((p: any) => ({ obrigacaoId: p.obrigacaoId, nome: p.nome }))}
           onClose={() => setCancelamentoOpen(false)}
           onDone={() => { setCancelamentoOpen(false); carregar() }}
@@ -808,6 +811,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
       {duplicarOpen && d && (
         <DuplicarReceitaModal
           receitaRef={String(d.obrigacaoId)}
+          natureza={isCusto ? "CUSTO" : "RECEITA"}
           onClose={() => setDuplicarOpen(false)}
           onDone={(obrigacaoIdNovo) => { setDuplicarOpen(false); router.push(`/financeiro/v3/receita/${obrigacaoIdNovo}`) }}
         />
@@ -815,6 +819,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
       {excluirOpen && d && (
         <ExcluirReceitaModal
           receitaRef={String(d.obrigacaoId)}
+          natureza={isCusto ? "CUSTO" : "RECEITA"}
           onClose={() => setExcluirOpen(false)}
           onDone={() => { setExcluirOpen(false); onVoltar() }}
         />

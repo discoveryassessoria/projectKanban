@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { LAYER } from "@/src/lib/ui/layers"
+import { vocabularioFinanceiro } from "@/lib/financeiro/vocabulario"
 import { X, Loader2, CheckCircle2, AlertTriangle, Ban, Info as InfoIcon, ArrowRight } from "lucide-react"
 
 const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
@@ -22,7 +23,7 @@ const num = (v: unknown) => { const n = Number(String(v ?? "").replace(/\./g, ""
 
 type Modo = "TOTAL" | "PARCIAL_VALOR" | "PARCIAL_PERCENTUAL" | "POR_PARTICIPANTE" | "POR_PARCELA"
 const MODOS: { modo: Modo; label: string; hint: string }[] = [
-  { modo: "TOTAL", label: "Total", hint: "Cancela todo o saldo em aberto da Receita." },
+  { modo: "TOTAL", label: "Total", hint: "Cancela todo o saldo em aberto do lançamento." },
   { modo: "PARCIAL_VALOR", label: "Parcial por valor", hint: "Cancela um valor do saldo em aberto." },
   { modo: "PARCIAL_PERCENTUAL", label: "Parcial por %", hint: "Cancela um percentual do saldo em aberto." },
   { modo: "POR_PARTICIPANTE", label: "Por participante", hint: "Cancela o saldo em aberto de um participante." },
@@ -43,9 +44,10 @@ interface Previsao {
 const inputCls = "w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--danger)]"
 const labelCls = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]"
 
-export default function CancelamentoAvancadoModal({ receitaRef, participantes, onClose, onDone }: {
-  receitaRef: string; participantes?: Participante[]; onClose: () => void; onDone?: () => void
+export default function CancelamentoAvancadoModal({ receitaRef, participantes, natureza, onClose, onDone }: {
+  receitaRef: string; participantes?: Participante[]; natureza?: string; onClose: () => void; onDone?: () => void
 }) {
+  const v = vocabularioFinanceiro(natureza)
   const [modo, setModo] = useState<Modo>("TOTAL")
   const [valor, setValor] = useState("")
   const [percentual, setPercentual] = useState("")
@@ -151,7 +153,7 @@ export default function CancelamentoAvancadoModal({ receitaRef, participantes, o
       <div className="my-4 w-full max-w-2xl rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--shadow-surface)]" onClick={(e) => e.stopPropagation()}>
         {/* header */}
         <div className="flex items-center justify-between border-b border-[var(--border-default)] px-5 py-4">
-          <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--text-primary)]"><Ban className="h-4 w-4 text-[var(--danger)]" /> Cancelamento da Receita</h2>
+          <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--text-primary)]"><Ban className="h-4 w-4 text-[var(--danger)]" /> Cancelamento {v.doDa}</h2>
           <button onClick={() => !enviando && onClose()} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><X className="h-5 w-5" /></button>
         </div>
 
@@ -181,7 +183,7 @@ export default function CancelamentoAvancadoModal({ receitaRef, participantes, o
                 <option value="">— Selecione —</option>
                 {parts.map((p) => <option key={p.obrigacaoId} value={p.obrigacaoId}>{p.nome}</option>)}
               </select>
-              {parts.length === 0 && <p className="mt-1 text-[11px] text-[var(--text-muted)]">Sem participantes disponíveis para esta Receita.</p>}
+              {parts.length === 0 && <p className="mt-1 text-[11px] text-[var(--text-muted)]">{`Sem participantes disponíveis para ${v.esteEsta}.`}</p>}
             </div>
           )}
           {modo === "POR_PARCELA" && (

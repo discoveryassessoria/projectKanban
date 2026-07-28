@@ -11,14 +11,16 @@
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { LAYER } from "@/src/lib/ui/layers"
+import { vocabularioFinanceiro } from "@/lib/financeiro/vocabulario"
 import { X, Loader2, CheckCircle2, AlertTriangle, Trash2, ShieldAlert } from "lucide-react"
 
 const authHeaders = (): Record<string, string> => { const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null; return t ? { Authorization: `Bearer ${t}` } : {} }
 const CONFIRMA = "EXCLUIR"
 
-export default function ExcluirReceitaModal({ receitaRef, onClose, onDone }: {
-  receitaRef: string; onClose: () => void; onDone?: () => void
+export default function ExcluirReceitaModal({ receitaRef, natureza, onClose, onDone }: {
+  receitaRef: string; natureza?: string; onClose: () => void; onDone?: () => void
 }) {
+  const v = vocabularioFinanceiro(natureza)
   const [checando, setChecando] = useState(true)
   const [permitido, setPermitido] = useState(false)
   const [motivos, setMotivos] = useState<string[]>([])
@@ -69,7 +71,7 @@ export default function ExcluirReceitaModal({ receitaRef, onClose, onDone }: {
     <div className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-[var(--app-overlay)] p-4 sm:items-center" style={{ zIndex: LAYER.aboveProcessCritical }} onClick={() => !enviando && onClose()}>
       <div className="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--shadow-surface)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--border-default)] px-5 py-4">
-          <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--text-primary)]"><Trash2 className="h-4 w-4 text-[var(--danger)]" /> Excluir Receita</h2>
+          <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--text-primary)]"><Trash2 className="h-4 w-4 text-[var(--danger)]" /> Excluir {v.Entidade}</h2>
           <button onClick={() => !enviando && onClose()} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><X className="h-5 w-5" /></button>
         </div>
 
@@ -84,12 +86,12 @@ export default function ExcluirReceitaModal({ receitaRef, onClose, onDone }: {
               {motivos.length > 0 ? (
                 <ul className="list-inside list-disc space-y-0.5 text-[var(--text-secondary)]">{motivos.map((m, i) => <li key={i}>{m}</li>)}</ul>
               ) : (
-                <p className="text-[var(--text-secondary)]">Esta Receita não pode ser excluída no estado atual. Cancele ou estorne os lançamentos antes.</p>
+                <p className="text-[var(--text-secondary)]">{`${v.custo ? "Este custo" : "Esta Receita"} não pode ser excluíd${v.custo ? "o" : "a"} no estado atual. Cancele ou estorne os lançamentos antes.`}</p>
               )}
             </div>
           ) : (
             <>
-              <p className="flex items-start gap-1.5 rounded-[var(--radius-sm)] border p-3 text-xs text-[var(--text-secondary)]" style={{ borderColor: "color-mix(in srgb, var(--danger) 25%, transparent)", background: "color-mix(in srgb, var(--danger) 5%, transparent)" }}><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--danger)]" /> A exclusão é lógica: a Receita sai das listagens, mas o histórico e o Ledger são preservados para auditoria. Esta ação não pode ser desfeita pela tela.</p>
+              <p className="flex items-start gap-1.5 rounded-[var(--radius-sm)] border p-3 text-xs text-[var(--text-secondary)]" style={{ borderColor: "color-mix(in srgb, var(--danger) 25%, transparent)", background: "color-mix(in srgb, var(--danger) 5%, transparent)" }}><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--danger)]" /> {`A exclusão é lógica: ${v.custo ? "o custo sai" : "a Receita sai"} das listagens, mas o histórico e o Ledger são preservados para auditoria. Esta ação não pode ser desfeita pela tela.`}</p>
               <div>
                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Motivo (opcional)</label>
                 <textarea value={motivo} onChange={(e) => setMotivo(e.target.value.slice(0, 300))} rows={2} placeholder="Justificativa (auditoria)" className="w-full resize-none rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--danger)]" />

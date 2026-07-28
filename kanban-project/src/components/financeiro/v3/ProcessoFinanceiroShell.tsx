@@ -284,11 +284,11 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
 
       {/* F5-UI.3 — modais compartilhados das ações rápidas da linha (mesmos de Receitas) */}
       {acao?.tipo === "editar" && <EditarReceitaView obrigacaoId={acao.o.obrigacaoId} receitaRef={String(acao.o.obrigacaoId)} natureza="CUSTO" onClose={() => setAcao(null)} onDone={aoConcluir} />}
-      {acao?.tipo === "duplicar" && <DuplicarReceitaModal receitaRef={String(acao.o.obrigacaoId)} onClose={() => setAcao(null)} onDone={(novoId?: number) => { aoConcluir(); if (novoId) onAbrirDetalhe?.(novoId) }} />}
+      {acao?.tipo === "duplicar" && <DuplicarReceitaModal receitaRef={String(acao.o.obrigacaoId)} natureza="CUSTO" onClose={() => setAcao(null)} onDone={(novoId?: number) => { aoConcluir(); if (novoId) onAbrirDetalhe?.(novoId) }} />}
       {acao?.tipo === "arquivar" && <AcaoReceitaModal acao="arquivar" receitaRef={String(acao.o.obrigacaoId)} natureza="CUSTO" onClose={() => setAcao(null)} onDone={aoConcluir} />}
       {acao?.tipo === "reprovar" && <AcaoReceitaModal acao="reprovar" receitaRef={String(acao.o.obrigacaoId)} natureza="CUSTO" onClose={() => setAcao(null)} onDone={aoConcluir} />}
-      {acao?.tipo === "cancelar" && <CancelamentoAvancadoModal receitaRef={String(acao.o.obrigacaoId)} onClose={() => setAcao(null)} onDone={aoConcluir} />}
-      {acao?.tipo === "excluir" && <ExcluirReceitaModal receitaRef={String(acao.o.obrigacaoId)} onClose={() => setAcao(null)} onDone={aoConcluir} />}
+      {acao?.tipo === "cancelar" && <CancelamentoAvancadoModal receitaRef={String(acao.o.obrigacaoId)} natureza="CUSTO" onClose={() => setAcao(null)} onDone={aoConcluir} />}
+      {acao?.tipo === "excluir" && <ExcluirReceitaModal receitaRef={String(acao.o.obrigacaoId)} natureza="CUSTO" onClose={() => setAcao(null)} onDone={aoConcluir} />}
     </div>
   )
 }

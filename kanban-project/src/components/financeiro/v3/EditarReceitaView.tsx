@@ -280,7 +280,7 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
               <span className="text-[var(--text-secondary)]">{rec?.codigo ?? receitaRef}</span><span>›</span><span className="text-[var(--text-secondary)]">Editar {ehCusto ? "custo" : "receita"}</span>
             </div>
             <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Editar {ehCusto ? "custo" : "receita"}</h1>
-            <p className="mt-0.5 text-sm text-[var(--text-muted)]">Altere os dados {ehCusto ? "deste custo" : "desta Receita"}. A divisão entre participantes é editada em “Editar distribuição”.</p>
+            <p className="mt-0.5 text-sm text-[var(--text-muted)]">Altere os dados {ehCusto ? "deste custo" : "desta Receita"}.{!ehCusto && " A divisão entre participantes é editada em “Editar distribuição”."}</p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={onClose} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">Cancelar</button>
