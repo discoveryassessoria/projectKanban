@@ -19,7 +19,11 @@
 // ligar FINANCEIRO_PERMISSOES_CUSTO_ESTRITAS): sem seed, sem escrita alguma.
 // ============================================================================
 import { spawnSync } from 'node:child_process'
+import path from 'node:path'
 import { CLASSE, classificar, confirmacaoExplicitaOk, identificador, retratar } from '../lib/db/identidade-banco.mjs'
+
+// Binário local — nada de `npx`, que pode tentar resolver na rede durante o build.
+const TSX = path.join(process.cwd(), 'node_modules', '.bin', 'tsx')
 
 const MODO = (process.env.PROD_CUSTOS_ROLLOUT || '').toLowerCase()
 const log = (m) => console.log(`[custos-rollout] ${m}`)
@@ -67,7 +71,7 @@ const ETAPAS = soSmoke
 
 for (const [rotulo, argv] of ETAPAS) {
   console.log(`\n${'─'.repeat(70)}\n[custos-rollout] ▶ ${rotulo}\n${'─'.repeat(70)}`)
-  const r = spawnSync('npx', ['tsx', ...argv], { stdio: 'inherit', env: process.env })
+  const r = spawnSync(TSX, argv, { stdio: 'inherit', env: process.env })
   if (r.status !== 0) {
     console.error(`[custos-rollout] ✗ ${rotulo} FALHOU (exit ${r.status}). Build derrubado.`)
     process.exit(1)
