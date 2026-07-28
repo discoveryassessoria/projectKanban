@@ -226,6 +226,35 @@ try {
     log(`✓ admin do sandbox criado (${ADMIN_EMAIL}).`)
   } else { log(`✓ admin do sandbox já existe (${ADMIN_EMAIL}).`) }
 
+  // ── 3b') FIXTURES FIXAS das suítes de smoke (Receitas/Custos) ──
+  // As suítes referenciam `processoId = 16` e `usuarioId = 1` como fixtures. Num
+  // banco de homologação recém-baselinado esses ids não nascem sozinhos (SERIAL
+  // começa em 1 e o processo #16 nunca existiu). Materializamos os dois com id
+  // explícito e realinhamos as sequências — idempotente, dado 100% sintético.
+  const fixarSequencia = async (tabela) => {
+    await prisma.$executeRawUnsafe(
+      `SELECT setval(pg_get_serial_sequence('"${tabela}"', 'id'), GREATEST((SELECT COALESCE(MAX("id"), 0) FROM "${tabela}"), 1))`,
+    )
+  }
+  try {
+    const PROC_SMOKE = 16
+    const ja = await prisma.processo.findUnique({ where: { id: PROC_SMOKE }, select: { id: true } })
+    if (!ja) {
+      await prisma.processo.create({
+        data: { id: PROC_SMOKE, codigo: 'SMOKE-16', nome: 'Processo fixo das suítes de smoke', pais: 'Itália', descricao: 'Fixture de homologação (Receitas/Custos). Não é dado real.' },
+      })
+      log(`✓ processo fixo de smoke criado (#${PROC_SMOKE}).`)
+    } else { log(`✓ processo fixo de smoke já existe (#${PROC_SMOKE}).`) }
+    await fixarSequencia('Processo')
+    const u1 = await prisma.usuario.findUnique({ where: { id: 1 }, select: { id: true } })
+    if (!u1) {
+      const bcrypt = (await import('bcrypt')).default
+      await prisma.usuario.create({ data: { id: 1, nome: 'Usuário de smoke', email: 'smoke@sandbox.local', senha: await bcrypt.hash('Smoke@2026', 10), tipo: 'admin' } })
+      log('✓ usuário fixo de smoke criado (#1).')
+    } else { log('✓ usuário fixo de smoke já existe (#1).') }
+    await fixarSequencia('Usuario')
+  } catch (e) { log(`AVISO fixtures de smoke: ${String(e?.message ?? e).slice(0, 180)}`) }
+
   // ── 3c) RESET opcional (SANDBOX_RESET=1): apaga TODO o dado sintético e re-semeia.
   // O banco do sandbox é 100% sintético (força inversa já garantiu). Preserva plano
   // de contas e o admin. One-shot: o flag é removido após aplicar.
