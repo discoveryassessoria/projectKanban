@@ -28,6 +28,17 @@ interface Item { id: number; name: string; natureza: string; categoria?: string 
 interface Requerente { id: number; nome: string; personId: number | null }
 interface Fase { phaseKey: string; label: string }
 interface Fornecedor { id: number; nome: string }
+// F8.1 — retorno de /v3/custos/analise (inteligência do lançamento).
+interface AvisoLancamento { codigo: string; severidade: "info" | "atencao" | "alto"; mensagem: string; evidencias?: { obrigacaoId: number; codigo: string | null; descricao: string | null; valor: number; moeda: string; criadoEm: string | null }[] }
+interface Analise {
+  avisos: AvisoLancamento[]
+  sugestoes: {
+    fornecedor: { id: number; nome: string; ocorrencias: number } | null
+    centroCusto: { id: number; nome: string; ocorrencias: number } | null
+    valorTipico: { valor: number; moeda: string; amostras: number; minimo: number; maximo: number } | null
+  }
+  baseHistorica: number
+}
 
 export function LancamentoManualModal({ natureza, processoId, onClose, onCriado }: { natureza: Natureza; processoId: number; onClose: () => void; onCriado: (r?: { obrigacaoRef: number | null }) => void }) {
   const receita = natureza === "RECEITA"
@@ -100,6 +111,13 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemId])
 
+  // ---- F8.1: inteligência do lançamento (server-side, só leitura) ----
+  // Conselho com evidência: avisa duplicidade provável / valor fora da faixa praticada /
+  // vencimento vencido / campos que custam caro depois, e sugere fornecedor, centro de custo
+  // e valor típicos do MESMO item. NUNCA bloqueia nem preenche sozinho.
+  const [analise, setAnalise] = useState<Analise | null>(null)
+  const [analisando, setAnalisando] = useState(false)
+
   // ---- totais ----
   const qtd = Math.max(1, Number(quantidade) || 1)
   const unit = Number(String(valorUnitario).replace(",", ".")) || 0
@@ -120,6 +138,20 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
     return reqSelecionados.map((r) => { const v = Number(rateioVal[r.id]) || 0; return { nome: r.nome, valor: cent(v), pct: total ? cent(v / total * 100) : 0 } })
   }, [vinculo, reqSelecionados, modoRateio, rateioVal, total])
   const somaRateio = cent(distribuicao.reduce((s, d) => s + d.valor, 0))
+
+  // F8.1 — reanalisa (com folga de digitação) sempre que muda algo que altera o julgamento.
+  // Só para CUSTO: a inteligência é do domínio Contas a Pagar.
+  useEffect(() => {
+    if (receita) return
+    const t = setTimeout(() => {
+      setAnalisando(true)
+      fetch(`/api/financeiro/v3/custos/analise`, {
+        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ processoId, itemCatalogoId: itemId ? Number(itemId) : null, fornecedorId: fornecedorId ? Number(fornecedorId) : null, centroCustoId: centroCustoId ? Number(centroCustoId) : null, valor: total || null, moeda, vencimento: vencimento || null }),
+      }).then((r) => r.json()).then((j) => setAnalise(j?.ok ? j : null)).catch(() => setAnalise(null)).finally(() => setAnalisando(false))
+    }, 400)
+    return () => clearTimeout(t)
+  }, [receita, processoId, itemId, fornecedorId, centroCustoId, total, moeda, vencimento])
 
   function toggleReq(id: number) { setSelReq((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n }) }
 
@@ -333,6 +365,58 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
             </div>
           )}
         </div>
+
+        {/* F8.1 — Inteligência do lançamento: conselho com evidência, nunca bloqueio.
+            Sugestões só aparecem quando divergem do que já está preenchido. */}
+        {!receita && analise && (analise.avisos.length > 0 || analise.sugestoes.fornecedor || analise.sugestoes.centroCusto || analise.sugestoes.valorTipico) && (
+          <div className="mt-3 space-y-2">
+            {analise.avisos.map((a) => {
+              const cor = a.severidade === "alto" ? "var(--danger)" : a.severidade === "atencao" ? "var(--accent-primary)" : "var(--info)"
+              return (
+                <div key={a.codigo} className="rounded-[var(--radius-sm)] border px-3 py-2 text-xs" style={{ borderColor: `color-mix(in srgb, ${cor} 30%, transparent)`, background: `color-mix(in srgb, ${cor} 8%, transparent)` }}>
+                  <div className="font-medium" style={{ color: cor }}>{a.mensagem}</div>
+                  {!!a.evidencias?.length && (
+                    <ul className="mt-1 space-y-0.5 text-[var(--text-muted)]">
+                      {a.evidencias.map((ev) => (
+                        <li key={ev.obrigacaoId}>• {ev.codigo ?? `#${ev.obrigacaoId}`} — {ev.descricao ?? "sem descrição"} — {fmt(ev.valor, ev.moeda)}{ev.criadoEm ? ` — ${new Date(ev.criadoEm).toLocaleDateString("pt-BR")}` : ""}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )
+            })}
+            {(() => {
+              const sug = analise.sugestoes
+              const mostrarForn = sug.fornecedor && String(sug.fornecedor.id) !== fornecedorId
+              const mostrarCentro = sug.centroCusto && String(sug.centroCusto.id) !== centroCustoId
+              const mostrarValor = sug.valorTipico && sug.valorTipico.moeda === moeda
+              if (!mostrarForn && !mostrarCentro && !mostrarValor) return null
+              return (
+                <div className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-xs">
+                  <div className="mb-1.5 text-[var(--text-muted)]">Com base em {analise.baseHistorica} lançamento(s) deste mesmo item:</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {mostrarForn && (
+                      <button type="button" onClick={() => setFornecedorId(String(sug.fornecedor!.id))} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] px-2 py-1 text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">
+                        Usar fornecedor <span className="font-medium text-[var(--text-primary)]">{sug.fornecedor!.nome}</span> ({sug.fornecedor!.ocorrencias}×)
+                      </button>
+                    )}
+                    {mostrarCentro && (
+                      <button type="button" onClick={() => setCentroCustoId(String(sug.centroCusto!.id))} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] px-2 py-1 text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">
+                        Usar centro de custo <span className="font-medium text-[var(--text-primary)]">{sug.centroCusto!.nome}</span> ({sug.centroCusto!.ocorrencias}×)
+                      </button>
+                    )}
+                    {mostrarValor && (
+                      <button type="button" onClick={() => { setQuantidade("1"); setValorUnitario(String(sug.valorTipico!.valor)) }} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] px-2 py-1 text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">
+                        Usar valor típico <span className="font-medium text-[var(--text-primary)]">{fmt(sug.valorTipico!.valor, sug.valorTipico!.moeda)}</span> (de {fmt(sug.valorTipico!.minimo, sug.valorTipico!.moeda)} a {fmt(sug.valorTipico!.maximo, sug.valorTipico!.moeda)})
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        )}
+        {!receita && analisando && !analise && <div className="mt-3 text-xs text-[var(--text-muted)]">analisando o histórico…</div>}
 
         {erro && <div className="mt-3 rounded-[var(--radius-sm)] border px-3 py-2 text-xs text-[var(--danger)]" style={{ borderColor: "color-mix(in srgb, var(--danger) 30%, transparent)", background: "color-mix(in srgb, var(--danger) 10%, transparent)" }}>{erro}</div>}
 
