@@ -65,17 +65,29 @@ const migrations = fs
 
 const sqlDe = (nome) => fs.readFileSync(path.join(DIR, nome, 'migration.sql'), 'utf8')
 
-/** Remove comentários e quebra em statements. Retorna null se houver bloco $$ (não parseável). */
+/**
+ * Comentários fora primeiro (um `--` pode citar `$$`), depois os blocos DO $$…$$
+ * — que são idempotentes por construção neste repositório e não têm DDL
+ * verificável fora deles. O resto vira statements.
+ */
 function statements(sql) {
-  if (sql.includes('$$')) return null
-  const limpo = sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ')
-  return limpo
+  const semComentario = sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ')
+  const semDo = semComentario.replace(/DO\s*\$\$[\s\S]*?\$\$/gi, ' ')
+  if (semDo.includes('$$')) return null // bloco $$ que não soubemos delimitar
+  return semDo
     .split(';')
     .map((s) => s.trim().replace(/\s+/g, ' '))
     .filter(Boolean)
 }
 
-const semAspas = (s) => String(s).replace(/"/g, '').replace(/^public\./, '')
+const semAspas = (s) =>
+  String(s)
+    .replace(/"/g, '')
+    .replace(/^public\./, '')
+
+// Identificador SQL: `X`, `"X"` ou `"public"."X"`.
+const NOME = '((?:"[^"]+"|\\w+)(?:\\.(?:"[^"]+"|\\w+))?)'
+const re = (corpo, flags = 'i') => new RegExp(corpo.replace(/§/g, NOME), flags)
 
 /** Extrai asserções verificáveis contra o catálogo do Postgres. */
 function asserçoes(sql) {
@@ -86,32 +98,36 @@ function asserçoes(sql) {
 
   for (const st of sts) {
     let m
-    if ((m = st.match(/^CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?((?:"[^"]+"|[\w.]+))/i))) {
+    if ((m = st.match(re('^CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?§')))) {
       add('tabela', semAspas(m[1]), true)
-    } else if ((m = st.match(/^DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?((?:"[^"]+"|[\w.]+))/i))) {
+    } else if ((m = st.match(re('^DROP\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?§')))) {
       add('tabela', semAspas(m[1]), false)
-    } else if ((m = st.match(/^CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?((?:"[^"]+"|[\w.]+))/i))) {
+    } else if ((m = st.match(re('^CREATE\\s+(?:UNIQUE\\s+)?INDEX\\s+(?:CONCURRENTLY\\s+)?(?:IF\\s+NOT\\s+EXISTS\\s+)?§')))) {
       add('indice', semAspas(m[1]), true)
-    } else if ((m = st.match(/^DROP\s+INDEX\s+(?:IF\s+EXISTS\s+)?((?:"[^"]+"|[\w.]+))/i))) {
+    } else if ((m = st.match(re('^DROP\\s+INDEX\\s+(?:IF\\s+EXISTS\\s+)?§')))) {
       add('indice', semAspas(m[1]), false)
-    } else if ((m = st.match(/^CREATE\s+TYPE\s+((?:"[^"]+"|[\w.]+))/i))) {
+    } else if ((m = st.match(re('^CREATE\\s+TYPE\\s+§')))) {
       add('tipo', semAspas(m[1]), true)
-    } else if ((m = st.match(/^DROP\s+TYPE\s+(?:IF\s+EXISTS\s+)?((?:"[^"]+"|[\w.]+))/i))) {
+    } else if ((m = st.match(re('^DROP\\s+TYPE\\s+(?:IF\\s+EXISTS\\s+)?§')))) {
       add('tipo', semAspas(m[1]), false)
-    } else if ((m = st.match(/^ALTER\s+TYPE\s+((?:"[^"]+"|[\w.]+))\s+ADD\s+VALUE\s+(?:IF\s+NOT\s+EXISTS\s+)?'([^']+)'/i))) {
+    } else if ((m = st.match(re("^ALTER\\s+TYPE\\s+§\\s+ADD\\s+VALUE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?'([^']+)'")))) {
       add('enumvalor', `${semAspas(m[1])}.${m[2]}`, true)
-    } else if ((m = st.match(/^ALTER\s+TABLE\s+(?:ONLY\s+)?((?:"[^"]+"|[\w.]+))\s+([\s\S]+)$/i))) {
+    } else if ((m = st.match(re('^ALTER\\s+TABLE\\s+(?:ONLY\\s+)?§\\s+([\\s\\S]+)$')))) {
       const tabela = semAspas(m[1])
       const resto = m[2]
       let a
-      const rAddCol = /ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?((?:"[^"]+"|\w+))/gi
+      const rAddCol = re('ADD\\s+COLUMN\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?§', 'gi')
       while ((a = rAddCol.exec(resto))) add('coluna', `${tabela}.${semAspas(a[1])}`, true)
-      const rDropCol = /DROP\s+COLUMN\s+(?:IF\s+EXISTS\s+)?((?:"[^"]+"|\w+))/gi
+      const rDropCol = re('DROP\\s+COLUMN\\s+(?:IF\\s+EXISTS\\s+)?§', 'gi')
       while ((a = rDropCol.exec(resto))) add('coluna', `${tabela}.${semAspas(a[1])}`, false)
-      const rAddCon = /ADD\s+CONSTRAINT\s+((?:"[^"]+"|[\w.]+))/gi
+      const rAddCon = re('ADD\\s+CONSTRAINT\\s+§', 'gi')
       while ((a = rAddCon.exec(resto))) add('constraint', semAspas(a[1]), true)
-      const rDropCon = /DROP\s+CONSTRAINT\s+(?:IF\s+EXISTS\s+)?((?:"[^"]+"|[\w.]+))/gi
+      const rDropCon = re('DROP\\s+CONSTRAINT\\s+(?:IF\\s+EXISTS\\s+)?§', 'gi')
       while ((a = rDropCon.exec(resto))) add('constraint', semAspas(a[1]), false)
+      const rNull = re('ALTER\\s+(?:COLUMN\\s+)?§\\s+(DROP|SET)\\s+NOT\\s+NULL', 'gi')
+      while ((a = rNull.exec(resto))) {
+        add('nulavel', `${tabela}.${semAspas(a[1])}`, a[2].toUpperCase() === 'DROP')
+      }
     }
   }
   return out
@@ -162,6 +178,11 @@ try {
     (r) => `${r.typname}.${r.enumlabel}`,
   )
 
+  const nulaveis = await conjunto(
+    `SELECT table_name, column_name FROM information_schema.columns WHERE table_schema='public' AND is_nullable='YES'`,
+    (r) => `${r.table_name}.${r.column_name}`,
+  )
+
   const existe = (a) => {
     switch (a.tipo) {
       case 'tabela': return tabelas.has(a.chave)
@@ -170,6 +191,7 @@ try {
       case 'constraint': return constraints.has(a.chave) || indices.has(a.chave)
       case 'tipo': return tipos.has(a.chave)
       case 'enumvalor': return enumValores.has(a.chave)
+      case 'nulavel': return nulaveis.has(a.chave)
       default: return false
     }
   }
@@ -211,12 +233,23 @@ try {
   console.log(`  PARCIAL ...........: ${parciais.length}`)
   console.log(`  PENDENTE ..........: ${pendentes.length}`)
 
-  // ---- PROVA 2: as pendentes têm de ser o RABO da lista (baseline seguro)
-  const idxPrimeiraPendente = linhas.findIndex((l) => l.estado === 'PENDENTE' || l.estado === 'PARCIAL')
-  const cauda = idxPrimeiraPendente === -1 ? [] : linhas.slice(idxPrimeiraPendente)
-  const cabeca = idxPrimeiraPendente === -1 ? linhas : linhas.slice(0, idxPrimeiraPendente)
-  const cabecaSuja = cabeca.filter((l) => l.estado === 'PENDENTE' || l.estado === 'PARCIAL')
+  // ---------------------------------------------------------------- o CORTE
+  // O schema de homologação NÃO foi construído migration a migration: nasceu de
+  // um `db push` do schema.prisma de uma data X. Logo ele reflete o ESTADO FINAL
+  // daquela data, não cada passo histórico — migrations antigas que criaram algo
+  // depois removido, ou CHECK/EXCLUDE que o Prisma não modela, aparecem como
+  // PARCIAL. Isso é esperado e não invalida o baseline.
+  //
+  // O corte é o ÚLTIMO ponto em que o schema ainda bate: depois da última
+  // migration integralmente REFLETIDA. Dali para frente é gap real.
+  let idxUltimaRefletida = -1
+  linhas.forEach((l, i) => { if (l.estado === 'REFLETIDA') idxUltimaRefletida = i })
+  const cabeca = linhas.slice(0, idxUltimaRefletida + 1)
+  const cauda = linhas.slice(idxUltimaRefletida + 1)
   const caudaLimpa = cauda.filter((l) => l.estado === 'REFLETIDA')
+  const cabecaSuja = cabeca.filter((l) => l.estado !== 'REFLETIDA')
+
+  console.log(`\nCORTE: após ${cabeca.at(-1)?.nome ?? '(nenhuma)'}`)
 
   console.log('\nA MARCAR COMO APLICADAS (baseline) — prefixo pré-existente:')
   for (const l of cabeca) console.log(`  ✓ ${l.nome}${jaAplicadas.has(l.nome) ? ' [já registrada]' : ''}`)
@@ -227,12 +260,40 @@ try {
   console.log(`  → ${cauda.length} migrations`)
 
   if (cabecaSuja.length) {
-    console.log('\n⚠ DIVERGÊNCIA: migration não refletida ANTES do corte:')
-    for (const l of cabecaSuja) console.log(`   ${l.nome}`)
+    console.log('\n⚠ LACUNA ESTRUTURAL do prefixo (objetos que o baseline dá como aplicados,')
+    console.log('  mas que NÃO existem no schema de homologação — em geral CHECK/EXCLUDE que o')
+    console.log('  Prisma não modela, ou objetos criados e depois removidos por migration posterior):')
+    for (const l of cabecaSuja) {
+      console.log(`   ${l.nome} (${l.ok}/${l.total})`)
+      for (const f of l.falhas) console.log(`      · ${f}`)
+    }
   }
   if (caudaLimpa.length) {
     console.log('\n⚠ ATENÇÃO: migration JÁ refletida DEPOIS do corte (migrate deploy pode falhar):')
     for (const l of caudaLimpa) console.log(`   ${l.nome}`)
+  }
+
+  // ---- PRÉ-VOO: as pendentes só aplicam se os objetos que elas REFERENCIAM existem
+  console.log('\nPRÉ-VOO das pendentes — dependências referenciadas:')
+  const faltando = new Set()
+  for (const l of cauda) {
+    const sql = sqlDe(l.nome)
+    const alvos = new Set()
+    let a
+    const rRef = re('REFERENCES\\s+§', 'gi')
+    while ((a = rRef.exec(sql))) alvos.add(semAspas(a[1]))
+    const rTipo = /"([A-Z]\w+)"(?=\s|,|\)|$)/g
+    while ((a = rTipo.exec(sql))) if (tipos.has(a[1])) alvos.add(a[1])
+    const ausentes = [...alvos].filter((t) => !tabelas.has(t) && !tipos.has(t) && !cauda.some((c) => sqlDe(c.nome).includes(`CREATE TABLE IF NOT EXISTS "${t}"`) || sqlDe(c.nome).includes(`CREATE TABLE "${t}"`)))
+    if (ausentes.length) {
+      ausentes.forEach((t) => faltando.add(t))
+      console.log(`  ✗ ${l.nome} → falta ${ausentes.join(', ')}`)
+    } else {
+      console.log(`  ✓ ${l.nome} → ${[...alvos].join(', ') || '(sem dependência externa)'}`)
+    }
+  }
+  if (faltando.size) {
+    console.log(`  ⚠ objetos referenciados e inexistentes: ${[...faltando].join(', ')}`)
   }
 
   if (MODO === 'analisar') {
