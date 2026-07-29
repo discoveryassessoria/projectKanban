@@ -179,6 +179,7 @@ export async function GET(
 
         return {
           id: s.id,
+          necessidadeId: s.necessidadeId,
           titulo: titulosPorStepKey.get(s.stepKey) ?? humanizar(s.stepKey),
           documento: docLabel ?? necLabel,
           pessoa: pessoaNome,
