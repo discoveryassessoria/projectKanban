@@ -27,6 +27,7 @@ import { usePaises, useUsers, useActivities, invalidateActivities } from "@/src/
 import type { Atividade } from "@/src/hooks/useActivitiesData"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 // Interfaces
 interface UserData {
@@ -143,11 +144,7 @@ function ActivitiesPageInner() {
     }
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem("authToken")
-    localStorage.removeItem("user")
-    router.push("/login")
-  }
+  const handleLogout = () => { void encerrarSessao("manual") }
 
   // Handlers para os modais
   const handleFiltersChange = useCallback((newFilters: Filters) => {

@@ -35,6 +35,7 @@ import {
   Thead, Th, Tr, EmptyState, SearchInput, SecondaryButton, type Tone,
 } from "@/src/components/financeiroComponents/ui/kit"
 import { Search, ChevronDown } from "lucide-react"
+import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 interface Usuario {
   id: number
@@ -151,11 +152,7 @@ const [lembreteDias, setLembreteDias] = useState("")
     }
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem("authToken")
-    localStorage.removeItem("user")
-    router.push("/login")
-  }
+  const handleLogout = () => { void encerrarSessao("manual") }
 
   // Métricas
   const hoje = new Date()

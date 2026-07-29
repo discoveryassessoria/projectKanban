@@ -19,6 +19,7 @@ import { DashboardCorporativo, OURO, type DashboardData } from "@/src/components
 import { CentralFinanceira } from "@/src/components/financeiro/CentralFinanceira"
 import { PagamentosView } from "@/src/components/financeiro/PagamentosView"
 import { CreditosView } from "@/src/components/financeiro/CreditosView"
+import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 const TesourariaTab = dynamic(() => import("@/src/components/financeiroComponents/TesourariaTab"), {
   ssr: false,
@@ -120,7 +121,7 @@ export default function FinanceiroPage() {
     finally { setLoading(false) }
   }
 
-  const handleLogout = () => { localStorage.removeItem("authToken"); localStorage.removeItem("user"); router.push("/login") }
+  const handleLogout = () => { void encerrarSessao("manual") }
 
   useEffect(() => {
     if (mounted && !carregando && !pode("financeiro.ver")) router.push("/")

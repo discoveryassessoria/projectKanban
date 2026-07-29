@@ -19,6 +19,7 @@ import { HomeContent } from "@/src/components/home/home-content"
 import { HomeShell } from "@/src/components/home/home-shell"
 import { HomeSkeleton } from "@/src/components/home/home-skeleton"
 import { BlocoCard, ErrorState } from "@/src/components/home/home-primitives"
+import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -39,10 +40,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const status = (error as (Error & { status?: number }) | undefined)?.status
     if (status === 401) {
-      localStorage.removeItem("authToken")
-      localStorage.removeItem("user")
-      document.cookie = "authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
-      router.replace("/login")
+      void encerrarSessao("token_invalido")
     }
   }, [error, router])
 

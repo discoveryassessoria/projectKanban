@@ -12,6 +12,7 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { HeaderBar } from "@/src/components/header-bar"
+import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 export function HomeShell({
   titulo = "Centro Operacional",
@@ -37,12 +38,7 @@ export function HomeShell({
     }
   }, [])
 
-  function sair() {
-    localStorage.removeItem("authToken")
-    localStorage.removeItem("user")
-    document.cookie = "authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
-    router.replace("/login")
-  }
+  function sair() { void encerrarSessao("manual") }
 
   return (
     <div className="relative min-h-screen overflow-x-hidden text-white">

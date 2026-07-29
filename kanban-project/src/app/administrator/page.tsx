@@ -56,6 +56,7 @@ import { HealthTab } from "@/src/components/gerenciamentoComponents/Gerenciament
 
 // Lote 4 — Diagnóstico do Sistema
 import { DiagnosticsTab } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds4"
+import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 // Lote 5 — Biblioteca de Modelos: REMOVIDA (legado eliminado).
 
@@ -455,9 +456,7 @@ export default function GerenciamentoPage() {
     setExpandedModule((prev) => toggleAccordion(prev, gkey))
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem("authToken"); localStorage.removeItem("user"); router.push("/login")
-  }
+  const handleLogout = () => { void encerrarSessao("manual") }
 
   const fetchHeaderData = useCallback(async () => {
     try {

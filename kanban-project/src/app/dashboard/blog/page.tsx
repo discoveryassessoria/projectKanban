@@ -1,4 +1,5 @@
 "use client"
+import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -115,11 +116,7 @@ export default function BlogAdminPage() {
     }
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem("authToken")
-    localStorage.removeItem("user")
-    router.push("/login")
-  }
+  const handleLogout = () => { void encerrarSessao("manual") }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

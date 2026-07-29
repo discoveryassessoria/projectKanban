@@ -12,6 +12,7 @@
 // idealmente 64+ caracteres).
 
 import { SignJWT, jwtVerify } from 'jose'
+import { expiracaoDoToken } from './sessao/politica'
 
 // Cache do TextEncoder.encode(secret) pra não recodificar a cada chamada
 let _secretKey: Uint8Array | null = null
@@ -37,6 +38,13 @@ export interface AuthTokenPayload {
   userId: number
   email: string
   tipo: string
+  /**
+   * Início ABSOLUTO da sessão (ms epoch). Congelado no login e copiado em toda
+   * renovação — é ele que faz o teto de 8 h não escorregar junto com o uso.
+   * Ausente em tokens emitidos antes desta arquitetura: nesses, `iat` faz as
+   * vezes de início (ver verifyAuthToken), para nenhuma sessão viva quebrar.
+   */
+  sessaoInicio?: number
 }
 
 export interface VerifiedAuthToken extends AuthTokenPayload {
@@ -44,17 +52,29 @@ export interface VerifiedAuthToken extends AuthTokenPayload {
   exp: number
   /** Issued at em **milissegundos** */
   iat: number
+  /** Início da sessão em ms — sempre preenchido (cai em `iat` no legado). */
+  sessaoInicio: number
 }
 
 /**
- * Assina um token JWT (HS256). Expira em 7 dias.
- * Retorna a string compacta JWT (header.payload.signature).
+ * Assina um token JWT (HS256).
+ *
+ * A validade NÃO é mais fixa em 7 dias: é a janela de inatividade (15 min),
+ * limitada pelo teto absoluto da sessão (8 h contadas de `sessaoInicio`). É
+ * assim que a inatividade passa a ser enforced no SERVIDOR — o token
+ * simplesmente deixa de valer — em vez de depender de um timer de tela.
+ *
+ * Sem `sessaoInicio`, a sessão começa AGORA (caso do login).
  */
 export async function signAuthToken(payload: AuthTokenPayload): Promise<string> {
-  return await new SignJWT({ ...payload })
+  const agora = Date.now()
+  const sessaoInicio = payload.sessaoInicio ?? agora
+  const expMs = expiracaoDoToken(agora, sessaoInicio)
+  return await new SignJWT({ ...payload, sessaoInicio })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('7d')
+    // jose aceita epoch em SEGUNDOS aqui (RFC 7519).
+    .setExpirationTime(Math.floor(expMs / 1000))
     .sign(getSecretKey())
 }
 
@@ -84,15 +104,22 @@ export async function verifyAuthToken(
       return null
     }
 
+    const iatMs = (payload.iat ?? 0) * 1000
+    // Token emitido antes desta arquitetura não traz `sessaoInicio`: o início
+    // vira o `iat`. A sessão legada segue válida e, na primeira renovação,
+    // entra no regime novo sem o usuário perceber.
+    const sessaoInicio = typeof payload.sessaoInicio === 'number' ? payload.sessaoInicio : iatMs
+
     return {
       userId: payload.userId,
       email: payload.email,
       tipo: payload.tipo,
+      sessaoInicio,
       // jose retorna `exp` e `iat` em SEGUNDOS (padrão JWT, RFC 7519).
       // Convertemos pra ms pra manter compat com código antigo que comparava
       // com Date.now() (sempre em ms).
       exp: (payload.exp ?? 0) * 1000,
-      iat: (payload.iat ?? 0) * 1000,
+      iat: iatMs,
     }
   } catch {
     // Qualquer erro (assinatura errada, expirado, malformado) → null

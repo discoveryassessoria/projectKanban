@@ -28,6 +28,7 @@ import {
 } from "@/src/types/kanban"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { Shield } from "lucide-react"
+import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 interface User {
   id: number
@@ -151,11 +152,7 @@ export function KanbanContent() {
     focarPais(paisSelecionado)
   }, [paisSelecionado, focarPais])
 
-  const handleLogout = () => {
-    localStorage.removeItem("authToken")
-    localStorage.removeItem("user")
-    router.push("/login")
-  }
+  const handleLogout = () => { void encerrarSessao("manual") }
 
   // Callback para limpar URL params depois que o modal abriu
   const handleModalOpened = useCallback(() => {

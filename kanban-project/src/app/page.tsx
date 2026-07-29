@@ -1,4 +1,5 @@
 "use client"
+import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -27,15 +28,12 @@ export default function HomePage() {
     // Se faltar um, limpa o lixo e manda pra /login.
     if (tokenLS && tokenCookie) {
       router.replace("/dashboard")
+    } else if (tokenLS || tokenCookie) {
+      // Estado inconsistente (só metade da credencial): isso É um fim de sessão
+      // — passa pelo ponto único, que limpa tudo, AUDITA o motivo, avisa as
+      // outras abas e navega. Não duplicamos a limpeza aqui.
+      void encerrarSessao("token_invalido")
     } else {
-      if (tokenLS || tokenCookie) {
-        // Estado inconsistente: limpa antes de redirecionar pra /login
-        // pra que /login não tente redirecionar de volta com o lixo.
-        localStorage.removeItem("authToken")
-        localStorage.removeItem("user")
-        document.cookie =
-          "authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
-      }
       router.replace("/login")
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

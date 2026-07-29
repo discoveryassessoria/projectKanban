@@ -18,6 +18,7 @@ import {
   ChevronUp
 } from "lucide-react"
 import { HeaderBar } from "@/src/components/header-bar"
+import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 interface Usuario {
   id: number
@@ -156,11 +157,7 @@ export default function GenealogyPage() {
     }
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem("authToken")
-    localStorage.removeItem("user")
-    router.push("/login")
-  }
+  const handleLogout = () => { void encerrarSessao("manual") }
   
   const savePesquisaRecente = (termo: string) => {
     if (!termo.trim()) return

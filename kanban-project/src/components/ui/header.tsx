@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Search, Bell, LogOut } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 interface SearchResult {
   id: number | string
@@ -56,9 +57,7 @@ export function Header({
     if (onLogout) {
       onLogout()
     } else {
-      localStorage.removeItem("authToken")
-      localStorage.removeItem("user")
-      router.push("/login")
+      void encerrarSessao("manual")
     }
   }
 

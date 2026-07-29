@@ -7,6 +7,7 @@ import { getStoredUser, isAuthenticated } from "@/lib/auth"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { HeaderBar } from "@/src/components/header-bar"
 import { Send, MessageCircle, ArrowLeft, Pencil, Trash2, X, Check } from "lucide-react"
+import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 interface User {
   id: number
@@ -346,11 +347,7 @@ export default function MensagensPage() {
         projetos={[]}
         processos={[]}
         arvores={[]}
-        onLogout={() => {
-          localStorage.removeItem("authToken")
-          localStorage.removeItem("user")
-          router.push("/login")
-        }}
+        onLogout={() => { void encerrarSessao("manual") }}
       />
 
       <div className="flex-1 relative overflow-hidden">

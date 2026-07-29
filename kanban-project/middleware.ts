@@ -20,6 +20,7 @@ import { verifyAuthToken } from "@/lib/auth-jwt"
 /**
  * Rotas /api PÚBLICAS (não exigem token interno). Cada entrada é justificada:
  *  - /api/auth/login  → autenticação interna (não pode exigir estar logado).
+ *  - /api/auth/logout → encerra sessão; aceita token expirado só para auditar.
  *  - /api/app/        → portal do cliente; usa token próprio (app-auth) e
  *                       cada rota se auto-verifica. `gerar-acesso` recebe gate
  *                       de staff no próprio handler.
@@ -35,6 +36,10 @@ import { verifyAuthToken } from "@/lib/auth-jwt"
  */
 const API_PUBLICA: string[] = [
   "/api/auth/login",
+  // Logout precisa aceitar token EXPIRADO: é exatamente quando a sessão morre
+  // por inatividade que queremos registrar quem expirou. O handler só audita e
+  // apaga o cookie — não concede nada.
+  "/api/auth/logout",
   "/api/app/",
   "/api/blog/",
   "/api/blog",
