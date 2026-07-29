@@ -214,7 +214,7 @@ secao('Cenário 9 — múltiplas moedas')
 // ── CENÁRIO 10 — criação manual é disciplinada pelo Catálogo Mestre ────────
 // SUPERSEDIDO: a arquitetura V1 proibia QUALQUER criação manual (o botão
 // "Nova Receita" era só informativo). A arquitetura V3 introduziu um
-// lançamento manual DELIBERADO (LancamentoManualModal → POST
+// lançamento manual DELIBERADO (LancamentoFinanceiroModal → POST
 // /api/financeiro/v3/receitas), mas disciplinado: exige item do Catálogo
 // Mestre (nunca valor livre) e override de preço exige permissão dedicada.
 // O invariante que sobrevive é "nada bypassa o motor/catálogo", não "nada é

@@ -119,10 +119,14 @@ async function main() {
   const rota = readFileSync(join(RAIZ, 'src/app/api/financeiro/v3/custos/analise/route.ts'), 'utf8')
   chk(/verificarPermissao\(req, 'financeiro\.ver'\)/.test(rota), 'rota de análise é gated (financeiro.ver)')
   chk(!/prisma\.[a-zA-Z]+\.(create|update|delete)/.test(rota), 'rota de análise não escreve no banco')
-  const modal = readFileSync(join(RAIZ, 'src/components/financeiro/v3/LancamentoManualModal.tsx'), 'utf8')
+  // O formulário legado (LancamentoManualModal) foi substituído pelo lançamento
+  // definitivo; a inteligência migrou junto e continua sendo conselho, nunca
+  // preenchimento automático.
+  const modal = readFileSync(join(RAIZ, 'src/components/financeiro/v3/lancamento/LancamentoFinanceiroModal.tsx'), 'utf8')
   chk(modal.includes('/api/financeiro/v3/custos/analise'), 'modal de lançamento consome a análise')
-  chk(modal.includes('if (receita) return'), 'a inteligência roda só para CUSTO')
-  chk(modal.includes('setFornecedorId(String(sug.fornecedor!.id))'), 'sugestão é APLICADA por ação do operador (nunca automática)')
+  chk(/if \(!custo \|\| !item\) return/.test(modal), 'a inteligência roda só para CUSTO')
+  chk(/onClick=\{\(\) => alterar\(setFornecedorId\)/.test(modal), 'sugestão é APLICADA por ação do operador (nunca automática)')
+  chk(!/setFornecedorId\(String\(analise\.sugestoes/.test(modal.replace(/onClick=\{\(\) => alterar\(setFornecedorId\)\(String\(analise\.sugestoes\.fornecedor!\.id\)\)/g, '')), 'nenhuma aplicação silenciosa da sugestão')
 
   console.log(`\n${ok} passaram, ${fail} falharam`)
   await prisma.$disconnect()
