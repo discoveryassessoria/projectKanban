@@ -43,6 +43,33 @@ async function main() {
   console.log('SMOKE DE PRODUÇÃO — Receitas e Custos')
   console.log(`segregação estrita: ${segregacaoEstrita() ? 'LIGADA' : 'desligada (retrocompat)'}`)
 
+  // ── 0) histórico de migrations: repositório × banco ─────────────────────────
+  // INFORMATIVO. Produção acumula migrations de várias branches; o repositório
+  // desta branch não é necessariamente um superconjunto do histórico do banco.
+  // Saber disso é o que separa "está tudo aplicado" de "está tudo conhecido".
+  secao('0) histórico de migrations (informativo)')
+  try {
+    const path = await import('node:path')
+    const { listarMigrations } = await import('@/lib/db/leitura-migrations.mjs')
+    const noRepo: string[] = listarMigrations(path.join(process.cwd(), 'prisma', 'migrations'))
+    const registradas = (await prisma.$queryRawUnsafe<{ migration_name: string }[]>(
+      'SELECT migration_name FROM _prisma_migrations ORDER BY migration_name',
+    )).map((r) => r.migration_name)
+    const conjuntoRepo = new Set(noRepo)
+    const foraDoRepo = registradas.filter((m) => !conjuntoRepo.has(m))
+    const naoAplicadas = noRepo.filter((m) => !registradas.includes(m))
+    console.log(`     ${noRepo.length} no repositório · ${registradas.length} registradas no banco`)
+    chk(naoAplicadas.length === 0, `nenhuma migration do repositório pendente${naoAplicadas.length ? `: ${naoAplicadas.join(', ')}` : ''}`)
+    if (foraDoRepo.length) {
+      console.log(`     ⚠ ${foraDoRepo.length} registrada(s) no banco e AUSENTE(s) neste repositório (de outras branches):`)
+      for (const m of foraDoRepo) console.log(`        · ${m}`)
+    } else {
+      console.log('     · o repositório cobre todo o histórico do banco')
+    }
+  } catch (e) {
+    console.log(`     ·  não foi possível comparar o histórico (${String((e as Error)?.message ?? e).slice(0, 140)})`)
+  }
+
   // ── 1) schema × Prisma Client ───────────────────────────────────────────────
   secao('1) schema × Prisma Client')
   await ler('obrigacaoEconomica com os campos novos de Custo', () => prisma.obrigacaoEconomica.findMany({
