@@ -13,7 +13,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from "react-dom"
 import { useRevalidacaoFinanceira, emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
 import { useRouter } from "next/navigation"
-import { LancamentoManualModal } from "./LancamentoManualModal"
+import { LancamentoFinanceiroModal } from "./lancamento/LancamentoFinanceiroModal"
 import EditarReceitaView from "./EditarReceitaView"
 import EditarDistribuicaoView from "./EditarDistribuicaoView"
 import RegistrarPagamentoModal from "./RegistrarPagamentoModal"
@@ -283,7 +283,7 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
         )}
       </div>
 
-      {novo && processoId != null && <LancamentoManualModal natureza="RECEITA" processoId={processoId} onClose={() => setNovo(false)} onCriado={(r) => { setNovo(false); carregar(); if (r?.obrigacaoRef) abrir(r.obrigacaoRef) }} />}
+      {novo && processoId != null && <LancamentoFinanceiroModal natureza="RECEITA" processoId={processoId} onClose={() => setNovo(false)} onCriado={(r) => { setNovo(false); carregar(); if (r?.obrigacaoRef) abrir(r.obrigacaoRef) }} />}
 
       {/* ── ações rápidas de estado (reuso de fluxos já prontos; cada onDone recarrega a lista) ── */}
       {acao?.tipo === "editar" && (

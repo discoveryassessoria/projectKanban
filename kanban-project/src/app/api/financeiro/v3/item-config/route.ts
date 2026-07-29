@@ -24,7 +24,10 @@ export async function GET(req: NextRequest) {
 
   const cfg = await prisma.produtoFinanceiro.findUnique({
     where: { itemCatalogoId },
-    include: { categoria: true, fornecedorPadrao: true, condicaoPagamento: true },
+    include: {
+      categoria: true, fornecedorPadrao: true, condicaoPagamento: true,
+      planoContaReceita: true, planoContaCusto: true, planoConta: true,
+    },
   }).catch(() => null)
 
   // Valor unitário padrão: via Tabela de Preços por Configuração Financeira.
@@ -46,19 +49,45 @@ export async function GET(req: NextRequest) {
     else if (cfg.valorPadrao && Number(cfg.valorPadrao) > 0) { valorUnitario = Number(cfg.valorPadrao); precoRazao = 'valor padrão da configuração' }
   }
 
+  // CONTA CONTÁBIL POR NATUREZA — Receita ao gerar RECEITA, Custo ao gerar CUSTO.
+  // `planoConta` (conta única) é o fallback histórico, preservado sem DROP.
+  const contaDaNatureza = natureza === 'CUSTO' ? cfg?.planoContaCusto : cfg?.planoContaReceita
+  const conta = contaDaNatureza ?? cfg?.planoConta ?? null
+
+  // O QUE FALTA para o item operar nesta natureza — é isto que o seletor e o
+  // formulário mostram ao operador, em vez de um silêncio que vira erro no salvar.
+  const pendencias: string[] = []
+  if (!cfg) pendencias.push('Item sem Configuração Financeira')
+  else {
+    if (valorUnitario == null || valorUnitario <= 0) pendencias.push('Sem valor na Tabela de Valores')
+    if (!conta) pendencias.push(`Sem conta contábil de ${natureza === 'CUSTO' ? 'custo' : 'receita'}`)
+    if (!cfg.categoriaId) pendencias.push('Sem classificação financeira')
+    if (natureza === 'CUSTO' && cfg.naturezaFin === 'SOMENTE_RECEITA') pendencias.push('Configuração não admite custo')
+    if (natureza === 'RECEITA' && cfg.naturezaFin === 'SOMENTE_CUSTO') pendencias.push('Configuração não admite receita')
+  }
+
   return NextResponse.json({
     item: { id: item.id, name: item.name, unidade: item.unidade, natureza: item.natureza, categoria: item.categoria },
     temConfig: !!cfg,
+    pendencias,
     defaults: {
       descricao: item.name,
       valorUnitario,
       moeda,
+      unidade: item.unidade,
       categoriaId: cfg?.categoriaId ?? null,
       categoriaNome: cfg?.categoria?.nome ?? item.categoria ?? null,
       fornecedorPadraoId: cfg?.fornecedorPadraoId ?? null,
       fornecedorPadraoNome: cfg?.fornecedorPadrao?.nome ?? null,
       condicaoPagamentoId: cfg?.condicaoPagamentoId ?? null,
       formaCobranca: cfg?.condicaoPagamento?.name ?? null,
+      // Comportamentos financeiros oficiais da configuração — só leitura na UI.
+      naturezaFin: cfg?.naturezaFin ?? null,
+      contaContabilId: conta?.id ?? null,
+      contaContabilLabel: conta ? `${conta.codigo} — ${conta.nome}` : null,
+      repasse: cfg?.repasse ?? false,
+      reembolsavel: cfg?.reembolsavel ?? false,
+      cobravelDoCliente: cfg?.cobravelDoCliente ?? false,
       precoRazao,
     },
   })

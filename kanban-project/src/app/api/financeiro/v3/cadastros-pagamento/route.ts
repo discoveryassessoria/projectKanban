@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   if (erro) return erro
   if (!flagAtiva('posicaoRead', await usuarioFlag(request))) return NextResponse.json({ disponivel: false, fallbackLegado: true }, { status: 409 })
   try {
-    const [formasPagamento, carteiras, contas, adquirentes, bandeiras, taxasRaw] = await Promise.all([
+    const [formasPagamento, carteiras, contas, adquirentes, bandeiras, taxasRaw, condicoes] = await Promise.all([
       prisma.formaPagamentoCadastro.findMany({
         where: { ativo: true },
         orderBy: [{ ordem: 'asc' }, { name: 'asc' }],
@@ -24,6 +24,10 @@ export async function GET(request: NextRequest) {
       prisma.adquirente.findMany({ where: { ativo: true }, orderBy: { nome: 'asc' }, select: { id: true, nome: true, slug: true, formasSuportadas: true } }).catch(() => [] as any[]),
       prisma.bandeira.findMany({ where: { ativo: true }, orderBy: { nome: 'asc' }, select: { id: true, nome: true, slug: true, adquirentesCompativeis: true } }).catch(() => [] as any[]),
       prisma.taxaPagamento.findMany({ where: { ativo: true }, select: { id: true, name: true, formaPagamentoId: true, feeType: true, feePercent: true, fixedFee: true, baseIncidencia: true, quemAbsorve: true, adquirenteId: true, bandeiraId: true, installmentsFrom: true, installmentsTo: true, vigenciaInicio: true, vigenciaFim: true, ativo: true } }).catch(() => [] as any[]),
+      // CONDIÇÕES DE PAGAMENTO — leitura para o lançamento de custo/receita. O cadastro
+      // completo segue em Gerenciamento (usuarios.gerenciar); aqui é só o que o operador
+      // financeiro precisa para escolher a regra de parcelamento, sob 'financeiro.ver'.
+      prisma.condicaoPagamento.findMany({ where: { ativo: true }, orderBy: [{ name: 'asc' }], select: { id: true, name: true, parcelas: true } }).catch(() => [] as any[]),
     ])
     // Mapeia TaxaPagamento → TaxaView (motor lib/financeiro/taxas-pagamento.ts) p/ o cálculo no cliente.
     const taxas = taxasRaw.map((t) => ({
@@ -35,7 +39,7 @@ export async function GET(request: NextRequest) {
     }))
     // formas úteis ao RECEBIMENTO primeiro (usoRecebimento != false)
     const formas = formasPagamento.filter((f) => f.usoRecebimento !== false)
-    return NextResponse.json({ formasPagamento: formas.length ? formas : formasPagamento, carteiras, contas, adquirentes, bandeiras, taxas })
+    return NextResponse.json({ formasPagamento: formas.length ? formas : formasPagamento, carteiras, contas, adquirentes, bandeiras, taxas, condicoes })
   } catch (e) {
     console.error('v3/cadastros-pagamento GET', e)
     return NextResponse.json({ formasPagamento: [], carteiras: [], contas: [], adquirentes: [], bandeiras: [], taxas: [] })

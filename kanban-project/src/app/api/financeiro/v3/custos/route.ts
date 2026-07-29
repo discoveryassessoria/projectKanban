@@ -1,7 +1,12 @@
 // /api/financeiro/v3/custos — lançamento MANUAL de Custo (Motor Financeiro V3).
 //   POST { processoId, itemCatalogoId, descricao?, quantidade?, valorUnitario,
 //          moeda?, desconto?, acrescimo?, vencimento?, formaCobranca?,
-//          fornecedorId?, faseLabel?, rateio?, registrarPagamento? }
+//          fornecedorId?, faseLabel?, rateio?, registrarPagamento?, parcelas? }
+// `parcelas` (aditivo): cronograma de pagáveis definido no MESMO request da
+// criação — o parcelamento faz parte do ato de lançar o custo, não de um segundo
+// passo que o operador pode esquecer. Reusa definirCronogramaPagavel (idempotente,
+// valida soma = valor da obrigação). Falha no cronograma NÃO desfaz a obrigação:
+// ela é o fato econômico; o cronograma é plano e volta como `cronogramaErro`.
 // Cria uma ObrigacaoEconomica de natureza CUSTO (A_PAGAR) a partir de um item já
 // cadastrado no Catálogo Mestre (Gerenciamento). Reusa o motor V3
 // (criarLancamentoManual → criarLancamentoExtra). Gated pela mesma flag de
@@ -10,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { flagAtiva } from '@/lib/financeiro/flags'
 import { criarLancamentoManual } from '@/lib/financeiro/extras/lancamento-manual'
+import { definirCronogramaPagavel } from '@/lib/financeiro/pagavel/cronograma-pagavel'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { usuarioFlag } from '../_flags'
 import { verificarPermissaoCusto } from '@/lib/financeiro/permissoes-custo'
@@ -54,8 +60,22 @@ export async function POST(req: NextRequest) {
       pagamento: b?.registrarPagamento ? { observacao: 'Pagamento no lançamento manual de custo' } : null,
       criadoPorId: actor?.userId ?? null,
     })
+    // Cronograma de pagáveis, quando o lançamento nasce parcelado.
+    let cronograma: { criadas: number } | null = null
+    let cronogramaErro: string | null = null
+    const parcelas = Array.isArray(b?.parcelas)
+      ? b.parcelas.map((p: any, i: number) => ({ numero: p?.numero != null ? Number(p.numero) : i + 1, vencimento: String(p?.vencimento), valor: Number(p?.valor) }))
+      : []
+    if (parcelas.length > 1) {
+      try {
+        const c = await definirCronogramaPagavel(r.obrigacaoId, parcelas, { usuarioId: actor?.userId ?? null })
+        cronograma = { criadas: c.criadas }
+      } catch (e) {
+        cronogramaErro = e instanceof Error ? e.message : 'Falha ao definir o cronograma.'
+      }
+    }
     await registrarAuditoria(req, { acao: 'CRIAR', entidade: 'CustoManual', entidadeId: r.obrigacaoId, descricao: `Custo manual lançado (${r.moeda} ${r.total})`, detalhes: { processoId, itemCatalogoId, total: r.total, moeda: r.moeda } })
-    return NextResponse.json({ ok: true, ...r })
+    return NextResponse.json({ ok: true, ...r, cronograma, cronogramaErro })
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e instanceof Error ? e.message : 'Falha ao criar o custo.' }, { status: 422 })
   }

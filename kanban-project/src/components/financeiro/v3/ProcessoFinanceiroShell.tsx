@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ReceitasTab } from "./ReceitasTab"
 import { ReceitaDetalheView } from "./ReceitaDetalheView"
-import { LancamentoManualModal } from "./LancamentoManualModal"
+import { LancamentoFinanceiroModal } from "./lancamento/LancamentoFinanceiroModal"
 import RegistrarPagamentoModal from "./RegistrarPagamentoModal"
 import EditarReceitaView from "./EditarReceitaView"
 import CancelamentoAvancadoModal from "./CancelamentoAvancadoModal"
@@ -304,7 +304,7 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
       </div>
       </>)}
 
-      {novo && <LancamentoManualModal natureza="CUSTO" processoId={processoId} onClose={() => setNovo(false)} onCriado={() => { setNovo(false); carregar() }} />}
+      {novo && <LancamentoFinanceiroModal natureza="CUSTO" processoId={processoId} onClose={() => setNovo(false)} onCriado={() => { setNovo(false); carregar() }} />}
       {/* F7.5 — pagamento de custo RICO (multi-forma, ajustes, comprovantes, parcelas). */}
       {pagar && <PagarCustoView obrigacaoId={pagar.obrigacaoId} fornecedor={pagar.fornecedor} onClose={() => setPagar(null)} onDone={() => { setPagar(null); carregar(); emitirMutacaoFinanceira() }} />}
 
