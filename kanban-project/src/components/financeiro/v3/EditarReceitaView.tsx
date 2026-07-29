@@ -120,7 +120,7 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
       } catch { if (vivo) setErro("Falha ao carregar.") } finally { if (vivo) setLoading(false) }
     })()
     return () => { vivo = false; document.body.style.overflow = orig }
-  }, [receitaRef])
+  }, [receitaRef, ehCusto])
 
   // Usuários para o seletor de Responsável (degrade gracioso → input de id se indisponível).
   useEffect(() => {

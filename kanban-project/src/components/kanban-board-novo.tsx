@@ -150,7 +150,7 @@ export function KanbanBoard({
         onModalOpened?.()
       }
     }
-  }, [initialProcessoId, initialTab, initialPessoaId, initialSidebarTab, localProcessos, initialParamsProcessed, onModalOpened])
+  }, [initialProcessoId, initialTab, initialPessoaId, initialSidebarTab, initialTarefaPaiId, initialAtividadeId, localProcessos, initialParamsProcessed, onModalOpened])
 
   // Processos agrupados por fase (A-Z dentro da fase)
   const processosByFase = useMemo(() => {

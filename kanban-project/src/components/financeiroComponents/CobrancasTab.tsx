@@ -77,7 +77,7 @@ export default function CobrancasTab() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { carregar() /* eslint-disable-next-line */ }, [status, busca])
+  useEffect(() => { carregar() }, [status, busca])
 
   const kpis = useMemo(() => {
     if (!resumo) return null

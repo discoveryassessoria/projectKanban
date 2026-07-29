@@ -175,7 +175,6 @@ export function IdentidadeVisualTab() {
               style={{ backgroundColor: valores["identidade.corDestaque"] || "#38bdf8", color: valores["identidade.corTexto"] || "#0b1220" }}
             >
               {valores["identidade.logoUrl"] ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img src={valores["identidade.logoUrl"]} alt="" className="h-9 w-9 rounded object-contain" />
               ) : (
                 <div className="flex h-9 w-9 items-center justify-center rounded bg-black/15 text-sm font-bold">
