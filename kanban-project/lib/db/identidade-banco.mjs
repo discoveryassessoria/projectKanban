@@ -65,6 +65,12 @@ export function classificar(retrato) {
   if (sentinelasAusentes.length === TABELAS_SENTINELA.length) return CLASSE.DESCONHECIDO
   if (sentinelasAusentes.length > 0) return CLASSE.DANIFICADO
 
+  // INCOERÊNCIA: as tabelas sentinela responderam, mas a contagem de tabelas
+  // veio zero. Isso não descreve banco nenhum — é leitura falha. Classificar
+  // como DESENVOLVIMENTO seria ler um soluço de rede como "banco vazio"; o
+  // certo é assumir que não sabemos.
+  if (tabelas === 0) return CLASSE.DESCONHECIDO
+
   const a = ASSINATURA_PRODUCAO
   if (tabelas >= a.minTabelas && migrations >= a.minMigrations && requerentes >= a.minRequerentes) {
     return CLASSE.PRODUCAO
@@ -76,8 +82,15 @@ export function classificar(retrato) {
 /** Coleta o retrato do banco com SELECTs — nenhuma escrita. */
 export async function retratar(prisma) {
   const q = (s) => prisma.$queryRawUnsafe(s)
+  // UMA nova tentativa antes de desistir. Sem isso, uma falha transitória de
+  // consulta virava "0" e o banco de PRODUÇÃO era classificado como
+  // DESENVOLVIMENTO — foi o que derrubou um deploy com 153 tabelas lidas
+  // segundos antes, no mesmo build.
   const n = async (s) => {
-    try { return Number((await q(s))[0].n) } catch { return 0 }
+    for (let tentativa = 0; tentativa < 2; tentativa++) {
+      try { return Number((await q(s))[0].n) } catch { /* tenta de novo */ }
+    }
+    return 0
   }
   const tabelas = await n(
     `SELECT count(*)::int n FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'`,
