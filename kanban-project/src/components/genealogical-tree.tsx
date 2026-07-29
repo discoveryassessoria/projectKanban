@@ -606,7 +606,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
     } catch (error) {
       MySwal.fire({ title: "Erro", text: "Não foi possível salvar o comentário.", icon: "error", customClass: { popup: "font-sans" } })
     }
-  }, [arvore.id, onUpdate, MySwal])
+  }, [arvore.id, onUpdate])
 
   const generateTreeLayout = useCallback(
     (pessoas: Pessoa[]) => {
@@ -724,7 +724,6 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
       arvore.commentPosX,
       arvore.commentPosY,
       arvore.descricao,
-      arvore.id,
       handleAddChild,
       handleAddParent,
       handleAddSpouse,
@@ -798,7 +797,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
       },
     });
     setShowPersonDialog(true);
-  }, [arvore.id, onUpdate, MySwal]);
+  }, [arvore.id, onUpdate]);
 
   useImperativeHandle(ref, () => ({
     addUnlinkedPerson() {
@@ -903,7 +902,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
     } catch (error) {
       MySwal.fire({ title: "Erro Inesperado", text: "Ocorreu um erro: " + error, icon: "error", customClass: { popup: "font-sans" } })
     }
-  }, [currentPersonForSpouse, arvore.pessoas, onUpdate, MySwal])
+  }, [currentPersonForSpouse, arvore.pessoas, onUpdate])
 
   return (
     <div

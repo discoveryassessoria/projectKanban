@@ -140,8 +140,11 @@ export function MultiSelect({
   }, [opcoes, filtro, busca])
 
   const fechar = React.useCallback(() => { setAberto(false); setFiltro('') }, [])
+  // A ref é sincronizada em EFEITO, não durante o render: escrever em ref no
+  // corpo do render é efeito colateral e quebra sob render concorrente (o React
+  // pode descartar a passagem). `fechar` é estável, então isto roda uma vez.
   const fecharRef = React.useRef(fechar)
-  fecharRef.current = fechar
+  React.useEffect(() => { fecharRef.current = fechar }, [fechar])
 
   const abrir = React.useCallback(() => {
     fecharTodosMultiSelects() // só um seletor aberto por vez
@@ -243,7 +246,7 @@ export function MultiSelect({
           <button type="button" onClick={() => onChange([])} className="text-white/60 transition hover:text-white">Limpar seleção</button>
         </div>
       )}
-      <ul ref={listaRef} role="listbox" aria-multiselectable tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-1">
+      <ul id={`${id}-lista`} ref={listaRef} role="listbox" aria-multiselectable tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-1">
         {opcoes.length === 0 ? (
           <li className="px-2 py-2 text-[11px] text-white/35">{vazioMsg}</li>
         ) : visiveis.length === 0 ? (
@@ -271,7 +274,7 @@ export function MultiSelect({
   return (
     <div ref={raiz} className="relative">
       <button
-        type="button" id={id} role="combobox" aria-expanded={aberto} aria-haspopup="listbox"
+        type="button" id={id} role="combobox" aria-expanded={aberto} aria-haspopup="listbox" aria-controls={`${id}-lista`}
         onClick={() => (aberto ? fechar() : abrir())} onKeyDown={teclado}
         className={`${INPUT} flex items-center justify-between gap-2 text-left`}
       >

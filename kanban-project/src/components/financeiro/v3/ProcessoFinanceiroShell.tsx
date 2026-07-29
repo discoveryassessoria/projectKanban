@@ -430,7 +430,7 @@ function TimelineTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; f
       return [...arr, { ...mv, saldoAcum: prev + (mv.receita ? mv.valorBRL : -mv.valorBRL) }]
     }, [])
     return comSaldo.reverse()
-  }, [obrs, fx])
+  }, [obrs])
   const cats = useMemo(() => ["Todas", ...Array.from(new Set(movsAll.map((mv) => mv.categoria)))], [movsAll])
   const respOpts = useMemo(() => ["Todos", ...Array.from(new Set(movsAll.map((mv) => mv.responsavel).filter((v): v is string => !!v)))], [movsAll])
   const movs = useMemo(() => movsAll.filter((mv) => (fCat === "Todas" || mv.categoria === fCat) && (fResp === "Todos" || mv.responsavel === fResp) && (!soPend || !mv.quitado) && (!busca || `${mv.descricao} ${mv.codigo} ${mv.categoria} ${mv.responsavel ?? ""}`.toLowerCase().includes(busca.toLowerCase()))), [movsAll, fCat, fResp, soPend, busca])

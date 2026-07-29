@@ -7,7 +7,7 @@
 //   npm run lint:gerenciamento   → só o Gerenciamento (o que esta entrega tocou)
 import coreWebVitals from 'eslint-config-next/core-web-vitals'
 
-export default [
+const config = [
   {
     ignores: [
       '.next/**', 'node_modules/**', 'public/**',
@@ -30,3 +30,5 @@ export default [
     },
   },
 ]
+
+export default config

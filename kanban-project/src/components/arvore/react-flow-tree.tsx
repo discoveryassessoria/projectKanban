@@ -1385,7 +1385,7 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
 
     setNodes(layoutedNodes)
     setEdges(layoutedEdges)
-  }, [pessoas, unioes, pessoaPrincipal, mode])
+  }, [pessoas, unioes, pessoaPrincipal, mode, setNodes, setEdges])
 
   useEffect(() => {
     calculateLayout()
