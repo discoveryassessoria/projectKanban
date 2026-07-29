@@ -26,7 +26,7 @@ import { carregarVisaoGeralProcesso } from '@/lib/financeiro/leitura/visao-geral
 import { carregarReceitaDetalhe } from '@/lib/financeiro/leitura/receita-detalhe'
 import { CHAVE_CUSTO, OPERACOES_CUSTO, podeOperarCusto, segregacaoEstrita } from '@/lib/financeiro/permissoes-custo'
 import { MATRIZ_CUSTO } from '@/scripts/seed-permissoes-custo'
-import type { MapaPermissoes } from '@/src/lib/permissoes'
+import { calcularPermissoes, type MapaPermissoes } from '@/src/lib/permissoes'
 
 let ok = 0
 let fail = 0
@@ -148,6 +148,42 @@ async function main() {
     OPERACOES_CUSTO.every((op) => podeOperarCusto({ [CHAVE_CUSTO[op]]: true }, op, estrita)),
     'chave específica concede a própria operação nos dois modos',
   )
+
+  // ── 5) impacto de acesso por USUÁRIO ────────────────────────────────────────
+  // A matriz vive no Perfil, mas quem opera é o usuário — e `permissoesCustom`
+  // sobrepõe o perfil. Ligar a segregação estrita tira de quem dependia de
+  // `financeiro.ver` para operar custo. Aqui se vê exatamente quem.
+  secao('5) impacto de acesso por usuário')
+  const usuarios = await prisma.usuario.findMany({
+    select: { id: true, nome: true, email: true, tipo: true, permissoesCustom: true, perfil: { select: { nome: true, permissoes: true } } },
+    orderBy: { id: 'asc' },
+  })
+  const efetivas = (u: (typeof usuarios)[number]) =>
+    calcularPermissoes(u.tipo, (u.perfil?.permissoes ?? null) as MapaPermissoes | null, u.permissoesCustom as MapaPermissoes | null)
+
+  const perderam: string[] = []
+  const semNenhuma: string[] = []
+  for (const u of usuarios) {
+    const p = efetivas(u)
+    const antes = OPERACOES_CUSTO.filter((op) => podeOperarCusto(p, op, false))
+    const agora = OPERACOES_CUSTO.filter((op) => podeOperarCusto(p, op, true))
+    const perdidas = antes.filter((op) => !agora.includes(op))
+    const rotulo = `#${u.id} ${u.nome} <${u.email}> · ${u.tipo}${u.perfil ? ` · perfil ${u.perfil.nome}` : ' · SEM PERFIL'}${u.permissoesCustom ? ' · tem permissoesCustom' : ''}`
+    console.log(`     ${rotulo} → retrocompat ${antes.length}/10, estrito ${agora.length}/10${perdidas.length ? `  ⚠ perdeu: ${perdidas.join(', ')}` : ''}`)
+    if (perdidas.length) perderam.push(rotulo)
+    if (!agora.length) semNenhuma.push(rotulo)
+  }
+  console.log(`\n     ${usuarios.length} usuário(s) · ${perderam.length} perderam operação ao ligar a segregação estrita · ${semNenhuma.length} sem nenhuma operação de custo`)
+  if (perderam.length) {
+    console.log('     ⚠ REVISAR — estes usuários operavam custo por retrocompat e agora não operam:')
+    for (const r of perderam) console.log(`        · ${r}`)
+  }
+  // Estrutural (isto sim reprova): ninguém pode ter ganhado operação ao ficar ESTRITO.
+  const ganhou = usuarios.filter((u) => {
+    const p = efetivas(u)
+    return OPERACOES_CUSTO.some((op) => podeOperarCusto(p, op, true) && !podeOperarCusto(p, op, false))
+  })
+  chk(ganhou.length === 0, `segregação estrita nunca CONCEDE o que a retrocompat negava (${ganhou.length} violação(ões))`)
 
   console.log(`\n${ok} passaram, ${fail} falharam`)
   await prisma.$disconnect()
