@@ -5,6 +5,9 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Buscar união por ID
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const semPermissao = await verificarPermissao(request, "arvore.ver")
+  if (semPermissao) return semPermissao
+
   try {
     const { id: idParam } = await params
     const id = Number.parseInt(idParam)
